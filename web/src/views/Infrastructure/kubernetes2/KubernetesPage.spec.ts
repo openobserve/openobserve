@@ -119,6 +119,7 @@ const layoutStub = defineComponent({
     return () =>
       h("div", {}, [
         h("div", { "data-test": "layout-actions" }, slots.actions?.()),
+        h("div", { "data-test": "layout-banner" }, slots.banner?.()),
         h("div", { "data-test": "layout-sidebar" }, slots.sidebar?.()),
         slots.default?.(),
       ]);
@@ -129,7 +130,7 @@ const setRelativeDate = vi.fn();
 const DAY_US = 24 * 3_600_000_000;
 
 const dateTimeStub = defineComponent({
-  name: "DateTime",
+  name: "ODateTimeRange",
   emits: ["on:date-change"],
   setup(_p, { expose, emit }) {
     expose({
@@ -201,7 +202,7 @@ describe("KubernetesPage", () => {
         plugins: [store, router, i18n],
         stubs: {
           OPageLayout: layoutStub,
-          DateTime: dateTimeStub,
+          ODateTimeRange: dateTimeStub,
           DataSourceSetupCard: setupCardStub,
           K8sListView: ListStub,
           MapView: MapStub,
@@ -861,7 +862,7 @@ describe("KubernetesPage", () => {
     it("explains an empty last-known range instead of repeating the offline copy", async () => {
       fixture = { CL1N: [{ metric: { k8s_cluster: "alpha" }, value: 1 }] };
       await mountPage();
-      const description = () => wrapper.findComponent(OEmptyState).props("description");
+      const description = () => wrapper.findComponent(OEmptyState).props("text");
       expect(description()).toContain("No nodes or pods were reported");
       queryClient.clear();
       wrapper.findComponent(OEmptyState).vm.$emit("action");
@@ -923,7 +924,7 @@ describe("KubernetesPage", () => {
             }),
             i18n,
           ],
-          stubs: { OPageLayout: layoutStub, DateTime: dateTimeStub },
+          stubs: { OPageLayout: layoutStub, ODateTimeRange: dateTimeStub },
         },
       });
       await flushPromises();

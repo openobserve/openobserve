@@ -79,7 +79,7 @@ test.describe('Alerts Firing tab', { tag: ['@alerts', '@alerts-firing', '@P1'] }
   test('Firing is the first tab, shows live counts, and /alerts still opens All alerts', async ({ page }) => {
     await firing.open();
     expect((await firing.tabOrder())[0]).toBe('alertFiring');
-    const badge = Number(await page.locator('[data-test="alert-section-tab-alertFiring-badge"]').textContent());
+    const badge = await firing.tabCount('alertFiring');
     expect(badge).toBeGreaterThanOrEqual(Object.keys(fixtures.alerts).length);
     await expect(firing.chip('firing')).toContainText(String(badge));
     await expect(firing.chip('failed')).toContainText(/[1-9]/);

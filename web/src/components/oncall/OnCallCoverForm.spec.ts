@@ -83,16 +83,16 @@ const stubs = {
     // The REAL prop names. `primary-label` / `primary-disabled` are not props
     // of ODialog at all — passing those is what hid the footer entirely, so a
     // stub that accepted them would keep the bug invisible in tests.
-    props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel", "primaryButtonDisabled"],
+    props: ["open", "title", "primary", "secondary", "primary"],
     emits: ["click:primary", "click:secondary", "update:open"],
     template: `<div v-if="open">
       <slot />
       <slot name="footer-left" />
       <button
         data-test="dialog-primary"
-        :disabled="primaryButtonDisabled"
+        :disabled="primary?.disabled"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
     </div>`,
   },
   // **OForm is NOT stubbed.** Stubbing it is how "Save issues no request"
@@ -144,7 +144,7 @@ const stubs = {
     template: `<button @click="$emit('click')"><slot /></button>`,
   },
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OBanner: { name: "OBanner", template: "<div><slot /></div>" },
+  OInlineNotice: { name: "OInlineNotice", template: "<div><slot /></div>" },
   OToggleGroup: {
     name: "OToggleGroup",
     props: ["modelValue"],
@@ -512,7 +512,7 @@ describe("OnCallCoverForm — swapping", () => {
   });
 
   /// The dialog had NO footer at all: it passed `primary-label` and
-  /// `secondary-label`, which are not props of ODialog — `primaryButtonLabel`
+  /// `secondary-label`, which are not props of ODialog — `primary?.label`
   /// is — so `hasFooter` was false and Save and Cancel were never rendered.
   /// Unknown props fall through as attributes and warn about nothing, which is
   /// why a whole missing button survived a screen-by-screen audit.

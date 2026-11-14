@@ -20,14 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSearchInput
         v-model="searchQuery"
         :placeholder="t('ingestion.awsSetup.searchPlaceholder')"
-        clearable
         class="max-w-md"
         data-test="aws-integration-search"
       />
     </div>
 
     <div class="mb-6">
-      <OTabs v-model="activeCategory" dense data-test="aws-integration-category-tabs">
+      <OTabs v-model="activeCategory" size="compact" data-test="aws-integration-category-tabs">
         <OTab name="all" :label="t('ingestion.awsSetup.categoryAll')" />
         <OTab name="logs" :label="t('ingestion.awsSetup.categoryLogs')" />
         <OTab name="metrics" :label="t('ingestion.awsSetup.categoryMetrics')" />

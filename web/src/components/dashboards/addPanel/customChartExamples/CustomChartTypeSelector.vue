@@ -15,140 +15,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Height matches the host ODialog's own max-h-[90vh] cap (minus its body
-       padding + borders) so the dialog body never overflows. That keeps the
-       inner right-content area as the single scroller instead of stacking a
-       second scrollbar on the dialog body. -->
-  <OCard
-    class="flex h-[calc(90vh_-_2rem)] w-full flex-col overflow-hidden p-0"
-    data-test="custom-chart-type-selector-popup"
-  >
-    <!-- Header -->
-    <OCardSection role="header">
+  <!-- The full-screen dialog body hands its whole height over, so the right-hand list is the only scroller. -->
+  <OCard flush class="h-full w-full" data-test="custom-chart-type-selector-popup">
+    <template #header>
       <div class="flex w-full items-center gap-3">
         <OIcon name="bar-chart" size="sm" />
-        <span class="text-xl font-semibold whitespace-nowrap">{{
-          t("dashboard.customChartTypeSelector.exampleOfCustomCharts")
-        }}</span>
+        <h3 class="text-text-heading text-compact font-semibold whitespace-nowrap">
+          {{ t("dashboard.customChartTypeSelector.exampleOfCustomCharts") }}
+        </h3>
         <OSearchInput
+          width="list"
           v-model="searchQuery"
           :placeholder="t('dashboard.customChartTypeSelector.searchCharts')"
-          clearable
-          class="ms-4 w-70 flex-[0_0_17.5rem]"
+          class="ms-4 flex-[0_0_17.5rem]"
           @clear="searchQuery = ''"
         />
         <div class="flex-1" />
         <OButton
+          icon-only
           variant="ghost"
-          size="icon"
+          size="sm"
           :title="t('dashboard.cancel')"
           @click.stop="closeDialog"
           data-test="custom-chart-type-selector-close"
-          icon-left="close"
+          icon="close"
         />
       </div>
-    </OCardSection>
+    </template>
 
-    <OSeparator />
+    <div class="flex h-full w-full flex-nowrap">
+      <!-- Left Sidebar -->
+      <div class="border-border-subtle h-full w-40 shrink-0 overflow-y-auto border-e p-3">
+        <div class="mb-3 text-sm font-bold font-medium">
+          {{ t("dashboard.customChartTypeSelector.chartTypes") }}
+        </div>
+        <ul class="m-0 flex list-none flex-col p-0">
+          <li
+            v-for="(category, index) in chartCategories"
+            :key="index"
+            @click="scrollToCategory(category.chartLabelKey)"
+            class="rounded-default mb-1 flex cursor-pointer items-center px-3 py-2 transition-all duration-200"
+            :class="
+              selectedCategory === category.chartLabelKey
+                ? 'bg-theme-accent text-text-inverse font-semibold'
+                : 'hover:bg-button-ghost-hover-bg'
+            "
+            data-test="chart-category-item"
+          >
+            <span class="text-sm">{{ t(category.chartLabelKey) }}</span>
+          </li>
+        </ul>
+      </div>
 
-    <!-- Main Content -->
-    <OCardSection class="flex h-[calc(100%_-_3.75rem)] overflow-hidden p-0">
-      <div class="flex h-full w-full flex-nowrap">
-        <!-- Left Sidebar -->
-        <OCard class="h-full w-40 shrink-0 overflow-y-auto p-4">
-          <div class="mb-3 text-sm font-bold font-medium">
-            {{ t("dashboard.customChartTypeSelector.chartTypes") }}
+      <!-- Right Content Area -->
+      <div
+        ref="contentArea"
+        class="h-full flex-1 overflow-x-hidden overflow-y-auto p-3"
+        @scroll="handleScroll"
+      >
+        <!-- No Results Message -->
+        <div v-if="filteredCategories.length === 0" class="flex h-full items-center justify-center">
+          <div class="text-center">
+            <OIcon class="h-16 w-16" name="search-off" />
+            <div class="text-text-muted mt-3 text-xl font-semibold">
+              {{ t("dashboard.customChartTypeSelector.noResultsFound") }}
+            </div>
+            <div class="text-text-muted mt-2 text-sm">
+              {{ t("dashboard.customChartTypeSelector.trySearchingDifferentKeywords") }}
+            </div>
           </div>
-          <ul class="m-0 flex list-none flex-col p-0">
-            <li
-              v-for="(category, index) in chartCategories"
-              :key="index"
-              @click="scrollToCategory(category.chartLabelKey)"
-              class="rounded-default mb-1 flex cursor-pointer items-center px-3 py-2 transition-all duration-200"
-              :class="
-                selectedCategory === category.chartLabelKey
-                  ? 'bg-theme-accent text-text-inverse font-semibold'
-                  : 'hover:bg-button-ghost-hover-bg'
-              "
-              data-test="chart-category-item"
-            >
-              <span class="text-sm">{{ t(category.chartLabelKey) }}</span>
-            </li>
-          </ul>
-        </OCard>
+        </div>
 
-        <!-- Right Content Area -->
+        <!-- Chart Categories -->
         <div
-          ref="contentArea"
-          class="h-full flex-1 overflow-x-hidden overflow-y-auto p-3"
-          @scroll="handleScroll"
+          v-for="(category, categoryIndex) in filteredCategories"
+          :key="categoryIndex"
+          class="chart-category-section mb-6 scroll-mt-5"
+          :data-category="category.chartLabelKey"
+          data-test="chart-category-section"
         >
-          <!-- No Results Message -->
-          <div
-            v-if="filteredCategories.length === 0"
-            class="flex h-full items-center justify-center"
-          >
-            <div class="text-center">
-              <OIcon class="h-16 w-16" name="search-off" />
-              <div class="text-text-muted mt-3 text-xl font-semibold">
-                {{ t("dashboard.customChartTypeSelector.noResultsFound") }}
-              </div>
-              <div class="text-text-muted mt-2 text-sm">
-                {{ t("dashboard.customChartTypeSelector.trySearchingDifferentKeywords") }}
-              </div>
-            </div>
+          <div class="mb-3 text-xl font-medium font-semibold">
+            {{ t(category.chartLabelKey) }}
           </div>
-
-          <!-- Chart Categories -->
-          <div
-            v-for="(category, categoryIndex) in filteredCategories"
-            :key="categoryIndex"
-            class="chart-category-section mb-6 scroll-mt-5"
-            :data-category="category.chartLabelKey"
-            data-test="chart-category-section"
-          >
-            <div class="mb-3 text-xl font-medium font-semibold">
-              {{ t(category.chartLabelKey) }}
-            </div>
-            <div class="flex gap-3">
-              <div
-                v-for="(chart, chartIndex) in category.type"
-                :key="chartIndex"
-                class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
+          <div class="flex gap-3">
+            <div
+              v-for="(chart, chartIndex) in category.type"
+              :key="chartIndex"
+              class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
+            >
+              <OCard
+                class="h-full cursor-pointer transition-colors"
+                :class="
+                  selectedChart?.value === chart.value
+                    ? 'border-accent ring-accent ring-1 ring-inset'
+                    : 'hover:border-accent/50'
+                "
+                @click="selectChart(chart)"
+                data-test="chart-type-card"
               >
-                <OCard
-                  class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                  :class="{
-                    'border-theme-accent shadow-theme-accent/30 border-2 shadow-md':
-                      selectedChart?.value === chart.value,
-                  }"
-                  @click="selectChart(chart)"
-                  data-test="chart-type-card"
-                >
-                  <OCardSection class="p-2">
-                    <div
-                      class="bg-surface-subtle rounded-default flex h-37.5 w-full items-center justify-center overflow-hidden"
-                    >
-                      <img
-                        :src="chart.asset"
-                        :alt="t(chart.labelKey)"
-                        class="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                  </OCardSection>
-                  <OCardSection class="px-2 pt-0 pb-2">
-                    <div class="text-center text-xs font-medium">
-                      {{ t(chart.labelKey) }}
-                    </div>
-                  </OCardSection>
-                </OCard>
-              </div>
+                <div class="flex flex-col gap-2">
+                  <div
+                    class="bg-surface-subtle rounded-default flex h-37.5 w-full items-center justify-center overflow-hidden"
+                  >
+                    <img
+                      :src="chart.asset"
+                      :alt="t(chart.labelKey)"
+                      class="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div class="text-center text-xs font-medium">
+                    {{ t(chart.labelKey) }}
+                  </div>
+                </div>
+              </OCard>
             </div>
           </div>
         </div>
       </div>
-    </OCardSection>
+    </div>
 
     <!-- Confirm Chart Selection Dialog -->
     <CustomChartConfirmDialog
@@ -172,19 +157,15 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 export default defineComponent({
   name: "CustomChartTypeSelector",
   components: {
-    OSeparator,
     CustomChartConfirmDialog,
     OButton,
     OSearchInput,
     OCard,
-    OCardSection,
     OIcon,
   },
   emits: ["close", "select"],

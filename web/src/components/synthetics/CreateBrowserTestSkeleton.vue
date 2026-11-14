@@ -51,10 +51,10 @@ withDefaults(
       <!-- Step 1: Journey (active) -->
       <div class="flex shrink-0 items-center gap-2 px-2 py-1.5">
         <div style="width: 2rem; height: 2rem">
-          <OSkeleton type="circle" animation="wave" />
+          <OSkeleton shape="circle" />
         </div>
         <div style="width: 3rem; height: 0.75rem">
-          <OSkeleton type="text" animation="wave" />
+          <OSkeleton />
         </div>
       </div>
       <!-- Connector line (mt-5.5=1.375rem) -->
@@ -62,10 +62,10 @@ withDefaults(
       <!-- Step 2: Configure (inactive) -->
       <div class="flex shrink-0 items-center gap-2 px-2 py-1.5">
         <div style="width: 2rem; height: 2rem">
-          <OSkeleton type="circle" animation="wave" />
+          <OSkeleton shape="circle" />
         </div>
         <div style="width: 4.5rem; height: 0.75rem">
-          <OSkeleton type="text" animation="wave" />
+          <OSkeleton />
         </div>
       </div>
     </div>
@@ -80,31 +80,31 @@ withDefaults(
       <div class="flex items-center gap-4 px-3 py-0" style="margin: 0 0 0.75rem 1.375rem">
         <!-- Select-all checkbox -->
         <div class="shrink-0" style="width: 1rem; height: 1rem">
-          <OSkeleton type="rect" animation="wave" />
+          <OSkeleton shape="block" />
         </div>
         <!-- "Steps" h3 + OBadge -->
         <div class="flex shrink-0 items-center gap-1">
           <div style="width: 2.5rem; height: 1.25rem">
-            <OSkeleton type="text" animation="wave" />
+            <OSkeleton />
           </div>
           <div style="width: 1.5rem; height: 1.25rem; border-radius: 0.25rem">
-            <OSkeleton type="rect" animation="wave" />
+            <OSkeleton shape="block" />
           </div>
         </div>
         <!-- Filter OInput -->
         <div class="flex-1" style="height: 2rem; min-width: 8rem">
-          <OSkeleton type="rect" animation="wave" />
+          <OSkeleton shape="block" />
         </div>
         <!-- Button cluster: Add Step | Replay | Record (OButton size="sm") -->
         <div class="flex shrink-0 items-center gap-2">
           <div style="width: 5.5rem; height: 2rem">
-            <OSkeleton type="rect" animation="wave" />
+            <OSkeleton shape="block" />
           </div>
           <div style="width: 4.75rem; height: 2rem">
-            <OSkeleton type="rect" animation="wave" />
+            <OSkeleton shape="block" />
           </div>
           <div style="width: 5rem; height: 2rem">
-            <OSkeleton type="rect" animation="wave" />
+            <OSkeleton shape="block" />
           </div>
         </div>
       </div>
@@ -124,38 +124,38 @@ withDefaults(
         >
           <!-- OTable expand toggle (built-in) -->
           <div class="shrink-0" style="width: 1rem; height: 1rem">
-            <OSkeleton type="rect" animation="wave" />
+            <OSkeleton shape="block" />
           </div>
           <!-- Step number (w-6=1.5rem, text-sm) -->
           <div class="shrink-0" style="width: 1.5rem; height: 0.875rem">
-            <OSkeleton type="text" animation="wave" />
+            <OSkeleton />
           </div>
           <!-- Action icon chip: bg-icon-chip-primary-bg, rounded, p-1 -->
           <div class="shrink-0" style="width: 1.75rem; height: 1.75rem; border-radius: 0.25rem">
-            <OSkeleton type="rect" animation="wave" />
+            <OSkeleton shape="block" />
           </div>
           <!-- Action badge pill -->
           <div class="shrink-0" style="width: 3.5rem; height: 1.25rem; border-radius: 0.25rem">
-            <OSkeleton type="rect" animation="wave" />
+            <OSkeleton shape="block" />
           </div>
           <!-- Step name (flex-1, truncate, min-w-0) -->
           <div class="flex-1" style="height: 0.875rem; min-width: 5rem">
-            <OSkeleton type="text" animation="wave" />
+            <OSkeleton />
           </div>
           <!-- Selector/value (font-mono, text-xs, text-secondary, max-w-[25%]) -->
           <div class="shrink-0" style="width: 20%; height: 0.75rem; min-width: 4rem">
-            <OSkeleton type="text" animation="wave" />
+            <OSkeleton />
           </div>
           <!-- Action buttons: insert(+) | duplicate | delete (3 x OButton ghost xs) -->
           <div class="flex shrink-0 items-center gap-0.5">
             <div style="width: 1.25rem; height: 1.25rem">
-              <OSkeleton type="rect" animation="wave" />
+              <OSkeleton shape="block" />
             </div>
             <div style="width: 1.25rem; height: 1.25rem">
-              <OSkeleton type="rect" animation="wave" />
+              <OSkeleton shape="block" />
             </div>
             <div style="width: 1.25rem; height: 1.25rem">
-              <OSkeleton type="rect" animation="wave" />
+              <OSkeleton shape="block" />
             </div>
           </div>
         </div>
@@ -173,11 +173,11 @@ withDefaults(
       <div class="flex-1"></div>
       <!-- Cancel button (ghost, sm) -->
       <div style="width: 4rem; height: 2rem">
-        <OSkeleton type="rect" animation="wave" />
+        <OSkeleton shape="block" />
       </div>
       <!-- Continue button (primary, sm, with chevron-right suffix) -->
       <div style="width: 6rem; height: 2rem">
-        <OSkeleton type="rect" animation="wave" />
+        <OSkeleton shape="block" />
       </div>
     </div>
   </div>

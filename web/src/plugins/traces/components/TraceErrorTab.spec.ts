@@ -652,7 +652,7 @@ describe("TraceErrorTab", () => {
         );
       });
 
-      it("should show a success notification after copying", async () => {
+      it("confirms the copy in place with a check, not a toast", async () => {
         wrapper = mountTraceErrorTab();
 
         // Row is auto-expanded on mount — copy button is already visible
@@ -660,12 +660,10 @@ describe("TraceErrorTab", () => {
         await copyBtn.trigger("click");
         await flushPromises();
 
-        expect(mockToast).toHaveBeenCalledWith(
-          expect.objectContaining({
-            message: "Stacktrace copied to clipboard",
-            variant: "success",
-          }),
-        );
+        expect(
+          wrapper.find('[data-test="exception-copy-stacktrace-btn"]').attributes("data-copied"),
+        ).toBe("true");
+        expect(mockToast).not.toHaveBeenCalled();
       });
     });
   });

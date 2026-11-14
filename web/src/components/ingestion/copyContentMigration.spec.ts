@@ -229,7 +229,7 @@ describe("CredentialCodeBlock", () => {
     expect(maskSecret("")).toBe("");
   });
 
-  it("shows the masked snippet and copies the real one with the token name", async () => {
+  it("shows the masked snippet and copies the real one", async () => {
     const wrapper = await mountBlock();
     const pre = wrapper.find('[data-test="ingestion-curl-code-block-pre"]');
     expect(pre.text()).toContain(maskSecret(PASSCODE));
@@ -239,7 +239,6 @@ describe("CredentialCodeBlock", () => {
     expect(copyMock.mock.calls[0][0]).toBe(
       `curl -u ${EMAIL}:${PASSCODE} https://h/api/acme-prod/default/_json`,
     );
-    expect(copyMock.mock.calls[0][2].successMessage).toBe("Copied with org token default");
     expect(track).toHaveBeenCalledWith("snippet_copied", { route: "curl", partial: false });
     wrapper.unmount();
   });
@@ -247,7 +246,7 @@ describe("CredentialCodeBlock", () => {
   it("insets the code from the block border, as CopyContent did", async () => {
     const wrapper = await mountBlock();
     const pre = wrapper.find('[data-test="ingestion-curl-code-block-pre"]');
-    expect(pre.attributes("style")).toContain("padding: 0.75rem");
+    expect(pre.classes()).toContain("p-3");
     wrapper.unmount();
   });
 

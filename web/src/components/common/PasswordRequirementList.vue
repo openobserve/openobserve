@@ -19,9 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Progress over the policy's own requirements, not an entropy score. -->
     <OProgressBar
       v-if="showStrength"
-      :value="metCount / requirements.length"
-      size="xs"
-      :variant="metCount === requirements.length ? 'success' : 'default'"
+      :value="(metCount / requirements.length) * 100"
+      :tone="metCount === requirements.length ? 'ok' : 'accent'"
       data-test="password-requirements-strength"
     />
 

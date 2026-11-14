@@ -17,7 +17,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- eslint-disable-next-line local/no-hardcoded-px -- 1-device-pixel trim off a 100% width to dodge sub-pixel overflow; a rem inset would open a visible gap -->
   <div class="relative-position flex h-full w-[calc(100%-1px)] flex-col overflow-hidden">
-    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="mx-2! mt-2! px-2 py-1" />
+    <OTabs
+      v-model="activeTab"
+      size="compact"
+      bordered
+      class="shrink-0"
+      data-test="player-events-tabs"
+    >
+      <OTab
+        v-for="tab in tabs"
+        :key="tab.value"
+        :name="tab.value"
+        :label="tab.label"
+        :icon="tab.icon"
+        :data-test="`tab-${tab.value}`"
+      />
+    </OTabs>
     <template v-if="activeTab === 'tags'">
       <div data-test="event-metadata" class="sticky top-0 flex p-2 px-3">
         <div class="flex w-full flex-col">
@@ -28,6 +43,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTruncatedText as="div" class="mb-2 w-full pe-1 text-xs">
             <OIcon name="schedule" size="sm" class="pe-1" />
             {{ sessionDetails.date }}
+          </OTruncatedText>
+          <OTruncatedText
+            v-if="sessionDetails.duration"
+            as="div"
+            class="mb-2 w-full pe-1 text-xs"
+            data-test="session-viewer-duration"
+          >
+            <OIcon name="access-time" size="sm" class="pe-1" />
+            {{ sessionDetails.duration }}
           </OTruncatedText>
           <OTruncatedText as="div" class="mb-2 w-full pe-1 text-xs">
             <OIcon name="settings" size="sm" class="pe-1" />
@@ -115,8 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag
                 v-if="markedSet.has(filteredEvent.timestamp)"
                 :label="t('rum.analytics.viewer.stepMark')"
-                variant="primary-soft"
-                size="xs"
+                tone="accent"
+                size="sm"
                 class="ms-2 shrink-0"
                 data-test="session-viewer-funnel-step-mark"
               />
@@ -129,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           aria-busy="true"
           data-test="player-events-loading"
         >
-          <OSkeleton v-for="i in 6" :key="i" type="text" />
+          <OSkeleton v-for="i in 6" :key="i" />
         </div>
         <OEmptyState
           v-else-if="!filteredEvents.length"
@@ -147,7 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch, type PropType } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import AppTabs from "../common/AppTabs.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
@@ -206,34 +231,10 @@ const markedSet = computed(() => new Set(props.markedTimestamps));
 const activeTab = ref<string>("breadcrumbs");
 watch(activeTab, (tab) => analytics.track("rum_session_sidebar_tab_switched", { tab }));
 
-const tabs: Array<{
-  label: I18nText;
-  value: string;
-  icon: string;
-  style: Record<string, string>;
-}> = [
-  {
-    label: t("rum.breadcrumbs"),
-    value: "breadcrumbs",
-    icon: "send",
-    style: {
-      width: "fit-content",
-      padding: "0.5rem 0.625rem",
-      "margin-right": "0.25rem",
-    },
-  },
-  {
-    label: t("rum.tags"),
-    value: "tags",
-    icon: "tag",
-    style: { width: "fit-content", padding: "0.5rem 0.625rem" },
-  },
-  {
-    label: t("rum.traces"),
-    value: "traces",
-    icon: "timeline",
-    style: { width: "fit-content", padding: "0.5rem 0.625rem" },
-  },
+const tabs: Array<{ label: I18nText; value: string; icon: string }> = [
+  { label: t("rum.breadcrumbs"), value: "breadcrumbs", icon: "send" },
+  { label: t("rum.tags"), value: "tags", icon: "tag" },
+  { label: t("rum.traces"), value: "traces", icon: "timeline" },
 ];
 
 const emit = defineEmits(["event-emitted"]);

@@ -27,7 +27,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -248,23 +248,23 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
     </template>
 
     <div v-if="access.isPending.value" class="flex justify-center py-8">
-      <OSpinner size="md" />
+      <OSpinner size="lg" />
     </div>
     <OEmptyState
       v-else-if="access.isError.value || !view"
-      size="compact"
-      preset="load-error"
-      :backdrop="false"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="t('emptyState.loadError.description')"
       data-test="slack-org-access-load-error"
       @action="access.refetch()"
     />
     <div v-else class="flex flex-col gap-4">
-      <OBanner v-if="onlyMeta" variant="info" icon="info" data-test="slack-org-access-only-meta">
+      <OInlineNotice v-if="onlyMeta" tone="info" data-test="slack-org-access-only-meta">
         <span class="text-text-heading font-semibold">{{
           t("slackApp.orgAccess.onlyMetaTitle", { team })
         }}</span>
         {{ t("slackApp.orgAccess.onlyMetaAction") }}
-      </OBanner>
+      </OInlineNotice>
 
       <div class="flex flex-wrap items-center gap-3">
         <OToggleGroup
@@ -301,7 +301,7 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
           :options="options"
           :label="t('slackApp.orgAccess.picker')"
           :help-text="t('slackApp.orgAccess.metaAlways')"
-          :max-visible-chips="20"
+          :max-chips="20"
           multiple
           searchable
           data-test="slack-org-access-picker"
@@ -325,17 +325,10 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
             :columns="columns"
             row-key="org_id"
             pagination="none"
-            :show-global-filter="false"
-            dense
             data-test="slack-org-access-table"
           >
             <template #cell-added="{ row }">
-              <OTag
-                v-if="row.kind === 'unsaved'"
-                variant="default-soft"
-                size="sm"
-                :label="row.added"
-              />
+              <OTag v-if="row.kind === 'unsaved'" tone="neutral" size="sm" :label="row.added" />
               <span v-else-if="row.kind === 'joined'" class="text-text-secondary">{{
                 row.added
               }}</span>
@@ -355,11 +348,10 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
         </div>
       </div>
 
-      <OBanner
+      <OInlineNotice
         v-for="other in view.other_apps_in_team"
         :key="other.installation_id"
-        variant="warning"
-        icon="warning"
+        tone="warn"
         data-test="slack-org-access-other-app"
       >
         <span class="text-text-heading font-semibold">{{
@@ -367,29 +359,18 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
         }}</span>
         {{ raw("·") }}
         {{ t("slackApp.orgAccess.otherAppDetail", { orgs: otherAppOrgs(other.org_ids) }) }}
-      </OBanner>
+      </OInlineNotice>
 
-      <OBanner
-        v-if="saveError"
-        variant="error-soft"
-        dense
-        icon="error-outline"
-        data-test="slack-org-access-error"
-        >{{ raw(saveError) }}</OBanner
-      >
+      <OInlineNotice v-if="saveError" tone="err" data-test="slack-org-access-error">{{
+        raw(saveError)
+      }}</OInlineNotice>
 
       <div class="flex justify-end gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          data-test="slack-org-access-cancel"
-          @click="reset"
-        >
+        <OButton variant="secondary" data-test="slack-org-access-cancel" @click="reset">
           {{ t("common.cancel") }}
         </OButton>
         <OButton
           variant="primary"
-          size="sm-action"
           :loading="put.isPending.value || preview.isPending.value"
           data-test="slack-org-access-save"
           @click="save"
@@ -403,10 +384,8 @@ const otherAppOrgs = (orgIds: readonly string[]): string => orgIds.join(", ");
       v-model:open="confirmOpen"
       size="md"
       :title="confirmTitle"
-      :primary-button-label="t('slackApp.orgAccess.remove')"
-      primary-button-variant="destructive"
-      :secondary-button-label="t('common.cancel')"
-      initial-focus="secondary"
+      :primary="{ label: t('slackApp.orgAccess.remove'), variant: 'danger' }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="slack-org-access-confirm"
       @click:primary="confirmRemove"
       @click:secondary="confirmOpen = false"

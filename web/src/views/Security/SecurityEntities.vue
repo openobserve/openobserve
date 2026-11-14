@@ -24,14 +24,14 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import SecurityRecordDrawer, {
   type RecordFact,
@@ -449,7 +449,6 @@ const stats = computed<StatItem[]>(() => {
       label: t("siem.entities.signal.failures"),
       value: counts.value.failures,
       icon: "error-outline",
-      tone: "orange",
       max: allRows.value.length || undefined,
       dataTest: "security-entities-stat-failures",
     },
@@ -458,7 +457,7 @@ const stats = computed<StatItem[]>(() => {
       label: t(`siem.entities.signal.spread.${kind.value}`),
       value: counts.value.spread,
       icon: "hub",
-      tone: "warning",
+      tone: "warn",
       max: allRows.value.length || undefined,
       dataTest: "security-entities-stat-spread",
     },
@@ -469,7 +468,6 @@ const stats = computed<StatItem[]>(() => {
       label: t("siem.entities.signal.external"),
       value: counts.value.external,
       icon: "language",
-      tone: "blue",
       max: allRows.value.length || undefined,
       dataTest: "security-entities-stat-external",
     });
@@ -488,12 +486,12 @@ const stats = computed<StatItem[]>(() => {
 /** The server's failure-signal bar, for the chip's explanation. */
 const FAILURE_SIGNAL = { ratePct: 20, minFailures: 5 };
 
-const SIGNAL_TAG: Record<EntitySignal, BadgeVariant> = {
-  failures: "error-soft",
-  fail_then_success: "error-soft",
-  open_case: "orange-soft",
-  spread: "amber-soft",
-  external: "blue-soft",
+const SIGNAL_TAG: Record<EntitySignal, ChipTone> = {
+  failures: "err",
+  fail_then_success: "err",
+  open_case: "warn",
+  spread: "warn",
+  external: "neutral",
 };
 function signalHint(sig: EntitySignal): I18nText {
   if (sig === "failures")
@@ -751,27 +749,25 @@ function openCase(id: string) {
 }
 
 /** Case priority tone: P1 and P2 are urgent, P3 elevated, anything else quiet. */
-const CASE_TAG: Record<string, BadgeVariant> = {
-  P1: "error-soft",
-  P2: "error-soft",
-  P3: "orange-soft",
-  P4: "default-soft",
+const CASE_TAG: Record<string, ChipTone> = {
+  P1: "err",
+  P2: "err",
+  P3: "warn",
+  P4: "neutral",
 };
 
 /** Raw spellings that differ from the canonical value, so the stored value stays visible. */
 const otherAliases = (r: EntityRow) => r.aliases.filter((a) => a !== r.value);
 
-function onEmptyAction(id?: string) {
-  if (id === "clear-filters") {
-    search.value = "";
-    signalFilters.value = [];
-  }
+function onEmptyAction() {
+  search.value = "";
+  signalFilters.value = [];
 }
 
-const STATUS_TAG: Record<StreamStatus, { variant: BadgeVariant; icon: string }> = {
-  loading: { variant: "default-soft", icon: "hourglass-empty" },
-  done: { variant: "success-soft", icon: "check-circle" },
-  failed: { variant: "error-soft", icon: "error-outline" },
+const STATUS_TAG: Record<StreamStatus, { variant: ChipTone; icon: string }> = {
+  loading: { variant: "neutral", icon: "hourglass-empty" },
+  done: { variant: "ok", icon: "check-circle" },
+  failed: { variant: "err", icon: "error-outline" },
 };
 const statusOf = (stream: string): StreamStatus => streamStatus.value[stream] ?? "loading";
 const tableLoading = computed(() => loading.value && !lastRunAt.value && !answered.value);
@@ -784,8 +780,7 @@ const noSources = computed(
 <template>
   <OPageLayout
     :title="t('siem.entities.title')"
-    :subtitle="t('siem.entities.subtitle')"
-    icon="groups"
+    :about="t('siem.entities.subtitle')"
     bleed
     title-data-test="security-entities-title"
   >
@@ -796,7 +791,7 @@ const noSources = computed(
           data-test="security-entities-range"
           @update:model-value="onRange"
         >
-          <OToggleGroupItem v-for="r in RANGES" :key="r.value" :value="r.value" size="sm">
+          <OToggleGroupItem v-for="r in RANGES" :key="r.value" :value="r.value">
             {{ t(`siem.range.${r.value}`) }}
           </OToggleGroupItem>
         </OToggleGroup>
@@ -805,7 +800,7 @@ const noSources = computed(
           data-test="security-entities-view"
           @update:model-value="view = $event as 'table' | 'graph'"
         >
-          <OToggleGroupItem v-for="v in VIEWS" :key="v.value" :value="v.value" size="sm">
+          <OToggleGroupItem v-for="v in VIEWS" :key="v.value" :value="v.value">
             <OIcon :name="v.icon" size="sm" />
             {{ t(`siem.entities.view.${v.value}`) }}
           </OToggleGroupItem>
@@ -855,10 +850,10 @@ const noSources = computed(
         <OTag
           v-for="name in streamNames"
           :key="name"
-          :variant="STATUS_TAG[statusOf(name)].variant"
+          :tone="STATUS_TAG[statusOf(name)].variant"
+          mono
           :icon="STATUS_TAG[statusOf(name)].icon"
-          size="xs"
-          class="font-mono"
+          size="sm"
           :data-test="`security-entities-source-${name}`"
           >{{ name }}<OTooltip :content="t(`siem.entities.sourceStatus.${statusOf(name)}`)"
         /></OTag>
@@ -868,15 +863,13 @@ const noSources = computed(
         v-if="accessDenials.length"
         :denials="accessDenials"
         :reason="raw(forbiddenReason(refusal))"
-        size="hero"
         data-test="security-entities-access-lock"
       />
       <OEmptyState
         v-else-if="noSources"
-        size="hero"
         icon="database"
         :title="t('siem.entities.noSources')"
-        :description="t('siem.entities.noSourcesHint')"
+        :text="t('siem.entities.noSourcesHint')"
       />
       <SecurityRiskGraph
         v-else-if="view === 'graph'"
@@ -896,7 +889,6 @@ const noSources = computed(
         :error="plansError || runError || null"
         :page-size="50"
         :page-size-options="[50, 100, 250]"
-        :show-global-filter="false"
         :persist-columns="true"
         :table-id="`security-entities-${kind}`"
         :get-row-status-color="(r: Row) => severityRailColor(r.tone)"
@@ -906,26 +898,28 @@ const noSources = computed(
         @row-click="openEntity"
         @sort-change="() => nextTick(relocate)"
       >
-        <template #toolbar>
-          <div class="contents">
-            <OSearchInput
-              v-model="search"
-              :placeholder="t(`siem.entities.search.${kind}`)"
-              class="min-w-0 flex-1 md:min-w-48"
-              data-test="security-entities-search"
-            />
+        <template #subheader>
+          <div class="px-page-edge border-table-row-divider border-b py-1.5">
             <OStatStrip
               compact-values
               :items="stats"
               :loading="tableLoading"
               selectable
-              :row="false"
-              class="max-md:order-last"
               multiple
               :selected-keys="signalFilters"
-              default-key="all"
               data-test="security-entities-stats"
               @update:selected-keys="signalFilters = $event as EntitySignal[]"
+            />
+          </div>
+        </template>
+
+        <template #toolbar>
+          <div class="flex min-w-0 flex-1 items-center gap-2">
+            <OSearchInput
+              v-model="search"
+              :placeholder="t(`siem.entities.search.${kind}`)"
+              class="max-w-md flex-1"
+              data-test="security-entities-search"
             />
             <span class="text-text-secondary text-xs">{{ t("siem.entities.windowNote") }}</span>
           </div>
@@ -941,8 +935,8 @@ const noSources = computed(
             >
             <OTag
               v-if="otherAliases(row).length"
-              variant="default-soft"
-              size="xs"
+              tone="neutral"
+              size="sm"
               class="shrink-0"
               :data-test="`security-entities-aliases-${row.value}`"
               >{{ t("siem.entities.aliasCount", otherAliases(row).length)
@@ -955,8 +949,8 @@ const noSources = computed(
             <OTag
               v-for="sig in row.signals"
               :key="sig"
-              :variant="SIGNAL_TAG[sig as EntitySignal]"
-              size="xs"
+              :tone="SIGNAL_TAG[sig as EntitySignal]"
+              size="sm"
               >{{
                 t(
                   sig === "spread"
@@ -974,9 +968,8 @@ const noSources = computed(
         <template #cell-failures="{ row }">
           <div v-if="row.failureKnown" class="flex w-full items-center gap-2">
             <OProgressBar
-              :value="failureRate(row)"
-              :variant="row.signals.includes('failures') ? 'danger' : 'default'"
-              size="xs"
+              :value="failureRate(row) * 100"
+              :tone="row.signals.includes('failures') ? 'err' : 'accent'"
               class="flex-1"
             />
             <span class="text-text-secondary w-16 text-right text-xs tabular-nums"
@@ -990,14 +983,9 @@ const noSources = computed(
         </template>
         <template #cell-streams="{ row }">
           <div class="flex min-w-0 gap-1 overflow-hidden">
-            <OTag
-              v-for="s in row.streams.slice(0, 2)"
-              :key="s"
-              variant="default-soft"
-              size="xs"
-              class="font-mono"
-              >{{ s }}</OTag
-            >
+            <OTag v-for="s in row.streams.slice(0, 2)" :key="s" tone="neutral" mono size="sm">{{
+              s
+            }}</OTag>
             <span v-if="row.streams.length > 2" class="text-text-secondary text-xs"
               >+{{ row.streams.length - 2 }}</span
             >
@@ -1012,9 +1000,9 @@ const noSources = computed(
 
         <template #toolbar-trailing>
           <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+            icon-only
+            variant="secondary"
+            icon="refresh"
             :loading="loading"
             data-test="security-entities-refresh-table"
             @click="refresh"
@@ -1025,11 +1013,9 @@ const noSources = computed(
 
         <template #error="{ message }">
           <OEmptyState
-            size="block"
-            icon="error-outline"
+            kind="error"
             :title="t('siem.entities.loadError')"
-            :description="raw(message)"
-            :action-label="t('siem.entities.refresh')"
+            :text="raw(message)"
             @action="refresh"
           />
         </template>
@@ -1037,11 +1023,9 @@ const noSources = computed(
         <template #empty>
           <OEmptyState
             v-if="!loading"
-            size="block"
-            icon="search-off"
+            :kind="!!search.trim() || signalFilters.length > 0 ? 'filtered' : 'first-run'"
             :title="t('siem.entities.empty')"
-            :description="t('siem.entities.emptyHint')"
-            :filtered="!!search.trim() || signalFilters.length > 0"
+            :text="t('siem.entities.emptyHint')"
             @action="onEmptyAction"
           />
         </template>
@@ -1068,7 +1052,7 @@ const noSources = computed(
       @next="step(1)"
     >
       <template #chips>
-        <OTag v-for="sig in selected.signals" :key="sig" :variant="SIGNAL_TAG[sig]" size="sm"
+        <OTag v-for="sig in selected.signals" :key="sig" :tone="SIGNAL_TAG[sig]" size="sm"
           >{{
             t(
               sig === "spread"
@@ -1080,29 +1064,24 @@ const noSources = computed(
         <OTag
           v-for="alias in otherAliases(selected)"
           :key="alias"
-          variant="default-soft"
+          tone="neutral"
+          mono
           size="sm"
-          class="font-mono"
           :data-test="`security-entity-drawer-alias-${alias}`"
           >{{ alias }}<OTooltip :content="t('siem.entities.aliasHint')"
         /></OTag>
-        <OTag v-if="selected.peers" variant="default-soft" size="sm">
+        <OTag v-if="selected.peers" tone="neutral" size="sm">
           {{ t(`siem.entities.peersChip.${PEER_LABEL[kind]}`, selected.peers) }}
         </OTag>
-        <OTag v-if="!selected.signals.length" variant="success-soft" icon="check-circle" size="sm">
+        <OTag v-if="!selected.signals.length" tone="ok" icon="check-circle" size="sm">
           {{ t("siem.entities.noSignals") }}
         </OTag>
       </template>
 
       <template v-if="detailFailed.length" #summary>
-        <OBanner
-          variant="warning"
-          icon="warning-amber"
-          dense
-          data-test="security-entity-drawer-failed"
-        >
+        <OInlineNotice tone="warn" data-test="security-entity-drawer-failed">
           {{ t("siem.entities.detailFailed", { streams: detailFailed.join(", ") }) }}
-        </OBanner>
+        </OInlineNotice>
       </template>
 
       <template #tab-activity>
@@ -1112,8 +1091,8 @@ const noSources = computed(
               t("siem.entities.activity")
             }}</span>
             <div class="flex items-center gap-1.5">
-              <OTag variant="blue-soft" size="xs" dot>{{ t("siem.entities.chart.ok") }}</OTag>
-              <OTag variant="error-soft" size="xs" dot>{{ t("siem.entities.chart.failed") }}</OTag>
+              <OTag tone="neutral" size="sm" dot>{{ t("siem.entities.chart.ok") }}</OTag>
+              <OTag tone="err" size="sm" dot>{{ t("siem.entities.chart.failed") }}</OTag>
             </div>
           </div>
           <div class="h-56">
@@ -1130,7 +1109,7 @@ const noSources = computed(
       </template>
 
       <template #tab-related>
-        <div v-if="detailLoading" class="flex justify-center py-8"><OSpinner size="sm" /></div>
+        <div v-if="detailLoading" class="flex justify-center py-8"><OSpinner size="lg" /></div>
         <template v-else>
           <div
             v-for="other in relatedKinds"
@@ -1167,7 +1146,7 @@ const noSources = computed(
                   :class="{ 'font-mono': other !== 'user' }"
                   >{{ item.value }}</span
                 >
-                <OTag v-if="item.fail" variant="error-soft" size="xs">{{
+                <OTag v-if="item.fail" tone="err" size="sm">{{
                   t("siem.entities.failedCount", item.fail)
                 }}</OTag>
                 <span class="text-text-secondary w-16 text-right text-xs tabular-nums">{{
@@ -1188,7 +1167,7 @@ const noSources = computed(
       </template>
 
       <template #tab-cases>
-        <div v-if="detailLoading" class="flex justify-center py-8"><OSpinner size="sm" /></div>
+        <div v-if="detailLoading" class="flex justify-center py-8"><OSpinner size="lg" /></div>
         <div
           v-else-if="cases.length"
           class="border-border-default rounded-surface overflow-hidden border"
@@ -1205,11 +1184,11 @@ const noSources = computed(
             @keydown.enter="openCase(c.id)"
             @keydown.space.prevent="openCase(c.id)"
           >
-            <OTag :variant="CASE_TAG[c.severity] ?? 'default-soft'" size="xs">{{
+            <OTag :tone="CASE_TAG[c.severity] ?? 'neutral'" size="sm">{{
               raw(c.severity || "P3")
             }}</OTag>
             <OTruncatedText class="text-text-heading flex-1 text-sm">{{ c.title }}</OTruncatedText>
-            <OTag :variant="c.open ? 'orange-soft' : 'default-soft'" size="xs">{{
+            <OTag :tone="c.open ? 'warn' : 'neutral'" size="sm">{{
               c.open ? t("siem.entities.caseOpen") : t("siem.entities.caseResolved")
             }}</OTag>
             <OIcon
@@ -1246,9 +1225,8 @@ const noSources = computed(
               </span>
             </div>
             <OButton
-              variant="ghost-primary"
-              size="sm"
-              icon-right="open-in-new"
+              variant="accent-ghost"
+              icon-end="open-in-new"
               :data-test="`security-entity-drawer-events-${s}`"
               @click="openEvents(s)"
             >
@@ -1262,8 +1240,7 @@ const noSources = computed(
         <OButton
           v-if="selected.streams.length"
           variant="primary"
-          size="sm-action"
-          icon-left="manage-search"
+          icon="manage-search"
           data-test="security-entity-drawer-open-events"
           @click="huntInEvents"
         >

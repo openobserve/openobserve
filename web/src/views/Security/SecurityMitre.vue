@@ -306,7 +306,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.mitrePage.stat.firing"),
     value: summary.value.techniquesFiring,
     icon: "local-fire-department",
-    tone: "error",
+    tone: "err",
     dataTest: "security-mitre-stat-firing",
   },
   {
@@ -314,7 +314,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.mitrePage.stat.gaps"),
     value: summary.value.gaps,
     icon: "grid-on",
-    tone: "warning",
+    tone: "warn",
     dataTest: "security-mitre-stat-gaps",
   },
   {
@@ -323,7 +323,7 @@ const stats = computed<StatItem[]>(() => [
     value: summary.value.techniquesCovered,
     max: summary.value.techniquesTotal || undefined,
     icon: "verified-user",
-    tone: "success",
+    tone: "ok",
     dataTest: "security-mitre-stat-covered",
   },
   {
@@ -332,14 +332,13 @@ const stats = computed<StatItem[]>(() => [
     value: summary.value.tacticsCovered,
     max: summary.value.tacticsTotal,
     icon: "target",
-    tone: "primary",
     selectable: false,
     dataTest: "security-mitre-stat-tactics",
   },
 ]);
 const selectedStat = computed(() => (view.value === "all" ? null : view.value));
-function onStat(key: string) {
-  view.value = view.value === key ? "all" : (key as View);
+function onStat(key: string | null) {
+  view.value = (key as View | null) ?? "all";
 }
 
 const HEAT_CLASS = [
@@ -453,8 +452,7 @@ function openDetections() {
 <template>
   <OPageLayout
     :title="t('siem.mitrePage.title')"
-    :subtitle="t('siem.mitrePage.subtitle')"
-    icon="grid-on"
+    :about="t('siem.mitrePage.subtitle')"
     scroll
     pad-y
     title-data-test="security-mitre-title"
@@ -470,7 +468,6 @@ function openDetections() {
             v-for="r in RANGES"
             :key="r.value"
             :value="r.value"
-            size="sm"
             :data-test="`security-mitre-range-${r.value}`"
           >
             {{ t(`siem.range.${r.value}`) }}
@@ -493,7 +490,6 @@ function openDetections() {
         :items="stats"
         :loading="(rulesLoading && !siemRows.length) || lastRunAt === null"
         selectable
-        :row="false"
         :selected-key="selectedStat"
         data-test="security-mitre-stats"
         @select="onStat"
@@ -505,16 +501,16 @@ function openDetections() {
           data-test="security-mitre-view"
           @update:model-value="(v: unknown) => (view = (v as View) || 'all')"
         >
-          <OToggleGroupItem value="all" size="sm" data-test="security-mitre-view-all">{{
+          <OToggleGroupItem value="all" data-test="security-mitre-view-all">{{
             t("siem.mitrePage.view.all")
           }}</OToggleGroupItem>
-          <OToggleGroupItem value="covered" size="sm" data-test="security-mitre-view-covered">{{
+          <OToggleGroupItem value="covered" data-test="security-mitre-view-covered">{{
             t("siem.mitrePage.view.covered")
           }}</OToggleGroupItem>
-          <OToggleGroupItem value="gaps" size="sm" data-test="security-mitre-view-gaps">{{
+          <OToggleGroupItem value="gaps" data-test="security-mitre-view-gaps">{{
             t("siem.mitrePage.view.gaps")
           }}</OToggleGroupItem>
-          <OToggleGroupItem value="firing" size="sm" data-test="security-mitre-view-firing">{{
+          <OToggleGroupItem value="firing" data-test="security-mitre-view-firing">{{
             t("siem.mitrePage.view.firing")
           }}</OToggleGroupItem>
         </OToggleGroup>
@@ -522,7 +518,6 @@ function openDetections() {
           <OSearchInput
             v-model="search"
             :placeholder="t('siem.mitrePage.search')"
-            size="sm"
             data-test="security-mitre-search"
           />
         </div>
@@ -576,7 +571,7 @@ function openDetections() {
             </div>
             <div class="flex flex-col gap-1.5 p-1.5">
               <template v-if="rulesLoading && !siemRows.length">
-                <OSkeleton v-for="n in 3" :key="n" class="h-12" />
+                <OSkeleton v-for="n in 3" :key="n" shape="block" class="h-12" />
               </template>
               <template v-else>
                 <div
@@ -621,10 +616,12 @@ function openDetections() {
 
       <OEmptyState
         v-if="filtered && !order.length && !rulesLoading"
-        size="block"
         icon="search-off"
+        kind="filtered"
         :title="t('siem.mitrePage.noMatch')"
-        filtered
+        :text="
+          t('emptyState.filtered.description', { noun: t('emptyState.filtered.fallbackNoun') })
+        "
         data-test="security-mitre-empty"
         @action="
           () => {
@@ -639,17 +636,15 @@ function openDetections() {
           t("siem.mitrePage.unmapped")
         }}</span>
         <div class="flex flex-wrap gap-1.5">
-          <OTag
+          <OButton
             v-for="cell in unmapped"
             :key="cell.id"
-            clickable
-            variant="default-soft"
-            shape="rounded"
-            size="sm"
+            variant="secondary"
+            size="xs"
+            :label="raw(cell.id)"
             :data-test="`security-mitre-unmapped-${cell.id}`"
             @click="openCell(cell)"
-            >{{ cell.id }}</OTag
-          >
+          />
         </div>
       </div>
 
@@ -684,26 +679,18 @@ function openDetections() {
     >
       <template #chips>
         <OTag
-          :variant="
-            selected.state === 'firing'
-              ? 'error-soft'
-              : selected.state === 'covered'
-                ? 'success-soft'
-                : 'default-soft'
+          :tone="
+            selected.state === 'firing' ? 'err' : selected.state === 'covered' ? 'ok' : 'neutral'
           "
           size="sm"
           >{{ t(`siem.mitrePage.state.${selected.state}`) }}</OTag
         >
-        <OTag v-for="tactic in selected.tactics" :key="tactic" variant="primary-soft" size="sm">{{
+        <OTag v-for="tactic in selected.tactics" :key="tactic" tone="accent" size="sm">{{
           t(`siem.mitre.tactics.${tactic}`)
         }}</OTag>
-        <OTag
-          v-if="parentTechnique(selected.id) !== selected.id"
-          variant="default-soft"
-          size="sm"
-          class="font-mono"
-          >{{ t("siem.mitrePage.subOf", { id: parentTechnique(selected.id) }) }}</OTag
-        >
+        <OTag v-if="parentTechnique(selected.id) !== selected.id" tone="neutral" mono size="sm">{{
+          t("siem.mitrePage.subOf", { id: parentTechnique(selected.id) })
+        }}</OTag>
       </template>
 
       <template #tab-detections>
@@ -721,12 +708,12 @@ function openDetections() {
               type="severity"
               :value="severityTagValue(toneOfSigmaLevel(det.level))"
               :label="t(toneLabelKey(toneOfSigmaLevel(det.level)))"
-              size="xs"
+              size="sm"
             />
             <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">{{
               det.name
             }}</span>
-            <OTag :variant="det.enabled ? 'success-soft' : 'default-soft'" size="xs">
+            <OTag :tone="det.enabled ? 'ok' : 'neutral'" size="sm">
               {{ det.enabled ? t("siem.mitrePage.enabled") : t("siem.mitrePage.disabled") }}
             </OTag>
           </div>
@@ -754,7 +741,7 @@ function openDetections() {
                   type="severity"
                   :value="severityTagValue(toneOfSigmaLevel(rule.level))"
                   :label="t(toneLabelKey(toneOfSigmaLevel(rule.level)))"
-                  size="xs"
+                  size="sm"
                 />
                 <span class="text-text-heading min-w-0 truncate text-sm font-medium">{{
                   rule.title
@@ -767,9 +754,8 @@ function openDetections() {
             </div>
             <OButton
               v-if="canAuthor"
-              variant="outline"
-              size="sm"
-              icon-left="add"
+              variant="secondary"
+              icon="add"
               :data-test="`security-mitre-enable-${rule.id}`"
               @click="enableRule(rule.key)"
             >
@@ -810,25 +796,21 @@ function openDetections() {
           </p>
           <div class="flex flex-wrap gap-2">
             <OButton
-              as="a"
               :href="techniqueUrl(selected.id)"
               target="_blank"
               rel="noopener"
-              variant="outline"
-              size="sm"
-              icon-right="open-in-new"
+              variant="secondary"
+              icon-end="open-in-new"
               data-test="security-mitre-reference-link"
               >{{ t("siem.mitrePage.openTechnique", { id: selected.id }) }}</OButton
             >
             <OButton
               v-if="parentTechnique(selected.id) !== selected.id"
-              as="a"
               :href="techniqueUrl(parentTechnique(selected.id))"
               target="_blank"
               rel="noopener"
               variant="ghost"
-              size="sm"
-              icon-right="open-in-new"
+              icon-end="open-in-new"
               data-test="security-mitre-reference-parent"
               >{{
                 t("siem.mitrePage.openTechnique", { id: parentTechnique(selected.id) })
@@ -840,19 +822,16 @@ function openDetections() {
 
       <template #footer>
         <OButton
-          as="a"
           :href="techniqueUrl(selected.id)"
           target="_blank"
           rel="noopener"
-          variant="outline"
-          size="sm-action"
-          icon-right="open-in-new"
+          variant="secondary"
+          icon-end="open-in-new"
           data-test="security-mitre-drawer-attack"
           >{{ t("siem.mitrePage.viewOnAttack") }}</OButton
         >
         <OButton
           variant="primary"
-          size="sm-action"
           data-test="security-mitre-drawer-detections"
           @click="openDetections"
           >{{ t("siem.mitrePage.manageDetections") }}</OButton

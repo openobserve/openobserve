@@ -108,8 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rca-steer-send-btn"
         type="submit"
         variant="primary"
-        size="sm"
-        icon-left="send"
+        icon="send"
         :disabled="!canSend"
         :loading="sending"
       >

@@ -26,12 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p class="text-text-secondary text-sm">{{ t("synthetics.split.description") }}</p>
       <p class="text-text-muted text-xs">{{ t("synthetics.split.overrideHint") }}</p>
 
-      <OBanner v-if="usedBy.length" variant="info" data-test="synthetics-split-used-by">
+      <OInlineNotice v-if="usedBy.length" tone="info" data-test="synthetics-split-used-by">
         <p class="m-0">
           {{ t("synthetics.split.usedBy", { n: usedBy.length, names: usedBy.join(", ") }) }}
         </p>
         <p class="m-0 text-xs">{{ t("synthetics.split.usedByHint") }}</p>
-      </OBanner>
+      </OInlineNotice>
 
       <div
         v-for="row in rows"
@@ -62,18 +62,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <OBanner v-if="unselected.length" variant="warning" data-test="synthetics-split-warning">
+      <OInlineNotice v-if="unselected.length" tone="warn" data-test="synthetics-split-warning">
         {{ t("synthetics.split.unselectedWarning", { envs: unselected.join(", ") }) }}
-      </OBanner>
+      </OInlineNotice>
     </div>
 
     <template #footer>
-      <OButton variant="outline" size="sm" @click="$emit('update:open', false)">
+      <OButton variant="secondary" @click="$emit('update:open', false)">
         {{ t("common.cancel") }}
       </OButton>
       <OButton
         variant="primary"
-        size="sm"
         :disabled="!canConfirm"
         data-test="synthetics-split-confirm-btn"
         @click="submit"
@@ -91,7 +90,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";

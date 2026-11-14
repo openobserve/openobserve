@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div aria-hidden="true" data-test="logs-search-result-table-skeleton">
     <div class="border-card-glass-border flex h-7 items-center gap-6 border-b px-3">
-      <OSkeleton type="text" class="h-3 w-40" />
-      <OSkeleton type="text" class="h-3 w-24" />
+      <OSkeleton class="h-3 w-40" />
+      <OSkeleton class="h-3 w-24" />
     </div>
     <div v-for="row in ROWS" :key="row" class="flex h-6 items-center gap-6 px-3">
-      <OSkeleton type="text" class="h-3 w-40" />
-      <OSkeleton type="text" class="h-3 flex-1" />
+      <OSkeleton class="h-3 w-40" />
+      <OSkeleton class="h-3 flex-1" />
     </div>
   </div>
 </template>

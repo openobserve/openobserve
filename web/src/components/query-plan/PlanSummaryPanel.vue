@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ProfileSectionTitle :title="t('search.queryProfile.whereItRuns')" />
       <div class="flex flex-col gap-1.5 text-xs">
         <div class="flex min-w-0 items-start gap-2" data-test="query-plan-where-leader">
-          <OBadge size="xs" shape="rounded" variant="default-soft" class="shrink-0">{{
+          <OBadge size="sm" tone="neutral" class="shrink-0">{{
             t("search.queryProfile.leader")
           }}</OBadge>
           <span class="text-text-body min-w-0">{{ leaderText }}</span>
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex min-w-0 items-start gap-2"
           :data-test="`query-plan-where-${s.id}`"
         >
-          <OBadge size="xs" shape="rounded" variant="default-soft" class="shrink-0">
+          <OBadge size="sm" tone="neutral" class="shrink-0">
             <span class="size-1.5 shrink-0 rounded-full" :class="stageSwatch(s.index)" />
             {{ t("search.queryProfile.stage", { index: s.index }) }}
           </OBadge>
@@ -134,11 +134,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("search.queryProfile.planOnlyNote") }}
       </p>
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         block
-        icon-left="speed"
-        icon-right="arrow-forward"
+        icon="speed"
+        icon-end="arrow-forward"
         data-test="query-plan-go-analyze"
         @click="emit('analyze')"
         >{{ t("search.queryProfile.measureWithAnalyze") }}</OButton

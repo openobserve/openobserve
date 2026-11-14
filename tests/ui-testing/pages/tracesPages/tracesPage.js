@@ -2191,9 +2191,8 @@ export class TracesPage {
   }
 
   /**
-   * Whether the error-only filter is currently active. The badge (SearchResult.vue)
-   * swaps its fill class when showErrorOnly is true, so this reads that class as the
-   * state guard for the toggle.
+   * Whether the error-only filter is currently active. The badge (SearchResult.vue) is a
+   * toggle OTag whose aria-pressed follows showErrorOnly, so this reads it as the state guard.
    * @returns {Promise<boolean>}
    */
   async isErrorOnlyFilterActive() {
@@ -2203,8 +2202,7 @@ export class TracesPage {
       .then(() => true)
       .catch(() => false);
     if (!shown) return false;
-    const cls = (await badge.getAttribute('class').catch(() => '')) || '';
-    return cls.includes('bg-badge-error-solid-bg');
+    return (await badge.getAttribute('aria-pressed').catch(() => null)) === 'true';
   }
 
   // --- Metrics Dashboard ---
@@ -3136,12 +3134,23 @@ export class TracesPage {
     return await this.page.locator(`${this.searchResultList} [data-test="span-row-status-pill"]`).allInnerTexts();
   }
 
+  // OPagination has no numbered buttons; its root carries data-test-page / data-test-page-count.
   async getResultPageCount() {
-    return await this.page.locator('[data-test^="traces-search-result-pagination-page-"]').count();
+    const count = await this.page.locator('[data-test="traces-search-result-pagination"]').getAttribute('data-test-page-count');
+    return Number(count) || 0;
   }
 
+  /** Steps the result pager with prev/next until its root reports `pageNumber`. */
   async goToResultPage(pageNumber) {
-    await this.page.locator(`[data-test="traces-search-result-pagination-page-${pageNumber}"]`).click();
+    const pager = this.page.locator('[data-test="traces-search-result-pagination"]');
+    for (let guard = 0; guard < 50; guard++) {
+      const current = Number(await pager.getAttribute('data-test-page'));
+      if (current === pageNumber) return;
+      const step = current < pageNumber ? 'next' : 'prev';
+      await this.page.locator(`[data-test="traces-search-result-pagination-${step}"]`).click();
+      await expect(pager).not.toHaveAttribute('data-test-page', String(current), { timeout: 30000 });
+    }
+    await expect(pager).toHaveAttribute('data-test-page', String(pageNumber));
   }
 
   async clickResultPaginationNext() {
@@ -3165,8 +3174,9 @@ export class TracesPage {
 
   // The pager comes from a separate count query; until it lands J on the last row reports the end instead of crossing a page.
   async expectTraceListPageCountAtLeast(pageNumber, timeout = 60000) {
-    await expect(this.page.locator(`[data-test="traces-search-result-pagination-page-${pageNumber}"]`))
-      .toBeVisible({ timeout });
+    await expect
+      .poll(async () => await this.getResultPageCount().catch(() => 0), { timeout })
+      .toBeGreaterThanOrEqual(pageNumber);
   }
 
   async expectTraceListPageLoaded(prevLastIndex = 24, timeout = 30000) {

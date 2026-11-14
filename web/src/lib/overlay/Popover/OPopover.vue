@@ -9,12 +9,14 @@
   Shares ODropdown's overlay coordination so descendant overlays (OSelect /
   OCombobox / nested dropdowns) opening INSIDE the popover never dismiss it.
 
-  Props: open (v-model) | anchor | side | align | flipAlign | sideOffset | arrow | hideWhenDetached | closeOnScroll | modal | ariaLabel | contentClass | collisionPadding
-  Slots: trigger (unused when `anchor` is set) | default | arrow (paths in a 12x6 viewBox)
+  Props: open (v-model) | size | title | reserveHeight | anchor | side | align | flipAlign | sideOffset | arrow | hideWhenDetached | closeOnScroll | modal | ariaLabel | contentClass | collisionPadding
+  Slots: trigger (unused when `anchor` is set) | default | footer | arrow (paths in a 12x6 viewBox)
   Emits: update:open | open-auto-focus
 -->
 <script lang="ts">
 import type { I18nText } from "@/types/i18n";
+/** sm 260 · md 320 · lg 440; `auto` only for library composites with a fixed layout (the date-time range). */
+export type PopoverSize = "sm" | "md" | "lg" | "auto";
 // True when the last document interaction was pointer-based (shared across
 // instances). Lets a mouse-close avoid leaving a :focus-visible ring on the
 // trigger, while keyboard closes keep it for a11y.
@@ -59,9 +61,22 @@ import {
 
 const { lgUp } = useBreakpoint();
 
+const SIZE_CLASSES: Record<PopoverSize, string> = {
+  sm: "w-65",
+  md: "w-80",
+  lg: "w-110",
+  auto: "",
+};
+
 const props = withDefaults(
   defineProps<{
     open?: boolean;
+    /** Fixed width (guideline O3), so it never changes while open (O4). */
+    size?: PopoverSize;
+    /** Optional head, 13 px semibold; also the accessible name. */
+    title?: I18nText;
+    /** Body height for the tallest state, so switching content never resizes the popover (O4). */
+    reserveHeight?: `${number}rem`;
     /** Positions against this element instead of a trigger, for a popover opened by code rather than a click on its own control. */
     anchor?: Element | null;
     /** Trap focus + block outside pointer events. Popovers are non-modal by default. */
@@ -86,6 +101,7 @@ const props = withDefaults(
     collisionPadding?: number | Partial<Record<"top" | "right" | "bottom" | "left", number>>;
   }>(),
   {
+    size: "md",
     modal: false,
     side: "bottom",
     align: "start",
@@ -270,16 +286,16 @@ onBeforeUnmount(() => {
         :side-offset="sideOffset"
         :hide-when-detached="hideWhenDetached"
         :collision-padding="collisionPadding ?? (lgUp ? 0 : 8)"
-        :aria-label="ariaLabel"
+        :aria-label="ariaLabel ?? title"
         :style="{ zIndex }"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         @open-auto-focus="(e) => emit('open-auto-focus', e)"
         :class="[
-          'outline-none max-lg:max-w-[calc(100vw-1rem)]',
-          'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
-          // Surface
-          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
+          'flex max-w-[calc(100vw-1rem)] flex-col outline-none',
+          SIZE_CLASSES[size],
+          'max-h-[min(30rem,calc(100vh-2rem))] max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
+          'bg-dropdown-bg rounded-menu shadow-overlay border border-transparent',
           // Open/close reveal animation (matches ODropdown)
           'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
           'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
@@ -288,7 +304,30 @@ onBeforeUnmount(() => {
           contentClass,
         ]"
       >
-        <slot />
+        <div
+          v-if="title"
+          class="border-border-subtle text-text-heading text-compact shrink-0 border-b px-3 py-2.5 font-semibold"
+          data-test="o-popover-title"
+        >
+          {{ title }}
+        </div>
+        <div
+          v-if="title || $slots.footer"
+          class="text-compact min-h-0 flex-1 overflow-auto p-3"
+          :style="reserveHeight ? { minHeight: reserveHeight } : undefined"
+        >
+          <slot />
+        </div>
+        <template v-else-if="reserveHeight">
+          <div class="min-h-0 flex-1" :style="{ minHeight: reserveHeight }"><slot /></div>
+        </template>
+        <slot v-else />
+        <div
+          v-if="$slots.footer"
+          class="border-border-subtle flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
+        >
+          <slot name="footer" />
+        </div>
         <PopoverArrow v-if="arrow" :width="14" :height="7" class="-translate-y-px overflow-visible">
           <slot name="arrow">
             <path class="fill-dropdown-bg" d="M0 0L6 6L12 0Z" />

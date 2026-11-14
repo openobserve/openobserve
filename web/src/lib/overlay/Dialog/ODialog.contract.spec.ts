@@ -50,13 +50,14 @@ const WEB_SRC = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 /// Props that LOOK right and silently do nothing, with what to write instead.
 const WRONG_PROPS: Record<string, string> = {
-  "primary-label": "primary-button-label",
-  "secondary-label": "secondary-button-label",
-  "neutral-label": "neutral-button-label",
-  "primary-disabled": "primary-button-disabled",
-  "secondary-disabled": "secondary-button-disabled",
-  "primary-loading": "primary-button-loading",
-  "secondary-loading": "secondary-button-loading",
+  "primary-label": ':primary="{ label }"',
+  "secondary-label": ':secondary="{ label }"',
+  "neutral-label": ':extra="{ label }"',
+  "primary-button-label": ':primary="{ label }"',
+  "secondary-button-label": ':secondary="{ label }"',
+  "neutral-button-label": ':extra="{ label }"',
+  "primary-disabled": ':primary="{ disabled }"',
+  "primary-loading": ':primary="{ loading }"',
 };
 
 function walk(dir: string): string[] {
@@ -106,8 +107,8 @@ describe("ODialog call sites use the contract ODialog actually has", () => {
     expect(offenders).toEqual([]);
   });
 
-  /// The button props are `primaryButtonLabel`, not `primaryLabel`. Getting it
-  /// wrong renders no footer at all rather than an unstyled one.
+  /// Footer buttons are action objects (`:primary="{ label }"`). A loose label prop
+  /// renders no footer at all rather than an unstyled one.
   it("names the footer button props the way ODialog declares them", () => {
     const offenders = callSites.flatMap(({ file, tags }) =>
       tags.flatMap((tag) =>

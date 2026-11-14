@@ -1,22 +1,21 @@
 <template>
   <ODrawer
+    size="xl"
     data-test="dashboard-json-editor-drawer"
     bleed
     :open="open"
-    :width="70"
-    persistent
+    :dirty="isDirty"
     :title="t('dashboard.editJson')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="t('common.save')"
-    :primary-button-loading="saveJsonLoading"
+    :secondary="{ label: t('common.cancel') }"
+    :primary="{ label: t('common.save'), loading: saveJsonLoading }"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
     @click:primary="saveChanges()"
   >
-    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div
       data-test="dashboard-json-editor-container"
-      class="bg-surface-base flex h-[calc(100vh-116px)] w-[70vw] flex-col"
+      class="bg-surface-base flex h-[calc(100vh-116px)] w-full flex-col"
     >
       <!-- eslint-enable local/no-hardcoded-px -->
       <!-- Monaco editor fills remaining space; flex-1 + min-h-0 lets it expand without overflow -->
@@ -148,14 +147,23 @@ export default defineComponent({
       }
     };
 
-    onMounted(() => {
-      jsonContent.value = JSON.stringify(props.dashboardData, null, 2);
-    });
+    const loadedContent = ref("");
+    const isDirty = computed(() => jsonContent.value !== loadedContent.value);
 
+    // Each open starts from the saved dashboard, so an edit discarded on close never returns.
+    const loadDashboard = () => {
+      jsonContent.value = JSON.stringify(props.dashboardData, null, 2);
+      loadedContent.value = jsonContent.value;
+      isValidJson.value = true;
+      validationErrors.value = [];
+    };
+
+    onMounted(loadDashboard);
+    watch(() => props.dashboardData, loadDashboard);
     watch(
-      () => props.dashboardData,
-      (newVal) => {
-        jsonContent.value = JSON.stringify(newVal, null, 2);
+      () => props.open,
+      (open) => {
+        if (open) loadDashboard();
       },
     );
 
@@ -163,6 +171,7 @@ export default defineComponent({
       t,
       store,
       jsonContent,
+      isDirty,
       isValidJson,
       validationErrors,
       saveJsonLoading,

@@ -157,8 +157,7 @@ describe("RunRowExpansion", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      // Skeleton divs should be present while loading (use animate-pulse class)
-      const skelElements = wrapper.findAll(".animate-pulse");
+      const skelElements = wrapper.findAllComponents({ name: "OSkeleton" });
       expect(skelElements.length).toBeGreaterThan(0);
 
       // Resolve to allow unmount

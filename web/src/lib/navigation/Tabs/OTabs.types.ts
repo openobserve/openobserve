@@ -3,21 +3,24 @@
  * OTabs is the tab-bar container that owns the active-tab state (v-model).
  */
 
-/** Alignment of tabs within the tab bar */
-export type TabsAlign = "left" | "center" | "right" | "justify";
+import type { I18nText } from "@/types/i18n";
 
 /** Orientation of the tab bar */
 export type TabsOrientation = "horizontal" | "vertical";
+
+/** page = its own 40 px row under the page header; compact = 32 px inside drawers and panels. */
+export type TabsSize = "page" | "compact";
+
+/** A horizontal strip shows this many tabs; the rest fold into "More ▾" (guideline N2). */
+export const TABS_MAX_VISIBLE = 6;
 
 export interface OTabsProps {
   /** Currently active tab name — required, drives v-model */
   modelValue: string | number;
   /** Layout direction of the tab bar. Default: 'horizontal' */
   orientation?: TabsOrientation;
-  /** Alignment of tabs within the tab bar. Default: 'left' */
-  align?: TabsAlign;
-  /** Compact height mode (~32px instead of ~40px) */
-  dense?: boolean;
+  /** Row height. Default: 'page' */
+  size?: TabsSize;
   /** Adds a bottom border matching the design-system border color token. Default: false */
   bordered?: boolean;
   /**
@@ -56,8 +59,8 @@ export interface TabsContext {
   onTabClick: (name: string | number) => void;
   /** Whether the tab bar is in vertical orientation */
   isVertical: boolean;
-  /** Whether the tab bar is in dense mode */
-  dense: boolean;
+  /** Row height of the strip */
+  size: TabsSize;
   /** Whether tabs can be dragged to reorder (sets draggable on each tab) */
   reorderable: boolean;
   /** Name of the tab currently being dragged (null when not dragging) */
@@ -68,6 +71,17 @@ export interface TabsContext {
   dropBefore: boolean;
   /** Whether inactive tabs hide their label below md (see OTabsProps) */
   collapseLabels: boolean;
+}
+
+/** A tab folded into "More ▾", read from the OTab vnode's props. */
+export interface TabsOverflowItem {
+  name: string | number;
+  label: I18nText;
+  icon?: string;
+  disabled: boolean;
+  to?: unknown;
+  count?: number | null;
+  dataTest?: string;
 }
 
 /** Symbol key used for provide / inject */

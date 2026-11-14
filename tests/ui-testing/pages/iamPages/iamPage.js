@@ -94,8 +94,10 @@ export class IamPage {
             this.emailCellByEmail(emailName).locator(
                 "xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]"
             );
-        this.deleteButtonByEmail = (emailName) =>
-            this.rowByEmail(emailName).locator('[data-test="service-accounts-delete"]');
+        this.rowMenuButtonByEmail = (emailName) =>
+            this.rowByEmail(emailName).locator('[data-test="service-accounts-row-more-actions"]');
+        // Delete renders in the open row menu's portal, outside the row.
+        this.deleteMenuItem = page.locator('[data-test="service-accounts-delete"]');
         this.refreshButtonByEmail = (emailName) =>
             this.rowByEmail(emailName).locator('[data-test="service-accounts-refresh"]');
         this.updateButtonByEmail = (emailName) =>
@@ -334,16 +336,15 @@ export class IamPage {
             throw new Error(`Cannot delete system account: ${emailName}. System accounts are protected.`);
         }
 
-        const deleteButtonLocator = this.deleteButtonByEmail(emailName);
+        // Delete sits in the row's ⋯ menu, so open the menu first.
+        const menuButton = this.rowMenuButtonByEmail(emailName);
+        await menuButton.waitFor({ state: 'visible', timeout: 30000 });
+        await this.rowByEmail(emailName).hover();
+        await menuButton.click();
 
-        // Wait for the delete button to be visible and enabled
-        await deleteButtonLocator.waitFor({ state: 'visible', timeout: 30000 });
-
-        // Verify the button is not disabled before clicking
-        await expect(deleteButtonLocator).toBeEnabled();
-
-        // Click the delete button
-        await deleteButtonLocator.click({ force: true });
+        await this.deleteMenuItem.waitFor({ state: 'visible', timeout: 10000 });
+        await expect(this.deleteMenuItem).toBeEnabled();
+        await this.deleteMenuItem.click();
     }
 
     async requestServiceAccountOk(emailName) {

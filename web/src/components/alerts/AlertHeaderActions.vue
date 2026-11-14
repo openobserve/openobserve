@@ -18,8 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OButton
     v-if="showAcknowledge"
     variant="primary"
-    size="sm-action"
-    icon-left="check"
+    icon="check"
     :disabled="actions.pending.value"
     data-test="alerts-alertdetail-ack"
     @click="onAcknowledge"
@@ -33,12 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="downtime?.end_here">
       <ODropdown align="end">
         <template #trigger>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="hourglass-empty"
-            data-test="alerts-alertdetail-extend"
-          >
+          <OButton variant="secondary" icon="hourglass-empty" data-test="alerts-alertdetail-extend">
             {{ t("alerts.downtimes.actions.extend") }}
           </OButton>
         </template>
@@ -52,8 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </ODropdown>
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         :disabled="actions.pending.value"
         data-test="alerts-alertdetail-end-mute"
         @click="onEndMute"
@@ -63,9 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <OButton
       v-else-if="downtime"
-      variant="outline"
-      size="sm-action"
-      icon-left="open-in-new"
+      variant="secondary"
+      icon="open-in-new"
       data-test="alerts-alertdetail-muted-by"
       @click="openDowntime"
     >
@@ -74,10 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODropdown v-else align="end">
       <template #trigger>
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="notifications-paused"
-          icon-right="arrow-drop-down"
+          variant="secondary"
+          icon="notifications-paused"
+          icon-end="arrow-drop-down"
           data-test="alerts-alertdetail-mute"
         >
           {{ t("alerts.downtimes.mute.bulk") }}
@@ -96,19 +87,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODropdown v-if="ack" align="end">
     <template #trigger>
       <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="more-vert"
+        icon-only
+        variant="secondary"
+        icon="more-vert"
         :aria-label="t('alerts.moreActions')"
         data-test="alerts-alertdetail-ack-menu"
       />
     </template>
-    <ODropdownItem icon-left="person" data-test="alerts-alertdetail-unack" @select="onUnack">
+    <ODropdownItem icon="person" data-test="alerts-alertdetail-unack" @select="onUnack">
       {{ t("alerts.ack.unacknowledge") }}
     </ODropdownItem>
     <ODropdownItem
       v-if="ack.acked_by !== actions.me.value"
-      icon-left="person"
+      icon="person"
       data-test="alerts-alertdetail-take-over"
       @select="onTakeOver"
     >

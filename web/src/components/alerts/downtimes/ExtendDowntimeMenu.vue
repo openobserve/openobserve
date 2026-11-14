@@ -19,16 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #trigger>
       <OButton
         v-if="compact"
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="hourglass-empty"
+        icon="hourglass-empty"
         :aria-label="t('alerts.downtimes.actions.extend')"
         :data-test="dataTest"
         @click.stop
       >
         <OTooltip side="bottom" :content="t('alerts.downtimes.actions.extend')" />
       </OButton>
-      <OButton v-else variant="outline" size="sm" icon-left="hourglass-empty" :data-test="dataTest">
+      <OButton v-else variant="secondary" icon="hourglass-empty" :data-test="dataTest">
         {{ t("alerts.downtimes.actions.extend") }}
       </OButton>
     </template>
@@ -43,9 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODropdown>
   <OButton
     v-else-if="compact"
+    icon-only
     variant="ghost"
-    size="icon-sm"
-    icon-left="hourglass-empty"
+    icon="hourglass-empty"
     disabled
     :aria-label="t('alerts.downtimes.extend.notActive')"
     :data-test="dataTest"

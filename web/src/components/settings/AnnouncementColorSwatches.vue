@@ -23,9 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OButton
       :ref="(el) => setOption(0, el)"
-      variant="outline"
-      size="xs"
-      :active="modelValue === DEFAULT_CHOICE"
+      variant="secondary"
+      size="sm"
+      :pressed="modelValue === DEFAULT_CHOICE"
       role="radio"
       :tabindex="tabStop(DEFAULT_CHOICE)"
       :aria-checked="modelValue === DEFAULT_CHOICE"
@@ -55,10 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OButton
       :ref="(el) => setOption(BANNER_COLOR_PRESETS.length + 1, el)"
-      variant="outline"
-      size="xs"
-      icon-left="colorize"
-      :active="modelValue === CUSTOM_CHOICE"
+      variant="secondary"
+      size="sm"
+      icon="colorize"
+      :pressed="modelValue === CUSTOM_CHOICE"
       role="radio"
       :tabindex="tabStop(CUSTOM_CHOICE)"
       :aria-checked="modelValue === CUSTOM_CHOICE"

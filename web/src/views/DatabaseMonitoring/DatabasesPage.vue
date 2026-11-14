@@ -58,18 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
-        :frame="false"
         :error="error"
         :forbidden="forbidden"
         sorting="server"
         :sort-by="sortBy"
         :sort-order="sortOrder"
-        :show-global-filter="false"
         :column-visibility="defaultColumnVisibility"
         :persist-columns="true"
         table-id="dbm-databases"
         :enable-column-resize="true"
-        :toolbar-bordered="false"
         :get-row-style="rowStyle"
         tree
         :get-row-warning="hasShortfall"
@@ -80,8 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #error="{ message }">
           <OEmptyState
-            preset="load-error"
-            :description="raw(message)"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="raw(message)"
             data-test="dbm-databases-error"
             @action="onRefresh()"
           />
@@ -118,19 +116,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
-            <DateTime
+            <ODateTimeRange
               auto-apply
               menu-align="end"
               :default-type="range.type"
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-databases-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
+              class="max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :loading="loading"
               :last-run-at="lastRunAt"
               data-test="dbm-databases-refresh"
@@ -142,13 +138,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <div data-test="dbm-databases-summary">
+          <div
+            class="px-page-edge border-table-row-divider border-b py-1.5"
+            data-test="dbm-databases-summary"
+          >
             <OStatStrip
               :items="summaryStats"
               :loading="loading"
               selectable
               :selected-key="statFilter"
-              default-key="databases"
               @select="onStatSelect"
             />
           </div>
@@ -206,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="bottom" :content="t('dbm.databases.unnamedInstanceHint')" />
             </span>
             <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
-              <OTag type="dbSystem" :value="row.db_system" size="xs" />
+              <OTag type="dbSystem" :value="row.db_system" size="sm" />
               <template v-if="namedSchemaCount(row) === 1">
                 <span class="opacity-45">·</span>
                 <OTruncatedText>{{ row.namedSchemas?.[0] }}</OTruncatedText>
@@ -463,7 +461,7 @@ import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
 import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
@@ -689,8 +687,8 @@ const errorCount = computed(() => rows.value.reduce((acc, row) => acc + (row.err
  */
 // The Failed tile narrows the table to databases with a failed call; Calls and Database time are totals, not rows.
 const statFilter = ref<"failed" | null>(null);
-const onStatSelect = (key: string) => {
-  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
+const onStatSelect = (key: string | null) => {
+  statFilter.value = key === "failed" ? "failed" : null;
 };
 
 const summaryStats = computed<StatItem[]>(() => {
@@ -704,6 +702,32 @@ const summaryStats = computed<StatItem[]>(() => {
 
   return [
     {
+      key: "failed",
+      label: t("dbm.databases.summary.failed"),
+      value: errorCount.value ? formatCount(errorCount.value) : null,
+      icon: "error-outline",
+      tone: errorCount.value ? "err" : "neutral",
+      selectable: errorCount.value > 0 || statFilter.value === "failed",
+      dataTest: "dbm-databases-summary-failed",
+    },
+    {
+      key: "calls",
+      label: t("dbm.databases.summary.calls"),
+      value: calls.value,
+      icon: "bar-chart",
+      tone: "info",
+      selectable: false,
+      dataTest: "dbm-databases-summary-calls",
+    },
+    {
+      key: "time",
+      label: t("dbm.databases.summary.time"),
+      value: time.value,
+      icon: "timer",
+      selectable: false,
+      dataTest: "dbm-databases-summary-time",
+    },
+    {
       key: "databases",
       label: t("dbm.databases.summary.databases"),
       // The same count the tab badge shows: two different numbers under one
@@ -713,35 +737,8 @@ const summaryStats = computed<StatItem[]>(() => {
       // with the two query-vantage tiles beside it.
       value: fleetRowCount.value,
       icon: "database",
-      tone: "primary",
+      all: true,
       dataTest: "dbm-databases-summary-databases",
-    },
-    {
-      key: "calls",
-      label: t("dbm.databases.summary.calls"),
-      value: calls.value ?? raw("—"),
-      icon: "bar-chart",
-      tone: "info",
-      selectable: false,
-      dataTest: "dbm-databases-summary-calls",
-    },
-    {
-      key: "time",
-      label: t("dbm.databases.summary.time"),
-      value: time.value ?? raw("—"),
-      icon: "timer",
-      tone: "teal",
-      selectable: false,
-      dataTest: "dbm-databases-summary-time",
-    },
-    {
-      key: "failed",
-      label: t("dbm.databases.summary.failed"),
-      value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
-      icon: "error-outline",
-      tone: errorCount.value ? "error" : "neutral",
-      selectable: errorCount.value > 0 || statFilter.value === "failed",
-      dataTest: "dbm-databases-summary-failed",
     },
   ];
 });

@@ -45,29 +45,28 @@ describe("ORadio", () => {
     expect(wrapper.find("button").exists()).toBe(true);
   });
 
-  it("supports val alias on ORadio", async () => {
+  it("has one 16 px circle", () => {
     wrapper = mount(ORadioGroup, {
       props: { modelValue: "" },
       slots: {
-        default: '<ORadio val="alias-value" label="Alias" />',
+        default: '<ORadio value="a" label="A" />',
       },
       global: { components: { ORadio } },
     });
 
-    await wrapper.find("button").trigger("click");
-    expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("alias-value");
+    expect(wrapper.find("button").classes()).toContain("size-4");
   });
 
-  it("supports xs size", () => {
+  it("renders a description under the label", () => {
     wrapper = mount(ORadioGroup, {
       props: { modelValue: "" },
       slots: {
-        default: '<ORadio value="a" size="xs" label="XS" />',
+        default: '<ORadio value="cloud" label="Cloud" description="We host and scale it" />',
       },
       global: { components: { ORadio } },
     });
 
-    expect(wrapper.find("button").classes()).toContain("size-3");
+    expect(wrapper.text()).toContain("We host and scale it");
   });
 
   it("renders the card variant as one selectable surface", async () => {

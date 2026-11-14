@@ -11,10 +11,10 @@ const stubs = {
     stubs: {
       OTag: { props: ["label"], template: "<span>{{ label }}</span>" },
       OButton: {
-        props: ["iconLeft", "title"],
+        props: ["icon", "title"],
         emits: ["click"],
         template:
-          '<button :title="title" :data-icon="iconLeft" @click="$emit(\'click\')"><slot /></button>',
+          '<button :title="title" :data-icon="icon" @click="$emit(\'click\')"><slot /></button>',
       },
       LLMContentRenderer: { props: ["content"], template: "<div>{{ content }}</div>" },
     },

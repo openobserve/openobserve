@@ -72,8 +72,8 @@ const OTabsStub = {
 };
 
 const OTabStub = {
-  props: ["name", "label", "icon", "suffixIcon"],
-  template: '<b :data-tab="name" :data-suffix="suffixIcon" />',
+  props: ["name", "label", "icon", "locked"],
+  template: '<b :data-tab="name" :data-suffix="locked ? \'lock\' : undefined" />',
 };
 
 async function mountShell() {
@@ -327,8 +327,7 @@ describe("AIObservabilityShell — tabs of a rail item", () => {
     const wrapper = await mountShell();
     expect((wrapper.vm as any).$.setupState.activeItemHeader).toEqual({
       title: "aiObservability.nav.costUsage",
-      subtitle: "aiObservability.itemSubtitle.costUsage",
-      icon: "paid",
+      about: "aiObservability.itemSubtitle.costUsage",
     });
   });
 

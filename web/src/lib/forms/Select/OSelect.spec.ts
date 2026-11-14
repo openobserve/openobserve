@@ -7,6 +7,7 @@ import OSelect from "./OSelect.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { TOOLTIP_DELAY_MS } from "@/lib/styles/motion";
 
 describe("OSelect", () => {
   let wrapper: VueWrapper;
@@ -21,8 +22,9 @@ describe("OSelect", () => {
   });
 
   it.each([
-    ["sm", "h-[2.125rem]"],
-    ["md", "h-[2.125rem]"],
+    ["sm", "h-control-sm"],
+    ["md", "h-control-md"],
+    ["lg", "h-control-lg"],
   ] as const)("sizes the trigger for %s", (size, expected) => {
     wrapper = mount(OSelect, { props: { size } });
     expect(wrapper.find("button").classes()).toContain(expected);
@@ -435,7 +437,7 @@ describe("OSelect", () => {
       });
       await wrapper.find("button").trigger("click");
       await flushPromises();
-      const scroller = document.body.querySelector<HTMLElement>(".overflow-auto.max-h-72")!;
+      const scroller = document.body.querySelector<HTMLElement>('[data-test="o-select-list"]')!;
       scroller.scrollTop = 600;
 
       const input = document.body.querySelector<HTMLInputElement>(
@@ -596,14 +598,14 @@ describe("OSelect", () => {
       wrapper = mount(OSelect, {
         props: { label: "Country", options },
         attrs: { "data-test": "country" },
-        slots: { tooltip: () => h(OTooltip, { content: "Where the team works", delay: 10 }) },
+        slots: { tooltip: () => h(OTooltip, { content: "Where the team works" }) },
         attachTo: document.body,
       });
       const info = wrapper.find('[data-test="country-info"]');
       expect(info.attributes("tabindex")).toBe("0");
       expect(info.attributes("aria-label")).toBeTruthy();
       info.element.dispatchEvent(new FocusEvent("focus"));
-      await new Promise((r) => setTimeout(r, 60));
+      await new Promise((r) => setTimeout(r, TOOLTIP_DELAY_MS + 50));
       await flushPromises();
       expect(document.body.textContent).toContain("Where the team works");
     });
@@ -657,55 +659,118 @@ describe("OSelect", () => {
     });
   });
 
-  describe("inline appearance with an inside label", () => {
+  describe("filter variant", () => {
     const options = [
-      { label: "Off", value: "off" },
-      { label: "1 day ago", value: "1d" },
+      { label: "Firing", value: "firing" },
+      { label: "Paused", value: "paused" },
+      { label: "Resolved", value: "resolved" },
     ];
-    const mountInline = (searchable: boolean) =>
+    const mountFilter = (props: Record<string, unknown> = {}) =>
       mount(OSelect, {
         attachTo: document.body,
-        props: {
-          appearance: "inline",
-          label: "Compare to",
-          labelPosition: "inside",
-          modelValue: "off",
-          options,
-          searchable,
-        },
+        props: { variant: "filter", label: "Status", options, ...props },
       });
 
-    it.each([false, true])(
-      "puts the label in the trigger beside the value (searchable: %s)",
-      async (searchable) => {
-        wrapper = mountInline(searchable);
-        await flushPromises();
-        const trigger = wrapper.find('button[role="combobox"]');
-        expect(trigger.text()).toContain("Compare to");
-        expect(trigger.text()).toContain("Off");
-        expect(trigger.attributes("aria-label")).toBe("Compare to");
-        expect(wrapper.find("label").exists()).toBe(false);
-      },
-    );
-
-    // The chevron is positioned against this wrapper, so a wrapper wider than the trigger strands it off the click target.
-    it.each([false, true])(
-      "keeps the chevron's wrapper hugging the trigger (searchable: %s)",
-      (searchable) => {
-        wrapper = mountInline(searchable);
-        expect(wrapper.find('button[role="combobox"]').element.parentElement!.className).toContain(
-          "w-fit",
-        );
-      },
-    );
-
-    it("opens the menu from the keyboard on the trigger", async () => {
-      wrapper = mountInline(false);
+    it("puts the label inside the trigger with Any while nothing is picked", () => {
+      wrapper = mountFilter();
       const trigger = wrapper.find('button[role="combobox"]');
-      await trigger.trigger("keydown", { key: "Enter" });
+      expect(trigger.text()).toContain("Status:");
+      expect(trigger.text()).toContain("Any");
+      expect(trigger.attributes("aria-label")).toBe("Status");
+      expect(wrapper.find("label").exists()).toBe(false);
+    });
+
+    it("shows the picked value, tints the trigger and offers clear once narrowed", () => {
+      wrapper = mountFilter({ modelValue: "paused" });
+      const trigger = wrapper.find('button[role="combobox"]');
+      expect(wrapper.find('[data-test="o-select-filter-value"]').text()).toBe("Paused");
+      expect(trigger.classes()).toContain("bg-select-item-selected-bg");
+      expect(wrapper.find('button[aria-label="Clear selection"]').exists()).toBe(true);
+    });
+
+    it("counts the picks of a multi filter", () => {
+      wrapper = mountFilter({ multiple: true, modelValue: ["firing", "paused"] });
+      expect(wrapper.find('[data-test="o-select-filter-value"]').text()).toBe("2");
+    });
+
+    it("stays untinted and unclearable when the page makes it required", () => {
+      wrapper = mountFilter({ modelValue: "paused", clearable: false });
+      const trigger = wrapper.find('button[role="combobox"]');
+      expect(trigger.classes()).not.toContain("bg-select-item-selected-bg");
+      expect(wrapper.find('button[aria-label="Clear selection"]').exists()).toBe(false);
+    });
+
+    it.each([
+      ["a searchable", { searchable: true }],
+      ["a simple", { searchable: false }],
+    ])(
+      "as %s select with no label, shows the bare value with no colon, tint or clear",
+      (_, extra) => {
+        wrapper = mountFilter({ label: undefined, modelValue: "paused", ...extra });
+        const trigger = wrapper.find('button[role="combobox"]');
+        expect(wrapper.find('[data-test="o-select-filter-label"]').exists()).toBe(false);
+        expect(trigger.text()).not.toContain(":");
+        expect(trigger.classes()).not.toContain("bg-select-item-selected-bg");
+        expect(wrapper.find('button[aria-label="Clear selection"]').exists()).toBe(false);
+      },
+    );
+
+    it("reads as the bare picked value with no label", () => {
+      wrapper = mountFilter({ label: undefined, modelValue: "paused", searchable: true });
+      expect(wrapper.find('button[role="combobox"]').text()).toBe("Paused");
+    });
+
+    it("offers clear on a label-less filter only when the page makes it clearable", () => {
+      wrapper = mountFilter({ label: undefined, modelValue: "paused", clearable: true });
+      expect(wrapper.find('button[aria-label="Clear selection"]').exists()).toBe(true);
+    });
+  });
+
+  describe("menu contents", () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ label: `Stream ${i}`, value: i }));
+
+    it("hides the search box up to eight options and shows it past eight", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { options: many.slice(0, 8) },
+      });
+      await wrapper.find("button").trigger("click");
       await flushPromises();
-      expect(trigger.attributes("aria-expanded")).toBe("true");
-      expect(document.body.textContent).toContain("1 day ago");
+      expect(document.body.querySelector('input[placeholder="Search..."]')).toBeNull();
+      wrapper.unmount();
+
+      wrapper = mount(OSelect, { attachTo: document.body, props: { options: many } });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+      expect(document.body.querySelector('input[placeholder="Search..."]')).not.toBeNull();
+    });
+
+    it("shows two chips and +N for a multi-select", () => {
+      wrapper = mount(OSelect, {
+        props: { multiple: true, options: many, modelValue: [0, 1, 2, 3] },
+      });
+      expect(wrapper.find('[data-test="o-select-overflow-chip"]').text()).toBe("+2");
+    });
+
+    it("offers an Add row for a typed value that is not listed", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { options: many.slice(0, 3), creatable: true },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+      const input = document.body.querySelector<HTMLInputElement>(
+        'input[placeholder="Search..."]',
+      )!;
+      input.value = "billing";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushPromises();
+      const create = document.body.querySelector<HTMLButtonElement>(
+        '[data-test="o-select-create"]',
+      )!;
+      expect(create.textContent).toContain('Add "billing"');
+      create.click();
+      expect(wrapper.emitted("create")?.[0]).toEqual(["billing"]);
     });
   });
 

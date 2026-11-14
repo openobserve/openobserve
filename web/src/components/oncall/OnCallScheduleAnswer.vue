@@ -58,8 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="!hasMembers"
         variant="primary"
-        size="sm"
-        icon-left="person-add"
+        icon="person-add"
         data-test="oncall-answer-add-people"
         @click="emit('add-people')"
       >
@@ -68,9 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Only with exactly one rotation: none has no first to back up, and a second off-hours now is still a secondary. -->
       <OButton
         v-else-if="!secondary && rotationCount === 1"
-        variant="outline"
-        size="sm"
-        icon-left="add"
+        variant="secondary"
+        icon="add"
         data-test="oncall-answer-assign-secondary"
         @click="emit('assign-secondary')"
       >

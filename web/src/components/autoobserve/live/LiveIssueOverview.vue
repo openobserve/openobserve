@@ -22,18 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-wrap items-center gap-2">
       <OTag type="severity" :value="item.incident.severity" size="sm" />
       <OTag type="incidentStatus" :value="item.incident.status" size="sm" />
-      <OTag
-        v-for="name in chips.shown"
-        :key="name"
-        variant="default-soft"
-        shape="rounded"
-        size="sm"
-        :label="raw(name)"
-      />
+      <OTag v-for="name in chips.shown" :key="name" tone="neutral" size="sm" :label="raw(name)" />
       <OTag
         v-if="chips.more"
-        variant="default-soft"
-        shape="rounded"
+        tone="neutral"
         size="sm"
         :title="chips.rest"
         :label="chips.more"
@@ -47,14 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="contents @min-[64rem]:flex @min-[64rem]:min-w-0 @min-[64rem]:flex-col @min-[64rem]:gap-4"
       >
-        <OCard variant="glass" data-test="autoobserve-issue-rca">
-          <OCardSection role="header" dense>
+        <OCard data-test="autoobserve-issue-rca">
+          <template #header>
             <OIcon name="psychology" size="sm" class="text-text-secondary" />
-            <OText variant="panel-title">{{
-              headline ? t("autoobserve.drawer.rca") : t("autoobserve.issueLive.whatHappened")
-            }}</OText>
-          </OCardSection>
-          <OCardSection role="body" dense class="flex flex-col gap-3">
+            <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+              {{ headline ? t("autoobserve.drawer.rca") : t("autoobserve.issueLive.whatHappened") }}
+            </h3>
+          </template>
+          <div class="flex flex-col gap-3">
             <p class="text-text-body text-sm" data-test="autoobserve-live-issue-why">{{ why }}</p>
             <p
               v-if="!headline && causeNote"
@@ -97,26 +89,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}
             </p>
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               class="self-start"
               data-test="autoobserve-issue-see-evidence"
               @click="emit('see-evidence')"
             >
               {{ t("autoobserve.issueLive.seeAnalysis") }}
             </OButton>
-          </OCardSection>
+          </div>
         </OCard>
-        <OCard
-          variant="glass"
-          class="order-1 @min-[64rem]:order-none"
-          data-test="autoobserve-issue-notification"
-        >
-          <OCardSection role="header" dense>
+        <OCard class="order-1 @min-[64rem]:order-none" data-test="autoobserve-issue-notification">
+          <template #header>
             <OIcon :name="notice.icon" size="sm" class="text-text-secondary" />
-            <OText variant="panel-title">{{ notice.title }}</OText>
-          </OCardSection>
-          <OCardSection role="body" dense class="flex flex-col gap-2">
+            <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+              {{ notice.title }}
+            </h3>
+          </template>
+          <div class="flex flex-col gap-2">
             <p
               class="text-sm"
               :class="NOTICE_INK[notice.tone]"
@@ -127,8 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
             <OButton
               v-if="notice.routing"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               class="self-start"
               data-test="autoobserve-live-issue-routing"
               @click="router.push({ name: 'onCallRouting', query: { org_identifier: org } })"
@@ -136,18 +125,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("autoobserveLive.incidents.routing") }}
             </OButton>
             <p class="text-text-secondary text-xs">{{ t("autoobserve.issueLive.pageNote") }}</p>
-          </OCardSection>
+          </div>
         </OCard>
       </div>
       <div
         class="contents @min-[64rem]:flex @min-[64rem]:min-w-0 @min-[64rem]:flex-col @min-[64rem]:gap-4"
       >
-        <OCard variant="glass" data-test="autoobserve-issue-timeline">
-          <OCardSection role="header" dense>
+        <OCard data-test="autoobserve-issue-timeline">
+          <template #header>
             <OIcon name="timeline" size="sm" class="text-text-secondary" />
-            <OText variant="panel-title">{{ t("autoobserve.drawer.timeline") }}</OText>
-          </OCardSection>
-          <OCardSection role="body" dense class="flex flex-col gap-2">
+            <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+              {{ t("autoobserve.drawer.timeline") }}
+            </h3>
+          </template>
+          <div class="flex flex-col gap-2">
             <OTimeline>
               <OTimelineItem
                 v-for="(entry, i) in timeline.entries"
@@ -168,22 +159,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
             <OButton
               v-if="timeline.more"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               class="self-start"
               data-test="autoobserve-live-issue-timeline-more"
               @click="emit('open-activity')"
             >
               {{ t("autoobserve.issueLive.timelineMore", { count: timeline.more }, timeline.more) }}
             </OButton>
-          </OCardSection>
+          </div>
         </OCard>
-        <OCard variant="glass" data-test="autoobserve-issue-blast">
-          <OCardSection role="header" dense>
+        <OCard data-test="autoobserve-issue-blast">
+          <template #header>
             <OIcon name="hub" size="sm" class="text-text-secondary" />
-            <OText variant="panel-title">{{ t("autoobserve.drawer.blastRadius") }}</OText>
-          </OCardSection>
-          <OCardSection role="body" dense class="flex flex-col gap-1.5">
+            <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+              {{ t("autoobserve.drawer.blastRadius") }}
+            </h3>
+          </template>
+          <div class="flex flex-col gap-1.5">
             <span class="text-text-secondary text-xs font-medium">{{
               t("autoobserve.issueLive.affectedStreams")
             }}</span>
@@ -191,8 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag
                 v-for="s in blast.shown"
                 :key="`${s.type}/${s.name}`"
-                :variant="s.recoveredUs === null ? 'error-soft' : 'default-soft'"
-                shape="rounded"
+                :tone="s.recoveredUs === null ? 'err' : 'neutral'"
                 size="sm"
                 :title="s.recoveredUs === null ? stillOut : backText"
                 :label="raw(s.name)"
@@ -203,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</span>
             </div>
             <p class="text-text-secondary text-xs">{{ t("autoobserve.issueLive.blastNote") }}</p>
-          </OCardSection>
+          </div>
         </OCard>
       </div>
     </div>
@@ -217,11 +209,9 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import type { AutoObserveIncidentItem } from "@/services/autoobserve";

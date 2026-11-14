@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OText as="label" class="text-xs font-medium">{{ t("workflow.http.endpointUrl") }}</OText>
       <OTag
         v-if="regionHost"
-        variant="primary-soft"
+        tone="accent"
         size="sm"
         :label="t('workflow.http.regionTag', { name: raw(regionHost) })"
         data-test="workflow-http-region"
@@ -32,19 +32,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OCode copyable :tooltip="false" class="min-w-0 flex-1 break-all">{{ url }}</OCode>
     </div>
-    <OBanner
+    <OInlineNotice
       v-if="regionHost"
-      variant="info"
-      dense
+      tone="info"
       data-test="workflow-http-region-banner"
-      :content="t('workflow.http.regionBanner', { field: raw('status_url') })"
+      :message="t('workflow.http.regionBanner', { field: raw('status_url') })"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";

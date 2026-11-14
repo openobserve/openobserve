@@ -29,7 +29,7 @@ const total = computed(() => props.values.reduce((sum, v) => sum + v.count, 0));
       {{ t("siem.events.topValuesWholeStream") }}
     </span>
     <div v-if="loading" class="flex justify-center py-2">
-      <OSpinner size="sm" />
+      <OSpinner size="lg" />
     </div>
     <span v-else-if="!values.length" class="text-text-secondary px-1 py-1 text-xs">
       {{ t("siem.events.noValues") }}
@@ -51,26 +51,26 @@ const total = computed(() => props.values.reduce((sum, v) => sum + v.count, 0));
             class="flex items-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
           >
             <OButton
+              icon-only
               :data-test="`security-events-value-include-${v.value}`"
               variant="ghost"
-              size="icon-xs"
-              icon-left="add-circle-outline"
+              icon="add-circle-outline"
               @click.stop="emit('add', field, v.value, '=')"
             >
               <OTooltip :content="t('siem.pivot.include')" />
             </OButton>
             <OButton
+              icon-only
               :data-test="`security-events-value-exclude-${v.value}`"
               variant="ghost"
-              size="icon-xs"
-              icon-left="block"
+              icon="block"
               @click.stop="emit('add', field, v.value, '!=')"
             >
               <OTooltip :content="t('siem.pivot.exclude')" />
             </OButton>
           </div>
         </div>
-        <OProgressBar :value="total ? v.count / total : 0" size="xs" />
+        <OProgressBar :value="total ? (v.count / total) * 100 : 0" />
       </div>
     </template>
   </div>

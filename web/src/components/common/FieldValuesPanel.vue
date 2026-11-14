@@ -21,8 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="value-search-input-wrap">
         <OSearchInput
           v-model="valueSearchTerm"
-          clearable
-          size="sm"
           :placeholder="t('common.searchValuesIn', { field: fieldName })"
           @clear="valueSearchTerm = ''"
         />
@@ -48,8 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
         <OButton
           v-if="selectedValues.length > 0"
+          icon-only
           variant="ghost"
-          size="icon"
+          size="xs"
           :title="t('search.clearSelection')"
           class="selection-clear-btn"
           @click="clearSelection"
@@ -63,8 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="field-values-panel-filter-mode-toggle"
       >
         <OButton
-          :variant="filterMode === 'include' ? 'primary' : 'ghost-muted'"
-          size="icon-chip"
+          icon-only
+          :variant="filterMode === 'include' ? 'primary' : 'ghost'"
+          size="xs"
           class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'include' && isModeToggleDisabled"
           :title="t('search.includeModeHint')"
@@ -77,8 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OIcon>
         </OButton>
         <OButton
-          :variant="filterMode === 'exclude' ? 'filter-exclude' : 'ghost-muted'"
-          size="icon-chip"
+          icon-only
+          :variant="filterMode === 'exclude' ? 'danger' : 'ghost'"
+          size="xs"
           class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'exclude' && isModeToggleDisabled"
           :title="t('search.excludeModeHint')"
@@ -95,17 +96,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scrollable values area -->
     <div class="max-h-64 overflow-y-auto">
       <!-- Loading state (only shown when there are no interim cached results) -->
-      <div v-show="fieldValues?.isLoading && !displayValues.length" class="relative h-15 py-1 ps-3">
-        <!-- scrim off: this box is empty while loading, so there is nothing to
-             dim — and the scrim is 70% of surface-base (white), which on this
-             panel's grey surface just reads as a white block. -->
-        <OInnerLoading
-          :showing="!!fieldValues?.isLoading && !displayValues.length"
-          :label="t('search.fetchingValues')"
-          size="xs"
-          :scrim="false"
-          data-test="field-values-panel-loading-indicator"
-        />
+      <div
+        v-if="fieldValues?.isLoading && !displayValues.length"
+        class="flex h-15 flex-col justify-center gap-2 py-1 ps-3 pe-3"
+        role="status"
+        :aria-label="t('search.fetchingValues')"
+        data-test="field-values-panel-loading-indicator"
+      >
+        <OSkeleton class="w-3/4" />
+        <OSkeleton class="w-1/2" />
       </div>
 
       <!-- No values found -->
@@ -150,8 +149,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="showMultiSelect"
               :model-value="selectedValues"
               :value="value.key"
-              :color="filterMode === 'exclude' ? 'negative' : 'primary'"
-              size="xs"
               class="shrink-0"
               @update:model-value="handleUserCheckboxChange"
               @click.stop
@@ -192,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"
       >
-        <OSpinner variant="dots" v-if="isLoadingMore" size="xs" />
+        <OSpinner v-if="isLoadingMore" />
         <span v-else>{{ t("search.viewMoreValues") }}</span>
       </button>
     </div>
@@ -209,7 +206,7 @@ import { formatLargeNumber } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";

@@ -10,7 +10,7 @@ export interface FormInputProps extends Omit<InputProps, "modelValue" | "error" 
 
 /**
  * OFormInput slots. In addition to the OInput passthrough slots
- * (icon-left/icon-right/prefix/suffix/tooltip/append), OFormInput adds:
+ * (icon/icon-end/tooltip), OFormInput adds:
  *
  * - `error` — when provided, the consumer OWNS the validation message: OInput's
  *   inline error TEXT is suppressed, but the field still renders its error

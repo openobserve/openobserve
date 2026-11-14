@@ -124,18 +124,16 @@ describe("K8sResourceTree", () => {
   it("persists a collapsed group and restores it on a fresh mount", async () => {
     const first = mountTree();
     const group = first.findComponent('[data-test="k8s2-tree-group-workloads"]');
-    group.vm.$emit("update:modelValue", false);
+    group.vm.$emit("update:open", false);
     await flushPromises();
     expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({ workloads: true });
     first.unmount();
 
     const second = mountTree();
-    expect(
-      second.findComponent('[data-test="k8s2-tree-group-workloads"]').props("modelValue"),
-    ).toBe(false);
-    expect(second.findComponent('[data-test="k8s2-tree-group-cluster"]').props("modelValue")).toBe(
-      true,
+    expect(second.findComponent('[data-test="k8s2-tree-group-workloads"]').props("open")).toBe(
+      false,
     );
+    expect(second.findComponent('[data-test="k8s2-tree-group-cluster"]').props("open")).toBe(true);
   });
 
   it("does not crash when localStorage throws", async () => {
@@ -146,9 +144,7 @@ describe("K8sResourceTree", () => {
       throw new Error("blocked");
     });
     const wrapper = mountTree();
-    wrapper
-      .findComponent('[data-test="k8s2-tree-group-workloads"]')
-      .vm.$emit("update:modelValue", false);
+    wrapper.findComponent('[data-test="k8s2-tree-group-workloads"]').vm.$emit("update:open", false);
     await flushPromises();
     expect(wrapper.find('[data-test="k8s2-tree"]').exists()).toBe(true);
   });

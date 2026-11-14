@@ -234,7 +234,7 @@ const stubs = {
   DbmRowChips: true,
   DbmServiceList: true,
   DbmOverlapValue: true,
-  DateTime: true,
+  ODateTimeRange: true,
   ORefreshButton: true,
   OEmptyState: true,
   OTag: true,

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Stream selector sits on the same page-edge rail inset as the field list below it. -->
     <div class="px-page-edge">
       <OSelect
+        searchable
         data-test="log-search-index-list-select-stream"
         :model-value="searchObj.data.stream.selectedStream?.value ?? null"
         :label="
@@ -103,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-if="field.name === 'duration'" #body>
                   <div v-if="durationPercentilesLoading" class="flex justify-center py-2">
-                    <OSpinner size="xs" />
+                    <OSpinner />
                   </div>
                   <template v-else-if="hasDurationPercentiles">
                     <div
@@ -118,8 +119,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex w-12">
                         <OButton
                           v-if="p.key !== 'max'"
+                          icon-only
                           variant="ghost"
-                          size="icon-xs-circle"
+                          size="xs"
                           :title="
                             t('common.durationGte', {
                               value: formatPercentile(durationPercentiles[p.key]),
@@ -135,8 +137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon name="arrow-forward-ios" size="sm" class="h-2! w-2!" />
                         </OButton>
                         <OButton
+                          icon-only
                           variant="ghost"
-                          size="icon-xs-circle"
+                          size="xs"
                           :title="
                             t('common.durationLte', {
                               value: formatPercentile(durationPercentiles[p.key]),
@@ -164,15 +167,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #after-list="bottomProps">
-          <GroupedFieldListPagination
+          <FieldListFooter
             data-test-prefix="traces-page"
             :current-page="bottomProps.currentPage"
             :pages-number="bottomProps.totalPages"
-            :is-first-page="bottomProps.isFirstPage"
-            :is-last-page="bottomProps.isLastPage"
             :total-fields-count="totalFieldsCount"
-            @first-page="bottomProps.firstPage()"
-            @last-page="bottomProps.lastPage()"
             @set-page="setPage"
             @reset-fields="resetSelectedFields"
           />
@@ -188,8 +187,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSkeleton
               v-for="(width, index) in RAIL_SKELETON_WIDTHS"
               :key="index"
-              type="text"
-              animation="none"
               :class="width"
               aria-hidden="true"
             />
@@ -252,9 +249,7 @@ export default defineComponent({
     GroupedFieldList: defineAsyncComponent(
       () => import("@/components/common/GroupedFieldList.vue"),
     ),
-    GroupedFieldListPagination: defineAsyncComponent(
-      () => import("@/components/common/FieldListPagination.vue"),
-    ),
+    FieldListFooter: defineAsyncComponent(() => import("@/components/common/FieldListFooter.vue")),
     FieldExpansion: defineAsyncComponent(() => import("@/components/common/FieldExpansion.vue")),
   },
   emits: ["update:changeStream", "update:selectedFields"],

@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="
       isEdit ? t('synthetics.environments.editTitle') : t('synthetics.environments.createTitle')
     "
-    :primary-button-label="isEdit ? t('common.save') : t('common.create')"
-    :secondary-button-label="t('common.cancel')"
+    :primary="{ label: isEdit ? t('common.save') : t('common.create') }"
+    :secondary="{ label: t('common.cancel') }"
     form-id="synthetics-environment-form"
     @click:secondary="handleClose"
     data-test="synthetics-environment-form-dialog"
@@ -36,9 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @submit="save"
       class="flex flex-col gap-4"
     >
-      <OBanner v-if="isEdit" variant="info" data-test="synthetics-environment-rename-note">
+      <OInlineNotice v-if="isEdit" tone="info" data-test="synthetics-environment-rename-note">
         {{ t("synthetics.environments.renameBlocked") }}
-      </OBanner>
+      </OInlineNotice>
 
       <OFormInput
         name="name"
@@ -66,7 +66,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsEnvironment } from "@/types/synthetics";
@@ -75,7 +75,7 @@ import { serverMessage } from "./serverMessage";
 
 export default defineComponent({
   name: "SyntheticsEnvironmentForm",
-  components: { ODialog, OForm, OFormInput, OFormTextarea, OBanner },
+  components: { ODialog, OForm, OFormInput, OFormTextarea, OInlineNotice },
   emits: ["close", "created", "update:list", "update:open"],
   props: {
     open: { type: Boolean, default: false },

@@ -17,12 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('alerts.insights.title')"
-    :back="{ label: t('menu.alerts'), onClick: goBack, dataTest: 'alert-insights-back-btn' }"
-    tabs-below
+    :back="{ label: t('alerts.header'), to: alertListRoute, dataTest: 'alert-insights-back-btn' }"
     bleed
   >
     <template #actions>
-      <date-time
+      <ODateTimeRange
         ref="dateTimeRef"
         auto-apply
         :default-type="dateTimeType"
@@ -37,10 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <OButton
+        icon-only
         @click="refreshDashboard"
         :loading="isLoading"
         variant="ghost"
-        size="icon-sm"
         data-test="alert-insights-refresh-btn"
       >
         <OIcon name="refresh" size="sm" />
@@ -51,8 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-tabs>
       <OTabs
         :model-value="currentTab"
-        dense
-        align="left"
+        size="compact"
         data-test="alert-insights-tabs"
         @update:model-value="onTabsChange"
       >
@@ -65,13 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="frequency"
           :label="t('alerts.insights.tabs.frequency')"
           data-test="tab-frequency"
-          :suffix-icon="!insightsAccess.allowed ? 'lock' : undefined"
+          :locked="!insightsAccess.allowed"
         />
         <OTab
           name="correlation"
           :label="t('alerts.insights.tabs.correlation')"
           data-test="tab-correlation"
-          :suffix-icon="!insightsAccess.allowed ? 'lock' : undefined"
+          :locked="!insightsAccess.allowed"
         />
         <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
       </OTabs>
@@ -138,11 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="hasActiveFilters"
         variant="ghost"
-        size="sm"
         class="ms-2"
         @click="clearAllFilters"
         data-test="clear-all-filters-btn"
-        icon-left="close"
+        icon="close"
       >
         {{ t("alerts.insights.filters.clearAll") }}
       </OButton>
@@ -160,23 +157,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <strong>{{ selectedAlertForAction }}</strong></span
       >
 
-      <OButton
-        variant="ghost-primary"
-        size="sm"
-        @click="editAlert"
-        data-test="edit-alert-btn"
-        icon-left="edit"
-      >
+      <OButton variant="accent-ghost" @click="editAlert" data-test="edit-alert-btn" icon="edit">
         {{ t("alerts.insights.actions.editAlert") }}
         <OTooltip :content="t('alerts.insights.actions.editAlertTooltip')" />
       </OButton>
 
       <OButton
-        variant="ghost-primary"
-        size="sm"
+        variant="accent-ghost"
         @click="viewHistory"
         data-test="view-history-btn"
-        icon-left="history"
+        icon="history"
       >
         {{ t("alerts.insights.actions.viewHistory") }}
         <OTooltip :content="t('alerts.insights.actions.viewHistoryTooltip')" />
@@ -185,8 +175,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex-1" />
 
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-circle-sm"
+        size="sm"
         @click="selectedAlertForAction = null"
         data-test="close-actions-btn"
       >
@@ -200,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)] max-md:h-auto">
         <div @contextmenu="handleNativeContextMenu">
           <div v-show="isLoading" class="flex h-100 items-center justify-center">
-            <OSpinner size="md" />
+            <OSpinner size="lg" />
             <div class="ms-3">{{ t("alerts.insights.loading.insights") }}</div>
           </div>
 
@@ -255,7 +246,7 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
-import dateTime from "@/components/DateTimePickerDashboard.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import AlertInsightsContextMenu from "./AlertInsightsContextMenu.vue";
 import { useAlertInsights } from "@/composables/useAlertInsights";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
@@ -443,13 +434,13 @@ const fetchAlerts = async () => {
   }
 };
 
-const goBack = () => {
+const alertListRoute = computed(() => {
   const { folder, tab } = route.query;
-  router.push({
+  return {
     name: "alertList",
     query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
-  });
-};
+  };
+});
 
 const updateDateTime = (value: any) => {
   if (value.userChangedValue) {

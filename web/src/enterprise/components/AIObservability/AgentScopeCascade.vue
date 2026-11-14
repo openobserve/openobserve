@@ -21,9 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="w-44 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink">
       <OSelect
+        width="full"
         :model-value="selectedEnv"
         :label="t('aiObservability.scope.env')"
-        label-position="inside"
+        variant="filter"
         :options="envs"
         labelKey="label"
         valueKey="value"
@@ -39,9 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`${prefix}-cascade-agent-id`"
     >
       <OSelect
+        width="full"
         :model-value="selectedAgentName"
         :label="t('aiObservability.scope.agent')"
-        label-position="inside"
+        variant="filter"
         :options="agentNames"
         labelKey="label"
         valueKey="value"
@@ -55,9 +57,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="w-44 flex-shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink"
     >
       <OSelect
+        width="full"
         :model-value="selectedVersion"
         :label="t('aiObservability.scope.version')"
-        label-position="inside"
+        variant="filter"
         :options="versions"
         labelKey="label"
         valueKey="value"
@@ -72,9 +75,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('aiObservability.scope.streamHint', { count: agentStreams.length })"
     >
       <OSelect
+        width="full"
         :model-value="selectedStream"
         :label="t('aiObservability.scope.stream')"
-        label-position="inside"
+        variant="filter"
         :options="agentStreams"
         labelKey="label"
         valueKey="value"

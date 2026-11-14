@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-2">{{ error_stack[0] }}</div>
 
       <!-- Tabs for Pretty and Raw views -->
-      <OTabs v-model="activeTab" dense class="text-text-secondary mb-1" align="left">
+      <OTabs v-model="activeTab" size="compact" class="text-text-secondary mb-1">
         <OTab
           name="raw"
           :label="t('rum.stackTraceRaw')"

@@ -24,20 +24,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :show-close="dismissible"
     size="md"
     :title="t('passwordReset.title')"
-    :sub-title="t('passwordReset.signedInAs', { email: raw(userEmail) })"
-    :neutral-button-label="dismissible ? undefined : t('passwordReset.signOut')"
-    :secondary-button-label="dismissible ? t('common.cancel') : undefined"
-    :primary-button-label="t('passwordReset.submit')"
+    :subtitle="t('passwordReset.signedInAs', { email: raw(userEmail) })"
+    :extra="{ label: dismissible ? undefined : t('passwordReset.signOut') }"
+    :secondary="{ label: dismissible ? t('common.cancel') : undefined }"
+    :primary="{ label: t('passwordReset.submit') }"
     form-id="update-password-form"
-    @click:neutral="requestSignOut"
+    @click:extra="requestSignOut"
     @click:secondary="close"
     @update:open="(open: boolean) => !open && close()"
   >
     <div class="flex flex-col gap-4">
-      <OBanner
-        variant="warning"
-        icon="warning"
-        :content="bannerMessage"
+      <OInlineNotice
+        tone="warn"
+        :message="bannerMessage"
         data-test="password-reset-dialog-banner"
       />
 
@@ -46,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="password-reset-dialog-current-password"
           name="old_password"
           type="password"
-          revealable
           :label="t('passwordReset.currentPassword')"
           required
           autocomplete="current-password"
@@ -57,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="password-reset-dialog-new-password"
             name="new_password"
             type="password"
-            revealable
             :label="t('passwordReset.newPassword')"
             required
             autocomplete="new-password"
@@ -75,7 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="password-reset-dialog-confirm-password"
           name="confirm_password"
           type="password"
-          revealable
           :label="t('passwordReset.confirmPassword')"
           required
           autocomplete="new-password"
@@ -97,7 +93,7 @@ import { useStore } from "vuex";
 
 import { usePasswordComplexity } from "@/composables/usePasswordComplexity";
 import { remediationOrg, usePasswordReset } from "@/composables/usePasswordReset";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";

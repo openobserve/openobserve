@@ -263,20 +263,18 @@ describe("insightCopy: Not working next step and actions (test 5)", () => {
 describe("insightCopy: chip colour and words (test 6)", () => {
   it("is a red Not working for a failing alert, with its tier in Details, not a High tag", () => {
     const p = parts(notWorking());
-    expect(p.chip).toEqual({ label: "Not working", variant: "error-soft", tone: "failure" });
-    expect(p.facts.map((f) => f.variant)).toEqual(["default-soft"]);
+    expect(p.chip).toEqual({ label: "Not working", variant: "err", tone: "failure" });
+    expect(p.facts.map((f) => f.variant)).toEqual(["neutral"]);
     expect(p.meta).toBe("From the calibration run 1 hour ago");
   });
 
   it("is amber for a gap and neutral for information", () => {
-    expect(parts(gap("coverage_gap")).chip.variant).toBe("amber-soft");
-    expect(parts(gap("no_absence_check")).chip.variant).toBe("amber-soft");
-    expect(parts(gap("discovery_unusable", { good: 1, active: 4 })).chip.variant).toBe(
-      "default-soft",
-    );
+    expect(parts(gap("coverage_gap")).chip.variant).toBe("warn");
+    expect(parts(gap("no_absence_check")).chip.variant).toBe("warn");
+    expect(parts(gap("discovery_unusable", { good: 1, active: 4 })).chip.variant).toBe("neutral");
     expect(parts(gap("some_new_kind")).chip).toMatchObject({
       label: "Other",
-      variant: "default-soft",
+      variant: "neutral",
     });
   });
 
@@ -312,7 +310,7 @@ describe("insightCopy: coverage kinds read the same on the rail and the card (te
       actions: [{ type: "review_alert", alert_id: "a7", focus: "query" }],
     };
     const p = parts(blind);
-    expect(p.chip.variant).toBe("error-soft");
+    expect(p.chip.variant).toBe("err");
     expect(p.cta?.label).toBe("Review alert");
     expect(p.cta?.target).toMatchObject({ alertName: "checkout-errors", findingId: "" });
     expect(p.dismissable).toBeNull();

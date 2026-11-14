@@ -20,10 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   cards, and a recent-stream chip loaded from localStorage.
 -->
 <template>
-  <OEmptyState illustration="stream-select" size="hero" :hide-action="true">
-    <template #title>{{ t("traces.noStream.title") }}</template>
-
-    <template #description>
+  <OEmptyState icon="dataset" :title="t('traces.noStream.title')">
+    <template #text>
       <span v-html="description" />
     </template>
 

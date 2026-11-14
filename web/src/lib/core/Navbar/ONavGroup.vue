@@ -69,6 +69,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { featureState } from "@/utils/featureGate";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { flyoutTop, needsColumns } from "./flyoutLayout";
+import { resolveActiveChild } from "./navGroups";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
 import { useFeatureNames } from "@/composables/useFeatureLock";
 import {
@@ -266,53 +267,14 @@ function childPath(name: string): string | null {
   }
 }
 
-// At most ONE child is active, resolved for the whole flyout rather than per
-// child. Deciding per child lit up ancestors too: any section whose path is a
-// prefix of another's matched both, which is right for a drill-down like
-// /alerts/detail/:id but wrong for a sibling that merely sits underneath.
-//
-// Exact route-name match wins outright; otherwise the DEEPEST path prefix wins,
-// so a nested route is attributed to its own section, not a shallower sibling.
-function resolveActiveChild(children: SubnavChild[]): SubnavChild | null {
-  const route = router.currentRoute.value;
-
-  const exactTab = children.find(
-    (c) => c.tab && route.name === c.name && route.query.tab === c.tab,
-  );
-  if (exactTab) return exactTab;
-
-  // A route alias, same idea for a section whose sub-views are sibling ROUTES
-  // rendered as in-page tabs (Databases owns dbmQueries / dbmQueryDetail).
-  // Checked before the prefix pass below, which would otherwise attribute a
-  // detail route to whichever child has the longest matching path.
-  const routeAlias = children.find((c) => c.activeOnRoutes?.includes(route.name as string));
-  if (routeAlias) return routeAlias;
-
-  const exact = children.find((c) => route.name === c.name && !c.tab);
-  if (exact) return exact;
-
-  const routeDefault = children.find((c) => c.defaultForRoute && route.name === c.name);
-  if (routeDefault) return routeDefault;
-
-  let best: SubnavChild | null = null;
-  let bestLen = 0;
-  for (const child of children) {
-    if (child.tab) continue; // query-tab children only match by exact name
-    const base = childPath(child.name);
-    if (!base || base === "/") continue;
-    if (route.path !== base && !route.path.startsWith(`${base}/`)) continue;
-    if (base.length > bestLen) {
-      best = child;
-      bestLen = base.length;
-    }
-  }
-  return best;
-}
-
 // A page reached by URL still lights its group when its child was filtered out.
-const activeChild = computed<SubnavChild | null>(
-  () => resolveActiveChild(props.children) ?? resolveActiveChild(props.filteredChildren ?? []),
-);
+const activeChild = computed<SubnavChild | null>(() => {
+  const route = router.currentRoute.value;
+  return (
+    resolveActiveChild(props.children, route, childPath) ??
+    resolveActiveChild(props.filteredChildren ?? [], route, childPath)
+  );
+});
 
 // By KEY, not reference: `visibleChildren` (what actually renders) maps each
 // child through a `{ ...c, locked }` spread to attach the locked state
@@ -818,7 +780,7 @@ function onChildMouseenter(event: MouseEvent) {
                 :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
               />
               <span class="leading-tight">{{ childLabel(child) }}</span>
-              <BetaBadge v-if="child.beta" size="xs" />
+              <BetaBadge v-if="child.beta" />
               <OIcon
                 v-if="isChildPaywalled(child) || child.locked || child.licenseLocked"
                 name="lock"
@@ -867,7 +829,7 @@ function onChildMouseenter(event: MouseEvent) {
               :class="isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass"
             />
             <span class="leading-tight">{{ childLabel(block.child) }}</span>
-            <BetaBadge v-if="block.child.beta" size="xs" />
+            <BetaBadge v-if="block.child.beta" />
             <OIcon
               v-if="
                 isChildPaywalled(block.child) || block.child.locked || block.child.licenseLocked
@@ -1002,7 +964,7 @@ function onChildMouseenter(event: MouseEvent) {
                       :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
                     />
                     <span class="leading-none">{{ childLabel(child) }}</span>
-                    <BetaBadge v-if="child.beta" size="xs" />
+                    <BetaBadge v-if="child.beta" />
                     <OIcon
                       v-if="isChildPaywalled(child) || child.locked || child.licenseLocked"
                       name="lock"
@@ -1066,7 +1028,7 @@ function onChildMouseenter(event: MouseEvent) {
                     "
                   />
                   <span class="leading-none">{{ childLabel(block.child) }}</span>
-                  <BetaBadge v-if="block.child.beta" size="xs" />
+                  <BetaBadge v-if="block.child.beta" />
                   <OIcon
                     v-if="
                       isChildPaywalled(block.child) ||

@@ -44,12 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
-        :frame="false"
-        :toolbar-bordered="false"
         :error="error"
         :forbidden="forbidden"
         sorting="client"
-        :show-global-filter="false"
         table-id="dbm-blocked"
         persist-columns
         :get-row-style="rowStyle"
@@ -58,8 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #error="{ message }">
           <OEmptyState
-            preset="load-error"
-            :description="raw(message)"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="raw(message)"
             data-test="dbm-blocked-error"
             @action="onRefresh()"
           />
@@ -86,19 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               mobile-dropdown
               data-test="dbm-blocked-perspective"
             >
-              <OToggleGroupItem
-                value="waiting"
-                size="sm"
-                data-test="dbm-blocked-perspective-waiting"
-              >
+              <OToggleGroupItem value="waiting" data-test="dbm-blocked-perspective-waiting">
                 {{ t("dbm.blocked.perspective.waiting") }}
                 <OTooltip side="bottom" :content="t('dbm.blocked.perspective.waitingHint')" />
               </OToggleGroupItem>
-              <OToggleGroupItem
-                value="blocking"
-                size="sm"
-                data-test="dbm-blocked-perspective-blocking"
-              >
+              <OToggleGroupItem value="blocking" data-test="dbm-blocked-perspective-blocking">
                 {{ t("dbm.blocked.perspective.blocking") }}
                 <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
               </OToggleGroupItem>
@@ -108,19 +98,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
-            <DateTime
+            <ODateTimeRange
               auto-apply
               menu-align="end"
               :default-type="range.type"
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-blocked-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
+              class="max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :loading="loading"
               :last-run-at="lastRunAt"
               data-test="dbm-blocked-refresh"
@@ -132,12 +120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <OStatStrip
-            :items="summaryStats"
-            :loading="loading"
-            row
+          <div
+            class="px-page-edge border-table-row-divider border-b py-1.5"
             data-test="dbm-blocked-summary"
-          />
+          >
+            <OStatStrip :items="summaryStats" :loading="loading" />
+          </div>
 
           <DbmLockCoverageLine
             v-if="samples.length"
@@ -205,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTruncatedText>
 
               <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
-                <OTag type="dbSystem" :value="row.db_system" size="xs" />
+                <OTag type="dbSystem" :value="row.db_system" size="sm" />
                 <template v-if="row.application || row.db_instance || row.waitingOnPid != null">
                   <span class="opacity-45">·</span>
                   <OTruncatedText
@@ -359,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.kind === 'root'"
               :label="t('dbm.ai.blockingFix')"
               :tooltip="t('dbm.ai.blockingFixHint')"
-              size="xs"
+              size="sm"
               data-test="dbm-blocked-ask-ai"
               @click="askAiForFix(row)"
             />
@@ -393,8 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex-1"></div>
             <OButton
               v-if="perspective === 'waiting' && rootPids.length === 1"
-              variant="ghost-muted"
-              size="sm"
+              variant="ghost"
               data-test="dbm-blocked-switch-perspective"
               @click="perspective = 'blocking'"
             >
@@ -451,7 +438,7 @@ import { useStore } from "vuex";
 import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
@@ -847,15 +834,15 @@ const summaryStats = computed<StatItem[]>(() => [
   {
     key: "waiting",
     label: t("dbm.blocked.summary.waiting"),
-    value: notCollecting.value ? raw("—") : waitingCount.value,
+    value: notCollecting.value ? null : waitingCount.value,
     icon: "lock",
-    tone: waitingCount.value > 0 ? "warning" : "neutral",
+    tone: waitingCount.value > 0 ? "warn" : "neutral",
     dataTest: "dbm-blocked-summary-waiting",
   },
   {
     key: "longest",
     label: t("dbm.blocked.summary.longest"),
-    value: notCollecting.value || !longestWait.value ? raw("—") : formatSeconds(longestWait.value),
+    value: notCollecting.value || !longestWait.value ? null : formatSeconds(longestWait.value),
     icon: "timer",
     tone: "neutral",
     dataTest: "dbm-blocked-summary-longest",
@@ -863,7 +850,7 @@ const summaryStats = computed<StatItem[]>(() => [
   {
     key: "chains",
     label: t("dbm.blocked.summary.chains"),
-    value: notCollecting.value ? raw("—") : chains.value.length,
+    value: notCollecting.value ? null : chains.value.length,
     icon: "account-tree",
     tone: "neutral",
     dataTest: "dbm-blocked-summary-chains",

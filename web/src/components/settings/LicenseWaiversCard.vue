@@ -30,11 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="id"
         pagination="none"
         sorting="none"
-        :frame="false"
         :default-columns="false"
-        :dense="false"
         wrap
-        :show-global-filter="false"
         table-id="license-waivers"
         data-test="license-waivers-table"
       >

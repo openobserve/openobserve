@@ -33,7 +33,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import {
   DEFAULT_SCHEDULE_PRESET,
   makeExtractSubtestSchema,
@@ -191,12 +191,11 @@ const scheduleLine = computed(() => {
     :open="open"
     size="md"
     :title="t('synthetics.journey.extract.title', { count }, count)"
-    :sub-title="t('synthetics.journey.extract.subtitle')"
+    :subtitle="t('synthetics.journey.extract.subtitle')"
     :persistent="isSubmitting"
     :show-close="!isSubmitting"
-    :primary-button-label="t('synthetics.journey.extract.confirm')"
-    :secondary-button-label="t('common.cancel')"
-    secondary-button-variant="ghost"
+    :primary="{ label: t('synthetics.journey.extract.confirm') }"
+    :secondary="{ label: t('common.cancel'), variant: 'ghost' }"
     :form-id="FORM_ID"
     data-test="synthetics-extract-dialog"
     @update:open="onUpdateOpen"
@@ -266,7 +265,7 @@ const scheduleLine = computed(() => {
         </template>
       </dl>
 
-      <OBanner variant="warning" dense :content="t('synthetics.journey.extract.historyNotice')" />
+      <OInlineNotice tone="warn" :message="t('synthetics.journey.extract.historyNotice')" />
 
       <p
         v-if="submitError"

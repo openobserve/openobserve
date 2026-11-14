@@ -167,7 +167,7 @@ const globalStubs = {
     name: "OButton",
     // inheritAttrs: false + v-bind="$attrs" lets data-test pass through.
     template:
-      '<button :disabled="disabled || undefined" v-bind="$attrs" @click="!disabled && $emit(\'click\', $event)" @keydown="$emit(\'keydown\', $event)"><slot name="icon-left" /><slot /></button>',
+      '<button :disabled="disabled || undefined" v-bind="$attrs" @click="!disabled && $emit(\'click\', $event)" @keydown="$emit(\'keydown\', $event)"><slot name="icon" /><slot /></button>',
     props: ["variant", "size", "disabled"],
     emits: ["click", "keydown"],
     inheritAttrs: false,

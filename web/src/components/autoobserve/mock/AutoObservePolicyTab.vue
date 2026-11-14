@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OContent y class="min-h-0 flex-1 overflow-auto" data-test="autoobserve-policy">
     <div class="flex flex-col gap-4">
-      <OBanner variant="info" icon="info-outline" dense data-test="autoobserve-policy-defaults">
+      <OInlineNotice tone="info" data-test="autoobserve-policy-defaults">
         {{ t("autoobserve.policy.defaultsNote") }}
-      </OBanner>
+      </OInlineNotice>
 
       <div ref="tabsRoot" class="flex min-w-0 flex-col gap-4 md:flex-row md:items-start">
         <OTabs
@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ tab.label }}
                 <OTag
                   v-if="tab.key === 'fixes'"
-                  variant="purple-soft"
-                  size="xs"
+                  tone="neutral"
+                  size="sm"
                   :label="t('autoobserve.phase2')"
                 />
               </span>
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`autoobserve-policy-${group.key}`"
             >
               <template v-if="group.key === 'action'" #actions>
-                <OTag variant="purple-soft" size="xs" :label="t('autoobserve.phase2')" />
+                <OTag tone="neutral" size="sm" :label="t('autoobserve.phase2')" />
               </template>
               <p class="text-text-secondary py-1 text-xs">{{ group.hint }}</p>
               <OSettingRow
@@ -81,35 +81,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :description="classDescription(cls.id)"
                 :data-test="`autoobserve-policy-${cls.id}`"
               >
-                <OTag
-                  :variant="MODE_VARIANT[cls.mode]"
-                  size="sm"
-                  :label="t(MODE_LABEL[cls.mode])"
-                />
+                <OTag :tone="MODE_VARIANT[cls.mode]" size="sm" :label="t(MODE_LABEL[cls.mode])" />
               </OSettingRow>
             </OFormSection>
 
-            <OCard
-              v-if="tab.key === 'fixes'"
-              variant="outlined"
-              data-test="autoobserve-policy-outcomes"
-            >
-              <OCardSection role="header">
+            <OCard v-if="tab.key === 'fixes'" data-test="autoobserve-policy-outcomes">
+              <template #header>
                 <OIcon name="trending-up" size="sm" class="text-text-secondary" />
-                <OText variant="panel-title">{{ t("autoobserve.policy.outcomesTitle") }}</OText>
-                <OTag
-                  class="ms-auto"
-                  variant="purple-soft"
-                  size="xs"
-                  :label="t('autoobserve.phase2')"
-                />
-              </OCardSection>
-              <OCardSection role="body" class="flex flex-col gap-2 pt-0">
+                <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+                  {{ t("autoobserve.policy.outcomesTitle") }}
+                </h3>
+                <OTag class="ms-auto" tone="neutral" size="sm" :label="t('autoobserve.phase2')" />
+              </template>
+              <div class="flex flex-col gap-2">
                 <p class="text-text-body text-sm">{{ t("autoobserve.policy.outcomesBody") }}</p>
                 <p class="text-text-secondary text-xs">
                   {{ t("autoobserve.policy.outcomesExample") }}
                 </p>
-              </OCardSection>
+              </div>
             </OCard>
 
             <template v-if="tab.key === 'investigation'">
@@ -127,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :description="row.description"
                   :data-test="`autoobserve-policy-triage-${row.key}`"
                 >
-                  <OTag :variant="row.variant" size="sm" :label="row.mode" />
+                  <OTag :tone="row.variant" size="sm" :label="row.mode" />
                 </OSettingRow>
               </OFormSection>
 
@@ -145,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :description="row.description"
                   :data-test="`autoobserve-policy-routing-${row.key}`"
                 >
-                  <OTag :variant="row.variant" size="sm" :label="row.mode" />
+                  <OTag :tone="row.variant" size="sm" :label="row.mode" />
                 </OSettingRow>
               </OFormSection>
             </template>
@@ -162,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :description="c.description"
                 :data-test="`autoobserve-policy-channel-${c.key}`"
               >
-                <OTag :variant="c.variant" size="sm" :label="c.state" />
+                <OTag :tone="c.variant" size="sm" :label="c.state" />
               </OSettingRow>
             </OFormSection>
           </OTabPanel>
@@ -181,15 +170,13 @@ import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import {
   CHANNELS,
   actionClassesFor,
@@ -240,10 +227,10 @@ const MODE_LABEL: Record<PolicyMode, I18nKey> = {
   suggest: "autoobserve.policy.suggest",
   auto: "autoobserve.policy.auto",
 };
-const MODE_VARIANT: Record<PolicyMode, BadgeVariant> = {
-  off: "default-soft",
-  suggest: "warning-soft",
-  auto: "blue-soft",
+const MODE_VARIANT: Record<PolicyMode, ChipTone> = {
+  off: "neutral",
+  suggest: "warn",
+  auto: "neutral",
 };
 const autonomy = useAutonomy();
 const completedFixes = useCompletedFixes();
@@ -288,7 +275,7 @@ const triageRows = computed(() => [
     short: t("autoobserve.policy.triage.p1Short"),
     description: t("autoobserve.policy.triage.p1Desc"),
     mode: t("autoobserve.policy.triage.parallel"),
-    variant: "default-soft" as BadgeVariant,
+    variant: "neutral" as ChipTone,
   },
   {
     key: "p2-p4",
@@ -296,7 +283,7 @@ const triageRows = computed(() => [
     short: t("autoobserve.policy.triage.p2p4"),
     description: t("autoobserve.policy.triage.gateDesc"),
     mode: t("autoobserve.policy.triage.gate"),
-    variant: "blue-soft" as BadgeVariant,
+    variant: "neutral" as ChipTone,
   },
 ]);
 
@@ -306,21 +293,21 @@ const routingRows = computed(() => [
     label: t("autoobserve.policy.routing.p1p2"),
     description: t("autoobserve.policy.routing.p1p2Desc"),
     mode: t("autoobserve.policy.routing.page"),
-    variant: "error-soft" as BadgeVariant,
+    variant: "err" as ChipTone,
   },
   {
     key: "p3",
     label: t("autoobserve.policy.routing.p3"),
     description: t("autoobserve.policy.routing.p3Desc"),
     mode: t("autoobserve.policy.routing.message"),
-    variant: "warning-soft" as BadgeVariant,
+    variant: "warn" as ChipTone,
   },
   {
     key: "p4",
     label: t("autoobserve.policy.routing.p4"),
     description: t("autoobserve.policy.routing.p4Desc"),
     mode: t("autoobserve.policy.routing.summary"),
-    variant: "default-soft" as BadgeVariant,
+    variant: "neutral" as ChipTone,
   },
 ]);
 
@@ -330,14 +317,14 @@ const channels = computed(() => [
     label: t("autoobserve.policy.channelInbox"),
     description: t("autoobserve.policy.channelDefault"),
     state: t("autoobserve.policy.alwaysOn"),
-    variant: "success-soft" as BadgeVariant,
+    variant: "ok" as ChipTone,
   },
   {
     key: "email-admins",
     label: t("autoobserve.policy.channelEmailAdmins"),
     description: t("autoobserve.policy.channelDefault"),
     state: t("autoobserve.policy.alwaysOn"),
-    variant: "success-soft" as BadgeVariant,
+    variant: "ok" as ChipTone,
   },
   ...CHANNELS.map((d) => ({
     key: d.id,
@@ -347,7 +334,7 @@ const channels = computed(() => [
         : t("autoobserve.policy.channelEmail", { address: raw(d.name) }),
     description: t("autoobserve.policy.channelConnectedDesc"),
     state: t("autoobserve.policy.connected"),
-    variant: "blue-soft" as BadgeVariant,
+    variant: "neutral" as ChipTone,
   })),
 ]);
 

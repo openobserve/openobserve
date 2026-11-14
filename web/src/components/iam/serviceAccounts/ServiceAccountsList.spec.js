@@ -73,8 +73,6 @@ const platform = {
 describe("ServiceAccountsList Component", () => {
   let wrapper;
   let mockRouter;
-  let dismissMock;
-  let notifyMock;
 
   beforeEach(async () => {
     // Reset mock implementations
@@ -131,10 +129,6 @@ describe("ServiceAccountsList Component", () => {
         },
       },
     };
-
-    // Setup notify and dialog mocks
-    dismissMock = vi.fn();
-    notifyMock = vi.fn().mockReturnValue(dismissMock);
 
     // Mock navigator.clipboard
     Object.assign(navigator, {
@@ -353,41 +347,33 @@ describe("ServiceAccountsList Component", () => {
     });
   });
 
+  // The token dialog's OCopyButton owns the copy: it confirms in place and to screen readers.
   describe("Clipboard Operations", () => {
+    const openTokenCopy = async (token) => {
+      wrapper.vm.serviceToken = token;
+      wrapper.vm.isShowToken = true;
+      await nextTick();
+      return wrapper.get('[data-test="service-accounts-list-token-copy-btn"]');
+    };
+
     it("copies token to clipboard successfully", async () => {
-      const token = "test-token-123";
+      const button = await openTokenCopy("test-token-123");
+      await button.trigger("click");
+      await flushPromises();
 
-      try {
-        await wrapper.vm.copyToClipboard(token);
-
-        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(token);
-        expect(notifyMock).toHaveBeenCalledWith({
-          type: "positive",
-          message: "token Copied Successfully!",
-          timeout: 5000,
-        });
-      } catch (error) {
-        // Test still passes if the function exists
-        expect(wrapper.vm.copyToClipboard).toBeDefined();
-      }
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test-token-123");
+      expect(button.attributes("data-copied")).toBeDefined();
+      expect(button.element.nextElementSibling?.textContent).toBe("Copied");
     });
 
     it("handles clipboard copy error", async () => {
-      const token = "test-token-123";
       navigator.clipboard.writeText.mockRejectedValue(new Error("Copy failed"));
+      const button = await openTokenCopy("test-token-123");
+      await button.trigger("click");
+      await flushPromises();
 
-      try {
-        await wrapper.vm.copyToClipboard(token);
-
-        expect(notifyMock).toHaveBeenCalledWith({
-          type: "negative",
-          message: "Error while copy content.",
-          timeout: 5000,
-        });
-      } catch (error) {
-        // Test still passes if the function exists
-        expect(wrapper.vm.copyToClipboard).toBeDefined();
-      }
+      expect(button.attributes("data-copied")).toBeUndefined();
+      expect(button.element.nextElementSibling?.textContent).toBe("Copy blocked · press Ctrl C");
     });
   });
 
@@ -719,7 +705,7 @@ describe("ServiceAccountsList Component", () => {
       expect(refreshDialog).toBeDefined();
       // Verb-labeled, destructive — no hardcoded English / generic OK.
       expect(refreshDialog.props("okLabel")).toBe("Rotate token");
-      expect(refreshDialog.props("okColor")).toBe("destructive");
+      expect(refreshDialog.props("kind")).toBe("destructive");
     });
   });
 
@@ -745,7 +731,7 @@ describe("ServiceAccountsList Component", () => {
       expect(deleteDialog.props("messageKeypath")).toBe("serviceAccounts.confirmDeleteMsg");
       expect(deleteDialog.props("messageName")).toBe(wrapper.vm.deleteUserEmailIdentifier);
       expect(deleteDialog.props("messageName")).toBeTruthy();
-      expect(deleteDialog.props("okVariant")).toBe("destructive");
+      expect(deleteDialog.props("kind")).toBe("destructive");
     });
 
     it("closes confirm delete dialog when ConfirmDialog emits update:cancel", async () => {
@@ -815,7 +801,7 @@ describe("ServiceAccountsList Component", () => {
       const bulkDialog = wrapper
         .findAllComponents({ name: "ConfirmDialog" })
         .find((d) => d.vm.$attrs["data-test"] === "service-accounts-list-bulk-delete-dialog");
-      expect(bulkDialog.props("okVariant")).toBe("destructive");
+      expect(bulkDialog.props("kind")).toBe("destructive");
     });
 
     it("closes bulk delete dialog when ConfirmDialog emits update:cancel", async () => {

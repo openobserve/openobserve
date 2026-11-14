@@ -33,8 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          tints one: a grey glyph alone reads as decoration, not as a target. -->
     <OButton
       v-if="collapsible && collapsed && icon"
+      icon-only
       variant="ghost"
-      size="icon-xs-sq"
+      size="sm"
       class="bg-tabs-hover-bg mx-auto mt-3 mb-1 shrink-0"
       :aria-expanded="false"
       :aria-label="collapsedLabel"
@@ -59,8 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the same affordance rather than each inventing one. -->
       <OButton
         v-if="collapsible"
-        variant="outline"
-        size="icon-xs-sq"
+        icon-only
+        variant="secondary"
+        size="sm"
         class="shrink-0"
         :aria-expanded="true"
         :aria-label="toggleLabel"
@@ -108,8 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="collapsed ? undefined : item.label"
               :tooltip="collapsed ? item.label : undefined"
               :icon="item.icon"
-              :suffix-icon="(item.locked || item.licenseLocked) && !collapsed ? 'lock' : undefined"
-              :suffix-label="item.lockedLabel"
+              :locked="(item.locked || item.licenseLocked) && !collapsed"
+              :locked-label="item.lockedLabel"
               :data-test="item.locked ? `${item.dataTest}-locked` : item.dataTest"
               class="w-full"
               :class="collapsed ? 'justify-center!' : undefined"

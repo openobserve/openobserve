@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`pattern-card-${index}-anomaly-badge`"
         >
           {{ t("search.anomalyLabel") }}
-          <OTooltip :content="raw(anomalyExplanationText)" max-width="22rem" />
+          <OTooltip :content="raw(anomalyExplanationText)" />
         </span>
       </div>
 

@@ -25,7 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     sorting="client"
     filter-mode="client"
     :default-columns="false"
-    :show-global-filter="false"
     class="h-full w-full"
   >
     <template #empty>
@@ -42,12 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #cell-actions="{ row }">
       <OButton
-        as="a"
+        icon-only
         :href="row.pdf"
         target="_blank"
         :title="t('billing.downloadInvoice')"
         variant="ghost"
-        size="icon-sm"
         class="ms-1"
       >
         <OIcon name="download" size="sm" />

@@ -13,22 +13,38 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { I18nText } from "@/types/i18n";
+import type { NoticeActionVariant } from "@/lib/feedback/Banner/OBanner.types";
 
-export type InlineNoticeVariant = "warning" | "error";
+export type InlineNoticeTone = "neutral" | "info" | "warn" | "err" | "ok";
+
+export const INLINE_NOTICE_TONES = [
+  "neutral",
+  "info",
+  "warn",
+  "err",
+  "ok",
+] as const satisfies readonly InlineNoticeTone[];
 
 export interface InlineNoticeProps {
-  /** The sentence; cut with "…" in tight space, full text in its tooltip. */
-  text: I18nText;
-  /** `error` is red and an alert, for a check that failed; `warning` is amber and a status. */
-  variant?: InlineNoticeVariant;
-  /** Label of the one text action after the sentence; never cut. */
+  tone?: InlineNoticeTone;
+  /** The condition of this section; wraps, never cut. The default slot replaces it with rich text. */
+  message?: I18nText;
+  /** A glyph that names the condition (lock, history) in place of the tone's own. */
+  icon?: IconName;
+  /** Label of the one action; the `#actions` slot replaces it. */
   actionLabel?: I18nText;
-  dataTest?: string;
-  /** `data-test` of the action button. */
+  actionVariant?: NoticeActionVariant;
   actionDataTest?: string;
 }
 
 export interface InlineNoticeEmits {
   (e: "action", event: MouseEvent): void;
+}
+
+export interface InlineNoticeSlots {
+  default?: () => unknown;
+  /** One small control, end-aligned; buttons inside default to the `sm` height. */
+  actions?: () => unknown;
 }

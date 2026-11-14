@@ -58,9 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Controls on the right -->
             <div class="flex shrink-0 items-start gap-1 max-md:w-full max-md:flex-wrap">
               <OButton
-                variant="outline"
-                size="icon-toolbar"
-                icon-left="menu"
+                icon-only
+                variant="secondary"
+                icon="menu"
                 class="md:hidden"
                 data-test="rum-sessions-mobile-fields-btn"
                 @click="mobileFieldsOpen = true"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('search.showFields')" />
               </OButton>
               <SyntaxGuide />
-              <DateTime
+              <ODateTimeRange
                 auto-apply
                 menu-align="end"
                 :default-type="sessionState.data.datetime.valueType"
@@ -84,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="sessions-run-query-button"
                 variant="primary"
-                size="sm-toolbar"
                 :title="t('metrics.runQuery')"
                 @click="runQuery"
                 class="shrink-0"
@@ -98,9 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <!-- Refresh button -->
               <OButton
-                variant="outline"
-                size="icon-toolbar"
-                icon-left="refresh"
+                icon-only
+                variant="secondary"
+                icon="refresh"
                 :loading="isLoading.length > 0"
                 data-test="rum-app-sessions-refresh-btn"
                 class="shrink-0"
@@ -109,15 +108,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip
                   side="bottom"
                   :content="t('common.refresh')"
-                  shortcut-id="rumSessionsRefresh"
+                  shortcut="rumSessionsRefresh"
                 />
               </OButton>
               <ShareButton
                 ref="shareButtonRef"
                 data-test="rum-app-sessions-share-link-btn"
                 :url="shareUrl"
-                variant="outline"
-                size="icon-toolbar"
+                variant="secondary"
                 shortcut-id="rumSessionsCopyUrl"
                 class="shrink-0"
               />
@@ -131,10 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end toolbar wrapper -->
 
       <ODrawer
+        size="xl"
         v-if="isMobile"
         v-model:open="mobileFieldsOpen"
         side="left"
-        :width="80"
         bleed
         :title="t('search.showFields')"
         anchor='[data-drawer-anchor="rum-sessions-toolbar"]'
@@ -220,92 +218,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="rum-app-sessions-segment-filters"
               >
                 <OToggleGroup
+                  size="sm"
                   :model-value="healthSegment"
                   type="single"
                   :label="t('rum.health')"
                   label-position="left"
                   @update:model-value="(v: any) => pickSegment('health', v)"
                 >
-                  <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-health-all">{{
+                  <OToggleGroupItem value="all" data-test="rum-app-sessions-health-all">{{
                     t("rum.all")
                   }}</OToggleGroupItem>
-                  <OToggleGroupItem
-                    value="errors"
-                    size="xs"
-                    data-test="rum-app-sessions-health-errors"
+                  <OToggleGroupItem value="errors" data-test="rum-app-sessions-health-errors"
                     >{{ t("rum.withErrors")
                     }}{{ segmentCount(sessionsSummary.errorSessions) }}</OToggleGroupItem
                   >
                   <OToggleGroupItem
                     value="frustrated"
-                    size="xs"
                     data-test="rum-app-sessions-health-frustrated"
                     >{{ t("rum.frustrated")
                     }}{{ segmentCount(sessionsSummary.frustratedSessions) }}</OToggleGroupItem
                   >
-                  <OToggleGroupItem
-                    value="clean"
-                    size="xs"
-                    data-test="rum-app-sessions-health-clean"
+                  <OToggleGroupItem value="clean" data-test="rum-app-sessions-health-clean"
                     >{{ t("rum.clean")
                     }}{{ segmentCount(sessionsSummary.cleanSessions) }}</OToggleGroupItem
                   >
                 </OToggleGroup>
 
                 <OToggleGroup
+                  size="sm"
                   :model-value="typeSegment"
                   type="single"
                   :label="t('rum.type')"
                   label-position="left"
                   @update:model-value="(v: any) => pickSegment('type', v)"
                 >
-                  <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-type-all">{{
+                  <OToggleGroupItem value="all" data-test="rum-app-sessions-type-all">{{
                     t("rum.all")
                   }}</OToggleGroupItem>
-                  <OToggleGroupItem
-                    value="engaged"
-                    size="xs"
-                    data-test="rum-app-sessions-type-engaged"
+                  <OToggleGroupItem value="engaged" data-test="rum-app-sessions-type-engaged"
                     >{{ t("rum.engaged")
                     }}{{ segmentCount(sessionsSummary.engagedSessions) }}</OToggleGroupItem
                   >
-                  <OToggleGroupItem
-                    value="bounced"
-                    size="xs"
-                    data-test="rum-app-sessions-type-bounced"
+                  <OToggleGroupItem value="bounced" data-test="rum-app-sessions-type-bounced"
                     >{{ t("rum.bounced")
                     }}{{ segmentCount(sessionsSummary.bouncedSessions) }}</OToggleGroupItem
                   >
                 </OToggleGroup>
 
                 <OToggleGroup
+                  size="sm"
                   :model-value="deviceSegment"
                   type="single"
                   :label="t('rum.device')"
                   label-position="left"
                   @update:model-value="(v: any) => pickSegment('device', v)"
                 >
-                  <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-device-all">{{
+                  <OToggleGroupItem value="all" data-test="rum-app-sessions-device-all">{{
                     t("rum.all")
                   }}</OToggleGroupItem>
-                  <OToggleGroupItem
-                    value="desktop"
-                    size="xs"
-                    data-test="rum-app-sessions-device-desktop"
+                  <OToggleGroupItem value="desktop" data-test="rum-app-sessions-device-desktop"
                     >{{ t("rum.desktop")
                     }}{{ segmentCount(sessionsSummary.deviceCounts.desktop) }}</OToggleGroupItem
                   >
-                  <OToggleGroupItem
-                    value="mobile"
-                    size="xs"
-                    data-test="rum-app-sessions-device-mobile"
+                  <OToggleGroupItem value="mobile" data-test="rum-app-sessions-device-mobile"
                     >{{ t("rum.mobile")
                     }}{{ segmentCount(sessionsSummary.deviceCounts.mobile) }}</OToggleGroupItem
                   >
-                  <OToggleGroupItem
-                    value="tablet"
-                    size="xs"
-                    data-test="rum-app-sessions-device-tablet"
+                  <OToggleGroupItem value="tablet" data-test="rum-app-sessions-device-tablet"
                     >{{ t("rum.tablet")
                     }}{{ segmentCount(sessionsSummary.deviceCounts.tablet) }}</OToggleGroupItem
                   >
@@ -322,15 +301,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 row-key="session_id"
                 pagination="none"
                 virtual-scroll
-                :dense="false"
-                :row-height="54"
                 class="h-full"
                 data-test="rum-sessions-table"
                 row-class="cursor-pointer"
                 :get-row-status-color="getSessionStatusColor"
                 @row-click="handleRowClick"
                 @scroll-end="handleScrollEnd"
-                :show-global-filter="false"
                 :default-columns="false"
               >
                 <template #empty>
@@ -341,8 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <p>{{ t("rum.noMatchingSessions") }}</p>
                     <OButton
-                      variant="outline"
-                      size="sm"
+                      variant="secondary"
                       data-test="rum-app-sessions-reset-segments-btn"
                       @click="resetSegments"
                     >
@@ -383,8 +358,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <OButton
                       v-if="row.has_replay"
+                      icon-only
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="sm"
                       :aria-label="t('rum.heatmap.viewHeatmap')"
                       :disabled="heatmapOpening === row.session_id"
                       data-test="rum-app-sessions-view-heatmap-btn"
@@ -397,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-platform="{ row }">
                   <OBadge
-                    :variant="isMobilePlatform(row.source) ? 'primary' : 'default'"
+                    :tone="isMobilePlatform(row.source) ? 'accent' : 'neutral'"
                     size="sm"
                     data-test="rum-app-sessions-platform-text"
                     >{{ row.platform }}</OBadge
@@ -460,12 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div></div>
             </div>
           </div>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :title="t('common.getStartedRUM')"
-            @click="getStarted"
-          >
+          <OButton variant="primary" :title="t('common.getStartedRUM')" @click="getStarted">
             {{ t("common.getStarted") }}
           </OButton>
         </div>
@@ -517,7 +488,7 @@ import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useSession from "@/composables/useSessionReplay";
 import { isMobileReplaySource } from "@/composables/rum/useMobileSessionReplay";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 import SessionHealthCell from "@/components/rum/sessionReplay/SessionHealthCell.vue";

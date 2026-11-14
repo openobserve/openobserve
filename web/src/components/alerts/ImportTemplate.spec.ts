@@ -242,14 +242,13 @@ describe("ImportTemplate", () => {
     });
   });
 
-  // ─── arrowBackFn ─────────────────────────────────────────────────────────
-  describe("arrowBackFn", () => {
-    it("pushes to alertTemplates route with org_identifier", () => {
-      wrapper.vm.arrowBackFn();
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "alertTemplates",
-        query: { org_identifier: "test-org" },
-      });
+  // ─── back ─────────────────────────────────────────────────────────────────
+  describe("back", () => {
+    it("goes to alertTemplates with org_identifier from a deep link", () => {
+      const target = { name: "alertTemplates", query: { org_identifier: "test-org" } };
+      expect(wrapper.vm.listRoute).toEqual(target);
+      wrapper.vm.goBack();
+      expect(mockRouterPush).toHaveBeenCalledWith(target);
     });
   });
 

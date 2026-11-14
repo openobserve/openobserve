@@ -19,44 +19,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- OPageLayout owns the whole skeleton (header + body inset/bleed) — search
        lives in the table's own toolbar. -->
-  <OPageLayout
-    :title="t('organization.header')"
-    :subtitle="t('iam.listOrganizations.subtitle')"
-    icon="corporate-fare"
-    bleed
-    :scroll="false"
-  >
+  <OPageLayout :title="t('iam.organizations')" bleed :scroll="false">
     <template #actions>
-      <OButton variant="primary" size="sm" @click="addOrganization" data-test="Add Organization">
+      <OButton variant="primary" @click="addOrganization" data-test="Add Organization">
         {{ t("organization.add") }}
       </OButton>
     </template>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
-          :frame="false"
           :data="organizations"
           :columns="columns"
           row-key="identifier"
           :row-actions="rowActions"
-          row-actions-more-data-test="organization-row-more-actions"
+          :row-menu="rowMenu"
+          row-menu-data-test="organization-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
           v-model:global-filter="filterQuery"
-          :show-global-filter="false"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
-          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-organizations-list"
         >
           <template #toolbar>
-            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('organization.search')"
@@ -67,22 +59,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="loading"
-              shortcut-id="iamOrganizationsRefresh"
+              shortcut="iamOrganizationsRefresh"
               data-test="organizations-list-refresh-btn"
               @click="getOrganizations"
             />
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-organizations"
-              :filtered="!!filterQuery"
-              :hide-action="!filterQuery"
-              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.organizations') })
+                  : t('emptyState.noOrganizations.title')
+              "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.nouns.organizations'),
+                    })
+                  : t('emptyState.noOrganizations.description')
+              "
+              :icon="filterQuery ? undefined : 'group'"
+              @action="filterQuery = ''"
             />
           </template>
 
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTruncatedText>{{ row.name }}</OTruncatedText>
               <OTag
                 v-if="isCurrentOrganization(row)"
-                variant="default-soft"
+                tone="neutral"
                 size="sm"
                 :label="t('iam.listOrganizations.current')"
                 data-test="organization-current-tag"
@@ -145,7 +145,11 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import analytics from "@/services/product_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import {
@@ -238,40 +242,36 @@ export default defineComponent({
         meta: { align: "left" },
       });
     }
-    columns.push({
-      id: "actions",
-      header: t("user.actions"),
-      isAction: true,
-      pinned: "right",
-    });
     const isCurrentOrganization = (row: any): boolean =>
       row.identifier === store.state.selectedOrganization?.identifier;
 
-    // The table ranks id "edit" first, so edit is "rename" with the edit shortcut to sit after Switch.
     const rowActions: OTableRowAction[] = [
       {
         id: "switch",
         label: t("iam.listOrganizations.switch"),
         icon: "swap-horiz",
-        onSelect: (row) => switchOrganization(row),
-        visible: (row) => !isCurrentOrganization(row),
-        dataTest: () => "organization-switch",
+        onClick: (row) => switchOrganization(row),
+        hidden: (row) => isCurrentOrganization(row),
+        dataTest: "organization-switch",
       },
       {
         id: "rename",
         shortcut: "edit",
         label: t("iam.listOrganizations.edit"),
         icon: "edit",
-        onSelect: (row) => renameOrganization(row),
-        dataTest: () => "organization-name-edit",
+        onClick: (row) => renameOrganization(row),
+        dataTest: "organization-name-edit",
       },
+    ];
+    const rowMenu: OTableRowMenuItem[] = [
       {
         id: "delete",
         label: t("iam.listOrganizations.deleteOrganization"),
         icon: "delete",
+        destructive: true,
         onSelect: (row) => deleteOrganization(row),
-        visible: (row) => canDeleteOrg(row),
-        dataTest: () => "organization-delete",
+        hidden: (row) => !canDeleteOrg(row),
+        dataTest: "organization-delete",
       },
     ];
 
@@ -483,7 +483,7 @@ export default defineComponent({
         messageName: row.name,
         confirmLabel: t("iam.listOrganizations.delete"),
         cancelLabel: t("iam.listOrganizations.cancel"),
-        confirmVariant: "destructive",
+        kind: "destructive",
       });
       if (!confirmed) return;
 
@@ -538,6 +538,7 @@ export default defineComponent({
       organization,
       columns,
       rowActions,
+      rowMenu,
       isCurrentOrganization,
       showAddOrganizationDialog,
       showJoinOrganizationDialog,

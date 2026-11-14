@@ -37,22 +37,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton
                 data-test="logs-view-mode-dropdown-btn"
-                size="sm-toolbar"
-                variant="outline"
-                icon-right="arrow-drop-down"
+                variant="secondary"
+                icon-end="arrow-drop-down"
               >
                 <OIcon :name="currentToggleOption.icon" size="sm" class="shrink-0" />
                 {{ currentToggleOption.label }}
               </OButton>
             </template>
             <ODropdownItem
+              :icon="opt.icon"
               v-for="opt in toggleViewOptions"
               :key="opt.value"
               :data-test="`logs-view-mode-${opt.value}-item`"
               :disabled="opt.disabled"
               @select="onLogsVisualizeToggleUpdate(opt.value)"
             >
-              <template #icon-left><OIcon :name="opt.icon" size="sm" /></template>
               {{ opt.label }}
             </ODropdownItem>
           </ODropdown>
@@ -66,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-logs-toggle"
               :aria-label="t('common.search')"
               value="logs"
-              size="toolbar"
               :tooltip="toolbarToggleIconOnly ? t('common.search') : undefined"
             >
               <template #icon-left>
@@ -91,7 +89,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : undefined
               "
               value="visualize"
-              size="toolbar"
             >
               <template #icon-left>
                 <OIcon name="timeline" size="sm" class="shrink-0" />
@@ -103,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-build-toggle"
               :aria-label="t('search.buildQuery')"
               value="build"
-              size="toolbar"
               :tooltip="toolbarToggleIconOnly ? t('search.buildQuery') : undefined"
             >
               <template #icon-left>
@@ -124,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : undefined
               "
               value="drilldown"
-              size="toolbar"
             >
               <template #icon-left>
                 <OIcon name="query-stats" size="sm" class="shrink-0" />
@@ -136,7 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-patterns-toggle"
               :aria-label="t('search.showPatternsLabel')"
               value="patterns"
-              size="toolbar"
               :tooltip="
                 patternsAccess.allowed && toolbarToggleIconOnly
                   ? t('search.showPatternsLabel')
@@ -155,9 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- reset filters button — moves into More menu at very narrow widths -->
           <OButton
             v-if="!toolbarMoveResetToMenu"
+            :icon-only="shouldHideToolbarButtonText"
             data-test="logs-search-bar-reset-filters-btn"
-            :size="shouldHideToolbarButtonText ? 'icon-toolbar' : 'sm-toolbar'"
-            variant="outline"
+            variant="secondary"
             @click="resetFilters"
           >
             <OIcon name="restart-alt" size="sm" />
@@ -175,14 +169,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedHistogram"
             as="div"
             data-test="logs-search-bar-histogram-btn"
-            size="sm-toolbar"
-            variant="outline"
+            variant="secondary"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <OSwitch
               v-model="searchObj.meta.showHistogram"
               :aria-label="t('search.showHistogramLabel')"
-              :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop
             />
             <OIcon name="bar-chart" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
@@ -192,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t('search.hideHistogram')
                   : t('search.showHistogramLabel')
               "
-              shortcut-id="logsToggleHistogram"
+              shortcut="logsToggleHistogram"
             />
           </OButton>
 
@@ -201,15 +193,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedSqlMode"
             as="div"
             data-test="logs-search-bar-sql-mode-pinned-btn"
-            size="sm-toolbar"
-            variant="outline"
+            variant="secondary"
             @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           >
             <OSwitch
               :model-value="searchObj.meta.sqlMode"
               :aria-label="t('search.sqlModeLabel')"
               :disabled="isSqlModeDisabled"
-              :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
             />
             <OIcon name="code" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
@@ -221,29 +211,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedQuickMode"
             as="div"
             data-test="logs-search-bar-quick-mode-pinned-btn"
-            size="sm-toolbar"
-            variant="outline"
+            variant="secondary"
             @click="handleQuickMode"
           >
             <OSwitch
               :model-value="searchObj.meta.quickMode"
               :aria-label="t('search.quickModeLabel')"
-              :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="handleQuickMode"
             />
             <!-- The switch gets its own tooltip; the button-level one stays closed while the switch is hovered. -->
-            <OTooltip :content="t('search.quickModeLabel')" :side-offset="2" />
+            <OTooltip :content="t('search.quickModeLabel')" />
             <OIcon name="bolt" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
             <OTooltip :content="t('search.quickModeLabel')" />
           </OButton>
 
           <!-- Saved Views (pinned) — button group styled to match the function
              selector for visual consistency: open-list dropdown trigger + create. -->
-          <OButtonGroup
-            v-if="showPinnedSavedViews"
-            data-test="logs-search-bar-saved-views-pinned"
-            class="border-button-outline-border border p-0"
-          >
+          <OButtonGroup v-if="showPinnedSavedViews" data-test="logs-search-bar-saved-views-pinned">
             <!-- A real dropdown, not a modal: one click to open, one click to
                apply. The heavyweight list dialog stays reachable via Manage. -->
             <ODropdown
@@ -255,13 +239,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #trigger>
                 <OButton
                   data-test="logs-search-bar-saved-views-pinned-list-btn"
-                  variant="ghost"
-                  size="sm-toolbar"
-                  class="h-8!"
+                  variant="secondary"
                 >
                   <OIcon name="saved-search" size="sm" />
                   <OIcon name="arrow-drop-down" size="sm" />
-                  <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
+                  <OTooltip :content="t('search.listSavedViews')" />
                 </OButton>
               </template>
               <SavedViewsMenu
@@ -280,20 +262,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @delete="handleDeleteSavedView"
               />
             </ODropdown>
-            <OSeparator vertical />
             <OButton
+              icon-only
+              :disabled-reason="saveViewReason || undefined"
               data-test="logs-search-bar-saved-views-pinned-create-btn"
               :aria-label="t('search.createSavedView')"
-              variant="ghost"
-              size="icon-panel"
-              class="size-8!"
+              variant="secondary"
               :disabled="!!saveViewReason"
-              focusable-unavailable
               @click="fnSavedView"
             >
               <OIcon name="save" size="sm" />
-              <OTooltip :content="saveViewReason || t('search.createSavedView')" :side-offset="6" />
-              <template #unavailable-reason>{{ saveViewReason }}</template>
+              <OTooltip v-if="!saveViewReason" :content="t('search.createSavedView')" />
             </OButton>
           </OButtonGroup>
 
@@ -318,9 +297,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
               class="max-md:ms-auto"
-              icon-left="more-horiz"
-              variant="outline"
-              size="sm-toolbar"
+              icon="more-horiz"
+              variant="secondary"
             >
               {{ t("search.menuMore") }}
             </OButton>
@@ -335,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 !isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
               "
             >
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
@@ -343,21 +321,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </template>
               {{ t("search.sqlModeLabel") }}
-              <template #icon-right>
+              <template #end>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
                     :model-value="searchObj.meta.sqlMode"
                     :disabled="isSqlModeDisabled"
-                    size="md"
                     data-test="logs-search-bar-sql-mode-toggle"
                     @click.stop="
                       !isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
                     "
                   />
                   <OButton
+                    icon-only
                     data-test="logs-search-bar-menu-pin-sql-mode-btn"
-                    variant="ghost-neutral"
-                    size="icon-sm"
+                    variant="ghost"
                     :title="
                       isPinned('sqlMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
                     "
@@ -375,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-menu-reset-btn"
               @select="resetFilters"
             >
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
@@ -390,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-menu-histogram-btn"
               @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
             >
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
@@ -398,18 +375,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </template>
               {{ t("search.showHistogramLabel") }}
-              <template #icon-right>
+              <template #end>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
                     v-model="searchObj.meta.showHistogram"
-                    size="md"
                     data-test="logs-search-bar-show-histogram-toggle-btn"
                     @click.stop
                   />
                   <OButton
+                    icon-only
                     data-test="logs-search-bar-menu-pin-histogram-btn"
-                    variant="ghost-neutral"
-                    size="icon-sm"
+                    variant="ghost"
                     :title="
                       isPinned('histogram')
                         ? t('search.unpinFromToolbar')
@@ -428,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-menu-quick-mode-toggle-btn"
               @select.prevent="handleQuickMode"
             >
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
@@ -436,18 +412,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </template>
               {{ t("search.quickModeLabel") }}
-              <template #icon-right>
+              <template #end>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
                     :model-value="searchObj.meta.quickMode"
-                    size="md"
                     data-test="logs-search-bar-quick-mode-switch"
                     @click.stop="handleQuickMode"
                   />
                   <OButton
+                    icon-only
                     data-test="logs-search-bar-menu-pin-quick-mode-btn"
-                    variant="ghost-neutral"
-                    size="icon-sm"
+                    variant="ghost"
                     :title="
                       isPinned('quickMode')
                         ? t('search.unpinFromToolbar')
@@ -468,25 +443,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor
               "
             >
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary text-compact text-accent inline-flex h-7 w-7 shrink-0 items-center justify-center font-mono font-bold italic"
                   >fx</span
                 >
               </template>
               {{ t("search.functionEditorLabel") }}
-              <template #icon-right>
+              <template #end>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
                     data-test="logs-search-bar-show-query-toggle-btn"
                     v-model="searchObj.meta.showTransformEditor"
-                    size="md"
                     @click.stop
                   />
                   <OButton
+                    icon-only
                     data-test="logs-search-bar-menu-pin-function-editor-btn"
-                    variant="ghost-neutral"
-                    size="icon-sm"
+                    variant="ghost"
                     :title="
                       isPinned('functionEditor')
                         ? t('search.unpinFromToolbar')
@@ -523,9 +497,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #actions>
               <OButton
+                icon-only
                 data-test="logs-search-bar-menu-pin-saved-views-btn"
-                variant="ghost-neutral"
-                size="icon-sm"
+                variant="ghost"
                 :title="
                   isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
                 "
@@ -546,9 +520,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-syntax-guide-btn"
             />
             <OButton
+              icon-only
               data-test="logs-search-bar-menu-pin-syntax-guide-btn"
-              variant="ghost-neutral"
-              size="icon-sm"
+              variant="ghost"
               class="ms-auto"
               :title="
                 isPinned('syntaxGuide') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
@@ -585,13 +559,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #trigger>
             <OButton
+              icon-only
               data-test="logs-search-bar-more-options-btn"
               class="download-logs-btn hover:bg-interactive-hover-bg! order-4"
-              variant="outline"
-              size="icon-md"
+              variant="secondary"
             >
               <OIcon name="menu" size="sm" />
-              <OTooltip max-width="7rem" :content="t('search.moreActions')" />
+              <OTooltip :content="t('search.moreActions')" />
             </OButton>
           </template>
 
@@ -603,8 +577,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <ShareButton
               :url="shareURL"
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               :show-label="true"
               :disabled="!!shareReason"
               :tooltip="shareReason || undefined"
@@ -618,10 +591,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup :label="t('search.menuGroupHistory')">
             <ODropdownItem
               data-test="search-history-item-btn"
-              shortcut-id="logsSearchHistory"
+              shortcut="logsSearchHistory"
               @select="showSearchHistoryfn"
             >
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
@@ -641,28 +614,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isDownloadDisabled"
               v-model:open="showDownloadSubmenu"
               data-test="search-download-submenu-trigger"
-              :text-value="t('search.downloadTable')"
+              :label="t('search.downloadTable')"
+              icon="download"
               :description="downloadNote"
             >
-              <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon size="sm" name="download" />
-                </span>
-              </template>
-              <template #trigger>{{ t("search.downloadTable") }}</template>
-              <template #icon-right><OIcon size="sm" name="chevron-right" /></template>
               <ODropdownItem
                 data-test="search-download-csv-btn"
-                icon-left="grid-on"
+                icon="grid-on"
                 :disabled="isDownloadDisabled"
                 @select="downloadLogs(searchObj.data.queryResults.hits, 'csv')"
                 >{{ t("search.downloadCSV") }}</ODropdownItem
               >
               <ODropdownItem
                 data-test="search-download-json-btn"
-                icon-left="data-object"
+                icon="data-object"
                 :disabled="isDownloadDisabled"
                 @select="downloadLogs(searchObj.data.queryResults.hits, 'json')"
                 >{{ t("search.downloadJSON") }}</ODropdownItem
@@ -673,11 +638,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               data-test="search-download-submenu-trigger"
               disabled
-              focusable-unavailable
-              :description="downloadReason"
+              :disabled-reason="downloadReason"
               :text-value="t('search.downloadTable')"
             >
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
@@ -685,7 +649,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </template>
               {{ t("search.downloadTable") }}
-              <template #icon-right
+              <template #end
                 ><OIcon size="sm" name="chevron-right" class="text-text-secondary"
               /></template>
             </ODropdownItem>
@@ -693,11 +657,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               data-test="logs-search-bar-download-custom-range-btn"
               :disabled="isDownloadDisabled || !!customRangeReason"
-              focusable-unavailable
-              :description="customRangeReason || downloadReason || customRangeNote"
+              :disabled-reason="customRangeReason || downloadReason"
+              :description="customRangeNote"
               @select="toggleCustomDownloadDialog"
             >
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
@@ -727,13 +691,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               data-test="search-scheduler-create-new-btn"
               :disabled="scheduledSearchAccess.allowed && !!scheduleJobReason"
-              focusable-unavailable
-              :description="
-                scheduledSearchAccess.allowed ? scheduleJobReason || scheduleJobNote : undefined
-              "
+              :disabled-reason="scheduledSearchAccess.allowed ? scheduleJobReason : undefined"
+              :description="scheduledSearchAccess.allowed ? scheduleJobNote : undefined"
               @select="scheduledSearchAccess.allowed ? createScheduleJob() : openUpgradeDialog()"
             >
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
@@ -755,7 +717,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 scheduledSearchAccess.allowed ? routeToSearchSchedule() : openUpgradeDialog()
               "
             >
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
@@ -810,7 +772,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('search.menuGroupInspect')"
           >
             <ODropdownItem data-test="search-inspect-btn" @select="openSearchInspectDialog">
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
@@ -833,7 +795,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               @select="openExplainDialog"
             >
-              <template #icon-left>
+              <template #icon>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
@@ -848,8 +810,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!shouldMoveShareToMenu"
           data-test="logs-search-bar-share-link-btn"
           :url="shareURL"
-          variant="outline"
-          size="icon-md"
+          variant="secondary"
           :disabled="!!shareReason"
           :tooltip="shareReason || undefined"
           class="order-3"
@@ -859,15 +820,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="showPinnedFunctionEditor"
           as="div"
           data-test="logs-search-bar-function-editor-pinned-btn"
-          size="sm-toolbar"
-          variant="outline"
+          variant="secondary"
           class="order-1"
           @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
         >
           <OSwitch
             v-model="searchObj.meta.showTransformEditor"
             :aria-label="t('search.functionEditorLabel')"
-            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
           <span class="text-accent shrink-0 font-mono text-sm font-bold italic">fx</span>
@@ -875,7 +834,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <div class="order-1 max-md:me-auto">
-          <DateTime
+          <ODateTimeRange
             ref="dateTimeRef"
             auto-apply
             menu-align="end"
@@ -891,8 +850,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
-            :disable="disable"
-            class="h-8.5!"
+            :disabled="disable"
           />
         </div>
 
@@ -908,13 +866,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span class="inline-flex">
                 <OButton
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   class="region-dropdown-btn px-1"
                   disabled
                   data-test="logs-search-bar-region-btn"
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon
                       name="lock"
                       class="lock-chip"
@@ -937,8 +894,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="start" data-test="logs-search-bar-region-btn">
                 <template #trigger>
                   <OButton
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     class="region-dropdown-btn px-1"
                     :title="t('search.regionTitle')"
                   >
@@ -985,7 +941,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-visualize-cancel-btn"
                   :title="t('search.cancel')"
                   variant="ghost"
-                  size="sm-toolbar"
                   class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
@@ -996,8 +951,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked"
-                  size="sm-toolbar"
-                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="hover:shadow-button-primary/70 rounded-s-default! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
                   :class="runButtonTone"
                   @click="handleRunQueryFn()"
                 >
@@ -1007,8 +961,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon-toolbar"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
@@ -1025,6 +979,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                   <ODropdownItem
+                    icon="refresh"
                     data-test="logs-search-bar-refresh-btn"
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
@@ -1033,7 +988,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     @select="handleRunQueryFn(true)"
                   >
-                    <template #icon-left><OIcon name="refresh" size="sm" /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
                 </ODropdown>
@@ -1045,7 +999,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-visualize-cancel-btn"
                   variant="ghost"
                   :title="t('search.cancel')"
-                  size="sm-toolbar"
                   class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
@@ -1057,8 +1010,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked || disable"
-                  size="sm-toolbar"
-                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="hover:shadow-button-primary/70 rounded-s-default! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
                   :class="runButtonTone"
                   @click="handleRunQueryFn()"
                 >
@@ -1068,8 +1020,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon-toolbar"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
@@ -1086,6 +1038,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                   <ODropdownItem
+                    icon="refresh"
                     data-test="logs-search-bar-refresh-btn"
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
@@ -1094,7 +1047,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     @select="handleRunQueryFn(true)"
                   >
-                    <template #icon-left><OIcon name="refresh" size="sm" /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
                 </ODropdown>
@@ -1108,7 +1060,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-patterns-cancel-btn"
                 variant="ghost"
                 :title="t('search.cancel')"
-                size="sm-toolbar"
                 class="bg-cancel-query-bg! text-button-primary-foreground! rounded-default min-w-[5.875rem] [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 @click="autoRun.engine.cancelGeneration(null, { cause: 'user' })"
                 >{{ t("search.cancel") }}</OButton
@@ -1119,20 +1070,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="search-bar-refresh-button"
                 variant="primary"
                 :title="t('search.cancel')"
-                size="sm-toolbar"
                 class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 @click="cancelRun"
                 >{{ t("search.cancel") }}</OButton
               >
               <OButton
                 v-else
+                :stale="showRunQueryPending"
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 :data-run-pending="showRunQueryPending ? 'true' : undefined"
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
-                :variant="showRunQueryPending ? 'pending' : 'primary'"
+                variant="primary"
                 :title="t('search.runQuery')"
-                size="sm-toolbar"
                 class="rounded-s-default! relative min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 :class="[
                   showRunQueryPending
@@ -1176,8 +1126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
-                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'pending' : 'ghost'"
-                    size="icon-toolbar"
+                    icon-only
+                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'primary' : 'ghost'"
                     :aria-label="t('search.refreshCacheAndRunQuery')"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
@@ -1198,12 +1148,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </template>
                 <ODropdownItem
+                  icon="refresh"
                   data-test="logs-search-bar-refresh-btn"
                   data-cy="search-bar-refresh-button"
                   :disabled="searchObj.loading == true || searchObj.loadingHistogram == true"
                   @select="handleRunQueryFn(true)"
                 >
-                  <template #icon-left><OIcon name="refresh" size="sm" /></template>
                   {{ t("search.refreshCacheAndRunQuery") }}
                 </ODropdownItem>
                 <ODropdownSeparator v-if="store.state.zoConfig.auto_query_enabled" />
@@ -1212,7 +1162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-live-mode-toggle-btn"
                   @select="toggleLiveMode"
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon
                       :name="searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'"
                       size="sm"
@@ -1268,12 +1218,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Expand / collapse button — always top-right of the full editor area -->
       <OButton
-        :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
+        icon-only
+        :icon="isFocused ? 'fullscreen-exit' : 'fullscreen'"
         data-test="logs-query-editor-full_screen-btn"
         variant="ghost"
-        size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="rounded-default border-card-glass-border! absolute! top-0.75 right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
+        class="rounded-default border-card-glass-border! absolute! top-0.75 right-1 z-51 border!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
@@ -1303,13 +1253,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !searchObj.meta.nlpMode &&
                   searchObj.meta.logsVisualizeToggle === 'logs'
                 "
-                :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
+                icon-only
+                :icon="filterBuilderOn ? 'code' : 'filter-list'"
                 data-test="logs-search-bar-filter-builder-toggle"
                 :aria-pressed="filterBuilderOn"
                 variant="ghost"
-                size="icon-toolbar"
                 @click="toggleFilterBuilder"
-                class="rounded-default border-card-glass-border! absolute! top-0.75 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
+                class="rounded-default border-card-glass-border! absolute! top-0.75 z-51 border!"
                 :style="{ right: filterBuilderToggleRight }"
               >
                 <OTooltip
@@ -1342,12 +1292,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OButton
                 v-if="showFilterBuilder && aiButtonShown"
+                icon-only
                 data-test="logs-search-bar-filter-builder-ai-btn"
                 variant="ghost"
-                size="icon-toolbar"
                 :disabled="!searchObj.data.stream.selectedStream.length"
                 @click="openAiFromBuilder"
-                class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 z-51 h-7! min-h-7! w-7! min-w-7! hover:shadow-md"
+                class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 z-51 hover:shadow-md"
                 :style="{ right: aiButtonRight }"
               >
                 <img
@@ -1506,39 +1456,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <RecentSearchesDrawer ref="recentDrawerRef" source="logs" @restore="restoreRecent" />
-    <ODialog
+    <ConfirmDialog
+      v-model="confirmDialogVisible"
       data-test="search-bar-confirm-dialog"
-      ref="confirmDialog"
-      v-model:open="confirmDialogVisible"
-      size="xs"
       :title="t('common.confirm')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('confirmDialog.ok')"
-      @click:secondary="cancelConfirmDialog"
-      @click:primary="confirmDialogOK"
-    >
-      <p>{{ confirmMessage }}</p>
-    </ODialog>
+      :message="confirmMessage"
+      :ok-label="t('common.update')"
+      :cancel-label="t('confirmDialog.cancel')"
+      @update:ok="confirmDialogOK"
+      @update:cancel="cancelConfirmDialog"
+    />
 
-    <ODialog
+    <ConfirmDialog
+      v-model="confirmSavedViewDialogVisible"
       data-test="search-bar-confirm-saved-view-dialog"
-      ref="confirmSavedViewDialog"
-      v-model:open="confirmSavedViewDialogVisible"
-      size="xs"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('confirmDialog.ok')"
-      @click:secondary="cancelConfirmDialog"
-      @click:primary="confirmDialogOK"
-    >
-      <p>{{ confirmMessageSavedView }}</p>
-    </ODialog>
+      :title="t('common.confirm')"
+      :message="confirmMessageSavedView"
+      :ok-label="t('common.update')"
+      :cancel-label="t('confirmDialog.cancel')"
+      @update:ok="confirmDialogOK"
+      @update:cancel="cancelConfirmDialog"
+    />
     <ODialog
       data-test="search-bar-custom-download-dialog"
       v-model:open="customDownloadDialog"
       size="md"
       :title="t('search.customDownloadTitle')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('search.btnDownload')"
+      :secondary="{ label: t('confirmDialog.cancel') }"
+      :primary="{ label: t('search.btnDownload') }"
       @click:secondary="customDownloadDialog = false"
       @click:primary="downloadRangeData"
     >
@@ -1570,9 +1515,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="option in downloadCustomFileTypeOptions"
               :key="option.value"
               :data-test="`custom-download-file-type-${option.value}-btn`"
-              :active="downloadCustomFileType === option.value"
-              variant="outline"
-              size="sm"
+              :pressed="downloadCustomFileType === option.value"
+              variant="secondary"
               @click="downloadCustomFileType = option.value"
               >{{ option.label }}</OButton
             >
@@ -1586,8 +1530,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="md"
       form-id="saved-view-form"
       :title="t('search.savedViewsLabel')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('common.save')"
+      :secondary="{ label: t('confirmDialog.cancel') }"
+      :primary="{ label: t('common.save') }"
       @click:secondary="store.state.savedViewDialog = false"
     >
       <OForm
@@ -1625,8 +1569,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="md"
       form-id="saved-function-form"
       :title="t('search.functionPlaceholder')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('confirmDialog.ok')"
+      :secondary="{ label: t('confirmDialog.cancel') }"
+      :primary="{ label: t('confirmDialog.ok') }"
       @click:secondary="
         store.state.savedFunctionDialog = false;
         functionUpdateConfirm = false;
@@ -1647,8 +1591,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="functionOptions.length == 0"
           class="mb-3"
         >
-          <OToggleGroupItem value="update" size="sm">{{ t("common.update") }}</OToggleGroupItem>
-          <OToggleGroupItem value="create" size="sm">{{ t("common.create") }}</OToggleGroupItem>
+          <OToggleGroupItem value="update">{{ t("common.update") }}</OToggleGroupItem>
+          <OToggleGroupItem value="create">{{ t("common.create") }}</OToggleGroupItem>
         </OFormToggleGroup>
         <div v-if="savedFunctionMode == 'create'">
           <OFormInput
@@ -1688,8 +1632,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="searchSchedulerJob"
       size="md"
       :title="t('search.scheduleSearchJob')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('confirmDialog.ok')"
+      :secondary="{ label: t('confirmDialog.cancel') }"
+      :primary="{ label: t('confirmDialog.ok') }"
       @click:secondary="
         searchSchedulerJob = false;
         searchObj.meta.showSearchScheduler = false;
@@ -1700,14 +1644,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mb-1 text-left">
           {{ t("search.noOfRecords") }}:
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-chip"
-            icon-left="info-outline"
+            size="xs"
+            icon="info-outline"
             class="ms-1 align-middle"
             :aria-label="t('search.noOfRecordsTooltip')"
             data-test="search-scheduler-records-info"
           >
-            <OTooltip side="right" align="center" max-width="18.75rem">
+            <OTooltip side="right">
               <template #content>
                 <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
               </template>
@@ -1736,9 +1681,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="searchInspectDialog"
       size="sm"
       :title="t('search.searchInspect')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('confirmDialog.ok')"
-      :primary-button-disabled="!searchInspectTraceId.trim()"
+      :secondary="{ label: t('confirmDialog.cancel') }"
+      :primary="{ label: t('confirmDialog.ok'), disabled: !searchInspectTraceId.trim() }"
       @click:secondary="searchInspectDialog = false"
       @click:primary="navigateToSearchInspect"
     >
@@ -1762,7 +1706,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('search.deleteSavedView')"
       message-keypath="search.deleteSavedViewConfirm"
       :message-name="deleteViewName"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="confirmDeleteSavedViews"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -1771,8 +1715,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('search.overwriteSavedView')"
       message-keypath="search.overwriteSavedViewConfirm"
       :message-name="overwriteViewName"
+      kind="destructive"
       :ok-label="t('search.overwriteSavedViewOk')"
-      focus-cancel
       @update:ok="confirmOverwriteSavedView"
       @update:cancel="cancelOverwriteSavedView"
       v-model="confirmOverwrite"
@@ -1813,7 +1757,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import useBreakpoint from "@/composables/useBreakpoint";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
@@ -2031,7 +1975,7 @@ export default defineComponent({
     ODropdownItem,
     ODropdownSeparator,
     ODropdownGroup,
-    DateTime,
+    ODateTimeRange,
     ShareButton,
     OButton,
     SyntaxGuide,
@@ -3224,7 +3168,7 @@ export default defineComponent({
     // Guard against the cascade that happens when we auto-clamp an absolute
     // range that exceeds queryRangeRestrictionInHour. The clamp path calls
     // dateTimeRef.setAbsoluteTime + setDateType, each of which re-triggers
-    // DateTime.vue's selectedDate watcher → saveDate → on:date-change, so
+    // ODateTimeRange's selectedDate watcher → saveDate → on:date-change, so
     // without this flag updateDateTime would re-enter twice.
     let suppressUpdateDateTime = false;
     // Drill down is built from the logs results, so a date change re-runs that search too.
@@ -3286,7 +3230,7 @@ export default defineComponent({
           );
 
           // Suppress the re-entrant cascade: setAbsoluteTime + setDateType
-          // each fire DateTime.vue's auto-apply watchers, which would call
+          // each fire ODateTimeRange's auto-apply watchers, which would call
           // updateDateTime again twice with the already-clamped values.
           suppressUpdateDateTime = true;
           try {

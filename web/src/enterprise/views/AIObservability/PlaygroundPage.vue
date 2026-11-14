@@ -14,21 +14,14 @@
   <OPageLayout
     data-test="ai-playground-page"
     :title="t('aiObservability.nav.playground')"
-    :subtitle="t('aiObservability.subtitle.playground')"
-    icon="play-circle"
+    :about="t('aiObservability.subtitle.playground')"
     title-data-test="ai-playground-title"
     bleed
-    overflow-first
   >
     <template #actions-overflow>
-      <ODropdown v-if="recentDrafts.length" align="end" content-class="w-100">
+      <ODropdown v-if="recentDrafts.length" align="end">
         <template #trigger>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            icon-right="expand-more"
-            data-test="ai-playground-recent-btn"
-          >
+          <OButton variant="secondary" icon-end="expand-more" data-test="ai-playground-recent-btn">
             {{ t("aiObservability.playground.recentDrafts") }}
           </OButton>
         </template>
@@ -52,8 +45,7 @@
       </ODropdown>
 
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         :disabled="running"
         data-test="ai-playground-reset-btn"
         @click="resetPlayground"
@@ -85,8 +77,7 @@
         @score="scoreAll"
       />
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         :loading="sharing"
         data-test="ai-playground-share-btn"
         @click="onShare"
@@ -110,8 +101,7 @@
       </span>
       <OButton
         v-if="runningAll"
-        variant="cancel-query"
-        size="sm-action"
+        variant="secondary"
         :title="t('common.cancel')"
         data-test="ai-playground-run-all-cancel-btn"
         @click="stopAll()"
@@ -121,7 +111,6 @@
       <OButton
         v-else
         variant="primary"
-        size="sm-action"
         :disabled="runDisabled"
         :title="t('aiObservability.playground.runAllTooltip')"
         data-test="ai-playground-run-all-btn"
@@ -131,13 +120,10 @@
       </OButton>
     </template>
 
-    <div class="flex h-full min-h-0 flex-col">
+    <template v-if="(!loadingProviders && !providers.length) || sharedSnapshot" #banner>
       <OBanner
         v-if="!loadingProviders && !providers.length"
-        variant="info"
-        icon="warning"
-        inline-actions
-        class="mx-4 mt-3 shrink-0"
+        tone="info"
         data-test="ai-playground-no-provider"
       >
         <div class="flex flex-col gap-0.5">
@@ -146,8 +132,7 @@
         </div>
         <template #actions>
           <OButton
-            variant="primary"
-            size="sm-action"
+            variant="secondary"
             data-test="ai-playground-setup-provider-btn"
             @click="goToProviders"
           >
@@ -156,15 +141,12 @@
         </template>
       </OBanner>
 
-      <!-- A snapshot is a copy someone sent you, so the page says so until you
-           take it over. Editing is never blocked: the edits are local and the
-           link they arrived on cannot change. -->
+      <!-- A snapshot is a copy someone sent you, so the page says so until you take it over.
+           Editing is never blocked: the edits are local and the link cannot change. -->
       <OBanner
         v-if="sharedSnapshot"
-        variant="info"
+        tone="info"
         icon="visibility"
-        inline-actions
-        class="mx-4 mt-3 shrink-0"
         data-test="ai-playground-shared-banner"
       >
         <div class="flex flex-col gap-0.5">
@@ -179,8 +161,7 @@
         </div>
         <template #actions>
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="ai-playground-shared-continue-btn"
             @click="continueFromSnapshot"
           >
@@ -188,7 +169,9 @@
           </OButton>
         </template>
       </OBanner>
+    </template>
 
+    <div class="flex h-full min-h-0 flex-col">
       <PlaygroundVariableBar
         ref="variableBarRef"
         class="shrink-0"
@@ -215,9 +198,9 @@
                on itself, so an `absolute` handed to the button loses. -->
         <div v-if="canScrollLeft" class="absolute start-1.5 top-1/2 z-1 -translate-y-1/2">
           <OButton
-            variant="outline"
-            size="icon-circle"
-            icon-left="chevron-left"
+            icon-only
+            variant="secondary"
+            icon="chevron-left"
             class="bg-surface-panel! text-accent! border-border-strong! hover:bg-accent/12! hover:border-accent! shadow-lg"
             :aria-label="t('aiObservability.playground.scrollLeft')"
             data-test="ai-playground-scroll-left"
@@ -226,9 +209,9 @@
         </div>
         <div v-if="canScrollRight" class="absolute end-1.5 top-1/2 z-1 -translate-y-1/2">
           <OButton
-            variant="outline"
-            size="icon-circle"
-            icon-left="chevron-right"
+            icon-only
+            variant="secondary"
+            icon="chevron-right"
             class="bg-surface-panel! text-accent! border-border-strong! hover:bg-accent/12! hover:border-accent! shadow-lg"
             :aria-label="t('aiObservability.playground.scrollRight')"
             data-test="ai-playground-scroll-right"

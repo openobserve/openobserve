@@ -6,6 +6,8 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 
 - [OButton](#obutton)
 - [OButtonGroup](#obuttongroup)
+- [OSplitButton](#osplitbutton)
+- [OCopyButton](#ocopybutton)
 - [ONavbar](#onavbar)
 - [ONavGroup](#onavgroup)
 - [ORefreshButton](#orefreshbutton)
@@ -22,68 +24,146 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 ### OButton
 
 **Import:** `@/lib/core/Button/OButton.vue`
-**Use when:** Any clickable action — form submit, toolbar action, icon button, destructive confirm, CTA. Design is baked into each variant/size; there are no style-override props.
-**Don't use for:** Navigation between routes — use a router-link/`MenuLink` styled tile. For a segmented on/off choice, use [OToggleGroup](#otogglegroup). For a set of buttons joined into one control, wrap in [OButtonGroup](#obuttongroup).
+**Use when:** Any clickable action — form submit, toolbar action, icon button, confirmation, CTA. The look is baked into the variant and size; there are no style-override props, and `local/o2-button-api` (ESLint, error in `lint:ci`) rejects any value not listed here.
+**Don't use for:** A mode or view choice — that is [OToggleGroup](#otogglegroup) (guideline F6). Copying a value — that is [OCopyButton](#ocopybutton). Refresh — that is [ORefreshButton](#orefreshbutton). One action plus its variants — [OSplitButton](#osplitbutton).
 **Key props:**
 
-- `variant` (default `"primary"`) — one of: `primary`, `secondary`, `outline`, `ghost`, `ghost-primary`, `ghost-muted`, `ghost-subtle`, `ghost-destructive`, `ghost-success`, `ghost-warning`, `ghost-neutral`, `outline-destructive`, `sidebar-toggle`, `panel-collapse`, `sidebar-button`, `destructive`, `ai-gradient`, `on-dark-primary`, `on-dark-ghost`, `warning`, `pending`, `preview-slack`, `preview-teams`, `preview-email`, `preview-action`, `webinar-dismiss`, `pricing-chip`, `outline-primary`, and the four tinted-fill variants `tint-teal`, `tint-purple`, `tint-blue`, `tint-orange` (soft categorical fill for tiles that identify an entity by colour, e.g. a cluster code; not for status)
-- `size` (default `"md"`) — one of: `xs`, `chip`, `sm`, `sm-action`, `md`, `cta`, `lg`, `icon`, `icon-xs`, `icon-xs-circle`, `icon-xs-sq`, `icon-chip`, `icon-sm`, `icon-md`, `icon-lg`, `icon-circle`, `icon-circle-sm`, `icon-toolbar`, `icon-panel`, `sidebar-button`, `sm-toolbar`, `chip-12`
-- `iconLeft` (`IconName`) — renders an OIcon before the label; `#icon-left` slot takes precedence if present
-- `iconRight` (`IconName`) — renders an OIcon after the label; `#icon-right` slot takes precedence if present
-- `loading` (boolean, default `false`) — shows a centered spinner overlay, keeps dimensions, disables interaction
-- `disabled` (boolean, default `false`) — disables interaction (loading also disables)
-- `active` (boolean, default `false`) — forces primary/selected appearance regardless of variant
-- `block` (boolean, default `false`) — full-width flex button
-- `type` (`"button"` | `"submit"` | `"reset"`, default `"button"`) — only meaningful when `as="button"`
-- `as` / `asChild` (`PrimitiveProps` from reka-ui) — render as a different element/child
-  **Slots:** `default` (label), `icon-left`, `icon-right`
+- `variant` (default `"secondary"`, so a forgotten prop never makes a primary) — seven, chosen by job (B2):
+
+  | Variant        | Job                                                                                    |
+  | -------------- | -------------------------------------------------------------------------------------- |
+  | `primary`      | The one main action of a region: page header, dialog/drawer footer, form (B1)          |
+  | `secondary`    | Outline. Alternatives, Cancel, toolbar actions beside a field                          |
+  | `ghost`        | Quiet actions in toolbars, rows and panel headers; most icon-only buttons              |
+  | `accent-ghost` | An inline next step that reads as a link-like action ("View logs")                     |
+  | `danger`       | Solid red, **only** the confirm button inside a confirmation dialog (B2)               |
+  | `danger-ghost` | Red text: Delete in bulk bars and footers; a row's Delete lives last in its ⋯ menu (B7) |
+  | `link`         | Inside running text; no control height or padding                                      |
+
+- `size` (default `"md"`, or the enclosing `OButtonGroup`'s `size`) — `xs` 24 · `sm` 28 · `md` 32 · `lg` 36, from the `--spacing-control-*` tokens (S1). Give the button the same size as the field beside it (S2); `lg` is for sign-in and the empty-state CTA only. Never set a height class on a button.
+- `icon` / `iconEnd` (`IconName`) — leading glyph; trailing chevron for a menu or ↗ for an external link. An icon goes on a text button only when it adds meaning the word lacks, and the create button never has "+" (B4). Slots `#icon` / `#icon-end` replace them.
+- `iconOnly` (boolean) — square button. Universal actions only (refresh, close, more, copy, expand, settings, columns, row edit/delete); it needs a name (B5): pass `label` (becomes the aria-label **and** the built-in tooltip, with `shortcut`) or an `aria-label` plus a child `OTooltip`
+- `label` (`I18nText`) — the visible text when there is no default slot; the name and tooltip with `iconOnly`. Labels are verb + noun (B3)
+- `count` (number) — pill after the label (e.g. Filters 2)
+- `pressed` (boolean) — a toggle button: sets `aria-pressed` and the selected tint; leave it unset on a plain button
+- `loading` (boolean) — keeps the width, shows a spinner after 300 ms, ignores clicks, stays focusable (B10)
+- `disabled` (boolean) + `disabledReason` (`I18nText`) — with a reason the button stays focusable (`aria-disabled`), the reason is its tooltip and description. Disable with a reason an action that will become available; hide one the user can never perform (B9)
+- `stale` (boolean) — warn dot: the result is older than the inputs (a Run/Apply waiting to be pressed)
+- `href` (anchor) / `to` (router link) — a button that navigates
+- `shortcut` (registry id) — keys appear in the tooltip, not on the button (B6)
+- `type` (`"button"` | `"submit"` | `"reset"`, default `"button"`) · `block` (full width) · `as` (`"button"` | `"div"`, the div hosts an embedded switch that cannot nest inside a native button)
+  **Slots:** `default` (label), `icon`, `icon-end`
   **Emits:** `click` (`MouseEvent`) — suppressed while `disabled` or `loading`
   **Example:**
 
 ```vue
-<OButton
-  variant="primary"
-  size="md"
-  type="submit"
-  :loading="saving"
-  @click="save"
->
-  Save
+<OButton variant="primary" type="submit" :loading="saving" @click="save">
+  {{ t("alerts.saveAlert") }}
 </OButton>
 
 <OButton
-  variant="ghost-destructive"
-  size="icon-sm"
-  icon-left="delete"
+  variant="danger-ghost"
+  icon-only
+  size="xs"
+  icon="delete"
+  :label="t('alerts.deleteAlert')"
   @click="remove"
 />
+
+<OButton
+  variant="secondary"
+  icon="pause"
+  :disabled="!selected.length"
+  :disabled-reason="t('alerts.selectToPause')"
+  @click="pause"
+>
+  {{ t("alerts.pause") }}
+</OButton>
 ```
 
-**Family:** OButtonGroup (joins multiple OButtons into one segmented control)
+More than three actions in a header or toolbar: the extras go into ⋯ More, frequent first, destructive last; never shrink or wrap the row (B8). Overflow is always ⋯ (B11).
+
+**Family:** OButtonGroup, OSplitButton, OCopyButton, ORefreshButton
 
 ---
 
 ### OButtonGroup
 
 **Import:** `@/lib/core/Button/OButtonGroup.vue`
-**Use when:** Joining 2+ OButtons into a single control with shared corners and dividers (e.g. a split action, segmented toolbar cluster).
-**Don't use for:** A single button (use [OButton](#obutton) directly). A mutually-exclusive selector where one option stays "on" — use [OToggleGroup](#otogglegroup) instead.
+**Use when:** Attaching 2–4 actions of equal weight that belong together: zoom −/Fit/+, previous/next.
+**Don't use for:** A single button. A mode or view, where one option stays "on" — that is [OToggleGroup](#otogglegroup) (F6). One default action plus its variants — [OSplitButton](#osplitbutton).
 **Key props:**
 
-- `orientation` (`"horizontal"` | `"vertical"`, default `"horizontal"`)
-- `align` (`"stretch"` | `"center"` | `"start"` | `"end"`, default `"stretch"`) — cross-axis alignment of children
-- `radius` (`"sm"` | `"md"` | `"lg"`, default `"md"`) — must match the inner buttons' radius; use `"sm"` when children use `size="chip"` or `size="icon-chip"`
-- The group never clips overflow (a clip hides a child's offset focus outline) and lifts the focused child with `z-1`; each child paints its own outer corners, so wrap non-OButton children that need clipping yourself
-  **Slots:** `default` (one or more OButton children)
+- `size` (`"xs"` | `"sm"` | `"md"` | `"lg"`) — every child without its own `size` takes it, so the group has one height (S1, S2)
+- Always horizontal and divided; no radius, orientation or alignment props. The group never clips overflow (a clip hides a child's focus outline) and lifts the focused child with `z-1`
+  **Slots:** `default` (OButton children, usually all `secondary` or all `ghost`)
   **Emits:** none
   **Example:**
 
 ```vue
-<OButtonGroup radius="md">
-  <OButton variant="outline" size="sm">Day</OButton>
-  <OButton variant="outline" size="sm">Week</OButton>
-  <OButton variant="outline" size="sm">Month</OButton>
+<OButtonGroup size="sm">
+  <OButton variant="secondary" icon-only icon="chevron-left" :label="t('common.previous')" />
+  <OButton variant="secondary" icon-only icon="chevron-right" :label="t('common.next')" />
 </OButtonGroup>
+```
+
+**Family:** OButton, OSplitButton
+
+---
+
+### OSplitButton
+
+**Import:** `@/lib/core/Button/OSplitButton.vue`
+**Use when:** One action is the default and a menu holds its variants: Run query ▾, Export ▾, Refresh ▾ (B6). At most one split per toolbar; overflow goes to ⋯ More (B8).
+**Don't use for:** A mode (OToggleGroup) or equal-weight actions (OButtonGroup).
+**Key props:**
+
+- `label` (`I18nText`, required) · `icon` (`IconName`) — the default action
+- `variant` (`"primary"` | `"secondary"`, default `"secondary"`) · `size` (`"sm"` | `"md"`, default `"md"`) — both halves share them
+- `menuLabel` (`I18nText`, default "More options") — aria-label of the menu half
+- `loading` · `disabled` · `stale` (warn dot on the action half while results are older than the query) · `shortcut`
+  **Slots:** `menu` (ODropdownItem children)
+  **Emits:** `click` (`MouseEvent`) — from the action half only
+  **Example:**
+
+```vue
+<OSplitButton
+  variant="primary"
+  icon="play-arrow"
+  :label="t('search.runQuery')"
+  :loading="running"
+  :stale="queryChanged"
+  shortcut="logsRunQuery"
+  @click="run"
+>
+  <template #menu>
+    <ODropdownItem @select="runAndSave">{{ t("search.runAndSaveView") }}</ODropdownItem>
+  </template>
+</OSplitButton>
+```
+
+**Family:** OButton, OButtonGroup
+
+---
+
+### OCopyButton
+
+**Import:** `@/lib/core/CopyButton/OCopyButton.vue`
+**Use when:** **Every copy action.** Beside a machine value people paste elsewhere (IDs, tokens, URLs, queries, commands, T4), inside the value it copies. Never hand-build a copy button from OButton + `copyToClipboard`, and never use the copy glyph for Duplicate or Clone.
+**Behaviour:** copies through the shared clipboard helper (works without HTTPS clipboard access), swaps its glyph to a check for 1.5 s and announces "Copied" to screen readers. It raises **no toast**, because the result is visible in place (K1). On failure it says "Copy blocked · press Ctrl C" and emits `failed`. Its click never reaches a clickable row.
+**Key props:**
+
+- `value` (`string | () => string`, required) — what lands on the clipboard; a function is read at click time
+- `label` (`I18nText`, default "Copy") — names the value ("Copy trace ID"); the aria-label and tooltip
+- `size` (`"xs"` | `"sm"` | `"md"`, default `"sm"`) — xs inside a field or row, sm in a panel header, md in a toolbar (S2)
+- `showLabel` (boolean) — a text button ("Copy command") instead of icon-only, for code blocks and dialogs
+- `variant` (`"ghost"` | `"secondary"`, default `"ghost"`) — secondary only in toolbars
+  **Emits:** `copied` (value) · `failed` (value) — analytics hooks
+  **Example:**
+
+```vue
+<OCopyButton size="xs" :value="span.trace_id" :label="t('traces.copyTraceId')" />
+<OCopyButton show-label variant="secondary" :value="installCommand" />
 ```
 
 **Family:** OButton
@@ -145,26 +225,28 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 ### ORefreshButton
 
 **Import:** `@/lib/core/RefreshButton/ORefreshButton.vue`
-**Use when:** A manual "refresh now" control that also shows a staleness dot (green <30s, amber 30s–5min, red >5min) and a live relative-time label ("2m ago") of the last query run.
-**Don't use for:** A plain icon action with no staleness indicator — use [OButton](#obutton) with `size="icon"`. Auto-refresh interval selection is a separate control.
+**Use when:** Refreshing any list, explorer or panel. One control, last in the toolbar (F1, F9): a `secondary` button with ↻ and the data age ("2m ago", absolute time in the tooltip), plus an optional auto-refresh menu segment.
+**Don't use for:** Retry after an error — that is a text button in the error state (K5). Never `primary`, never beside the create action in the page header (H3). No OButton with a refresh icon and its own "checked just now" text.
 **Key props:**
 
-- `lastRunAt` (`number | null`, default `null`) — Unix ms timestamp of the last completed query; drives the dot color and relative label
-- `loading` (boolean, default `false`) — spins the icon, disables the button, forces the idle dot
-- `disabled` (boolean, default `false`) — disables independently of loading
-- `variant` (`"ghost"` | `"outline"`, default `"ghost"`) — `outline` beside a bordered date picker in a page header
-- `layout` (`"split"` | `"inline"`, default `"split"`) — `inline` puts the age inside the button ([⟳ | 2m ago]); the age hides below md
-- `dataTest` / `shortcutId` — keep a page's own selector; show the page's refresh shortcut in the tooltip
-
-  **Every page refreshes with this button.** A page header is `DateTime` + `ORefreshButton layout="inline" variant="outline"`, the same as the dashboards list and Database Monitoring; no hand-rolled refresh button with its own "checked just now" text. When an absolute range fills the header below lg, pass `:last-run-at="null"` there so the button drops to its icon.
+- `lastRunAt` (`number | null`, default `null`) — epoch ms of the last completed read; drives the data age (hidden below 1024 px)
+- `loading` (boolean) — swaps ↻ for a spinner and the age for "Refreshing"; the rows stay (K4); clicks are ignored, focus stays
+- `failedAt` (`number | null`) — a failed refresh: warn dot and "Failed", the button reads Retry, the full sentence is its tooltip and description
+- `autoRefresh` (`"off"` | `"10s"` | `"30s"` | `"1m"` | `"5m"` | `"15m"`) — shows the auto-refresh menu; bind with `v-model:auto-refresh`; omit to hide the menu. While on, the label reads "Auto · 30 s"
+- `size` (`"sm"` | `"md"`, default `"md"`) — md in a toolbar beside the time range (S2), sm in a panel header
+- `disabled` · `shortcut` (registry id, shown in the tooltip) · `dataTest` (keeps a page's selector) · `tooltip` (replaces the last-refreshed time for data with its own as-of time) · `timeZone`
   **Slots:** none
-  **Emits:** `click` (`MouseEvent`) — suppressed while `loading` or `disabled`
+  **Emits:** `click` (`MouseEvent`) — suppressed while `loading` or `disabled` · `update:autoRefresh`
   **Example:**
 
 ```vue
 <ORefreshButton
+  v-model:auto-refresh="autoRefresh"
   :last-run-at="lastQueryTs"
   :loading="isFetching"
+  :failed-at="refreshFailedAt"
+  shortcut="alertsRefresh"
+  data-test="alert-list-refresh-btn"
   @click="runQuery"
 />
 ```
@@ -206,10 +288,11 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 ### OToggleGroup
 
 **Import:** `@/lib/core/ToggleGroup/OToggleGroup.vue`
-**Use when:** A segmented control — a horizontal (or vertical) bar of mutually-exclusive (`type="single"`) or multi-select (`type="multiple"`) pills sharing one track. Ideal for view switches (Logs/Table), density toggles, mode pickers. Built on reka-ui `ToggleGroupRoot`.
-**Don't use for:** A binary on/off setting — use a switch/checkbox. Joined action buttons that each fire a command — use [OButtonGroup](#obuttongroup). Form-bound toggles — use [OFormToggleGroup](#oformtogglegroup).
+**Use when:** A segmented control that switches a view or an object type — 2–4 options ("Alerts | Anomalies", Table | Chart) (S5, F6). Built on reka-ui `ToggleGroupRoot`.
+**Don't use for:** Narrowing a list by state ("Firing", "Paused") — that is a filter select, a KPI tile or a chip (F6). Peer pages — that is `OTabs` (N2). A binary on/off setting — use a switch/checkbox. Joined action buttons — use [OButtonGroup](#obuttongroup). Form-bound toggles — use [OFormToggleGroup](#oformtogglegroup).
 **Key props:**
 
+- `size` (`"sm"` 28 | `"md"` 32 default) — set on the GROUP, never on an item; the track is `h-control-*` with 2 px padding and `rounded-default`, segments are one token down with `text-compact` at weight 500 (S1, S2). Never an `h-*` class on the group or an item (`local/o2-control-height`).
 - `type` (`"single"` | `"multiple"`, default `"single"`) — in `single` mode empty/null selections are ignored so one item always stays active
 - `modelValue` (`AcceptableValue | AcceptableValue[]`) — active value(s); `v-model`
 - `variant` (`"default"` | `"primary"`, default `"default"`) — use `primary` when the bar sits on a primary-colored surface (e.g. dashboard query bar)
@@ -217,7 +300,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 - `disabled` (boolean, default `false`) — disables all items
 - `label` (string) — text label beside the bar; for rich content use the `label` slot
 - `labelPosition` (`"left"` | `"right"` | `"top"`, default `"left"`)
-- `mobileDropdown` (boolean, default `false`) — below md a single-select horizontal group renders as a dropdown whose trigger shows the active item. Use it on every toolbar filter strip so it doesn't claim its own phone row. Data-tests: trigger `<group data-test>-dropdown-btn`, items `<item data-test>-item`. `AppTabs` forwards it. See [responsive § Toolbars](responsive.md#toolbars-one-row-filters-become-a-dropdown).
+- `mobileDropdown` (boolean, default `false`) — below md a single-select horizontal group renders as a dropdown whose trigger shows the active item. Use it on every toolbar view switch so it doesn't claim its own phone row (R1). A strip that narrows by state is a filter select instead (F6). Data-tests: trigger `<group data-test>-dropdown-btn`, items `<item data-test>-item`. `AppTabs` forwards it. See [responsive § Toolbars](responsive.md#toolbars-one-row-filters-become-a-dropdown).
   **Slots:** `default` (OToggleGroupItem children), `label` (overrides the `label` prop)
   **Emits:** `update:modelValue` (`AcceptableValue | AcceptableValue[]`)
   **Example:**
@@ -241,21 +324,21 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 **Key props:**
 
 - `value` (`AcceptableValue`, required) — unique option value
-- `size` (`"md"` | `"sm"` | `"xs"`, default `"md"`) — `md` full toolbar, `sm` small toolbar, `xs` compact inline
 - `disabled` (boolean, default `false`) — disables only this item (wrapper keeps `cursor-not-allowed` + tooltip visible)
-- `tooltip` (string) — hover tooltip (OTooltip); useful to explain a disabled item
+- `tooltip` (`I18nText`) — hover tooltip (OTooltip); an icon-only segment uses it as its `aria-label` too (B5)
+- `count` (number) — tabular count after the label ("Logs 12")
+- There is no item `size`: the item takes its group's size, and `local/o2-controls-api` rejects a `size` on an item.
 - `iconLeft` (string) / `iconRight` (string) — OIcon registry names; `icon-left`/`icon-right` slots take precedence
   **Slots:** `default` (label), `icon-left`, `icon-right`
   **Emits:** none (selection is handled by the parent ToggleGroupRoot)
   **Example:**
 
 ```vue
-<OToggleGroupItem
-  value="json"
-  size="sm"
-  icon-left="code"
-  tooltip="Raw JSON"
->JSON</OToggleGroupItem>
+<OToggleGroup v-model="view" size="sm">
+  <OToggleGroupItem value="json" icon-left="code" :tooltip="t('logs.rawJson')">{{
+    t("logs.json")
+  }}</OToggleGroupItem>
+</OToggleGroup>
 ```
 
 **Family:** OToggleGroup (parent)
@@ -270,7 +353,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 **Key props:** accepts everything OToggleGroup accepts **except** `modelValue` (auto-bound), plus:
 
 - `name` (string, required) — field name; must match a key in the parent OForm's `defaultValues`
-- `type`, `variant`, `orientation`, `disabled`, `label`, `labelPosition` — passed through to OToggleGroup (same defaults)
+- `size`, `type`, `variant`, `orientation`, `disabled`, `label`, `labelPosition` — passed through to OToggleGroup (same defaults; `size` is the group's sm 28 / md 32)
   **Slots:** `default` (OToggleGroupItem children), `label`
   **Emits:** none (changes are pushed into the form field, not emitted)
   **Example:**
@@ -303,14 +386,11 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
   - `rowKey` (string, default `"id"`) — unique row identifier field
   - `tableId` (string) — instance id; required for `persistColumns`
 
-- **Pagination** (`pagination`: `"client"` | `"server"` | `"none"`, default `"client"`)
-  - `pageSize` (number, default `20`), `pageSizeOptions` (number[], default `[20, 50, 100, 250, 500]`)
-  - ⚠️ A custom `pageSize` **must be a member of `pageSizeOptions`** — otherwise
-    the "Records per page" select renders with nothing selected (e.g.
-    `:page-size="10"` against the default options). Prefer the default `20`;
-    only override `pageSize` together with a matching `pageSizeOptions`.
+- **Pagination** (`pagination`: `"client"` | `"server"` | `"none"`, default `"client"`) — records page, event streams (logs, spans) scroll with `"none"` (D5)
+  - `pageSize` (number, default `20`, the same everywhere), `pageSizeOptions` (number[], default `[20, 50, 100]`, no "All")
+  - A `pageSize` outside `pageSizeOptions` is listed in the select too, so it never renders blank; still, prefer the default `20`.
   - `currentPage` (number, 1-based) — `v-model:currentPage` for server mode
-  - `totalCount` (number) — required for server-side pagination
+  - `totalCount` (number) — required for server-side pagination; `totalCountExact: false` makes the range read "of many" and drops Last page
   - `keepPageOnDataChange` (boolean, default false) — don't reset page when `data` changes
 
 - **Sorting** (`sorting`: `"client"` | `"server"` | `"none"`, default `"client"`)
@@ -318,8 +398,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
   - `sortFieldMap` (`Record<string,string>`) — TanStack column id → backend field name
 
 - **Filtering** (`filterMode`: `"client"` | `"server"`, default `"client"`)
-  - `globalFilter` (string) `v-model`, `globalFilterPlaceholder` (default `"Search..."`)
-  - `showGlobalFilter` (boolean, default `true`) — built-in search bar
+  - `globalFilter` (string) — the text the rows are filtered by. OTable draws **no search box**: put an `OSearchInput width="list"` in `#toolbar` and bind it here (F1, F2). `"server"` leaves the text to the caller's fetch.
 
 - **Selection** (`selection`: `"none"` | `"single"` | `"multiple"`, default `"none"`)
   - `selectedIds` (string[]) `v-model:selectedIds`
@@ -331,8 +410,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
   - `getSubRows` (`(row) => TData[]`)
   - `tree` (boolean) — inline-chevron tree mode; `getChildren` (default `row.children`), `getRowWarning` (renders `#tree-warning` row), `treeColumnId` (which column hosts the chevron)
 
-- **Columns / persistence**
-  - `showIndex` (boolean) — auto-inject a fixed-width `#` index column
+- **Columns / persistence** — there is no row-number column (D2): `showIndex` is gone and `local/o2-table-api` rejects a column with `id: "#"`
   - `enableColumnResize`, `enableColumnReorder`, `enableColumnPin` (all default `false`)
   - `columnVisibility` (`Record<string,boolean>`) — initial visibility
   - `persistColumns` (boolean, default `false`) — persist widths + visibility to localStorage (needs `tableId`)
@@ -342,15 +420,20 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
     - A refetch (`loading` true again after a settled, non-empty answer) keeps the last rows on screen; if it runs past 150 ms they dim, go inert and the bottom bar pulses. A first load, or the load after an error or an empty answer, shows the skeleton.
     - `loadingResetKey` — bind the folder, tab or entity the rows belong to; changing it drops the kept rows, so a switch shows the skeleton instead of the previous context's rows.
     - `skeletonOnRefetch` — skeleton on every load, for tables whose old rows mislead once the query changes (log search results).
-  - `dense` (default `true`), `bordered` (default `true`), `frame` (default `false` — outer frame border), `striped` (default false)
+  - `density` (`"default"` | `"compact"`, default `"default"`) — rows 36 / 28 px, header 32 / 28 px, 12 px cell padding (L7, D1). One density per view; there is no `dense`, `compact` or `rowHeight`, and no user density setting exists yet. A page whose rows are taller or shorter (a two-line cell, the logs viewer's own row CSS) keeps its look: virtual scroll reads its estimate off a rendered row.
+  - One frame (D8): `frame`, `bordered`, `toolbarBordered`, `paginationBordered` and `width` are gone; rows always carry dividers, the toolbar and footer always carry theirs, and the table fills its container. `striped` (default false)
+  - The header is 12 px medium secondary text on the body's surface, no coloured band (D1); an actions column's header is screen-reader only and see-through, so a label scrolled under it is never covered (D7).
   - `stickyHeader` (default `true`), `showHeader` (default `true`), `wrap` (default false), `horizontalScroll` (natural-width cells + horizontal scroll; pair with `wrap=false`)
   - `cellOverflowTooltip` (default `true`) — the shared full-text tooltip on cut body cells; pass `false` for a table whose reveal is Wrap / row expansion (logs, correlated logs). See [Cut cell text](#cut-cell-text--the-shared-tooltip)
-  - `fillHeight` (default `true` — set false to shrink to content), `virtualScroll` (default false, `virtualScrollItemSize` default `48`), `maxHeight`, `width`
+  - `fillHeight` (default `true` — set false to shrink to content), `virtualScroll` (default false; the row estimate is the density's height, then a measured row), `maxHeight`
     - Empty state: fill-height tables let the empty state fill the available
       space; non-fill-height tables reserve a `min-h-75` floor so the empty
       state has presence. In a height-constrained card, keep `fillHeight`
       (default) so the empty state never forces a scrollbar.
-  - Row styling: `rowClass`, `getRowStyle`, `getRowStatusColor` (4px left status bar), `getCellStyle`, `enableCellCopy`
+  - **Row state (C3)** — `rowState: (row) => "exception" | "warn" | "paused" | "recent" | null`. `exception` draws the error rail and the error wash, `warn` the warning rail only, `paused` recedes (panel fill, secondary text), `recent` a soft info tint; a healthy row returns `null` and stays clean. Selection and the active row paint over the fill. A page that draws its own rail (`rowRailTone`, `getRowStyle`, `getRowStatusColor`) keeps it, and the state adds only its fill. `rowTone` is gone: `"muted"` is `rowState` `"paused"`. The calm-signal rules (rail for the state column, wash only for failed and paused) are unchanged — see [calm-signal](calm-signal.md).
+  - **Row actions (B7)** — `rowActions: OTableRowAction[]` (at most two) and `rowMenu: OTableRowMenuItem[]`; full shapes under "Row actions" below. OTable appends a right-pinned actions column: xs ghost icon buttons shown on row hover and focus (always on touch, `pointer-coarse`), then ⋯ with the menu, destructive items last and red. Below md the inline actions fold into ⋯. Selectors: `o2-table-row-action-<id>`, `o2-table-row-menu`, `o2-table-row-menu-<id>`, or each item's `dataTest`. A hand-built `#cell-actions` still works; new lists use these props.
+  - Row styling: `rowClass`, `rowRailTone`, `getRowStyle`, `getRowStatusColor` (4px left status bar for event severity), `getCellStyle`, `enableCellCopy`
+  - **Cells (C4, D3, D4)** — a default-rendered empty value (null, undefined, blank) reads "—" in tertiary text; a column of plain numbers (no `align`, no `cell`, no slot) right-aligns with tabular figures, header included; `meta.identifier: true` renders a long id in mono, cut in the middle so its tail stays readable. A column `meta.format` keeps the say over its own blanks.
   - Highlight: `highlightText`, `highlightFields`
 
 **`OTableColumnDef` shape:**
@@ -381,54 +464,68 @@ interface OTableColumnDef<TData = any> {
     isName?: boolean; // primary name column (weight 500)
     format?: (value: any, row: any) => any;
     cellOverflowTooltip?: boolean; // false = this column never shows the cut-cell tooltip (secret columns)
-    actionCount?: number; // buttons a hand-written actions cell draws; ignored when the table has rowActions
+    actionCount?: number; // buttons a hand-written actions cell draws; OTable sets it on its own column
     link?: (row: any) => RouteLocationRaw | (() => void) | undefined; // name cell opens the item
     [key: string]: any;
   };
 }
 ```
 
-**Row actions (`rowActions`).** Pass the list once on the table; the `isAction`
-column draws it and sizes itself to the declared list, three buttons at most (so
-no `meta.actionCount`), the same while loading and loaded. Declare a two-state
-action as one entry, or the column reserves a button no row draws. A
-`#cell-<actions column id>` slot, when present, wins.
+**Row actions (`rowActions` + `rowMenu`, B7).** OTable appends its own pinned
+actions column, sized from the declared lists (inline count plus one for ⋯), the
+same while loading and loaded; a page declares no "actions" column for it.
 
 ```ts
+type OTableRowValue<T, TData> = T | ((row: TData) => T);
+type OTableRowDataTest<TData> = string | ((row: TData, index: number) => string);
+
 interface OTableRowAction<TData = any> {
-  id: string; // "edit" is placed first, "delete" last and destructive; any other id keeps array order
-  label: I18nText | ((row: TData) => I18nText); // tooltip, aria-label and menu text
-  icon: IconName | ((row: TData) => IconName);
-  onSelect: (row: TData) => void;
-  visible?: (row: TData) => boolean;
-  disabled?: (row: TData) => boolean | I18nText; // true, or the reason shown in the tooltip
-  inline?: boolean; // stays inline when more than three exist; at most two are honoured
-  tone?: "destructive" | "success" | ((row: TData) => "destructive" | "success" | undefined);
-  shortcut?: string | ((row: TData) => string); // data-row-action it answers; defaults to id
+  // at most two; xs ghost icon buttons, shown on row hover and focus
+  id: string;
+  icon: OTableRowValue<IconName, TData>;
+  label: OTableRowValue<I18nText, TData>; // aria-label and tooltip
+  onClick: (row: TData) => void;
+  hidden?: (row: TData) => boolean;
+  disabled?: (row: TData) => boolean;
+  disabledReason?: (row: TData) => I18nText | undefined; // tooltip while disabled (B9)
+  shortcut?: OTableRowValue<string, TData>; // data-row-action it answers; defaults to id
   loading?: (row: TData) => boolean | { label?: I18nText; dataTest?: string }; // spinner replaces the button
-  badge?: (row: TData, placement: "inline" | "menu" | "more") => boolean | { label?: I18nText; dataTest?: string };
-  dataTest?: (row: TData, index: number) => string; // inline button; the menu item appends "-menu"
+  badge?: (row: TData) => boolean | { label?: I18nText; dataTest?: string }; // dot on the button
+  dataTest?: OTableRowDataTest<TData>; // default o2-table-row-action-<id>
+}
+
+interface OTableRowMenuItem<TData = any> {
+  // the ⋯ menu; destructive items last, after a separator, in red
+  id: string;
+  label: OTableRowValue<I18nText, TData>;
+  icon?: OTableRowValue<IconName, TData>;
+  onSelect: (row: TData) => void;
+  hidden?: (row: TData) => boolean;
+  disabled?: (row: TData) => boolean;
+  disabledReason?: (row: TData) => I18nText | undefined;
+  destructive?: boolean;
+  shortcut?: OTableRowValue<string, TData>;
+  badge?: (row: TData, placement: "menu" | "more") => boolean | { label?: I18nText; dataTest?: string };
+  dataTest?: OTableRowDataTest<TData>; // default o2-table-row-menu-<id>
 }
 ```
 
-- md and up: up to three visible actions are inline, end-aligned. More than three:
-  two inline (those marked `inline`, else the first two) plus a "More actions" menu.
-- Below md: one kebab holds every visible action in the same order.
-- **A two-state action is one entry** (Enable/Disable, Block/Unblock): `label`, `icon`,
-  `tone` and `shortcut` read the row. `tone: "destructive"` is for a non-delete action
-  that destroys or stops something (Cancel query, Disable); `"success"` for its
-  opposite (Enable). In the menu only destructive is coloured.
-- **Shortcuts.** Each inline button carries `data-row-action="<shortcut>"`; an action
-  inside the menu keeps a hidden in-row proxy, so the row shortcuts reach it too.
+- Two inline actions at most, chosen by frequency; delete and anything else
+  destructive go in `rowMenu` with `destructive: true` and confirm. Below md the
+  inline actions fold into ⋯ (their data-test gains `-menu`).
+- **A two-state action is one entry** (Enable/Disable, Block/Unblock): `label`,
+  `icon` and `shortcut` read the row. Inline buttons have no tone.
+- **Shortcuts.** Each inline button carries `data-row-action="<shortcut>"`; a menu
+  item keeps a hidden in-row proxy, so the row shortcuts reach it too.
 - **`loading(row)`** swaps the button for a spinner (data-test `<dataTest>-spinner`
-  unless the mark names one). **`badge(row, placement)`** draws a dot on the inline
-  button, on the menu item, and (`"more"`) on the menu trigger; its `label` names the
-  marked part. Use it for a kept unsaved copy.
-- **Table props.** `row-actions-more-data-test` (string or `(row, index) => string`)
-  names the menu trigger; a page that had `<x>-row-more-actions` passes it.
-  `#row-actions="{ row, index }"` replaces the buttons on the rows
-  `:row-actions-slot="(row) => boolean"` names (every row without the prop), for
-  example a "managed" tag on system rows.
+  unless the mark names one). **`badge`** draws a dot on the button, or on the
+  menu item and (`"more"`) on ⋯; its `label` names the marked part. A row with a
+  dot or a spinner shows its actions without hover. Use it for a kept unsaved copy.
+- **Table props.** `row-menu-data-test` (string or `(row, index) => string`)
+  names the ⋯ trigger (default `o2-table-row-menu`); a page that had
+  `<x>-row-more-actions` passes it. `#row-actions="{ row, index }"` replaces the
+  actions cell on the rows `:row-actions-slot="(row) => boolean"` names (every row
+  without the prop), for example a "managed" tag on system rows.
 - **Overflow.** The actions column stays pinned. When the columns cannot fit even
   at their `minSize` the table scrolls sideways under it, so nothing is out of
   reach. The scrollbar and the table's minimum width share one threshold, which
@@ -468,10 +565,10 @@ arrow, the rows re-order, and the order is wrong.
 
 **Column hygiene** — mistakes that keep recurring:
 
-- **Never hand-roll a `#` index column.** A data column with `accessorKey: "id"`
-  is draggable, resizable, hideable, and its numbers stop matching the visible
-  rows the moment the table is sorted or filtered. Pass `showIndex` and let OTable
-  render the fixed gutter.
+- **No row-number column (D2).** Its numbers stop matching the rows the moment
+  the table is sorted or filtered, and the first column is the entity's name.
+  There is no `showIndex`, and `local/o2-table-api` rejects a column `id: "#"` and
+  a `#cell-#` slot.
 - **Hide conditional columns by id, not by position** — `columns.splice(2, 1)`
   silently removes the wrong column as soon as someone inserts one above it. Use
   `columns.filter((c) => c.id !== "region")`.
@@ -498,28 +595,30 @@ arrow, the rows re-order, and the order is wrong.
 - Columns: `column-order-change`, `column-visibility-change`, `update:columnSizes`
 - Virtual scroll: `scroll`, `scroll-end`
 
-**Always supply `#error` when `error` can be set.** Without the slot, OTable falls back to a solid red banner carrying the raw server string — a different failure look on every page. Use `<template #error="{ message }"><OEmptyState preset="load-error" :description="raw(message)" @action="onRefresh()" /></template>`, with Retry wired to the page's own refresh handler.
+**Always supply `#error` when `error` can be set.** Without the slot, OTable falls back to a solid red banner carrying the raw server string — a different failure look on every page. Use `<template #error="{ message }"><OEmptyState kind="error" :title="t('common.errorLoadingData')" :text="raw(message)" @action="onRefresh()" /></template>`, with Retry wired to the page's own refresh handler.
 
 **Main slots:** `cell` (scoped `{ row, column, value, table }`), `top`, `toolbar` (inside the frame, above header), `toolbar-trailing`, `header-actions`, `selection-actions` (bulk-action buttons for the footer), `footer-note` (a footer line the pager cannot say), `pagination-bar` (a caller-drawn pager, scoped with pagination state/actions), `loading`, `loading-banner`, `empty`, `error` (`{ message }`), `expansion` (`{ row }`), `tree-warning` (`{ row }`)
 
 #### Footer
 
-**A footer is never hand-built.** Every paginated `OTable` draws the same bar, the
-same one-row height in every state: the pager ("Showing x – y of z", page size,
-page buttons) on the end edge, and on the start edge the first of these that
-applies — otherwise nothing, not even a wrapper:
+**A footer is never hand-built.** Every paginated `OTable` draws the same 44 px
+bar (D5, S8): the one pager, `OPagination` ("1–20 of 143", the page-size select
+and previous / next, all at sm 28; first and last only past ten pages), on the end
+edge, and on the start edge the first of these that applies — otherwise nothing:
 
-1. **Rows selected and `#selection-actions` provided** → "N of M selected", a
-   divider, then the slot. M is `data.length` in client mode and `totalCount` in
-   server mode, with a `+` when `totalCountExact` is false; when N exceeds M the
-   text is "N selected".
+1. **Rows selected** → the bar turns into the selection bar (D6): a selected
+   tint, "3 selected", the `#selection-actions` buttons, then Clear. The range
+   keeps the total, so the count never repeats it. Without a pager
+   (`pagination="none"`) the bar still appears for a selection.
 2. **`#footer-note` provided** → the note, in the bar's small secondary text, in
    the width left of the pager.
 
-Neither renders while the table is loading, and both live in the built-in bar:
-with `pagination="none"` or a `#pagination-bar` there is no bar, so they render
-nothing. There is **no total label** — the `footerTitle` prop and the bare row
-count are gone, and so are `#bottom` and `customPaginationBar`.
+**No pager under an empty table (D5):** while the table shows its empty, denied
+or error state and the total is 0, there is no bar at all. Neither start-side part
+renders while the table is loading, and a `#pagination-bar` replaces the whole
+bar. There is **no total label** — `footerTitle`, `#bottom` and
+`customPaginationBar` are gone. The bar is `data-toast-avoid`, so toasts keep
+clear of it.
 
 - **`#selection-actions`** takes the bulk-action buttons and nothing else: no
   wrapper, no `v-if` on the selection length, no margin / height / padding
@@ -531,18 +630,39 @@ count are gone, and so are `#bottom` and `customPaginationBar`.
   `<template>` so the note exists only in the states where it says more, and give
   it one root element; a root with `max-md:hidden` leaves no empty row on a phone.
 - **`#pagination-bar`** (scope: `currentPage`, `pageSize`, `totalPages`,
-  `totalRows`, `isFirstPage`, `isLastPage`, `setPageSize`, `firstPage`, `prevPage`,
-  `nextPage`, `lastPage`) replaces the built-in bar with a pager the caller draws,
-  and still renders with `pagination="none"`. Only the dashboard panel table
-  (`TableRenderer.vue`) needs it — a list page never does.
+  `totalRows`, `isFirstPage`, `isLastPage`, `setPageSize`, `goToPage`, `firstPage`,
+  `prevPage`, `nextPage`, `lastPage`) replaces the built-in bar with a band the
+  caller draws, and still renders with `pagination="none"`: a totals row
+  (billing usage) or a dashboard panel's footer, which renders `OPagination` from
+  the scope. A list page never needs it, and it never holds a hand-built pager.
 
 The slot content adds no padding, height or typography: the bar owns all three.
 Below md the count and actions take a full row above the pager and a note takes
-its own row. A leftover `#bottom` fails `npm run type-check:app`; because vue-tsc
-never reads a `// @ts-nocheck` file, `OTable.callSites.spec.ts` also scans every
-SFC for the removed `#bottom`, `footer-title` and `custom-pagination-bar`, and for
-footer slots on a table without the built-in bar (`pagination="none"` or
-`#pagination-bar`).
+its own row. `local/o2-table-api` (ESLint, error in `lint:ci`) rejects every
+removed prop (`show-index`, `show-global-filter`, `frame`, `bordered`,
+`toolbar-bordered`, `pagination-bordered`, `width`, `dense`, `compact`,
+`row-height`, `row-tone`, `show-footer`), a density other than default or
+compact, more than two literal `row-actions`, a `#` column and any pager other
+than `OPagination`. `OTable.callSites.spec.ts` also scans every SFC (vue-tsc skips
+`// @ts-nocheck` files) for the removed footer API and for a `#footer-note` on a
+table without a pager.
+
+#### OPagination — the one pager
+
+**Import:** `@/lib/navigation/Pagination/OPagination.vue`. OTable's footer renders
+it; use it directly only for a list that is not an `OTable` (a drawer's event list,
+the logs and traces explorers' result headers, the field list).
+
+- `page` (`v-model:page`, 1-based) · `pageSize` (`v-model:page-size`) · `pageSizes`
+  (number[], default none — the select only renders with choices; no "All")
+- `total` (rows) → "1–20 of 143"; `totalExact: false` → "1–20 of many" and no Last
+  page; without `total`, `pageCount` → "Page 4 of 31"
+- `loading` — paging is busy or locked: buttons stay focusable but ignore input
+  (tooltip `disabledReason`, default "Loading"), an open size menu closes
+- `#range` slot replaces the range (a skeleton, or nothing where the page states it)
+- Parts are `<root data-test>-range | -size | -first | -prev | -next | -last`, or
+  `testIds` to keep existing selectors. Every control is sm 28 (S8); first and last
+  appear only past ten pages. Never build a pager from buttons and a select.
 
 **Exposed (template ref):** `table` (TanStack instance), `toggleAllRows`, `clearSelection`, `resetColumnSizes`, `resetColumnOrder`, `resetPersistedColumns`, `scrollToTop`, `getRows`
 
@@ -552,11 +672,17 @@ footer slots on a table without the built-in bar (`pagination="none"` or
 <script setup lang="ts">
 import { ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { OTimeCell, OUserCell } from "@/lib/core/Table/cells";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 
 const rows = ref([/* ... */]);
 const selectedIds = ref<string[]>([]);
+const search = ref("");
 
 const columns: OTableColumnDef[] = [
   {
@@ -574,7 +700,14 @@ const columns: OTableColumnDef[] = [
     cell: OTimeCell,
     size: 200,
   },
-  { id: "actions", header: "", isAction: true, hideable: false },
+];
+
+const rowActions: OTableRowAction<Row>[] = [
+  { id: "edit", icon: "edit", label: t("common.edit"), onClick: edit },
+];
+const rowMenu: OTableRowMenuItem<Row>[] = [
+  { id: "duplicate", label: t("common.duplicate"), onSelect: duplicate },
+  { id: "delete", label: t("common.delete"), destructive: true, onSelect: confirmDelete },
 ];
 </script>
 
@@ -585,26 +718,22 @@ const columns: OTableColumnDef[] = [
     row-key="id"
     selection="multiple"
     v-model:selected-ids="selectedIds"
-    :page-size="50"
+    :global-filter="search"
+    :row-state="(row) => (row.failed ? 'exception' : row.paused ? 'paused' : null)"
+    :row-actions="rowActions"
+    :row-menu="rowMenu"
     @row-click="openRow"
   >
-    <template #cell="{ column, row, value }">
-      <template v-if="column.id === 'actions'">
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="edit"
-          @click.stop="edit(row.original)"
-        />
-      </template>
+    <template #toolbar>
+      <OSearchInput v-model="search" width="list" data-test="things-search" />
     </template>
 
-    <!-- The footer shows "N of M selected" and these buttons only while rows are selected. -->
+    <!-- The footer turns into "N selected · these buttons · Clear" while rows are selected. -->
     <template #selection-actions>
-      <OButton variant="outline" size="sm" icon-left="download" @click="exportSelected">
+      <OButton variant="secondary" size="sm" icon="download" @click="exportSelected">
         {{ t("common.export") }}
       </OButton>
-      <OButton variant="outline-destructive" size="sm" icon-left="delete" @click="deleteSelected">
+      <OButton variant="danger-ghost" size="sm" icon="delete" @click="deleteSelected">
         {{ t("common.delete") }}
       </OButton>
     </template>
@@ -622,9 +751,8 @@ const columns: OTableColumnDef[] = [
 - **A header names its column, nothing more.** Qualifiers ("(est.)", "(lifetime)")
   are what the ellipsis eats first; put the explanation in `meta.headerTooltip`.
   The tooltip anchors to the whole header cell, so it costs no width and no icon.
-- **Good news drops the count.** An empty table whose `#empty` says "All clear"
-  must not print "0 of 0" beneath it; pass an empty `#pagination-bar` (or the
-  wrapper's `#bottom`) for that case only.
+- **An empty table has no pager (D5).** OTable drops the footer itself while it
+  shows its empty state, so "All clear" is never followed by "0 of 0".
 
 **Family:** cell renderers (below); `OTable.types.ts` exports `OTableColumnDef`, the mode/param types, and `COL`/`TABLE_*` size constants. `sub-components/` is internal.
 
@@ -664,8 +792,8 @@ For renders not covered by prebuilt cells, use a slot template `#cell-{id}`:
 
   <template #cell-actions="{ row }">
     <div class="flex gap-1">
-      <OButton variant="ghost" size="sm" icon-left="edit" @click="edit(row)" />
-      <OButton variant="ghost" size="sm" icon-left="delete" @click="remove(row)" />
+      <OButton variant="ghost" icon-only size="xs" icon="edit" :label="t('common.edit')" @click="edit(row)" />
+      <OButton variant="danger-ghost" icon-only size="xs" icon="delete" :label="t('common.delete')" @click="remove(row)" />
     </div>
   </template>
 </OTable>

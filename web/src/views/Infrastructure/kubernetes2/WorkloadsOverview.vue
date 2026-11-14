@@ -401,8 +401,8 @@ function setNamespaces(namespaces: string[]) {
       >
         <div class="flex items-center justify-between gap-2">
           <OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             :data-test="`k8s2-workloads-title-${card.kind}`"
             @click="emit('view', card.view)"
           >
@@ -456,10 +456,6 @@ function setNamespaces(namespaces: string[]) {
         :data="problems"
         :columns="problemColumns"
         row-key="key"
-        dense
-        :row-height="40"
-        :frame="false"
-        :show-global-filter="false"
         pagination="none"
         sorting="client"
         enable-column-resize
@@ -490,8 +486,8 @@ function setNamespaces(namespaces: string[]) {
         </template>
         <template #cell-status="{ row }">
           <OTag
-            size="xs"
-            :variant="row.severity === 'failed' ? 'error-soft' : 'warning-soft'"
+            size="sm"
+            :tone="row.severity === 'failed' ? 'err' : 'warn'"
             :data-test="`k8s2-workloads-problem-status-${row.key}`"
             >{{ t(problemStatusWord(row.kind, row.severity)) }}</OTag
           >
@@ -499,8 +495,8 @@ function setNamespaces(namespaces: string[]) {
         <template #cell-actions="{ row }">
           <OButton
             v-if="row.pod"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             :data-test="`k8s2-workloads-problem-logs-${row.key}`"
             @click.stop="logsOf(row)"
             >{{ t("infra.k8s2.workloadsLogs") }}</OButton
@@ -522,7 +518,7 @@ function setNamespaces(namespaces: string[]) {
       <OEmptyState
         v-else-if="!problems.length"
         size="inline"
-        preset="no-data"
+        :text="t('emptyState.noData.description')"
         :title="t('infra.k8s2.workloadsNoProblems')"
         data-test="k8s2-workloads-problems-empty"
       />
@@ -537,8 +533,8 @@ function setNamespaces(namespaces: string[]) {
           t("infra.k8s2.workloadsRecentEvents")
         }}</OText>
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           class="ms-auto"
           data-test="k8s2-workloads-events-view-all"
           @click="emit('view', 'events')"
@@ -549,10 +545,6 @@ function setNamespaces(namespaces: string[]) {
         :data="recentEvents"
         :columns="columns"
         row-key="key"
-        dense
-        :row-height="32"
-        :frame="false"
-        :show-global-filter="false"
         pagination="none"
         sorting="client"
         enable-column-resize
@@ -572,8 +564,8 @@ function setNamespaces(namespaces: string[]) {
         <template #cell-namespace="{ row }">
           <OButton
             v-if="row.object.namespace"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             :data-test="`k8s2-workloads-event-namespace-${row.key}`"
             @click.stop="setNamespaces([row.object.namespace])"
             >{{ raw(row.object.namespace) }}</OButton
@@ -582,8 +574,8 @@ function setNamespaces(namespaces: string[]) {
         <template #cell-object="{ row }">
           <OButton
             v-if="linkable(row)"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             :data-test="`k8s2-workloads-event-object-${row.key}`"
             @click.stop="openObject(row)"
             >{{ raw(`${row.object.kind}: ${row.object.name}`) }}</OButton

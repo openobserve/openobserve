@@ -149,7 +149,7 @@ describe("FleetEditorCanvas", () => {
     const button = wrapper
       .findAllComponents({ name: "OButton" })
       .find((b) => b.attributes("data-test") === "fleet-editor-canvas-clear")!;
-    expect(button.props()).toMatchObject({ variant: "outline", size: "icon-sm" });
+    expect(button.props()).toMatchObject({ variant: "secondary", iconOnly: true });
     expect(clear.attributes("aria-label")).toBe("Clear canvas");
     expect(clear.text()).toBe("");
     await clear.trigger("click");

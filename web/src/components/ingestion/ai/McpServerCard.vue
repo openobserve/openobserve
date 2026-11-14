@@ -46,7 +46,7 @@ import { b64EncodeStandard } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { MCP_READONLY_ROLE, useMcpCredential } from "@/composables/useMcpCredential";
 import analytics from "@/services/product_analytics";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -472,7 +472,7 @@ const openSkillsRepo = () => {
     <template #step-connect>
       <div class="flex flex-col gap-3">
         <!-- Without OAuth there is only one method, so the picker is just noise. -->
-        <OTabs v-if="oauthAvailable" v-model="selectedAuthMode" dense>
+        <OTabs v-if="oauthAvailable" v-model="selectedAuthMode" size="compact">
           <OTab
             name="oauth"
             :label="t('ingestion.mcp.auth.oauth')"
@@ -485,7 +485,7 @@ const openSkillsRepo = () => {
           />
         </OTabs>
 
-        <OBanner
+        <OInlineNotice
           v-if="authMode === 'oauth'"
           icon="login"
           data-test="ai-integrations-mcp-oauth-note"
@@ -498,12 +498,12 @@ const openSkillsRepo = () => {
               {{ t("ingestion.mcp.auth.oauthNote") }}
             </OText>
           </div>
-        </OBanner>
+        </OInlineNotice>
 
         <div v-else class="flex flex-col gap-3" data-test="ai-integrations-mcp-credential">
           <!-- No dedicated credential: the snippets carry a placeholder header -->
           <template v-if="!credential">
-            <OBanner icon="key" inline-actions>
+            <OInlineNotice icon="key">
               <div class="flex flex-col gap-1">
                 <OText variant="body-strong">
                   {{ t("ingestion.mcp.credential.quickStartTitle") }}
@@ -517,8 +517,7 @@ const openSkillsRepo = () => {
                   <span class="inline-flex">
                     <OButton
                       variant="primary"
-                      size="sm-action"
-                      icon-left="lock"
+                      icon="lock"
                       disabled
                       data-test="ai-integrations-mcp-generate-btn"
                     >
@@ -529,7 +528,6 @@ const openSkillsRepo = () => {
                 <OButton
                   v-else
                   variant="primary"
-                  size="sm-action"
                   :loading="generating"
                   data-test="ai-integrations-mcp-generate-btn"
                   @click="onGenerate"
@@ -537,51 +535,44 @@ const openSkillsRepo = () => {
                   {{ t("ingestion.mcp.credential.generate") }}
                 </OButton>
               </template>
-            </OBanner>
+            </OInlineNotice>
 
-            <OBanner
+            <OInlineNotice
               v-if="genError"
-              variant="error"
-              dense
-              icon="warning"
-              :content="raw(genError)"
+              tone="err"
+              :message="raw(genError)"
               data-test="ai-integrations-mcp-credential-error"
             />
 
-            <OBanner
-              variant="info"
-              dense
-              icon="info-outline"
-              :content="t('ingestion.mcp.securityBody')"
+            <OInlineNotice
+              tone="info"
+              :message="t('ingestion.mcp.securityBody')"
               data-test="ai-integrations-mcp-security"
             />
           </template>
 
           <!-- After generation: show-once reveal + manage -->
           <template v-else>
-            <OBanner variant="success" icon="check-circle">
+            <OInlineNotice tone="ok">
               <div class="flex flex-col gap-1">
                 <OText variant="body-strong">{{ t("ingestion.mcp.credential.created") }}</OText>
                 <OText variant="meta" as="p" class="leading-snug">
                   {{ t("ingestion.mcp.credential.shownOnce", { email: credential.email }) }}
                 </OText>
               </div>
-            </OBanner>
+            </OInlineNotice>
 
             <OCodeBlock
               :code="credentialHeader"
               :code-masked="MASKED_AUTH"
               lang="http"
-              :reveal-tooltip="t('ingestion.setupCard.revealToken')"
-              :hide-tooltip="t('ingestion.setupCard.hideToken')"
               data-test="ai-integrations-mcp-credential-header"
             />
 
             <div class="flex flex-wrap gap-2">
               <OButton
-                variant="outline"
-                size="sm-action"
-                icon-left="download"
+                variant="secondary"
+                icon="download"
                 data-test="ai-integrations-mcp-download-btn"
                 @click="downloadCredential"
               >
@@ -591,8 +582,7 @@ const openSkillsRepo = () => {
                 <span class="inline-flex">
                   <OButton
                     variant="ghost"
-                    size="sm-action"
-                    icon-left="lock"
+                    icon="lock"
                     disabled
                     data-test="ai-integrations-mcp-manage-btn"
                   >
@@ -603,8 +593,7 @@ const openSkillsRepo = () => {
               <OButton
                 v-else
                 variant="ghost"
-                size="sm-action"
-                icon-left="open-in-new"
+                icon="open-in-new"
                 data-test="ai-integrations-mcp-manage-btn"
                 @click="goToServiceAccounts"
               >
@@ -612,12 +601,10 @@ const openSkillsRepo = () => {
               </OButton>
             </div>
 
-            <OBanner
+            <OInlineNotice
               v-if="credential.scope === 'unscoped'"
-              variant="warning"
-              dense
-              icon="warning"
-              :content="t('ingestion.mcp.credential.readonlyWarn', { role: MCP_READONLY_ROLE })"
+              tone="warn"
+              :message="t('ingestion.mcp.credential.readonlyWarn', { role: MCP_READONLY_ROLE })"
               data-test="ai-integrations-mcp-readonly-warn"
             />
             <OText
@@ -646,7 +633,7 @@ const openSkillsRepo = () => {
     <!-- The client picker drives the snippet below it, so it renders above it. -->
     <template #step-configure-controls>
       <div class="flex flex-col gap-3">
-        <OTabs v-model="selectedClient" dense>
+        <OTabs v-model="selectedClient" size="compact">
           <OTab
             v-for="c in CLIENTS"
             :key="c.id"
@@ -659,8 +646,7 @@ const openSkillsRepo = () => {
         <OButton
           v-if="activeDeepLink"
           variant="primary"
-          size="sm-action"
-          icon-left="open-in-new"
+          icon="open-in-new"
           class="self-start"
           data-test="ai-integrations-mcp-install-btn"
           @click="openDeepLink"
@@ -673,8 +659,7 @@ const openSkillsRepo = () => {
     <template #step-skills>
       <OButton
         variant="ghost"
-        size="sm-action"
-        icon-left="open-in-new"
+        icon="open-in-new"
         class="self-start"
         data-test="ai-integrations-mcp-skills-repo-btn"
         @click="openSkillsRepo"

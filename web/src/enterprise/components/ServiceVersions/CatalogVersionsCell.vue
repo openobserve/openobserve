@@ -3,9 +3,14 @@
     v-if="state === 'loading' && content === 'verdict'"
     class="flex flex-col items-start gap-0.5 py-1"
     data-test="svcver-cell-loading"
-    ><OSkeleton class="h-5 w-24" /><OSkeleton class="h-3 w-16"
+    ><OSkeleton shape="block" class="h-5 w-24" /><OSkeleton shape="block" class="h-3 w-16"
   /></span>
-  <OSkeleton v-else-if="state === 'loading'" class="h-5 w-24" data-test="svcver-cell-loading" />
+  <OSkeleton
+    v-else-if="state === 'loading'"
+    shape="block"
+    class="h-5 w-24"
+    data-test="svcver-cell-loading"
+  />
   <span
     v-else-if="state === 'locked'"
     class="text-text-secondary flex items-center gap-1 text-xs"
@@ -41,7 +46,7 @@
       <span class="inline-flex max-w-full min-w-0"
         ><OButton
           variant="ghost"
-          size="chip"
+          size="xs"
           class="max-w-full min-w-0 font-mono"
           :disabled="!shownKey || detail.compare_disabled"
           :data-test="`svcver-version-${scope.scope_key}-${shownKey || 'unavailable'}`"
@@ -70,9 +75,8 @@
           }}</span
         ><span v-if="liveOthers.length > 0" class="inline-flex shrink-0"
           ><OTag
-            variant="default"
-            size="xs"
-            shape="rounded"
+            tone="neutral"
+            size="sm"
             :label="t('serviceVersions.catalog.liveCount', { count: liveOthers.length })"
             data-test="svcver-live-count" /><OTooltip
             :content="alsoLive"

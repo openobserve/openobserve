@@ -46,8 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="byOptions?.length"
         :model-value="by"
         :options="byOptions"
-        size="sm"
-        appearance="inline"
+        variant="filter"
         :searchable="false"
         class="shrink-0"
         :data-test="`dbm-metric-panel-by-${panelKey}`"
@@ -99,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="emit('zoom', $event)"
         @error="onPanelError"
       />
-      <OSkeleton v-else type="rect" class="rounded-default h-full w-full" />
+      <OSkeleton v-else shape="block" class="h-full w-full" />
       <!-- A stream-permission 403 named, instead of the engine's raw
            "Unauthorized Access" body text. Non-403 errors keep the engine's
            own rendering. -->

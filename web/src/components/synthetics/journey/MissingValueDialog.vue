@@ -22,7 +22,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { makeMissingValueSchema, type MissingValueForm } from "./MissingValueDialog.schema";
 
 const FORM_ID = "synthetics-journey-missing-value-form";
@@ -100,17 +100,16 @@ function onUpdateOpen(value: boolean) {
     :title="t('synthetics.journey.missingValue.title', { name, environment: environmentName })"
     :persistent="isSubmitting"
     :show-close="!isSubmitting"
-    :primary-button-label="t('synthetics.journey.missingValue.saveAndReplay')"
-    :secondary-button-label="t('common.cancel')"
-    secondary-button-variant="outline"
-    :neutral-button-label="
-      canReplayAnyway ? t('synthetics.journey.missingValue.replayAnyway') : undefined
-    "
+    :primary="{ label: t('synthetics.journey.missingValue.saveAndReplay') }"
+    :secondary="{ label: t('common.cancel'), variant: 'secondary' }"
+    :extra="{
+      label: canReplayAnyway ? t('synthetics.journey.missingValue.replayAnyway') : undefined,
+    }"
     :form-id="FORM_ID"
     data-test="synthetics-journey-missing-value-dialog"
     @update:open="onUpdateOpen"
     @click:secondary="onUpdateOpen(false)"
-    @click:neutral="emit('replay-anyway')"
+    @click:extra="emit('replay-anyway')"
   >
     <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">
       <p class="text-text-body m-0 text-sm">{{ body }}</p>
@@ -121,7 +120,6 @@ function onUpdateOpen(value: boolean) {
         "
         required
         :type="storedAsSecret ? 'password' : 'text'"
-        :revealable="storedAsSecret"
         :autocomplete="storedAsSecret ? 'new-password' : undefined"
         data-test="synthetics-journey-missing-value-input"
       />
@@ -136,11 +134,9 @@ function onUpdateOpen(value: boolean) {
           {{ kindLocked }}
         </span>
       </div>
-      <OBanner
-        variant="warning"
-        dense
-        role="status"
-        :content="
+      <OInlineNotice
+        tone="warn"
+        :message="
           isGlobal
             ? t('synthetics.journey.missingValue.globalWarning')
             : t(

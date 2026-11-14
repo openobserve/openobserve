@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-for="(issue, i) in data.issues"
         :key="i"
-        :variant="issue.severity === 'error' ? 'error-soft' : 'warning-soft'"
-        size="xs"
+        :tone="issue.severity === 'error' ? 'err' : 'warn'"
+        size="sm"
         icon="warning"
         :label="issue.text"
       />

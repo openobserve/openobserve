@@ -58,15 +58,23 @@ describe("DBM tone maps", () => {
     }
   });
 
-  it("renders each soft tone through the OTag variant painted with the same badge token", () => {
+  it("renders each soft tone through the OTag tone painted with the same badge token", () => {
     expect(DBM_SOFT_VARIANTS).toEqual({
-      error: "error-soft",
-      warning: "warning-soft",
-      info: "blue-soft",
-      new: "primary-soft",
+      error: "err",
+      warning: "warn",
+      info: "info",
+      new: "accent",
     });
-    for (const [tone, variant] of Object.entries(DBM_SOFT_VARIANTS)) {
-      expect(DBM_SOFT_TONES[tone as keyof typeof DBM_SOFT_TONES]).toContain(`badge-${variant}-bg`);
+    const token = {
+      err: "error-soft",
+      warn: "warning-soft",
+      info: "blue-soft",
+      accent: "primary-soft",
+    };
+    for (const [tone, chip] of Object.entries(DBM_SOFT_VARIANTS)) {
+      expect(DBM_SOFT_TONES[tone as keyof typeof DBM_SOFT_TONES]).toContain(
+        `badge-${token[chip as keyof typeof token]}-bg`,
+      );
     }
   });
 

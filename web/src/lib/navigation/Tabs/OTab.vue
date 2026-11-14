@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { OTabProps, OTabSlots } from "./OTab.types";
-import { computed, inject, type ComputedRef } from "vue";
+import { computed, inject, onMounted, watch, type ComputedRef } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { TABS_CONTEXT_KEY } from "./OTabs.types";
 import type { TabsContext } from "./OTabs.types";
 import { TabsTrigger } from "reka-ui";
@@ -10,6 +11,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import useDragHandle from "@/composables/useDragHandle";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
+import { useI18nTyped } from "@/types/i18n";
 
 // Disable auto-attribute inheritance so the consumer's `data-test="..."` lands
 // on the inner clickable TabsTrigger (Reka button) instead of the wrapper
@@ -17,17 +19,25 @@ import { useLockedDisabled } from "@/composables/useFeatureLock";
 defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(defineProps<OTabProps>(), {
-  disable: false,
+  disabled: false,
   disableDrag: false,
+  locked: false,
+  dirty: false,
+  countTone: "default",
 });
 
 const slots = defineSlots<OTabSlots>();
 
+const { t } = useI18nTyped();
 const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY);
+// Only a route tab reads the router, so a plain tab renders where none is installed.
+const isRouteTab = props.to !== undefined;
+const router = isRouteTab ? useRouter() : null;
+const route = isRouteTab ? useRoute() : null;
 
-const isDisabled = useLockedDisabled(() => props.disable);
+const isDisabled = useLockedDisabled(() => props.disabled);
 const isActive = computed<boolean>(() => context?.value.modelValue === props.name);
-const isDense = computed<boolean>(() => context?.value.dense ?? false);
+const isCompact = computed<boolean>(() => context?.value.size === "compact");
 const isVertical = computed<boolean>(() => context?.value.isVertical ?? false);
 const isReorderable = computed<boolean>(() => context?.value.reorderable ?? false);
 /** Reorderable, and this tab hasn't opted out (e.g. while its label is edited). */
@@ -54,6 +64,28 @@ const dropIndicatorClass = computed<string>(() => {
   return before ? "left-0 top-1 bottom-1 w-0.5" : "right-0 top-1 bottom-1 w-0.5";
 });
 
+// ── Route tab ──────────────────────────────────────────────────────────────
+function syncWithRoute(): void {
+  if (props.to === undefined || !route || !context?.value) return;
+  if (route.name === props.name && context.value.modelValue !== props.name) {
+    context.value.onTabClick(props.name);
+  }
+}
+onMounted(syncWithRoute);
+watch(() => route?.name, syncWithRoute);
+
+function handleClick(): void {
+  if (isDisabled.value || props.to === undefined) return;
+  router?.push(props.to);
+}
+
+// ── Count ──────────────────────────────────────────────────────────────────
+const hasCount = computed<boolean>(() => props.count !== undefined);
+const countText = computed<string>(() => {
+  if (props.count == null) return "";
+  return props.count > 999 ? "999+" : String(props.count);
+});
+
 /** True when the icon prop uses the `img:` prefix (renders as <img>) */
 const isImgIcon = computed<boolean>(() => Boolean(props.icon?.startsWith("img:")));
 /** The resolved src URL (stripped of `img:` prefix) */
@@ -62,11 +94,9 @@ const imgSrc = computed<string>(() => (props.icon?.startsWith("img:") ? props.ic
 const isOIcon = computed<boolean>(() =>
   Boolean(props.icon && (props.icon as keyof typeof iconRegistry) in iconRegistry),
 );
-// Only a horizontal prop label reserves its bold width, so only it turns bold without moving its neighbours.
-const reservesBoldWidth = computed<boolean>(() => Boolean(props.label) && !isVertical.value);
-const emboldens = computed<boolean>(() => isActive.value && reservesBoldWidth.value);
 
 // ── Classes ────────────────────────────────────────────────────────────────
+// One weight (500) in every state, so selecting or hovering never changes a tab's width (guideline H8).
 const baseClasses = computed<string>(() =>
   [
     "o-tab",
@@ -84,12 +114,7 @@ const baseClasses = computed<string>(() =>
         : slots.trailing
           ? "ps-2 pe-1"
           : "px-2",
-    emboldens.value
-      ? "font-semibold"
-      : isVertical.value && isActive.value
-        ? "font-medium"
-        : "font-normal",
-    "text-sm whitespace-nowrap",
+    "text-compact font-medium whitespace-nowrap",
     isVertical.value ? "rounded-default" : "rounded-t-default",
     "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke] duration-(--duration-control) ease-(--ease-control)",
     "select-none",
@@ -103,17 +128,23 @@ const stateClasses = computed<string>(() => {
   // A locked page disables its active tab too; it still has to read as the current one.
   if (isDisabled.value && isActive.value) {
     return [
-      "text-tabs-active-text cursor-not-allowed opacity-60",
+      "text-tabs-active-text cursor-not-allowed",
       isVertical.value
         ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
         : "border-b-2 border-transparent",
     ].join(" ");
   }
   if (isDisabled.value) {
-    return "text-tabs-disabled-text cursor-not-allowed opacity-60";
+    return [
+      "text-tabs-disabled-text cursor-not-allowed",
+      isVertical.value ? "" : "border-b-2 border-transparent",
+    ].join(" ");
   }
   if (isActive.value) {
-    // OTabs draws the one sliding underline, so a horizontal tab keeps a transparent border the size of its inactive one.
+    // Horizontal tabs: colored text only. The active underline is a single
+    // shared bar in OTabs that slides between tabs, so each tab keeps a
+    // transparent 2px border (layout parity with inactive) rather than drawing
+    // its own colored one.
     return [
       "text-tabs-active-text cursor-pointer",
       isVertical.value
@@ -136,10 +167,22 @@ const iconToneClass = computed<string>(() =>
 
 const heightClasses = computed<string>(() => {
   if (isVertical.value) {
-    return "py-1.5";
+    return isCompact.value ? "min-h-control-sm py-1" : "min-h-control-md py-1.5";
   }
-  return isDense.value ? "h-8" : "h-10";
+  return isCompact.value ? "h-control-md" : "h-tabs-height";
 });
+
+const countClasses = computed<string>(() =>
+  [
+    "o-tab__count inline-block shrink-0 rounded-full px-1.25 text-center text-2xs leading-4 font-medium tabular-nums",
+    // Four characters wide: "999+" is the cap, so a growing count never pushes the next tab.
+    "min-w-[calc(4ch+0.625rem)]",
+    props.countTone === "error"
+      ? "bg-badge-error-soft-bg text-badge-error-soft-text"
+      : "bg-surface-subtle text-text-secondary",
+    props.count == null ? "invisible" : "",
+  ].join(" "),
+);
 </script>
 
 <template>
@@ -153,10 +196,8 @@ const heightClasses = computed<string>(() => {
       TabsTrigger handles: role="tab", aria-selected, tabindex (via RovingFocusItem),
       disabled, data-state, click/keyboard activation, and aria-controls linkage.
       aria-disabled is passed explicitly for screen-reader compatibility.
-      data-test is forwarded so Playwright can reliably target the clickable button —
       `v-bind="$attrs"` forwards the consumer's data-test onto the inner Reka
-      button, which is where data-state="active" also lives so the
-      `[data-test="X"][data-state="active"]` composite selectors work.
+      button, which is where data-state="active" also lives.
     -->
     <TabsTrigger
       :value="name"
@@ -168,24 +209,16 @@ const heightClasses = computed<string>(() => {
       :draggable="(isDraggable && isDragArmed()) || undefined"
       :data-otab-name="name"
       v-bind="$attrs"
+      @click="handleClick"
     >
-      <!-- Insertion line — shows where the dragged tab will land (before/after
-           this drop-target tab) so the drop position is visible during drag.
-           Together with the grab cursor and the FLIP slide it carries the whole
-           reorder affordance — reorderable tabs stay clean text (no grip icon),
-           matching Sheets/Grafana tab strips. -->
+      <!-- Insertion line: where the dragged tab will land (before/after this drop target). -->
       <span
         v-if="isDropTarget"
         aria-hidden="true"
         class="bg-tabs-indicator pointer-events-none absolute z-20 rounded-full"
         :class="dropIndicatorClass"
       />
-      <!-- Drag grip — lives inside the reorderable tab's 1rem left gutter
-           (absolute, so it never participates in layout) and fades in on tab
-           hover, Gmail-style: at rest the gutter reads as ordinary padding.
-           Dragging is armed only by pressing the grip; while the tab opts out
-           (disableDrag, e.g. label editing) the grip stays mounted but inert so
-           nothing shifts. Decorative for AT — drag has no keyboard path. -->
+      <!-- The grip arms a drag on press; it sits in the reorderable gutter, so it never shifts the label. -->
       <span
         v-if="isReorderable && !isDisabled"
         aria-hidden="true"
@@ -200,14 +233,8 @@ const heightClasses = computed<string>(() => {
       >
         <OIcon name="drag-indicator" size="sm" />
       </span>
-      <!--
-        If label or icon props are provided, render them (prop-driven mode).
-        If neither is set, fall back to the default slot (custom content mode:
-        badges, close icons, folder rows, etc.).
-      -->
       <template v-if="label || icon">
         <slot name="icon">
-          <!-- img: prefix → render as <img> -->
           <img
             v-if="icon && isImgIcon"
             :src="imgSrc"
@@ -215,7 +242,6 @@ const heightClasses = computed<string>(() => {
             aria-hidden="true"
             alt=""
           />
-          <!-- OIcon registry name (kebab-case SVG icon) -->
           <OIcon
             v-else-if="icon && isOIcon"
             :name="icon as any"
@@ -223,7 +249,6 @@ const heightClasses = computed<string>(() => {
             class="o-tab__icon shrink-0"
             :class="iconToneClass"
           />
-          <!-- Fallback: Material icon font glyph (legacy underscore names) -->
           <span
             v-else-if="icon"
             class="o-tab__icon material-icons-outlined shrink-0 text-base leading-none"
@@ -231,33 +256,33 @@ const heightClasses = computed<string>(() => {
             >{{ icon }}</span
           >
         </slot>
-        <span
+        <OTruncatedText
           v-if="label"
-          :data-otab-label="label"
-          class="inline-grid min-w-0 grid-cols-[minmax(0,1fr)] text-start"
-          :class="[
-            reservesBoldWidth
-              ? 'after:invisible after:h-0 after:overflow-hidden after:font-semibold after:whitespace-nowrap after:content-[attr(data-otab-label)]'
-              : '',
-            context?.collapseLabels && !isActive ? 'max-md:hidden' : '',
-          ]"
+          class="o-tab__label"
+          :class="context?.collapseLabels && !isActive ? 'max-md:hidden' : ''"
+          :tooltip="tooltip ? false : undefined"
+          >{{ label }}</OTruncatedText
         >
-          <OTruncatedText class="o-tab__label" :tooltip="tooltip ? false : undefined">{{
-            label
-          }}</OTruncatedText>
-        </span>
-        <OIcon
-          v-if="suffixIcon"
-          :name="suffixIcon as any"
-          size="xs"
-          class="ms-auto shrink-0"
-          :class="suffixIcon === 'lock' ? 'lock-chip' : ''"
-        />
-        <span v-if="suffixIcon === 'lock' && (suffixLabel ?? tooltip)" class="sr-only">{{
-          suffixLabel ?? tooltip
-        }}</span>
       </template>
       <slot v-else />
+      <span v-if="hasCount" :class="countClasses" data-test="o-tab-count">{{ countText }}</span>
+      <span
+        v-if="dirty"
+        class="bg-tabs-indicator size-1.5 shrink-0 rounded-full"
+        data-test="o-tab-dirty"
+        :aria-label="t('components.tabs.unsaved')"
+        role="img"
+      />
+      <template v-if="locked">
+        <OIcon
+          name="lock"
+          size="xs"
+          class="lock-chip shrink-0"
+          :class="isVertical ? 'ms-auto' : ''"
+          data-test="o-tab-lock"
+        />
+        <span class="sr-only">{{ lockedLabel ?? tooltip ?? t("components.tabs.locked") }}</span>
+      </template>
     </TabsTrigger>
     <!-- OTabs measures this with the trigger for the underline and the overflow arrows. -->
     <span

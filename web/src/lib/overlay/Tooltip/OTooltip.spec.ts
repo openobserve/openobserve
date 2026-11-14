@@ -3,6 +3,11 @@ import { mount } from "@vue/test-utils";
 import { h, nextTick, ref } from "vue";
 import { TooltipProvider } from "reka-ui";
 import OTooltip from "./OTooltip.vue";
+
+vi.mock("@/lib/styles/motion", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/styles/motion")>()),
+  TOOLTIP_DELAY_MS: 10,
+}));
 import OButton from "@/lib/core/Button/OButton.vue";
 
 // Reka UI portals content into <body>. Render inline for unit tests.
@@ -77,7 +82,7 @@ describe("OTooltip", () => {
 
     it("opens in wrapper mode, where the trigger is the default slot", async () => {
       const wrapper = mount(OTooltip, {
-        props: { content: "Hello", delay: 10 },
+        props: { content: "Hello" },
         slots: { default: () => h("button", { "data-testid": "t" }, "Hover") },
         attachTo: document.body,
       });
@@ -94,8 +99,7 @@ describe("OTooltip", () => {
     it("opens in child mode, where it attaches to its parent element", async () => {
       const wrapper = mount(
         {
-          render: () =>
-            h("button", { "data-testid": "t" }, [h(OTooltip, { content: "Hello", delay: 10 })]),
+          render: () => h("button", { "data-testid": "t" }, [h(OTooltip, { content: "Hello" })]),
         },
         { attachTo: document.body },
       );
@@ -115,8 +119,7 @@ describe("OTooltip", () => {
     it("closes once the pointer moves off the trigger even when mouseleave never fires", async () => {
       const wrapper = mount(
         {
-          render: () =>
-            h("button", { "data-testid": "t" }, [h(OTooltip, { content: "Hello", delay: 10 })]),
+          render: () => h("button", { "data-testid": "t" }, [h(OTooltip, { content: "Hello" })]),
         },
         { attachTo: document.body },
       );
@@ -149,11 +152,11 @@ describe("OTooltip", () => {
           render: () =>
             h("div", [
               h("button", { "data-testid": "pause" }, [
-                h(OTooltip, { content: "Pause alert", delay: 10, ...extra }),
+                h(OTooltip, { content: "Pause alert", ...extra }),
               ]),
               h(
                 OTooltip,
-                { content: "Couldn't pause", delay: 10, ...extra },
+                { content: "Couldn't pause", ...extra },
                 {
                   default: () => h("span", { "data-testid": "marker", tabindex: 0 }, "!"),
                 },
@@ -235,8 +238,7 @@ describe("OTooltip", () => {
     it("closes an open child-mode tooltip when its page is deactivated", async () => {
       const Page = {
         name: "TooltipPage",
-        render: () =>
-          h("button", { "data-testid": "t" }, [h(OTooltip, { content: "Hello", delay: 10 })]),
+        render: () => h("button", { "data-testid": "t" }, [h(OTooltip, { content: "Hello" })]),
       };
       const Other = { name: "OtherPage", render: () => h("div", "elsewhere") };
       const wrapper = mount(
@@ -321,7 +323,7 @@ describe("OTooltip", () => {
             h(
               OButton,
               { iconLeft: "refresh", "data-testid": "btn" },
-              { default: () => h(OTooltip, { content: "Refresh data", delay: 10 }) },
+              { default: () => h(OTooltip, { content: "Refresh data" }) },
             ),
         },
         { attachTo: document.body },
@@ -342,7 +344,7 @@ describe("OTooltip", () => {
             h(
               OButton,
               { iconLeft: "info-outline", "data-testid": "btn", ...listeners },
-              { default: () => h(OTooltip, { content: "About this", delay: 5000 }) },
+              { default: () => h(OTooltip, { content: "About this" }) },
             ),
         },
         { attachTo: document.body },
@@ -395,7 +397,7 @@ describe("OTooltip", () => {
           render: () =>
             h("div", { "data-testid": "row" }, [
               h("span", { "data-testid": "icon" }),
-              h(OTooltip, { content: "About this field", delay: 10 }),
+              h(OTooltip, { content: "About this field" }),
             ]),
         },
         { attachTo: document.body },
@@ -441,9 +443,17 @@ describe("OTooltip", () => {
     });
   });
 
-  it("waits 300 ms before opening by default", () => {
-    const wrapper = mount(OTooltip, { props: { content: "Hello" } });
-    expect(wrapper.props("delay")).toBe(300);
+  it("waits the one shared delay before opening, with no per-tooltip override", async () => {
+    const { TOOLTIP_DELAY_MS } = await import("@/lib/styles/motion");
+    const wrapper = mount(OTooltip, {
+      props: { content: "Hello" },
+      slots: { default: () => h("button", "Hover") },
+    });
+    expect(wrapper.findComponent({ name: "TooltipRoot" }).props("delayDuration")).toBe(
+      TOOLTIP_DELAY_MS,
+    );
+    expect(OTooltip.props).not.toHaveProperty("delay");
+    expect(OTooltip.props).not.toHaveProperty("maxWidth");
   });
 
   describe("trigger naming", () => {
@@ -508,7 +518,7 @@ describe("OTooltip", () => {
         {
           render: () =>
             h("span", { "data-testid": "t" }, [
-              h(OTooltip, { overflowOnly: true, delay: 10 }),
+              h(OTooltip, { overflowOnly: true }),
               "payment-service-production-eu-west",
             ]),
         },
@@ -544,7 +554,7 @@ describe("OTooltip", () => {
     it("opens in wrapper mode only when the wrapped trigger is cut", async () => {
       const mountWrapper = (cut: boolean) => {
         const wrapper = mount(OTooltip, {
-          props: { overflowOnly: true, delay: 10 },
+          props: { overflowOnly: true },
           slots: { default: () => h("button", { "data-testid": "t" }, "Long name") },
           attachTo: document.body,
         });
@@ -571,7 +581,7 @@ describe("OTooltip", () => {
         {
           render: () =>
             h("span", { "data-testid": "t" }, [
-              h(OTooltip, { overflowOnly: true, delay: 10 }),
+              h(OTooltip, { overflowOnly: true }),
               h("i", { class: "icon" }),
             ]),
         },
@@ -667,11 +677,10 @@ describe("OTooltip", () => {
       { content: "Wide", open: true, style: "min-width: 5rem" },
       { default: () => h("button", "Hover") },
     );
-    const style = wrapper.find('[data-test="o-tooltip-content"]').attributes("style") ?? "";
-    // The caller's declaration lands without discarding max-width, which the
-    // component sets from its own `maxWidth` prop.
-    expect(style).toContain("min-width");
-    expect(style).toContain("max-width");
+    const bubble = wrapper.find('[data-test="o-tooltip-content"]');
+    // The caller's declaration lands; the 280 cap comes from the bubble's own class.
+    expect(bubble.attributes("style") ?? "").toContain("min-width");
+    expect(bubble.classes()).toContain("max-w-70");
   });
 
   // e2e selects the bubble by `o-tooltip-content` in many places, so a call-site

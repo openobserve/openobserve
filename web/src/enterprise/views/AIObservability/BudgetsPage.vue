@@ -19,8 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AiPageShell
     data-test="ai-budgets"
     :title="t('aiBudgets.title')"
-    :subtitle="t('aiBudgets.subtitle')"
-    icon="account-balance"
+    :about="t('aiBudgets.subtitle')"
     :date-state="dateState"
     :last-run-at="lastRunAt"
     :is-loading="loading"
@@ -34,17 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="stream"
           :options="availableStreams.map((s) => ({ value: s, label: raw(s) }))"
           :label="t('llmAttribution.users.stream')"
-          label-position="inside"
-          size="sm"
-          width="sm"
+          variant="filter"
+          width="s"
           data-test="ai-budgets-stream"
           @update:model-value="reload"
         />
         <span class="text-2xs text-text-secondary flex-1">{{ t("aiBudgets.signalNote") }}</span>
         <OButton
           variant="primary"
-          size="sm"
-          icon-left="add"
+          icon="add"
           :disabled="noStream || !!forbidden"
           data-test="ai-budgets-new"
           @click="openNew"
@@ -54,46 +51,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Spend is read from an LLM trace stream; without one nothing can be budgeted. -->
-      <OBanner
-        v-if="noStream"
-        variant="info"
-        icon="info"
-        dense
-        text-size="small"
-        data-test="ai-budgets-no-stream"
-      >
+      <OInlineNotice v-if="noStream" tone="info" data-test="ai-budgets-no-stream">
         {{ t("aiBudgets.noStream") }}
-      </OBanner>
+      </OInlineNotice>
 
       <!-- One compact line, as the page's other notes: the message, then its action. -->
-      <OBanner
-        v-if="unpricedTraces > 0"
-        variant="warning"
-        icon="warning"
-        dense
-        inline-actions
-        text-size="small"
-        data-test="ai-budgets-unpriced"
-      >
+      <OInlineNotice v-if="unpricedTraces > 0" tone="warn" data-test="ai-budgets-unpriced">
         {{ t("aiBudgets.unpriced", { n: unpricedTraces }, unpricedTraces) }}
         <template #actions>
           <OButton
-            variant="outline"
-            size="xs"
+            variant="secondary"
+            size="sm"
             data-test="ai-budgets-unpriced-add-price"
             @click="router.push(pricingGapsRoute(stream, org(), unpricedWindow))"
           >
             {{ t("llmDataTrust.cost.addPrice") }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
 
       <OTable
         :data="rows"
         :columns="columns"
         row-key="alertId"
         :loading="loading"
-        :show-global-filter="false"
         pagination="none"
         class="min-h-0 flex-1"
         :empty-message="t('aiBudgets.empty')"
@@ -124,21 +105,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-compact">{{ spentLabel(row) }}</span>
             <OProgressBar
               :value="Math.min(100, (row.shown / Math.max(row.limitUsd, 0.0001)) * 100)"
-              :variant="
-                row.state === 'over' ? 'danger' : row.state === 'warning' ? 'warning' : 'default'
-              "
-              size="sm"
+              :tone="row.state === 'over' ? 'err' : row.state === 'warning' ? 'warn' : 'accent'"
               class="w-48"
               aria-hidden="true"
             />
           </div>
         </template>
         <template #cell-state="{ row }">
-          <OBadge
-            :variant="stateVariant(row)"
-            size="sm"
-            :data-test="`ai-budgets-state-${row.name}`"
-          >
+          <OBadge :tone="stateVariant(row)" size="sm" :data-test="`ai-budgets-state-${row.name}`">
             {{ stateLabel(row) }}
           </OBadge>
         </template>
@@ -146,25 +120,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
+                icon-only
                 :aria-label="t('common.moreActions')"
-                icon-left="more-vert"
+                icon="more-vert"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 :data-test="`ai-budgets-actions-${row.name}`"
                 @click.stop
               />
             </template>
             <ODropdownItem
-              icon-left="edit"
+              icon="edit"
               :disabled="row.legacy"
-              :description="row.legacy ? t('aiBudgets.legacyEdit') : null"
+              :disabled-reason="t('aiBudgets.legacyEdit')"
               :data-test="`ai-budgets-edit-${row.name}`"
               @select="openEdit(row)"
             >
               {{ t("common.edit") }}
             </ODropdownItem>
+            <ODropdownSeparator />
             <ODropdownItem
-              icon-left="delete"
+              icon="delete"
+              tone="danger"
               :data-test="`ai-budgets-delete-${row.name}`"
               @select="remove(row)"
             >
@@ -179,11 +156,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="dialogOpen"
       size="md"
       :title="editing ? t('aiBudgets.edit') : t('aiBudgets.new')"
-      :primary-button-label="editing ? t('aiBudgets.save') : t('aiBudgets.create')"
-      :primary-button-disabled="!canCreate"
-      :primary-button-loading="creating"
-      primary-button-data-test="ai-budgets-create"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{
+        label: editing ? t('aiBudgets.save') : t('aiBudgets.create'),
+        disabled: !canCreate,
+        loading: creating,
+        dataTest: 'ai-budgets-create',
+      }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="ai-budgets-dialog"
       @click:primary="submit"
       @click:secondary="dialogOpen = false"
@@ -266,13 +245,14 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import alertsService from "@/services/alerts";
@@ -306,7 +286,7 @@ import {
   type BudgetRow,
   type BudgetScope,
 } from "@/utils/alerts/aiBudgets";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 
 defineOptions({ name: "AIBudgetsPage" });
 
@@ -471,10 +451,10 @@ function spentLabel(r: Row) {
       });
 }
 
-function stateVariant(r: Row): BadgeVariant {
-  if (r.state === "over") return "error-soft";
-  if (r.state === "warning") return "warning-soft";
-  return r.state === "under" ? "success-soft" : "default-soft";
+function stateVariant(r: Row): ChipTone {
+  if (r.state === "over") return "err";
+  if (r.state === "warning") return "warn";
+  return r.state === "under" ? "ok" : "neutral";
 }
 
 function stateLabel(r: Row) {
@@ -678,8 +658,7 @@ async function remove(row: Row) {
     message: t("aiBudgets.deleteMessage", { count: row.alertIds.length }, row.alertIds.length),
     confirmLabel: t("common.delete"),
     cancelLabel: t("common.cancel"),
-    confirmVariant: "destructive",
-    focusCancel: true,
+    kind: "destructive",
   });
   if (!ok) return;
   try {

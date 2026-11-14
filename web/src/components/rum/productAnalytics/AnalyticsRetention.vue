@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       :reason="pa.identityGapText.value ?? t('rum.analytics.identity.absent')"
     />
-    <OCard v-else variant="outlined" class="rounded-surface flex flex-col">
+    <OCard v-else flush>
       <div class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2">
         <span
           class="flex min-w-0 flex-1 flex-wrap items-center gap-2"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 field: raw(identitySql?.field ?? ''),
               })
             "
-            variant="teal-soft"
+            tone="neutral"
             icon="person"
             size="sm"
           />
@@ -72,12 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           :model-value="def.per"
           :options="perOptions"
-          size="sm"
-          width="sm"
+          width="s"
           data-test="rum-analytics-retention-granularity"
           @update:model-value="(v) => update({ per: v as Granularity })"
         />
         <OToggleGroup
+          size="sm"
           :model-value="def.mode"
           type="single"
           data-test="rum-analytics-retention-mode"
@@ -85,14 +85,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OToggleGroupItem
             value="on"
-            size="xs"
             :tooltip="t('rum.analytics.retention.modeOnTooltip')"
             data-test="rum-analytics-retention-mode-on"
             >{{ t("rum.analytics.retention.modeOn") }}</OToggleGroupItem
           >
           <OToggleGroupItem
             value="after"
-            size="xs"
             :tooltip="t('rum.analytics.retention.modeAfterTooltip')"
             data-test="rum-analytics-retention-mode-after"
             >{{ t("rum.analytics.retention.modeAfter") }}</OToggleGroupItem
@@ -103,17 +101,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-secondary text-xs">{{
           t("rum.analytics.retention.cohortCaption")
         }}</span>
-        <OBanner
+        <OInlineNotice
           v-if="periods && periods.clipped && periods.dataStartUs"
-          variant="info"
-          dense
-          :content="t('rum.analytics.retention.dataStart', { date: fmtDate(periods.dataStartUs) })"
+          tone="info"
+          :message="t('rum.analytics.retention.dataStart', { date: fmtDate(periods.dataStartUs) })"
           data-test="rum-analytics-retention-data-start"
         />
         <OEmptyState
           v-if="periodState === 'tooShort' || periodState === 'tooMany'"
-          preset="no-search-results"
-          size="block"
+          kind="filtered"
+          :text="t('emptyState.noSearchResults.description')"
           :title="
             periodState === 'tooShort'
               ? t('rum.analytics.retention.tooShort')
@@ -128,8 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #actions>
             <OButton
               v-if="periodState === 'tooShort' && pa.canWidenRange.value"
-              variant="outline"
-              size="md"
+              variant="secondary"
               data-test="rum-analytics-retention-widen-range-btn"
               @click="widenRange"
               >{{ t("rum.analytics.overview.widenRange") }}</OButton
@@ -194,7 +190,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

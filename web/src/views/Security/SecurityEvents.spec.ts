@@ -215,7 +215,7 @@ const mountView = async (query: string) => {
     global: {
       provide: { store },
       plugins: [store, router],
-      stubs: { DateTime: true, CodeQueryEditor: true, SecurityNewDetectionDialog: true },
+      stubs: { ODateTimeRange: true, CodeQueryEditor: true, SecurityNewDetectionDialog: true },
     },
   });
   await settle();

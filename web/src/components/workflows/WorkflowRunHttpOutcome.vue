@@ -30,43 +30,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </span>
     </div>
-    <OBanner
+    <OInlineNotice
       v-if="reason === 'expired'"
-      variant="info"
-      dense
+      tone="info"
       data-test="workflow-run-expired-banner"
-      :content="t('workflow.http.runExpiredBanner')"
+      :message="t('workflow.http.runExpiredBanner')"
     />
-    <OBanner
+    <OInlineNotice
       v-else-if="reason === 'worker_lost'"
-      variant="error-soft"
-      dense
+      tone="err"
       data-test="workflow-run-worker-lost-banner"
-      :content="t('workflow.http.runWorkerLostBanner')"
+      :message="t('workflow.http.runWorkerLostBanner')"
     />
     <span v-else-if="reason" class="text-text-secondary text-xs">
       {{ t(RUN_REASON_KEYS[reason]) }}
     </span>
   </div>
   <div v-else-if="failedStep" class="flex shrink-0 flex-col gap-1">
-    <OBanner
-      variant="error-soft"
-      dense
-      inline-actions
+    <OInlineNotice
+      tone="err"
       data-test="workflow-run-error"
-      :content="t('workflow.http.runFailedAt', { step: failedStep.label, error: error ?? '' })"
+      :message="t('workflow.http.runFailedAt', { step: failedStep.label, error: error ?? '' })"
     >
       <template #actions>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="workflow-run-error-open-step"
           @click="emit('open-step', failedStep.id)"
         >
           {{ t("workflow.http.openStep") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
     <!-- JS errors rarely name the missing path, so the hint keys off the failing step's type. -->
     <div
       v-if="failedStep.isFunction"
@@ -82,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";

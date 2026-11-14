@@ -22,12 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dataTest: 'storage-settings-editor-back-btn',
     }"
     :title="headerTitle"
+    title-data-test="storage-settings-editor-title"
     bleed
   >
-    <template #title>
-      <span data-test="storage-settings-editor-title">{{ headerTitle }}</span>
-    </template>
-
     <OForm
       ref="storageForm"
       class="flex min-h-0 flex-1 flex-col"
@@ -56,12 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("storage_settings.selectProviderDesc") }}
                   {{ t("settings.orgStorageEditor.selectProviderDescCont") }}
                 </template>
-                <OBanner v-if="!isEditMode" variant="warning" icon="warning" class="mb-3">
+                <OInlineNotice v-if="!isEditMode" tone="warn" class="mb-3">
                   {{ t("settings.orgStorageEditor.irreversibleWarnPre")
                   }}<strong>{{ t("settings.orgStorageEditor.irreversibleWarnEmphasis") }}</strong
                   >{{ t("settings.orgStorageEditor.irreversibleWarnPost") }}
                   {{ t("settings.orgStorageEditor.credentialsOnlyInfo") }}
-                </OBanner>
+                </OInlineNotice>
                 <ORadioGroup
                   v-model="selectedProvider"
                   required
@@ -118,14 +115,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="storage-settings-server-url-input"
                       name="server_url"
                       :label="t('settings.orgStorageEditor.serverUrlLabel')"
-                      width="lg"
+                      width="l"
                       :disabled="isEditMode"
                     />
                     <OFormInput
                       data-test="storage-settings-region-input"
                       name="region"
                       :label="t('settings.orgStorageEditor.regionLabel')"
-                      width="lg"
+                      width="l"
                       :disabled="isEditMode || !!cloudRegion"
                     />
                     <OFormInput
@@ -133,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="bucket_name"
                       :label="t('settings.orgStorageEditor.bucketNameLabel')"
                       required
-                      width="lg"
+                      width="l"
                       :disabled="isEditMode"
                     />
                     <OFormInput
@@ -141,14 +138,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="access_key"
                       :label="t('settings.orgStorageEditor.accessKeyLabel')"
                       required
-                      width="lg"
+                      width="l"
                     />
                     <OFormInput
                       data-test="storage-settings-secret-key-input"
                       name="secret_key"
                       :label="t('settings.orgStorageEditor.secretKeyLabel')"
                       required
-                      width="lg"
+                      width="l"
                       type="password"
                     />
                   </div>
@@ -162,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="storage_account"
                       :label="t('settings.orgStorageEditor.storageAccountNameLabel')"
                       required
-                      width="lg"
+                      width="l"
                       :disabled="isEditMode"
                     />
                     <OFormInput
@@ -170,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="bucket_name"
                       :label="t('settings.orgStorageEditor.bucketNameLabel')"
                       required
-                      width="lg"
+                      width="l"
                       :disabled="isEditMode"
                     />
                     <OFormInput
@@ -178,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="secret_key"
                       :label="t('settings.orgStorageEditor.secretKeyLabel')"
                       required
-                      width="lg"
+                      width="l"
                       type="password"
                     />
                     <OFormInput
@@ -186,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="storage-settings-server-url-input"
                       name="server_url"
                       :label="t('settings.orgStorageEditor.serverUrlLabel')"
-                      width="lg"
+                      width="l"
                       :disabled="isEditMode"
                     />
                   </div>
@@ -200,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="bucket_name"
                       :label="t('settings.orgStorageEditor.bucketNameLabel')"
                       required
-                      width="lg"
+                      width="l"
                       :disabled="isEditMode"
                     />
                     <OFormInput
@@ -208,14 +205,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="access_key"
                       :label="t('settings.orgStorageEditor.accessKeyLabel')"
                       required
-                      width="lg"
+                      width="l"
                     />
                     <OFormInput
                       v-if="!isCloud"
                       data-test="storage-settings-server-url-input"
                       name="server_url"
                       :label="t('settings.orgStorageEditor.serverUrlLabel')"
-                      width="lg"
+                      width="l"
                       :disabled="isEditMode"
                     />
                   </div>
@@ -223,21 +220,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- AwsRoleArn Fields -->
                 <template v-if="selectedProvider === 'AwsRoleArn'">
-                  <OBanner variant="info" icon="info" class="mb-3">
+                  <OInlineNotice tone="info" class="mb-3">
                     <template v-if="isCloud">
                       {{ t("storage_settings.awsStsCloudInfo", { product: raw("OpenObserve") }) }}
                     </template>
                     <template v-else>
                       {{ t("storage_settings.awsStsSelfHostedInfo") }}
                     </template>
-                  </OBanner>
+                  </OInlineNotice>
                   <div class="flex flex-col gap-y-3">
                     <OFormInput
                       data-test="storage-settings-bucket-name-input"
                       name="bucket_name"
                       :label="t('settings.orgStorageEditor.bucketNameLabel')"
                       required
-                      width="lg"
+                      width="l"
                       :disabled="isEditMode"
                     />
                     <OFormInput
@@ -245,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="region"
                       :label="t('settings.orgStorageEditor.regionLabel')"
                       required
-                      width="lg"
+                      width="l"
                       :disabled="isEditMode || !!cloudRegion"
                     />
                     <OFormInput
@@ -253,14 +250,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="role_arn"
                       :label="t('settings.orgStorageEditor.roleArnLabel')"
                       required
-                      width="lg"
+                      width="l"
                     />
                     <OFormInput
                       data-test="storage-settings-role-external-id-input"
                       name="external_id"
                       :label="t('settings.orgStorageEditor.externalIdLabel')"
                       required
-                      width="lg"
+                      width="l"
                     />
                   </div>
                 </template>
@@ -293,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @cancel="emit('cancel')"
       >
         <template v-if="!isEditMode" #actions>
-          <OButton data-test="step2-back-btn" variant="outline" size="sm-action" @click="prevStep">
+          <OButton data-test="step2-back-btn" variant="secondary" @click="prevStep">
             {{ t("storage_settings.back") }}
           </OButton>
         </template>
@@ -315,7 +312,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";

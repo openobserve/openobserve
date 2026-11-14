@@ -22,8 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #actions>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :disabled="addableDomains.length === 0"
           :title="
             addableDomains.length === 0
@@ -43,16 +42,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="blocklists"
           :columns="columns"
           row-key="name"
-          show-index
           pagination="none"
           sorting="client"
           :fill-height="false"
-          :show-global-filter="false"
         >
           <template #empty>
             <OEmptyState
-              preset="no-blocked-users"
-              :actions="addableDomains.length === 0 ? [] : undefined"
+              :title="t('emptyState.noBlockedUsers.title')"
+              :text="t('emptyState.noBlockedUsers.description')"
+              icon="group"
+              :action-label="
+                addableDomains.length === 0 ? undefined : t('emptyState.noBlockedUsers.action')
+              "
               @action="openAdd"
             />
           </template>
@@ -68,24 +69,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   row.blockedEmails.length,
                 )
               }}
-              <OTooltip :max-width="'25rem'" :content="raw(row.blockedEmails.join(', '))" />
+              <OTooltip :content="raw(row.blockedEmails.join(', '))" />
             </span>
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center gap-1">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="edit"
+                icon="edit"
                 class="max-md:hidden"
                 :title="t('common.edit')"
                 :data-test="`settings-org-domain-restrictions-edit-${row.name}`"
                 @click.stop="openEdit(row)"
               />
               <OButton
-                variant="ghost-destructive"
-                size="icon-sm"
-                icon-left="delete"
+                icon-only
+                variant="danger-ghost"
+                icon="delete"
                 class="max-md:hidden"
                 :title="t('settings.orgDomainMapping.unblockAll')"
                 :data-test="`settings-org-domain-restrictions-remove-${row.name}`"
@@ -94,16 +95,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
-                    icon-left="more-vert"
+                    icon-only
+                    icon="more-vert"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="sm"
                     class="md:hidden"
                     :data-test="`settings-org-domain-restrictions-more-${row.name}`"
                     @click.stop
                   />
                 </template>
                 <ODropdownItem
-                  icon-left="edit"
+                  icon="edit"
                   class="md:hidden"
                   :data-test="`settings-org-domain-restrictions-edit-${row.name}-menu`"
                   @select="openEdit(row)"
@@ -111,8 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("common.edit") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="delete"
-                  variant="destructive"
+                  icon="delete"
+                  tone="danger"
                   class="md:hidden"
                   :data-test="`settings-org-domain-restrictions-remove-${row.name}-menu`"
                   @select="removeBlocklist(row)"

@@ -77,7 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="min-w-0"
         :code="configText(change.shifts, 'from')"
         lang="yaml"
-        chrome="editor"
         :filename="t('autoobserve.activity.before')"
         wrap
         :copyable="false"
@@ -87,7 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="min-w-0"
         :code="configText(change.shifts, 'to')"
         lang="yaml"
-        chrome="editor"
         :filename="t('autoobserve.activity.after')"
         wrap
         :copyable="false"

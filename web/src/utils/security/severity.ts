@@ -44,10 +44,10 @@ export function severityTagValue(tone: SeverityTone): string {
 }
 
 export const TONE_STAT: Record<SeverityTone, StatTone> = {
-  critical: "error",
-  high: "orange",
-  medium: "warning",
-  low: "blue",
+  critical: "crit",
+  high: "err",
+  medium: "warn",
+  low: "info",
   info: "neutral",
   unknown: "neutral",
 };

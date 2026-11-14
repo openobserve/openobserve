@@ -36,7 +36,7 @@ import SetupCardRenderer from "@/components/ingestion/setupCard/SetupCardRendere
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { CardSubstitutions, RichCardContent } from "@/components/ingestion/setupCard/types";
@@ -182,21 +182,20 @@ const subs = computed<CardSubstitutions>(() => ({
             v-for="p in PLATFORMS"
             :key="p.id"
             :value="p.id"
-            size="sm"
             :data-test="`rum-setup-platform-${p.id}`"
           >
             <OIcon :name="p.icon" size="xs" class="me-1" />
             {{ t(p.labelKey) }}
-            <BetaBadge v-if="p.beta" size="xs" class="ms-1.5" />
+            <BetaBadge v-if="p.beta" class="ms-1.5" />
           </OToggleGroupItem>
         </OToggleGroup>
       </template>
     </SetupCardRenderer>
-    <OBanner
+    <OInlineNotice
       v-else-if="rumTokenForbidden"
-      variant="warning"
+      tone="warn"
       data-test="rum-web-token-forbidden"
-      :content="t('ingestion.rumTokenForbiddenMessage')"
+      :message="t('ingestion.rumTokenForbiddenMessage')"
     />
     <p v-else class="mt-1" data-test="rum-web-no-token-message">
       {{ t("ingestion.generateRUMTokenMessage") }}

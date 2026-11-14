@@ -432,7 +432,7 @@ describe("Server: Get started pick", () => {
             template:
               '<div><slot name="tabs" :tabs="tabs" filter=""><span data-test="default-rail" /></slot></div>',
           },
-          ORouteTab: true,
+          OTab: true,
           "router-view": true,
         },
       },
@@ -448,7 +448,7 @@ describe("Server: Get started pick", () => {
     expect(wrapper.find('[data-test="ingestion-servers-pick-group"]').text()).toBe("Your pick");
     expect(wrapper.find('[data-test="ingestion-servers-pick-tab-nginx"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="ingestion-servers-rest-group"]').text()).toBe("Web Servers");
-    const names = wrapper.findAllComponents({ name: "ORouteTab" }).map((c) => c.props("name"));
+    const names = wrapper.findAllComponents({ name: "OTab" }).map((c) => c.props("name"));
     expect(names).toEqual(["nginx", "iis"]);
     wrapper.unmount();
   });

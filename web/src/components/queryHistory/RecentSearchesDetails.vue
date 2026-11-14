@@ -49,16 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-secondary text-2xs flex-1 font-semibold uppercase">{{
             t("recentSearches.functionLabel")
           }}</span>
-          <OButton
-            variant="ghost"
-            size="icon-xs"
-            icon-left="content-copy"
-            :aria-label="t('recentSearches.copyFunction')"
+          <OCopyButton
             data-test="recent-searches-details-copy-function"
-            @click="copyFunction"
-          >
-            <OTooltip :content="t('recentSearches.copyFunction')" />
-          </OButton>
+            size="md"
+            :label="t('recentSearches.copyFunction')"
+            :value="vrl"
+          />
         </div>
         <pre
           class="m-0 min-h-0 overflow-auto px-2 pb-2 font-mono text-xs wrap-anywhere whitespace-pre-wrap"
@@ -84,17 +80,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               t("recentSearches.failed")
             }}</span>
           </div>
-          <OButton
-            variant="ghost"
-            size="icon-xs"
-            icon-left="content-copy"
+          <OCopyButton
             class="shrink-0"
-            :aria-label="t('recentSearches.copyQuery')"
             data-test="recent-searches-details-copy"
-            @click="copyQuery"
-          >
-            <OTooltip :content="t('recentSearches.copyQuery')" />
-          </OButton>
+            size="md"
+            :label="t('recentSearches.copyQuery')"
+            :value="entry.query"
+          />
         </div>
         <div
           v-if="entry.status === 'error' && entry.context.error"
@@ -113,11 +105,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useI18nTyped } from "@/types/i18n";
 import { useRecentEntryText } from "@/composables/queryHistory/useRecentEntryText";
 import type { QueryHistoryEntry } from "@/services/query_history";
-import { copyToClipboard } from "@/utils/clipboard";
 import { logsEntryFunction } from "@/utils/queryHistory/logs";
 import { observeMoves } from "@/utils/queryHistory/observeMoves";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 
 const WIDTH_PX = 400;
 const WIDE_WIDTH_PX = 560;
@@ -284,12 +274,6 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => stopObserving?.());
-
-const copyQuery = () =>
-  copyToClipboard(props.entry.query, t, { successMessage: t("recentSearches.queryCopied") });
-
-const copyFunction = () =>
-  copyToClipboard(vrl.value, t, { successMessage: t("recentSearches.functionCopied") });
 
 /** Scrolls the query one page down (1) or up (-1); false when there is nothing to scroll. */
 const scrollPage = (step: 1 | -1) => {

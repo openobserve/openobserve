@@ -55,10 +55,11 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
           class="preview-image rounded-default border-border-default h-16 w-16 border object-cover [transition:transform_0.2s_ease] hover:scale-105"
         />
         <OButton
+          icon-only
           :aria-label="t('common.remove')"
           variant="ghost"
-          size="icon-xs-circle"
-          class="image-remove-btn bg-status-negative! hover:bg-status-negative! absolute! -top-1.5! -right-1.5! z-10 h-5! min-h-5! w-5! min-w-5! p-0!"
+          size="xs"
+          class="image-remove-btn bg-status-negative! hover:bg-status-negative! absolute! -top-1.5! -right-1.5! z-10"
           @click.stop="emit('remove-image', index)"
         >
           <OIcon name="close" size="xs" />
@@ -94,9 +95,9 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
         <!-- Image upload button -->
         <OButton
           v-if="!isLoading"
+          icon-only
           @click.stop="emit('trigger-image-upload')"
           variant="ghost"
-          size="icon-sm"
           class="image-upload-btn opacity-70 transition-opacity duration-200 hover:opacity-100"
         >
           <OIcon name="image" size="sm" class="text-icon-color" />
@@ -109,7 +110,6 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
           v-if="!isLoading"
           @click.stop="emit('update:autoNavigation', !autoNavigation)"
           variant="ghost"
-          size="sm"
           class="auto-nav-toggle-btn rounded-default hover:bg-surface-subtle flex items-center gap-1.5 px-2 py-1 transition-all duration-200"
         >
           <OIcon
@@ -135,12 +135,13 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
       <div class="flex items-center gap-2">
         <!-- Send button - shown when not loading -->
         <OButton
-          :aria-label="t('common.send')"
           v-if="!isLoading"
+          icon-only
+          :aria-label="t('common.send')"
           :disabled="!modelValue.trim() && pendingImages.length === 0"
           @click="emit('send')"
           variant="primary"
-          size="icon-xs-circle"
+          size="xs"
           class="send-button hover:bg-gradient-ai!"
         >
           <OIcon name="arrow-upward" size="sm" />
@@ -148,11 +149,12 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
 
         <!-- Stop button - shown when loading/streaming -->
         <OButton
-          :aria-label="t('common.stopGenerating')"
           v-if="isLoading"
+          icon-only
+          :aria-label="t('common.stopGenerating')"
           @click="emit('cancel')"
           variant="ghost"
-          size="icon-xs-circle"
+          size="xs"
           class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-gradient-danger! hover:bg-gradient-danger-hover! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
         >
           <OIcon name="stop" size="sm" />

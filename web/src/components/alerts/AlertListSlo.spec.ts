@@ -156,9 +156,8 @@ const O_OVERLAY_PROPS = {
   size: { type: String, default: undefined },
   title: { type: String, default: undefined },
   persistent: { type: Boolean, default: false },
-  primaryButtonLabel: { type: String, default: undefined },
-  secondaryButtonLabel: { type: String, default: undefined },
-  primaryButtonDisabled: { type: Boolean, default: false },
+  primary: { type: Object, default: undefined },
+  secondary: { type: Object, default: undefined },
 };
 
 async function mountBare(rows: any[]) {

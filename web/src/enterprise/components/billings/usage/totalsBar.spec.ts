@@ -19,11 +19,11 @@ import { totalsGridTemplate } from "./totalsBar";
 describe("totalsGridTemplate", () => {
   const columns = [{ id: "name" }, { id: "volume", size: 128 }, { id: "cost", size: 112 }];
 
-  it("mirrors the index column, the fill column and each fixed width", () => {
-    expect(totalsGridTemplate(columns)).toBe("3.5rem minmax(0, 1fr) 8rem 7rem");
+  it("mirrors the fill column and each fixed width", () => {
+    expect(totalsGridTemplate(columns)).toBe("minmax(0, 1fr) 8rem 7rem");
   });
 
   it("drops a column the table hides, so the cells stay under their headers", () => {
-    expect(totalsGridTemplate(columns, { volume: false })).toBe("3.5rem minmax(0, 1fr) 7rem");
+    expect(totalsGridTemplate(columns, { volume: false })).toBe("minmax(0, 1fr) 7rem");
   });
 });

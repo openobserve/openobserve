@@ -18,17 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <OPageLayout
-    overflow-first
     bleed
     :key="store.state.selectedOrganization.identifier"
     :title="t('dashboard.header')"
-    icon="dashboard"
-    :subtitle="t('dashboard.subtitle')"
     :main-panel="false"
   >
     <template #actions>
       <!-- new dashboard button -->
-      <OButton variant="primary" size="sm" data-test="dashboard-new" @click="addDashboard">
+      <OButton variant="primary" data-test="dashboard-new" @click="addDashboard">
         {{ t(`dashboard.add`) }}
       </OButton>
     </template>
@@ -38,9 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              the home page and jumps straight to it. -->
       <OButton
         v-if="homeDashboard"
-        variant="outline"
-        size="sm"
-        icon-left="keep-outline"
+        variant="secondary"
+        icon="keep-outline"
         class="max-w-60"
         data-test="dashboard-home-shortcut"
         @click="openHomeDashboard"
@@ -50,24 +46,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip v-if="homeDashboard" side="bottom" :content="t('dashboard.openHomeDashboard')" />
       <OButton
         v-if="publicLinksEnabled"
-        variant="outline"
-        size="sm"
-        icon-left="language"
+        variant="secondary"
+        icon="language"
         data-test="dashboard-public-links"
         @click="openPublicLinks"
       >
         {{ t("dashboard.publicLinks.pageTitle") }}
-        <BetaBadge size="xs" class="ms-1.5 max-md:hidden" />
+        <BetaBadge class="ms-1.5 max-md:hidden" />
       </OButton>
       <!-- import dashboard button with dropdown -->
       <ODropdown side="bottom" align="end">
         <template #trigger>
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             data-test="dashboard-import"
-            icon-left="upload-file"
-            icon-right="expand-more"
+            icon="upload-file"
+            icon-end="expand-more"
           >
             {{ t(`dashboard.import`) }}
           </OButton>
@@ -148,11 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loading"
             :loading-reset-key="activeFolderId"
             :forbidden="forbidden"
-            :frame="false"
             :default-columns="false"
-            show-index
             :global-filter="filterQuery"
-            :show-global-filter="false"
             :page-size="pageSize"
             :page-size-options="[20, 50, 100, 250, 500]"
             @update:page-size="pageSize = $event"
@@ -175,59 +166,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- min-w-0: otherwise the wrapper can't shrink below the search's min-content and pushes controls off-edge. -->
               <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
                 <div class="min-w-0 flex-1 max-md:min-w-40">
-                  <OInput
+                  <OSearchInput
                     v-model="dynamicQueryModel"
                     :placeholder="
                       searchAcrossFolders ? t('dashboard.searchAcross') : t('dashboard.search')
                     "
-                    clearable
+                    :scope="searchAcrossFolders ? 'all' : 'this'"
+                    :scope-options="searchScopeOptions"
+                    @update:scope="(v) => (searchAcrossFolders = v === 'all')"
                     @clear="clearSearchHistory"
                     data-test="dashboard-search"
                     class="w-full"
-                  >
-                    <template #icon-left>
-                      <OIcon name="search" size="sm" />
-                    </template>
-                    <template #icon-right>
-                      <OToggleGroup
-                        :model-value="searchAcrossFolders ? 'all' : 'this'"
-                        type="single"
-                        class="me-1 self-center"
-                        @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
-                      >
-                        <OToggleGroupItem
-                          value="this"
-                          size="xs"
-                          icon-left="folder-outline"
-                          data-test="dashboard-search-scope-current"
-                          :title="t('dashboard.searchThisFolderTitle')"
-                          ><span class="max-md:hidden">{{
-                            t("dashboard.searchThisFolder")
-                          }}</span></OToggleGroupItem
-                        >
-                        <OToggleGroupItem
-                          value="all"
-                          size="xs"
-                          icon-left="search"
-                          data-test="dashboard-search-across-folders-toggle"
-                          :title="t('dashboard.searchAllFoldersTitle')"
-                          ><span class="max-md:hidden">{{
-                            t("dashboard.searchAllFolders")
-                          }}</span></OToggleGroupItem
-                        >
-                      </OToggleGroup>
-                    </template>
-                  </OInput>
+                  />
                 </div>
               </div>
             </template>
             <template #toolbar-trailing>
               <ORefreshButton
-                layout="inline"
-                variant="outline"
                 :last-run-at="lastUpdatedAt"
                 :loading="refreshing"
-                shortcut-id="dashboardsListRefresh"
+                shortcut="dashboardsListRefresh"
                 data-test="dashboard-list-refresh"
                 @click="refreshDashboards"
               />
@@ -237,9 +195,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- One-click favorite toggle — filled gold star when
                      favorited, neutral outline otherwise. -->
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs-sq"
-                  :icon-left="isFavorite(row.id) ? 'star' : 'star-outline'"
+                  size="sm"
+                  :icon="isFavorite(row.id) ? 'star' : 'star-outline'"
                   :class="isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'"
                   :aria-label="
                     isFavorite(row.id)
@@ -309,10 +268,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="row-actions flex items-center justify-end gap-0.5">
                 <OButton
                   v-if="row.actions == 'true'"
-                  icon-left="drive-file-move"
+                  icon-only
+                  icon="drive-file-move"
                   :aria-label="t('dashboard.move_to_another_folder')"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="max-md:hidden"
                   data-test="dashboard-move-to-another-folder"
                   @click.stop="showMoveDashboardPanel(row)"
@@ -321,10 +281,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   v-if="row.actions == 'true'"
-                  icon-left="content-copy"
+                  icon-only
+                  icon="content-copy"
                   :aria-label="t('dashboard.duplicate')"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="max-md:hidden"
                   data-test="dashboard-duplicate"
                   data-row-action="duplicate"
@@ -334,10 +295,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   v-if="row.actions == 'true'"
-                  icon-left="delete"
+                  icon-only
+                  icon="delete"
                   :aria-label="t('dashboard.delete')"
-                  variant="ghost-destructive"
-                  size="icon-xs-sq"
+                  variant="danger-ghost"
+                  size="sm"
                   class="max-md:hidden"
                   data-test="dashboard-delete"
                   data-row-action="delete"
@@ -351,10 +313,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown v-if="row.actions == 'true'" side="bottom" align="end">
                   <template #trigger>
                     <OButton
-                      icon-left="more-vert"
+                      icon-only
+                      icon="more-vert"
                       :aria-label="t('dashboard.moreActions')"
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="sm"
                       data-test="dashboard-row-more-actions"
                       @click.stop
                     >
@@ -362,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                   <ODropdownItem
-                    icon-left="drive-file-move"
+                    icon="drive-file-move"
                     class="md:hidden"
                     data-test="dashboard-move-to-another-folder-menu"
                     @select="showMoveDashboardPanel(row)"
@@ -370,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("dashboard.move_to_another_folder") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="content-copy"
+                    icon="content-copy"
                     class="md:hidden"
                     data-test="dashboard-duplicate-menu"
                     @select="duplicateDashboard(row.id, row.folder_id)"
@@ -378,16 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("dashboard.duplicate") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
-                    class="md:hidden"
-                    data-test="dashboard-delete-menu"
-                    @select="showDeleteDialogFn({ row })"
-                  >
-                    <span>{{ t("dashboard.delete") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
-                    :icon-left="isHome(row.id) ? 'keep' : 'keep-outline'"
+                    :icon="isHome(row.id) ? 'keep' : 'keep-outline'"
                     data-test="dashboard-list-set-home-btn"
                     @select="toggleHome(row)"
                   >
@@ -395,36 +349,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       isHome(row.id) ? t("dashboard.removeFromHome") : t("dashboard.setAsHome")
                     }}</span>
                   </ODropdownItem>
+                  <ODropdownSeparator class="md:hidden" />
+                  <ODropdownItem
+                    icon="delete"
+                    tone="danger"
+                    class="md:hidden"
+                    data-test="dashboard-delete-menu"
+                    @select="showDeleteDialogFn({ row })"
+                  >
+                    <span>{{ t("dashboard.delete") }}</span>
+                  </ODropdownItem>
                 </ODropdown>
               </span>
             </template>
             <template #empty>
               <div class="flex w-full flex-col items-center gap-2">
                 <OEmptyState
-                  size="hero"
-                  :preset="
-                    activeFolderId !== 'default' ? 'no-dashboards-in-folder' : 'no-dashboards'
-                  "
+                  :kind="filterQuery ? 'filtered' : 'first-run'"
                   :title="
-                    showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesTitle') : undefined
+                    showFavoritesOnly && !filterQuery
+                      ? t('dashboard.noFavoritesTitle')
+                      : filterQuery
+                        ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.dashboards') })
+                        : activeFolderId !== 'default'
+                          ? t('emptyState.noDashboardsInFolder.title')
+                          : t('emptyState.noDashboards.title')
                   "
-                  :description="
+                  :text="
                     showFavoritesOnly && !filterQuery
                       ? t('dashboard.noFavoritesMessage')
-                      : undefined
+                      : filterQuery
+                        ? t('emptyState.filtered.description', {
+                            noun: t('emptyState.nouns.dashboards'),
+                          })
+                        : activeFolderId !== 'default'
+                          ? t('emptyState.noDashboardsInFolder.description')
+                          : t('emptyState.noDashboards.description')
                   "
-                  :hide-action="showFavoritesOnly && !filterQuery"
-                  :filtered="!!filterQuery"
-                  @action="
-                    (id) =>
-                      id === 'clear-filters'
-                        ? (filterQuery = '')
-                        : id === 'import'
-                          ? importDashboard()
-                          : id === 'templates'
-                            ? (showAddDashboardFromGitHub = true)
-                            : addDashboard()
+                  :icon="filterQuery ? undefined : 'dashboard'"
+                  :action-label="
+                    filterQuery || showFavoritesOnly
+                      ? undefined
+                      : activeFolderId !== 'default'
+                        ? t('emptyState.noDashboardsInFolder.action')
+                        : t('emptyState.noDashboards.action')
                   "
+                  :secondary-action-label="
+                    filterQuery || showFavoritesOnly
+                      ? undefined
+                      : activeFolderId !== 'default'
+                        ? t('emptyState.noDashboardsInFolder.import')
+                        : t('emptyState.noDashboards.import')
+                  "
+                  @action="filterQuery ? (filterQuery = '') : addDashboard()"
+                  @secondary-action="importDashboard()"
                 />
                 <!-- Gated on the URL folder — correct on FIRST render, unlike the async activeFolderId. -->
                 <TemplateSuggestionCards
@@ -441,9 +419,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #selection-actions>
               <OButton
-                variant="outline"
-                size="sm"
-                icon-left="tv"
+                variant="secondary"
+                icon="tv"
                 data-test="dashboard-list-tv-playlist-btn"
                 @click="openPlaylistDialog"
               >
@@ -451,27 +428,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('dashboard.playlist.actionTooltip')" />
               </OButton>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 data-test="dashboard-list-move-across-folders-btn"
                 @click="moveMultipleDashboards"
-                icon-left="drive-file-move"
+                icon="drive-file-move"
               >
                 {{ t("common.move") }}
               </OButton>
               <OButton
-                variant="outline"
-                size="sm"
-                icon-left="download"
+                variant="secondary"
+                icon="download"
                 data-test="dashboard-list-export-dashboards-btn"
                 @click="multipleExportDashboard"
               >
                 {{ t("common.export") }}
               </OButton>
               <OButton
-                variant="outline-destructive"
-                size="sm"
-                icon-left="delete"
+                variant="danger-ghost"
+                icon="delete"
                 data-test="dashboard-list-delete-dashboards-btn"
                 :loading="bulkDeleteLoading"
                 @click="openBulkDeleteDialog"
@@ -490,8 +464,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="md"
       :title="t('dashboard.createdashboard')"
       data-test="dashboard-add-dialog"
-      :secondary-button-label="t('dashboard.cancel')"
-      :primary-button-label="t('dashboard.save')"
+      :secondary="{ label: t('dashboard.cancel') }"
+      :primary="{ label: t('dashboard.save') }"
       form-id="add-dashboard-form"
       @click:secondary="showAddDashboardDialog = false"
     >
@@ -512,8 +486,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="sm"
       :title="isFolderEditMode ? t('dashboard.updateFolder') : t('dashboard.newFolder')"
       data-test="dashboard-folder-dialog"
-      :secondary-button-label="t('dashboard.cancel')"
-      :primary-button-label="t('dashboard.save')"
+      :secondary="{ label: t('dashboard.cancel') }"
+      :primary="{ label: t('dashboard.save') }"
       form-id="add-folder-dashboards-form"
       @click:secondary="showAddFolderDialog = false"
     >
@@ -544,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'dashboard.deleteDashboardConfirmMsg'
       "
       :message-name="selectedDelete?.name"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="deleteDashboard"
       @update:cancel="confirmDeleteDialog = false"
       v-model="confirmDeleteDialog"
@@ -573,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           selectedIds.length,
         )
       "
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="bulkDeleteDashboards"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -598,9 +572,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import type { SearchScopeOption } from "@/lib/forms/SearchInput/OSearchInput.types";
 // @ts-nocheck
 import {
   computed,
@@ -726,7 +699,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
-    OInput,
+    OSearchInput,
     ODialog,
     AddDashboard,
     OTooltip,
@@ -737,8 +710,6 @@ export default defineComponent({
     AddFolder,
     MoveDashboardToAnotherFolder,
     FolderList,
-    OToggleGroup,
-    OToggleGroupItem,
     PlaylistDialog,
   },
   setup() {
@@ -778,6 +749,22 @@ export default defineComponent({
     const selectedDashboardIdToMove = ref<string[] | null>(null);
     const showMoveDashboardDialog = ref(false);
     const searchAcrossFolders = ref(savedView.searchAcrossFolders);
+    const searchScopeOptions = computed<SearchScopeOption[]>(() => [
+      {
+        value: "this",
+        label: t("dashboard.searchThisFolder"),
+        icon: "folder-outline",
+        tooltip: t("dashboard.searchThisFolderTitle"),
+        dataTest: "dashboard-search-scope-current",
+      },
+      {
+        value: "all",
+        label: t("dashboard.searchAllFolders"),
+        icon: "search",
+        tooltip: t("dashboard.searchAllFoldersTitle"),
+        dataTest: "dashboard-search-across-folders-toggle",
+      },
+    ]);
     const filterQuery = ref(savedView.filterQuery);
     const sortBy = ref<string>(savedView.sortBy);
     const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
@@ -1998,6 +1985,7 @@ export default defineComponent({
       },
     ]);
     return {
+      searchScopeOptions,
       t,
       oTableRef,
       selectedDelete,

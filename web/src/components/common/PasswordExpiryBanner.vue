@@ -18,32 +18,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OBanner
     v-if="daysRemaining !== null"
-    bar
-    variant="warning"
+    tone="warn"
     icon="timer"
+    dismissible
     data-test="password-expiry-banner"
+    @dismiss="dismiss"
   >
     {{ t("passwordReset.expiryBanner", { count: daysRemaining }, daysRemaining) }}
 
     <template #actions>
-      <div class="flex flex-wrap items-center gap-3">
-        <OButton
-          variant="banner-dismiss"
-          size="sm"
-          data-test="password-expiry-banner-update"
-          @click="openVoluntarily()"
-        >
-          {{ t("passwordReset.expiryBannerAction") }}
-        </OButton>
-        <OButton
-          variant="banner-dismiss"
-          size="sm"
-          data-test="password-expiry-banner-dismiss"
-          @click="dismiss"
-        >
-          {{ t("passwordReset.expiryBannerDismiss") }}
-        </OButton>
-      </div>
+      <OButton variant="link" data-test="password-expiry-banner-update" @click="openVoluntarily()">
+        {{ t("passwordReset.expiryBannerAction") }}
+      </OButton>
     </template>
   </OBanner>
 </template>

@@ -31,10 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        → generic message (no action card; Ask AI available)
 -->
 <template>
-  <OEmptyState illustration="trace" size="hero" :hide-action="true">
-    <template #title>{{ t("traces.noEvents.title") }}</template>
-
-    <template #description>
+  <OEmptyState icon="timeline" :title="t('traces.noEvents.title')">
+    <template #text>
       <!-- Filter applied within an overlapping window: relax the query. -->
       <span
         v-if="windowHasStreamData && hasFilters"
@@ -66,11 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="aiEnabled && windowHasStreamData && !jumpTarget"
           variant="ghost"
-          size="sm"
           data-test="traces-no-events-ask-ai-btn"
           @click="emit('ask-ai')"
         >
-          <template #icon-left>
+          <template #icon>
             <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
           </template>
           {{ t("traces.noEvents.askAi") }}

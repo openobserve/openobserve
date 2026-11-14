@@ -30,7 +30,7 @@ describe("OverviewSectionEmpty", () => {
     const w = mountEmpty({});
     const message = w.get('[data-test="overview-incidents-empty-message"]');
     expect(message.text()).toContain("No open incidents");
-    expect(w.find("[data-o2-empty-state], .o2-empty-state").exists()).toBe(true);
+    expect(w.find("[data-kind]").exists()).toBe(true);
   });
 
   it("explains a forbidden section in the same words as a forbidden card", () => {

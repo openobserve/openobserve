@@ -124,10 +124,10 @@ function fmtDuration(ms: number) {
                 trace.zip
               </a>
               <OButton
+                icon-only
                 :aria-label="t('common.close')"
                 variant="ghost"
-                size="icon-sm"
-                icon-left="close"
+                icon="close"
                 data-test="synthetics-execution-detail-close-btn"
                 @click="emit('close')"
               />

@@ -100,8 +100,8 @@ function onAdd(name: unknown) {
         /></span>
         <OTag
           v-if="sourceByName.get(name)?.reason === 'auto'"
-          variant="primary-soft"
-          size="xs"
+          tone="accent"
+          size="sm"
           :data-test="`security-events-source-auto-${name}`"
           >{{ t("siem.events.autoTag") }}</OTag
         >
@@ -110,10 +110,10 @@ function onAdd(name: unknown) {
         }}</span>
         <OButton
           v-if="canExclude"
+          icon-only
           :data-test="`security-events-source-remove-${name}`"
           variant="ghost"
-          size="icon-xs"
-          icon-left="remove"
+          icon="remove"
           class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
           @click.stop="emit('remove', name)"
         >
@@ -130,7 +130,7 @@ function onAdd(name: unknown) {
         class="px-page-edge text-text-secondary text-2xs flex items-center gap-1.5 pt-1 font-semibold tracking-wide uppercase"
       >
         <span>{{ t("siem.events.suggested") }}</span>
-        <OSpinner v-if="classifying" size="xs">
+        <OSpinner v-if="classifying">
           <OTooltip :content="t('siem.events.classifying')" />
         </OSpinner>
       </div>
@@ -153,18 +153,18 @@ function onAdd(name: unknown) {
         /></span>
         <OButton
           v-if="canInclude"
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="add"
+          icon="add"
           :data-test="`security-events-suggested-add-${entry.name}`"
           @click="emit('add', entry.name)"
         >
           <OTooltip :content="t('siem.events.addSuggested')" />
         </OButton>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="close"
+          icon="close"
           :data-test="`security-events-suggested-dismiss-${entry.name}`"
           @click="emit('dismiss', entry.name)"
         >
@@ -174,7 +174,7 @@ function onAdd(name: unknown) {
       <div v-if="suggestions.length > SUGGESTIONS_SHOWN" class="px-page-edge">
         <OButton
           variant="ghost"
-          size="xs"
+          size="sm"
           data-test="security-events-suggested-more"
           @click="showAll = !showAll"
         >
@@ -193,7 +193,6 @@ function onAdd(name: unknown) {
         :options="addOptions"
         :placeholder="t('siem.events.addSource')"
         searchable
-        size="sm"
         data-test="security-events-add-source"
         @update:model-value="onAdd"
       />

@@ -19,6 +19,7 @@ import { computed, onUnmounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import {
@@ -192,11 +193,11 @@ function failedAtStep(steps: StepResult[]): string {
     <!-- Loading skeleton -->
     <div v-if="loading" class="flex flex-col gap-2 p-4">
       <div class="flex items-center gap-3 py-2">
-        <div class="rounded-default bg-border-default h-4 w-24 animate-pulse" />
-        <div class="rounded-default bg-border-default h-4 w-16 animate-pulse" />
-        <div class="rounded-default bg-border-default h-4 w-40 animate-pulse" />
+        <OSkeleton class="h-4 w-24" />
+        <OSkeleton class="h-4 w-16" />
+        <OSkeleton class="h-4 w-40" />
       </div>
-      <div class="rounded-default bg-border-default h-24 w-full animate-pulse" />
+      <OSkeleton shape="block" class="h-24" />
     </div>
 
     <!-- Query error -->
@@ -233,7 +234,7 @@ function failedAtStep(steps: StepResult[]): string {
           <!-- Location header row — click to expand/collapse -->
           <OButton
             variant="ghost"
-            size="xs"
+            size="sm"
             class="w-full justify-start gap-2 px-4 py-2.5 text-left text-xs font-medium"
             :data-test="`synthetics-run-row-toggle-location-${group.location}-btn`"
             @click="toggleLocation(group.location)"

@@ -10,7 +10,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -160,9 +160,8 @@ function onPrimary() {
     :size="bulk ? 'md' : 'sm'"
     :title="title"
     :form-id="results ? undefined : FORM_ID"
-    :primary-button-label="primaryLabel"
-    :primary-button-disabled="!results && bulk && closing === 0"
-    :secondary-button-label="results ? undefined : t('siem.cases.close.cancel')"
+    :primary="{ label: primaryLabel, disabled: !results && bulk && closing === 0 }"
+    :secondary="{ label: results ? undefined : t('siem.cases.close.cancel') }"
     data-test="security-case-close-dialog"
     @update:open="emit('update:open', $event)"
     @click:primary="onPrimary"
@@ -183,7 +182,7 @@ function onPrimary() {
           :data-outcome="row.outcome"
         >
           <OIcon :name="OUTCOME_ICON[row.outcome]" size="sm" :class="OUTCOME_CLASS[row.outcome]" />
-          <OTag type="severity" :value="row.priority.toLowerCase()" size="xs" class="shrink-0" />
+          <OTag type="severity" :value="row.priority.toLowerCase()" size="sm" class="shrink-0" />
           <div class="flex min-w-0 flex-1 flex-col">
             <OTruncatedText class="text-text-heading text-sm">{{ row.title }}</OTruncatedText>
             <OTruncatedText class="text-text-secondary text-2xs font-mono">{{
@@ -205,13 +204,7 @@ function onPrimary() {
       class="flex flex-col gap-5"
       data-test="security-case-close-form"
     >
-      <OBanner
-        v-if="highCount"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        data-test="security-case-close-high"
-      >
+      <OInlineNotice v-if="highCount" tone="warn" data-test="security-case-close-high">
         <div class="flex min-w-0 flex-1 flex-col gap-2">
           <span>{{ t("siem.cases.close.highWarning", { n: highCount }, highCount) }}</span>
           <ul class="flex flex-col gap-1">
@@ -221,7 +214,7 @@ function onPrimary() {
               class="flex min-w-0 items-center gap-2"
               :data-test="`security-case-close-high-${c.id}`"
             >
-              <OTag type="severity" :value="c.priority.toLowerCase()" size="xs" class="shrink-0" />
+              <OTag type="severity" :value="c.priority.toLowerCase()" size="sm" class="shrink-0" />
               <OTruncatedText class="text-text-heading min-w-0 flex-1 text-xs">{{
                 c.title
               }}</OTruncatedText>
@@ -239,7 +232,7 @@ function onPrimary() {
             data-test="security-case-close-include-high"
           />
         </div>
-      </OBanner>
+      </OInlineNotice>
       <OFormSelect
         name="verdict"
         :label="t('siem.cases.close.verdict')"
@@ -255,13 +248,11 @@ function onPrimary() {
         required
         data-test="security-case-close-reason"
       />
-      <OBanner
+      <OInlineNotice
         v-if="verdict === 'benign' && cannotSuppress"
-        variant="info"
-        icon="info-outline"
-        dense
+        tone="info"
         data-test="security-case-close-no-entity"
-        >{{ t("siem.cases.close.noEntity", { n: selected }, selected) }}</OBanner
+        >{{ t("siem.cases.close.noEntity", { n: selected }, selected) }}</OInlineNotice
       >
       <OFormSelect
         v-else-if="verdict === 'benign'"

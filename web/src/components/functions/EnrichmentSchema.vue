@@ -22,13 +22,13 @@
     data-test="enrichment-schema-drawer"
     bleed
     :open="open"
-    size="lg"
+    size="md"
     :title="t('logStream.schemaHeader')"
     @update:open="$emit('update:open', $event)"
   >
     <div>
       <div v-if="loadingState" class="flex h-full w-full items-center justify-center py-10">
-        <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
+        <OSpinner size="lg" data-test="enrichment-schema-loading-indicator" />
       </div>
       <div v-else class="indexDetailsContainer h-screen w-full p-5">
         <div
@@ -88,7 +88,6 @@
               :columns="columns"
               row-key="name"
               :global-filter="filterField"
-              :show-global-filter="false"
               :default-columns="false"
               :page-size-options="[5, 10, 20, 50]"
             />

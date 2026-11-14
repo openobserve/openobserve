@@ -35,14 +35,15 @@
      Values match Tailwind's conventional scale, so token-driven element rules and
      the text-* utilities agree pixel-for-pixel. Do NOT use raw text-[..px]. */
   --text-3xs: 0.625rem; /* 10px — chart axis micro-labels, dense table sub-text */
-  --text-2xs: 0.6875rem; /* 11px — tiny labels, chips, badge text */
-  --text-xs: 0.75rem; /* 12px — captions, metadata, timestamps */
-  --text-compact: 0.8125rem; /* 13px — dense body / data tables */
-  --text-sm: 0.875rem; /* 14px — DEFAULT body text */
-  --text-base: 1rem; /* 16px — comfortable body, form inputs */
-  --text-lg: 1.125rem; /* 18px — card / panel titles */
-  --text-xl: 1.25rem; /* 20px — section headings */
-  --text-2xl: 1.5rem; /* 24px — page / modal titles */
+  --text-2xs: 0.6875rem; /* 11px — key chips, chart axes, micro captions */
+  --text-xs: 0.75rem; /* 12px — meta, helper text, chips, badges, column headers */
+  --text-compact: 0.8125rem; /* 13px — UI text: controls, menus, table cells, labels */
+  --text-sm: 0.875rem; /* 14px — reading text: descriptions, dialog bodies, empty states */
+  --text-title: 0.9375rem; /* 15px — dialog, drawer and section titles */
+  --text-base: 1rem; /* 16px — page title, never larger */
+  --text-lg: 1.125rem; /* 18px — outside the v2 type table (guideline T1) */
+  --text-xl: 1.25rem; /* 20px — small KPI values */
+  --text-2xl: 1.5rem; /* 24px — KPI values */
   --text-3xl: 1.875rem; /* 30px — hero numbers / large display */
   --text-4xl: 2.25rem; /* 36px — display */
 
@@ -346,23 +347,14 @@
   --spacing-10: 2.5rem; /* 40px */
 
   /* --- Radius scale --- */
-  /* Two real corner radii, one job each — no fake tiers:
-       --radius-default (6px)   tight interactive controls (buttons, inputs,
-                                chips, small icon buttons)
-       --radius-surface (12px)  large surfaces (dialogs, drawers, cards/panels,
-                                the app-shell content area)
-     plus --radius-full for pills/avatars/circles. Changing either knob retunes
-     its whole tier at once. The old sm/md/lg/xl scale was retired — it exposed
-     five names for what was one value; every former ref was repointed
-     (small→default, large→surface). Do NOT reintroduce sm/md/lg/xl. */
-  --radius-default: 0.375rem; /* 6px  — control tier */
-  --radius-surface: 0.75rem; /* 12px — surface tier (matches the historical dialog curve) */
+  /* One tier per role, picked by the element's job, never by eye. Do NOT reintroduce
+     the retired sm/md/lg/xl names: they were five spellings of one value. */
+  --radius-chip: 0.25rem; /* 4px  — chips, badges, kbd, checkbox */
+  --radius-default: 0.375rem; /* 6px  — buttons, inputs, selects, segmented, every control */
+  --radius-menu: 0.5rem; /* 8px  — menus, popovers, tooltips */
+  --radius-surface: 0.625rem; /* 10px — dialogs, drawers, cards, panels, the content frame */
   /* eslint-disable-next-line local/no-hardcoded-px -- fully-rounded pill sentinel */
   --radius-full: 9999px; /* pills / avatars / circles */
-  /* Checkboxes stay at the original 4px: the tick box is tiny (12–16px), and the
-     control tier's 6px reads as visibly round on a box that small. Pinned to its
-     own knob so it holds independent of --radius-default. */
-  --radius-checkbox: 0.25rem; /* 4px  — checkbox tick box only */
 
   /* --- Shadow scale — hairline-border philosophy ---
      Only sm/md/lg render real elevation (overlays: dialogs, menus). Cards use a

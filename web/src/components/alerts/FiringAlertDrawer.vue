@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="!!alertId"
     side="right"
-    size="lg"
+    size="md"
     seamless
     :modal="false"
     :title="raw(view?.name ?? alertId ?? '')"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alerts-firing-drawer-muted"
             >
               <OTag
-                variant="default-soft"
+                tone="neutral"
                 icon="notifications-paused"
                 size="sm"
                 :label="t('alerts.firing.chipMuted')"
@@ -58,7 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex h-full items-center justify-center"
       data-test="alerts-firing-drawer-error"
     >
-      <OEmptyState preset="load-error" hide-action />
+      <OEmptyState
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
+      />
     </div>
 
     <div v-else-if="view" class="flex flex-col gap-3" data-test="alerts-firing-drawer-body">
@@ -74,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag
                 v-for="name in confirmed"
                 :key="name"
-                variant="success-soft"
+                tone="ok"
                 icon="check"
                 size="sm"
                 :label="raw(name)"
@@ -88,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag
                 v-for="name in unconfirmed"
                 :key="name"
-                variant="default-soft"
+                tone="neutral"
                 size="sm"
                 :label="raw(name)"
                 :data-test="`alerts-firing-drawer-dest-${name}`"
@@ -96,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag
                 v-for="name in delivery?.names ?? []"
                 :key="name"
-                variant="error-soft"
+                tone="err"
                 size="sm"
                 :label="t('alerts.firing.drawer.notDeliveredTo', { name: raw(name) })"
                 :data-test="`alerts-firing-drawer-failed-${name}`"
@@ -115,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="showAcknowledge"
             variant="primary"
-            size="xs"
-            icon-left="check"
+            size="sm"
+            icon="check"
             :disabled="actions.pending.value"
             data-test="alerts-firing-drawer-ack"
             @click="onAcknowledge"
@@ -126,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="showTakeOver"
             variant="primary"
-            size="xs"
+            size="sm"
             :disabled="actions.pending.value"
             data-test="alerts-firing-drawer-take-over"
             @click="onTakeOver"
@@ -135,10 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             v-if="logsHref"
-            as="a"
-            variant="outline"
-            size="xs"
-            icon-left="open-in-new"
+            variant="secondary"
+            size="sm"
+            icon="open-in-new"
             :href="logsHref"
             target="_blank"
             rel="noopener"
@@ -148,9 +151,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             v-if="showMute"
-            variant="outline"
-            size="xs"
-            icon-left="notifications-paused"
+            variant="secondary"
+            size="sm"
+            icon="notifications-paused"
             data-test="alerts-firing-drawer-mute"
             @click="muteOpen = true"
           >

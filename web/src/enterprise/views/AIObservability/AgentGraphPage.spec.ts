@@ -105,8 +105,8 @@ vi.mock("@/lib/core/PageLayout/OPageLayout.vue", () => ({
   },
 }));
 
-vi.mock("@/components/DateTime.vue", () => ({
-  default: { name: "DateTime", template: `<div class="date-time" />` },
+vi.mock("@/lib/forms/DateTimeRange/ODateTimeRange.vue", () => ({
+  default: { name: "ODateTimeRange", template: `<div class="date-time" />` },
 }));
 
 vi.mock("@/lib/forms/Select/OSelect.vue", () => ({
@@ -175,10 +175,6 @@ vi.mock("@/lib/core/EmptyState/OEmptyState.vue", () => ({
     props: ["title", "description", "illustration", "size"],
     template: `<div class="o-empty-state" :data-title="title" />`,
   },
-}));
-
-vi.mock("@/components/shared/SkeletonBox.vue", () => ({
-  default: { name: "SkeletonBox", template: `<div class="skeleton-box" />` },
 }));
 
 import { describe, it, expect, vi, beforeEach } from "vitest";

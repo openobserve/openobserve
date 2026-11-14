@@ -729,7 +729,7 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
       expect(popover).toBeDefined();
       expect(popover!.find(`[data-test="${PICKER}"]`).exists()).toBe(true);
       expect(w.findAll(`[data-test="${PICKER}"]`)).toHaveLength(1);
-      expect(w.findComponent(`[data-test="${ADD}"]`).props("active")).toBe(true);
+      expect(w.findComponent(`[data-test="${ADD}"]`).props("pressed")).toBe(true);
       expect(picker(w).find(`[data-test="${PICKER}-step-p:/web/ingestion"]`).exists()).toBe(true);
       expect(picker(w).find(`[data-test="${PICKER}-apply"]`).exists()).toBe(false);
     });
@@ -749,7 +749,7 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
       ]);
       expect(popoverAround(w, ADD)?.props("open")).toBe(false);
       expect(picker(w).exists()).toBe(false);
-      expect(w.findComponent(`[data-test="${ADD}"]`).props("active")).toBe(false);
+      expect(w.findComponent(`[data-test="${ADD}"]`).props("pressed")).toBe(false);
     });
 
     it("Cancel and closing the popover drop a staged edit", async () => {

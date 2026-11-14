@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { gt, type I18nKey } from "@/types/i18n";
+import type { OTableDensity } from "@/lib/core/Table/OTable.types";
 import { getDataValue } from "./aliasUtils";
 import { parseOverrideConfigs } from "./tableConfigUtils";
 import { getSeriesThresholds, resolveStepValues, stepColorFor } from "./thresholds";
@@ -23,10 +24,6 @@ export const TABLE_DENSITIES = ["compact", "standard", "comfortable"] as const;
 export const DEFAULT_TABLE_DENSITY = "compact";
 
 export type TableFooterCalc = (typeof TABLE_FOOTER_CALCS)[number];
-
-// Absent density keeps today's row height, which is the compact one.
-const ROW_HEIGHTS: Record<string, number> = { compact: 22, standard: 28, comfortable: 36 };
-const DEFAULT_ROW_HEIGHT = 22;
 
 const CALC_LABEL_KEYS: Record<TableFooterCalc, I18nKey> = {
   sum: "dashboard.tableFooterCalcSum",
@@ -45,9 +42,19 @@ const toNumber = (value: unknown): number | null => {
   return Number.isFinite(numeric) ? numeric : null;
 };
 
-/** Row height in px for a table density; absent keeps today's height. */
-export const tableRowHeight = (density: unknown): number =>
-  ROW_HEIGHTS[String(density)] ?? DEFAULT_ROW_HEIGHT;
+/** Selectors of a dashboard table's pager, kept from the pager it replaced. */
+export const DASHBOARD_TABLE_PAGER_TEST_IDS = {
+  range: "dashboard-table-row-count",
+  size: "dashboard-table-rows-per-page-select",
+  first: "dashboard-table-pagination-first-page",
+  prev: "dashboard-table-pagination-prev-page",
+  next: "dashboard-table-pagination-next-page",
+  last: "dashboard-table-pagination-last-page",
+} as const;
+
+/** OTable density for a panel's `table_density`: comfortable rows are 36 px, the others 28 (L7). */
+export const tableDensity = (density: unknown): OTableDensity =>
+  density === "comfortable" ? "default" : "compact";
 
 /** Parses a sparkline cell (a numeric array or its JSON text) into points, or null when it is not one. */
 export const parseSparklineValue = (value: unknown): number[] | null => {

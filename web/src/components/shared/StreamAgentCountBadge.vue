@@ -19,7 +19,7 @@
        OAgentBadges shows env/version beside the agent picker — one consistent
        "scope chip" pattern across the AI pages. Kept OUT of the dropdown trigger
        so it never overlaps the (truncated) stream name. -->
-  <OBadge variant="default-soft" size="sm" class="shrink-0" :data-test="dataTest">
+  <OBadge tone="neutral" size="sm" class="shrink-0" :data-test="dataTest">
     {{ t("traces.agentCountBadgeSingular", { count }) }}
   </OBadge>
 </template>

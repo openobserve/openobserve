@@ -16,13 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="sm"
     :open="open"
     @update:open="$emit('update:open', $event)"
     :title="isEdit ? t('synthetics.locations.editTitle') : t('synthetics.locations.createTitle')"
-    :primary-button-label="
-      isEdit ? t('synthetics.locations.updateClose') : t('synthetics.locations.createClose')
-    "
-    :secondary-button-label="t('synthetics.locations.cancel')"
+    :primary="{
+      label: isEdit ? t('synthetics.locations.updateClose') : t('synthetics.locations.createClose'),
+    }"
+    :secondary="{ label: t('synthetics.locations.cancel') }"
     form-id="synthetics-location-form"
     @click:secondary="handleClose"
     data-test="synthetics-location-form-drawer"

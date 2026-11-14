@@ -159,7 +159,7 @@ describe("AnalyticsRetention", () => {
     const per = wrapper!
       .findAllComponents(OSelect)
       .find((c) => c.attributes("data-test") === "rum-analytics-retention-granularity");
-    expect(per?.props("width")).toBe("sm");
+    expect(per?.props("width")).toBe("s");
   });
 
   it("without an identity shows the unlock state with the setUser snippet and never a grid (AC-30)", async () => {
@@ -362,18 +362,18 @@ describe("AnalyticsRetention", () => {
     expect(running).toContain("still running");
   });
 
-  it("a cell opens a full-height lg drawer whose View in Sessions points away", async () => {
+  it("a cell opens a full-height md drawer whose View in Sessions points away", async () => {
     await mountRetention();
     await wrapper!.find('[data-test="rum-analytics-retention-cell-0-1"]').trigger("click");
     for (let i = 0; i < 4; i++) await flushPromises();
     const drawer = wrapper!.findComponent(ODrawer);
-    expect(drawer.props("size")).toBe("lg");
+    expect(drawer.props("size")).toBe("md");
     expect(drawer.props("anchor") ?? null).toBeNull();
     expect(drawer.props("seamless")).toBe(false);
     const btn = wrapper!
       .findAllComponents(OButton)
       .find((b) => b.attributes("data-test") === "rum-analytics-retention-user-0-sessions-btn")!;
-    expect(btn.props("iconRight")).toBe("arrow-forward");
+    expect(btn.props("iconEnd")).toBe("arrow-forward");
   });
 
   it("a cell opens retained and not retained users, and View in Sessions filters Sessions to that user (AC-35)", async () => {

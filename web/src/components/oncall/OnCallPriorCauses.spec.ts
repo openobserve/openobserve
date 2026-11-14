@@ -22,8 +22,7 @@ import type { CauseGroup } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OCard: { name: "OCard", template: "<div><slot /></div>" },
-  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
-  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
+  OTag: { name: "OTag", props: ["tone"], template: "<span><slot /></span>" },
   OButton: {
     name: "OButton",
     emits: ["click"],
@@ -84,10 +83,10 @@ describe("OnCallPriorCauses", () => {
     const expected = render([group({ cause: "expected_or_maintenance" })]);
     const noisy = render([group({ cause: "noisy_threshold" })]);
 
-    const variant = (w: any) => w.findComponent({ name: "OTag" }).props("variant");
-    expect(variant(defect)).toBe("error-soft");
-    expect(variant(expected)).toBe("success-soft");
-    expect(variant(noisy)).toBe("amber-soft");
+    const variant = (w: any) => w.findComponent({ name: "OTag" }).props("tone");
+    expect(variant(defect)).toBe("err");
+    expect(variant(expected)).toBe("ok");
+    expect(variant(noisy)).toBe("warn");
   });
 
   it("renders a cause that has no note", () => {

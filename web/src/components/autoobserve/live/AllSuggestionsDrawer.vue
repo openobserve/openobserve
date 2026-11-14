@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="xl"
+    size="lg"
     :title="t('autoobserveLive.suggestions.drawerTitle')"
     data-test="autoobserve2-suggestions-drawer"
     @update:open="(v) => emit('update:open', v)"
@@ -32,13 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OSkeleton
         v-else-if="!notice"
-        animation="none"
-        class="h-5 w-8 rounded-full"
+        shape="block"
+        class="h-5 w-8"
         data-test="autoobserve2-suggestions-drawer-count-skeleton"
       />
       <OTag
         v-if="kindLabel"
-        variant="default-soft"
+        tone="neutral"
         size="sm"
         removable
         :label="kindLabel"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LiveNoticeState
         v-if="notice"
         :notice="notice"
-        size="block"
+        size="page"
         :detail="state.detail"
         :busy="state.busy"
         data-test="autoobserve2-suggestions-drawer-error"
@@ -85,7 +85,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="rows"
         :columns="columns"
         :loading="skeleton || paging || clampTotal !== null || locating"
-        :frame="false"
         row-key="id"
         :pagination="total > 0 ? 'server' : 'none'"
         :page-size="DRAWER_PAGE"
@@ -96,7 +95,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:expanded-ids="expandedIds"
         expansion="single"
         expand-on-row-click
-        :show-global-filter="false"
         :cell-overflow-tooltip="false"
         class="min-h-0 flex-1"
         data-test="autoobserve2-suggestions-table"
@@ -115,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-kind="{ row }">
           <OTag
-            :variant="row.kindVariant"
+            :tone="row.kindVariant"
             size="sm"
             :label="row.kind"
             :data-test="`autoobserve2-suggestions-kind-${row.id}`"
@@ -124,8 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-next="{ row }">
           <OButton
             v-if="row.insight.cta"
-            variant="outline"
-            size="xs"
+            variant="secondary"
+            size="sm"
             class="max-w-full"
             :title="row.insight.cta.label"
             :loading="pendingId === row.id"
@@ -160,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="inline"
             icon="filter-alt"
             :title="t('autoobserveLive.suggestions.kindEmptyTitle', { kind: kindLabel })"
-            :description="
+            :text="
               t('autoobserveLive.suggestions.kindEmptyDesc', { count: othersOpen }, othersOpen)
             "
             :action-label="t('autoobserveLive.suggestions.clearKind')"
@@ -172,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="inline"
             icon="task-alt"
             :title="t('autoobserveLive.notice.suggestions.emptyTitle')"
-            :description="t('autoobserveLive.notice.suggestions.emptyDesc')"
+            :text="t('autoobserveLive.notice.suggestions.emptyDesc')"
             data-test="autoobserve2-suggestions-drawer-empty"
           />
         </template>

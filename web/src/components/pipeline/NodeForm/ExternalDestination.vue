@@ -30,16 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('alerts.externalDestinationTitle')"
-    size="lg"
+    size="md"
     :show-close="true"
     @keydown.stop
-    :primaryButtonLabel="!creating ? t('alerts.save') : undefined"
-    :secondaryButtonLabel="!creating ? t('alerts.cancel') : undefined"
-    :neutralButtonLabel="!creating && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
-    neutralButtonVariant="outline-destructive"
+    :primary="{ label: !creating ? t('alerts.save') : undefined }"
+    :secondary="{ label: !creating ? t('alerts.cancel') : undefined }"
+    :extra="{
+      label: !creating && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined,
+      variant: 'danger-ghost',
+    }"
     @click:primary="saveDestination"
     @click:secondary="handleCancel"
-    @click:neutral="openDeleteDialog"
+    @click:extra="openDeleteDialog"
   >
     <!-- No padding here: ODrawer now pads its own body (bodyPaddingClass). -->
     <div class="w-full">

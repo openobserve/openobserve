@@ -522,8 +522,7 @@ describe("IncidentList.vue", () => {
       await flushPromises();
       expect(vi.mocked(toast).mock.calls.at(-1)?.[0]).toMatchObject({
         variant: "error",
-        title: "You can't acknowledge this.",
-        message: "On call: bo@acme.io",
+        message: "You can't acknowledge this. On call: bo@acme.io",
       });
     });
 

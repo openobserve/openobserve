@@ -23,25 +23,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #right>
         <OButton
           variant="primary"
-          size="sm"
           @click.stop="addNewItem"
           data-test="dashboard-tab-settings-add-tab"
           >{{ t("dashboard.newTab") }}</OButton
         >
       </template>
     </DashboardHeader>
+    <!-- Created in place: a dialog over the settings drawer would chain two modals (O8). -->
+    <div
+      v-if="addingTab"
+      class="flex items-end gap-2 px-3 pb-3"
+      data-test="dashboard-tab-settings-add-tab-inline"
+    >
+      <OInput
+        v-model="newTabName"
+        :label="t('dashboard.inlineCreate.tabName')"
+        :error="newTabError !== ''"
+        :error-message="newTabError || undefined"
+        autofocus
+        class="min-w-0 flex-1"
+        data-test="dashboard-add-tab-name"
+        @keydown.enter.prevent="createTab"
+        @keydown.esc.stop="closeAddTab"
+      />
+      <OButton
+        variant="primary"
+        :loading="creatingTab"
+        data-test="dashboard-add-tab-create"
+        @click="createTab"
+        >{{ t("dashboard.inlineCreate.createTab") }}</OButton
+      >
+      <OButton variant="ghost" data-test="dashboard-add-tab-cancel" @click="closeAddTab">{{
+        t("dashboard.cancel")
+      }}</OButton>
+    </div>
     <div ref="tableWrapper" data-test="dashboard-tab-settings-drag">
       <OTable
         data-test="dashboard-tabs-table"
         :data="currentDashboardData.data.tabs ?? []"
         :columns="columns"
         row-key="tabId"
-        :frame="false"
         pagination="none"
         sorting="none"
         selection="none"
         :default-columns="false"
-        :show-global-filter="false"
       >
         <template #cell-drag>
           <div
@@ -66,22 +91,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-tab-settings-tab-name-edit"
             />
             <OButton
+              icon-only
               variant="ghost"
-              size="icon"
+              size="xs"
               :title="t('dashboard.save')"
               @click.stop="saveEdit"
               :disabled="!editTabObj.data.name.trim()"
               data-test="dashboard-tab-settings-tab-name-edit-save"
-              icon-left="check"
+              icon="check"
             >
             </OButton>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon"
+              size="xs"
               :title="t('dashboard.cancel')"
               @click.stop="cancelEdit"
               data-test="dashboard-tab-settings-tab-name-edit-cancel"
-              icon-left="close"
+              icon="close"
             >
             </OButton>
           </div>
@@ -90,41 +117,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <div class="flex justify-center gap-1">
             <OButton
+              icon-only
               variant="ghost"
-              size="icon"
+              size="xs"
               :disabled="row.tabId === editTabId"
               :title="t('dashboard.edit')"
               @click.stop="editItem(row.tabId)"
               data-test="dashboard-tab-settings-tab-edit-btn"
-              icon-left="edit"
+              icon="edit"
               class="max-md:hidden"
             >
             </OButton>
             <OButton
               v-if="currentDashboardData.data.tabs.length !== 1"
+              icon-only
               variant="ghost"
-              size="icon"
+              size="xs"
               :title="t('dashboard.delete')"
               @click.stop="deleteItem(row.tabId)"
               data-test="dashboard-tab-settings-tab-delete-btn"
               class="max-md:hidden"
             >
-              <template #icon-left><OIcon name="delete" size="sm" /></template>
+              <template #icon><OIcon name="delete" size="sm" /></template>
             </OButton>
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
-                  icon-left="more-vert"
+                  icon-only
+                  icon="more-vert"
                   :title="t('dashboard.moreActions')"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   data-test="dashboard-tab-settings-row-more-actions"
                   @click.stop
                 />
               </template>
               <ODropdownItem
-                icon-left="edit"
+                icon="edit"
                 :disabled="row.tabId === editTabId"
                 class="md:hidden"
                 data-test="dashboard-tab-settings-tab-edit-btn-menu"
@@ -134,8 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
               <ODropdownItem
                 v-if="currentDashboardData.data.tabs.length !== 1"
-                icon-left="delete"
-                variant="destructive"
+                icon="delete"
+                tone="danger"
                 class="md:hidden"
                 data-test="dashboard-tab-settings-tab-delete-btn-menu"
                 @select="deleteItem(row.tabId)"
@@ -148,14 +178,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTable>
     </div>
 
-    <AddTab
-      v-model:open="showAddTabDialog"
-      :edit-mode="isTabEditMode"
-      :tabId="selectedTabIdToEdit"
-      :dashboard-id="currentDashboardData.data.dashboardId"
-      data-test="dashboard-tab-settings-add-tab-dialog"
-      @refresh="refreshRequired"
-    />
     <!-- delete tab dialog -->
     <TabsDeletePopUp
       v-model="deletePopupVisible"
@@ -180,19 +202,19 @@ import {
   watch,
 } from "vue";
 import Sortable from "sortablejs";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
-import { deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commons";
+import { addTab, deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
-import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import useNotifications from "@/composables/useNotifications";
 import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
@@ -202,21 +224,22 @@ export default defineComponent({
   name: "TabsSettings",
   components: {
     DashboardHeader,
-    AddTab,
     TabsDeletePopUp,
     OButton,
     ODropdown,
     ODropdownItem,
     OIcon,
     OTable,
+    OInput,
   },
   setup(props, { emit }) {
     const store = useStore();
     const route = useRoute();
 
-    const showAddTabDialog = ref(false);
-    const isTabEditMode = ref(false);
-    const selectedTabIdToEdit: any = ref("");
+    const addingTab = ref(false);
+    const newTabName = ref("");
+    const newTabError = ref<I18nText | "">("");
+    const creatingTab = ref(false);
 
     const deletePopupVisible = ref(false);
     const tabIdToBeDeleted: any = ref(null);
@@ -474,8 +497,49 @@ export default defineComponent({
     );
 
     const addNewItem = () => {
-      isTabEditMode.value = false;
-      showAddTabDialog.value = true;
+      newTabName.value = "";
+      newTabError.value = "";
+      addingTab.value = true;
+    };
+
+    const closeAddTab = () => {
+      addingTab.value = false;
+      newTabName.value = "";
+      newTabError.value = "";
+    };
+
+    const createTab = async () => {
+      if (creatingTab.value) return;
+      const name = newTabName.value.trim();
+      if (!name) {
+        newTabError.value = t("dashboard.nameRequired");
+        return;
+      }
+      const newTabData = { name, panels: [] };
+      const folderId = (route.query.folder as string) ?? "default";
+      creatingTab.value = true;
+      try {
+        await addTab(store, currentDashboardData.data.dashboardId, folderId, newTabData);
+        closeAddTab();
+        await refreshRequired();
+        showPositiveNotification(t("dashboard.addTab.tabAddedSuccessfully"));
+      } catch (error: any) {
+        if (saveConflict.isConflict(error)) {
+          closeAddTab();
+          void saveConflict.openConflict({
+            dashboardId: currentDashboardData.data.dashboardId,
+            folderId,
+            change: t("dashboard.saveConflict.change.addedTab", { name }),
+            onResolved: refreshRequired,
+          });
+        } else {
+          showErrorNotification(error?.message ?? t("dashboard.addTab.failedToAddTab"), {
+            timeout: 2000,
+          });
+        }
+      } finally {
+        creatingTab.value = false;
+      }
     };
 
     const deleteItem = async (tabId: any) => {
@@ -529,8 +593,6 @@ export default defineComponent({
     const refreshRequired = async () => {
       await getDashboardData();
       emit("refresh");
-      showAddTabDialog.value = false;
-      isTabEditMode.value = false;
     };
 
     return {
@@ -548,9 +610,12 @@ export default defineComponent({
       tabIdToBeDeleted,
       handleDragEnd,
       addNewItem,
-      showAddTabDialog,
-      isTabEditMode,
-      selectedTabIdToEdit,
+      addingTab,
+      newTabName,
+      newTabError,
+      creatingTab,
+      createTab,
+      closeAddTab,
       currentDashboardData,
       refreshRequired,
       store,

@@ -19,20 +19,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="copy.title(alertTitle)"
-    :neutral-button-label="canApplyHere ? t('insight.decisions.apply.edit') : undefined"
-    neutral-button-variant="outline"
-    :neutral-button-loading="opening"
-    :secondary-button-label="t('common.cancel')"
-    secondary-button-variant="outline"
-    :primary-button-label="
-      canApplyHere ? t('insight.decisions.apply.button') : t('insight.decisions.apply.edit')
-    "
-    :primary-button-data-test="canApplyHere ? 'review-change-apply' : 'review-change-edit'"
-    :primary-button-disabled="canApplyHere && !applicable"
-    :primary-button-loading="canApplyHere ? applying : opening"
+    :extra="{
+      label: canApplyHere ? t('insight.decisions.apply.edit') : undefined,
+      variant: 'secondary',
+      loading: opening,
+    }"
+    :secondary="{ label: t('common.cancel'), variant: 'secondary' }"
+    :primary="{
+      label: canApplyHere ? t('insight.decisions.apply.button') : t('insight.decisions.apply.edit'),
+      disabled: canApplyHere && !applicable,
+      loading: canApplyHere ? applying : opening,
+      dataTest: canApplyHere ? 'review-change-apply' : 'review-change-edit',
+    }"
     data-test="review-change-dialog"
     @update:open="emit('update:open', $event)"
-    @click:neutral="openEditor"
+    @click:extra="openEditor"
     @click:secondary="emit('update:open', false)"
     @click:primary="canApplyHere ? apply() : openEditor()"
   >

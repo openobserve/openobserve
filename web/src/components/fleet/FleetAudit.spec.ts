@@ -84,7 +84,7 @@ describe("FleetAudit", () => {
   async function mountAudit() {
     wrapper = mount(FleetAudit, {
       attachTo: document.body,
-      global: { plugins: [i18n, store], stubs: { DateTime: true } },
+      global: { plugins: [i18n, store], stubs: { ODateTimeRange: true } },
     });
     await settle();
     return wrapper;
@@ -234,8 +234,8 @@ describe("FleetAudit", () => {
     await pick("fleet-audit-module-filter", "tokens");
     expect(lastParams()).toMatchObject({ module: "tokens" });
     const empty = wrapper.findComponent({ name: "OEmptyState" });
-    expect(empty.props("filtered")).toBe(true);
-    empty.vm.$emit("action", "clear-filters");
+    expect(empty.props("kind")).toBe("filtered");
+    empty.vm.$emit("action");
     await settle();
     expect(auditText(wrapper)).toContain("edge-minimal v1");
     expect(

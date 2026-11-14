@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </svg>
       </div>
 
+      <!-- eslint-disable-next-line local/o2-page-header-api -- a standalone page outside the app shell: this is its error state's heading -->
       <h1 class="text-text-heading m-0 mb-3 text-2xl font-semibold">
         {{ t("common.pageNotFound") }}
       </h1>
@@ -47,16 +48,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
 
       <div class="mb-8 flex gap-3">
-        <OButton data-test="error-404-go-home-btn" variant="primary" size="sm-action" to="/">{{
+        <OButton data-test="error-404-go-home-btn" variant="primary" to="/">{{
           t("common.goHome")
         }}</OButton>
-        <OButton
-          data-test="error-404-go-back-btn"
-          variant="outline"
-          size="sm-action"
-          @click="goBack"
-          >{{ t("common.goBack") }}</OButton
-        >
+        <OButton data-test="error-404-go-back-btn" variant="secondary" @click="goBack">{{
+          t("common.goBack")
+        }}</OButton>
       </div>
 
       <p class="text-compact text-text-secondary m-0">
@@ -70,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OButton from "@/lib/core/Button/OButton.vue";
 
 const { t } = useI18nTyped();
@@ -77,13 +75,8 @@ const router = useRouter();
 const countdown = ref(10);
 let timer: ReturnType<typeof setInterval>;
 
-const goBack = () => {
-  if (window.history.length > 1) {
-    router.back();
-  } else {
-    router.push("/");
-  }
-};
+// An in-app history entry goes back; a deep link lands home instead of leaving the app (N3).
+const { goBack } = useSmartBack(() => "/");
 
 onMounted(() => {
   timer = setInterval(() => {

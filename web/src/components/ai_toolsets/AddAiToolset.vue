@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="o2-input flex-1"
                 :type="header.visible ? 'text' : 'password'"
               >
-                <template #icon-right>
+                <template #icon-end>
                   <OIcon
                     :name="header.visible ? 'visibility-off' : 'visibility'"
                     size="sm"
@@ -120,15 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OFormInput>
               <OButton
+                icon-only
                 :aria-label="t('common.delete')"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
+                variant="danger-ghost"
+                size="sm"
                 @click="removeHeader(idx)"
               >
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
-            <OButton variant="outline" size="sm" class="mb-4" @click="addHeader" icon-left="add">
+            <OButton variant="secondary" class="mb-4" @click="addHeader" icon="add">
               {{ t("aiToolset.addHeader") }}
             </OButton>
           </template>
@@ -141,18 +142,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex items-center gap-1">
                 <span class="text-text-muted text-xs">{{ t("aiToolset.presets") }}:</span>
-                <OTag
+                <OButton
                   v-for="preset in CLI_PRESETS"
                   :key="preset.id"
-                  type="cliPreset"
-                  :value="preset.id"
-                  clickable
-                  class="cursor-pointer"
+                  variant="secondary"
+                  size="xs"
                   :data-test="`cli-preset-${preset.id}`"
                   @click="applyPreset(preset)"
                 >
                   {{ preset.label }}
-                </OTag>
+                </OButton>
               </div>
             </div>
             <div class="o2-input mb-4">
@@ -218,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="o2-input flex-1"
                 :type="env.visible ? 'text' : 'password'"
               >
-                <template #icon-right>
+                <template #icon-end>
                   <OIcon
                     :name="env.visible ? 'visibility-off' : 'visibility'"
                     size="sm"
@@ -228,15 +227,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OFormInput>
               <OButton
+                icon-only
                 :aria-label="t('common.delete')"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
+                variant="danger-ghost"
+                size="sm"
                 @click="removeEnvVar(idx)"
               >
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
-            <OButton variant="outline" size="sm" class="mb-4" @click="addEnvVar" icon-left="add">
+            <OButton variant="secondary" class="mb-4" @click="addEnvVar" icon="add">
               {{ t("aiToolset.addEnvVar") }}
             </OButton>
 
@@ -255,8 +255,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="o2-input w-48"
                 />
                 <OButton
-                  variant="ghost-destructive"
-                  size="icon-xs-sq"
+                  icon-only
+                  variant="danger-ghost"
+                  size="sm"
                   :title="t('common.delete')"
                   @click="removeCredFile(idx)"
                 >
@@ -281,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("common.editorDraft.reenterField") }}
               </div>
             </div>
-            <OButton variant="outline" size="sm" class="mb-4" @click="addCredFile" icon-left="add">
+            <OButton variant="secondary" class="mb-4" @click="addCredFile" icon="add">
               {{ t("aiToolset.addCredFile") }}
             </OButton>
           </template>
@@ -315,8 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OButton
             data-test="ai-toolset-cancel-btn"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="isSubmitting"
             @click="closeEditor"
           >
@@ -325,7 +325,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="ai-toolset-save-btn"
             variant="primary"
-            size="sm-action"
             type="submit"
             :loading="isSubmitting"
           >
@@ -354,7 +353,6 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
@@ -395,7 +393,6 @@ export default defineComponent({
   name: "AddAiToolset",
   components: {
     OPageLayout,
-    OTag,
     OButton,
     OIcon,
     OForm,

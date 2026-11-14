@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import ODrawer from "./ODrawer.vue";
 import { DialogContent } from "reka-ui";
 
@@ -67,7 +67,7 @@ describe("ODrawer", () => {
   });
 
   it("is described by its visible subtitle, not a hidden copy of it", () => {
-    const wrapper = mount(ODrawer, { props: { open: true, title: "Orders", subTitle: "2 of 5" } });
+    const wrapper = mount(ODrawer, { props: { open: true, title: "Orders", subtitle: "2 of 5" } });
     const dialog = wrapper.get("[data-o2-drawer]");
     const described = wrapper.get(`[id="${dialog.attributes("aria-describedby")}"]`);
     expect(described.text()).toBe("2 of 5");
@@ -115,25 +115,54 @@ describe("ODrawer", () => {
     expect(emitted?.[0]).toEqual([false]);
   });
 
-  it("stays open when closeGuard returns false, and closes when it returns true", async () => {
-    let allow = false;
+  it("asks in its own footer when dirty, and closes on Discard", async () => {
     const wrapper = mount(ODrawer, {
-      props: { open: true, title: "Drawer", closeGuard: () => allow },
+      props: { open: true, title: "Drawer", dirty: true, primary: { label: "Save" } },
     });
-    const closeBtn = wrapper.find('button[aria-label="Close drawer"]');
-    await closeBtn.trigger("click");
-    expect(wrapper.emitted("update:open")).toBeFalsy();
 
-    allow = true;
-    await closeBtn.trigger("click");
-    expect(wrapper.emitted("update:open")?.[0]).toEqual([false]);
+    await wrapper.find('[data-test="o-drawer-close-btn"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("update:open")).toBeFalsy();
+    expect(wrapper.find('[data-test="o-drawer-discard-row"]').exists()).toBe(true);
+
+    await wrapper.find('[data-test="o-drawer-discard-btn"]').trigger("click");
+    expect(wrapper.emitted("discard")).toBeTruthy();
+    expect(wrapper.emitted("update:open")).toEqual([[false]]);
   });
 
-  it("shows the close button when persistent=true (persistent only blocks Escape/backdrop)", () => {
+  it("hides the close button when persistent=true, since a forced flow cannot be dismissed", () => {
     const wrapper = mount(ODrawer, {
       props: { open: true, persistent: true, title: "Persistent" },
     });
-    expect(wrapper.find('button[aria-label="Close drawer"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="o-drawer-close-btn"]').exists()).toBe(false);
+  });
+
+  it.each([
+    ["sm", "30rem"],
+    ["md", "40rem"],
+    ["lg", "50rem"],
+    ["xl", "60rem"],
+  ])("draws size %s at its fixed width, with no width override", (size, width) => {
+    const wrapper = mount(ODrawer, { props: { open: true, size: size as "sm" } });
+    expect(wrapper.find("[data-o2-drawer]").classes().join(" ")).toContain(width);
+    expect(ODrawer.props).not.toHaveProperty("width");
+    expect(ODrawer.props).not.toHaveProperty("closeGuard");
+  });
+
+  it("renders compact tabs under the header and reports the chosen one", async () => {
+    const wrapper = mount(ODrawer, {
+      props: {
+        open: true,
+        title: "Stream",
+        tabs: [
+          { value: "schema", label: "Schema" },
+          { value: "settings", label: "Settings" },
+        ],
+        tab: "schema",
+      },
+    });
+    expect(wrapper.find('[data-test="o-drawer-tabs"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("Settings");
   });
 
   it("hides the close button when showClose=false even with persistent=true", () => {
@@ -208,7 +237,7 @@ describe("ODrawer", () => {
   // A subtitle wider than a phone-sized panel pushed the close button off screen while the block could not shrink.
   it("lets the title block shrink below lg, and only there", () => {
     const wrapper = mount(ODrawer, {
-      props: { open: true, title: "Quick start", subTitle: "A sentence longer than the panel" },
+      props: { open: true, title: "Quick start", subtitle: "A sentence longer than the panel" },
     });
     const title = wrapper
       .findAll("span")
@@ -258,7 +287,7 @@ describe("ODrawer", () => {
   describe("body action button validation suppression", () => {
     it("AC-4: primary button emits click:primary so consumer can trigger validation", async () => {
       const wrapper = mount(ODrawer, {
-        props: { open: true, primaryButtonLabel: "Save" },
+        props: { open: true, primary: { label: "Save" } },
       });
       await wrapper.find('[data-test="o-drawer-primary-btn"]').trigger("click");
       expect(wrapper.emitted("click:primary")).toBeTruthy();
@@ -340,17 +369,16 @@ describe("ODrawer", () => {
       expect(emitted?.[0]).toEqual([false]);
     });
 
-    it("cancels Escape when closeGuard vetoes it, so the drawer stays open", async () => {
-      const guard = vi.fn(() => false);
+    it("cancels Escape while dirty, so the drawer stays open and asks", async () => {
       const wrapper = mount(ODrawer, {
-        props: { open: true, title: "Test", closeGuard: guard },
+        props: { open: true, title: "Test", dirty: true },
       });
       const panel = findDrawerPanel(wrapper);
       const event = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
       await panel.vm.$emit("escapeKeyDown", event);
       expect(event.defaultPrevented).toBe(true);
-      expect(guard).toHaveBeenCalledTimes(1);
       expect(wrapper.emitted("update:open")).toBeFalsy();
+      expect(wrapper.find('[data-test="o-drawer-discard-row"]').exists()).toBe(true);
     });
 
     it("does NOT emit update:open when Escape is pressed and persistent=true", async () => {

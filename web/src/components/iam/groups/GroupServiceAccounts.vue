@@ -37,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="visual in usersDisplayOptions"
               :key="visual.value"
               :value="visual.value"
-              size="sm"
               :data-test="`iam-service-accounts-selection-show-${visual.value}-btn`"
             >
               {{ visual.label }}
@@ -47,9 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div data-test="iam-service-accounts-selection-search-input" class="me-3">
         <OSearchInput
+          width="list"
           data-test="service-accounts-list-search-input"
           v-model="userSearchKey"
-          class="h-9 w-50"
           :placeholder="t('iam.groupServiceAccounts.searchServiceAccounts')"
         />
       </div>
@@ -67,8 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
-        :show-global-filter="false"
-        dense
       >
         <template #cell-select="{ row }">
           <OCheckbox
@@ -80,11 +77,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #empty>
           <OEmptyState
-            size="hero"
-            preset="no-service-accounts"
-            :filtered="!!userSearchKey"
-            :hide-action="!userSearchKey"
-            @action="(id) => (id === 'clear-filters' ? (userSearchKey = '') : null)"
+            :kind="userSearchKey ? 'filtered' : 'first-run'"
+            :title="
+              userSearchKey
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.serviceAccounts') })
+                : t('emptyState.noServiceAccounts.title')
+            "
+            :text="
+              userSearchKey
+                ? t('emptyState.filtered.description', {
+                    noun: t('emptyState.nouns.serviceAccounts'),
+                  })
+                : t('emptyState.noServiceAccounts.description')
+            "
+            :icon="userSearchKey ? undefined : 'group'"
+            @action="userSearchKey = ''"
           />
         </template>
       </OTable>

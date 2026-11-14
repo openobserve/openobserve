@@ -49,7 +49,7 @@ import {
 } from "@/components/autoobserve/mock/data/facts";
 import type { LogEntry } from "@/components/autoobserve/mock/v2/useDecisions";
 import type { LookKind } from "@/components/autoobserve/mock/v2/changes";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 
 export type { Autonomy, HistoryKind, Outcome, RequestKind, Scenario, Severity };
 export type ProblemOutcome = Outcome | "fixing" | "contained";
@@ -103,7 +103,7 @@ export interface RequestCopy {
   label: I18nText;
   headline: I18nText;
   why: I18nText | null;
-  tags: { label: I18nText; variant: BadgeVariant; hint?: I18nText }[];
+  tags: { label: I18nText; variant: ChipTone; hint?: I18nText }[];
   look: LookKind;
 }
 

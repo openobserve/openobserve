@@ -20,7 +20,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { useOncallRoomNames, useSlackAppSwitch } from "@/composables/slack/useSlackAppSwitch";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -52,13 +52,7 @@ const run = () => switchAll(candidates.value, props.installation.id);
 </script>
 
 <template>
-  <OBanner
-    v-if="candidates.length"
-    variant="info"
-    icon="sync"
-    inline-actions
-    data-test="slack-switch-all"
-  >
+  <OInlineNotice v-if="candidates.length" tone="info" icon="sync" data-test="slack-switch-all">
     <div class="flex flex-col gap-1">
       <span>
         <span class="font-semibold">{{
@@ -71,17 +65,11 @@ const run = () => switchAll(candidates.value, props.installation.id);
       }}</span>
     </div>
     <template #actions>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        data-test="slack-switch-all-review"
-        @click="review"
-      >
+      <OButton variant="secondary" data-test="slack-switch-all-review" @click="review">
         {{ t("slackApp.switchAll.review") }}
       </OButton>
       <OButton
         variant="primary"
-        size="sm-action"
         :loading="switching"
         data-test="slack-switch-all-action"
         @click="run"
@@ -89,5 +77,5 @@ const run = () => switchAll(candidates.value, props.installation.id);
         {{ t("slackApp.switchAll.action") }}
       </OButton>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>

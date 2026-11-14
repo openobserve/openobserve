@@ -136,9 +136,9 @@ const runRemind = async () => {
         data-test="slack-oncall-unlinked-count"
       />
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="send"
+        variant="secondary"
+        size="sm"
+        icon="send"
         :loading="remind.isPending.value"
         data-test="slack-oncall-unlinked-remind"
         @click="runRemind"
@@ -153,10 +153,7 @@ const runRemind = async () => {
         row-key="email"
         :pagination="rows.length > PAGE_SIZE ? 'client' : 'none'"
         :page-size="PAGE_SIZE"
-        :show-global-filter="false"
         :cell-overflow-tooltip="false"
-        :frame="false"
-        dense
       >
         <template #cell-email="{ row }">
           <span :data-test="`slack-oncall-unlinked-person-${row.email}`">
@@ -170,7 +167,7 @@ const runRemind = async () => {
             :data-test="`slack-oncall-unlinked-teams-${row.email}`"
           >
             <template #item="{ item }">
-              <OTag size="sm" variant="default-soft" data-test="slack-oncall-unlinked-team">
+              <OTag size="sm" tone="neutral" data-test="slack-oncall-unlinked-team">
                 <OTruncatedText>{{ raw(item.name) }}</OTruncatedText>
               </OTag>
             </template>
@@ -179,7 +176,7 @@ const runRemind = async () => {
         <template #cell-next_shift="{ row }">
           <OTag
             v-if="row.onCallNow"
-            variant="success-soft"
+            tone="ok"
             size="sm"
             :label="t('slackApp.oncallUnlinked.onCallNow')"
             :data-test="`slack-oncall-unlinked-now-${row.email}`"

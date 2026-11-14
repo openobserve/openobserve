@@ -1253,18 +1253,18 @@ describe("AddPanel.vue", () => {
       expect(wrapper.vm.showApplyMenu).toBe(true);
     });
 
-    it("turns Apply into a red Cancel while a query runs on enterprise", async () => {
+    it("turns Apply into a secondary Cancel while a query runs on enterprise", async () => {
       (config as any).isEnterprise = "true";
       wrapper = await mountForMenu();
       await startQuery(wrapper);
-      expect(wrapper.vm.applyVariant).toBe("destructive");
+      expect(wrapper.vm.applyVariant).toBe("secondary");
     });
 
-    it("keeps Apply out of red on OSS while a query runs, which it cannot cancel", async () => {
+    it("keeps Apply primary on OSS while a query runs, which it cannot cancel", async () => {
       (config as any).isEnterprise = "false";
       wrapper = await mountForMenu();
       await startQuery(wrapper);
-      expect(wrapper.vm.applyVariant).not.toBe("destructive");
+      expect(wrapper.vm.applyVariant).toBe("primary");
     });
   });
 });

@@ -38,10 +38,10 @@
           {{ t("aiObservability.remoteTasks.testPanel.sourceLabel") }}
         </span>
         <OToggleGroup v-model="source" type="single" data-test="ai-remote-task-test-source">
-          <OToggleGroupItem value="dataset" size="sm">
+          <OToggleGroupItem value="dataset">
             {{ t("aiObservability.remoteTasks.testPanel.sourceDataset") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="manual" size="sm">
+          <OToggleGroupItem value="manual">
             {{ t("aiObservability.remoteTasks.testPanel.sourceManual") }}
           </OToggleGroupItem>
         </OToggleGroup>
@@ -67,7 +67,6 @@
         :label="t('aiObservability.remoteTasks.testPanel.inputLabel')"
         :placeholder="t('aiObservability.remoteTasks.testPanel.inputPlaceholder')"
         :rows="4"
-        size="sm"
         data-test="ai-remote-task-test-input"
       />
 
@@ -77,15 +76,13 @@
         :label="t('aiObservability.remoteTasks.testPanel.metadataLabel')"
         :placeholder="t('aiObservability.remoteTasks.testPanel.metadataPlaceholder')"
         :rows="2"
-        size="sm"
         data-test="ai-remote-task-test-metadata"
       />
 
       <div class="flex flex-col items-start gap-1.5">
         <OButton
           variant="primary"
-          size="sm-action"
-          icon-left="play-arrow"
+          icon="play-arrow"
           :loading="state === 'running'"
           :disabled="state === 'running' || !canRun"
           data-test="ai-remote-task-test-run-btn"
@@ -125,7 +122,7 @@
 
         <template v-else>
           <div class="flex items-center gap-2">
-            <OTag :variant="state === 'passed' ? 'success-soft' : 'error-soft'" dot>
+            <OTag :tone="state === 'passed' ? 'ok' : 'err'" dot>
               {{
                 state === "passed"
                   ? t("aiObservability.remoteTasks.testPanel.passed")

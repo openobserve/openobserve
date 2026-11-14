@@ -37,14 +37,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="workflow-link-alerts-dialog"
     size="md"
     :title="t('workflow.linkAlerts.title')"
-    :primary-button-label="
-      selected.length
+    :primary="{
+      label: selected.length
         ? t('workflow.linkAlerts.linkN', { count: selected.length })
-        : t('workflow.linkAlerts.link')
-    "
-    :primary-button-disabled="selected.length === 0 || linking"
-    :primary-button-loading="linking"
-    :secondary-button-label="t('workflow.linkAlerts.skip')"
+        : t('workflow.linkAlerts.link'),
+      disabled: selected.length === 0 || linking,
+      loading: linking,
+    }"
+    :secondary="{ label: t('workflow.linkAlerts.skip') }"
     @click:primary="linkSelected"
     @click:secondary="close"
   >
@@ -100,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OText>
             <OButton
               variant="ghost"
-              size="sm"
               :disabled="!selected.length"
               data-test="workflow-link-alerts-clear"
               @click="clearAll"

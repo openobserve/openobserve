@@ -46,7 +46,6 @@ defineExpose({ clear: () => comboboxRef.value?.clear() });
         :debounce="props.debounce"
         :id="props.id"
         :name="props.name"
-        :label-position="props.labelPosition"
         :model-value="field.state.value"
         :error="shown(field).invalid"
         :error-message="shown(field).message !== undefined ? raw(shown(field).message) : undefined"

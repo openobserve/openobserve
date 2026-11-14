@@ -32,10 +32,19 @@ describe("OToggleGroup", () => {
     expect(element.getAttribute("class") || "").toContain("flex-row");
   });
 
-  it("applies outer border class", () => {
+  it("sizes the track from the md control token by default, with no border", () => {
     const wrapper = mountGroup();
-    const element = wrapper.find("div").element as HTMLElement;
-    expect(element.getAttribute("class") || "").toContain("border");
+    const classes = (wrapper.find("div").element as HTMLElement).getAttribute("class") || "";
+    expect(classes).toContain("h-control-md");
+    expect(classes).toContain("p-0.5");
+    expect(classes.split(" ")).not.toContain("border");
+  });
+
+  it('sizes the track from the sm control token when size="sm"', () => {
+    const wrapper = mountGroup({ size: "sm" });
+    const classes = (wrapper.find("div").element as HTMLElement).getAttribute("class") || "";
+    expect(classes).toContain("h-control-sm");
+    expect(classes).not.toContain("h-control-md");
   });
 
   // --- Orientation ---

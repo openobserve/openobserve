@@ -38,7 +38,7 @@ describe("O2AIConfirmDialog delete confirmations", () => {
     expect(name().classes()).toContain("font-semibold");
     expect(title().text()).toBe("Are you sure you want to delete the cpu-high alert?");
     const confirm = wrapper.find('[data-test="o2-ai-confirm-dialog-confirm"]');
-    expect(confirm.attributes("data-o2-variant")).toBe("destructive");
+    expect(confirm.attributes("data-o2-variant")).toBe("danger");
     expect(confirm.text()).toBe("Yes");
   });
 
@@ -59,7 +59,7 @@ describe("O2AIConfirmDialog delete confirmations", () => {
     expect(title().text()).toBe("Are you sure you want to delete this report?");
     expect(
       wrapper.find('[data-test="o2-ai-confirm-dialog-confirm"]').attributes("data-o2-variant"),
-    ).toBe("destructive");
+    ).toBe("danger");
   });
 
   it("emits confirm from the destructive button", async () => {

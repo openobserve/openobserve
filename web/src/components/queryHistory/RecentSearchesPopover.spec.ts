@@ -711,7 +711,7 @@ describe("long queries in the details pane", () => {
     expect(copy.getAttribute("aria-label")).toBe("Copy query");
     copy.click();
     expect(clipboard.copyToClipboard).toHaveBeenCalledWith(LONG, expect.any(Function), {
-      successMessage: "Query copied",
+      silent: true,
     });
   });
 
@@ -751,7 +751,7 @@ describe("long queries in the details pane", () => {
       expect(query().textContent).toBe(LONG);
       copyButton().click();
       expect(clipboard.copyToClipboard).toHaveBeenCalledWith(LONG, expect.any(Function), {
-        successMessage: "Query copied",
+        silent: true,
       });
       expect(details()).not.toBeNull();
     });
@@ -774,7 +774,7 @@ describe("long queries in the details pane", () => {
       expect(query().textContent).toBe(LONG);
       copyButton().click();
       expect(clipboard.copyToClipboard).toHaveBeenCalledWith(LONG, expect.any(Function), {
-        successMessage: "Query copied",
+        silent: true,
       });
     });
 
@@ -850,11 +850,11 @@ describe("long queries in the details pane", () => {
       .querySelector<HTMLElement>('[data-test="recent-searches-details-copy-function"]')!
       .click();
     expect(clipboard.copyToClipboard).toHaveBeenLastCalledWith(vrl, expect.any(Function), {
-      successMessage: "Function copied",
+      silent: true,
     });
     document.querySelector<HTMLElement>('[data-test="recent-searches-details-copy"]')!.click();
     expect(clipboard.copyToClipboard).toHaveBeenLastCalledWith("SELECT 1", expect.any(Function), {
-      successMessage: "Query copied",
+      silent: true,
     });
 
     await hover("e1");

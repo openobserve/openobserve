@@ -1,482 +1,319 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick, ref } from "vue";
+import { createRouter, createMemoryHistory } from "vue-router";
 import OButton from "./OButton.vue";
+import OButtonGroup from "./OButtonGroup.vue";
 import { provideFeatureLock } from "@/composables/useFeatureLock";
-import type { ButtonVariant } from "./OButton.types";
+import { BUTTON_SIZES, BUTTON_VARIANTS, type ButtonVariant } from "./OButton.types";
 import { LOADER_DELAY_MS } from "@/lib/styles/motion";
+import { raw } from "@/types/i18n";
+
+const TooltipStub = {
+  name: "OTooltip",
+  props: ["content", "shortcut"],
+  template: `<span class="tooltip-stub" :data-content="content" :data-shortcut="shortcut" />`,
+};
+const global = { stubs: { OTooltip: TooltipStub } };
 
 describe("OButton", () => {
-  // --- Slots ---
-
-  it("renders default slot content", () => {
-    const wrapper = mount(OButton, { slots: { default: "Save" } });
-    expect(wrapper.text()).toBe("Save");
-  });
-
-  it("renders icon-left slot", () => {
-    const wrapper = mount(OButton, {
-      slots: { "icon-left": '<span data-testid="icon-left">ΓåÉ</span>' },
+  describe("API surface", () => {
+    it("declares exactly the seven variants and four sizes", () => {
+      expect([...BUTTON_VARIANTS]).toEqual([
+        "primary",
+        "secondary",
+        "ghost",
+        "accent-ghost",
+        "danger",
+        "danger-ghost",
+        "link",
+      ]);
+      expect([...BUTTON_SIZES]).toEqual(["xs", "sm", "md", "lg"]);
     });
-    expect(wrapper.find('[data-testid="icon-left"]').exists()).toBe(true);
-  });
 
-  it("renders icon-right slot", () => {
-    const wrapper = mount(OButton, {
-      slots: { "icon-right": '<span data-testid="icon-right">ΓåÆ</span>' },
+    it("defaults to a secondary md button, so a forgotten variant is never a primary", () => {
+      const wrapper = mount(OButton, { slots: { default: "Export" } });
+      expect(wrapper.attributes("data-o2-variant")).toBe("secondary");
+      expect(wrapper.attributes("data-o2-size")).toBe("md");
+      expect(wrapper.classes()).toContain("h-control-md");
+      expect(wrapper.classes()).toContain("border-button-outline-border");
     });
-    expect(wrapper.find('[data-testid="icon-right"]').exists()).toBe(true);
+
+    it.each([
+      ["xs", "h-control-xs", "rounded-chip", "text-xs"],
+      ["sm", "h-control-sm", "rounded-default", "text-compact"],
+      ["md", "h-control-md", "rounded-default", "text-compact"],
+      ["lg", "h-control-lg", "rounded-default", "text-sm"],
+    ] as const)("sizes %s from the control token", (size, height, radius, text) => {
+      const classes = mount(OButton, { props: { size }, slots: { default: "Save" } }).classes();
+      expect(classes).toContain(height);
+      expect(classes).toContain(radius);
+      expect(classes).toContain(text);
+      expect(classes.some((c) => /^h-(\d|\[)/.test(c))).toBe(false);
+    });
+
+    it("keeps a 6px icon gap at every size above xs", () => {
+      for (const size of ["sm", "md", "lg"] as const) {
+        expect(mount(OButton, { props: { size } }).classes()).toContain("gap-1.5");
+      }
+    });
+
+    it.each(BUTTON_VARIANTS)("paints %s with token utilities only", (variant) => {
+      const classes = mount(OButton, { props: { variant } }).classes();
+      expect(classes.some((c) => /#|rgb\(|-\[(#|rgb)/.test(c))).toBe(false);
+    });
+
+    it.each([
+      ["primary", "bg-button-primary"],
+      ["secondary", "bg-button-secondary"],
+      ["ghost", "text-text-secondary"],
+      ["accent-ghost", "text-text-link"],
+      ["danger", "bg-button-destructive"],
+      ["danger-ghost", "text-button-ghost-destructive-text"],
+      ["link", "text-text-link"],
+    ] satisfies [ButtonVariant, string][])("gives %s its look", (variant, token) => {
+      expect(mount(OButton, { props: { variant } }).classes()).toContain(token);
+    });
+
+    it("lets a link sit in running text without a control height or padding", () => {
+      const classes = mount(OButton, { props: { variant: "link" } }).classes();
+      expect(classes).toContain("h-auto");
+      expect(classes).toContain("p-0");
+      expect(classes).not.toContain("h-control-md");
+    });
   });
 
-  // --- Props ---
-
-  it("section-chip variant is a pill that marks the current section through aria-current", () => {
-    const classes = mount(OButton, {
-      props: { variant: "section-chip" },
-      attrs: { "aria-current": "location" },
-    }).classes();
-    expect(classes).toContain("!rounded-full");
-    expect(classes).toContain("aria-[current=location]:bg-surface-accent-active");
-    expect(classes).toContain("focus-visible:ring-3");
-  });
-
-  it("cell variant keeps a visible focus ring and the control radius", () => {
-    const classes = mount(OButton, { props: { variant: "cell" } }).classes();
-    expect(classes).toContain("focus-visible:ring-3");
-    expect(classes).toContain("rounded-default");
-    expect(classes).toContain("h-auto!");
-  });
-
-  it("cell variant dims when unavailable but focusable, like the other variants", () => {
-    const classes = mount(OButton, {
-      props: { variant: "cell", disabled: true, focusableUnavailable: true },
-    }).classes();
-    expect(classes).toContain("opacity-60");
-  });
-
-  it("row variant lays out start name and end value on an auto-height compact row", () => {
-    const classes = mount(OButton, { props: { variant: "row", block: true } }).classes();
-    for (const c of ["h-auto!", "justify-between!", "gap-3!", "px-0!", "py-1.5!", "text-start"]) {
-      expect(classes).toContain(c);
-    }
-    expect(classes).toContain("focus-visible:ring-3");
-  });
-
-  it("locked-body variant starts and wraps its message on an outlined body", () => {
-    const classes = mount(OButton, { props: { variant: "locked-body", block: true } }).classes();
-    for (const c of [
-      "h-auto!",
-      "justify-start!",
-      "whitespace-normal!",
-      "px-3!",
-      "py-3!",
-      "border",
-    ]) {
-      expect(classes).toContain(c);
-    }
-  });
-
-  it("row and locked-body dim when unavailable but focusable", () => {
-    const row = mount(OButton, {
-      props: { variant: "row", disabled: true, focusableUnavailable: true },
-    }).classes();
-    expect(row).toContain("text-text-disabled");
-    const locked = mount(OButton, {
-      props: { variant: "locked-body", disabled: true, focusableUnavailable: true },
-    }).classes();
-    expect(locked).toContain("opacity-50");
-  });
-
-  it.each(["row", "locked-body"] satisfies ButtonVariant[])(
-    "%s keeps start alignment, focus and aria-disabled when unavailable",
-    async (variant) => {
+  describe("content", () => {
+    it("renders the label, the leading icon and the trailing icon", () => {
       const wrapper = mount(OButton, {
-        props: { variant, disabled: true, focusableUnavailable: true },
-        attachTo: document.body,
+        props: { icon: "download", iconEnd: "arrow-drop-down", label: raw("Export") },
       });
-      expect(wrapper.classes()).toContain("text-start");
-      expect(wrapper.classes()).toContain("focus-visible:ring-3");
-      expect(wrapper.attributes("disabled")).toBeUndefined();
+      expect(wrapper.text()).toBe("Export");
+      expect(wrapper.findAll("[aria-hidden='true']").length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("lets the slots replace the icons", () => {
+      const wrapper = mount(OButton, {
+        slots: {
+          icon: '<i data-testid="lead" />',
+          "icon-end": '<i data-testid="trail" />',
+          default: "Run",
+        },
+      });
+      expect(wrapper.find('[data-testid="lead"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="trail"]').exists()).toBe(true);
+    });
+
+    it("shows a count pill after the label", () => {
+      const wrapper = mount(OButton, { props: { count: 3 }, slots: { default: "Filters" } });
+      expect(wrapper.find(".tabular-nums").text()).toBe("3");
+    });
+
+    it("paints a lock icon with the locked-icon token", () => {
+      const wrapper = mount(OButton, { props: { icon: "lock" }, slots: { default: "Run" } });
+      expect(wrapper.find(".lock-chip").exists()).toBe(true);
+    });
+  });
+
+  describe("iconOnly", () => {
+    it("is square at every size and turns its label into the name and the tooltip", () => {
+      for (const size of BUTTON_SIZES) {
+        const wrapper = mount(OButton, {
+          props: { iconOnly: true, icon: "refresh", label: raw("Refresh"), size, shortcut: "r" },
+          global,
+        });
+        expect(wrapper.classes()).toContain(`size-control-${size}`);
+        expect(wrapper.attributes("aria-label")).toBe("Refresh");
+        expect(wrapper.text()).toBe("");
+        const tooltip = wrapper.get(".tooltip-stub");
+        expect(tooltip.attributes("data-content")).toBe("Refresh");
+        expect(tooltip.attributes("data-shortcut")).toBe("r");
+      }
+    });
+
+    it("keeps a caller's aria-label over the label", () => {
+      const wrapper = mount(OButton, {
+        props: { iconOnly: true, icon: "close", label: raw("Close") },
+        attrs: { "aria-label": "Close panel" },
+        global,
+      });
+      expect(wrapper.attributes("aria-label")).toBe("Close panel");
+    });
+  });
+
+  describe("pressed", () => {
+    it("renders no aria-pressed for a plain button", () => {
+      expect(mount(OButton).attributes("aria-pressed")).toBeUndefined();
+    });
+
+    it.each([true, false])("sets aria-pressed=%s for a toggle", (pressed) => {
+      const wrapper = mount(OButton, { props: { pressed, variant: "ghost" } });
+      expect(wrapper.attributes("aria-pressed")).toBe(String(pressed));
+      expect(wrapper.classes().includes("bg-surface-accent-hover")).toBe(pressed);
+    });
+
+    it("marks the selected secondary with the selected border, never a fill colour of its own", () => {
+      const classes = mount(OButton, { props: { pressed: true } }).classes();
+      expect(classes).toContain("text-accent-on-tint");
+      expect(classes).toContain("border-button-outline-hover-border");
+      expect(classes).not.toContain("bg-button-primary");
+    });
+  });
+
+  describe("native behaviour", () => {
+    it('defaults to type="button" and forwards type', () => {
+      expect(mount(OButton).attributes("type")).toBe("button");
+      expect(mount(OButton, { props: { type: "submit" } }).attributes("type")).toBe("submit");
+    });
+
+    it("emits click with the MouseEvent", async () => {
+      const wrapper = mount(OButton);
+      await wrapper.trigger("click");
+      expect(wrapper.emitted("click")?.[0]?.[0]).toBeInstanceOf(MouseEvent);
+    });
+
+    it("sets disabled and aria-disabled and emits no click when disabled", async () => {
+      const wrapper = mount(OButton, { props: { disabled: true } });
+      expect(wrapper.attributes("disabled")).toBeDefined();
       expect(wrapper.attributes("aria-disabled")).toBe("true");
-      (wrapper.element as HTMLElement).focus();
-      expect(document.activeElement).toBe(wrapper.element);
+      expect(wrapper.classes()).toContain("text-text-disabled");
       await wrapper.trigger("click");
       expect(wrapper.emitted("click")).toBeUndefined();
+    });
+
+    it("renders an anchor for href, never underlined, without a type", () => {
+      const wrapper = mount(OButton, { props: { href: "https://openobserve.ai" } });
+      expect(wrapper.element.tagName).toBe("A");
+      expect(wrapper.attributes("href")).toBe("https://openobserve.ai");
+      expect(wrapper.attributes("type")).toBeUndefined();
+      expect(wrapper.classes()).toContain("no-underline");
+    });
+
+    it("renders a router link for to", async () => {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/", component: { template: "<div />" } }],
+      });
+      const wrapper = mount(OButton, {
+        props: { to: "/" },
+        slots: { default: "Home" },
+        global: { plugins: [router] },
+      });
+      await router.isReady();
+      expect(wrapper.element.tagName).toBe("A");
+      expect(wrapper.attributes("href")).toBe("/");
+    });
+
+    it("blocks a disabled link without a native disabled attribute", () => {
+      const wrapper = mount(OButton, { props: { href: "#target", disabled: true } });
+      expect(wrapper.attributes("href")).toBeUndefined();
+      expect(wrapper.attributes("aria-disabled")).toBe("true");
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+      wrapper.element.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it("renders a div host for an embedded switch", () => {
+      expect(mount(OButton, { props: { as: "div" } }).element.tagName).toBe("DIV");
+    });
+
+    it("passes extra attributes to the root", () => {
+      const wrapper = mount(OButton, { attrs: { "data-test": "save-btn", id: "save" } });
+      expect(wrapper.attributes("data-test")).toBe("save-btn");
+      expect(wrapper.attributes("id")).toBe("save");
+    });
+
+    it("draws an offset outline in the focus-ring token for focus", () => {
+      const classes = mount(OButton).classes();
+      expect(classes).toContain("focus-visible:outline-focus-ring-accent");
+      expect(classes).toContain("focus-visible:outline-offset-2");
+    });
+  });
+
+  describe("disabledReason", () => {
+    it("keeps a disabled action focusable, connects its reason and shows it as the tooltip", async () => {
+      const wrapper = mount(OButton, {
+        props: { disabled: true, disabledReason: raw("Select alerts to pause them") },
+        slots: { default: "Pause" },
+        global,
+      });
+      expect(wrapper.attributes("disabled")).toBeUndefined();
+      expect(wrapper.attributes("aria-disabled")).toBe("true");
+      const reason = wrapper.get(".sr-only");
+      expect(reason.text()).toBe("Select alerts to pause them");
+      expect(reason.attributes("aria-hidden")).toBe("true");
+      expect(wrapper.attributes("aria-describedby")).toBe(reason.attributes("id"));
+      expect(wrapper.get(".tooltip-stub").attributes("data-content")).toBe(
+        "Select alerts to pause them",
+      );
+      const click = new MouseEvent("click", { cancelable: true });
+      wrapper.element.dispatchEvent(click);
+      expect(click.defaultPrevented).toBe(true);
+      expect(wrapper.emitted("click")).toBeUndefined();
+    });
+
+    it("ignores the reason while the button is enabled", () => {
+      const wrapper = mount(OButton, {
+        props: { disabledReason: raw("Run first") },
+        slots: { default: "Pause" },
+        global,
+      });
+      expect(wrapper.find(".sr-only").exists()).toBe(false);
+      expect(wrapper.find(".tooltip-stub").exists()).toBe(false);
+      expect(wrapper.attributes("aria-disabled")).toBeUndefined();
+    });
+
+    it.each(["Enter", " "])("stops %j before parent or caller activation", (key) => {
+      const parentKeydown = vi.fn();
+      const callerKeydown = vi.fn();
+      const wrapper = mount(OButton, {
+        props: { disabled: true, disabledReason: raw("Run first") },
+        attrs: { onKeydown: callerKeydown },
+        global,
+      });
+      const parent = document.createElement("div");
+      parent.addEventListener("keydown", parentKeydown);
+      parent.appendChild(wrapper.element);
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      wrapper.element.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(parentKeydown).not.toHaveBeenCalled();
+      expect(callerKeydown).not.toHaveBeenCalled();
       wrapper.unmount();
-    },
-  );
-
-  it('defaults to type="button"', () => {
-    const wrapper = mount(OButton);
-    expect(wrapper.attributes("type")).toBe("button");
-  });
-
-  it("forwards the type prop to the native button", () => {
-    const wrapper = mount(OButton, { props: { type: "submit" } });
-    expect(wrapper.attributes("type")).toBe("submit");
-  });
-
-  it("sets the disabled attribute when disabled prop is true", () => {
-    const wrapper = mount(OButton, { props: { disabled: true } });
-    expect(wrapper.attributes("disabled")).toBeDefined();
-  });
-
-  it("keeps a loading button focusable: aria-disabled, no native disabled", () => {
-    const wrapper = mount(OButton, { props: { loading: true } });
-    expect(wrapper.attributes("disabled")).toBeUndefined();
-    expect(wrapper.attributes("aria-disabled")).toBe("true");
-  });
-
-  it("keeps the native disabled attribute for an explicitly disabled loading button", () => {
-    const wrapper = mount(OButton, { props: { loading: true, disabled: true } });
-    expect(wrapper.attributes("disabled")).toBeDefined();
-  });
-
-  // --- Emits ---
-
-  it("emits click with the MouseEvent when clicked", async () => {
-    const wrapper = mount(OButton);
-    await wrapper.trigger("click");
-    const emitted = wrapper.emitted("click");
-    expect(emitted).toHaveLength(1);
-    expect(emitted![0][0]).toBeInstanceOf(MouseEvent);
-  });
-
-  it("does not emit click when disabled", async () => {
-    const wrapper = mount(OButton, { props: { disabled: true } });
-    await wrapper.trigger("click");
-    expect(wrapper.emitted("click")).toBeUndefined();
-  });
-
-  it("does not emit click when loading", async () => {
-    const wrapper = mount(OButton, { props: { loading: true } });
-    await wrapper.trigger("click");
-    expect(wrapper.emitted("click")).toBeUndefined();
-  });
-
-  // --- ARIA ---
-
-  it('sets aria-disabled="true" when disabled', () => {
-    const wrapper = mount(OButton, { props: { disabled: true } });
-    expect(wrapper.attributes("aria-disabled")).toBe("true");
-  });
-
-  it('sets aria-disabled="true" when loading', () => {
-    const wrapper = mount(OButton, { props: { loading: true } });
-    expect(wrapper.attributes("aria-disabled")).toBe("true");
-  });
-
-  it('sets aria-busy="true" when loading', () => {
-    const wrapper = mount(OButton, { props: { loading: true } });
-    expect(wrapper.attributes("aria-busy")).toBe("true");
-  });
-
-  it("does not set aria-busy when not loading", () => {
-    const wrapper = mount(OButton);
-    expect(wrapper.attributes("aria-busy")).toBeUndefined();
-  });
-
-  it("does not set aria-disabled when not disabled or loading", () => {
-    const wrapper = mount(OButton);
-    expect(wrapper.attributes("aria-disabled")).toBeUndefined();
-  });
-
-  // --- Variant classes ---
-
-  it("applies primary variant classes by default", () => {
-    const wrapper = mount(OButton);
-    expect(wrapper.classes().join(" ")).toContain("bg-button-primary");
-  });
-
-  it("applies secondary variant classes", () => {
-    const wrapper = mount(OButton, { props: { variant: "secondary" } });
-    expect(wrapper.classes().join(" ")).toContain("bg-button-secondary");
-  });
-
-  it("applies outline variant classes", () => {
-    const wrapper = mount(OButton, { props: { variant: "outline" } });
-    expect(wrapper.classes().join(" ")).toContain("text-button-outline-text");
-  });
-
-  it("applies ghost variant classes", () => {
-    const wrapper = mount(OButton, { props: { variant: "ghost" } });
-    expect(wrapper.classes().join(" ")).toContain("text-button-ghost-text");
-  });
-
-  it("applies destructive variant classes", () => {
-    const wrapper = mount(OButton, { props: { variant: "destructive" } });
-    expect(wrapper.classes().join(" ")).toContain("bg-button-destructive");
-  });
-
-  it("applies ghost-primary variant classes", () => {
-    const wrapper = mount(OButton, { props: { variant: "ghost-primary" } });
-    expect(wrapper.classes().join(" ")).toContain("text-button-ghost-primary-text");
-  });
-
-  it("applies ghost-destructive variant classes", () => {
-    const wrapper = mount(OButton, { props: { variant: "ghost-destructive" } });
-    expect(wrapper.classes().join(" ")).toContain("text-button-ghost-destructive-text");
-  });
-
-  it("paints pending as a solid amber fill bordered in its own colour, never warning or the accent", () => {
-    const wrapper = mount(OButton, { props: { variant: "pending" } });
-    const classes = wrapper.classes();
-    expect(classes).toEqual(
-      expect.arrayContaining([
-        "bg-button-pending-bg",
-        "text-button-pending-text",
-        "border",
-        "border-button-pending-bg",
-        "enabled:hover:bg-button-pending-hover-bg",
-        "enabled:hover:border-button-pending-hover-bg",
-        "enabled:active:bg-button-pending-active-bg",
-        "enabled:active:border-button-pending-active-bg",
-        "focus-visible:ring-button-pending-focus-ring",
-        "rounded-default",
-      ]),
-    );
-    const paint = classes.filter((value) => /^(enabled:\w+:)?(bg|text|border)-/.test(value));
-    expect(paint.filter((value) => /warning|accent|primary/.test(value))).toEqual([]);
-  });
-
-  it("dims a disabled pending button like warning", () => {
-    const wrapper = mount(OButton, { props: { variant: "pending", disabled: true } });
-    expect(wrapper.classes()).toContain("disabled:opacity-60");
-    expect(wrapper.attributes("data-o2-variant")).toBe("pending");
-  });
-
-  // Destination previews are fixed-light brand replicas: the label must use the
-  // fixed brand foreground, not text-text-inverse, which turns near-black in dark mode.
-  it.each([
-    ["preview-slack", "text-brand-slack-foreground"],
-    ["preview-teams", "text-brand-teams-foreground"],
-    ["preview-email", "text-brand-email-foreground"],
-    ["preview-opsgenie", "text-brand-email-ink-foreground"],
-  ] as const)("paints the %s label with %s", (variant, label) => {
-    const wrapper = mount(OButton, { props: { variant } });
-    expect(wrapper.classes()).toContain(label);
-    expect(wrapper.classes()).not.toContain("text-text-inverse");
-  });
-
-  // --- Size classes ---
-
-  it("applies the h-8.5 md size classes by default", () => {
-    const classes = mount(OButton).classes();
-    expect(classes).toContain("h-8.5");
-    expect(classes).not.toContain("h-10");
-  });
-
-  it("applies the h-10 cta size classes", () => {
-    const classes = mount(OButton, { props: { size: "cta" } }).classes();
-    expect(classes).toContain("h-10");
-    expect(classes).not.toContain("h-8.5");
-  });
-
-  it("applies sm size classes", () => {
-    const wrapper = mount(OButton, { props: { size: "sm" } });
-    // 34px control height per the design system (HANDOFF §11).
-    expect(wrapper.classes().join(" ")).toContain("h-[2.125rem]");
-  });
-
-  it("applies lg size classes", () => {
-    const wrapper = mount(OButton, { props: { size: "lg" } });
-    expect(wrapper.classes().join(" ")).toContain("h-12");
-  });
-
-  it("applies icon size classes", () => {
-    const wrapper = mount(OButton, { props: { size: "icon" } });
-    expect(wrapper.classes().join(" ")).toContain("size-6");
-  });
-
-  it("applies icon-circle size classes with rounded-full", () => {
-    const wrapper = mount(OButton, { props: { size: "icon-circle" } });
-    const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("size-8");
-    expect(classes).toContain("rounded-full");
-  });
-
-  it("applies icon-sm size classes (h-8 w-8)", () => {
-    const wrapper = mount(OButton, { props: { size: "icon-sm" } });
-    const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("h-8");
-    expect(classes).toContain("w-8");
-  });
-
-  it("applies icon-md size classes (h-8.5 w-8.5), matching md", () => {
-    const classes = mount(OButton, { props: { size: "icon-md" } }).classes();
-    expect(classes).toContain("h-8.5");
-    expect(classes).toContain("w-8.5");
-    expect(classes).not.toContain("h-10");
-  });
-
-  it("applies icon-lg size classes (h-12 w-12)", () => {
-    const wrapper = mount(OButton, { props: { size: "icon-lg" } });
-    const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("h-12");
-    expect(classes).toContain("w-12");
-  });
-
-  it("sizes xs-grouped one border-pair (0.125rem) shorter than xs", () => {
-    expect(mount(OButton, { props: { size: "xs" } }).classes()).toContain("h-7");
-    const classes = mount(OButton, { props: { size: "xs-grouped" } }).classes();
-    expect(classes).toContain("h-6.5");
-    expect(classes).not.toContain("h-7");
-  });
-
-  it("sizes icon-panel as a 1.625rem square, the icon partner of xs-grouped", () => {
-    const classes = mount(OButton, { props: { size: "icon-panel" } }).classes();
-    expect(classes).toContain("size-6.5");
-    expect(classes).toContain("p-0");
-  });
-
-  // --- Keyboard ---
-
-  it("emits click on Enter key (native button behaviour)", async () => {
-    const wrapper = mount(OButton);
-    await wrapper.trigger("keydown", { key: "Enter" });
-    // Native button fires click on Enter ΓÇö we trust browser behaviour;
-    // ensure the component does not suppress it when enabled.
-    // Trigger click directly to confirm handler works.
-    await wrapper.trigger("click");
-    expect(wrapper.emitted("click")).toHaveLength(1);
-  });
-
-  // --- Attrs passthrough ---
-
-  it("passes extra attributes to the native button", () => {
-    const wrapper = mount(OButton, {
-      attrs: { "data-testid": "my-btn" },
     });
-    expect(wrapper.attributes("data-testid")).toBe("my-btn");
-  });
 
-  // --- Primitive: as prop ---
-
-  it("renders as a <button> by default", () => {
-    const wrapper = mount(OButton);
-    expect(wrapper.element.tagName.toLowerCase()).toBe("button");
-  });
-
-  it('renders as an <a> when as="a"', () => {
-    const wrapper = mount(OButton, { props: { as: "a" } });
-    expect(wrapper.element.tagName.toLowerCase()).toBe("a");
-  });
-
-  // base-elements.css underlines every a:hover, which would make a link-button
-  // read as prose text rather than a control.
-  it('never underlines when as="a"', () => {
-    const wrapper = mount(OButton, { props: { as: "a" } });
-    const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("no-underline");
-    expect(classes).toContain("hover:no-underline");
-  });
-
-  it('does not set type attribute when as="a"', () => {
-    const wrapper = mount(OButton, { props: { as: "a" } });
-    expect(wrapper.attributes("type")).toBeUndefined();
-  });
-
-  it('does not set disabled attribute when as="a"', () => {
-    const wrapper = mount(OButton, { props: { as: "a", disabled: true } });
-    expect(wrapper.attributes("disabled")).toBeUndefined();
-  });
-
-  // --- Primitive: asChild prop ---
-
-  it("renders the child element when asChild is true", () => {
-    const wrapper = mount(OButton, {
-      props: { asChild: true },
-      slots: { default: '<a href="/home">Home</a>' },
+    it("joins a caller's aria-describedby with the reason", () => {
+      const wrapper = mount(OButton, {
+        props: { disabled: true, disabledReason: raw("Read only") },
+        attrs: { "aria-describedby": "hint" },
+        global,
+      });
+      expect(wrapper.attributes("aria-describedby")).toBe(
+        `hint ${wrapper.get(".sr-only").attributes("id")}`,
+      );
     });
-    // asChild merges the button's attributes onto the slot's first child.
-    // The <a> element should be present with the expected href.
-    const link = wrapper.find('a[href="/home"]');
-    expect(link.exists()).toBe(true);
-    expect(link.text()).toBe("Home");
   });
 
-  // --- Base layout / transition / focus-ring offset ---
+  describe("stale", () => {
+    it("adds the stale dot on top of the variant", () => {
+      const wrapper = mount(OButton, { props: { variant: "primary", stale: true } });
+      expect(wrapper.find(".bg-warning-500").exists()).toBe(true);
+      expect(wrapper.classes()).toContain("bg-button-primary");
+      expect(wrapper.attributes("data-o2-stale")).toBe("true");
+    });
 
-  it("applies the multi-property transition class (color, bg, border, shadow, etc.)", () => {
-    const wrapper = mount(OButton);
-    const classes = wrapper.classes().join(" ");
-    expect(classes).toContain(
-      "transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow]",
-    );
-    // Animating outline would fade the focus indicator in from the default grey.
-    expect(classes).not.toMatch(/transition-\[[^\]]*outline/);
-    expect(wrapper.classes()).not.toContain("transition-all");
-    expect(classes).toContain("duration-(--duration-control)");
+    it("omits the stale hook when fresh", () => {
+      expect(mount(OButton).attributes("data-o2-stale")).toBeUndefined();
+    });
   });
 
-  it("does not apply the old transition-colors-only utility", () => {
-    const wrapper = mount(OButton);
-    // The migration replaced `transition-colors` with an explicit property list.
-    // Ensure we don't regress back to the colors-only utility.
-    expect(wrapper.classes()).not.toContain("transition-colors");
-  });
-
-  it("uses an offset outline in the opaque focus-ring token, not a ring, for focus", () => {
-    const wrapper = mount(OButton);
-    const classes = wrapper.classes();
-    // A hugging accent ring merges into the accent-filled primary button; the offset gap keeps focus visible.
-    expect(classes).toContain("focus-visible:outline-2!");
-    expect(classes).toContain("focus-visible:outline-solid!");
-    expect(classes).toContain("focus-visible:outline-offset-2!");
-    expect(classes).toContain("focus-visible:outline-focus-ring-accent!");
-    // ring-0! keeps the per-variant rings from painting a second indicator inside the outline.
-    expect(classes).toContain("focus-visible:ring-0!");
-    expect(classes).not.toContain("focus-visible:ring-[0.125rem]!");
-    expect(classes).not.toContain("focus-visible:ring-focus-ring-accent!");
-    // accent/25 measured 1.38:1 light and 1.50:1 dark against the 3:1 SC 1.4.11 floor;
-    // an alpha here is a contrast regression, not a styling preference.
-    expect(classes).not.toContain("focus-visible:outline-accent/25!");
-  });
-
-  it("retains outline-none as part of base classes", () => {
-    const wrapper = mount(OButton);
-    const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("outline-none");
-  });
-
-  it("applies a focus-visible ring on the default primary variant", () => {
-    const wrapper = mount(OButton);
-    expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-button-primary-hover");
-  });
-
-  it("applies a focus-visible ring on the secondary variant", () => {
-    const wrapper = mount(OButton, { props: { variant: "secondary" } });
-    expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-button-secondary-focus-ring");
-  });
-
-  it("applies focus-visible:ring-3 on every styled variant", () => {
-    const wrapper = mount(OButton, { props: { variant: "destructive" } });
-    expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-3");
-  });
-
-  // --- Loading ---
-
-  // Regression: a child-mode OTooltip mounted mid-query anchored to an inline-flex wrapper that lost its box once loading ended, opening at (0,0)
-  it("keeps the slot wrapper display:contents while loading and only hides it", async () => {
-    vi.useFakeTimers();
-    const wrapper = mount(OButton, { props: { loading: true }, slots: { default: "Save" } });
-    vi.advanceTimersByTime(LOADER_DELAY_MS);
-    await nextTick();
-    vi.useRealTimers();
-    const content = wrapper.find("span.contents");
-    expect(content.exists()).toBe(true);
-    expect(content.classes()).toContain("text-transparent");
-    expect(content.classes()).toContain("[&>*]:opacity-0");
-    expect(content.classes()).not.toContain("invisible");
-    expect(content.classes()).not.toContain("inline-flex");
-    expect(content.attributes("style")).toBeUndefined();
-  });
-
-  it("does not hide the slot wrapper when not loading", () => {
-    const wrapper = mount(OButton, { slots: { default: "Save" } });
-    const content = wrapper.find("span.contents");
-    expect(content.exists()).toBe(true);
-    expect(content.classes()).not.toContain("invisible");
+  describe("motion", () => {
+    it("colours on the shared control timing, never animating the outline", () => {
+      const classes = mount(OButton).classes().join(" ");
+      expect(classes).toContain("duration-(--duration-control)");
+      expect(classes).toContain("ease-(--ease-control)");
+      expect(classes).not.toMatch(/transition-\[[^\]]*outline/);
+    });
   });
 
   describe("busy timing", () => {
@@ -487,23 +324,32 @@ describe("OButton", () => {
       const wrapper = mount(OButton, { props: { loading: true }, slots: { default: "Save" } });
       await nextTick();
       expect(wrapper.attributes("aria-busy")).toBe("true");
+      expect(wrapper.attributes("disabled")).toBeUndefined();
       expect(wrapper.find(".animate-spin").exists()).toBe(false);
-      expect(wrapper.find("span.contents").classes()).not.toContain("text-transparent");
       await wrapper.trigger("click");
       expect(wrapper.emitted("click")).toBeUndefined();
     });
 
-    it("shows the spinner once the load outlasts the loader delay", async () => {
+    it("shows the spinner once the load outlasts the loader delay and keeps the width", async () => {
       vi.useFakeTimers();
       const wrapper = mount(OButton, { props: { loading: true }, slots: { default: "Save" } });
+      vi.advanceTimersByTime(LOADER_DELAY_MS);
       await nextTick();
-      vi.advanceTimersByTime(LOADER_DELAY_MS - 1);
+      expect(wrapper.find(".animate-spin").classes()).toContain("o2-motion-keep");
+      expect(wrapper.text()).toBe("Save");
+      expect(wrapper.find("span.contents").classes()).toContain("text-transparent");
+    });
+
+    it("never shows a spinner for a load shorter than the loader delay", async () => {
+      vi.useFakeTimers();
+      const wrapper = mount(OButton, { slots: { default: "Save" } });
+      await wrapper.setProps({ loading: true });
+      vi.advanceTimersByTime(200);
+      await wrapper.setProps({ loading: false });
+      vi.advanceTimersByTime(LOADER_DELAY_MS);
       await nextTick();
       expect(wrapper.find(".animate-spin").exists()).toBe(false);
-      vi.advanceTimersByTime(1);
-      await nextTick();
-      expect(wrapper.find(".animate-spin").exists()).toBe(true);
-      expect(wrapper.find(".animate-spin").classes()).toContain("o2-motion-keep");
+      expect(wrapper.attributes("aria-busy")).toBeUndefined();
     });
 
     it("keeps focus when a focused button turns busy", async () => {
@@ -511,11 +357,10 @@ describe("OButton", () => {
       (wrapper.element as HTMLButtonElement).focus();
       await wrapper.setProps({ loading: true });
       expect(document.activeElement).toBe(wrapper.element);
-      expect(wrapper.attributes("aria-busy")).toBe("true");
       wrapper.unmount();
     });
 
-    it("blocks a busy submit button's default action and its Enter or Space keys", async () => {
+    it("blocks a busy submit button's default action and its Enter or Space keys", () => {
       const onSubmit = vi.fn((event: Event) => event.preventDefault());
       const wrapper = mount(
         {
@@ -534,250 +379,22 @@ describe("OButton", () => {
         button.element.dispatchEvent(keydown);
         expect(keydown.defaultPrevented).toBe(true);
       }
-      expect(wrapper.findComponent(OButton).emitted("click")).toBeUndefined();
       wrapper.unmount();
     });
+  });
 
-    it("looks unavailable while busy and returns to its variant after", async () => {
-      const wrapper = mount(OButton, { slots: { default: "Save" } });
-      await wrapper.setProps({ loading: true });
-      expect(wrapper.classes()).toContain("cursor-not-allowed!");
-      expect(wrapper.classes()).toContain("bg-button-primary-disabled");
-      await wrapper.setProps({ loading: false });
-      expect(wrapper.classes()).not.toContain("cursor-not-allowed!");
-      expect(wrapper.classes()).not.toContain("bg-button-primary-disabled");
-    });
-
-    it("never shows a spinner for a load shorter than the loader delay", async () => {
-      vi.useFakeTimers();
-      const wrapper = mount(OButton, { slots: { default: "Save" } });
-      await wrapper.setProps({ loading: true });
-      vi.advanceTimersByTime(200);
-      await wrapper.setProps({ loading: false });
-      vi.advanceTimersByTime(LOADER_DELAY_MS);
-      await nextTick();
-      expect(wrapper.find(".animate-spin").exists()).toBe(false);
-      expect(wrapper.attributes("aria-busy")).toBeUndefined();
-    });
-
-    it("with spinner off, stays busy and unavailable with its label shown but never spins", async () => {
-      vi.useFakeTimers();
-      const wrapper = mount(OButton, {
-        props: { loading: true, spinner: false },
-        slots: { default: "Save" },
+  describe("inside an OButtonGroup", () => {
+    it("inherits the group's size unless it sets its own", () => {
+      const wrapper = mount({
+        render: () =>
+          h(OButtonGroup, { size: "sm" }, () => [
+            h(OButton, { "data-test": "a" }, () => "A"),
+            h(OButton, { "data-test": "b", size: "xs" }, () => "B"),
+          ]),
       });
-      vi.advanceTimersByTime(LOADER_DELAY_MS * 10);
-      await nextTick();
-      expect(wrapper.find(".animate-spin").exists()).toBe(false);
-      expect(wrapper.find("span.contents").classes()).not.toContain("text-transparent");
-      expect(wrapper.attributes("aria-busy")).toBe("true");
-      expect(wrapper.attributes("aria-disabled")).toBe("true");
-      expect(wrapper.classes()).toContain("cursor-not-allowed!");
-      await wrapper.trigger("click");
-      expect(wrapper.emitted("click")).toBeUndefined();
+      expect(wrapper.get('[data-test="a"]').attributes("data-o2-size")).toBe("sm");
+      expect(wrapper.get('[data-test="b"]').attributes("data-o2-size")).toBe("xs");
     });
-  });
-
-  // --- data attributes ---
-
-  it("sets data-o2-btn on the rendered element", () => {
-    const wrapper = mount(OButton);
-    expect(wrapper.attributes("data-o2-btn")).toBeDefined();
-  });
-
-  it("sets data-o2-variant to the active variant name", () => {
-    const wrapper = mount(OButton, { props: { variant: "ghost-primary" } });
-    expect(wrapper.attributes("data-o2-variant")).toBe("ghost-primary");
-  });
-
-  it("defaults data-o2-variant to primary", () => {
-    const wrapper = mount(OButton);
-    expect(wrapper.attributes("data-o2-variant")).toBe("primary");
-  });
-  it.each([
-    "primary",
-    "secondary",
-    "outline",
-    "ghost",
-    "ghost-primary",
-    "ghost-muted",
-    "ghost-subtle",
-    "ghost-destructive",
-    "ghost-success",
-    "destructive",
-    "filter-exclude",
-    "ghost-warning",
-    "warning",
-    "pending",
-    "ghost-neutral",
-    "outline-destructive",
-    "cancel-query",
-    "panel-collapse",
-    "sidebar-button",
-    "sidebar-toggle",
-    "ai-gradient",
-    "on-dark-primary",
-    "on-dark-ghost",
-    "preview-slack",
-    "preview-teams",
-    "preview-email",
-    "preview-opsgenie",
-    "preview-action",
-    "webinar-dismiss",
-    "banner-dismiss",
-    "outline-primary",
-    "dashed",
-    "pricing-chip",
-    "section-chip",
-    "tint-teal",
-    "tint-purple",
-    "tint-blue",
-    "tint-orange",
-    "row",
-    "locked-body",
-  ] satisfies ButtonVariant[])(
-    "preserves native disabled styling for %s when unavailable",
-    (variant) => {
-      const disabled = mount(OButton, { props: { variant, disabled: true } });
-      const unavailable = mount(OButton, {
-        props: { variant, disabled: true, focusableUnavailable: true },
-      });
-      const disabledClasses = disabled
-        .classes()
-        .filter((value) => value.startsWith("disabled:") && value !== "disabled:cursor-not-allowed")
-        .map((value) => value.slice("disabled:".length));
-      expect(disabledClasses.length).toBeGreaterThan(0);
-      for (const value of disabledClasses) expect(unavailable.classes()).toContain(value);
-      const groups = disabledClasses.map((value) => value.split("-")[0]);
-      expect(
-        unavailable
-          .classes()
-          .filter(
-            (value) =>
-              groups.includes(value.split("-")[0]) &&
-              !/^text-(xs|sm|base|lg|compact|inherit|start)$/.test(value),
-          )
-          .sort(),
-      ).toEqual(disabledClasses.sort());
-      expect(unavailable.classes().some((value) => value.startsWith("enabled:"))).toBe(false);
-      expect(unavailable.attributes("disabled")).toBeUndefined();
-      disabled.unmount();
-      unavailable.unmount();
-    },
-  );
-
-  it("keeps an unavailable action focusable and connects its reason", async () => {
-    const wrapper = mount(OButton, {
-      props: { disabled: true, focusableUnavailable: true },
-      slots: { default: "Configure", "unavailable-reason": "Permission required" },
-    });
-    expect(wrapper.attributes("disabled")).toBeUndefined();
-    expect(wrapper.attributes("aria-disabled")).toBe("true");
-    const reason = wrapper.get(".sr-only");
-    expect(wrapper.attributes("aria-describedby")).toBe(reason.attributes("id"));
-    expect(reason.text()).toBe("Permission required");
-    const click = new MouseEvent("click", { cancelable: true });
-    wrapper.element.dispatchEvent(click);
-    expect(click.defaultPrevented).toBe(true);
-    await wrapper.trigger("click");
-    expect(wrapper.emitted("click")).toBeUndefined();
-  });
-
-  it.each(["Enter", " "])("stops unavailable %s before parent or caller activation", (key) => {
-    const parentKeydown = vi.fn();
-    const callerKeydown = vi.fn();
-    const wrapper = mount(OButton, {
-      props: { disabled: true, focusableUnavailable: true },
-      attrs: { onKeydown: callerKeydown },
-    });
-    const parent = document.createElement("div");
-    parent.addEventListener("keydown", parentKeydown);
-    parent.appendChild(wrapper.element);
-    const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
-    wrapper.element.dispatchEvent(event);
-    expect(event.defaultPrevented).toBe(true);
-    expect(parentKeydown).not.toHaveBeenCalled();
-    expect(callerKeydown).not.toHaveBeenCalled();
-    expect(wrapper.emitted("click")).toBeUndefined();
-    wrapper.unmount();
-  });
-
-  it.each([false, true])("preserves the accessible label when icon-only is %s", (iconOnly) => {
-    const wrapper = mount(OButton, {
-      props: { disabled: true, focusableUnavailable: true },
-      attrs: iconOnly ? { "aria-label": "Share" } : {},
-      slots: { default: iconOnly ? "" : "Configure", "unavailable-reason": "Run first" },
-    });
-    const reason = wrapper.get(".sr-only");
-    expect(reason.attributes("aria-hidden")).toBe("true");
-    expect(wrapper.attributes("aria-describedby")).toBe(reason.attributes("id"));
-    expect(reason.text()).toBe("Run first");
-    const nameContent = wrapper.element.cloneNode(true) as HTMLElement;
-    nameContent.querySelectorAll('[aria-hidden="true"]').forEach((node) => node.remove());
-    expect(nameContent.getAttribute("aria-label") ?? nameContent.textContent).toBe(
-      iconOnly ? "Share" : "Configure",
-    );
-    wrapper.unmount();
-  });
-
-  it.each([false, true])(
-    "keeps a single loading label when focusable unavailable is %s",
-    (focusableUnavailable) => {
-      const wrapper = mount(OButton, {
-        props: { loading: true, disabled: focusableUnavailable, focusableUnavailable },
-        slots: { default: "Next", "unavailable-reason": "Loading page 2…" },
-      });
-      const nameContent = wrapper.element.cloneNode(true) as HTMLElement;
-      nameContent.querySelectorAll('[aria-hidden="true"]').forEach((node) => node.remove());
-      expect(nameContent.textContent).toBe("Next");
-      expect(wrapper.find(".invisible").exists()).toBe(false);
-      expect(wrapper.attributes("aria-label")).toBeUndefined();
-      if (focusableUnavailable) {
-        expect(wrapper.attributes("disabled")).toBeUndefined();
-        const reason = wrapper.get(".sr-only");
-        expect(wrapper.attributes("aria-describedby")).toBe(reason.attributes("id"));
-        expect(reason.text()).toBe("Loading page 2…");
-      }
-      wrapper.unmount();
-    },
-  );
-
-  it("keeps descriptions distinct when instances share a test marker", () => {
-    const wrapper = mount({
-      render: () =>
-        h(
-          "div",
-          ["First reason", "Second reason"].map((reason) =>
-            h(
-              OButton,
-              { disabled: true, focusableUnavailable: true, "data-test": "shared-action" },
-              { "unavailable-reason": () => reason },
-            ),
-          ),
-        ),
-    });
-    const buttons = wrapper.findAllComponents(OButton);
-    const ids = buttons.map((button) => button.attributes("aria-describedby"));
-    expect(new Set(ids).size).toBe(2);
-    expect(ids.map((id) => wrapper.find(`[id="${id}"]`).text())).toEqual([
-      "First reason",
-      "Second reason",
-    ]);
-    wrapper.unmount();
-  });
-
-  it("uses an external reason and preserves unavailable focus during loading", () => {
-    const wrapper = mount(OButton, {
-      props: {
-        disabled: true,
-        focusableUnavailable: true,
-        descriptionId: "permission",
-        loading: true,
-      },
-    });
-    expect(wrapper.attributes("disabled")).toBeUndefined();
-    expect(wrapper.attributes("aria-describedby")).toBe("permission");
-    expect(wrapper.find(".sr-only").exists()).toBe(false);
   });
 
   describe("unnamed icon-only dev warning", () => {
@@ -788,7 +405,7 @@ describe("OButton", () => {
     });
 
     const mountIconOnly = (attrs: Record<string, string> = {}) =>
-      mount(OButton, { props: { size: "icon" }, attrs, slots: { default: () => h("svg") } });
+      mount(OButton, { props: { iconOnly: true }, attrs, slots: { default: () => h("svg") } });
 
     it("schedules nothing under test", () => {
       vi.useFakeTimers();
@@ -808,37 +425,13 @@ describe("OButton", () => {
       wrapper.unmount();
     });
 
-    it("stays quiet for a title, or a name that arrives before the check", async () => {
+    it("stays quiet for a title", () => {
       vi.stubEnv("MODE", "development");
       vi.useFakeTimers();
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       mountIconOnly({ title: "Delete" });
-      const late = mountIconOnly();
-      late.element.setAttribute("aria-label", "Loaded later");
-      await nextTick();
       vi.advanceTimersByTime(1000);
       expect(warn).not.toHaveBeenCalled();
-    });
-
-    it("does not warn for a button unmounted before the check", () => {
-      vi.stubEnv("MODE", "development");
-      vi.useFakeTimers();
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      mountIconOnly().unmount();
-      vi.advanceTimersByTime(1000);
-      expect(warn).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("lock icon", () => {
-    it.each(["iconLeft", "iconRight"])("paints a %s lock with the locked-icon token", (prop) => {
-      const wrapper = mount(OButton, { props: { [prop]: "lock" }, slots: { default: "Run" } });
-      expect(wrapper.find(".lock-chip").exists()).toBe(true);
-    });
-
-    it("leaves other icons uncoloured", () => {
-      const wrapper = mount(OButton, { props: { iconLeft: "add" }, slots: { default: "Run" } });
-      expect(wrapper.find(".lock-chip").exists()).toBe(false);
     });
   });
 
@@ -856,28 +449,20 @@ describe("OButton", () => {
     };
 
     it("renders disabled and emits no click", async () => {
-      const wrapper = mountLocked();
-      const button = wrapper.findComponent(OButton);
+      const button = mountLocked().findComponent(OButton);
       expect(button.attributes("disabled")).toBeDefined();
       expect(button.attributes("aria-disabled")).toBe("true");
       await button.trigger("click");
       expect(button.emitted("click")).toBeUndefined();
     });
 
-    it("blocks an anchor button, which has no native disabled", async () => {
-      const wrapper = mountLocked({ as: "a", href: "#target" });
-      const button = wrapper.findComponent(OButton);
-      expect(button.classes()).toContain("cursor-not-allowed!");
+    it("blocks an anchor button, which has no native disabled", () => {
+      const button = mountLocked({ href: "#target" }).findComponent(OButton);
+      expect(button.classes()).toContain("cursor-not-allowed");
       const event = new MouseEvent("click", { bubbles: true, cancelable: true });
       button.element.dispatchEvent(event);
       expect(event.defaultPrevented).toBe(true);
       expect(button.emitted("click")).toBeUndefined();
-    });
-
-    it("stays enabled outside any provider", async () => {
-      const wrapper = mount(OButton, { slots: { default: "Save" } });
-      await wrapper.trigger("click");
-      expect(wrapper.emitted("click")).toHaveLength(1);
     });
   });
 });

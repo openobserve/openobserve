@@ -32,9 +32,9 @@ const oDialogStub = {
     '<slot name="header" />' +
     "<slot />" +
     '<slot name="footer" />' +
-    '<button data-test="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primaryButtonLabel }}</button>' +
-    '<button data-test="o-dialog-secondary" @click="$emit(\'click:secondary\')">{{ secondaryButtonLabel }}</button>' +
-    '<button data-test="o-dialog-neutral" @click="$emit(\'click:neutral\')">{{ neutralButtonLabel }}</button>' +
+    '<button data-test="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primary?.label }}</button>' +
+    '<button data-test="o-dialog-secondary" @click="$emit(\'click:secondary\')">{{ secondary?.label }}</button>' +
+    '<button data-test="o-dialog-neutral" @click="$emit(\'click:extra\')">{{ extra?.label }}</button>' +
     '<button data-test="o-dialog-close" @click="$emit(\'update:open\', false)">close</button>' +
     "</div>",
   props: [
@@ -42,23 +42,23 @@ const oDialogStub = {
     "persistent",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "primaryButtonVariant",
-    "primaryButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLabel",
-    "secondaryButtonVariant",
-    "secondaryButtonDisabled",
-    "secondaryButtonLoading",
-    "neutralButtonLabel",
-    "neutralButtonVariant",
-    "neutralButtonDisabled",
-    "neutralButtonLoading",
+    "primary",
+    "primary",
+    "primary",
+    "primary",
+    "secondary",
+    "secondary",
+    "secondary",
+    "secondary",
+    "extra",
+    "extra",
+    "extra",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 describe("OperationsList", () => {
@@ -293,7 +293,7 @@ describe("OperationsList", () => {
       expect(dialog.exists()).toBe(true);
       expect(dialog.props("size")).toBe("sm");
       expect(dialog.props("title")).toBe("Add Operation");
-      expect(dialog.props("primaryButtonLabel")).toBe("Close");
+      expect(dialog.props("primary")?.label).toBe("Close");
     });
 
     it("should close dialog when primary button (Close) is clicked via emit", async () => {

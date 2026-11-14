@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-wrap items-center gap-2"
         :data-test="`oncall-rotation-preview-${shift.startMicros}`"
       >
-        <OTag variant="default-soft" size="sm">{{ shift.when }}</OTag>
+        <OTag tone="neutral" size="sm">{{ shift.when }}</OTag>
         <OUserCell :value="shift.member" />
         <!-- The second rotation's holder for the same week. Side by side is the
              point: it is how "these two can never be the same person" stops

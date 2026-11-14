@@ -141,7 +141,8 @@ export default class DashboardPanelConfigs {
     // Pagination container scoped inside the rendered panel table (distinct from the
     // unscoped tablePagination, which can also match a PromQL legend bottom slot).
     this.tablePaginationInTable = page.locator('[data-test="dashboard-panel-table"] [data-test="dashboard-table-pagination"]');
-    this.tableRowsPerPageLabel = page.locator('[data-test="dashboard-table-rows-per-page-label"]');
+    // The pager has no "Records per page" label; its page-size select is the visible control.
+    this.tableRowsPerPageSelect = page.locator('[data-test="dashboard-table-rows-per-page-select"]');
     this.tableRowCount = page.locator('[data-test="dashboard-table-row-count"]');
     // Generic role=tooltip (e.g. rows-per-page info icon hover tooltip)
     this.infoTooltip = page.locator('[role="tooltip"]');
@@ -979,13 +980,12 @@ export default class DashboardPanelConfigs {
   }
 
   /**
-   * Select alignment (auto|left|center|right). Alignment buttons have no data-test
-   * (verified against source); the second `.cf-seg` toggle group in the popup is
-   * Alignment (the first is Field Type).
+   * Select alignment by its visible label (Auto|Left|Center|Right). Each alignment
+   * button is `o2-format-alignment-<value>-<field>`, and the popup shows one column.
    */
   async selectAlignment(label) {
-    const group = this.overrideDialog.locator(".cf-seg").nth(1);
-    await group.getByText(label, { exact: true }).click();
+    const options = this.overrideDialog.locator('[data-test^="o2-format-alignment-"]');
+    await options.getByText(label, { exact: true }).click();
   }
 
   /** Click "Add Rule" to append a conditional styling rule for the current column. */
@@ -1755,6 +1755,15 @@ export default class DashboardPanelConfigs {
    */
   async cancelColorBySeries() {
     await this.colorBySeriesCancelBtn.click();
+    // ✕ on an edited form asks "Discard changes?" in the dialog footer before it closes.
+    const discardBtn = this.page.locator(
+      '[data-test="color-by-series-popup-dialog"] [data-test="o-dialog-discard-btn"]'
+    );
+    const asked = await Promise.race([
+      discardBtn.waitFor({ state: "visible", timeout: 5000 }).then(() => true),
+      this.colorBySeriesPopup.waitFor({ state: "hidden", timeout: 5000 }).then(() => false),
+    ]).catch(() => false);
+    if (asked) await discardBtn.click();
     await this.colorBySeriesPopup.waitFor({ state: "hidden", timeout: 10000 });
   }
 

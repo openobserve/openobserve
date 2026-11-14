@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full min-h-60 flex-col">
     <div v-if="loading" class="flex items-center justify-center py-8">
-      <OSpinner variant="dots" size="md" />
+      <OSpinner size="lg" />
     </div>
 
     <div
@@ -41,16 +41,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="relative flex min-h-0 flex-1 flex-col">
       <div v-if="showScrollButtons" class="absolute top-1 right-1 z-10 flex flex-col gap-1">
         <OButton
-          variant="ghost-muted"
-          size="icon-circle-sm"
+          icon-only
+          variant="ghost"
+          size="sm"
           @click="scrollToTop"
           :aria-label="scrollTopTooltip"
           :data-test="dataTestScrollTop"
           ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip :content="scrollTopTooltip"
         /></OButton>
         <OButton
-          variant="ghost-muted"
-          size="icon-circle-sm"
+          icon-only
+          variant="ghost"
+          size="sm"
           @click="scrollToBottom"
           :aria-label="scrollBottomTooltip"
           :data-test="dataTestScrollBottom"
@@ -109,8 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OTooltip
                           v-if="getTooltip && getTooltip(event)"
                           side="bottom"
-                          align="start"
-                          :max-width="'24rem'"
                           :content="getTooltip(event) ?? undefined"
                         />
                       </span>
@@ -210,8 +210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="absolute right-3 bottom-3">
             <OButton
+              icon-only
               variant="primary"
-              size="icon-circle-sm"
+              size="sm"
               :disabled="!commentText.trim() || submitting"
               :loading="submitting"
               @click="onSubmit"

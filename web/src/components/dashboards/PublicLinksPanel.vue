@@ -15,17 +15,16 @@
 -->
 <template>
   <ODrawer
+    size="xl"
     v-model:open="open"
-    :width="74"
-    :close-guard="guardClose"
+    :dirty="formDirty"
     :bleed="currentView === 'list' && !forbidden && !loadFailed"
     data-test="dashboards-public-links-panel"
     :title="drawerTitle"
     :form-id="currentView === 'form' ? FORM_ID : undefined"
-    :primary-button-label="primaryLabel"
-    :primary-button-disabled="currentView === 'form' && variablesPending"
-    :secondary-button-label="currentView === 'form' ? t('common.cancel') : undefined"
-    @click:secondary="closeForm"
+    :primary="{ label: primaryLabel, disabled: currentView === 'form' && variablesPending }"
+    :secondary="{ label: currentView === 'form' ? t('common.cancel') : undefined }"
+    @click:secondary="leaveForm"
   >
     <template #header>
       <div class="flex min-w-0 items-center gap-2">
@@ -65,7 +64,9 @@
 
     <OEmptyState
       v-else-if="loadFailed"
-      preset="load-error"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="t('emptyState.loadError.description')"
       data-test="dashboards-public-links-panel-error"
       @action="refetchLinks"
     />
@@ -106,8 +107,7 @@
         <OButton
           v-if="createdLink.slug"
           variant="primary"
-          size="sm-action"
-          icon-left="content-copy"
+          icon="content-copy"
           data-test="dashboards-public-links-panel-created-copy-btn"
           @click="copyLink(createdLink)"
         >
@@ -115,18 +115,16 @@
         </OButton>
         <OButton
           v-if="createdLink.slug"
-          variant="outline"
-          size="sm-action"
-          icon-left="open-in-new"
+          variant="secondary"
+          icon="open-in-new"
           data-test="dashboards-public-links-panel-created-open-btn"
           @click="openPublicPage(createdLink)"
         >
           {{ t("dashboard.publicLinks.openPublicPage") }}
         </OButton>
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="edit"
+          variant="secondary"
+          icon="edit"
           data-test="dashboards-public-links-panel-created-edit-btn"
           @click="openForm(createdLink)"
         >
@@ -168,7 +166,7 @@
                   :data-test="`dashboards-public-links-panel-range-${index}`"
                 >
                   <div class="relative">
-                    <DateTime
+                    <ODateTimeRange
                       class="min-w-0"
                       field-appearance
                       menu-align="start"
@@ -189,9 +187,10 @@
                       @on:date-change="(value: PickedTime) => onRangeChanged(row, value)"
                     />
                     <OButton
-                      variant="outline"
-                      size="icon-xs-circle"
-                      class="bg-surface-base! absolute! -end-1.5 -top-1.5 size-4!"
+                      icon-only
+                      variant="secondary"
+                      size="xs"
+                      class="bg-surface-base! absolute! -end-1.5 -top-1.5"
                       :aria-label="
                         t('dashboard.publicLinks.removeRange', {
                           range: longRange(row.range, t, timezone),
@@ -200,7 +199,7 @@
                       :data-test="`dashboards-public-links-panel-range-${index}-remove-btn`"
                       @click="removeRange(row)"
                     >
-                      <template #icon-left><OIcon name="close" size="xs" /></template>
+                      <template #icon><OIcon name="close" size="xs" /></template>
                     </OButton>
                   </div>
                   <span
@@ -214,9 +213,8 @@
                 </div>
                 <OButton
                   v-if="rows.length < MAX_RANGES"
-                  variant="outline"
-                  size="sm"
-                  icon-left="add"
+                  variant="secondary"
+                  icon="add"
                   data-test="dashboards-public-links-panel-add-range-btn"
                   @click="addRange"
                 >
@@ -256,11 +254,9 @@
         <div class="text-input-label-text text-compact leading-tight font-medium">
           {{ t("dashboard.publicDashboard.defaultVariableValues") }}
         </div>
-        <OBanner
-          variant="info"
-          icon="info"
-          dense
-          :content="t('dashboard.publicLinks.frozenVariablesNote')"
+        <OInlineNotice
+          tone="info"
+          :message="t('dashboard.publicLinks.frozenVariablesNote')"
           data-test="dashboards-public-links-panel-variables-note"
         />
         <template v-if="formVarsReady">
@@ -300,11 +296,9 @@
       data-test="dashboards-public-links-panel-list"
     >
       <OContent v-if="orgDisabled" class="pt-2">
-        <OBanner
-          variant="warning"
-          icon="warning-amber"
-          dense
-          :content="t('dashboard.publicLinks.orgDisabledBanner')"
+        <OInlineNotice
+          tone="warn"
+          :message="t('dashboard.publicLinks.orgDisabledBanner')"
           data-test="dashboards-public-links-panel-org-disabled"
         />
       </OContent>
@@ -314,38 +308,29 @@
         :columns="columns"
         row-key="id"
         :loading="loading"
-        :frame="false"
         pagination="client"
-        :show-global-filter="false"
         :default-columns="false"
-        show-index
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="public-links-panel"
         data-test="dashboards-public-links-panel-table"
       >
         <template #toolbar>
-          <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+          <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
             <div class="min-w-0 flex-1 max-md:min-w-40">
-              <OInput
+              <OSearchInput
                 v-model="searchQuery"
                 :placeholder="t('dashboard.publicLinks.search')"
-                clearable
                 class="w-full"
                 data-test="dashboards-public-links-panel-search"
               >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
+              </OSearchInput>
             </div>
           </div>
         </template>
         <template #toolbar-trailing>
           <div class="flex items-center gap-2">
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt || null"
               :loading="fetching"
               data-test="dashboards-public-links-panel-refresh-btn"
@@ -353,7 +338,6 @@
             />
             <OButton
               variant="primary"
-              size="sm"
               :disabled="orgDisabled"
               data-test="dashboards-public-links-panel-new-btn"
               @click="openForm(null)"
@@ -365,10 +349,11 @@
         <template #empty>
           <OEmptyState
             v-if="searchQuery.trim()"
-            preset="no-search-results"
-            filtered
+            kind="filtered"
+            :title="t('emptyState.noSearchResults.title')"
+            :text="t('emptyState.noSearchResults.description')"
             data-test="dashboards-public-links-panel-no-match"
-            @action="(id?: string) => (id === 'clear-filters' ? (searchQuery = '') : undefined)"
+            @action="searchQuery = ''"
           />
         </template>
         <template #cell-name="{ row }">
@@ -379,7 +364,7 @@
             <!-- The server hides the URL of a link whose dashboard the viewer can't read. -->
             <span v-if="!row.slug" class="inline-flex shrink-0">
               <OBadge
-                variant="default-soft"
+                tone="neutral"
                 size="sm"
                 icon="lock"
                 :data-test="`dashboards-public-links-panel-${row.id}-url-hidden`"
@@ -402,7 +387,7 @@
             </span>
             <OBadge
               v-if="row.publisher_left"
-              variant="warning-soft"
+              tone="warn"
               size="sm"
               icon="person"
               class="min-w-0"
@@ -438,9 +423,9 @@
           <div class="flex items-center justify-end gap-0.5" @click.stop>
             <OButton
               v-if="row.slug"
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="content-copy"
+              icon="content-copy"
               class="max-md:hidden"
               :aria-label="t('dashboard.publicDashboard.copyLink')"
               :data-test="`dashboards-public-links-panel-${row.id}-copy-btn`"
@@ -450,9 +435,9 @@
             </OButton>
             <OButton
               v-if="row.slug"
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="open-in-new"
+              icon="open-in-new"
               class="max-md:hidden"
               :aria-label="t('dashboard.publicLinks.openPublicPage')"
               :data-test="`dashboards-public-links-panel-${row.id}-open-btn`"
@@ -463,9 +448,9 @@
             <!-- No access to the dashboard: the server refuses every change, so no action shows. -->
             <OButton
               v-if="!noDashboardAccess(row)"
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="edit"
+              icon="edit"
               class="max-md:hidden"
               :aria-label="t('dashboard.publicLinks.editSettings')"
               :data-test="`dashboards-public-links-panel-${row.id}-edit-btn`"
@@ -475,9 +460,9 @@
             </OButton>
             <OButton
               v-if="!noDashboardAccess(row) && takeOverReplacesResume(row, userId)"
-              variant="ghost-success"
-              size="icon-sm"
-              icon-left="how-to-reg"
+              icon-only
+              variant="ghost"
+              icon="how-to-reg"
               class="max-md:hidden"
               :aria-label="t('dashboard.publicLinks.takeOver')"
               :loading="busyRows.get(row.id) === 'inline'"
@@ -491,9 +476,9 @@
             <span v-else-if="!noDashboardAccess(row)" class="inline-flex max-md:hidden">
               <OTooltip v-if="!canPause(row)" side="bottom" :content="pauseBlockedReason(row, t)" />
               <OButton
-                :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                size="icon-sm"
-                :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                icon-only
+                :variant="row.enabled ? 'danger-ghost' : 'ghost'"
+                :icon="row.enabled ? 'pause' : 'play-arrow'"
                 :aria-label="
                   row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
                 "
@@ -516,9 +501,9 @@
             <ODropdown v-if="!noDashboardAccess(row)" side="bottom" align="end">
               <template #trigger>
                 <OButton
-                  icon-left="more-vert"
+                  icon-only
+                  icon="more-vert"
                   variant="ghost"
-                  size="icon-sm"
                   :title="t('dashboard.moreActions')"
                   :aria-label="t('dashboard.moreActions')"
                   :loading="busyRows.get(row.id) === 'menu'"
@@ -527,7 +512,7 @@
               </template>
               <ODropdownItem
                 v-if="row.slug"
-                icon-left="content-copy"
+                icon="content-copy"
                 class="md:hidden"
                 :data-test="`dashboards-public-links-panel-${row.id}-copy-menu`"
                 @select="copyLink(row)"
@@ -536,7 +521,7 @@
               </ODropdownItem>
               <ODropdownItem
                 v-if="row.slug"
-                icon-left="open-in-new"
+                icon="open-in-new"
                 class="md:hidden"
                 :data-test="`dashboards-public-links-panel-${row.id}-open-menu`"
                 @select="openPublicPage(row)"
@@ -544,7 +529,7 @@
                 {{ t("dashboard.publicLinks.openPublicPage") }}
               </ODropdownItem>
               <ODropdownItem
-                icon-left="edit"
+                icon="edit"
                 class="md:hidden"
                 :data-test="`dashboards-public-links-panel-${row.id}-edit-menu`"
                 @select="openForm(row)"
@@ -553,7 +538,7 @@
               </ODropdownItem>
               <ODropdownItem
                 v-if="canPause(row) && !takeOverReplacesResume(row, userId)"
-                :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                :icon="row.enabled ? 'pause' : 'play-arrow'"
                 class="md:hidden"
                 :disabled="busyRows.has(row.id) || orgDisabled"
                 :data-test="`dashboards-public-links-panel-${row.id}-${row.enabled ? 'pause' : 'resume'}-menu`"
@@ -565,7 +550,7 @@
               </ODropdownItem>
               <ODropdownItem
                 v-if="canTakeOver(row, userId)"
-                icon-left="how-to-reg"
+                icon="how-to-reg"
                 :class="{ 'md:hidden': takeOverReplacesResume(row, userId) }"
                 :disabled="busyRows.has(row.id)"
                 :data-test="`dashboards-public-links-panel-${row.id}-take-over-menu`"
@@ -575,7 +560,7 @@
               </ODropdownItem>
               <ODropdownItem
                 v-if="canRefresh(row)"
-                icon-left="refresh"
+                icon="refresh"
                 :disabled="busyRows.has(row.id)"
                 :data-test="`dashboards-public-links-panel-${row.id}-refresh-menu`"
                 @select="refreshLink(row)"
@@ -583,8 +568,8 @@
                 {{ t("dashboard.publicLinks.refreshOnNextView") }}
               </ODropdownItem>
               <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
+                icon="delete"
+                tone="danger"
                 :disabled="busyRows.has(row.id)"
                 :data-test="`dashboards-public-links-panel-${row.id}-revoke-menu`"
                 @select="revokeLink(row)"
@@ -621,10 +606,11 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OAccessLock from "@/components/access/OAccessLock.vue";
@@ -643,7 +629,7 @@ import {
   type VariableConfig,
   type VariableRuntimeState,
 } from "@/composables/dashboard/useVariablesManager";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
   hasUnsavedDashboardEdits,
@@ -758,19 +744,6 @@ const open = computed({
   set: (v: boolean) => emit("update:modelValue", v),
 });
 
-// From a dashboard, leaving the form returns to its link list; from the org-wide list it closes the drawer.
-function guardClose(): boolean {
-  if (currentView.value === "form" && isFormDirty()) {
-    void closeForm();
-    return false;
-  }
-  if (currentView.value === "list" || !links.value.length || props.editLinkId) return true;
-  editing.value = null;
-  form.reset(publicLinkDefaults());
-  view.value = "list";
-  return false;
-}
-
 const timezone = computed<string>(
   () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
 );
@@ -843,7 +816,7 @@ const variablesPending = computed(
   () => !!props.variablesConfig?.list?.length && (!formVarsReady.value || formVars.isLoading.value),
 );
 // The pickers settle on loaded or auto-selected values, so only a change after that is the author's.
-let settledVariables: string | null = null;
+const settledVariables = ref<string | null>(null);
 // Rows with a pause, resume, refresh or revoke in flight, so a second click can't send it again.
 const busyRows = reactive(new Map<string, RowActionSource>());
 
@@ -881,6 +854,14 @@ const form = useOForm<PublicLinkForm>({
   onSubmit: (value) => submit(value),
 });
 const ranges = form.useStore((s) => s.values.ranges);
+const formValues = form.useStore((s) => s.values);
+// Unsaved form edits make the drawer ask before Escape, ✕ or an outside click discards them (V5).
+const formDirty = computed(() => {
+  if (currentView.value !== "form") return false;
+  if (!isEqual(formValues.value, form.options.defaultValues)) return true;
+  const settled = settledVariables.value;
+  return settled !== null && JSON.stringify(frozenVariables()) !== settled;
+});
 // A duplicate row is still in the list until it's fixed, but is one choice.
 const defaultOptions = computed<RangeOption[]>(() =>
   [...new Map(ranges.value.map((range) => [rangeKey(range), range])).entries()].map(
@@ -1081,7 +1062,7 @@ function withoutEmptyQuerySeeds(
 
 async function seedFormVariables() {
   formVarsReady.value = false;
-  settledVariables = null;
+  settledVariables.value = null;
   const list = (props.variablesConfig?.list ?? []) as VariableConfig[];
   if (!list.length) return;
   // Dynamic filters are never part of a public link.
@@ -1106,27 +1087,10 @@ function openForm(link: PublicLink | null) {
 
 function goBack() {
   if (currentView.value === "created") view.value = "list";
-  else void closeForm();
+  else leaveForm();
 }
 
-function isFormDirty(): boolean {
-  if (!isEqual(form.state.values, form.options.defaultValues)) return true;
-  return settledVariables !== null && JSON.stringify(frozenVariables()) !== settledVariables;
-}
-
-async function closeForm() {
-  if (isFormDirty()) {
-    const discard = await confirm({
-      title: t("common.unsavedChanges"),
-      message: t("common.unsavedMessage"),
-      confirmLabel: t("common.discardChanges"),
-      cancelLabel: t("common.cancel"),
-    });
-    if (!discard) return;
-  }
-  leaveForm();
-}
-
+// From a dashboard, leaving the form returns to its link list; from the org-wide list it closes the drawer.
 function leaveForm() {
   editing.value = null;
   form.reset(publicLinkDefaults());
@@ -1220,8 +1184,7 @@ async function revokeLink(link: PublicLink) {
     message: t("dashboard.publicLinks.revokeMessage"),
     confirmLabel: t("dashboard.publicDashboard.revoke"),
     cancelLabel: t("common.cancel"),
-    confirmVariant: "destructive",
-    focusCancel: true,
+    kind: "destructive",
   });
   if (!ok) return;
   await runRowAction(
@@ -1298,8 +1261,8 @@ watch(
   { immediate: true },
 );
 watch(variablesPending, (pending) => {
-  if (!pending && formVarsReady.value && settledVariables === null) {
-    settledVariables = JSON.stringify(frozenVariables());
+  if (!pending && formVarsReady.value && settledVariables.value === null) {
+    settledVariables.value = JSON.stringify(frozenVariables());
   }
 });
 watch(defaultOptions, (options) => {

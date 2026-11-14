@@ -17,48 +17,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('telephony.title')"
-    :subtitle="t('telephony.subtitle')"
-    icon="call"
+    :about="t('telephony.subtitle')"
     title-data-test="telephony-settings-title"
     scroll
   >
     <div class="flex flex-col gap-4 py-3">
-      <OBanner
+      <OInlineNotice
         v-if="readOnly && state !== 'forbidden'"
-        variant="info"
+        tone="info"
         data-test="telephony-settings-read-only"
       >
         {{ t("telephony.readOnly") }}
-      </OBanner>
+      </OInlineNotice>
 
       <div v-if="state === 'loading'" class="flex justify-center py-10">
-        <OSpinner size="md" data-test="telephony-settings-loading" />
+        <OSpinner size="lg" data-test="telephony-settings-loading" />
       </div>
 
       <OEmptyState
         v-else-if="state === 'forbidden'"
-        size="hero"
-        preset="no-access"
-        :description="t('telephony.readOnly')"
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('telephony.readOnly')"
         data-test="telephony-settings-forbidden"
       />
 
       <OEmptyState
         v-else-if="state === 'failed'"
-        size="block"
-        preset="load-error"
-        :description="loadFailedText"
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="loadFailedText"
         data-test="telephony-settings-failed"
         @action="read.refetch()"
       />
 
       <div v-else-if="state === 'empty'" data-test="telephony-settings-hero">
         <OEmptyState
-          size="hero"
-          preset="no-phone-provider"
-          :description="t('emptyState.noPhoneProvider.description')"
-          :hide-action="readOnly"
-          @action="(id) => id === 'connect' && openDialog('connect')"
+          :title="t('emptyState.noPhoneProvider.title')"
+          :text="t('emptyState.noPhoneProvider.description')"
+          icon="link"
+          :action-label="readOnly ? undefined : t('emptyState.noPhoneProvider.action')"
+          @action="openDialog('connect')"
         />
       </div>
 
@@ -73,9 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #actions>
           <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="swap-horiz"
+            variant="secondary"
+            icon="swap-horiz"
             :disabled="readOnly"
             data-test="telephony-settings-use-own"
             @click="openDialog('connect')"
@@ -102,9 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #actions>
           <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="edit"
+            variant="secondary"
+            icon="edit"
             :disabled="readOnly"
             data-test="telephony-settings-update"
             @click="openDialog('update')"
@@ -112,9 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("telephony.update") }}
           </OButton>
           <OButton
-            variant="outline-destructive"
-            size="sm-action"
-            icon-left="link-off"
+            variant="danger-ghost"
+            icon="link-off"
             :disabled="readOnly"
             data-test="telephony-settings-disconnect"
             @click="confirmingDisconnect = true"
@@ -144,8 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       :message-name="view?.org ? shortSid(view.org.account_sid) : ''"
       :ok-label="t('telephony.disconnectConfirm', { provider: PROVIDER })"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       @update:ok="disconnect"
     />
   </OPageLayout>
@@ -160,7 +155,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { deleteTelephonyMutation, telephonyQuery } from "@/services/oncall.queries";

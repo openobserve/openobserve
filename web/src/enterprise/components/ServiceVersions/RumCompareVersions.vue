@@ -17,9 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButton
     v-if="scope"
-    variant="outline"
-    size="sm"
-    icon-left="compare-arrows"
+    variant="secondary"
+    icon="compare-arrows"
     data-test="svcver-rum-compare-versions"
     @click="compare"
     >{{ t("serviceVersions.rum.compareVersions") }}</OButton

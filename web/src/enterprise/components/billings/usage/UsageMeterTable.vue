@@ -23,8 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="key"
       pagination="none"
       sorting="none"
-      :show-global-filter="false"
-      show-index
       :default-columns="false"
       class="min-h-0 flex-1"
       :row-class="rowClass"
@@ -68,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="grid w-full min-w-28 grid-cols-[minmax(2.5rem,1fr)_2.75rem] items-center gap-2.5"
         >
-          <OProgressBar :value="shareOf(row) / 100" :color="colorOf(row.key)" />
+          <OProgressBar :value="shareOf(row)" />
           <span>{{ percentText(shareOf(row)) }}</span>
         </div>
       </template>
@@ -93,13 +91,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :style="{ gridTemplateColumns: gridTemplate }"
           data-test="billings-usagemetertable-total"
         >
-          <span />
-          <span class="px-2">{{ t("billing.usageV2.colTotal") }}</span>
-          <span class="px-2">{{ formatCost(loading ? null : gross) }}</span>
-          <span v-if="discount > 0 && !loading" class="text-status-success-text px-2">
+          <span class="ps-table-edge pe-3">{{ t("billing.usageV2.colTotal") }}</span>
+          <span class="px-3">{{ formatCost(loading ? null : gross) }}</span>
+          <span v-if="discount > 0 && !loading" class="text-status-success-text px-3">
             {{ formatCost(-discount) }}
           </span>
-          <span class="px-2">{{ formatCost(loading ? null : total) }}</span>
+          <span class="px-3">{{ formatCost(loading ? null : total) }}</span>
           <span />
           <span />
         </div>
@@ -120,7 +117,6 @@ import type { I18nText } from "@/types/i18n";
 import { formatCost, type BillRow } from "./meteringModel";
 import { meterColorFor } from "./usageCharts";
 import { totalsGridTemplate } from "./totalsBar";
-import useBreakpoint from "@/composables/useBreakpoint";
 
 const EM_DASH = raw("—");
 
@@ -211,10 +207,8 @@ const costColumns = computed<OTableColumnDef<BillRow>[]>(() => [
   openColumn,
 ]);
 
-const { isMobile } = useBreakpoint();
-
 /** OTable drops the index column on a phone, so the bar drops it too. */
-const gridTemplate = computed(() => totalsGridTemplate(columns.value, {}, !isMobile.value));
+const gridTemplate = computed(() => totalsGridTemplate(columns.value));
 
 const rowClass = (row: BillRow) => (row.drillable ? "cursor-pointer" : "");
 

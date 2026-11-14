@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title-data-test="add-report-title"
     :back="{
       label: t('reports.header'),
-      onClick: () => router.back(),
+      to: reportsListRoute(),
       dataTest: 'add-report-back-btn',
     }"
     bleed
@@ -43,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="name"
                   :label="t('alerts.name')"
                   required
-                  color="input-border"
                   class="showLabelOnTop"
                   :readonly="isEditingReport"
                   :disabled="isEditingReport"
@@ -72,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-report-description-input"
                 name="description"
                 :label="t('reports.description')"
-                color="input-border"
                 class="showLabelOnTop"
                 tabindex="0"
                 style="width: 37.5rem"
@@ -83,11 +81,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormSwitch
                 data-test="report-cached-toggle-btn"
                 name="isCachedReport"
-                size="lg"
                 :label="t('reports.cachedReport')"
               />
               <OIcon name="info-outline" class="ms-2 cursor-pointer" size="sm">
-                <OTooltip side="right" align="center">
+                <OTooltip side="right">
                   <template #content>{{ t("reports.cachedReportHint") }}</template>
                 </OTooltip>
               </OIcon>
@@ -220,7 +217,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               },
                             ]"
                             :label="t('reports.reportType')"
-                            color="input-border"
                             class="showLabelOnTop"
                             style="min-width: 11.25rem"
                           />
@@ -248,11 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="mt-2"
                         data-test="add-report-png-note"
                       >
-                        <OBanner
-                          variant="warning"
-                          icon="info"
-                          :content="t('reports.pngPageLimitNote')"
-                        />
+                        <OInlineNotice tone="warn" :message="t('reports.pngPageLimitNote')" />
                       </div>
 
                       <!-- Custom Dimensions (Advanced) -->
@@ -282,7 +274,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               type="number"
                               min="1"
                               :label="t('reports.dimensionWidth')"
-                              color="input-border"
                               class="showLabelOnTop"
                               style="min-width: 7.5rem"
                               :placeholder="t('reports.widthPlaceholder')"
@@ -295,7 +286,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               type="number"
                               min="1"
                               :label="t('reports.dimensionHeight')"
-                              color="input-border"
                               class="showLabelOnTop"
                               style="min-width: 7.5rem"
                               :placeholder="t('reports.heightPlaceholder')"
@@ -316,7 +306,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     data-test="add-report-step1-continue-btn"
                     variant="primary"
-                    size="sm-action"
                     @click="
                       goToStep(
                         [
@@ -355,7 +344,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :key="visual.value"
                       :data-test="`add-report-schedule-frequency-${visual.value}-btn`"
                       :value="visual.value"
-                      size="sm"
                     >
                       {{ visual.label }}
                     </OToggleGroupItem>
@@ -373,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="text-text-secondary mb-1 font-bold">
                           {{ t("reports.cronExpression") + " *" }}
                           <OIcon name="info" size="sm" class="text-text-muted ms-1 cursor-pointer">
-                            <OTooltip side="right" align="center">
+                            <OTooltip side="right">
                               <template #content>
                                 <span style="font-size: var(--text-sm); white-space: pre-line">
                                   {{ t("reports.cronFormatTooltip") }}
@@ -382,14 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </OTooltip>
                           </OIcon>
                         </div>
-                        <OFormInput
-                          name="cron"
-                          color="input-border"
-                          type="text"
-                          outlined
-                          class="w-full"
-                          :debounce="400"
-                        />
+                        <OFormInput name="cron" type="text" class="w-full" :debounce="400" />
                       </div>
                       <div class="o2-input">
                         <OFormSelect
@@ -412,13 +393,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="visual.value"
                           :data-test="`add-report-schedule-${visual.value}-btn`"
                           :value="visual.value"
-                          size="sm"
                         >
                           {{ visual.label }}
                         </OToggleGroupItem>
                       </OFormToggleGroup>
                       <OIcon name="info-outline" class="ms-2 cursor-pointer" size="sm">
-                        <OTooltip side="right" align="center">
+                        <OTooltip side="right">
                           <template #content
                             >{{ t("reports.scheduleNowHint") }}<br />
                             {{ t("reports.scheduleLaterHint") }}</template
@@ -440,7 +420,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="customInterval"
                           :label="t('reports.repeatEvery')"
                           required
-                          color="input-border"
                           class="showLabelOnTop w-full"
                           type="number"
                         />
@@ -503,8 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mt-4 flex gap-2">
                   <OButton
                     data-test="add-report-step2-back-btn"
-                    variant="outline"
-                    size="sm-action"
+                    variant="secondary"
                     @click="step--"
                   >
                     {{ t("common.back") }}
@@ -512,7 +490,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     data-test="add-report-step2-continue-btn"
                     variant="primary"
-                    size="sm-action"
                     @click="
                       goToStep(
                         ['cron', 'customInterval', 'customPeriod', 'timezone', 'date', 'time'],
@@ -578,12 +555,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OFormSwitch
                       name="imagePreview"
-                      size="lg"
                       :label="t('reports.imagePreview')"
                       data-test="add-report-image-preview-toggle"
                     />
                     <OIcon name="info-outline" class="ms-2 cursor-pointer" size="sm">
-                      <OTooltip max-width="20rem">
+                      <OTooltip>
                         <template #content>{{ t("reports.imagePreviewHint") }}</template>
                       </OTooltip>
                     </OIcon>
@@ -592,8 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mt-4 flex gap-2">
                   <OButton
                     data-test="add-report-step3-back-btn"
-                    variant="outline"
-                    size="sm-action"
+                    variant="secondary"
                     @click="step--"
                   >
                     {{ t("common.back") }}
@@ -610,8 +585,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OButton
         data-test="add-report-cancel-btn"
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         class="me-2"
         :disabled="isSaving"
         @click="openCancelDialog"
@@ -621,7 +595,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         data-test="add-report-save-btn"
         variant="primary"
-        size="sm-action"
         type="submit"
         :form="formId"
         :loading="isSaving"
@@ -662,7 +635,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

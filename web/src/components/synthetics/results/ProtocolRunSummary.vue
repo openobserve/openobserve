@@ -34,7 +34,7 @@ import syntheticsService from "@/services/synthetics";
 import { syntheticsResultsRoute } from "@/utils/synthetics/routes";
 import { formatMs } from "@/utils/formatters";
 import type { HttpAssertion } from "@/types/synthetics";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 
 const props = withDefaults(
   defineProps<{
@@ -51,7 +51,7 @@ const emit = defineEmits<{
   (
     e: "update-status",
     status: {
-      variant: BadgeVariant;
+      variant: ChipTone;
       icon: string;
       label: I18nText;
       url: string;
@@ -127,25 +127,25 @@ const statusMeta = computed(() => {
   switch (run.value?.status) {
     case "passed":
       return {
-        variant: "success" as const,
+        variant: "ok" as const,
         icon: "check-circle",
         label: t("synthetics.protocolRun.passed"),
       };
     case "warning":
       return {
-        variant: "warning" as const,
+        variant: "warn" as const,
         icon: "error",
         label: t("synthetics.protocolRun.warning"),
       };
     case "error":
       return {
-        variant: "error-soft" as const,
+        variant: "err" as const,
         icon: "error",
         label: t("synthetics.protocolRun.error"),
       };
     default:
       return {
-        variant: "error" as const,
+        variant: "err" as const,
         icon: "cancel",
         label: t("synthetics.protocolRun.failed"),
       };
@@ -157,7 +157,7 @@ watch(
   (status) => {
     if (!props.drawerMode || !status || !run.value) return;
     emit("update-status", {
-      variant: statusMeta.value.variant === "error" ? "error" : statusMeta.value.variant,
+      variant: statusMeta.value.variant,
       icon: statusMeta.value.icon,
       label: statusMeta.value.label,
       url: run.value.target,
@@ -252,29 +252,20 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
   <OPageLayout data-test="synthetics-protocol-run-detail" bleed>
     <template #header v-if="!drawerMode">
       <OPageHeader
-        class=""
-        :subtitle="raw(run ? fmtTs(run.timestamp) : '')"
+        :title="raw(run?.monitorName)"
+        title-data-test="synthetics-protocol-run-title"
         :back="{
-          label: t('synthetics.results.monitors'),
+          label: t('synthetics.results.title'),
           to: backTo,
           dataTest: 'synthetics-protocol-run-back-btn',
         }"
       >
-        <template #title>
-          <span data-test="synthetics-protocol-run-title">{{ run?.monitorName || "" }}</span>
-        </template>
-        <template #title-trail>
-          <OBadge v-if="run" :variant="statusMeta.variant" size="sm" :icon="statusMeta.icon">
+        <template #status>
+          <OBadge v-if="run" :tone="statusMeta.variant" size="sm" :icon="statusMeta.icon">
             {{ statusMeta.label }}
           </OBadge>
-          <OBadge v-if="run" variant="default" size="sm">{{ run.type.toUpperCase() }}</OBadge>
-          <OBadge
-            v-if="run?.target"
-            variant="default"
-            size="sm"
-            icon="link"
-            class="max-w-60 min-w-0"
-          >
+          <OBadge v-if="run" tone="neutral" size="sm">{{ run.type.toUpperCase() }}</OBadge>
+          <OBadge v-if="run?.target" tone="neutral" size="sm" icon="link" class="max-w-60 min-w-0">
             <OTruncatedText>{{ run.target }}</OTruncatedText>
           </OBadge>
         </template>
@@ -286,7 +277,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
 
       <OEmptyState
         v-else-if="!run"
-        preset="no-data"
+        :text="t('emptyState.noData.description')"
         :title="t('synthetics.protocolRun.notFound')"
       />
 
@@ -305,12 +296,10 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
                 t("synthetics.protocolRun.status")
               }}</span>
               <span class="flex items-center gap-2">
-                <OBadge :variant="statusMeta.variant" size="sm" :icon="statusMeta.icon">{{
+                <OBadge :tone="statusMeta.variant" size="sm" :icon="statusMeta.icon">{{
                   statusMeta.label
                 }}</OBadge>
-                <OBadge v-if="run.errorClass" variant="default" size="sm">{{
-                  run.errorClass
-                }}</OBadge>
+                <OBadge v-if="run.errorClass" tone="neutral" size="sm">{{ run.errorClass }}</OBadge>
               </span>
             </div>
             <div
@@ -392,12 +381,8 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
             </h3>
             <OBadge
               class="ms-2"
-              :variant="
-                !assertionsEvaluated
-                  ? 'default'
-                  : run.assertionsPassed === false
-                    ? 'error'
-                    : 'success'
+              :tone="
+                !assertionsEvaluated ? 'neutral' : run.assertionsPassed === false ? 'err' : 'ok'
               "
               size="sm"
               data-test="synthetics-protocol-run-assertions-badge"
@@ -419,7 +404,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
               :data-test="`synthetics-protocol-run-assertion-${i}`"
             >
               <OBadge
-                :variant="!assertionsEvaluated ? 'default' : a.failed ? 'error' : 'success'"
+                :tone="!assertionsEvaluated ? 'neutral' : a.failed ? 'err' : 'ok'"
                 size="sm"
                 :icon="!assertionsEvaluated ? 'remove' : a.failed ? 'cancel' : 'check-circle'"
               />
@@ -460,7 +445,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
             <span>{{ t("synthetics.protocolRun.certExpires", { date: certExpiryDate }) }}</span>
             <OBadge
               v-if="certDaysRemaining != null"
-              :variant="certDaysRemaining < 30 ? 'warning' : 'default'"
+              :tone="certDaysRemaining < 30 ? 'warn' : 'neutral'"
               size="sm"
             >
               {{ t("synthetics.protocolRun.daysRemaining", { days: certDaysRemaining }) }}

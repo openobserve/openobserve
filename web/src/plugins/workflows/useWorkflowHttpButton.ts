@@ -18,7 +18,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import { useOrgId } from "@/composables/query/useOrgId";
 import type { I18nKey } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { HttpTriggerState } from "@/services/workflows";
 import { workflowHttpTriggerQuery } from "@/services/workflows.queries";
 import { workflowHooksEnabled } from "./httpEndpoint";
@@ -27,7 +27,7 @@ import { workflowHooksEnabled } from "./httpEndpoint";
 export type HttpButtonState = "none" | "off" | "on" | "draft" | "paused";
 
 export interface HttpButtonChip {
-  variant: BadgeVariant;
+  variant: ChipTone;
   labelKey: I18nKey;
 }
 
@@ -39,10 +39,10 @@ export interface UseWorkflowHttpButtonArgs {
 
 const CHIPS: Record<HttpButtonState, HttpButtonChip | null> = {
   none: null,
-  off: { variant: "default-soft", labelKey: "workflow.http.editorButtonOff" },
-  on: { variant: "success-soft", labelKey: "workflow.http.editorButtonOn" },
-  draft: { variant: "warning-soft", labelKey: "workflow.http.editorButtonOn" },
-  paused: { variant: "warning-soft", labelKey: "workflow.http.editorButtonOn" },
+  off: { variant: "neutral", labelKey: "workflow.http.editorButtonOff" },
+  on: { variant: "ok", labelKey: "workflow.http.editorButtonOn" },
+  draft: { variant: "warn", labelKey: "workflow.http.editorButtonOn" },
+  paused: { variant: "warn", labelKey: "workflow.http.editorButtonOn" },
 };
 
 const TOOLTIPS: Record<HttpButtonState, I18nKey | null> = {

@@ -35,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <OToggleGroup v-model="metric" class="flex-shrink-0">
-        <OToggleGroupItem value="cost" size="sm">
+        <OToggleGroupItem value="cost">
           {{ t("traces.sessionDetail.kpi.cost") }}
         </OToggleGroupItem>
-        <OToggleGroupItem value="latency" size="sm">
+        <OToggleGroupItem value="latency">
           {{ t("traces.sessionDetail.kpi.duration") }}
         </OToggleGroupItem>
-        <OToggleGroupItem value="tokens" size="sm">
+        <OToggleGroupItem value="tokens">
           {{ t("traces.sessionDetail.kpi.tokens") }}
         </OToggleGroupItem>
       </OToggleGroup>

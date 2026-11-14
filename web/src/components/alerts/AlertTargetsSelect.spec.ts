@@ -28,7 +28,7 @@ import AlertTargetsSelect from "./AlertTargetsSelect.vue";
 
 const OSelectStub = {
   name: "OSelect",
-  props: ["modelValue", "options", "multiple", "error", "collapsibleGroups", "pinSelectedInGroups"],
+  props: ["modelValue", "options", "multiple", "error", "collapsibleGroups"],
   emits: ["update:modelValue"],
   template: `<div class="o-select" :data-error="String(error)" :data-multiple="String(multiple)">
     <span class="o-select-empty"><slot name="empty" /></span>
@@ -286,15 +286,6 @@ describe("AlertTargetsSelect", () => {
       expect(select(createWrapper({ workflowsEnabled: false })).props("collapsibleGroups")).toBe(
         false,
       );
-    });
-  });
-
-  describe("selected-first ordering", () => {
-    it("floats the selection to the top of each group on open", () => {
-      // The stub declares untyped props, so a bare boolean attribute arrives as "".
-      expect(
-        select(createWrapper({ workflowsEnabled: true })).props("pinSelectedInGroups"),
-      ).not.toBe(undefined);
     });
   });
 

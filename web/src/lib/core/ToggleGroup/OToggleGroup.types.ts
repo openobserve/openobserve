@@ -8,12 +8,11 @@ import type { AcceptableValue } from "reka-ui";
 import type { ComputedRef, InjectionKey } from "vue";
 
 // Re-export item types so callers can import everything from one place if needed
-export type {
-  ToggleGroupItemSize,
-  ToggleGroupItemProps,
-  ToggleGroupItemSlots,
-} from "./OToggleGroupItem.types";
+export type { ToggleGroupItemProps, ToggleGroupItemSlots } from "./OToggleGroupItem.types";
 
+/** Control height of the whole group: sm 28, md 32 (guidelines S1, S2). */
+export type ToggleGroupSize = "sm" | "md";
+export const TOGGLE_GROUP_SIZES = ["sm", "md"] as const satisfies readonly ToggleGroupSize[];
 export type ToggleGroupType = "single" | "multiple";
 export type ToggleGroupOrientation = "horizontal" | "vertical";
 /**
@@ -30,6 +29,8 @@ export interface ToggleGroupProps {
    *  some groups toggle between two boolean-valued items (reka-ui's AcceptableValue
    *  omits boolean, but it round-trips fine at runtime). */
   modelValue?: AcceptableValue | AcceptableValue[] | boolean;
+  /** Height token for the group and every item in it; defaults to `md`. */
+  size?: ToggleGroupSize;
   /** Disables all items in the group */
   disabled?: boolean;
   /** Layout axis for keyboard navigation */
@@ -66,6 +67,10 @@ export const ToggleGroupMenuKey: InjectionKey<ToggleGroupMenuContext> =
  * groups (which have exactly one item to track); false for multiple-select, where
  * each item keeps painting its own fill.
  */
+/** The group's size, read by each OToggleGroupItem so size is set once on the group. */
+export const ToggleGroupSizeKey: InjectionKey<ComputedRef<ToggleGroupSize>> =
+  Symbol("o-toggle-group-size");
+
 export const ToggleGroupAnimatedKey: InjectionKey<ComputedRef<boolean>> = Symbol(
   "o-toggle-group-animated-selection",
 );

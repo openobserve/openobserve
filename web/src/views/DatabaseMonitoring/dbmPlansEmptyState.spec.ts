@@ -191,8 +191,8 @@ describe("the drift finding is promoted and plans precede samples", () => {
     const text = source();
     const at = text.indexOf('data-test="dbm-detail-plans-drift-top"');
     expect(at, "the promoted drift callout must exist").toBeGreaterThan(-1);
-    const open = text.lastIndexOf("<OBanner", at);
-    expect(open, "the callout must be an OBanner").toBeGreaterThan(-1);
+    const open = text.lastIndexOf("<OInlineNotice", at);
+    expect(open, "the callout must be an OInlineNotice").toBeGreaterThan(-1);
     return text.slice(open, text.indexOf(">", at));
   };
 
@@ -205,7 +205,7 @@ describe("the drift finding is promoted and plans precede samples", () => {
   it("reuses the plans section's drift statement rather than recomputing", () => {
     const text = source();
     const at = text.indexOf('data-test="dbm-detail-plans-drift-top"');
-    const block = text.slice(at, text.indexOf("</OBanner>", at));
+    const block = text.slice(at, text.indexOf("</OInlineNotice>", at));
     expect(block, "the callout must quote the section's own drift copy").toContain(
       "dbm.detail.plans.driftCallout",
     );

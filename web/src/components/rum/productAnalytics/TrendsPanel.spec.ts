@@ -140,12 +140,12 @@ describe("TrendsPanel (AC-48)", () => {
       .findAllComponents({ name: "OButton" })
       .find((b) => b.attributes("data-test") === "rum-analytics-trends-add-dashboard-btn")!;
     expect(btn.props("disabled")).toBe(true);
-    expect(btn.props("iconLeft")).toBe("lock");
+    expect(btn.props("icon")).toBe("lock");
     await btn.trigger("click");
     expect(w.find("[data-test='add-to-dashboard-stub']").exists()).toBe(false);
     (store.state as any).zoConfig = { features: { dashboards: "enabled" } };
     await flushPromises();
-    expect(btn.props("iconLeft")).toBe("dashboard-customize");
+    expect(btn.props("icon")).toBe("dashboard-customize");
     expect(btn.props("disabled")).toBe(false);
     delete (store.state as any).zoConfig;
   });

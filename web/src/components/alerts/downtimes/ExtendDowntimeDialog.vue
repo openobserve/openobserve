@@ -18,11 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     size="sm"
-    persistent
     :title="title"
     :form-id="FORM_ID"
-    :primary-button-label="primaryLabel"
-    :secondary-button-label="t('alerts.downtimes.form.cancel')"
+    :primary="{ label: primaryLabel }"
+    :secondary="{ label: t('alerts.downtimes.form.cancel') }"
     data-test="extend-downtime-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"

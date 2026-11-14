@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 export { default as OEmptyState } from "./OEmptyState.vue";
-export { illustrations, type IllustrationName } from "./illustrations";
 export {
-  emptyStatePresets,
-  type EmptyStatePreset,
-  type EmptyStatePresetName,
-  type EmptyStateVariant,
-} from "./presets";
+  EMPTY_STATE_KINDS,
+  EMPTY_STATE_SIZES,
+  type EmptyStateKind,
+  type EmptyStateProps,
+  type EmptyStateSize,
+  type EmptyStateSlots,
+} from "./OEmptyState.types";

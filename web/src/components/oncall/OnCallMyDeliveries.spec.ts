@@ -49,7 +49,7 @@ const stubs = {
   },
   OEmptyState: {
     name: "OEmptyState",
-    props: ["title", "description", "actionLabel"],
+    props: ["title", "text", "actionLabel"],
     emits: ["action"],
     template:
       "<div>{{ title }} {{ description }}<button v-if='actionLabel' data-test='empty-action' @click=\"$emit('action')\">{{ actionLabel }}</button></div>",
@@ -57,12 +57,12 @@ const stubs = {
   OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
   // `type` and `value` are declared so the state chip can be asserted on: an
   // undeclared prop lands in attrs and `props("value")` reads undefined.
-  OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
+  OTag: { name: "OTag", props: ["tone", "type", "value"], template: "<span><slot /></span>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
   OTimeCell: { name: "OTimeCell", props: ["value", "unit"], template: "<span />" },
   OButton: {
     name: "OButton",
-    props: ["iconLeft", "loading"],
+    props: ["icon", "loading"],
     emits: ["click"],
     template: `<button @click="$emit('click', $event)"><slot /></button>`,
   },
@@ -488,7 +488,7 @@ describe("OnCallMyDeliveries", () => {
       "invisible",
     );
     const toggle = wrapper.findComponent('[data-test="oncall-my-delivery-toggle-ev_88"]');
-    expect(toggle.props("iconLeft")).toBe("mark-email-unread");
+    expect(toggle.props("icon")).toBe("mark-email-unread");
     expect(toggle.findComponent({ name: "OTooltip" }).props("content")).toBe("Mark unread");
     await toggle.trigger("click");
     await flushPromises();
@@ -595,7 +595,7 @@ describe("OnCallMyDeliveries", () => {
       await flushPromises();
 
       const toggle = wrapper.findComponent('[data-test="oncall-my-delivery-toggle-ev_1"]');
-      expect(toggle.props("iconLeft")).toBe("check-circle");
+      expect(toggle.props("icon")).toBe("check-circle");
       expect(toggle.findComponent({ name: "OTooltip" }).props("content")).toBe("Mark read");
       await toggle.trigger("click");
       await flushPromises();

@@ -2,13 +2,12 @@
   <ODialog
     data-test="cross-link-dialog"
     v-model:open="dialogVisible"
-    persistent
     size="md"
     :show-close="false"
     form-id="cross-link-form"
     :title="isEditing ? t('crossLinks.editCrossLink') : t('crossLinks.addCrossLink')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="isEditing ? t('crossLinks.update') : t('crossLinks.add')"
+    :secondary="{ label: t('common.cancel') }"
+    :primary="{ label: isEditing ? t('crossLinks.update') : t('crossLinks.add') }"
     @click:secondary="onCancel"
   >
     <template #header-right>
@@ -97,10 +96,10 @@
             data-test="cross-link-field-input"
           />
           <OButton
+            icon-only
             :aria-label="t('common.add')"
             variant="ghost"
-            size="icon-sm"
-            icon-left="add"
+            icon="add"
             @click="addField"
             data-test="cross-link-add-field-btn"
           />

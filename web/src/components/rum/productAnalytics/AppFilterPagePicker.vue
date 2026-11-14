@@ -25,13 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="op"
           :options="opOptions"
           :aria-label="t('rum.analytics.exclusions.match')"
-          size="sm"
           data-test="rum-analytics-app-filter-page-picker-op"
         />
       </span>
       <OInput
         v-model="value"
-        size="sm"
         class="min-w-0 flex-1"
         :aria-label="t('rum.analytics.exclusions.value')"
         :placeholder="t('rum.analytics.exclusions.pagePlaceholder')"
@@ -71,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-analytics-app-filter-page-picker-failed"
             >{{ t("rum.analytics.exclusions.pagesLoadFailed") }}
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="rum-analytics-app-filter-page-picker-retry"
               @click="load"
               >{{ t("common.retry") }}</OButton
@@ -94,14 +92,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span class="border-border-default mt-auto flex items-center justify-end gap-1.5 border-t pt-2">
       <OButton
         variant="ghost"
-        size="sm"
         data-test="rum-analytics-app-filter-page-picker-cancel"
         @click="emit('cancel')"
         >{{ t("common.cancel") }}</OButton
       >
       <OButton
         variant="primary"
-        size="sm"
         :disabled="!ready"
         data-test="rum-analytics-app-filter-page-picker-apply"
         @click="apply"

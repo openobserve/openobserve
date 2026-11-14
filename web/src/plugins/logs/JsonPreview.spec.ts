@@ -19,32 +19,32 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <slot name="header" />
       <slot />
@@ -52,11 +52,11 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -693,8 +693,8 @@ describe("JsonPreview Component", () => {
 
     it("forwards localized primary and secondary button labels to ODialog", () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBeTruthy();
-      expect(dialog.props("secondaryButtonLabel")).toBeTruthy();
+      expect(dialog.props("primary")?.label).toBeTruthy();
+      expect(dialog.props("secondary")?.label).toBeTruthy();
     });
 
     it("forwards typeOfRegexPattern false to the open prop initially", () => {
@@ -1092,9 +1092,9 @@ describe("JsonPreview Component", () => {
                 CodeQueryEditor: true,
                 ODialog: ODialogStub,
                 OButton: {
-                  props: { disabled: Boolean, iconLeft: String },
+                  props: { disabled: Boolean, icon: String },
                   template:
-                    '<button :disabled="disabled" :data-icon="iconLeft" @click="$emit(\'click\')"><slot /></button>',
+                    '<button :disabled="disabled" :data-icon="icon" @click="$emit(\'click\')"><slot /></button>',
                 },
                 OTooltip: { template: "<div><slot /></div>" },
                 ODropdown: true,
@@ -1266,7 +1266,7 @@ describe("JsonPreview Component", () => {
             OButton: {
               props: { disabled: Boolean },
               template:
-                '<button :disabled="disabled" @click="$emit(\'click\')"><slot name="icon-left" /><slot /></button>',
+                '<button :disabled="disabled" @click="$emit(\'click\')"><slot name="icon" /><slot /></button>',
             },
             OTooltip: { template: "<div><slot /></div>" },
             ODropdown: true,

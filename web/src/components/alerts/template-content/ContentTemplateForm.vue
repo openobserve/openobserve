@@ -47,20 +47,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-for="action in toolbarActions"
           :key="action.name"
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          :icon-left="action.icon"
+          :icon="action.icon"
           :aria-label="action.label"
           :title="action.label"
           :data-test="`content-template-form-toolbar-${action.name}-btn`"
           @click="applyToolbarAction(action.name)"
         />
-        <OPopover side="bottom" align="start" content-class="p-1.5">
+        <OPopover size="md" side="bottom" align="start" content-class="p-1.5">
           <template #trigger>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="add-reaction"
+              icon="add-reaction"
               :aria-label="t('alert_templates.toolbarEmoji')"
               :title="t('alert_templates.toolbarEmoji')"
               data-test="content-template-form-toolbar-emoji-btn"
@@ -70,8 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-for="emoji in emojiOptions"
               :key="emoji.char"
+              icon-only
               variant="ghost"
-              size="icon-sm"
               :aria-label="emoji.label"
               :title="emoji.label"
               :data-test="`content-template-form-emoji-${emoji.name}-btn`"
@@ -113,8 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-for="variable in visibleVariables"
           :key="variable"
-          variant="outline"
-          size="chip"
+          variant="secondary"
+          size="xs"
           :data-test="`content-template-form-variable-chip-${variable}-btn`"
           :aria-label="t('alert_templates.insertVariable') + ' ' + variable"
           @click="insertVariable(variable)"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="hiddenVariableCount > 0"
           variant="ghost"
-          size="chip"
+          size="xs"
           data-test="content-template-form-variable-chips-more-btn"
           @click="showAllVariables = true"
           >{{ t("alert_templates.moreVariables", { count: hiddenVariableCount }) }}</OButton
@@ -133,8 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OCollapsible
       :default-open="hasOptionalContentInitially"
-      :label="t('alert_templates.addToTemplate')"
-      :caption="t('alert_templates.addToTemplateCaption')"
+      :title="t('alert_templates.addToTemplate')"
+      :summary="t('alert_templates.addToTemplateCaption')"
       data-test="content-template-form-optional-collapsible"
     >
       <!-- Each optional section is a card styled like the alert-creation
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="spec.rows.enabled">
                 <OInput
                   type="number"
-                  width="sm"
+                  width="s"
                   class="shrink-0"
                   :model-value="spec.rows.max"
                   :label="t('alert_templates.rowsMax')"
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="(v) => updateRows('max', clampRowsMax(v))"
                 />
                 <OInput
-                  width="md"
+                  width="m"
                   class="shrink-0"
                   :model-value="spec.rows.format ?? ''"
                   :label="t('alert_templates.rowsFormat')"
@@ -322,9 +322,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="(v) => updateOverrideRow(index, 'title', String(v ?? ''))"
                 />
                 <OButton
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  icon-left="delete"
+                  icon-only
+                  variant="danger-ghost"
+                  icon="delete"
                   :data-test="`content-template-form-channel-titles-row-${index}-remove-btn`"
                   :aria-label="t('common.delete')"
                   @click="removeOverrideRow(index)"
@@ -332,9 +332,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <OButton
-              variant="dashed"
-              size="sm-action"
-              icon-left="add"
+              variant="ghost"
+              icon="add"
               class="self-start"
               :disabled="titleOverrideRows.length >= overrideChannels.length"
               data-test="content-template-form-channel-titles-add-btn"

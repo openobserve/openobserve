@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OFormSwitch
         name="budgetEnabled"
         :label="t('evalSpend.budget.enabled')"
-        size="sm"
         data-test="job-form-budget-enabled"
       />
       <div v-if="budgetEnabled" class="grid grid-cols-2 gap-3.5 max-[68.75rem]:grid-cols-1">
@@ -65,7 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="number"
           min="0.01"
           step="0.01"
-          size="sm"
           required
           :help-text="t('evalSpend.budget.help', { amount: formatUsd(DEFAULT_DAILY_BUDGET_USD) })"
           data-test="job-form-daily-budget-input"
@@ -79,7 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="action in ACTIONS"
             :key="action"
             :value="action"
-            size="sm"
             :data-test="`job-form-budget-action-${action}`"
           >
             <template #label>

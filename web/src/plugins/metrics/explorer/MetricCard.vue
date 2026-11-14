@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The title opens the detail view, not the chart body: that owns drag-to-zoom and right-click. -->
         <OButton
           variant="ghost"
-          size="chip"
+          size="xs"
           class="min-w-0"
           :aria-label="t('metrics.explorer.card.detailsAria', { name: card.name })"
           :data-test="`metrics-explorer-card-title-${card.name}`"
@@ -94,9 +94,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              OTooltip, since a full help sentence never fits on the card. -->
         <OButton
           v-if="card.help"
+          icon-only
           variant="ghost"
-          size="icon"
-          icon-left="info-outline"
+          size="xs"
+          icon="info-outline"
           class="ms-1 shrink-0"
           :aria-label="
             t('metrics.explorer.card.helpAria', {
@@ -107,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-explorer-card-help-${card.name}`"
           @click.stop
         >
-          <OTooltip side="bottom" align="end" max-width="13.75rem">
+          <OTooltip side="bottom">
             <template #content
               ><div class="whitespace-pre-wrap">{{ card.help }}</div></template
             >
@@ -155,8 +156,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              live in the detail view this opens. -->
         <OButton
           variant="ghost"
-          size="xs"
-          icon-left="open-in-full"
+          size="sm"
+          icon="open-in-full"
           class="ms-1 shrink-0"
           :aria-label="t('metrics.explorer.card.detailsAria', { name: card.name })"
           :data-test="`metrics-explorer-card-details-${card.name}`"
@@ -170,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="exemplarsEligible && exemplarsOn" class="flex shrink-0 items-center">
           <OTag
             v-if="exemplars?.status === 'empty'"
-            variant="default-soft"
+            tone="neutral"
             size="sm"
             :aria-label="t('dashboard.exemplars.empty')"
             :data-test="`metrics-explorer-card-exemplars-empty-${card.name}`"
@@ -185,13 +186,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTag>
           <OButton
             v-if="exemplars?.status === 'error'"
-            variant="ghost-warning"
-            size="icon"
-            icon-left="warning"
+            icon-only
+            variant="ghost"
+            size="xs"
+            icon="warning"
             :aria-label="t('dashboard.exemplars.loadFailed')"
             :data-test="`metrics-explorer-card-exemplars-error-${card.name}`"
           >
-            <OTooltip side="bottom" align="end" max-width="22.5rem" hoverable>
+            <OTooltip side="bottom" hoverable>
               <template #content>
                 <div class="flex flex-col gap-1.5">
                   <div class="font-medium">{{ t("dashboard.exemplars.loadFailed") }}</div>
@@ -203,9 +205,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div>
                     <OButton
-                      variant="outline"
-                      size="xs"
-                      icon-left="replay"
+                      variant="secondary"
+                      size="sm"
+                      icon="replay"
                       data-test="dashboard-panel-exemplars-retry"
                       @click="$emit('retry-exemplars', card)"
                     >
@@ -233,9 +235,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              changes. Otherwise the toolbar Refresh covers a card. -->
         <OButton
           v-if="preview?.cachedDataDiffersFromTimeRange && !card.unsupported"
-          variant="warning"
-          size="icon"
-          icon-left="refresh"
+          icon-only
+          variant="primary"
+          stale
+          size="xs"
+          icon="refresh"
           :disabled="preview?.status === 'loading'"
           :aria-label="t('metrics.explorer.card.refreshAria', { name: card.name })"
           :data-test="`metrics-explorer-card-refresh-${card.name}`"
@@ -253,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            progress bar over the body, with whatever chart is already there kept
            visible beneath it. The card has no chunk-level progress to report,
            so the bar runs at its indeterminate floor with the shimmer. -->
-      <LoadingProgress :loading="preview?.status === 'loading'" :loading-progress-percentage="0" />
+      <OLoadingLine :active="preview?.status === 'loading'" class="absolute inset-x-0 top-0 z-10" />
 
       <!-- Unsupported: a placeholder rather than a wrong chart. Drill down
            still works, so the metric stays explorable. -->
@@ -302,20 +306,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :data-test="`metrics-explorer-card-error-tip-${card.name}`"
         >
-          <OTooltip
-            :content="raw(errorTooltip)"
-            content-class="whitespace-pre-line"
-            max-width="22.5rem"
-            :delay="200"
-          />
+          <OTooltip :content="raw(errorTooltip)" content-class="whitespace-pre-line" />
           <OIcon name="error-outline" size="sm" class="text-error-600" />
           <span>{{ t("metrics.explorer.queryFailed") }}</span>
         </span>
 
         <div class="flex items-center gap-1">
           <OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             :data-test="`metrics-explorer-card-retry-${card.name}`"
             @click.stop="$emit('refresh', card)"
           >
@@ -326,18 +325,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                retyped by hand. This is how it leaves the page. -->
           <OButton
             variant="ghost"
-            size="xs"
+            size="sm"
             :aria-label="t('metrics.explorer.card.copyErrorAria', { name: card.name })"
             :data-test="`metrics-explorer-card-copy-error-${card.name}`"
             @click.stop="copyErrorReport"
           >
             {{ t("metrics.explorer.card.copyDetails") }}
-            <OTooltip
-              :content="raw(errorReport)"
-              content-class="whitespace-pre-line"
-              max-width="22.5rem"
-              :delay="400"
-            />
+            <OTooltip :content="raw(errorReport)" content-class="whitespace-pre-line" />
           </OButton>
         </div>
       </div>
@@ -361,29 +355,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="isSparse"
         size="inline"
         icon="show-chart"
-        :backdrop="false"
+        :title="t('metrics.explorer.card.sparse')"
+        :text="t('metrics.explorer.card.sparseHint')"
         class="h-full"
         :data-test="`metrics-explorer-card-sparse-${card.name}`"
-      >
-        <template #title>
-          <span class="inline-flex cursor-help items-center gap-1">
-            <OTooltip
-              :content="t('metrics.explorer.card.sparseHint')"
-              content-class="whitespace-pre-line"
-              max-width="20rem"
-              :delay="200"
-            />
-            {{ t("metrics.explorer.card.sparse") }}
-          </span>
-        </template>
-      </OEmptyState>
+      />
 
       <OEmptyState
         v-else-if="isEmpty"
         size="inline"
         icon="bar-chart"
         :title="t('panel.noData')"
-        :backdrop="false"
         class="h-full"
         :data-test="`metrics-explorer-card-nodata-${card.name}`"
       />
@@ -396,18 +378,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-card-render-error-${card.name}`"
       >
         <span class="inline-flex cursor-help items-center gap-1">
-          <OTooltip
-            :content="raw(renderError)"
-            content-class="whitespace-pre-line"
-            max-width="22.5rem"
-            :delay="200"
-          />
+          <OTooltip :content="raw(renderError)" content-class="whitespace-pre-line" />
           <OIcon name="error-outline" size="sm" class="text-error-600" />
           <span>{{ t("metrics.explorer.queryFailed") }}</span>
         </span>
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :data-test="`metrics-explorer-card-render-retry-${card.name}`"
           @click.stop="onRetryRender"
         >
@@ -446,11 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-card-nan-guard-${card.name}`"
       >
         <span class="inline-flex cursor-help">
-          <OTooltip
-            :content="t('metrics.explorer.card.nanGuard')"
-            max-width="22.5rem"
-            :delay="200"
-          />
+          <OTooltip :content="t('metrics.explorer.card.nanGuard')" />
           <OIcon name="info-outline" size="xs" />
         </span>
       </div>
@@ -471,12 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-explorer-card-stale-copy-${card.name}`"
           @click.stop="copyErrorReport"
         >
-          <OTooltip
-            :content="raw(staleTooltip)"
-            content-class="whitespace-pre-line"
-            max-width="22.5rem"
-            :delay="200"
-          />
+          <OTooltip :content="raw(staleTooltip)" content-class="whitespace-pre-line" />
           <OIcon name="sync-problem" size="xs" />
         </button>
       </div>
@@ -505,7 +473,7 @@ import { STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -533,7 +501,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OEmptyState,
-    LoadingProgress,
+    OLoadingLine,
     PanelBar,
     OTag,
     OTooltip,

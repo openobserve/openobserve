@@ -21,22 +21,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="
       isEdit ? t('regex_patterns.edit_regex_pattern') : t('regex_patterns.create_regex_pattern')
     "
-    :size="isFullScreen ? 'full' : store.state.isAiChatEnabled ? 'xxl' : 'lg'"
-    :primary-button-label="
-      isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')
-    "
-    :secondary-button-label="t('regex_patterns.cancel')"
+    :size="isFullScreen || store.state.isAiChatEnabled ? 'xl' : 'md'"
+    :primary="{
+      label: isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close'),
+    }"
+    :secondary="{ label: t('regex_patterns.cancel') }"
     form-id="add-regex-pattern-form"
-    :close-guard="guardClose"
     @click:secondary="handleClose"
+    @discard="regexDraft.discard()"
     data-test="add-regex-pattern-drawer"
   >
     <template #header-right>
       <div class="flex items-center gap-2">
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+          icon-only
           variant="ghost"
-          size="icon-toolbar"
           @click="toggleAIChat"
           data-test="add-regex-pattern-open-close-ai-btn"
           :aria-label="t('menu.aiAssistant')"
@@ -52,10 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
         <OButton
+          icon-only
           :aria-label="isFullScreen ? t('common.exitFullscreen') : t('common.fullscreen')"
           data-test="add-regex-pattern-fullscreen-btn"
           variant="ghost"
-          size="icon-xs-sq"
+          size="sm"
           @click="toggleFullScreen"
         >
           <OIcon name="fullscreen" size="xs" :class="isFullScreen ? 'text-accent' : ''" />
@@ -96,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-regex-pattern-description-input"
               :placeholder="t('settings.addRegexPattern.descriptionPlaceholder')"
             />
-            <OBanner variant="info" icon="info" dense data-test="add-regex-pattern-lookaround-note">
+            <OInlineNotice tone="info" data-test="add-regex-pattern-lookaround-note">
               <div class="text-xs leading-4.5 font-normal">
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
@@ -108,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   raw("openobserve\\w*")
                 }}</code>
               </div>
-            </OBanner>
+            </OInlineNotice>
             <div class="regex-pattern-input-container">
               <div class="flex items-center justify-between">
                 <span class="text-sm leading-5.25 font-bold">{{
@@ -117,7 +118,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
                   variant="ghost"
-                  size="sm"
                   @click="toggleAIChat"
                 >
                   <img alt="" :src="goToAILogo" class="me-1 h-5 w-5" />
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OButton
                   variant="primary"
-                  size="chip"
+                  size="xs"
                   :disabled="!patternValue"
                   @click="testStringOutput"
                 >
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div v-else-if="testLoading">
                     <span class="flex h-27.75 items-center justify-center">
-                      <OSpinner size="sm" />
+                      <OSpinner size="lg" />
                     </span>
                   </div>
                 </div>
@@ -263,7 +263,7 @@ import { useRouter } from "vue-router";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { makeAddRegexPatternSchema, type AddRegexPatternForm } from "./AddRegexPattern.schema";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
@@ -290,7 +290,7 @@ export default defineComponent({
   emit: ["close", "update:list", "update:open"],
   components: {
     OSeparator,
-    OBanner,
+    OInlineNotice,
     FullViewContainer,
     O2AIChat,
     OButton,
@@ -596,18 +596,6 @@ export default defineComponent({
       emit("close");
     };
 
-    // The close button, Escape and an outside click ask first when the drawer holds unsaved work.
-    const guardClose = () => {
-      if (!regexDraft.hasUnsavedChanges()) {
-        regexDraft.discard();
-        return true;
-      }
-      void regexDraft.confirmLeave().then((allowed) => {
-        if (allowed) emit("update:open", false);
-      });
-      return false;
-    };
-
     return {
       raw,
       t,
@@ -631,7 +619,6 @@ export default defineComponent({
       inputContext,
       closeAddRegexPatternDialog,
       handleClose,
-      guardClose,
       regexDraft,
       // Form wiring — MUST be returned so the Options-API template can resolve
       // them (a module import alone is out of the template's scope).

@@ -46,12 +46,7 @@ defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(defineProps<TooltipProps>(), {
   side: "top",
-  align: "center",
-  sideOffset: 4,
-  alignOffset: 0,
   arrowClass: "fill-surface-overlay",
-  delay: TOOLTIP_DELAY_MS,
-  maxWidth: "20rem",
   disabled: false,
   hoverable: false,
   // MUST stay explicitly undefined. Vue casts an absent Boolean prop to `false`,
@@ -143,9 +138,7 @@ const childOpen = ref(false);
 // tooltip has been opened we keep it mounted so repeat hovers are instant.
 const childActivated = ref(false);
 let cleanupFn: (() => void) | null = null;
-// Pending open timer for the hover delay (child mode). Wrapper mode gets its
-// delay for free from reka's `delay-duration`; child mode wires its own hover
-// listeners, so it has to honour `props.delay` here too.
+// Child mode wires its own hover listeners, so it runs the shared delay itself.
 let childShowTimer: ReturnType<typeof setTimeout> | null = null;
 // Grace-period close timer used only when `hoverable` is set. On leaving the
 // trigger we wait briefly before closing so the pointer can travel onto the
@@ -256,11 +249,7 @@ onMounted(() => {
     if (parentEl.value) {
       parentEl.value.setAttribute(TOOLTIP_TRIGGER_ATTR, triggerMarker.value);
       syncTriggerName();
-      // Open after `props.delay` ms of hover (matching wrapper mode); leaving
-      // before then cancels the pending open so a quick pass-over shows nothing.
-      // Mount the reka tree (if not already) and open it. Deferring the mount to
-      // here — the first hover, after the delay — is what keeps un-hovered rows
-      // cheap.
+      // Mounting the reka tree only after the delay keeps un-hovered rows cheap.
       const activateAndOpen = () => {
         childShowTimer = null;
         // Only the innermost tooltip that will actually open wins.
@@ -283,8 +272,8 @@ onMounted(() => {
           childHideTimer = null;
         }
         const insideSkipWindow = appProvider ? !appProvider.isOpenDelayed.value : false;
-        if (props.delay > 0 && !insideSkipWindow) {
-          childShowTimer = setTimeout(activateAndOpen, props.delay);
+        if (!insideSkipWindow) {
+          childShowTimer = setTimeout(activateAndOpen, TOOLTIP_DELAY_MS);
         } else {
           activateAndOpen();
         }
@@ -452,13 +441,12 @@ onActivated(() => {
   suspended.value = false;
 });
 
-const effectiveSideOffset = computed(() => props.sideOffset);
-
-const contentStyle = computed(() => ({ maxWidth: props.maxWidth }));
+// One gap from the trigger for every tooltip (6 px).
+const SIDE_OFFSET = 6;
 
 const contentClasses = computed(() => [
-  "z-10100 px-2.5 py-1.5",
-  "bg-surface-overlay rounded-default border border-tooltip-border shadow-md",
+  "z-10100 max-w-70 px-2 py-1.5",
+  "bg-surface-overlay rounded-menu border border-tooltip-border shadow-md",
   "text-xs text-text-body font-medium leading-snug",
   // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the
   // max-width box instead of overflowing onto the content behind the tooltip.
@@ -481,7 +469,7 @@ const contentClasses = computed(() => [
   <!-- ΓöÇΓöÇ Wrapper mode: default slot provides the trigger ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
   <LinkedTooltipProvider v-if="hasDefaultSlot" :shared="appProvider">
     <TooltipRoot
-      :delay-duration="delay"
+      :delay-duration="TOOLTIP_DELAY_MS"
       :disable-hoverable-content="!hoverable"
       :open="wrapperRootOpen"
       :disabled="disabled"
@@ -500,19 +488,16 @@ const contentClasses = computed(() => [
           v-bind="forwardedAttrs"
           data-test="o-tooltip-content"
           :side="side"
-          :align="align"
-          :side-offset="effectiveSideOffset"
-          :align-offset="alignOffset"
-          :style="contentStyle"
+          :side-offset="SIDE_OFFSET"
           :class="contentClasses"
         >
           <span
-            :class="shortcut || shortcutId ? 'inline-flex items-center gap-1.5' : ''"
+            :class="shortcut || keys ? 'inline-flex items-center gap-1.5' : ''"
             @vue:mounted="onBubbleMounted"
             @vue:unmounted="onBubbleUnmounted"
           >
             <slot name="content">{{ contentText }}</slot>
-            <OShortcut v-if="shortcut || shortcutId" :keys="shortcut" :id="shortcutId" />
+            <OShortcut v-if="shortcut || keys" :keys="keys" :id="shortcut" />
           </span>
           <TooltipArrow :width="10" :height="5" :class="arrowClass" />
         </TooltipContent>
@@ -544,18 +529,15 @@ const contentClasses = computed(() => [
             v-bind="forwardedAttrs"
             data-test="o-tooltip-content"
             :side="side"
-            :align="align"
-            :side-offset="effectiveSideOffset"
-            :align-offset="alignOffset"
-            :style="contentStyle"
+            :side-offset="SIDE_OFFSET"
             :class="contentClasses"
             @pointer-down-outside="onChildPointerDownOutside"
             @mouseenter="onContentEnter"
             @mouseleave="onContentLeave"
           >
-            <span :class="shortcut || shortcutId ? 'inline-flex items-center gap-1.5' : ''">
+            <span :class="shortcut || keys ? 'inline-flex items-center gap-1.5' : ''">
               <slot name="content">{{ contentText }}</slot>
-              <OShortcut v-if="shortcut || shortcutId" :keys="shortcut" :id="shortcutId" />
+              <OShortcut v-if="shortcut || keys" :keys="keys" :id="shortcut" />
             </span>
             <TooltipArrow :width="10" :height="5" :class="arrowClass" />
           </TooltipContent>

@@ -16,17 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="searchdetaildialog flex h-full flex-col flex-nowrap"
+    class="flex h-full w-full min-w-0 flex-col flex-nowrap"
     :class="severityBorderClass"
     data-test="dialog-box"
     data-no-autofocus
   >
-    <!-- Single Tab Row -->
-    <div class="flex shrink-0 items-center justify-between">
-      <div class="-mb-0.75 flex items-center gap-2">
+    <!-- A narrow drawer wraps the actions under the tabs instead of pushing them past its edge. -->
+    <div class="flex shrink-0 flex-wrap items-center justify-between gap-y-1">
+      <div class="-mb-0.75 flex max-w-full min-w-0 items-center gap-2">
         <OTabs
           :model-value="tab"
-          align="left"
           reorderable
           @update:model-value="onTabChange"
           @reorder="onTabReorder"
@@ -48,26 +47,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="tabItem.dataTest"
               :name="tabItem.name"
               :label="tabItem.label"
-              :suffix-icon="tabItem.locked ? 'lock' : undefined"
+              :locked="tabItem.locked"
               :tooltip="tabItem.locked ? correlationLockedReason : undefined"
             />
           </template>
         </OTabs>
       </div>
-      <div class="flex shrink-0 items-center gap-2 pe-3">
-        <OPopover v-if="!embedded" align="end" :aria-label="t('logs.severity.popoverAriaLabel')">
+      <div class="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2 pe-3">
+        <OPopover
+          size="sm"
+          v-if="!embedded"
+          align="end"
+          :aria-label="t('logs.severity.popoverAriaLabel')"
+        >
           <template #trigger>
             <OTag
               type="logLevel"
               :value="severity.level"
               :label="severityTagLabel"
-              clickable
+              toggle
               data-test="log-detail-severity-badge"
               :data-severity-source="severity.source"
             />
           </template>
           <div
-            class="flex w-72 flex-col gap-1.5 px-3 py-2.5 text-xs"
+            class="flex flex-col gap-1.5 px-3 py-2.5 text-xs"
             data-test="log-detail-severity-popover"
           >
             <span class="text-text-heading font-semibold">{{
@@ -124,19 +128,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex shrink-0 items-center"
           data-test="log-detail-copy-line-link"
         >
-          <OTooltip :content="lineLinkTooltip" />
+          <OTooltip
+            v-if="!(lineLink.kind === 'disabled' || pageLoading)"
+            :content="lineLinkTooltip"
+          />
           <OButton
+            :disabled-reason="lineLinkTooltip"
             data-test="log-detail-copy-line-link-btn"
-            variant="outline"
-            size="xs"
-            icon-left="link"
+            variant="secondary"
+            size="sm"
+            icon="link"
             :disabled="lineLink.kind === 'disabled' || pageLoading"
-            focusable-unavailable
             :loading="lineLinkBusy"
             @click="copyLineLink(modelValue, 'drawer')"
           >
             {{ t("search.linePermalink.copyLink") }}
-            <template #unavailable-reason>{{ lineLinkTooltip }}</template>
           </OButton>
           <LogLineLinkPopover source="drawer" />
         </div>
@@ -157,9 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="inline-flex">
               <OButton
                 data-test="log-detail-view-trace-btn"
-                size="xs"
-                variant="outline"
-                icon-left="lock"
+                size="sm"
+                variant="secondary"
+                icon="lock"
                 disabled
                 >{{ t("search.viewTrace") }}</OButton
               >
@@ -173,13 +179,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-40! shrink-0"
               :loading="isTracesStreamsLoading"
               :disabled="isTracesStreamsLoading"
-              size="sm"
             />
             <OButton
               data-test="log-detail-view-trace-btn"
-              size="xs"
-              variant="outline"
-              icon-left="account-tree"
+              size="sm"
+              variant="secondary"
+              icon="account-tree"
               :disabled="pageLoading"
               @click="viewTrace"
               >{{ t("search.viewTrace") }}</OButton
@@ -191,7 +196,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="log-detail-wrap-values-toggle-btn"
           v-model="shouldWrapValues"
           :label="t('common.wrap')"
-          size="sm"
           @update:model-value="toggleWrapLogDetails"
         />
       </div>
@@ -236,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <slot :name="`panel-${lt.name}`" />
         </OTabPanel>
         <OTabPanel name="json">
-          <OCardSection data-test="log-detail-json-content" class="px-page-edge mb-6 pt-2">
+          <div data-test="log-detail-json-content" class="px-page-edge mb-6 pt-2">
             <JsonPreview
               :value="rowData"
               show-copy-button
@@ -255,13 +259,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @closeTable="closeTable"
               @show-correlation="showCorrelation"
             />
-          </OCardSection>
+          </div>
         </OTabPanel>
         <OTabPanel name="table">
-          <OCardSection
-            class="px-page-edge mb-6 py-[0.675rem]"
-            data-test="log-detail-table-content"
-          >
+          <div class="px-page-edge mb-6 py-[0.675rem]" data-test="log-detail-table-content">
             <div v-if="rowData.length == 0" class="max-w-87.5 pt-3">
               {{ t("logs.detailTable.noDataAvailable") }}
             </div>
@@ -272,9 +273,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :columns="tableColumns"
               row-key="_rowKey"
               pagination="none"
-              :row-height="24"
+              density="compact"
               :default-columns="false"
-              :show-global-filter="false"
               :global-filter="detailSearchQuery"
               class="o2-table o2-schema-table log-detail-source-table border-card-glass-border w-full border border-solid"
             >
@@ -304,10 +304,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #trigger>
                         <OButton
+                          icon-only
                           :data-test="`log-details-include-exclude-field-btn-${row.field}`"
-                          size="icon-xs"
                           variant="ghost"
-                          class="h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
+                          class="align-middle"
                           :aria-label="t('logs.detailTable.addIcon')"
                         >
                           <OIcon
@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="log-details-include-field-btn"
                         @select="toggleIncludeSearchTerm(row.field, row.value, 'include')"
                       >
-                        <template #icon-left><EqualIcon class="size-2.5" /></template>
+                        <template #icon><EqualIcon class="size-2.5" /></template>
                         {{ t("common.includeSearchTerm") }}
                       </ODropdownItem>
                       <ODropdownItem
@@ -341,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="log-details-exclude-field-btn"
                         @select="toggleExcludeSearchTerm(row.field, row.value, 'exclude')"
                       >
-                        <template #icon-left><NotEqualIcon class="size-2.5" /></template>
+                        <template #icon><NotEqualIcon class="size-2.5" /></template>
                         {{ t("common.excludeSearchTerm") }}
                       </ODropdownItem>
                       <template
@@ -353,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                           data-test="log-details-include-field-btn"
                           @select="addFieldToTable(row.field.toString())"
-                          icon-left="visibility"
+                          icon="visibility"
                         >
                           {{ t("common.addFieldToTable") }}
                         </ODropdownItem>
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-else
                           data-test="log-details-include-field-btn"
                           @select="addFieldToTable(row.field.toString())"
-                          icon-left="visibility-off"
+                          icon="visibility-off"
                         >
                           {{ t("common.removeFieldFromTable") }}
                         </ODropdownItem>
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="crossLink.name"
                           :data-test="`log-details-cross-link-${crossLink.name}`"
                           @select.stop="openCrossLink(crossLink.resolvedUrl)"
-                          icon-left="open-in-new"
+                          icon="open-in-new"
                         >
                           {{ crossLink.name }}
                         </ODropdownItem>
@@ -384,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="log-details-table-send-to-ai-chat-btn"
                         @select="sendToAiChat(JSON.stringify({ [row.field]: row.value }))"
                       >
-                        <template #icon-left>
+                        <template #icon>
                           <img :src="getBtnLogo" width="14" height="14" alt="" />
                         </template>
                         {{ t("logs.detailTable.sendToAiChat") }}
@@ -394,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="log-details-table-redirect-to-regex-pattern-btn"
                         @select="createRegexPatternFromLogs(row.field, row.value)"
                       >
-                        <template #icon-left>
+                        <template #icon>
                           <img :src="regexIcon" width="14" height="14" alt="" />
                         </template>
                         {{ t("regex_patterns.create_regex_pattern_field") }}
@@ -424,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </OTable>
-          </OCardSection>
+          </div>
         </OTabPanel>
 
         <!-- Correlated Logs Tab Panel (Custom Component) -->
@@ -566,29 +566,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs; hidden when embedded) -->
     <OSeparator v-if="!embedded && (tab === 'json' || tab === 'table')" />
-    <OCardSection
+    <div
       v-if="!embedded && (tab === 'json' || tab === 'table')"
       class="px-page-edge bg-dialog-bg sticky bottom-0 z-10 py-4"
     >
       <div class="flex flex-nowrap items-center justify-between max-md:flex-wrap max-md:gap-2">
         <div class="w-1/12 max-md:w-auto">
           <OButton
+            :disabled-reason="prevTooltip"
             data-test="log-detail-previous-detail-btn"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="prevDisabled"
-            focusable-unavailable
             :loading="pageLoading && pageLoadingDirection === 'prev'"
             @click="$emit('showPrevDetail', false, true)"
           >
-            <OTooltip :content="prevTooltip" shortcut-id="logsPrevRow" />
+            <OTooltip v-if="!prevDisabled" :content="prevTooltip" shortcut="logsPrevRow" />
             <OIcon name="navigate-before" size="sm" class="me-1" />{{ t("common.previous") }}
             <OShortcut
               id="logsPrevRow"
               class="ms-1.5 max-md:hidden"
               data-test="log-detail-previous-detail-btn-kbd"
             />
-            <template #unavailable-reason>{{ prevTooltip }}</template>
           </OButton>
         </div>
         <div
@@ -603,14 +601,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             v-model="selectedRelativeValue"
             :options="recordSizeOptions"
-            size="md"
             class="select-noof-records"
             :disabled="pageLoading"
           />
           <OButton
             data-test="logs-detail-table-search-around-btn"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="pageLoading"
             @click="searchTimeBoxed(rowData, selectedRelativeValue)"
             >{{ t("common.searchAround") }}</OButton
@@ -618,15 +614,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="w-1/12 items-end" style="display: contents">
           <OButton
+            :disabled-reason="nextTooltip"
             data-test="log-detail-next-detail-btn"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="nextDisabled"
-            focusable-unavailable
             :loading="pageLoading && pageLoadingDirection === 'next'"
             @click="$emit('showNextDetail', true, false)"
           >
-            <OTooltip :content="nextTooltip" shortcut-id="logsNextRow" />
+            <OTooltip v-if="!nextDisabled" :content="nextTooltip" shortcut="logsNextRow" />
             {{ t("common.next") }}
             <OShortcut
               id="logsNextRow"
@@ -634,17 +629,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="log-detail-next-detail-btn-kbd"
             />
             <OIcon name="navigate-next" size="sm" class="ms-1" />
-            <template #unavailable-reason>{{ nextTooltip }}</template>
           </OButton>
         </div>
       </div>
-    </OCardSection>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
@@ -732,7 +725,6 @@ export default defineComponent({
   name: "SearchDetail",
   components: {
     OSeparator,
-    OCardSection,
     OTabs,
     OTab,
     OTabPanels,
@@ -1558,10 +1550,6 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.searchdetaildialog {
-  width: 85vw;
 }
 
 /* keep(lib-override:oselect): reaches into the OSelect-rendered button to size

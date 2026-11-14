@@ -82,11 +82,8 @@ describe("switch confirmation refusals", () => {
     expect(mocks.toast).toHaveBeenCalledTimes(1);
     const notice = mocks.toast.mock.calls[0][0];
     expect(notice.variant).toBe("warning");
-    expect(notice.title).toMatchObject({
-      key: "slackApp.switchAll.summary",
-      params: { switched: 1, count: 3 },
-    });
-    const lines = String(notice.message).split("\n");
+    const [summary, ...lines] = String(notice.message).split("\n");
+    expect(summary).toBe(`slackApp.switchAll.summary ${JSON.stringify({ switched: 1, count: 3 })}`);
     expect(lines).toHaveLength(3);
     const expected = [
       ["shared-test", "sharedRequired"],
@@ -108,7 +105,9 @@ describe("switch confirmation refusals", () => {
     expect(await app.switchAll([row("oncall-test"), row("ok-test")], "inst-test")).toBe(1);
     expect(mocks.toast).toHaveBeenCalledTimes(1);
     const notice = mocks.toast.mock.calls[0][0];
-    expect(notice.title.params).toEqual({ switched: 1, count: 1 });
+    expect(String(notice.message).split("\n")[0]).toContain(
+      JSON.stringify({ switched: 1, count: 1 }),
+    );
     notice.action.handler();
     expect(mocks.push).toHaveBeenCalledWith(
       expect.objectContaining({

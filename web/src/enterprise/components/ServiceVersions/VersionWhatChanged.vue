@@ -16,7 +16,7 @@
       </p>
       <div v-if="early && errorRows.length" class="flex flex-wrap items-center gap-2">
         <OTag
-          variant="default-soft"
+          tone="neutral"
           :label="raw(t('serviceVersions.compare.tooEarlyCount', { n: formatCount(sampleSoFar) }))"
           data-test="svcver-too-early"
         /><span class="text-text-secondary text-xs">{{
@@ -37,8 +37,8 @@
           ><OButton
             v-if="allErrors"
             class="ms-auto"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             data-test="svcver-evidence-allErrors-service"
             @click="visit(allErrors)"
             >{{
@@ -52,21 +52,18 @@
           row-key="id"
           pagination="none"
           sorting="none"
-          :show-global-filter="false"
           :fill-height="false"
-          frame
           data-test="svcver-error-table"
           ><template #cell-change="{ row }"
             ><OTag
-              :variant="changeVariant(row)"
+              :tone="changeVariant(row)"
               :label="raw(t(`serviceVersions.compare.changeKind.${row.kind}`))"
               :data-test="`svcver-error-${row.kind}-${row.key}`" /></template
           ><template #cell-errorType="{ row }"
             ><span class="truncate font-mono text-xs">{{ row.label }}</span></template
           ><template #cell-source="{ row }"
             ><OTag
-              :variant="row.source === 'rum' ? 'cyan-soft' : 'teal-soft'"
-              shape="pill"
+              tone="neutral"
               :icon="row.source === 'rum' ? 'devices' : 'account-tree'"
               :label="raw(t(`serviceVersions.compare.${row.source}`))" /></template
           ><template #cell-before="{ row }"
@@ -84,8 +81,8 @@
           ><template #cell-link="{ row }"
             ><OButton
               v-if="row.link"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :data-test="`svcver-evidence-${row.source === 'rum' ? 'sessions' : 'allErrors'}-${row.key}`"
               @click="visit(row.link)"
               >{{
@@ -97,8 +94,8 @@
               }}</OButton
             ><OButton
               v-if="row.details"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :data-test="`svcver-evidence-errorDetails-${row.key}`"
               @click="visit(row.details)"
               >{{ t("serviceVersions.evidence.errorDetails") }}</OButton
@@ -117,9 +114,7 @@
           row-key="id"
           pagination="none"
           sorting="none"
-          :show-global-filter="false"
           :fill-height="false"
-          frame
           data-test="svcver-endpoint-table"
           ><template #cell-endpoint="{ row }"
             ><span
@@ -140,7 +135,7 @@
               :data-test="`svcver-endpoint-errors-${row.endpoint.source_stream}-${row.endpoint.operation}`"
               ><OTag
                 v-if="row.presence"
-                :variant="row.presence.variant"
+                :tone="row.presence.variant"
                 :label="raw(t(`serviceVersions.compare.changeKind.${row.presence.kind}`))"
                 :data-test="`svcver-endpoint-${row.presence.kind}-${row.endpoint.source_stream}-${row.endpoint.operation}`"
               /><NotComparedMark v-if="row.errors === null" /><span v-else-if="row.errors">{{
@@ -156,8 +151,8 @@
           ><template #cell-link="{ row }"
             ><OButton
               v-if="row.slow"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :data-test="`svcver-evidence-slowTraces-${row.endpoint.source_stream}-${row.endpoint.operation}`"
               @click="visit(row.slow)"
               >{{ t("serviceVersions.evidence.slowTraces") }}</OButton
@@ -185,7 +180,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import NotComparedMark from "./NotComparedMark.vue";
 import { detailGapText } from "@/utils/serviceVersionsCopy";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { CompareResponse, Endpoint, MetricDelta } from "@/services/service_versions";
 import { armWhere, traceEvidence, rumEvidence, serviceErrors, errorDetails } from "./deepLinks";
 import { errorCounts, rumEarly, type ErrorKind as ChangeKind } from "./errorTypes";
@@ -373,13 +368,13 @@ function p95Change(row: Endpoint): string | null {
   return percentChange(value.a - value.b, value.b);
 }
 // Coarse detail cannot tell a new or gone endpoint from one the other arm's rows missed.
-function presence(row: Endpoint): { kind: ChangeKind; variant: BadgeVariant } | undefined {
+function presence(row: Endpoint): { kind: ChangeKind; variant: ChipTone } | undefined {
   if (!oneSided(row) || endpointCoarse.value || !hasBaseline(props.result)) return undefined;
   if (row.requests_a) {
     const early = !judged.value && !floorMet(row, "error_rate");
-    return { kind: "introduced", variant: early ? "default-outline" : "error-soft" };
+    return { kind: "introduced", variant: early ? "outline" : "err" };
   }
-  return row.requests_b ? { kind: "fixed", variant: "success-soft" } : undefined;
+  return row.requests_b ? { kind: "fixed", variant: "ok" } : undefined;
 }
 function errorChange(row: Endpoint): string | null {
   const value = row.error_rate;
@@ -472,9 +467,9 @@ const endpointColumns = computed<OTableColumnDef<(typeof endpointRows.value)[num
   },
   { id: "link", header: raw(""), size: 100, isAction: true },
 ]);
-function changeVariant(row: ErrorRow): BadgeVariant {
-  if (row.early || row.kind === "shared") return "default-outline";
-  return row.kind === "fixed" ? "success-soft" : "error-soft";
+function changeVariant(row: ErrorRow): ChipTone {
+  if (row.early || row.kind === "shared") return "outline";
+  return row.kind === "fixed" ? "ok" : "err";
 }
 function toneClass(tone: TileTone) {
   return tone === "crit"

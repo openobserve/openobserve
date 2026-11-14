@@ -9,9 +9,9 @@
           v-if="systemProvidedVariables.length"
           data-test="job-input-mapping-system-variables-learn-more"
           type="button"
-          variant="ghost-primary"
-          size="xs"
-          icon-left="help"
+          variant="accent-ghost"
+          size="sm"
+          icon="help"
           class="gap-1 font-medium"
           @click="systemVariablesDrawerOpen = true"
         >
@@ -29,7 +29,7 @@
         v-model:open="systemVariablesDrawerOpen"
         data-test="job-input-mapping-system-variables-drawer"
         :title="systemProvidedTitle"
-        size="lg"
+        size="md"
         bleed
       >
         <!-- `bleed` drops ODrawer's body inset so the table runs edge to edge.
@@ -48,12 +48,9 @@
             pagination="none"
             sorting="none"
             selection="none"
-            :show-global-filter="false"
             :default-columns="false"
             :fill-height="false"
-            :frame="false"
             :sticky-header="false"
-            dense
             wrap
           >
             <template #cell-variable="{ row }">
@@ -66,10 +63,10 @@
 
             <template #cell-source="{ row }">
               <div class="flex flex-wrap items-center gap-1">
-                <OTag variant="primary-soft" size="xs">
+                <OTag tone="accent" size="sm">
                   {{ t("onlineEvals.job.inputMapping.systemProvided.badge") }}
                 </OTag>
-                <OTag v-if="row.name === 'spans'" variant="warning-soft" size="xs">
+                <OTag v-if="row.name === 'spans'" tone="warn" size="sm">
                   {{ t("onlineEvals.job.inputMapping.systemProvided.selectorRequired") }}
                 </OTag>
               </div>
@@ -154,7 +151,6 @@
             <div class="flex min-w-0 items-center gap-1.5">
               <OSelect
                 class="min-w-0 flex-1"
-                size="sm"
                 searchable
                 :options="mappingOptions"
                 :model-value="inputMappings[entityId(scorer)]?.[variable] || ''"
@@ -166,10 +162,11 @@
                 "
               />
               <OButton
+                icon-only
                 type="button"
-                variant="ghost-muted"
-                size="icon-chip"
-                icon-left="content-copy"
+                variant="ghost"
+                size="xs"
+                icon="content-copy"
                 :aria-label="t('common.copy')"
                 :title="t('common.copy')"
                 :data-test="`job-input-mapping-copy-${entityId(scorer)}-${variable}`"

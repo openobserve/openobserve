@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Bar wrapped in an absolute div: OProgressBar's own root is `relative w-full`,
          so positioning it directly would keep it in flow and crush the number. -->
     <div class="pointer-events-none absolute inset-x-0 bottom-0.5">
-      <OProgressBar :value="ratio" :variant="variant" size="xs" />
+      <OProgressBar :value="ratio * 100" :tone="tone" />
     </div>
   </div>
   <!-- Stacked (default): number above a full-width bar. -->
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ label }}
       <OTooltip v-if="tooltip" :content="tooltip" />
     </span>
-    <OProgressBar :value="ratio" :variant="variant" size="xs" />
+    <OProgressBar :value="ratio * 100" :tone="tone" />
   </div>
 </template>
 
@@ -51,13 +51,13 @@ import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 
 const props = defineProps<{
   value: number;
   max: number;
   label: I18nText;
-  variant?: ProgressBarVariant;
+  tone?: ProgressBarTone;
   tooltip?: I18nText;
   align?: "left" | "right";
   /** Render the number inline (row-baseline) with the bar as a bottom underline,

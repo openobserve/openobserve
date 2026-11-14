@@ -4,14 +4,14 @@
     :open="open"
     size="lg"
     :title="t('aiObservability.promptManagement.saveAsPrompt')"
-    :primary-button-label="
-      matches.length
+    :primary="{
+      label: matches.length
         ? t('aiObservability.promptManagement.saveDuplicate')
         : values.mode === 'create'
           ? t('aiObservability.promptManagement.createPrompt')
-          : t('aiObservability.promptManagement.appendVersion')
-    "
-    :secondary-button-label="t('aiObservability.promptManagement.cancel')"
+          : t('aiObservability.promptManagement.appendVersion'),
+    }"
+    :secondary="{ label: t('aiObservability.promptManagement.cancel') }"
     form-id="save-as-prompt-form"
     data-test="save-as-prompt-dialog"
     @update:open="requestClose"
@@ -35,9 +35,9 @@
       <template v-else>
         <OEmptyState
           v-if="promptQuery.isError.value"
-          preset="load-error"
-          size="block"
-          :description="t('aiObservability.promptManagement.loadError')"
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="t('aiObservability.promptManagement.loadError')"
           @action="promptQuery.refetch()"
         />
         <OFormSelect

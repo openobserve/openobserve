@@ -154,18 +154,15 @@ const openNode = (p: PodRow) =>
     :data="rows"
     :columns="columns"
     row-key="key"
-    dense
     virtual-scroll
     :max-height="TABLE_MAX_HEIGHT"
     pagination="none"
     sorting="client"
     enable-column-resize
-    :frame="false"
-    :show-global-filter="false"
     data-test="k8s2-related-pods"
   >
     <template #cell-name="{ row }">
-      <OButton variant="ghost-primary" size="xs" @click.stop="openPod(row)">{{
+      <OButton variant="accent-ghost" size="sm" @click.stop="openPod(row)">{{
         raw(row.name)
       }}</OButton>
     </template>
@@ -188,7 +185,7 @@ const openNode = (p: PodRow) =>
       </span>
     </template>
     <template #cell-node="{ row }">
-      <OButton v-if="row.node" variant="ghost-primary" size="xs" @click.stop="openNode(row)">{{
+      <OButton v-if="row.node" variant="accent-ghost" size="sm" @click.stop="openNode(row)">{{
         raw(row.node)
       }}</OButton>
       <span v-else>{{ raw("—") }}</span>
@@ -202,10 +199,9 @@ const openNode = (p: PodRow) =>
     <template v-for="r in USAGE" :key="r.id" #[`cell-${r.id}`]="{ row }">
       <div v-if="shareOf(row, r) != null" class="flex w-full min-w-0 items-center gap-2">
         <OProgressBar
-          size="xs"
           class="min-w-0 flex-1"
-          :value="Math.min(shareOf(row, r) ?? 0, 100) / 100"
-          :variant="usageBarVariant(shareOf(row, r))"
+          :value="Math.min(shareOf(row, r) ?? 0, 100)"
+          :tone="usageBarVariant(shareOf(row, r))"
         />
         <OTooltip
           :content="t(r.tip, { pct: formatPct(shareOf(row, r)), value: r.format(r.used(row)) })"
@@ -216,8 +212,8 @@ const openNode = (p: PodRow) =>
     <template #cell-status="{ row }">
       <OTag
         v-if="row.status"
-        size="xs"
-        :variant="TONE_PILL[toneOf(row.status.variant)].variant"
+        size="sm"
+        :tone="TONE_PILL[toneOf(row.status.variant)].variant"
         :icon="TONE_PILL[toneOf(row.status.variant)].icon"
         >{{ chipLabel(row.status, t) }}</OTag
       >

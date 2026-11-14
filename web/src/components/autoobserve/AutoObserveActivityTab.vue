@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="f in FILTERS"
           :key="f"
           :value="f"
-          size="sm"
           :disabled="!counts[f] && f !== filter"
           :data-test="`autoobserve-activity-chip-${f}`"
         >
@@ -56,12 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         aria-hidden="true"
         data-test="autoobserve-activity-skeleton"
       >
-        <OSkeleton v-for="n in 4" :key="n" animation="none" class="h-9 w-full" />
+        <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-9 w-full" />
       </div>
       <LiveNoticeState
         v-else-if="live.notice.value"
         :notice="live.notice.value"
-        size="block"
+        size="page"
         :busy="live.busy.value"
         data-test="autoobserve-activity-error"
         retry-test="autoobserve-activity-retry"
@@ -131,26 +130,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("autoobserve.activityLive.proposedBy") }}
               </td>
               <td class="px-1.5 py-2">
-                <OTag
-                  variant="warning-soft"
-                  size="xs"
-                  :label="t('autoobserve.activityLive.needsOk')"
-                />
+                <OTag tone="warn" size="sm" :label="t('autoobserve.activityLive.needsOk')" />
               </td>
               <td class="px-1.5 py-2 pe-3">
                 <span class="flex justify-end gap-1">
                   <OButton
                     v-if="request.insight.dismissable"
-                    variant="ghost-muted"
-                    size="xs"
+                    variant="ghost"
+                    size="sm"
                     :data-test="`autoobserve-ledger-pending-${request.id}-dismiss`"
                     @click="dismiss(request.insight)"
                   >
                     {{ t("autoobserve.activityLive.reject") }}
                   </OButton>
                   <OButton
-                    variant="outline"
-                    size="xs"
+                    variant="secondary"
+                    size="sm"
                     :disabled="!!request.insight.cta?.locked"
                     :title="request.insight.cta?.locked ?? undefined"
                     :data-test="`autoobserve-ledger-pending-${request.id}-review`"
@@ -204,8 +199,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </td>
                 <td class="px-1.5 py-2">
                   <OTag
-                    :variant="STATE_LOOK[change.state].variant"
-                    size="xs"
+                    :tone="STATE_LOOK[change.state].variant"
+                    size="sm"
                     :label="t(STATE_LOOK[change.state].key)"
                   />
                 </td>
@@ -213,9 +208,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="flex justify-end gap-1">
                     <OButton
                       v-if="change.state === 'done'"
-                      variant="ghost-muted"
-                      size="xs"
-                      icon-left="undo"
+                      variant="ghost"
+                      size="sm"
+                      icon="undo"
                       :loading="live.isUndoing(change)"
                       :data-test="`autoobserve-ledger-${change.id}-undo`"
                       @click="void live.undo(change)"
@@ -223,9 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("autoobserve2.activityPage.actions.undo") }}
                     </OButton>
                     <OButton
-                      variant="ghost-muted"
-                      size="xs"
-                      :icon-left="expanded[change.id] ? 'expand-less' : 'expand-more'"
+                      variant="ghost"
+                      size="sm"
+                      :icon="expanded[change.id] ? 'expand-less' : 'expand-more'"
                       :aria-expanded="!!expanded[change.id]"
                       :aria-label="
                         expanded[change.id]
@@ -251,9 +246,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <tr v-if="capped.more">
               <td :colspan="COLUMNS.length" class="px-1.5 py-1">
                 <OButton
-                  variant="ghost-primary"
-                  size="xs"
-                  icon-right="expand-more"
+                  variant="accent-ghost"
+                  size="sm"
+                  icon-end="expand-more"
                   data-test="autoobserve-activity-more"
                   @click="showAll = true"
                 >

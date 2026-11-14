@@ -30,26 +30,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     data-test="oncall-policies-page"
     :title="t('oncall.policiesTitle')"
-    icon="arrow-upward"
     :back="{
-      label: t('oncall.backToTeams'),
+      label: t('oncall.teamsTitle'),
       to: { name: 'onCallTeams', query: { org_identifier: orgId } },
       dataTest: 'oncall-policies-back-btn',
     }"
   >
     <OTable
       ref="oTableRef"
-      :frame="false"
       :forbidden="forbidden"
       :data="rows"
       :columns="columns"
       row-key="teamId"
       :loading="loading"
       pagination="client"
-      show-index
       table-id="oncall-policies"
       :persist-columns="true"
-      :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-policies-table"
       :page-size="pageSize"
@@ -62,33 +58,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:sort-by="sortBy = $event"
       @update:sort-order="sortOrder = $event"
     >
-      <template v-if="!lgUp" #subheader>
-        <OStatStrip :items="summaryStats" :loading="loading" row />
+      <template #subheader>
+        <div class="px-page-edge border-table-row-divider border-b py-1.5">
+          <OStatStrip :items="summaryStats" :loading="loading" />
+        </div>
       </template>
 
       <template #toolbar>
-        <div class="flex w-full items-center gap-2 max-md:contents">
+        <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
           <OSearchInput
             v-model="search"
             class="flex-1"
-            clearable
             :placeholder="t('oncall.searchTeams')"
             data-test="oncall-policies-search"
-          />
-          <OStatStrip
-            v-if="lgUp"
-            :items="summaryStats"
-            :loading="loading"
-            inline
-            class="shrink-0"
           />
         </div>
       </template>
 
       <template #toolbar-trailing>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="lastUpdatedAt"
           :loading="loading"
           data-test="oncall-policies-refresh"
@@ -119,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-for="priority in row.silent"
             :key="priority"
-            :variant="priorityTagVariant(priority)"
+            :tone="priorityTagVariant(priority)"
             size="sm"
           >
             {{ priorityLabel(priority) }}
@@ -132,12 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            supply right now. -->
       <template #cell-unreachable="{ row }">
         <span v-if="row.unreachable.length" class="flex flex-wrap gap-1">
-          <OTag
-            v-for="priority in row.unreachable"
-            :key="priority"
-            variant="warning-soft"
-            size="sm"
-          >
+          <OTag v-for="priority in row.unreachable" :key="priority" tone="warn" size="sm">
             {{ priorityLabel(priority) }}
           </OTag>
         </span>
@@ -147,11 +130,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <OEmptyState
           v-if="!loading"
-          size="hero"
-          preset="no-oncall-teams"
-          :filtered="!!search"
+          :kind="search ? 'filtered' : 'first-run'"
+          :title="
+            search
+              ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+              : t('emptyState.noOncallTeams.title')
+          "
+          :text="
+            search
+              ? t('emptyState.filtered.description', {
+                  noun: t('emptyState.filtered.fallbackNoun'),
+                })
+              : undefined
+          "
+          :icon="search ? undefined : 'group'"
           data-test="oncall-policies-empty"
-          @action="onEmptyAction"
+          :action-label="search ? undefined : t('emptyState.noOncallTeams.action')"
+          @action="onEmptyAction(search ? 'clear-filters' : 'create')"
         />
       </template>
     </OTable>
@@ -177,7 +172,6 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
-import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
 import { oncallTeamsQuery, teamPolicyQuery, whoIsOnCallQuery } from "@/services/oncall.queries";
 import type { OnCallPolicy, OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
@@ -197,7 +191,6 @@ interface PolicyRow {
 }
 
 const { t } = useI18nTyped();
-const { lgUp } = useBreakpoint();
 const store = useStore();
 const router = useRouter();
 
@@ -295,7 +288,7 @@ const summaryStats = computed<StatItem[]>(() => [
     label: t("oncall.statCoverageGaps"),
     value: rows.value.filter((row) => !row.onCall).length,
     icon: "person-pin-circle",
-    tone: rows.value.some((row) => !row.onCall) ? "error" : "neutral",
+    tone: rows.value.some((row) => !row.onCall) ? "err" : "neutral",
     dataTest: "oncall-policies-stat-gaps",
   },
   {
@@ -303,7 +296,7 @@ const summaryStats = computed<StatItem[]>(() => [
     label: t("oncall.statSilentPriorities"),
     value: rows.value.reduce((total, row) => total + row.silent.length, 0),
     icon: "volume-off",
-    tone: "warning",
+    tone: "warn",
     dataTest: "oncall-policies-stat-silent",
   },
   {
@@ -311,7 +304,7 @@ const summaryStats = computed<StatItem[]>(() => [
     label: t("oncall.statUnreachableRungs"),
     value: rows.value.reduce((total, row) => total + row.unreachable.length, 0),
     icon: "warning-amber",
-    tone: rows.value.some((row) => row.unreachable.length) ? "error" : "neutral",
+    tone: rows.value.some((row) => row.unreachable.length) ? "err" : "neutral",
     dataTest: "oncall-policies-stat-unreachable",
   },
 ]);

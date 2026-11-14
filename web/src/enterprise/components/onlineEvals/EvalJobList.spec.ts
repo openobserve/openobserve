@@ -80,8 +80,8 @@ describe("EvalJobList budget banner", () => {
   });
 });
 
-describe("EvalJobList status chips", () => {
-  it("ORs two picked status chips", async () => {
+describe("EvalJobList status tiles", () => {
+  it("ORs two picked status tiles", async () => {
     const rows = [
       { id: "a", name: "a", status: "active" },
       { id: "p", name: "p", status: "paused" },
@@ -94,7 +94,7 @@ describe("EvalJobList status chips", () => {
           OTable: {
             props: ["data"],
             template:
-              "<div><slot name='toolbar' /><i data-test='ids'>{{ (data || []).map((r) => r.id).join(',') }}</i></div>",
+              "<div><slot name='toolbar' /><slot name='subheader' /><i data-test='ids'>{{ (data || []).map((r) => r.id).join(',') }}</i></div>",
           },
           EvalListShell: { template: "<div><slot name='table' /></div>" },
         },

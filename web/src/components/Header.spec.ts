@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { enableAutoUnmount, mount, shallowMount } from "@vue/test-utils";
 import { computed, nextTick } from "vue";
 import i18n from "@/locales";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
@@ -56,6 +56,9 @@ vi.mock("@/utils/cookies", () => ({
   setToken: vi.fn(),
   removeToken: vi.fn(),
 }));
+
+// A wrapper left mounted keeps its open dialogs in <body>, and a field-less dialog holds focus.
+enableAutoUnmount(afterEach);
 
 describe("Header Component", () => {
   let wrapper: any;

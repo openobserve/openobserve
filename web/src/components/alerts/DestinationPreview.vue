@@ -104,9 +104,11 @@ limitations under the License.
                 <strong>{{ raw("Threshold Exceeded:") }}</strong> {{ raw("greater than 80%") }}
               </div>
               <div class="slack-actions mt-4 flex justify-center">
-                <OButton data-test="slack-preview-action" variant="preview-slack">{{
-                  raw("View in OpenObserve")
-                }}</OButton>
+                <span
+                  data-test="slack-preview-action"
+                  class="rounded-chip bg-brand-slack text-brand-slack-foreground inline-flex items-center px-3 py-2 text-sm font-medium"
+                  >{{ raw("View in OpenObserve") }}</span
+                >
               </div>
             </div>
           </div>
@@ -180,7 +182,10 @@ limitations under the License.
             </div>
           </div>
           <div class="teams-actions flex justify-center p-4">
-            <OButton variant="preview-teams">{{ raw("View in OpenObserve") }}</OButton>
+            <span
+              class="rounded-chip bg-brand-teams text-brand-teams-foreground inline-flex items-center px-4 py-2 text-sm font-medium"
+              >{{ raw("View in OpenObserve") }}</span
+            >
           </div>
         </div>
       </div>
@@ -273,7 +278,10 @@ limitations under the License.
               <span class="detail-value text-brand-msg-meta">{{ getCurrentTime() }}</span>
             </div>
           </div>
-          <OButton variant="preview-email">{{ raw("View in OpenObserve") }}</OButton>
+          <span
+            class="rounded-chip bg-brand-email text-brand-email-foreground inline-flex items-center px-6 py-3 text-sm font-medium"
+            >{{ raw("View in OpenObserve") }}</span
+          >
         </div>
       </div>
 
@@ -396,7 +404,10 @@ limitations under the License.
             </div>
           </div>
           <div class="opsgenie-actions mt-4 flex justify-center">
-            <OButton variant="preview-opsgenie">{{ raw("View in OpenObserve") }}</OButton>
+            <span
+              class="rounded-chip bg-brand-email-ink text-brand-email-ink-foreground inline-flex items-center px-3 py-2 text-sm font-medium"
+              >{{ raw("View in OpenObserve") }}</span
+            >
           </div>
         </div>
       </div>
@@ -427,14 +438,13 @@ limitations under the License.
       <div class="flex w-full items-center justify-center gap-2">
         <OButton
           data-test="preview-copy-button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           @click="copyTemplate"
-          icon-left="content-copy"
+          icon="content-copy"
         >
           {{ t("alerts.previewCopyTemplateBtn") }}
         </OButton>
-        <OButton variant="outline" size="sm-action" @click="isOpen = false">
+        <OButton variant="secondary" @click="isOpen = false">
           {{ t("common.close") }}
         </OButton>
       </div>

@@ -14,28 +14,13 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  DbmPageChrome — the header every DBM list tab wears.
-
-  All seven list pages opened with the same twenty lines: an OPageLayout with the
-  database icon, tabs on a second row, a bleeding body and the shared tab strip
-  in `#header-tabs`. Title and subtitle are one constant "Databases" header for
-  the whole section — the tab strip already names the view. Only the title's
-  data-test differs per page, for the e2e selectors that key off it.
-
-  Two things deliberately stay in the page. The tab strip's markup lives HERE
-  rather than in `DbmShell` for the reason `dbmTabCounts.ts` documents — it
-  belongs inside each page's own header — and the query-detail page is NOT one
-  of these: it has a back target, no tab strip, a different icon and a scrolling
-  body, which is four opt-outs for one caller and no dedup at all.
--->
+<!-- One constant "Databases" header for every DBM list tab: the tab strip names the view (H8).
+     The strip lives here, not in DbmShell, because it belongs inside each page's own header. -->
 <template>
   <OPageLayout
     :title="t('dbm.header.title')"
-    :subtitle="t('dbm.header.subtitle')"
-    icon="database"
+    :about="t('dbm.header.subtitle')"
     :title-data-test="titleDataTest"
-    tabs-below
     bleed
   >
     <template #header-tabs>

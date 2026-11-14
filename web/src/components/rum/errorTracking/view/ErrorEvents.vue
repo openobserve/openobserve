@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               v-if="isErrorEvent(event)"
               :label="t('rum.error')"
-              variant="error-soft"
-              size="xs"
+              tone="err"
+              size="sm"
               :data-test="`error-events-timeline-level-${index}`"
             />
           </div>

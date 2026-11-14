@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { computed, ref } from "vue";
 import { useMutation } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -80,14 +80,9 @@ async function onSubmit(value: AllowlistFormValues) {
     class="border-border-default rounded-surface flex flex-col gap-3 border p-3"
     data-test="security-allowlist-form"
   >
-    <OBanner
-      v-if="saveError"
-      variant="error-soft"
-      icon="error-outline"
-      dense
-      data-test="security-allowlist-form-error"
-      >{{ saveError }}</OBanner
-    >
+    <OInlineNotice v-if="saveError" tone="err" data-test="security-allowlist-form-error">{{
+      saveError
+    }}</OInlineNotice>
     <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
         <OFormInput
@@ -129,19 +124,14 @@ async function onSubmit(value: AllowlistFormValues) {
       />
       <div class="flex justify-end gap-2">
         <OButton
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           data-test="security-allowlist-form-cancel"
           @click="emit('cancel')"
           >{{ t("siem.detections.cancel") }}</OButton
         >
-        <OButton
-          variant="primary"
-          size="sm-action"
-          type="submit"
-          data-test="security-allowlist-form-save"
-          >{{ t("siem.tuning.allowlists.save") }}</OButton
-        >
+        <OButton variant="primary" type="submit" data-test="security-allowlist-form-save">{{
+          t("siem.tuning.allowlists.save")
+        }}</OButton>
       </div>
     </OForm>
   </div>

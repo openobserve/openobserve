@@ -20,10 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="t('dashboard.moveDashboardToAnotherFolder.moveDashboard')"
-    :secondary-button-label="t('dashboard.cancel')"
-    :primary-button-label="t('common.move')"
-    :primary-button-loading="onSubmit.isLoading.value"
-    :primary-button-disabled="isSameFolder"
+    :secondary="{ label: t('dashboard.cancel') }"
+    :primary="{
+      label: t('common.move'),
+      disabled: isSameFolder,
+      loading: onSubmit.isLoading.value,
+    }"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
     @click:primary="onSubmit.execute()"

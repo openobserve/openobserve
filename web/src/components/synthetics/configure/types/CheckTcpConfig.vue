@@ -61,14 +61,14 @@ const responseContains = computed({
           type="number"
           required
           :label="t('synthetics.protocolConfig.port')"
-          width="xs"
+          width="s"
           data-test="synthetics-check-tcp-port-input"
         />
         <OInput
           v-model.number="timeoutMs"
           type="number"
           :label="t('synthetics.protocolConfig.timeoutMs')"
-          width="sm"
+          width="s"
           data-test="synthetics-check-tcp-timeout-input"
         />
       </div>

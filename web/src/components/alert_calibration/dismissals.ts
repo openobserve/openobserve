@@ -149,7 +149,7 @@ export type DismissForm = {
 };
 
 export interface WriteNotice {
-  variant: "error" | "warning";
+  tone: "err" | "warn";
   text: I18nText;
 }
 
@@ -295,15 +295,15 @@ export function dismissalCopy(t: TranslateFn, locale: string) {
   const writeError = (error: unknown): WriteNotice => {
     switch (httpStatus(error)) {
       case 403:
-        return { variant: "error", text: t("alertCalibration.dismiss.error.denied") };
+        return { tone: "err", text: t("alertCalibration.dismiss.error.denied") };
       case 404:
-        return { variant: "error", text: t("alertCalibration.dismiss.error.gone") };
+        return { tone: "err", text: t("alertCalibration.dismiss.error.gone") };
       case 409:
-        return { variant: "warning", text: t("alertCalibration.dismiss.error.changed") };
+        return { tone: "warn", text: t("alertCalibration.dismiss.error.changed") };
       case 429:
-        return { variant: "error", text: t("alertCalibration.dismiss.error.throttled") };
+        return { tone: "err", text: t("alertCalibration.dismiss.error.throttled") };
       default:
-        return { variant: "error", text: t("alertCalibration.dismiss.error.failed") };
+        return { tone: "err", text: t("alertCalibration.dismiss.error.failed") };
     }
   };
 

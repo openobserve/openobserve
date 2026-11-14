@@ -29,26 +29,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Main List View -->
     <OPageLayout
-      overflow-first
       v-if="!showImportModelPricingPage"
-      icon="paid"
-      :subtitle="t('settings.modelPricingList.subtitle')"
+      :title="t('settings.llmModelPricing')"
+      :about="t('modelPricing.matchingPriorityTooltip')"
       bleed
     >
-      <template #title>
-        {{ t("modelPricing.header") }}
-        <OButton variant="ghost" size="icon-xs-sq" class="-ms-1" data-test="model-pricing-info-btn">
-          <OIcon name="info-outline" size="sm" />
-          <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
-        </OButton>
-      </template>
       <template #actions-overflow>
-        <OButton variant="outline" size="sm" @click="openGaps" data-test="model-pricing-gaps-btn">
+        <OButton variant="secondary" @click="openGaps" data-test="model-pricing-gaps-btn">
           {{ t("modelPricing.unpriced.title") }}
         </OButton>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :loading="refreshing"
           @click="refreshBuiltIn"
           data-test="model-pricing-refresh-btn"
@@ -56,26 +47,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("modelPricing.syncBuiltInPrices") }}
         </OButton>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           @click="showTestMatchDialog = true"
           data-test="model-pricing-test-match-btn"
         >
           {{ t("modelPricing.testMatch") }}
         </OButton>
-        <OButton
-          variant="outline"
-          size="sm"
-          @click="openImport"
-          data-test="model-pricing-import-btn"
-        >
+        <OButton variant="secondary" @click="openImport" data-test="model-pricing-import-btn">
           {{ t("modelPricing.importBtn") }}
         </OButton>
       </template>
       <template #actions>
         <OButton
           variant="primary"
-          size="sm"
           :aria-label="
             pricingDrafts.hasNew
               ? t('common.editorDraft.newDot', { label: t('modelPricing.newModel') })
@@ -107,12 +91,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           ref="qTableRef"
-          :frame="false"
           data-test="model-pricing-list-table"
           :data="filteredModels"
           :columns="columns"
           :row-actions="rowActions"
-          row-actions-more-data-test="model-pricing-row-more-actions"
+          :row-menu="rowMenu"
+          row-menu-data-test="model-pricing-row-more-actions"
           row-key="id"
           :loading="loading"
           :forbidden="forbidden"
@@ -130,13 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-model-pricing"
-          :show-global-filter="false"
           tree
           tree-column-id="name"
           :get-row-warning="
             (row: any) => !!(row.children?.length && shadowingParentNames.has(row.name))
           "
-          :row-tone="(row: any) => (isDisabled(row) ? 'muted' : null)"
+          :row-state="(row: any) => (isDisabled(row) ? 'paused' : null)"
           @row-click="openPricingDialog"
           @update:selected-ids="handleSelectedIdsUpdate"
           @update:page-size="pageSize = $event"
@@ -146,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Toolbar: Built-in/Custom tabs + search -->
           <template #toolbar>
-            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents md:max-lg:flex-wrap">
+            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents md:max-lg:flex-wrap">
               <div class="app-tabs-container h-9">
                 <AppTabs
                   class="tabs-selection-container"
@@ -157,19 +140,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <OSearchInput
+                width="list"
                 v-model="filterQuery"
-                class="ms-auto w-64 max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1 md:max-lg:ms-0 md:max-lg:w-full"
+                class="ms-auto max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1 md:max-lg:ms-0 md:max-lg:w-full"
                 :placeholder="t('modelPricing.searchPlaceholder')"
               />
             </div>
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="modelPricingRefresh"
+              shortcut="modelPricingRefresh"
               data-test="model-pricing-list-refresh-btn"
               @click="refreshModels"
             />
@@ -191,7 +173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <img :src="ooLogo" class="h-4 w-4" :alt="t('modelPricing.openObserveLogoAlt')" />
                 <OTooltip
                   side="top"
-                  align="center"
                   :content="t('modelPricing.sourceBuiltIn', { product: raw('OpenObserve') })"
                 />
               </span>
@@ -203,11 +184,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="me-1 inline-flex shrink-0 cursor-default"
               >
                 <OIcon name="corporate-fare" size="sm" class="text-text-secondary" />
-                <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
+                <OTooltip side="top" :content="t('modelPricing.sourceInherited')" />
               </span>
               <span v-else class="me-1 inline-flex shrink-0 cursor-default">
                 <OIcon name="person" size="sm" class="text-text-secondary" />
-                <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
+                <OTooltip side="top" :content="t('modelPricing.sourceCustom')" />
               </span>
               <div class="flex min-w-0 items-center gap-2">
                 <ONameLinkCell
@@ -250,7 +231,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip
                   side="top"
-                  align="center"
                   :content="t('modelPricing.shadowedTooltip', { name: getParentName(row) })"
                 />
               </OIcon>
@@ -273,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTag
                       type="countChip"
                       value="neutral"
-                      clickable
+                      toggle
                       @click.stop="openPricingDialog(row)"
                     >
                       +{{ count }}
@@ -326,13 +306,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="shrink-0"
                   type="countChip"
                   value="neutral"
-                  clickable
+                  toggle
                   icon="schedule"
                   data-test="model-pricing-time-based-chip"
                   @click.stop="openPricingDialog(row)"
                 >
                   {{ t("modelPricing.timeBasedChip") }}
-                  <OTooltip side="top" align="center">
+                  <OTooltip side="top">
                     <template #content>
                       <div class="min-w-60">
                         <div class="text-compact mb-1 font-bold">{{ row.name }}</div>
@@ -390,32 +370,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-model-pricing"
-              :filtered="isFiltered"
+              :kind="isFiltered ? 'filtered' : 'first-run'"
+              :title="
+                isFiltered
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.modelPricing') })
+                  : t('emptyState.noModelPricing.title')
+              "
+              :text="
+                isFiltered
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.nouns.modelPricing'),
+                    })
+                  : t('emptyState.noModelPricing.description')
+              "
               data-test="model-pricing-empty-state"
-              @action="(id) => (id === 'clear-filters' ? clearFilters() : openEditor(null))"
+              :action-label="isFiltered ? undefined : t('emptyState.noModelPricing.action')"
+              @action="isFiltered ? clearFilters() : openEditor(null)"
             />
           </template>
 
           <template #selection-actions>
             <OButton
               data-test="model-pricing-export-selected-btn"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               @click="exportSelected"
             >
-              <template #icon-left><OIcon name="download" size="xs" /></template>
+              <template #icon><OIcon name="download" size="xs" /></template>
               {{ t("common.export") }}
             </OButton>
             <OButton
               v-if="selectedIdsOnlyContainsOwn"
               data-test="model-pricing-delete-selected-btn"
-              variant="outline-destructive"
-              size="sm"
+              variant="danger-ghost"
               :loading="bulkDeleteLoading"
               @click="confirmDeleteSelected"
-              icon-left="delete"
+              icon="delete"
             >
               {{ t("common.delete") }}
             </OButton>
@@ -427,18 +416,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Pricing detail side panel -->
     <ODrawer
+      size="sm"
       data-test="model-pricing-list-pricing-drawer"
       v-model:open="showPricingDialog"
-      size="md"
       :title="pricingDialogRow?.name"
       :title-data-test="'model-pricing-drawer-title'"
-      :sub-title="t('modelPricing.modelDetails')"
-      :primary-button-label="drawerReadOnly ? undefined : t('modelPricing.actionEdit')"
-      primary-button-data-test="model-pricing-drawer-edit-btn"
-      :secondary-button-label="
-        drawerReadOnly ? t('modelPricing.actionClone') : t('modelPricing.actionDuplicate')
-      "
-      secondary-button-variant="outline"
+      :subtitle="t('modelPricing.modelDetails')"
+      :primary="{
+        label: drawerReadOnly ? undefined : t('modelPricing.actionEdit'),
+        dataTest: 'model-pricing-drawer-edit-btn',
+      }"
+      :secondary="{
+        label: drawerReadOnly ? t('modelPricing.actionClone') : t('modelPricing.actionDuplicate'),
+        variant: 'secondary',
+      }"
       @click:primary="editFromDrawer"
       @click:secondary="duplicateFromDrawer"
     >
@@ -451,7 +442,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <img :src="ooLogo" class="h-4.5 w-4.5" :alt="t('modelPricing.openObserveLogoAlt')" />
           <OTooltip
             side="top"
-            align="center"
             :content="t('modelPricing.sourceBuiltIn', { product: raw('OpenObserve') })"
           />
         </span>
@@ -464,11 +454,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="inline-flex shrink-0 cursor-default"
         >
           <OIcon name="corporate-fare" size="sm" class="text-text-secondary" />
-          <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
+          <OTooltip side="top" :content="t('modelPricing.sourceInherited')" />
         </span>
         <span v-else class="inline-flex shrink-0 cursor-default">
           <OIcon name="person" size="sm" class="text-text-secondary" />
-          <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
+          <OTooltip side="top" :content="t('modelPricing.sourceCustom')" />
         </span>
       </template>
 
@@ -478,11 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText variant="label" class="mb-1.5 block">
               {{ t("modelPricing.colPattern") }}
             </OText>
-            <!-- No `copyable`: OCode's copy is navigator.clipboard-only and fails
-                 silently on HTTP, unlike @/utils/clipboard's execCommand fallback. -->
-            <OCode block class="max-h-75 overflow-y-auto">{{
-              pricingDialogRow.match_pattern
-            }}</OCode>
+            <OCodeBlock :code="pricingDialogRow.match_pattern" wrap />
           </div>
           <OSeparator class="mb-4" />
 
@@ -587,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message="confirmDialogMeta.message"
       :message-keypath="confirmDialogMeta.messageKeypath"
       :message-name="confirmDialogMeta.messageName"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="confirmDialogMeta.onConfirm()"
       @update:cancel="resetConfirmDialog"
     />
@@ -624,10 +610,15 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { ONameLinkCell } from "@/lib/core/Table/cells";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import OCode from "@/lib/core/Code/OCode.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import FitItems from "@/components/common/FitItems.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
@@ -845,8 +836,10 @@ const columns: OTableColumnDef[] = [
     sortable: true,
     resizable: true,
     hideable: true,
+    // Not a flex share: names are short, and the pricing column needs the room for input and output.
+    size: 240,
     minSize: 180,
-    meta: { align: "left", flex: true },
+    meta: { align: "left" },
   },
   {
     id: "match_pattern",
@@ -866,41 +859,43 @@ const columns: OTableColumnDef[] = [
     minSize: 200,
     meta: { align: "left", flex: true },
   },
-  {
-    id: "actions",
-    header: t("modelPricing.colActions"),
-    isAction: true,
-    pinned: "right",
-  },
 ];
 
 const draftMark = (row: any, dataTest: string, label: I18nText) =>
   hasDuplicateDraft(row) && { label: duplicateActionLabel(row, label), dataTest };
+// A read-only row has one action, Clone, so it takes the first inline slot that Edit holds on other rows.
 const rowActions: OTableRowAction[] = [
   {
     id: "edit",
-    label: t("modelPricing.actionEdit"),
-    icon: "edit",
-    visible: (row) => !isReadOnly(row),
-    onSelect: (row) => openEditor(row),
-    dataTest: () => "model-pricing-edit-btn",
+    label: (row) =>
+      isReadOnly(row)
+        ? duplicateActionLabel(row, t("modelPricing.actionClone"))
+        : t("modelPricing.actionEdit"),
+    icon: (row) => (isReadOnly(row) ? "content-copy" : "edit"),
+    shortcut: (row) => (isReadOnly(row) ? "duplicate" : "edit"),
+    onClick: (row) => (isReadOnly(row) ? duplicateModel(row) : openEditor(row)),
+    badge: (row) =>
+      isReadOnly(row) &&
+      draftMark(row, `model-pricing-${row.id}-clone-draft-dot`, t("modelPricing.actionClone")),
+    dataTest: (row) => (isReadOnly(row) ? "model-pricing-clone-btn" : "model-pricing-edit-btn"),
   },
   {
     id: "toggle",
     label: (row) =>
       row.enabled ? t("modelPricing.actionDisable") : t("modelPricing.actionEnable"),
     icon: (row) => (row.enabled ? "pause" : "play-arrow"),
-    tone: (row) => (row.enabled ? "destructive" : "success"),
     shortcut: (row) => (row.enabled ? "pause" : "resume"),
-    visible: (row) => !isReadOnly(row),
-    onSelect: (row) => toggleEnabled(row, !row.enabled),
-    dataTest: () => "model-pricing-toggle-btn",
+    hidden: isReadOnly,
+    onClick: (row) => toggleEnabled(row, !row.enabled),
+    dataTest: "model-pricing-toggle-btn",
   },
+];
+const rowMenu: OTableRowMenuItem[] = [
   {
     id: "duplicate",
     label: t("modelPricing.actionDuplicate"),
     icon: "content-copy",
-    visible: (row) => !isReadOnly(row),
+    hidden: isReadOnly,
     onSelect: (row) => duplicateModel(row),
     badge: (row, placement) =>
       placement === "more"
@@ -914,26 +909,16 @@ const rowActions: OTableRowAction[] = [
             `model-pricing-${row.id}-duplicate-menu-draft-dot`,
             t("modelPricing.actionDuplicate"),
           ),
-    dataTest: () => "model-pricing-duplicate-btn",
-  },
-  {
-    id: "clone",
-    label: (row) => duplicateActionLabel(row, t("modelPricing.actionClone")),
-    icon: "content-copy",
-    shortcut: "duplicate",
-    visible: isReadOnly,
-    onSelect: (row) => duplicateModel(row),
-    badge: (row) =>
-      draftMark(row, `model-pricing-${row.id}-clone-draft-dot`, t("modelPricing.actionClone")),
-    dataTest: () => "model-pricing-clone-btn",
+    dataTest: "model-pricing-duplicate-btn-menu",
   },
   {
     id: "delete",
     label: t("modelPricing.actionDelete"),
     icon: "delete",
-    visible: (row) => !isReadOnly(row),
+    destructive: true,
+    hidden: isReadOnly,
     onSelect: (row) => confirmDelete(row),
-    dataTest: () => "model-pricing-delete-btn",
+    dataTest: "model-pricing-delete-btn-menu",
   },
 ];
 

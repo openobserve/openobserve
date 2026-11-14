@@ -18,7 +18,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import alertsService from "@/services/alerts";
@@ -320,9 +320,9 @@ function openAllowlists() {
 }
 
 const STATUS_TAG = {
-  installed: { variant: "success-soft", icon: "check-circle" },
-  skipped: { variant: "default-soft", icon: "do-not-disturb-on" },
-  failed: { variant: "error-soft", icon: "error-outline" },
+  installed: { variant: "ok", icon: "check-circle" },
+  skipped: { variant: "neutral", icon: "do-not-disturb-on" },
+  failed: { variant: "err", icon: "error-outline" },
 } as const;
 
 const primaryLabel = computed(() =>
@@ -342,15 +342,16 @@ function onPrimary() {
     size="lg"
     :persistent="phase === 'running'"
     :title="t('siem.content.bulk.title', { n: shownRules }, shownRules)"
-    :sub-title="t('siem.content.bulk.subtitle')"
-    :primary-button-label="primaryLabel"
-    :secondary-button-label="phase === 'configure' ? t('siem.detections.cancel') : undefined"
+    :subtitle="t('siem.content.bulk.subtitle')"
+    :primary="{
+      label: primaryLabel,
+      disabled:
+        phase === 'running' || (phase === 'configure' && (!chosenTargets.length || !canAuthor)),
+      loading: phase === 'running',
+      dataTest: 'security-content-bulk-primary',
+    }"
+    :secondary="{ label: phase === 'configure' ? t('siem.detections.cancel') : undefined }"
     :form-id="phase === 'configure' ? FORM_ID : undefined"
-    :primary-button-disabled="
-      phase === 'running' || (phase === 'configure' && (!chosenTargets.length || !canAuthor))
-    "
-    :primary-button-loading="phase === 'running'"
-    primary-button-data-test="security-content-bulk-primary"
     data-test="security-content-bulk-dialog"
     @update:open="(v: boolean) => phase !== 'running' && emit('update:open', v)"
     @click:secondary="emit('update:open', false)"
@@ -424,15 +425,9 @@ function onPrimary() {
           data-test="security-content-bulk-learn"
         />
       </OForm>
-      <OBanner
-        v-if="!targets.length"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        data-test="security-content-bulk-nothing"
-      >
+      <OInlineNotice v-if="!targets.length" tone="warn" data-test="security-content-bulk-nothing">
         {{ t("siem.content.bulk.nothing") }}
-      </OBanner>
+      </OInlineNotice>
       <div v-else class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <OCheckbox
@@ -449,15 +444,9 @@ function onPrimary() {
             )
           }}</span>
         </div>
-        <OBanner
-          v-if="mismatchCount"
-          variant="info"
-          icon="info-outline"
-          dense
-          data-test="security-content-bulk-mismatch"
-        >
+        <OInlineNotice v-if="mismatchCount" tone="info" data-test="security-content-bulk-mismatch">
           {{ t("siem.content.bulk.mismatchHint", { n: mismatchCount }, mismatchCount) }}
-        </OBanner>
+        </OInlineNotice>
         <ul
           class="border-border-default rounded-surface max-h-60 overflow-y-auto border"
           data-test="security-content-bulk-targets"
@@ -483,13 +472,13 @@ function onPrimary() {
               type="severity"
               :value="severityTagValue(toneOfSigmaLevel(target.rule.level))"
               :label="t(toneLabelKey(toneOfSigmaLevel(target.rule.level)))"
-              size="xs"
+              size="sm"
             />
             <OTruncatedText class="text-text-heading min-w-0 flex-1 text-sm">{{
               target.rule.title
             }}</OTruncatedText>
             <span v-if="targetMismatch(target)" class="inline-flex shrink-0">
-              <OTag variant="warning-soft" icon="warning-amber" size="xs">{{
+              <OTag tone="warn" icon="warning-amber" size="sm">{{
                 t("siem.content.bulk.otherSource")
               }}</OTag>
               <OTooltip
@@ -501,7 +490,7 @@ function onPrimary() {
                 "
               />
             </span>
-            <OTag v-if="target.rule.correlation" variant="purple-soft" size="xs">{{
+            <OTag v-if="target.rule.correlation" tone="neutral" size="sm">{{
               t("siem.content.bulk.correlation")
             }}</OTag>
             <span class="text-text-secondary shrink-0 font-mono text-xs">{{ target.stream }}</span>
@@ -527,8 +516,8 @@ function onPrimary() {
           }}</span
         >
         <OProgressBar
-          :value="counts.total ? (counts.total - counts.pending) / counts.total : 0"
-          :variant="counts.failed ? 'warning' : 'success'"
+          :value="counts.total ? ((counts.total - counts.pending) / counts.total) * 100 : 0"
+          :tone="counts.failed ? 'warn' : 'ok'"
           data-test="security-content-bulk-progress"
         />
         <span
@@ -538,17 +527,15 @@ function onPrimary() {
           >{{ t("siem.content.bulk.keepOpen") }}</span
         >
       </div>
-      <OBanner
+      <OInlineNotice
         v-if="nothingInstalled"
-        variant="error-soft"
-        icon="error-outline"
-        dense
+        tone="err"
         data-test="security-content-bulk-none-installed"
-        >{{ t("siem.content.bulk.noneInstalled") }}</OBanner
+        >{{ t("siem.content.bulk.noneInstalled") }}</OInlineNotice
       >
-      <OBanner
+      <OInlineNotice
         v-else-if="installedSome"
-        variant="info"
+        tone="info"
         icon="lightbulb-outline"
         data-test="security-content-bulk-onboarding"
       >
@@ -563,18 +550,17 @@ function onPrimary() {
             <li>{{ t("siem.content.bulk.tuneJumpHosts") }}</li>
             <li>{{ t("siem.content.bulk.tuneScanners") }}</li>
           </ul>
-          <div>
-            <OButton
-              variant="outline"
-              size="sm"
-              icon-left="checklist"
-              data-test="security-content-bulk-open-allowlists"
-              @click="openAllowlists"
-              >{{ t("siem.content.bulk.openAllowlists") }}</OButton
-            >
-          </div>
         </div>
-      </OBanner>
+        <template #actions>
+          <OButton
+            size="sm"
+            icon="checklist"
+            data-test="security-content-bulk-open-allowlists"
+            @click="openAllowlists"
+            >{{ t("siem.content.bulk.openAllowlists") }}</OButton
+          >
+        </template>
+      </OInlineNotice>
       <ul class="border-border-default rounded-surface max-h-96 overflow-y-auto border">
         <li
           v-for="(result, i) in results"
@@ -585,12 +571,12 @@ function onPrimary() {
           <div class="flex items-center gap-2">
             <OTag
               v-if="result"
-              :variant="STATUS_TAG[result.status].variant"
+              :tone="STATUS_TAG[result.status].variant"
               :icon="STATUS_TAG[result.status].icon"
-              size="xs"
+              size="sm"
               >{{ t(`siem.content.bulk.status.${result.status}`) }}</OTag
             >
-            <OTag v-else variant="default-soft" icon="hourglass-empty" size="xs">{{
+            <OTag v-else tone="neutral" icon="hourglass-empty" size="sm">{{
               t("siem.content.bulk.status.pending")
             }}</OTag>
             <OTruncatedText class="text-text-heading min-w-0 flex-1 text-sm">{{

@@ -41,7 +41,7 @@ vi.mock("@/lib/core/Button/OButton.vue", () => ({
     name: "OButton",
     template:
       '<button :data-test="$attrs[\'data-test\']" :disabled="disabled" @click="!disabled && $emit(\'click\')"><slot /></button>',
-    props: ["variant", "size", "iconLeft", "title", "disabled"],
+    props: ["variant", "size", "icon", "title", "disabled"],
     emits: ["click"],
     inheritAttrs: false,
   },

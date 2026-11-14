@@ -60,23 +60,23 @@ const ODrawerStub = {
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "seamless",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 // The annotation tab's own behaviour is covered in AnnotationSettings.spec.ts.
@@ -232,11 +232,11 @@ describe("DashboardSettings.vue", () => {
       expect(drawer.props("title")).toBe("Dashboard Settings");
     });
 
-    it("should pass the configured width (74) to ODrawer", () => {
+    it("opens the drawer at the xl width", () => {
       wrapper = mountComponent();
 
       const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("width")).toBe(74);
+      expect(drawer.props("size")).toBe("xl");
     });
 
     it("should render splitter with correct model value", () => {

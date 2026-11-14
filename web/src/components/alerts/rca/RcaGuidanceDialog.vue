@@ -20,10 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="md"
     data-test="rca-guidance-dialog"
     :title="t('alerts.incidents.rcaReanalyze')"
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('alerts.incidents.rcaSteer.guidanceDialog.start')"
-    :primary-button-disabled="!canStart"
-    :primary-button-loading="triggering"
+    :secondary="{ label: t('confirmDialog.cancel') }"
+    :primary="{
+      label: t('alerts.incidents.rcaSteer.guidanceDialog.start'),
+      disabled: !canStart,
+      loading: triggering,
+    }"
     @click:secondary="isOpen = false"
     @click:primary="start"
   >

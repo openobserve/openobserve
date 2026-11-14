@@ -4,7 +4,6 @@ import type { I18nText } from "@/types/i18n";
 
 export type OptionGroupType = "radio" | "checkbox";
 export type OptionGroupOrientation = "horizontal" | "vertical";
-export type OptionGroupSize = "xs" | "sm" | "md";
 
 export type OptionPrimitive = string | number | boolean;
 
@@ -41,8 +40,6 @@ export interface OptionGroupProps {
   disabled?: boolean;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
-  /** Size for inner radio/checkbox controls */
-  size?: OptionGroupSize;
   /** HTML name applied to inner inputs */
   name?: string;
 }

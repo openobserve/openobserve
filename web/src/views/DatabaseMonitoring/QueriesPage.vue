@@ -54,9 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            QPS FALL — and a falling line reads as recovery at the worst possible
            moment. When volume collapses while failures climb, say so before the
            reader draws the opposite conclusion from the table below. -->
-      <OBanner
+      <OInlineNotice
         v-if="completionBias"
-        variant="warning"
+        tone="warn"
         class="shrink-0"
         data-test="dbm-queries-completion-bias"
       >
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dbm.queries.completionBias.title", { drop: completionBias.dropPercent }) }}
         </span>
         {{ t("dbm.queries.completionBias.body") }}
-      </OBanner>
+      </OInlineNotice>
 
       <!-- Scope lives ABOVE both tables, not inside either one's toolbar.
            It used to sit in the client table's `#toolbar`, so it unmounted
@@ -92,7 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             :model-value="search"
             :placeholder="t('dbm.queries.searchPlaceholder')"
-            clearable
             :debounce="400"
             data-test="dbm-queries-search"
             @update:model-value="onSearchInput"
@@ -108,7 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             true-value="all"
             false-value="query"
             data-test="dbm-queries-stmt-class-checkbox"
-            size="sm"
             :label="t('dbm.queries.stmtClass.overheadLabel')"
             @update:model-value="onStmtClassChange"
           />
@@ -125,11 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dbm-queries-baseline"
           @update:model-value="onBaselineChange"
         >
-          <OToggleGroupItem value="previous" size="sm" data-test="dbm-queries-baseline-previous">
+          <OToggleGroupItem value="previous" data-test="dbm-queries-baseline-previous">
             {{ t("dbm.insights.baseline.previousShort") }}
             <OTooltip side="bottom" :content="t('dbm.insights.baseline.previousHint')" />
           </OToggleGroupItem>
-          <OToggleGroupItem value="yesterday" size="sm" data-test="dbm-queries-baseline-yesterday">
+          <OToggleGroupItem value="yesterday" data-test="dbm-queries-baseline-yesterday">
             {{ t("dbm.insights.baseline.yesterdayShort") }}
             <OTooltip side="bottom" :content="t('dbm.insights.baseline.yesterdayHint')" />
           </OToggleGroupItem>
@@ -172,20 +170,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:column-visibility="setColumnVisibility"
           @reset:column-sizes="tableRef?.resetColumnSizes?.()"
         />
-        <DateTime
+        <ODateTimeRange
           auto-apply
           menu-align="end"
           :default-type="range.type"
           :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
           :default-relative-time="range.relativeTimePeriod ?? undefined"
           data-test-name="dbm-queries-date-time"
-          class="h-8 max-md:[&_.date-time-label]:hidden"
+          class="max-md:[&_.date-time-label]:hidden"
           @on:date-change="onDateChange"
         />
         <!-- ms-auto: when the row wraps, refresh lands right-aligned instead of orphaned at the start. -->
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           class="ms-auto"
           :loading="loading"
           :last-run-at="lastRunAt"
@@ -206,14 +202,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
-        :frame="false"
-        :toolbar-bordered="false"
         :error="error"
         :forbidden="forbidden"
         sorting="server"
         :sort-by="sortBy"
         sort-order="desc"
-        :show-global-filter="false"
         :column-visibility="columnVisibility"
         :persist-columns="true"
         table-id="dbm-queries"
@@ -226,8 +219,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #error="{ message }">
           <OEmptyState
-            preset="load-error"
-            :description="raw(message)"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="raw(message)"
             data-test="dbm-queries-error"
             @action="onRefresh()"
           />
@@ -239,13 +233,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's totals live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <div data-test="dbm-queries-summary">
+          <div
+            class="px-page-edge border-table-row-divider border-b py-1.5"
+            data-test="dbm-queries-summary"
+          >
             <OStatStrip
               :items="visibleSummaryStats"
               :loading="loading"
               selectable
               :selected-key="statFilter"
-              default-key="queries"
               @select="onStatSelect"
             />
           </div>
@@ -302,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-text-secondary text-3xs flex min-w-0 items-center gap-1"
               :class="row.isTail ? 'ps-4' : ''"
             >
-              <OTag type="dbSystem" :value="row.db_system" size="xs" />
+              <OTag type="dbSystem" :value="row.db_system" size="sm" />
               <span class="opacity-45">·</span>
               <OTruncatedText
                 :tooltip="raw([row.serviceLabel, row.db_instance].filter(Boolean).join(' · '))"
@@ -508,10 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="filteredServerRows"
           :columns="serverColumns"
           row-key="fingerprint"
-          :frame="false"
-          :toolbar-bordered="false"
           sorting="client"
-          :show-global-filter="false"
           table-id="dbm-server-queries"
           :total-count-exact="!serverTruncated"
           data-test="dbm-server-queries-table"
@@ -525,12 +518,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                the failure tile — which only traces can answer — is absent
                rather than claiming an all-clear. -->
           <template #subheader>
-            <OStatStrip
-              :items="visibleSummaryStats"
-              :loading="loading"
-              row
+            <div
+              class="px-page-edge border-table-row-divider border-b py-1.5"
               data-test="dbm-server-queries-summary"
-            />
+            >
+              <OStatStrip :items="visibleSummaryStats" :loading="loading" />
+            </div>
           </template>
           <template #cell-query="{ row }">
             <DbmQueryCell
@@ -601,7 +594,7 @@ import DbmLoadCell from "@/components/dbm/DbmLoadCell.vue";
 import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -624,7 +617,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
   type Freshness,
@@ -1140,8 +1133,8 @@ const fallbackTimeQualifier = computed(() =>
  */
 // The Failed tile narrows the table to the queries with a failed call; Calls and Database time are totals, not rows.
 const statFilter = ref<"failed" | null>(null);
-const onStatSelect = (key: string) => {
-  statFilter.value = key === "failed" && statFilter.value !== "failed" ? "failed" : null;
+const onStatSelect = (key: string | null) => {
+  statFilter.value = key === "failed" ? "failed" : null;
 };
 
 const summaryStats = computed<StatItem[]>(() => {
@@ -1170,27 +1163,22 @@ const summaryStats = computed<StatItem[]>(() => {
   const time = overlapTile(totals.time.value, measured, formatNs);
 
   return [
+    // TRACE-ONLY: the server feed carries no error counts. In fallback mode
+    // the tile is REMOVED rather than shown as "—" under a label promising a
+    // measurement — see `visibleSummaryStats`.
     {
-      key: "queries",
-      // In fallback mode the count describes the rows actually on screen.
-      label: t("dbm.queries.summary.queries"),
-      // The one tile that is NOT an overlap measure: it counts the rows in the
-      // table below, which the reader can see. An empty table honestly has 0
-      // kinds of query on it — but only once a read has ANSWERED, so the
-      // pre-answer state is withheld rather than asserted as an empty fleet.
-      value: measured
-        ? serverListShown.value
-          ? filteredServerRows.value.length
-          : rows.value.length
-        : raw("—"),
-      icon: "database",
-      tone: "primary",
-      dataTest: "dbm-queries-summary-queries",
+      key: "failed",
+      label: t("dbm.queries.summary.failed"),
+      value: errorCount.value ? formatCount(errorCount.value) : null,
+      icon: "error-outline",
+      tone: errorCount.value ? "err" : "neutral",
+      selectable: errorCount.value > 0 || statFilter.value === "failed",
+      dataTest: "dbm-queries-summary-failed",
     },
     {
       key: "calls",
       label: t("dbm.queries.summary.calls"),
-      value: calls.value ?? raw("—"),
+      value: calls.value,
       // D2: the qualifier renders only alongside a value it can qualify.
       ...(calls.qualified
         ? { sub: qualifier(totals.calls.qualifierKey), ...qualifierIcon(totals.calls.qualifierKey) }
@@ -1203,26 +1191,30 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "time",
       label: t("dbm.queries.summary.time"),
-      value: time.value ?? raw("—"),
+      value: time.value,
       ...(time.qualified
         ? { sub: qualifier(totals.time.qualifierKey), ...qualifierIcon(totals.time.qualifierKey) }
         : {}),
       icon: "timer",
-      tone: "teal",
       selectable: false,
       dataTest: "dbm-queries-summary-time",
     },
-    // TRACE-ONLY: the server feed carries no error counts. In fallback mode
-    // the tile is REMOVED rather than shown as "—" under a label promising a
-    // measurement — see `visibleSummaryStats`.
     {
-      key: "failed",
-      label: t("dbm.queries.summary.failed"),
-      value: errorCount.value ? formatCount(errorCount.value) : raw("—"),
-      icon: "error-outline",
-      tone: errorCount.value ? "error" : "neutral",
-      selectable: errorCount.value > 0 || statFilter.value === "failed",
-      dataTest: "dbm-queries-summary-failed",
+      key: "queries",
+      // In fallback mode the count describes the rows actually on screen.
+      label: t("dbm.queries.summary.queries"),
+      // The one tile that is NOT an overlap measure: it counts the rows in the
+      // table below, which the reader can see. An empty table honestly has 0
+      // kinds of query on it — but only once a read has ANSWERED, so the
+      // pre-answer state is withheld rather than asserted as an empty fleet.
+      value: measured
+        ? serverListShown.value
+          ? filteredServerRows.value.length
+          : rows.value.length
+        : null,
+      icon: "database",
+      all: true,
+      dataTest: "dbm-queries-summary-queries",
     },
   ];
 });

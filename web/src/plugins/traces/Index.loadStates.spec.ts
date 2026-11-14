@@ -703,7 +703,11 @@ describe("Traces page load states", () => {
     });
 
     it("starts no search from a URL tab change while it sits in the cache", async () => {
-      const route = ref({ query: { stream: "default" } as Record<string, string>, name: "traces" });
+      const route = ref({
+        query: { stream: "default" } as Record<string, string>,
+        name: "traces",
+        path: "/traces",
+      });
       routeSpy.mockReturnValue(route as any);
       const { show } = mountKeptAlive();
       await settleSearch();
@@ -716,6 +720,7 @@ describe("Traces page load states", () => {
       route.value = {
         query: { stream: "incoming", tab: otherMode, reload: "true" },
         name: "traces",
+        path: "/traces",
       };
       await flushPromises();
       // A mode switch clears the results and re-runs the search, for a URL this page is not showing yet.

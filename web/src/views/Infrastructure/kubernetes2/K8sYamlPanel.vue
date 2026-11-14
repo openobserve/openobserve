@@ -22,7 +22,6 @@ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { KIND_INFO } from "./kubernetesQueries";
 import type { AnyRow } from "./kubernetesModel";
 import { toYaml } from "./k8sYaml";
@@ -48,32 +47,23 @@ const text = computed(() =>
         >{{ t("infra.k8s2.yamlReadOnly") }}</OTruncatedText
       >
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="lock"
+        variant="secondary"
+        icon="lock"
         disabled
-        focusable-unavailable
+        :disabled-reason="t('infra.k8s2.readOnlyAccess')"
         data-test="k8s2-yaml-edit"
       >
         {{ t("infra.k8s2.yamlEdit") }}
-        <OTooltip :content="t('infra.k8s2.readOnlyAccess')" />
       </OButton>
     </div>
     <div v-if="text" class="min-h-0 flex-1 overflow-auto px-3">
-      <OCodeBlock
-        :code="text"
-        lang="yaml"
-        line-numbers
-        :copy-message="t('infra.k8s2.yamlCopied')"
-        data-test="k8s2-yaml"
-      />
+      <OCodeBlock :code="text" lang="yaml" line-numbers data-test="k8s2-yaml" />
     </div>
     <OEmptyState
       v-else
       size="inline"
-      preset="no-data"
       :title="t('infra.k8s2.yamlUnavailable')"
-      :description="t('infra.k8s2.objectsNotObserved')"
+      :text="t('infra.k8s2.objectsNotObserved')"
       data-test="k8s2-yaml-unavailable"
     />
   </div>

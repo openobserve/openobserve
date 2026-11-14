@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :sort-order="sortOrder"
     row-key="id"
     selection="multiple"
-    :show-global-filter="false"
     :persist-columns="true"
     table-id="synthetic-monitoring-table"
     :enable-column-resize="true"
@@ -39,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :horizontal-scroll="true"
     :row-class="monitorRowClass"
     :get-row-style="monitorRowStyle"
-    show-index
     @row-click="(row: any) => emit('row-click', row)"
     @update:current-page="emit('update:currentPage', $event)"
     @update:page-size="emit('update:pageSize', $event)"
@@ -61,11 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Status badge -->
     <template #cell-status="{ row }">
-      <OBadge
-        :variant="resolveBadge('serviceStatus', (row as any).status).variant"
-        :dot="true"
-        size="sm"
-      >
+      <OBadge :tone="resolveBadge('serviceStatus', (row as any).status).tone" :dot="true" size="sm">
         {{ statusLabel(row as any) }}
       </OBadge>
     </template>
@@ -100,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip
         v-if="(row as any).url"
         :content="(row as any).url"
-        content-class="max-w-[25rem] whitespace-normal break-words text-xs"
+        content-class="whitespace-normal break-words text-xs"
       >
         <span class="cursor-pointer truncate">{{ (row as any).url }}</span>
       </OTooltip>
@@ -109,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- HTTP Method badge (API mode) -->
     <template #cell-method="{ row }">
-      <OBadge :variant="resolveBadge('httpMethod', (row as any).method).variant" size="sm">
+      <OBadge :tone="resolveBadge('httpMethod', (row as any).method).tone" size="sm">
         {{ String((row as any).method).toUpperCase() }}
       </OBadge>
     </template>
@@ -124,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
         <OBadge
           v-if="brokenReferenceLabel((row as any).referenceState)"
-          variant="warning-soft"
+          tone="warn"
           size="sm"
           :data-test="`${dataTest}-reference-state`"
         >
@@ -164,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Type badge (monitors mode) -->
     <template #cell-type="{ row }">
-      <OBadge :variant="resolveBadge('syntheticType', (row as any).type).variant" size="sm">
+      <OBadge :tone="resolveBadge('syntheticType', (row as any).type).tone" size="sm">
         {{ resolveBadgeLabel("syntheticType", (row as any).type) }}
       </OBadge>
     </template>
@@ -205,15 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="(row as any).uptime !== null">
         <div class="flex items-center justify-end gap-2">
           <OProgressBar
-            :value="(row as any).uptime / 100"
-            :variant="
-              (row as any).uptime >= 99
-                ? 'default'
-                : (row as any).uptime >= 95
-                  ? 'warning'
-                  : 'danger'
+            :value="(row as any).uptime"
+            :tone="
+              (row as any).uptime >= 99 ? 'accent' : (row as any).uptime >= 95 ? 'warn' : 'err'
             "
-            size="xs"
             class="flex-1"
           />
           <span
@@ -237,8 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip
         v-if="(row as any).locations?.length"
         :content="raw(formatLocationsList((row as any).locations))"
-        content-class="max-w-[20rem] whitespace-pre-wrap text-xs"
-        :delay="0"
+        content-class="whitespace-pre-wrap text-xs"
       >
         <FitItems :items="(row as any).locations" class="cursor-pointer">
           <template #default="{ item }">
@@ -276,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex h-8 w-7 items-center justify-center max-md:hidden"
           :data-test="`${dataTest}-toggle-spinner`"
         >
-          <OSpinner size="xs" />
+          <OSpinner />
           <OTooltip
             side="bottom"
             :content="
@@ -286,9 +274,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OButton
           v-else
-          :variant="(row as any).enabled ? 'ghost-destructive' : 'ghost'"
-          size="icon-xs-sq"
-          :icon-left="(row as any).enabled ? 'pause' : 'play-arrow'"
+          icon-only
+          :variant="(row as any).enabled ? 'danger-ghost' : 'ghost'"
+          size="sm"
+          :icon="(row as any).enabled ? 'pause' : 'play-arrow'"
           class="max-md:hidden"
           :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn`"
           @click.stop="emit('toggle-enabled', row)"
@@ -303,9 +292,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Edit -->
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="edit"
+          size="sm"
+          icon="edit"
           class="max-md:hidden"
           :data-test="`${dataTest}-edit-btn`"
           @click.stop="emit('edit', row)"
@@ -315,9 +305,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Duplicate -->
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="content-copy"
+          size="sm"
+          icon="content-copy"
           class="max-md:hidden"
           :data-test="`${dataTest}-duplicate-btn`"
           @click.stop="emit('duplicate', row)"
@@ -326,9 +317,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="drive-file-move"
+          size="sm"
+          icon="drive-file-move"
           class="max-md:hidden"
           :data-test="`${dataTest}-move-btn`"
           @click.stop="emit('move', row)"
@@ -345,14 +337,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex h-8 w-7 items-center justify-center"
               :data-test="`${dataTest}-trigger-spinner`"
             >
-              <OSpinner size="xs" />
+              <OSpinner />
               <OTooltip side="bottom" :content="t('synthetics.table.triggering')" />
             </div>
             <OButton
               v-else
+              icon-only
               variant="ghost"
-              size="icon-xs-sq"
-              icon-left="more-vert"
+              size="sm"
+              icon="more-vert"
               :data-test="`${dataTest}-more-btn`"
               @click.stop
             >
@@ -361,49 +354,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <ODropdownItem
+            :icon="(row as any).enabled ? 'pause' : 'play-arrow'"
             class="md:hidden"
             :disabled="!!props.toggleLoadingMap[(row as any).id]"
             :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn-menu`"
             @select="emit('toggle-enabled', row)"
           >
-            <template #icon-left>
-              <OIcon :name="(row as any).enabled ? 'pause' : 'play-arrow'" size="sm" />
-            </template>
             {{ (row as any).enabled ? t("synthetics.table.pause") : t("synthetics.table.enable") }}
           </ODropdownItem>
 
           <ODropdownItem
+            icon="edit"
             class="md:hidden"
             :data-test="`${dataTest}-edit-btn-menu`"
             @select="emit('edit', row)"
           >
-            <template #icon-left>
-              <OIcon name="edit" size="sm" />
-            </template>
             {{ t("synthetics.table.edit") }}
           </ODropdownItem>
 
           <ODropdownItem
+            icon="content-copy"
             class="md:hidden"
             :data-test="`${dataTest}-duplicate-btn-menu`"
             @select="emit('duplicate', row)"
           >
-            <template #icon-left>
-              <OIcon name="content-copy" size="sm" />
-            </template>
             {{ t("synthetics.table.duplicate") }}
           </ODropdownItem>
 
           <ODropdownSeparator class="md:hidden" />
 
           <ODropdownItem
+            icon="drive-file-move"
             class="md:hidden"
             :data-test="`${dataTest}-move-item`"
             @select="emit('move', row)"
           >
-            <template #icon-left>
-              <OIcon name="drive-file-move" size="sm" />
-            </template>
             {{ t("synthetics.table.move") }}
           </ODropdownItem>
 
@@ -430,28 +415,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownSeparator />
 
           <ODropdownItem
-            variant="destructive"
-            shortcut-id="alertsRowDelete"
-            :data-test="`${dataTest}-delete-item`"
-            @select="emit('delete', row)"
-          >
-            <template #icon-left>
-              <OIcon name="delete" size="sm" />
-            </template>
-            {{ t("synthetics.table.delete") }}
-          </ODropdownItem>
-
-          <ODropdownSeparator />
-
-          <ODropdownItem
+            icon="sound-sampler"
             :data-test="`${dataTest}-run-item`"
             :disabled="!!props.triggerLoadingMap[(row as any).id]"
             @select="emit('run', row)"
           >
-            <template #icon-left>
-              <OIcon name="sound-sampler" size="sm" />
-            </template>
             {{ t("synthetics.table.trigger") }}
+          </ODropdownItem>
+          <ODropdownSeparator />
+          <ODropdownItem
+            icon="delete"
+            tone="danger"
+            shortcut="alertsRowDelete"
+            :data-test="`${dataTest}-delete-item`"
+            @select="emit('delete', row)"
+          >
+            {{ t("synthetics.table.delete") }}
           </ODropdownItem>
         </ODropdown>
       </div>
@@ -460,54 +439,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state -->
     <template #empty>
       <OEmptyState
-        size="block"
-        preset="no-synthetic-monitors"
-        :filtered="props.hasFilters"
-        columns
-        :description="t('synthetics.table.noResults')"
-        :data-test="`${dataTest}-empty-state`"
-        @action="
-          (id?: string) => {
-            if (!id) return;
-            emit('empty-action', id);
-          }
+        :kind="props.hasFilters ? 'filtered' : 'first-run'"
+        :title="
+          props.hasFilters
+            ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.monitors') })
+            : t('emptyState.noMonitors.title')
         "
+        :icon="props.hasFilters ? undefined : 'web'"
+        :text="t('synthetics.table.noResults')"
+        :data-test="`${dataTest}-empty-state`"
+        :action-label="props.hasFilters ? undefined : t('synthetics.newCheck.browser')"
+        :secondary-action-label="props.hasFilters ? undefined : t('synthetics.newCheck.http')"
+        @action="emit('empty-action', props.hasFilters ? 'clear-filters' : 'create-browser')"
+        @secondary-action="emit('empty-action', 'create-http')"
       />
     </template>
 
     <!-- Footer with count + bulk action buttons -->
     <template #selection-actions>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="pause"
+        variant="secondary"
+        icon="pause"
         :data-test="`${dataTest}-pause-selected-btn`"
         :disabled="!!props.bulkActionLoading"
         @click="emit('pause-selected')"
         >{{ t("synthetics.table.pause") }}</OButton
       >
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="play-arrow"
+        variant="secondary"
+        icon="play-arrow"
         :data-test="`${dataTest}-enable-selected-btn`"
         :disabled="!!props.bulkActionLoading"
         @click="emit('enable-selected')"
         >{{ t("synthetics.table.enable") }}</OButton
       >
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="sound-sampler"
+        variant="secondary"
+        icon="sound-sampler"
         :data-test="`${dataTest}-trigger-selected-btn`"
         :disabled="!!props.bulkActionLoading"
         @click="emit('trigger-selected')"
         >{{ t("synthetics.table.trigger") }}</OButton
       >
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="drive-file-move"
+        variant="secondary"
+        icon="drive-file-move"
         :data-test="`${dataTest}-move-selected-btn`"
         @click="emit('move-selected')"
         >{{ t("synthetics.table.move") }}</OButton
@@ -515,9 +491,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdown v-if="downtimesEnabled" side="top">
         <template #trigger>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="notifications-paused"
+            variant="secondary"
+            icon="notifications-paused"
             :data-test="`${dataTest}-mute-selected-btn`"
           >
             {{ t("alerts.downtimes.mute.bulk") }}
@@ -530,9 +505,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </ODropdown>
       <OButton
-        variant="outline-destructive"
-        size="sm"
-        icon-left="delete"
+        variant="danger-ghost"
+        icon="delete"
         :data-test="`${dataTest}-delete-selected-btn`"
         :loading="!!props.bulkActionLoading"
         @click="emit('delete-selected')"
@@ -568,12 +542,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OBadge
           size="sm"
-          :variant="
-            sparkTip.tick.status === 'up'
-              ? 'success-soft'
-              : sparkTip.tick.status === 'down'
-                ? 'error-soft'
-                : 'warning-soft'
+          :tone="
+            sparkTip.tick.status === 'up' ? 'ok' : sparkTip.tick.status === 'down' ? 'err' : 'warn'
           "
         >
           {{
@@ -612,7 +582,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";

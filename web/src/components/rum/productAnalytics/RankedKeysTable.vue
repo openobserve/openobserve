@@ -30,14 +30,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :current-page="page"
       :keep-page-on-data-change="true"
       sorting="none"
-      :show-global-filter="false"
-      :frame="false"
       :data-test="dataTest"
       @pagination-change="onPage"
     >
       <template #empty>
         <slot name="empty">
-          <OEmptyState preset="no-search-results" size="inline" :hide-action="true" />
+          <OEmptyState
+            kind="filtered"
+            :title="t('emptyState.noSearchResults.title')"
+            :text="t('emptyState.noSearchResults.description')"
+            size="inline"
+          />
         </slot>
       </template>
       <template #cell-key="{ row, index }">
@@ -45,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="kind === 'e'"
             :label="t('rum.analytics.kind.event')"
-            variant="purple-soft"
-            size="xs"
+            tone="neutral"
+            size="sm"
           />
           <span
             class="text-text-body block max-w-[32rem] truncate font-mono text-xs"
@@ -74,12 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #cell-pages="{ row, index }">
         <span :data-test="`${dataTest}-row-${index}-pages`">
-          <OSkeleton v-if="row.pages === null && pagesPending" type="text" class="h-4 w-8" />
+          <OSkeleton v-if="row.pages === null && pagesPending" class="h-4 w-8" />
           <OTag
             v-else-if="(row.pages ?? 0) >= MULTI_PAGE"
             :label="t('rum.analytics.onPages', { count: row.pages }, row.pages ?? 0)"
-            variant="default-soft"
-            size="xs"
+            tone="neutral"
+            size="sm"
           />
           <span v-else class="tabular-nums">{{ row.pages ?? dash }}</span>
         </span>
@@ -100,8 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="row.delta.kind === 'new'"
             :label="t('rum.analytics.new')"
-            variant="info-outline"
-            size="xs"
+            tone="outline"
+            size="sm"
           />
           <template v-else-if="row.delta.kind === 'pct'">
             <OIcon
@@ -135,8 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex items-center gap-1 max-md:hidden">
             <OButton
               variant="ghost"
-              size="sm"
-              icon-left="filter-alt"
+              icon="filter-alt"
               :data-test="`${dataTest}-row-${index}-funnel-btn`"
               @click.stop="emit('build-funnel', stepOf(row))"
               >{{ t("rum.analytics.buildFunnel")
@@ -144,8 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></OButton>
             <OButton
               variant="ghost"
-              size="sm"
-              icon-left="account-tree"
+              icon="account-tree"
               :data-test="`${dataTest}-row-${index}-paths-btn`"
               @click.stop="emit('paths', stepOf(row))"
               >{{ t("rum.analytics.pathsFromHere")
@@ -153,9 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></OButton>
             <OTooltip :content="trendTip(row)">
               <OButton
-                :variant="isTrended(row) ? 'ghost-primary' : 'ghost'"
-                size="sm"
-                :icon-left="isTrended(row) ? 'check' : 'show-chart'"
+                :variant="isTrended(row) ? 'accent-ghost' : 'ghost'"
+                :icon="isTrended(row) ? 'check' : 'show-chart'"
                 :disabled="trendBlocked(row)"
                 :aria-pressed="isTrended(row)"
                 :data-test="`${dataTest}-row-${index}-trend-btn`"
@@ -166,8 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="kind === 'c'"
               variant="ghost"
-              size="sm"
-              icon-left="bookmark-add"
+              icon="bookmark-add"
               :data-test="`${dataTest}-row-${index}-define-event-btn`"
               @click.stop="emit('define-event', row)"
               >{{ t("rum.analytics.defineEvent")
@@ -177,22 +176,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="more-vert"
+                icon="more-vert"
                 class="md:hidden"
                 :aria-label="t('rum.analytics.events.moreActions')"
                 :data-test="`${dataTest}-row-${index}-menu`"
               />
             </template>
-            <ODropdownItem icon-left="filter-alt" @select="emit('build-funnel', stepOf(row))">{{
+            <ODropdownItem icon="filter-alt" @select="emit('build-funnel', stepOf(row))">{{
               t("rum.analytics.buildFunnel")
             }}</ODropdownItem>
-            <ODropdownItem icon-left="account-tree" @select="emit('paths', stepOf(row))">{{
+            <ODropdownItem icon="account-tree" @select="emit('paths', stepOf(row))">{{
               t("rum.analytics.pathsFromHere")
             }}</ODropdownItem>
             <ODropdownItem
-              :icon-left="isTrended(row) ? 'check' : 'show-chart'"
+              :icon="isTrended(row) ? 'check' : 'show-chart'"
               :disabled="trendBlocked(row)"
               :data-test="`${dataTest}-row-${index}-trend-menu-item`"
               @select="emit('trend', stepOf(row))"
@@ -202,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <ODropdownItem
               v-if="kind === 'c'"
-              icon-left="bookmark-add"
+              icon="bookmark-add"
               @select="emit('define-event', row)"
               >{{ t("rum.analytics.defineEvent") }}</ODropdownItem
             >

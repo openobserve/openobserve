@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
@@ -22,7 +22,7 @@ defineSlots<{
 <template>
   <div data-test="o2-table-error" class="sticky start-0 px-2 py-4">
     <slot :message="message ?? ''">
-      <OBanner variant="error" :content="raw(message ?? '')" inline-actions>
+      <OInlineNotice tone="err" :message="raw(message ?? '')">
         <template v-if="message" #actions>
           <button
             data-test="o2-table-error-retry-btn"
@@ -32,7 +32,7 @@ defineSlots<{
             {{ t("common.retry") }}
           </button>
         </template>
-      </OBanner>
+      </OInlineNotice>
     </slot>
   </div>
 </template>

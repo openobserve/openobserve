@@ -129,7 +129,7 @@ describe("PlaylistStrip", () => {
       "h-11",
     );
     for (const id of ["prev", "pause", "next", "exit"]) {
-      expect(byTest(wrapper, id).classes()).toEqual(expect.arrayContaining(["h-8", "w-8"]));
+      expect(byTest(wrapper, id).classes()).toEqual(expect.arrayContaining(["size-control-md"]));
     }
   });
 

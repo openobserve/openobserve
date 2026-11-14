@@ -24,6 +24,8 @@ import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
 import { queryClient } from "@/composables/query/queryClient";
 import { readEditorDraft, type EditorDraftScope } from "@/utils/drafts/editorDraftStore";
+import { fillField } from "@/test/unit/helpers/fillField";
+import { pressEscape } from "@/test/unit/helpers/draftDom";
 import AlertList from "./AlertList.vue";
 import AddAlert from "./AddAlert.vue";
 
@@ -189,35 +191,75 @@ const leaveButton = (id: string) =>
     `[data-test="editor-draft-leave-dialog"] [data-test="${id}"]`,
   );
 
-describe("AlertList with the real editor: Discard on leave", () => {
-  beforeEach(() => {
-    localStorage.clear();
-    queryClient.clear();
-    store.state.selectedOrganization = {
-      ...store.state.selectedOrganization,
-      identifier: "default",
+const seedAlerts = () => {
+  localStorage.clear();
+  queryClient.clear();
+  store.state.selectedOrganization = {
+    ...store.state.selectedOrganization,
+    identifier: "default",
+  };
+  Object.assign(store.state.organizationData, {
+    foldersByType: [{ type: "alerts", folders: [{ id: "default", name: "Default" }] }],
+    allAlertsListByFolderId: {},
+  });
+  vi.mocked(alertsService.listByFolderId).mockResolvedValue({
+    data: { list: [savedAlert] },
+  } as never);
+  vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
+    data: { ...savedAlert },
+  } as never);
+  vi.mocked(templateService.list).mockResolvedValue({ data: [{ name: "t1" }] } as never);
+  vi.mocked(destinationService.list).mockResolvedValue({
+    data: [{ name: "EndpointTest", type: "http" }],
+  } as never);
+};
+
+const unmountApp = () => {
+  wrapper?.unmount();
+  wrapper = null;
+  localStorage.clear();
+};
+
+describe("AlertList clone dialog", () => {
+  beforeEach(seedAlerts);
+  afterEach(unmountApp);
+
+  const openClone = async () => {
+    await mountApp({});
+    const list = wrapper!.findComponent(AlertList).vm as unknown as {
+      duplicateAlert: (row: unknown) => Promise<void>;
+      showForm: boolean;
     };
-    Object.assign(store.state.organizationData, {
-      foldersByType: [{ type: "alerts", folders: [{ id: "default", name: "Default" }] }],
-      allAlertsListByFolderId: {},
-    });
-    vi.mocked(alertsService.listByFolderId).mockResolvedValue({
-      data: { list: [savedAlert] },
-    } as never);
-    vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({
-      data: { ...savedAlert },
-    } as never);
-    vi.mocked(templateService.list).mockResolvedValue({ data: [{ name: "t1" }] } as never);
-    vi.mocked(destinationService.list).mockResolvedValue({
-      data: [{ name: "EndpointTest", type: "http" }],
-    } as never);
+    await list.duplicateAlert(savedAlert);
+    await flushPromises();
+    return list;
+  };
+
+  it("asks before Escape drops an edited clone form", async () => {
+    const list = await openClone();
+    await fillField("to-be-clone-alert-name", "Memory_Utilization_copy");
+
+    pressEscape();
+    await flushPromises();
+
+    expect(byTest("o-dialog-discard-row")).not.toBeNull();
+    expect(list.showForm).toBe(true);
   });
 
-  afterEach(() => {
-    wrapper?.unmount();
-    wrapper = null;
-    localStorage.clear();
+  it("closes on Escape while the clone form is as it opened", async () => {
+    const list = await openClone();
+
+    pressEscape();
+    await flushPromises();
+
+    expect(byTest("o-dialog-discard-row")).toBeNull();
+    expect(list.showForm).toBe(false);
   });
+});
+
+describe("AlertList with the real editor: Discard on leave", () => {
+  beforeEach(seedAlerts);
+  afterEach(unmountApp);
 
   it("removes the edit's autosaved draft and its list dot", async () => {
     await mountApp({ action: "update", alert_id: ALERT_ID, name: savedAlert.name });

@@ -15,8 +15,7 @@
       >
         <span>{{ t("serviceVersions.compare.error") }}</span>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="svcver-discovery-retry"
           @click="discovery.refetch()"
           >{{ t("serviceVersions.actions.retry") }}</OButton
@@ -26,8 +25,7 @@
         <OSelect
           :model-value="where"
           :label="t('serviceVersions.catalog.where')"
-          label-position="inside"
-          size="sm"
+          variant="filter"
           data-test="svcver-where"
           @update:model-value="(value) => panel.update(String(value), 'versions')"
           ><OSelectItem
@@ -61,6 +59,7 @@
       />
       <OSkeleton
         v-if="query.isPending.value"
+        shape="block"
         class="h-24 w-full"
         data-test="svcver-panel-loading"
       />
@@ -70,7 +69,7 @@
         data-test="svcver-panel-error"
       >
         <span>{{ t("serviceVersions.compare.error") }}</span>
-        <OButton variant="outline" size="sm" data-test="svcver-retry" @click="query.refetch()">{{
+        <OButton variant="secondary" data-test="svcver-retry" @click="query.refetch()">{{
           t("serviceVersions.actions.retry")
         }}</OButton>
       </div>
@@ -85,8 +84,7 @@
           }}</span
         >
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="svcver-panel-verdict-retry"
           @click="
             transitions.refetch();
@@ -110,10 +108,8 @@
         :pagination="rows.length > pageSize ? 'client' : 'none'"
         :page-size="pageSize"
         sorting="none"
-        :show-global-filter="false"
         :fill-height="false"
         :sticky-header="false"
-        frame
         expansion="multiple"
         :expanded-ids="expansionIds"
         :get-row-expansion-enabled="() => false"
@@ -164,8 +160,7 @@
         <template #cell-last_seen="{ row }">
           <OTag
             v-if="row.active"
-            variant="success-soft"
-            shape="pill"
+            tone="ok"
             dot
             :label="t('serviceVersions.panel.live')"
             data-test="svcver-version-status"
@@ -181,13 +176,11 @@
           <span class="flex flex-wrap items-center gap-1">
             <OTag
               v-if="row.signals.traces"
-              variant="teal-soft"
-              shape="pill"
+              tone="neutral"
               icon="account-tree"
               :label="t('serviceVersions.compare.traces')" /><OTag
               v-if="row.signals.rum"
-              variant="cyan-soft"
-              shape="pill"
+              tone="neutral"
               icon="devices"
               :label="t('serviceVersions.compare.rum')"
           /></span>
@@ -229,9 +222,9 @@
             class="inline-flex"
             :data-test="`svcver-compare-wrap-${row.version_key}`"
             ><OButton
-              variant="ghost-primary"
-              size="chip"
-              icon-left="compare-arrows"
+              variant="accent-ghost"
+              size="xs"
+              icon="compare-arrows"
               :disabled="row.compare_disabled || latest.compare_disabled"
               :data-test="`svcver-compare-${row.version_key}`"
               :aria-label="compareLabel(row)"
@@ -246,8 +239,9 @@
           /></span>
           <OButton
             v-if="row.history.length"
+            icon-only
             variant="ghost"
-            size="icon-chip"
+            size="xs"
             :aria-label="t('serviceVersions.panel.deployCount', { count: row.history.length })"
             :data-test="`svcver-expand-${row.version_key}`"
             :aria-expanded="expanded.includes(row.version_key)"
@@ -268,7 +262,6 @@
               v-for="deploy in row.history"
               :key="deploy.deploy_key"
               variant="ghost"
-              size="sm"
               class="justify-start! gap-3!"
               :data-test="`svcver-deploy-${deploy.deploy_key}`"
               @click.stop="open(deploy.version, deploy.deploy_key)"
@@ -297,7 +290,6 @@
           <OButton
             v-if="moreLine(row.version_key)"
             variant="ghost"
-            size="sm"
             class="ms-1 justify-start! gap-1!"
             data-test="svcver-versions-image-more"
             @click.stop="showImages(moreLine(row.version_key)?.version || '')"
@@ -320,7 +312,6 @@
       <div v-if="versioned.length || !unversioned" class="flex flex-wrap items-center gap-2">
         <OSwitch
           v-model="inactive"
-          size="sm"
           data-test="svcver-include-inactive"
           :label="t('serviceVersions.panel.showStopped')"
         />
@@ -329,9 +320,8 @@
         }}</span>
         <span class="flex-1" />
         <OSearchInput
+          width="list"
           v-model="search"
-          size="sm"
-          class="w-48!"
           :placeholder="t('serviceVersions.compare.searchVersions')"
           data-test="svcver-version-search"
           data-no-autofocus
@@ -347,9 +337,8 @@
           }}</span
         >
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="compare-arrows"
+          variant="secondary"
+          icon="compare-arrows"
           :disabled="selected.length !== 2"
           data-test="svcver-compare"
           @click="compare"

@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <DateTime
+  <ODateTimeRange
     ref="dateTimePicker"
     :auto-apply="autoApplyDashboard"
     :default-type="modelValue.valueType"
@@ -26,27 +26,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @on:date-change="updateDateTime"
     @on:timezone-change="onTimezoneChange"
     :initialTimezone="initialTimezone"
-    :disable="disable"
+    :disabled="disabled"
+    :size="size"
     :hide-relative-timezone="hideRelativeTimezone"
     :hide-range-shift="hideRangeShift"
     :menu-align="menuAlign"
-    :variant="variant"
     :calendar-presets="calendarPresets"
     @hide="onHide"
     @show="onShow"
   >
-  </DateTime>
+  </ODateTimeRange>
 </template>
 
 <script lang="ts">
 import { ref, defineComponent, onUnmounted, type PropType } from "vue";
-import DateTime from "@/components/DateTime.vue";
-import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
+import type {
+  DateTimeRangeMenuAlign,
+  DateTimeRangeSize,
+} from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
 
 export default defineComponent({
   name: "DateTimePickerDashboard",
   components: {
-    DateTime,
+    ODateTimeRange,
   },
   props: {
     modelValue: {
@@ -62,9 +65,13 @@ export default defineComponent({
       required: false,
       default: null,
     },
-    disable: {
-      required: false,
+    disabled: {
+      type: Boolean,
       default: false,
+    },
+    size: {
+      type: String as PropType<DateTimeRangeSize>,
+      default: "md",
     },
     autoApplyDashboard: {
       required: false,
@@ -83,12 +90,7 @@ export default defineComponent({
     menuAlign: {
       required: false,
       default: "end",
-      type: String as PropType<"center" | "start" | "end">,
-    },
-    variant: {
-      required: false,
-      default: "outline",
-      type: String as PropType<ButtonVariant>,
+      type: String as PropType<DateTimeRangeMenuAlign>,
     },
     calendarPresets: {
       required: false,

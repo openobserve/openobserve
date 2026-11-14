@@ -16,15 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full flex-col p-0">
-    <OPageLayout
-      :title="t('settings.organizationManagement')"
-      icon="lan"
-      :subtitle="t('settings.organizationManagementPage.subtitle')"
-      bleed
-    >
+    <OPageLayout :title="t('settings.organizationManagement')" bleed>
       <div class="bg-card-glass-bg mt-2.5 min-h-0 flex-1 overflow-hidden">
         <OTable
-          :frame="false"
           data-test="org-management-list-table"
           :data="visibleRows"
           :columns="columns"
@@ -35,27 +29,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
-          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="org-management-list"
-          :show-global-filter="false"
           :loading="loading"
           :forbidden="forbidden"
         >
           <template #toolbar>
             <OSearchInput
+              width="list"
               data-test="org-management-search-input"
               v-model="filterQuery"
-              class="no-border o2-search-input w-64 max-md:w-auto max-md:flex-1"
+              class="no-border o2-search-input max-md:w-auto max-md:flex-1"
               :placeholder="t('settings.searchOrgs')"
             />
           </template>
           <template #toolbar-trailing>
             <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              icon-only
+              variant="secondary"
+              icon="refresh"
               :loading="loading"
               data-test="org-management-list-refresh-btn"
               @click="getData"
@@ -63,17 +56,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip
                 side="bottom"
                 :content="t('common.refresh')"
-                shortcut-id="orgManagementRefresh"
+                shortcut="orgManagementRefresh"
               />
             </OButton>
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-organizations"
-              :filtered="!!filterQuery"
-              :hide-action="!filterQuery"
-              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.organizations') })
+                  : t('emptyState.noOrganizations.title')
+              "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.nouns.organizations'),
+                    })
+                  : t('emptyState.noOrganizations.description')
+              "
+              :icon="filterQuery ? undefined : 'group'"
+              @action="filterQuery = ''"
             />
           </template>
           <template #cell-ai_credits_used="{ row }">
@@ -102,11 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-status="{ row }">
             <OBadge
-              :variant="
-                row.status === 'pending_deletion' || row.status === 'deleting'
-                  ? 'warning'
-                  : 'success-soft'
-              "
+              :tone="row.status === 'pending_deletion' || row.status === 'deleting' ? 'warn' : 'ok'"
               size="sm"
             >
               {{ statusLabel(row) }}
@@ -115,9 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center gap-1">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs-circle"
-                icon-left="paid"
+                size="xs"
+                icon="paid"
                 class="max-md:hidden"
                 :aria-label="t('settings.organizationManagementPage.setUsageLimits')"
                 data-test="org-management-set-usage-limits-btn"
@@ -126,9 +126,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('settings.organizationManagementPage.setUsageLimits')" />
               </OButton>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs-circle"
-                icon-left="event"
+                size="xs"
+                icon="event"
                 class="max-md:hidden"
                 data-test="otg-management-extend-trial-btn"
                 @click.stop="toggleExtendTrialDialog(row)"
@@ -137,9 +138,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="row.billing_provider === '-'"
+                icon-only
                 variant="ghost"
-                size="icon-xs-circle"
-                icon-left="note-add"
+                size="xs"
+                icon="note-add"
                 class="max-md:hidden"
                 data-test="org-management-add-contract-btn"
                 @click.stop="toggleContractDialog(row, 'create')"
@@ -148,9 +150,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="row.billing_provider === 'no_op'"
+                icon-only
                 variant="ghost"
-                size="icon-xs-circle"
-                icon-left="event"
+                size="xs"
+                icon="event"
                 class="max-md:hidden"
                 data-test="org-management-extend-contract-btn"
                 @click.stop="toggleContractDialog(row, 'extend')"
@@ -159,9 +162,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="row.billing_provider === 'no_op'"
-                variant="ghost-destructive"
-                size="icon-xs-circle"
-                icon-left="block"
+                icon-only
+                variant="danger-ghost"
+                size="xs"
+                icon="block"
                 class="max-md:hidden"
                 data-test="org-management-revoke-contract-btn"
                 @click.stop="confirmRevokeContract(row)"
@@ -171,9 +175,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip v-if="!row.org_storage_enabled && byobLocked" :content="byobLockedReason">
                 <span class="inline-flex max-md:hidden">
                   <OButton
+                    icon-only
                     variant="ghost"
-                    size="icon-xs-circle"
-                    icon-left="lock"
+                    size="xs"
+                    icon="lock"
                     disabled
                     :aria-label="t('settings.organizationManagementPage.enableStorage')"
                     data-test="org-management-storage-enable-btn"
@@ -182,9 +187,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
               <OButton
                 v-else-if="!row.org_storage_enabled"
+                icon-only
                 variant="ghost"
-                size="icon-xs-circle"
-                icon-left="cloud-upload"
+                size="xs"
+                icon="cloud-upload"
                 class="max-md:hidden"
                 data-test="org-management-storage-enable-btn"
                 @click.stop="toggleOrgStorage(row)"
@@ -193,9 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-else
+                icon-only
                 variant="ghost"
-                size="icon-xs-circle"
-                icon-left="cloud-done"
+                size="xs"
+                icon="cloud-done"
                 disabled
                 class="text-status-positive"
                 data-test="org-management-storage-enabled-btn"
@@ -204,9 +211,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="row.status === 'deleting'"
+                icon-only
                 variant="ghost"
-                size="icon-xs-circle"
-                icon-left="history"
+                size="xs"
+                icon="history"
                 class="max-md:hidden"
                 data-test="org-management-cleanup-tasks-btn"
                 @click.stop="viewCleanupTasks(row)"
@@ -215,9 +223,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="row.status === 'pending_deletion'"
+                icon-only
                 variant="ghost"
-                size="icon-xs-circle"
-                icon-left="undo"
+                size="xs"
+                icon="undo"
                 class="max-md:hidden"
                 data-test="org-management-resurrect-btn"
                 @click.stop="resurrectOrganization(row)"
@@ -227,17 +236,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    icon-only
                     :aria-label="t('common.moreActions')"
-                    icon-left="more-vert"
+                    icon="more-vert"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="sm"
                     class="md:hidden"
                     data-test="org-management-row-more-actions"
                     @click.stop
                   />
                 </template>
                 <ODropdownItem
-                  icon-left="paid"
+                  icon="paid"
                   class="md:hidden"
                   data-test="org-management-set-usage-limits-btn-menu"
                   @select="toggleUsageLimitsDialog(row)"
@@ -245,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("settings.organizationManagementPage.setUsageLimits") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="event"
+                  icon="event"
                   class="md:hidden"
                   data-test="otg-management-extend-trial-btn-menu"
                   @select="toggleExtendTrialDialog(row)"
@@ -254,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <ODropdownItem
                   v-if="row.billing_provider === '-'"
-                  icon-left="note-add"
+                  icon="note-add"
                   class="md:hidden"
                   data-test="org-management-add-contract-btn-menu"
                   @select="toggleContractDialog(row, 'create')"
@@ -263,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <ODropdownItem
                   v-if="row.billing_provider === 'no_op'"
-                  icon-left="event"
+                  icon="event"
                   class="md:hidden"
                   data-test="org-management-extend-contract-btn-menu"
                   @select="toggleContractDialog(row, 'extend')"
@@ -271,21 +281,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("settings.organizationManagementPage.extendContract") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  v-if="row.billing_provider === 'no_op'"
-                  icon-left="block"
-                  variant="destructive"
-                  class="md:hidden"
-                  data-test="org-management-revoke-contract-btn-menu"
-                  @select="confirmRevokeContract(row)"
-                >
-                  <span>{{ t("settings.organizationManagementPage.revoke") }}</span>
-                </ODropdownItem>
-                <ODropdownItem
                   v-if="!row.org_storage_enabled"
-                  :icon-left="byobLocked ? 'lock' : 'cloud-upload'"
+                  :icon="byobLocked ? 'lock' : 'cloud-upload'"
                   :disabled="byobLocked"
-                  :focusable-unavailable="byobLocked"
-                  :description="byobLocked ? byobLockedReason : null"
+                  :disabled-reason="byobLocked ? byobLockedReason : null"
                   class="md:hidden"
                   data-test="org-management-storage-enable-btn-menu"
                   @select="toggleOrgStorage(row)"
@@ -294,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <ODropdownItem
                   v-if="row.status === 'deleting'"
-                  icon-left="history"
+                  icon="history"
                   class="md:hidden"
                   data-test="org-management-cleanup-tasks-btn-menu"
                   @select="viewCleanupTasks(row)"
@@ -303,12 +302,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <ODropdownItem
                   v-if="row.status === 'pending_deletion'"
-                  icon-left="undo"
+                  icon="undo"
                   class="md:hidden"
                   data-test="org-management-resurrect-btn-menu"
                   @select="resurrectOrganization(row)"
                 >
                   <span>{{ t("organization.resurrect") }}</span>
+                </ODropdownItem>
+                <ODropdownSeparator class="md:hidden" />
+                <ODropdownItem
+                  v-if="row.billing_provider === 'no_op'"
+                  icon="block"
+                  tone="danger"
+                  class="md:hidden"
+                  data-test="org-management-revoke-contract-btn-menu"
+                  @select="confirmRevokeContract(row)"
+                >
+                  <span>{{ t("settings.organizationManagementPage.revoke") }}</span>
                 </ODropdownItem>
               </ODropdown>
             </div>
@@ -327,11 +337,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name: extendTrialDataRow?.name,
         })
       "
-      :sub-title="t('settings.organizationManagementPage.extendTrialSubtitle')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-label="
-        t('settings.organizationManagementPage.extendTrialByWeeks', { n: extendedTrial })
-      "
+      :subtitle="t('settings.organizationManagementPage.extendTrialSubtitle')"
+      :secondary="{ label: t('common.cancel') }"
+      :primary="{
+        label: t('settings.organizationManagementPage.extendTrialByWeeks', { n: extendedTrial }),
+      }"
       form-id="org-extend-trial-form"
       @click:secondary="extendTrialPrompt = false"
     >
@@ -370,14 +380,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="usageLimitsPrompt"
       size="sm"
       :title="usageLimitsTitle"
-      :sub-title="usageLimitsSubtitle"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-label="usageLimitsPrimaryLabel"
+      :subtitle="usageLimitsSubtitle"
+      :secondary="{ label: t('common.cancel') }"
+      :primary="{ label: usageLimitsPrimaryLabel }"
       :form-id="usageLimitsFormId"
       @click:secondary="usageLimitsPrompt = false"
     >
       <div class="flex flex-col gap-3">
-        <OTabs v-model="usageLimitsTab" dense bordered data-test="org-management-usage-limits-tabs">
+        <OTabs
+          v-model="usageLimitsTab"
+          size="compact"
+          bordered
+          data-test="org-management-usage-limits-tabs"
+        >
           <OTab
             name="ai_credits"
             :label="t('settings.organizationManagementPage.aiCreditsTab')"
@@ -464,12 +479,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name: contractDataRow?.name,
             })
       "
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-label="
-        contractMode === 'create'
-          ? t('settings.organizationManagementPage.createContract')
-          : t('settings.organizationManagementPage.extendContract')
-      "
+      :secondary="{ label: t('common.cancel') }"
+      :primary="{
+        label:
+          contractMode === 'create'
+            ? t('settings.organizationManagementPage.createContract')
+            : t('settings.organizationManagementPage.extendContract'),
+      }"
       form-id="org-contract-form"
       @click:secondary="contractPrompt = false"
     >
@@ -531,6 +547,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -576,6 +593,7 @@ export default defineComponent({
     ODialog,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
     OTooltip,
     OForm,
     OFormInput,
@@ -1178,7 +1196,7 @@ export default defineComponent({
         title: t("settings.organizationManagementPage.revokeConfirmTitle"),
         messageKeypath: "settings.organizationManagementPage.revokeConfirmMessage",
         messageName: row.name,
-        confirmVariant: "destructive",
+        kind: "destructive",
       });
       if (ok) {
         const metaOrg = store.state.selectedOrganization.identifier;

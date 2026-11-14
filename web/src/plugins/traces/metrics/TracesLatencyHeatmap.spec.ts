@@ -128,7 +128,7 @@ const options = (wrapper: any) =>
 const cellWithCount = (wrapper: any, count: number) =>
   options(wrapper).series[0].data.find((c: number[]) => c[3] === count);
 
-const panelLine = (wrapper: any) => wrapper.findComponent({ name: "LoadingProgress" });
+const panelLine = (wrapper: any) => wrapper.findComponent({ name: "OLoadingLine" });
 
 let wrapper: any = null;
 
@@ -172,14 +172,14 @@ describe("TracesLatencyHeatmap", () => {
       expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
       expect(body.attributes("aria-busy")).toBe("true");
-      expect(panelLine(wrapper).props("loading")).toBe(true);
+      expect(panelLine(wrapper).props("active")).toBe(true);
       await new Promise((r) => setTimeout(r, 160));
       expect(body.classes()).not.toContain("opacity-60");
 
       answer({ data: { hits: HITS, histogram_interval: 10 } });
       await settle();
       expect(body.attributes("aria-busy")).toBeUndefined();
-      expect(panelLine(wrapper).props("loading")).toBe(false);
+      expect(panelLine(wrapper).props("active")).toBe(false);
       expect(wrapper.find('[data-test="traces-latency-heatmap-chart"]').exists()).toBe(true);
     });
 
@@ -192,26 +192,22 @@ describe("TracesLatencyHeatmap", () => {
         "traces-latency-heatmap-body",
       );
       expect(line.element.parentElement?.firstElementChild).toBe(line.element);
-      expect(line.props()).toMatchObject({
-        loading: true,
-        loadingProgressPercentage: 0,
-        indeterminate: false,
-      });
+      expect(line.props("active")).toBe(true);
       expect(wrapper.find('[data-test="traces-latency-heatmap-loading"]').exists()).toBe(true);
 
       first({ data: { hits: HITS, histogram_interval: 10 } });
       await settle();
-      expect(panelLine(wrapper).props("loading")).toBe(false);
+      expect(panelLine(wrapper).props("active")).toBe(false);
 
       let again!: (v: any) => void;
       search.mockReturnValueOnce(new Promise((r) => (again = r)) as any);
       await wrapper.setProps({ request: request("SELECT 2") });
       await settle();
-      expect(panelLine(wrapper).props("loading")).toBe(true);
+      expect(panelLine(wrapper).props("active")).toBe(true);
 
       again({ data: { hits: HITS, histogram_interval: 10 } });
       await settle();
-      expect(panelLine(wrapper).props("loading")).toBe(false);
+      expect(panelLine(wrapper).props("active")).toBe(false);
     });
 
     it("never keeps another stream's grid while the new stream's loads", async () => {
@@ -242,7 +238,7 @@ describe("TracesLatencyHeatmap", () => {
       expect(options(wrapper)).toEqual(drawn);
       expect(body.attributes("aria-busy")).toBeUndefined();
       expect(body.classes()).not.toContain("opacity-60");
-      expect(panelLine(wrapper).props("loading")).toBe(false);
+      expect(panelLine(wrapper).props("active")).toBe(false);
       expect(wrapper.emitted("refresh-failed")).toHaveLength(1);
     });
 

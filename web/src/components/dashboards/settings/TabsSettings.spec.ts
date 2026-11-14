@@ -14,12 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import TabsSettings from "./TabsSettings.vue";
+import { addTab } from "../../../utils/commons";
 
 // Mock external dependencies
 vi.mock("../../../utils/commons", () => ({
   getDashboard: vi.fn(),
+  addTab: vi.fn(),
   editTab: vi.fn(),
   deleteTab: vi.fn(),
   updateDashboard: vi.fn(),
@@ -76,15 +78,6 @@ const mockDashboardHeader = {
   </div>`,
 };
 
-const mockAddTab = {
-  name: "AddTab",
-  props: ["open", "editMode", "tabId", "dashboardId"],
-  template: "<div data-test='mock-add-tab'></div>",
-  methods: {
-    submit: vi.fn(),
-  },
-};
-
 const mockTabsDeletePopUp = {
   name: "TabsDeletePopUp",
   template: "<div data-test='mock-tabs-delete-popup'></div>",
@@ -109,7 +102,6 @@ describe("TabsSettings", () => {
         plugins: [],
         components: {
           DashboardHeader: mockDashboardHeader,
-          AddTab: mockAddTab,
           TabsDeletePopUp: mockTabsDeletePopUp,
         },
         stubs: {},
@@ -209,14 +201,16 @@ describe("TabsSettings", () => {
   });
 
   describe("Header and Navigation", () => {
-    it("should show add tab dialog when add button is clicked", async () => {
+    it("shows the inline new-tab row, not a dialog, when the add button is clicked", async () => {
       wrapper = createWrapper();
 
       const addButton = wrapper.find('[data-test="dashboard-tab-settings-add-tab"]');
       await addButton.trigger("click");
 
-      expect(wrapper.vm.showAddTabDialog).toBe(true);
-      expect(wrapper.vm.isTabEditMode).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-tab-settings-add-tab-inline"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.findComponent({ name: "ODialog" }).exists()).toBe(false);
     });
   });
 
@@ -433,32 +427,54 @@ describe("TabsSettings", () => {
     });
   });
 
-  describe("Add Tab Drawer (AddTab owns its ODrawer)", () => {
-    it("should close drawer when AddTab emits update:open with false", async () => {
+  describe("Inline new tab", () => {
+    const openRow = async (w: VueWrapper<any>) => {
+      await w.find('[data-test="dashboard-tab-settings-add-tab"]').trigger("click");
+    };
+
+    it("creates the tab, refreshes and closes the row", async () => {
+      vi.mocked(addTab).mockResolvedValueOnce({ tabId: "tab4", name: "Errors" } as never);
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
+      await openRow(wrapper);
 
-      wrapper.vm.showAddTabDialog = true;
-      await wrapper.vm.$nextTick();
+      await wrapper.find('[data-test="dashboard-add-tab-name"] input').setValue("  Errors ");
+      await wrapper.find('[data-test="dashboard-add-tab-create"]').trigger("click");
+      await flushPromises();
 
-      const addTabComponent = wrapper.findComponent({ name: "AddTab" });
-      await addTabComponent.vm.$emit("update:open", false);
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.showAddTabDialog).toBe(false);
+      expect(addTab).toHaveBeenCalledWith(expect.anything(), "test-dashboard-id", "test-folder", {
+        name: "Errors",
+        panels: [],
+      });
+      expect(wrapper.emitted("refresh")).toBeTruthy();
+      expect(wrapper.find('[data-test="dashboard-tab-settings-add-tab-inline"]').exists()).toBe(
+        false,
+      );
     });
 
-    it("should close dialog and refresh after tab creation", async () => {
+    it("refuses an empty name with an error under the field", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
+      await openRow(wrapper);
 
-      wrapper.vm.showAddTabDialog = true;
+      await wrapper.find('[data-test="dashboard-add-tab-create"]').trigger("click");
+      await flushPromises();
 
-      await wrapper.vm.refreshRequired();
+      expect(addTab).not.toHaveBeenCalled();
+      expect(wrapper.vm.newTabError).toBe("dashboard.nameRequired");
+    });
 
-      expect(wrapper.vm.showAddTabDialog).toBe(false);
-      expect(wrapper.vm.isTabEditMode).toBe(false);
-      expect(wrapper.emitted("refresh")).toBeTruthy();
+    it("Cancel closes the row without creating anything", async () => {
+      wrapper = createWrapper();
+      await wrapper.vm.$nextTick();
+      await openRow(wrapper);
+
+      await wrapper.find('[data-test="dashboard-add-tab-cancel"]').trigger("click");
+
+      expect(addTab).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="dashboard-tab-settings-add-tab-inline"]').exists()).toBe(
+        false,
+      );
     });
   });
 

@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="`${dataTestPrefix}-zoom-controls`"
   >
     <OButton
+      icon-only
       variant="ghost"
-      size="icon-sm"
-      icon-left="add"
+      icon="add"
       class="rounded-none"
       :data-test="`${dataTestPrefix}-zoom-in`"
       @click="emit('zoom-in')"
@@ -31,9 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
     <OSeparator />
     <OButton
+      icon-only
       variant="ghost"
-      size="icon-sm"
-      icon-left="remove"
+      icon="remove"
       class="rounded-none"
       :data-test="`${dataTestPrefix}-zoom-out`"
       @click="emit('zoom-out')"
@@ -42,9 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
     <OSeparator />
     <OButton
+      icon-only
       variant="ghost"
-      size="icon-sm"
-      icon-left="fullscreen"
+      icon="fullscreen"
       class="rounded-none"
       :data-test="`${dataTestPrefix}-fit-screen`"
       @click="emit('fit')"

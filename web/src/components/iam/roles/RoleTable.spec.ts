@@ -46,8 +46,8 @@ describe("RoleTable member count columns", () => {
     await flushPromises();
     const variant = (id: string) =>
       wrapper.find(`[data-test="iam-roles-bots-${id}-link"]`).attributes("data-o2-variant");
-    expect(variant("users")).toBe("ghost-muted");
-    expect(variant("service-accounts")).toBe("ghost-primary");
+    expect(variant("users")).toBe("ghost");
+    expect(variant("service-accounts")).toBe("accent-ghost");
     wrapper.unmount();
   });
 

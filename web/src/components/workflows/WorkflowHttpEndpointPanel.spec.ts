@@ -97,26 +97,26 @@ describe("WorkflowHttpEndpointPanel", () => {
     for (const w of mounted.splice(0)) w.unmount();
   });
 
-  it("the panel is xl with the kind subtitle, name only without a trigger", async () => {
+  it("the panel is lg (800) with the kind subtitle, name only without a trigger", async () => {
     const w = await mountPanel();
-    expect(drawer(w).props("size")).toBe("xl");
+    expect(drawer(w).props("size")).toBe("lg");
     expect(drawer(w).props("title")).toBe(t("workflow.http.panelTitle"));
-    expect(drawer(w).props("subTitle")).toBe(
+    expect(drawer(w).props("subtitle")).toBe(
       t("workflow.http.panelSubtitle", { name: "Restart failed deploy", kind: "Alert Fired" }),
     );
     expect(drawer(w).attributes("data-test")).toBe("workflow-http-panel");
     expect(drawer(w).props("persistent")).toBeFalsy();
     const bare = await mountPanel({ kind: undefined });
-    expect(drawer(bare).props("subTitle")).toBe("Restart failed deploy");
+    expect(drawer(bare).props("subtitle")).toBe("Restart failed deploy");
   });
 
   it("an unnamed workflow reads Untitled Workflow in the subtitle, never a bare separator", async () => {
     const w = await mountPanel({ workflowName: "" });
-    expect(drawer(w).props("subTitle")).toBe(
+    expect(drawer(w).props("subtitle")).toBe(
       t("workflow.http.panelSubtitle", { name: "Untitled Workflow", kind: "Alert Fired" }),
     );
     const bare = await mountPanel({ workflowName: "  ", kind: undefined });
-    expect(drawer(bare).props("subTitle")).toBe("Untitled Workflow");
+    expect(drawer(bare).props("subtitle")).toBe("Untitled Workflow");
   });
 
   it("kind note on alert and incident workflows only", async () => {
@@ -133,7 +133,7 @@ describe("WorkflowHttpEndpointPanel", () => {
     expect(byTest(none, "workflow-http-kind-note").exists()).toBe(false);
   });
 
-  it("sets the field in monospace and pads the sample payload, as in the mockups", async () => {
+  it("sets the field in monospace and wraps the sample payload, as in the mockups", async () => {
     const w = await mountPanel();
     const note = byTest(w, "workflow-http-kind-note");
     expect(note.find(".font-mono").text()).toBe('meta.trigger_source = "http"');
@@ -141,7 +141,6 @@ describe("WorkflowHttpEndpointPanel", () => {
       'HTTP runs get the request instead (meta.trigger_source = "http"), so add a Condition if a step needs Alert Fired fields.',
     );
     await byTest(w, "workflow-http-kind-note-payload").trigger("click");
-    expect(w.findComponent({ name: "OCodeBlock" }).props("padded")).toBe(true);
     expect(w.findComponent({ name: "OCodeBlock" }).props("wrap")).toBe(true);
   });
 

@@ -77,7 +77,7 @@ const NamedConfirmDialogStub = defineComponent({
     messageKeypath: { type: String, default: "" },
     messageName: { type: String, default: "" },
     okLabel: { type: String, default: "" },
-    okVariant: { type: String, default: "primary" },
+    kind: { type: String, default: "confirm" },
   },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: `
@@ -381,7 +381,7 @@ describe("SlackWorkspaceCard (A3)", () => {
     expect(w.find('[data-test-stub="confirm-name"]').text()).toBe("Acme Corp");
     const dialog = w.findComponent(NamedConfirmDialogStub);
     expect(dialog.props("messageKeypath")).toBe("slackApp.card.forgetMessage");
-    expect(dialog.props("okVariant")).toBe("destructive");
+    expect(dialog.props("kind")).toBe("destructive");
     await w.find('[data-test-stub="confirm-ok"]').trigger("click");
     await flushPromises();
     expect(slack.updateCredentials).toHaveBeenCalledWith("acme", "inst-1", {

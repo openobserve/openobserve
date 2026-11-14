@@ -6,14 +6,15 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 
 - [OBadge](#obadge)
 - [OTag](#otag)
+- [OPriority · OSeverity · OCountBadge](#opriority--oseverity--ocountbadge)
 - [ODimensionChip](#odimensionchip)
-- [OCard](#ocard)
-- [OCardSection](#ocardsection)
-- [OCardActions](#ocardactions)
+- [OCard (the panel)](#ocard)
 - [OCode](#ocode)
 - [OCodeBlock](#ocodeblock)
+- [OJsonViewer](#ojsonviewer)
 - [OCollapsible](#ocollapsible)
 - [OEmptyState](#oemptystate)
+- [OAvatar · OAvatarGroup](#oavatar--oavatargroup)
 - [OIcon](#oicon)
 - [OSeparator](#oseparator)
 - [OSettingRow](#osettingrow)
@@ -27,30 +28,33 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 ### OBadge
 
 **Import:** `@/lib/core/Badge/OBadge.vue`
-**Use when:** You need the low-level badge renderer with full manual control over variant, size, shape, dot, icon, count, and interactivity. In app code you almost never reach for this directly.
-**Don't use for:** Application-level badges — use `OTag` instead (it wraps OBadge and adds registry-driven semantic colours/labels). OBadge is used only _inside_ OTag.
-**Key props:**
+**Use when:** You need the low-level chip renderer. In app code you almost never reach for it directly.
+**Don't use for:** Application chips — use `OTag`, which wraps OBadge and adds the registry.
+**Key props** (shared with OTag; types `ChipTone` / `ChipSize` in `OBadge.types.ts`):
 
-- `variant` (default `"default"`) — one of: `default`, `primary`, `success`, `warning`, `error`, `default-outline`, `primary-outline`, `success-outline`, `warning-outline`, `error-outline`, `info-outline`, `purple-outline`, `default-soft`, `primary-soft`, `success-soft`, `warning-soft`, `error-soft`, `teal`, `teal-outline`, `teal-soft`, `orange`, `orange-outline`, `orange-soft`, `lime`, `lime-outline`, `lime-soft`, `amber`, `amber-outline`, `amber-soft`, `cyan`, `cyan-outline`, `cyan-soft`, `blue`, `blue-outline`, `blue-soft`, `purple`, `purple-soft`, `indigo`, `indigo-outline`, `indigo-soft`
-- `size` (`xs` | `sm` | `md` — default `md`)
-- `shape` (`pill` | `rounded` | `square` — default `pill`).
-  **Strict: badges are `pill` by default and STAY pill.** Do not pass `rounded`
-  or `square` — never pick a badge shape by eye. Only set another shape when a
-  design explicitly calls for it, and for a typed `OTag` that shape lives in the
-  badge-registry group (`badgeGroups.ts`), never as a call-site prop.
-- `icon` (string — Material icon or OIcon registry name; overridden by `#icon` slot)
-- `count` (number — trailing segment; `0` still renders unless `hideZeroCount`)
-- `hideZeroCount` (boolean — suppress trailing segment when count is 0)
-- `dot` (boolean, default `false` — leading status dot in the badge's foreground colour)
-- `clickable` (boolean, default `false` — makes it a keyboard-focusable button that emits `click`)
-- `disabled` (boolean, default `false`)
+- `tone` (default `neutral`) — `neutral` | `outline` | `accent` | `ok` | `warn` | `err` | `crit` | `info`.
+  Status tones (ok, warn, err, crit, info) are the soft triplet: text, fill and a 1 px edge (C2).
+  `accent` is the selected look, `outline` a transparent chip with a border, `neutral` a grey
+  fill with secondary text. There are no decorative hues: categories are `neutral` or
+  `outline` (C1, C3).
+- `size` (default `sm`) — `sm` 20 px inside text and tables, `md` 24 px in a 24 px row (S1).
+  Radius is always `rounded-chip`, text `text-xs` medium. There is no `shape`.
+- `icon` (OIcon name, 12 px) · `dot` (6 px; unset means automatic: a status tone without an
+  icon gets a dot, so status never reads by colour alone, C2) · `mono` (identifiers, T4)
+- `toggle` + `pressed` — a 24 px `<button aria-pressed>`: a chip that selects something
+  (KB4). A chip that only acts is an `OButton`, not a chip.
+- `removable` + `removeLabel` (✕ that emits `remove`) · `disabled`
 
-**Slots:** `default` (label), `icon` (custom left content, overrides `icon` prop), `trailing` (custom right content, overrides `count`)
-**Emits:** `click` (`[e: MouseEvent | KeyboardEvent]`) — only when `clickable`
+**Slots:** `default` (text), `icon`, `trailing` (a segment after a divider, e.g. a count)
+**Emits:** `click` (only when `toggle`), `remove`
+**Removed:** `variant` → `tone`, `shape`, `clickable` → `toggle`/`removable`/`OButton`,
+`count`/`hideZeroCount` → `#trailing` or `OCountBadge`, sizes `xs`/`lg`. `local/o2-display-api`
+rejects them and any class that restyles a chip (`uppercase`, `h-*`, `py-*`, `rounded*`, text
+sizes).
 **Example:**
 
 ```vue
-<OBadge variant="success-soft" dot>Active</OBadge>
+<OBadge tone="ok">Active</OBadge>
 ```
 
 **Family:** Rendered internally by `OTag`. Standalone otherwise.
@@ -60,61 +64,64 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 ### OTag
 
 **Import:** `@/lib/core/Badge/OTag.vue`
-**Use when:** This is THE badge for application code. Use it for any status pill, type chip, or label — either semantic (pass `type` + `value` to resolve colour/icon/dot/label from the badge registry) or manual (pass `variant`/slots like OBadge).
-**Don't use for:** Two-segment `key=value` dimension chips — use `ODimensionChip`. Don't reach past it to `OBadge`.
+**Use when:** This is THE chip for application code: any status, type or label chip —
+semantic (`type` + `value` resolve tone/icon/dot/label from `badgeGroups.ts`) or manual
+(`tone` + slots, as OBadge).
+**Don't use for:** `key=value` chips (`ODimensionChip`), priorities (`OPriority`), log levels
+(`OSeverity`), counts on tabs or nav (`OCountBadge`), or anything that acts (`OButton`).
 
-> **Rule (strict) — styling lives in the registry, never at the call site.**
-> A semantic `<OTag>` in application code carries **only `type` + `value`** (plus
-> `label`/`count`/`#default` for genuinely dynamic *content* the registry cannot
-> enumerate — a version string, an instance name, a live count). Every VISUAL
-> decision — `variant`, `size`, `shape`, `icon`, `dot` — belongs in the group's
-> entry in `badgeGroups.ts`, **not** as a per-call prop, so one edit restyles
-> every use and the look cannot drift between call sites. The style-override props
-> listed below exist for the low-level library and one-off *manual* passthrough
-> badges (no `type`) only — do not use them to re-style a typed badge.
+> **Rule (strict) — styling lives in the registry, never at the call site.** A semantic
+> `<OTag>` carries only `type` + `value` (plus `label` / `#default` for dynamic content the
+> registry cannot enumerate). Every visual decision — `tone`, `size`, `icon`, `dot` — lives
+> in the group's entry in `badgeGroups.ts`, so one edit restyles every use. A chip that must
+> look different in another context gets its own group.
 >
-> A badge that must look different **in a different context** gets its own
-> registry **group** (e.g. a distinct `type`), not a call-site override. If you
-> find yourself writing `<OTag type="x" value="y" size="md" shape="pill">`, the
-> size/shape belong in group `x` (or a new group), not on the tag.
+> **Colour the exception, not the norm (C3).** The healthy majority is a `neutral` chip or
+> plain text; `ok`/`warn`/`err`/`crit` mark the rows that need attention. Grey is "never or
+> unknown", amber only "went quiet" (C5). No uppercase chip text (T5).
 **Key props:**
 
-- `type` (`BadgeGroupName | string` — registry group e.g. `"alertType"`; omit for a manual badge)
-- `value` (unknown — raw value resolved against the group)
-- `size` (`xs` | `sm` | `md` — precedence: prop → registry → `sm`)
-- `shape` (`pill` | `rounded` | `square` — precedence: prop → registry → `pill`).
-  Default is `pill` and stays pill; a group sets `rounded`/`square` in
-  `badgeGroups.ts` only when a design explicitly calls for it — never a call-site
-  shape override.
-- `label` (string — override resolved label)
-- `variant` (`BadgeVariant` — override resolved colour; same enum as OBadge)
-- `icon` (string — override resolved OIcon name; `""` suppresses)
-- `dot` (boolean — override leading dot; defaults to registry dot for typed groups)
-- `count` (number — trailing count, OBadge passthrough)
-- `hideZeroCount` (boolean)
-- `clickable` (boolean)
-- `disabled` (boolean)
-- `emptyLabel` (string, default `"—"` — shown when a typed value is empty)
+- `type` (`BadgeGroupName | string`) · `value` (raw value resolved against the group)
+- `tone` · `size` (`sm` default, `md`) · `icon` (`""` suppresses) · `dot` · `mono` — as OBadge
+- `label` (I18nText — dynamic text) · `emptyLabel` (default "—", for an empty typed value, C4)
+- `toggle` + `pressed` · `removable` + `removeLabel` · `disabled`
 
-**Slots:** `default` (label content — wins over `label`), `icon`, `trailing`
-**Emits:** `click` (`[e: MouseEvent | KeyboardEvent]`)
+**Slots:** `default` (wins over `label`), `icon`, `trailing`
+**Emits:** `click` (toggle only), `remove`
 **Example:**
 
 ```vue
-<!-- semantic: colour + icon resolved from the registry -->
+<!-- semantic: tone + dot resolved from the registry -->
 <OTag type="alertStatus" value="active" />
-<!-- manual passthrough -->
-<OTag variant="primary-soft" :count="12">Steps</OTag>
+<!-- manual: a count in the trailing segment -->
+<OTag tone="accent">Steps<template #trailing>12</template></OTag>
+<!-- toggle chip -->
+<OTag toggle :pressed="onlyMine" @click="onlyMine = !onlyMine">{{ t("alerts.mine") }}</OTag>
 ```
 
-**Family:** Wraps `OBadge`. Sibling `ODimensionChip` for key=value chips.
+**Family:** Wraps `OBadge`. Siblings `OPriority`, `OSeverity`, `OCountBadge`, `ODimensionChip`.
+
+---
+
+### OPriority · OSeverity · OCountBadge
+
+**Import:** `@/lib/core/Badge/OPriority.vue` · `OSeverity.vue` · `OCountBadge.vue`
+
+- **`OPriority`** `level` 1 | 2 | 3 — P1 solid strong, P2 outlined, P3 quiet: priority reads by
+  weight, never by hue. Priorities beyond P3 stay a typed `OTag`.
+- **`OSeverity`** `level` `fatal` | `error` | `warn` | `info` | `debug`, optional `mark` (3 px
+  bar) and `label` — mono 11 px text in the status colour (T4, C2). `toSeverityLevel()` in
+  `severityLevel.ts` maps raw log levels. Read-only; a severity that opens a menu is a toggle
+  `OTag`.
+- **`OCountBadge`** `count`, `tone` `neutral` (default) | `accent` | `err`, `max` (default 99 →
+  "99+"): a 16 px round count. Red only for firing counts (C3).
 
 ---
 
 ### ODimensionChip
 
 **Import:** `@/lib/core/Badge/ODimensionChip.vue`
-**Use when:** Displaying a two-segment `key=value` dimension chip (e.g. `service=openobserve`, `k8s-cluster=prod`). Colour is derived from the key via `dimensionVariant()` (exact → substring → stable hash) so the same dimension is the same colour everywhere.
+**Use when:** Displaying a two-segment `key=value` dimension chip (e.g. `service=openobserve`, `k8s-cluster=prod`): a mono key on a subtle fill, then the mono value in strong text. It carries no hue; an optional `tone` from the chip tones marks a status.
 **Don't use for:** Single-label status/type chips — use `OTag`. Do not pass `type="dimensionKey"` to OTag for prefixed keys (it only exact-matches).
 **Key props:**
 
@@ -144,82 +151,44 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 ### OCard
 
 **Import:** `@/lib/core/Card/OCard.vue`
-**Use when:** You need a flat surface container. Always flat — no elevation/variant props. Compose `OCardSection`, `OSeparator`, and `OCardActions` inside it.
-**Don't use for:** A raised/modal surface — those are handled by dialog/overlay components. Don't add padding directly; use `OCardSection`.
-**Key props:** none (use `class` for layout and sizing)
-**Slots:** `default` (card content)
-**Emits:** none
+**Use when:** The one panel frame: overview tiles, settings sections, side panels, dashboard
+tiles. 1 px `border-border-default`, `rounded-surface` (10), surface fill, no shadow. Panels
+stack 12 apart (L4).
+**Don't use for:** A table that already has a frame — never a card inside a card (D8); a raised
+or modal surface (dialogs, drawers).
+**Key props:**
+
+- `title` · `meta` (I18nText) — the 40 px header shows when `title` or `#header` is set:
+  title 13/600 strong, meta 12 tertiary, `border-b border-border-subtle`.
+- `flush` (boolean) — no body padding, for a table or chart; the body is `p-3`, 13 px otherwise.
+- `loading` (boolean) — skeleton body; the frame and header stay.
+
+**Slots:** `default` (body), `#actions` (header end, `sm` 28 px controls only), `#header` (a
+custom header line, still 40 px), `#footer` (right-aligned row under the body)
+**Removed:** `variant` (panel / outlined / glass), and `OCardSection` / `OCardActions` (fold
+into `title`, the body and `#footer`). `local/o2-display-api` rejects classes that restyle the
+frame (`rounded-*`, `shadow-*`, padding, `card-container`).
 **Example:**
 
 ```vue
-<OCard class="w-full">
-  <OCardSection role="header">Title</OCardSection>
-  <OSeparator />
-  <OCardSection role="body">Content</OCardSection>
+<OCard :title="t('usage.requestsByStatus')" :meta="t('common.lastHour')" flush>
+  <template #actions><OButton size="sm" variant="ghost">{{ t("common.viewAll") }}</OButton></template>
+  <OTable :data="rows" :columns="columns" />
 </OCard>
 ```
-
-**Family:** Use with `OCardSection`, `OCardActions`, and `OSeparator`.
-
----
-
-### OCardSection
-
-**Import:** `@/lib/core/Card/OCardSection.vue`
-**Use when:** Defining a semantic zone inside an `OCard`. `role` bundles the correct padding, flex-grow/shrink, and layout for the three standard zones.
-**Don't use for:** Action button rows — use `OCardActions`. Outside a card, apply your own classes rather than a role.
-**Key props:**
-
-- `role` (`header` | `body` | `footer` — omit for a plain unstyled section)
-- `scrollable` (boolean, default `false` — adds `overflow-y: auto`; only meaningful with `role="body"`)
-
-**Slots:** `default`
-**Emits:** none
-**Example:**
-
-```vue
-<OCardSection role="body" scrollable>
-  <OText variant="body">Scrollable card content…</OText>
-</OCardSection>
-```
-
-**Family:** Child of `OCard`. Sibling `OCardActions`.
-
----
-
-### OCardActions
-
-**Import:** `@/lib/core/Card/OCardActions.vue`
-**Use when:** Laying out the action button row (typically `OButton`s) at the bottom of an `OCard`.
-**Don't use for:** General card content — use `OCardSection`.
-**Key props:**
-
-- `align` (`left` | `center` | `right` | `between` — default `right`)
-
-**Slots:** `default` (action buttons)
-**Emits:** none
-**Example:**
-
-```vue
-<OCardActions align="between">
-  <OButton variant="ghost">Cancel</OButton>
-  <OButton variant="primary">Save</OButton>
-</OCardActions>
-```
-
-**Family:** Child of `OCard`. Sibling `OCardSection`.
 
 ---
 
 ### OCode
 
 **Import:** `@/lib/core/Code/OCode.vue`
-**Use when:** Displaying short monospace code — cron expressions, stream/resource IDs, SQL/PromQL/VRL snippets, config values, paths, terminal commands. Inline chip by default; `block` for a scrollable pre/code.
-**Don't use for:** Syntax-highlighted multi-line blocks with chrome/masking — use `OCodeBlock`. For non-executable identifiers shown as plain text, prefer `<OText variant="mono">`.
+**Use when:** Inline code — a cron expression, a stream or resource id, a path: a 4 px mono
+12 px chip (T4).
+**Don't use for:** A block of code — every block is `OCodeBlock` (the `block` prop is gone). For
+non-executable identifiers shown as plain text, prefer `<OText variant="mono">`.
 **Key props:**
 
-- `block` (boolean, default `false` — full-width scrollable block vs inline chip)
-- `copyable` (boolean, default `false` — shows a copy-to-clipboard button)
+- `copyable` (boolean, default `false` — an `OCopyButton` after the chip copies the rendered text)
 - `truncate` (boolean, default `false` — ellipsis; inline mode only). A cut value shows its full text on hover, only while it is cut.
 - `tooltip` (I18nText | `false` — with `truncate`: hover text when cut, defaults to the value; **`false` for secrets** such as API keys and tokens, which must never show on hover)
 
@@ -238,63 +207,84 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 ### OCodeBlock
 
 **Import:** `@/lib/core/Code/OCodeBlock.vue`
-**Use when:** Rendering a syntax-highlighted block of code (highlight.js) with a copy button, optional secret masking (Reveal/Hide), and optional window chrome. Copy always copies the raw `code` prop.
-**Don't use for:** Short inline code or simple non-highlighted blocks — use `OCode`.
+**Use when:** Any read-only block of code: snippets, install commands, credentials, configs,
+stack traces (T4). One 36 px head — file name (mono) and language, then Reveal, Wrap and a
+labelled `OCopyButton` ("Copy", inline check, no toast: K1). The frame is `rounded-default`,
+12 px mono on an 18 px line, `p-3`. Copy always copies the raw `code`.
+**Don't use for:** Editing (queries and functions use the code editor) or inline code (`OCode`).
 **Key props:**
 
-- `code` (string, required — raw code; copy uses this)
-- `lang` (string — fence language, auto-detected when omitted)
-- `codeMasked` (string — masked variant shown by default with a Reveal/Hide toggle)
-- `chrome` (`terminal` | `editor` — terminal traffic-lights + "Terminal" label, or a filename tab; omit for a plain language label)
-- `filename` (string — shown in `editor` chrome, falls back to `lang`)
-- `copyable` (boolean, default `true`)
-- `copyMessage` (string, default `"Copied to clipboard!"`)
-- `revealTooltip` (string, default `"Reveal"`)
-- `hideTooltip` (string, default `"Hide"`)
-- `dataTest` (string, default `"code-block"` — prefix for toolbar button test ids)
+- `code` (string, required) · `lang` (auto-detected when omitted) · `filename`
+- `codeMasked` (string) + `sensitive` — the secret is masked by default behind Reveal; Copy
+  works without revealing. Never show a secret unmasked by default.
+- `copyable` (default `true`) · `wrap` (initial state; the head offers Wrap when a line is long)
+- `maxLines` (default 12) — longer code collapses behind "Show all N lines"
+- `lineNumbers` (ignored while wrapped) · `dataTest` (prefix: `<prefix>-copy-btn`, `-reveal-btn`,
+  `-wrap-btn`, `-show-all`) · `tokenName` + `@token-click` (credential picker link)
 
-**Slots:** `actions` (extra toolbar actions, rendered left of the copy button)
-**Emits:** `copy` (fired after the raw code is copied)
+**Slots:** `actions` (extra `sm` head actions, before Copy)
+**Emits:** `copy` (`{ partial }` — after a whole-block copy or a selection copy), `token-click`
+**Removed:** `chrome`, `padded`, `inset`, `copyMessage`, `revealTooltip`, `hideTooltip`.
 **Example:**
 
 ```vue
-<OCodeBlock :code="installCmd" lang="bash" chrome="terminal" @copy="onCopied" />
+<OCodeBlock :code="installCmd" lang="bash" filename="install.sh" @copy="onCopied" />
 ```
 
-**Family:** Composes `OButton`, `OIcon`, `OTooltip`. Sibling `OCode`.
+**Family:** Composes `OButton`, `OCopyButton`, `OTooltip`. Siblings `OCode`, `OJsonViewer`.
+
+---
+
+### OJsonViewer
+
+**Import:** `@/lib/core/Code/OJsonViewer.vue`
+**Use when:** Showing a JSON value or record read-only: 24 px rows, keys secondary, values
+coloured by type from the syntax tokens, objects past `expandDepth` (default 2) collapsed to
+"{ N fields }". Each leaf row offers, on hover and always on touch, include, exclude and copy.
+**Don't use for:** Editing JSON (code editor) or comparing records (a table).
+**Key props:** `value` (unknown), `expandDepth`, `dataTest` (row ids are
+`<prefix>-row-<path>`, paths like `http.status` and `tags[0]`)
+**Emits:** `include(path, value)` and `exclude(path, value)` — each action shows only when its
+listener is bound; feed them to the filter chips (F5) — and `copy(path, value)`.
+
+```vue
+<OJsonViewer :value="record" @include="addFilter" @exclude="addExclusion" />
+```
 
 ---
 
 ### OCollapsible
 
 **Import:** `@/lib/core/Collapsible/OCollapsible.vue`
-**Use when:** A show/hide content section with an animated trigger row. Supports uncontrolled (`defaultOpen`), controlled (`v-model`), and accordion (`group`) modes. Two layouts: general content sections and sidebar/config panels.
-**Don't use for:** Non-collapsing card sections — use `OCardSection`.
+**Use when:** Optional detail inside a form or panel, or one expandable row. ONE look: a 32 px
+trigger (`min-h-control-md`) with a leading chevron that turns when open, the title 13/500 and an
+optional summary on the end edge ("3 rules", "none"); the body indents under the title (`ps-6`).
+Uncontrolled (`defaultOpen`), controlled (`v-model:open`), accordion (`group`).
+**Don't use for:** Hiding required fields — "Advanced" is not a dumping ground.
 **Key props:**
 
-- `label` (string — trigger label when no `#trigger` slot)
-- `icon` (string — Material or OIcon name before the label)
-- `caption` (string — secondary text below the label)
-- `defaultOpen` (boolean, default `false` — uncontrolled initial state)
-- `modelValue` (boolean — controlled state via `v-model`; takes precedence over `defaultOpen`)
-- `group` (string — accordion group name; only one open at a time)
-- `variant` (`default` | `sidebar` — default `default`; `default` = right chevron/rounded trigger, `sidebar` = left chevron/flush trigger)
-- `triggerClass` (string — extra classes on the trigger button)
+- `title` · `summary` (I18nText)
+- `open` (boolean, `v-model:open`) · `defaultOpen` (boolean)
+- `group` (string — accordion: one open at a time)
+- `persistKey` (string — remembers the open state in local storage, where it matters: N6)
 
-**Slots:** `default` (body content), `trigger` (custom trigger row, exposes `{ open: boolean }`; hides the built-in chevron)
-**Emits:** `update:modelValue` (boolean), `open`, `opened`, `close`, `closed`
+**Slots:** `default` (body), `trigger` (custom content in place of title and summary, exposes
+`{ open }`; the chevron stays)
+**Emits:** `update:open`, `open`, `opened`, `close`, `closed`
+**Removed:** `label` → `title`, `caption` → `summary`, `icon`, `variant`
+(default / sidebar / config), `triggerClass`, `modelValue` → `open`. `local/o2-display-api`
+flags a bare `v-model` on it.
 **Example:**
 
 ```vue
-<OCollapsible label="Advanced settings" icon="settings" caption="Optional">
+<OCollapsible v-model:open="advancedOpen" :title="t('pipeline.advancedOptions')" :summary="t('common.ruleCount', { count: 3 }, 3)">
   <OText variant="body">Body content…</OText>
 </OCollapsible>
 ```
 
 **Rich list row** — one item per row: name + status on line 1, the detail on one
 truncated line, the full detail when opened (copy-and-values.md § One line per item).
-The `#trigger` slot hides the built-in chevron, so draw one and rotate it on `open`;
-hide the truncated line while open so it is not said twice.
+Hide the truncated line while open so it is not said twice; do not draw a second chevron.
 
 ```vue
 <OCollapsible>
@@ -306,12 +296,6 @@ hide the truncated line while open so it is not said twice.
       </span>
       <OText v-if="!open" variant="meta" truncate>{{ row.detail }}</OText>
     </span>
-    <OIcon
-      name="expand-more"
-      size="sm"
-      class="text-text-secondary shrink-0 transition-transform duration-200"
-      :class="open ? 'rotate-180' : 'rotate-0'"
-    />
   </template>
   <p class="px-2 pb-2 leading-5 break-words">
     <OText variant="meta">{{ row.detail }}</OText>
@@ -322,12 +306,12 @@ hide the truncated line while open so it is not said twice.
 - **A control beside the trigger:** the body renders inside the root, so a sibling
   placed after an `OCollapsible` sits beside the whole open body, not the trigger.
   When a control must stay on the trigger's line (an info button beside "38 panels
-  hidden"), use an `OButton` toggle (`icon-right` `expand-more`/`expand-less`,
+  hidden"), use an `OButton` toggle (`icon-end` `expand-more`/`expand-less`,
   `:aria-expanded`, `aria-controls`) and render the body below with `v-if`.
 - **Nothing interactive inside `#trigger`** — it is already a button. A Set-up
   action for a row goes beside the `OCollapsible`, not in its trigger.
 - **In specs**, open an uncontrolled one by clicking its trigger `button`;
-  `setValue(true)` on the component does nothing without a bound `v-model`.
+  `setValue(true)` on the component does nothing without a bound `v-model:open`.
 
 **Family:** Built on reka-ui `Collapsible*` + `OIcon`; accordion coordination via `useCollapsibleGroup`. Standalone.
 
@@ -336,49 +320,52 @@ hide the truncated line while open so it is not said twice.
 ### OEmptyState
 
 **Import:** `@/lib/core/EmptyState/OEmptyState.vue`
-**Use when:** The app-wide empty-state primitive for "no data / no results" contexts. Driven by a named `preset` (fills illustration + copy + actions) or by props/slots. Three sizes for the three contexts: full page/section (`hero`), inside a card/panel (`block`), inside a table/dropdown (`inline`).
-**Don't use for:** Loading/skeleton states, or inline validation errors.
+**Use when:** Every empty state, inside the table body or panel that is empty (never instead
+of the frame). Four kinds in one component (K5), each telling the one next step:
 
-> **Rule (strict) — every empty state IS `OEmptyState`.** Never hand-roll a
-> "no data / no results / nothing here yet" state from a bare `<div>` with
-> centered text and a button. ANY empty/zero state — a table with no rows, a
-> panel or tab with nothing yet, a filtered list with no matches — renders
-> through `OEmptyState` (illustration + title + description). **Actions use the
-> ONE standard layout:** a rich action **card** — `EmptyStateActionCard` via the
-> `actions` prop or the `#actions` slot — for a primary next-step CTA (icon chip
-> + label + sublabel + chevron, the same card the empty dashboard uses), or
-> `actionLabel` + `@action` for a simple button. Never a hand-placed button row
-> or a custom card. So every empty state across the app reads as one system.
+| `kind` | Says | Action |
+| --- | --- | --- |
+| `first-run` (default) | What this is and why you would use it | One primary, the header's words: "New alert" (H6) |
+| `filtered` | No rows match; which filters are on | Clear filters (default label) (F5) |
+| `denied` | No access, and who can grant it (`contact`) | None, or "Request access" |
+| `error` | What failed, in plain words (K6) | Retry (default label, refresh icon) |
+
+**A failed load is `error`, never `first-run` (K5).** No pager under an empty table (D5).
+**Don't use for:** Loading (skeletons, K4) or field validation errors (inline, K2).
 **Key props:**
 
-- `preset` (`EmptyStatePresetName` — named scenario from the catalog; see `EmptyState/presets.ts`)
-- `size` (`hero` | `block` | `inline` — default `block`)
-- `variant` (`EmptyStateVariant` — tone; defaults from preset, else `neutral`)
-- `illustration` (`IllustrationName` — ignored if a preset or `#illustration` slot is set)
-- `icon` (`IconName` — compact icon for `inline` size when no illustration)
-- `title` (string — overrides preset copy)
-- `description` (string — overrides preset copy)
-- `actions` (`EmptyStateAction[]` — rich action cards; overrides preset actions)
-- `actionLabel` (string — simple primary button; emits `action`)
-- `actionIcon` (`IconName`)
-- `secondaryActionLabel` (string — emits `secondaryAction`)
-- `hideAction` (boolean — suppress preset actions)
-- `filtered` (boolean — switches to a "no results" treatment with a Clear-filters action)
-- `backdrop` (boolean — force the dot-grid backdrop on/off; default on for hero/block)
+- `kind` (above) · `size` (`page` default: 40 px icon tile, 16/600 title, 14 px text at 44ch;
+  `inline`: 32 px tile, 14 px title, 13 px text — inside a table body, list or dropdown)
+- `title` · `text` (I18nText) · `icon` (IconName; the kind sets a default; the tile is neutral,
+  red-tinted only for `error`)
+- `actionLabel` + `@action` (an `lg` 36 px button: primary for first-run, secondary otherwise) ·
+  `secondaryActionLabel` + `@secondary-action`. With a listener and no label, `error` shows
+  Retry and `filtered` shows Clear filters.
+- `requestId` (string, mono under an error) · `contact` (I18nText, denied)
 
-**Slots:** `illustration`, `title`, `description`, `actions`, `extra`
-**Emits:** `action` (`(id?: string)`), `secondaryAction`
-**In a scroll pane:** the root is `overflow-hidden`, so as a flex child of a
-`flex-col overflow-y-auto` pane it shrinks and clips its own `#extra` list instead of
-letting the pane scroll — pass `class="shrink-0"` and centre with
-`justify-center-safe` on the pane. A list in `#extra` follows "one line per item".
+**Slots:** `#text` (rich text), `#actions` (onboarding cards such as `EmptyStateIngestionCard`
+in place of the buttons), `#extra` (content below)
+**Emits:** `action`, `secondary-action` (no payload)
+**Removed:** `preset` (and `presets.ts`) → `kind` + `title`/`text`; `illustration` (and the 35
+SVGs), `backdrop`, `toneIcon` → `icon`; `variant`, `filtered` → `kind`; `hideAction`; `actions`
+cards → the two action labels; `actionIcon`; `description` → `text`; sizes hero/block/compact →
+`page`, slim → `inline`. `local/o2-display-api` rejects all of them.
+**In a scroll pane:** pass `class="shrink-0"` so it does not clip its own `#extra` list, and
+centre with `justify-center-safe` on the pane.
 **Example:**
 
 ```vue
-<OEmptyState preset="no-search-results" filtered @action="clearFilters" />
+<OEmptyState
+  :kind="search ? 'filtered' : 'first-run'"
+  :title="search ? t('alerts.noMatch') : t('alerts.emptyTitle')"
+  :text="search ? undefined : t('alerts.emptyText')"
+  :action-label="search ? undefined : t('alerts.newAlert')"
+  @action="search ? (search = '') : openCreate()"
+/>
+<OEmptyState v-if="isError" kind="error" :title="t('alerts.loadFailed')" @action="refetch" />
 ```
 
-**Family:** Composes `OButton`, `OIcon`, `EmptyStateActionCard`, illustrations, and presets. Standalone.
+**Family:** Composes `OButton`, `OIcon`. Standalone.
 
 ---
 
@@ -448,7 +435,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
   data-test="settings-retention-section"
 >
   <OSettingRow :label="t('settings.retentionDays')" data-test="settings-retention-days">
-    <OFormInput name="retention_days" type="number" width="xs" />
+    <OFormInput name="retention_days" type="number" width="s" />
   </OSettingRow>
 </OFormSection>
 
@@ -511,7 +498,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
   :description="t('passwordPolicy.minLengthDesc')"
   data-test="settings-password-policy-min-length"
 >
-  <OFormInput name="min_length" type="number" width="xs" />
+  <OFormInput name="min_length" type="number" width="s" />
 </OSettingRow>
 ```
 **Family:** Pair with `OFormSection`, which supplies the card. On Settings and IAM pages use `variant="plain"`: one heading level, no accent bar, no section over a single control.
@@ -521,24 +508,37 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 ### OShortcut
 
 **Import:** `@/lib/core/Shortcut/OShortcut.vue`
-**Use when:** Rendering keyboard shortcut keycaps. Modifier tokens are symbolised and made platform-aware automatically (`ctrl` → `⌘` on Mac / `Ctrl` on Windows, `shift` → `⇧`, `enter` → `↵`, …).
-**Don't use for:** Displaying arbitrary code/text — use `OCode` or `OText variant="mono"`.
+**Use when:** The Kbd key cap. ONE size: 18 px caps (11 px mono, `rounded-chip`, 2 px bottom
+edge), one cap per key, 3 px apart, no "+". Modifiers are platform-aware (`ctrl` → `⌘` on Mac
+/ `Ctrl` elsewhere, `enter` → `↵`). Shown in tooltips, menus and the palette; on a button only
+for Run and the palette trigger (B6, KB3).
+**Don't use for:** Arbitrary code or text — use `OCode` or `OText variant="mono"`.
 **Key props:**
 
-- `keys` (`string | string[]` — a combo string like `"ctrl+enter"` renders as ONE keycap; an array renders one keycap per element. Optional when `id` is given)
-- `id` (string — registry shortcut id, resolves keys from `shortcutRegistry.ts`; ignored when `keys` is provided)
-- `size` (`sm` | `md` — default `sm`)
+- `id` (string — registry shortcut id; preferred, so the cap is always the real binding, KB3)
+- `keys` (`string | string[]` — only when there is no binding; `"ctrl+enter"` → `Ctrl` `↵`)
 
-**Slots:** none
-**Emits:** none
+**Removed:** `size` (one size). Renders nothing when no key resolves.
 **Example:**
 
 ```vue
-<OShortcut keys="ctrl+enter" />
-<OShortcut :keys="['g', 'l']" size="md" />
+<OShortcut id="logsRunQuery" />
+<OShortcut keys="/" />
 ```
 
-**Family:** Resolves ids via `shortcutRegistry`. Standalone.
+**Family:** Resolves ids via `shortcutRegistry`. Rendered by `OTooltip`, `ODropdownItem`,
+`OContextMenuItem` and `OSearchInput`.
+
+---
+
+### OAvatar · OAvatarGroup
+
+**Import:** `@/lib/core/Avatar/OAvatar.vue` · `OAvatarGroup.vue`
+**Use when:** On-call rosters and people pickers only: initials in a circle whose tone is
+derived from the identity. Owner and user cells stay plain text (OUserCell), on purpose.
+**Key props:** `OAvatar` `value` (email or name), `name`, `size` `sm` 20 | `md` 24 (default) |
+`lg` 32, `tooltip` (default `true`). `OAvatarGroup` `people` (`{ value, name? }[]`), `max`,
+`size`; the rest collapse into a "+N" neutral chip.
 
 ---
 

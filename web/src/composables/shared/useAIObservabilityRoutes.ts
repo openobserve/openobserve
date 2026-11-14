@@ -534,7 +534,7 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
       name: section.routeName,
       component: section.component!,
       meta: {
-        titleKey: section.metaTitleKey ?? section.labelKey,
+        titleKey: section.metaTitleKey ?? railLabelKey(section),
         titleKeyByTab: titleKeysByTab(section.routeName),
         keepAlive: false,
         requiresOnlineEvals: !!section.featureKey && !!ONLINE_EVAL_FEATURE_KEYS[section.featureKey],
@@ -567,11 +567,13 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
 function titleKeysByTab(routeName: string): Record<string, I18nKey> | undefined {
   const entries = AI_OBSERVABILITY_SECTIONS.filter(
     (section) => section.routeName === routeName && section.tabQuery,
-  ).map((section): [string, I18nKey] => [
-    section.tabQuery!,
-    section.tabOf ? AI_OBSERVABILITY_TABBED_ITEMS[section.tabOf].labelKey : section.labelKey,
-  ]);
+  ).map((section): [string, I18nKey] => [section.tabQuery!, railLabelKey(section)]);
   return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
+/** A tab's page is its rail item, so the browser tab carries the rail item's name (H7). */
+function railLabelKey(section: AiObservabilitySection): I18nKey {
+  return section.tabOf ? AI_OBSERVABILITY_TABBED_ITEMS[section.tabOf].labelKey : section.labelKey;
 }
 
 /** The `ai` shell route itself — same `component`/guard in every edition. */

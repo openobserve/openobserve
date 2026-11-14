@@ -27,12 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     v-model:open="open"
     data-test="workflow-test-drawer"
-    size="xl"
+    size="lg"
     :title="t('workflow.test.title')"
-    :primary-button-label="t('workflow.test.run')"
-    :primary-button-disabled="!canRun"
-    :primary-button-loading="running"
-    :secondary-button-label="t('common.close')"
+    :primary="{ label: t('workflow.test.run'), disabled: !canRun, loading: running }"
+    :secondary="{ label: t('common.close') }"
     @click:primary="run"
     @click:secondary="close"
   >
@@ -58,21 +56,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-model="suppressDestinations"
           :label="t('workflow.test.suppressDestinations')"
-          label-position="right"
+          label-position="end"
           data-test="workflow-test-suppress-destinations"
         />
         <OText v-if="suppressDestinations" variant="meta" as="p">
           {{ t("workflow.test.suppressDestinationsHint") }}
         </OText>
-        <OBanner
-          v-else
-          variant="warning"
-          dense
-          icon="warning"
-          data-test="workflow-test-dispatch-warning"
-        >
+        <OInlineNotice v-else tone="warn" data-test="workflow-test-dispatch-warning">
           {{ dispatchWarning }}
-        </OBanner>
+        </OInlineNotice>
       </div>
 
       <div v-if="hooksOn" class="flex flex-col gap-1">
@@ -95,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Provenance travels with the payload (it is persisted too), so a
                  hand-edited or run-seeded payload can never read as the sample. -->
             <OTag
-              :variant="sourceVariant"
+              :tone="sourceVariant"
               size="sm"
               :label="sourceLabel"
               data-test="workflow-test-input-source"
@@ -121,8 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="workflow-test-run-picker"
             />
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               data-test="workflow-test-reset-sample"
               @click="resetSample"
             >
@@ -162,7 +153,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { workflowHooksEnabled } from "@/plugins/workflows/httpEndpoint";
@@ -431,7 +422,7 @@ const sourceLabel = computed<I18nText>(() => {
 });
 
 const sourceVariant = computed(() =>
-  workflowObj.testRun.inputSource === "sample" ? "default-soft" : "warning-soft",
+  workflowObj.testRun.inputSource === "sample" ? "neutral" : "warn",
 );
 
 // Only non-generated data needs a way back; the generated sample IS the origin.

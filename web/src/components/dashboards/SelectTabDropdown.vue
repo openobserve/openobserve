@@ -27,17 +27,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OButton
+      icon-only
       :aria-label="t('dashboard.newTab')"
       data-test="dashboard-tab-new-add"
-      variant="outline"
-      size="icon-xs-sq"
-      class="h-8! w-8!"
+      variant="secondary"
+      size="sm"
       @click="
         () => {
           showAddTabDialog = true;
         }
       "
-      icon-left="add"
+      icon="add"
     >
     </OButton>
   </div>

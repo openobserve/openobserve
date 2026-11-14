@@ -20,23 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[containerClass]"
     :style="containerStyle"
   >
-    <!-- Header Section — the standard OPageHeader (back tile + title + actions)
-         used across the app. Hidden when the host page provides its own page
-         header, e.g. the pipeline shell's OPageHeader (avoids a duplicate). -->
-    <OPageHeader
-      v-if="!hideHeader"
-      :title="title"
-      :back="{ label: raw(''), onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
-      class="border-border-default shrink-0 border-b"
-      :class="headerContainerClass"
-    >
+    <!-- Hidden when the host page renders its own header, e.g. the pipeline shell's. -->
+    <OPageHeader v-if="!hideHeader" :title="title" :back="headerBack">
       <template #actions>
         <!-- Slot for additional header content (e.g., folder dropdown) -->
         <slot name="header-additional" />
 
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :class="cancelButtonClass"
           @click="handleCancel"
           :data-test="`${testPrefix}-import-cancel-btn`"
@@ -44,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OButton
           variant="primary"
-          size="sm"
           type="submit"
           :class="importButtonClass"
           @click="handleImport"
@@ -97,7 +87,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OInput
                         :data-test="`${testPrefix}-import-url-input`"
                         v-model="url"
-                        size="md"
                         :placeholder="t('dashboard.addURL')"
                       />
                     </div>
@@ -127,24 +116,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"
-                          bottom-slots
-                          :label="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
-                          :helpText="t('common.jsonFilesOnlyHint')"
-                        >
-                          <template v-slot:prepend>
-                            <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
-                          </template>
-                          <template v-slot:append>
-                            <OIcon
-                              name="close"
-                              size="sm"
-                              @click.stop.prevent="jsonFiles = null"
-                              class="cursor-pointer"
-                            />
-                          </template>
-                        </OFile>
+                          :validate="validateJsonFile"
+                        />
                       </div>
                     </div>
                   </slot>
@@ -207,15 +182,17 @@ import {
   onBeforeUnmount,
   type PropType,
 } from "vue";
-import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
+import { type I18nText, useI18nTyped } from "@/types/i18n";
 import axios from "axios";
 import { debounce } from "lodash-es";
 import AppTabs from "./AppTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import type { PageHeaderBack } from "@/lib/core/PageHeader/OPageHeader.types";
+import { usePageContextLabel } from "@/lib/core/PageHeader/pageContext";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { createJsonFileValidator } from "@/lib/forms/File/validateJsonFile";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -231,7 +208,6 @@ export default defineComponent({
     OPageHeader,
     OButton,
     OInput,
-    OIcon,
     OFile,
   },
   props: {
@@ -269,6 +245,12 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    // The parent list: its name labels the header's back link and `to` is where Back lands (N3).
+    // Without it the link reads as the page's area and emits "back".
+    back: {
+      type: Object as PropType<PageHeaderBack>,
+      default: undefined,
+    },
     // Hide the built-in header (title + back + cancel/import buttons) when the
     // host page already renders its own page header and teleports the actions.
     hideHeader: {
@@ -298,10 +280,6 @@ export default defineComponent({
       type: String,
       default: "",
     },
-    headerContainerClass: {
-      type: String,
-      default: "",
-    },
     headerClass: {
       type: String,
       default: "py-3",
@@ -327,6 +305,7 @@ export default defineComponent({
   emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
+    const validateJsonFile = createJsonFileValidator(t);
     const { lgUp } = useBreakpoint();
     const stackPanes = computed(() => !lgUp.value);
 
@@ -377,6 +356,12 @@ export default defineComponent({
     const handleBack = () => {
       emit("back");
     };
+
+    const pageContext = usePageContextLabel();
+    const headerBack = computed<PageHeaderBack>(() => ({
+      dataTest: `${props.testPrefix}-import-back-btn`,
+      ...(props.back ?? { label: pageContext.value, onClick: handleBack }),
+    }));
 
     const handleCancel = () => {
       emit("cancel");
@@ -539,8 +524,8 @@ export default defineComponent({
     });
 
     return {
-      raw,
       t,
+      validateJsonFile,
       stackPanes,
       jsonStr,
       jsonFiles,
@@ -552,6 +537,7 @@ export default defineComponent({
       editorKey,
       isImportingLocal,
       handleBack,
+      headerBack,
       handleCancel,
       handleImport,
       handleTabChange,

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="query-editor-dialog"
     bleed
     v-model:open="isOpen"
-    size="full"
+    size="xl"
     :show-close="false"
   >
     <template #header-left>
@@ -75,12 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- AI button -->
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          :ripple="false"
+          icon-only
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
           :aria-label="t('menu.aiAssistant')"
           variant="ghost"
-          size="icon-toolbar"
           class="group hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-md hover:[background:var(--color-gradient-ai)]!"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
@@ -149,7 +148,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         >
                           <OTooltip
-                            :delay="400"
                             :content="
                               sqlEditorMaximized
                                 ? t('alerts.queryEditor.showVrlEditor')
@@ -160,8 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           data-test="alert-run-query-btn"
                           variant="primary"
-                          size="sm"
-                          class="rounded-default h-7 px-3! text-xs"
+                          class="rounded-default px-3! text-xs"
                           :disabled="
                             localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''
                           "
@@ -224,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }}</OTruncatedText>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
-                        <OSpinner size="xs" class="shrink-0" />
+                        <OSpinner class="shrink-0" />
                         <span>{{ t("alerts.queryEditor.fetchingResults") }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--hint'">
@@ -291,8 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         data-test="alert-apply-vrl-btn"
                         variant="primary"
-                        size="sm"
-                        class="rounded-default h-7 px-3! text-xs"
+                        class="rounded-default px-3! text-xs"
                         :disabled="vrlFunctionContent == ''"
                         @click="runTestFunction"
                       >
@@ -394,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else-if="runQueryLoading"
                     class="flex h-full flex-col items-center justify-center gap-2"
                   >
-                    <OSpinner size="md" />
+                    <OSpinner size="lg" />
                     <span class="text-text-secondary text-sm">{{
                       t("search.fetchingResults")
                     }}</span>
@@ -473,7 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else-if="runFnQueryLoading"
                     class="flex h-full flex-col items-center justify-center gap-2"
                   >
-                    <OSpinner size="md" />
+                    <OSpinner size="lg" />
                     <span class="text-text-secondary text-sm">{{
                       t("search.fetchingResults")
                     }}</span>

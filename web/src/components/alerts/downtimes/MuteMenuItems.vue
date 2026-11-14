@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODropdownGroup :label="t(LABELS[labels].menu)">
     <ODropdownItem
       v-if="untilClear"
-      :icon-left="LABELS[labels].icon"
+      :icon="LABELS[labels].icon"
       :data-test="`${dataTestPrefix}-until-clear`"
       @select="emit('untilClear')"
     >
@@ -28,13 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODropdownItem
       v-for="preset in QUICK_MUTE_PRESETS"
       :key="preset.key"
-      :icon-left="LABELS[labels].icon"
+      :icon="LABELS[labels].icon"
       :data-test="`${dataTestPrefix}-${preset.key}`"
       @select="emit('preset', preset.secs)"
     >
       {{ t(preset.labelKey) }}
     </ODropdownItem>
-    <ODropdownItem icon-left="event" :data-test="`${dataTestPrefix}-until`" @select="emit('until')">
+    <ODropdownItem icon="event" :data-test="`${dataTestPrefix}-until`" @select="emit('until')">
       {{ t("alerts.downtimes.mute.until") }}
     </ODropdownItem>
   </ODropdownGroup>

@@ -37,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :code="endpointUrl"
         data-test="ingestion-splunkhec-endpoint-code-block"
         wrap
-        inset
         class="my-0"
         @copy="onSnippetCopy"
       />
@@ -71,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         lang="bash"
         data-test="ingestion-splunkhec-example-code-block"
         wrap
-        inset
         class="my-0"
         @copy="onSnippetCopy"
       />
@@ -84,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         lang="json"
         data-test="ingestion-splunkhec-payload-code-block"
         wrap
-        inset
         class="my-0"
         @copy="onSnippetCopy"
       />
@@ -99,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OText variant="body" as="p">
         {{ t("ingestion.splunkHec.payloadTime", { field: raw("time") }) }}
       </OText>
-      <OBanner variant="warning" icon="schedule" data-test="ingestion-logs-splunkhec-window-note">
+      <OInlineNotice tone="warn" icon="schedule" data-test="ingestion-logs-splunkhec-window-note">
         <div class="flex flex-col gap-1">
           <OText variant="body-strong">{{ t("ingestion.splunkHec.windowTitle") }}</OText>
           <OText variant="meta" as="p" class="leading-snug">
@@ -111,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}
           </OText>
         </div>
-      </OBanner>
+      </OInlineNotice>
       <OText variant="body" as="p">
         {{
           t("ingestion.splunkHec.payloadMetadata", {
@@ -135,17 +132,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         lang="bash"
         data-test="ingestion-splunkhec-health-code-block"
         wrap
-        inset
         class="my-0"
         @copy="onSnippetCopy"
       />
     </section>
 
-    <OBanner
-      variant="warning"
-      icon="warning"
-      data-test="ingestion-logs-splunkhec-edge-processor-note"
-    >
+    <OInlineNotice tone="warn" data-test="ingestion-logs-splunkhec-edge-processor-note">
       <div class="flex flex-col gap-1">
         <OText variant="body-strong">
           {{ t("ingestion.splunkHec.edgeTitle", { product: raw("Splunk Edge Processor") }) }}
@@ -162,9 +154,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </OText>
       </div>
-    </OBanner>
+    </OInlineNotice>
 
-    <OBanner variant="warning" icon="lock" data-test="ingestion-logs-splunkhec-tls-note">
+    <OInlineNotice tone="warn" icon="lock" data-test="ingestion-logs-splunkhec-tls-note">
       <div class="flex flex-col gap-1">
         <OText variant="body-strong">{{ t("ingestion.splunkHec.tlsTitle") }}</OText>
         <OText variant="meta" as="p" class="leading-snug">
@@ -176,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </OText>
       </div>
-    </OBanner>
+    </OInlineNotice>
   </IngestionContent>
 </template>
 
@@ -191,7 +183,7 @@ import analytics from "@/services/product_analytics";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import type { CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 
 export default defineComponent({
@@ -204,7 +196,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { OCodeBlock, IngestionContent, OBanner, OText },
+  components: { OCodeBlock, IngestionContent, OInlineNotice, OText },
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();

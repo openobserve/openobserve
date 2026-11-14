@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="resume-pipeline-dialog"
     size="sm"
     :title="t('pipeline_list.resume_pipeline_title')"
-    :sub-title="
+    :subtitle="
       lastPausedAt
         ? t('common.lastPausedAt', { time: convertUnixToDateFormat(lastPausedAt) })
         : undefined
     "
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('pipeline_list.run_pipeline')"
+    :secondary="{ label: t('confirmDialog.cancel') }"
+    :primary="{ label: t('pipeline_list.run_pipeline') }"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </ORadio>
-        <ORadio :value="true" style="height: 1.125rem">
+        <ORadio :value="true">
           <template #label>
             <span class="text-compact leading-4.5 font-normal">{{
               t("confirmDialog.startFromNow")

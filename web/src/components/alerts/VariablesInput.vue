@@ -30,19 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>
         {{ t("alerts.variables.label") }}
       </span>
-      <OButton variant="ghost-muted" size="icon-sm">
+      <OButton icon-only variant="ghost">
         <OIcon name="info-outline" size="sm" />
         <OTooltip :content="t('alerts.advanced.variablesTooltip')" />
       </OButton>
     </div>
     <template v-if="!formRows.length">
       <div class="flex items-center justify-between">
-        <OButton
-          data-test="alert-variables-add-btn"
-          size="sm"
-          variant="outline"
-          @click="addFormRow"
-        >
+        <OButton data-test="alert-variables-add-btn" variant="secondary" @click="addFormRow">
           <OIcon name="add" size="sm" />
           <span>{{ t("alerts.advanced.addVariable") }}</span>
         </OButton>
@@ -80,21 +75,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="ms-0 w-1/6">
           <OButton
+            icon-only
             data-test="alert-variables-delete-variable-btn"
             class="ms-1"
             variant="ghost"
-            size="icon-circle-sm"
+            size="sm"
             :title="t('alert_templates.edit')"
             @click="removeFormRow(index)"
           >
             <OIcon name="delete" size="sm" />
           </OButton>
           <OButton
-            data-test="alert-variables-add-variable-btn"
             v-if="index === formRows.length - 1"
+            icon-only
+            data-test="alert-variables-add-variable-btn"
             class="ms-1"
             variant="ghost"
-            size="icon-circle-sm"
+            size="sm"
             :title="t('alert_templates.edit')"
             @click="addFormRow"
           >

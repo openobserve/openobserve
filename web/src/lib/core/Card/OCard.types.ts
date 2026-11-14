@@ -1,25 +1,24 @@
-/**
- * Visual chrome of the card surface.
- *
- * - `panel`    — the filled, borderless surface OCard has always drawn.
- * - `outlined` — base surface + one hairline border: the chrome every
- *   `card-container` panel elsewhere in the app uses, so a page built from
- *   OCards sits on the same grid as a page built from those.
- * - `glass`    — the tiled section pane of a dense detail page: translucent
- *   surface, hairline border, 4px corners, clipped content. Pair it with
- *   `dense` OCardSections so a column of panes reads as one divided page.
- */
-export type OCardVariant = "panel" | "outlined" | "glass";
+import type { I18nText } from "@/types/i18n";
 
-/** OCard — flat surface container. */
+/** OCard: the one panel frame (border, radius 10, no shadow). The header shows when `title` or `#header` is set. */
 export interface OCardProps {
-  /** Defaults to `panel`. Use `class` for layout and sizing. */
-  variant?: OCardVariant;
+  title?: I18nText;
+  /** Short context after the title, e.g. "last 1 hour". */
+  meta?: I18nText;
+  /** No body padding, for tables and charts. */
+  flush?: boolean;
+  /** Skeleton body; keeps the frame and header. */
+  loading?: boolean;
 }
 
 export type OCardEmits = Record<never, never>;
 
 export interface OCardSlots {
-  /** Card content — compose OCardSection, OSeparator, OCardActions inside */
-  default(): unknown;
+  default?(): unknown;
+  /** Header end: sm (28 px) controls only. */
+  actions?(): unknown;
+  /** A custom header line in place of title and meta; still 40 px. */
+  header?(): unknown;
+  /** Right-aligned row under the body. */
+  footer?(): unknown;
 }

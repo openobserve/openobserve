@@ -16,13 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="xl"
     data-test="dashboard-settings-drawer"
     bleed
     :open="open"
-    :width="74"
     :title="t('dashboard.setting')"
-    :close-guard="guardClose"
-    @update:open="$emit('update:open', $event)"
+    :dirty="dirty"
+    @update:open="onOpenChange"
+    @discard="discardEdits"
   >
     <DashboardSettingsDraftScope
       ref="draftScope"
@@ -220,21 +221,24 @@ export default defineComponent({
       emit("close");
     };
 
-    const guardClose = (): boolean => {
-      const draft = draftScope.value?.draft;
-      if (!draft) return true;
-      if (!draft.hasUnsavedChanges()) {
-        void draft.confirmLeave();
-        return true;
-      }
-      void draft.confirmLeave().then((allowed) => {
-        if (allowed) closeDrawer();
-      });
-      return false;
+    // ✕, Escape and the backdrop ask "Discard changes?" in the drawer's footer, never in a dialog over it (O8).
+    const dirty = computed(() => draftContext.hasPending());
+
+    const discardEdits = () => {
+      draftScope.value?.draft.discard();
+      draftContext.reset();
     };
 
+    // A clean close still settles the draft session, so its autosave is flushed.
+    const onOpenChange = (value: boolean) => {
+      if (!value && !dirty.value) void draftScope.value?.draft.confirmLeave();
+      emit("update:open", value);
+    };
+
+    // Cancel is an explicit choice, so it discards without asking.
     const requestClose = () => {
-      if (guardClose()) closeDrawer();
+      discardEdits();
+      closeDrawer();
     };
 
     return {
@@ -250,7 +254,9 @@ export default defineComponent({
       draftScope,
       draftOptions,
       loadDraftBase,
-      guardClose,
+      dirty,
+      discardEdits,
+      onOpenChange,
       requestClose,
     };
   },

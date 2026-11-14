@@ -205,13 +205,13 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
     <ODropdown v-model:open="open" side="bottom" align="end">
       <template #trigger>
         <OButton
-          variant="outline-primary"
-          size="xs"
+          variant="secondary"
+          size="sm"
           data-test="navbar-organizations-select-trigger"
           class="text-text-body! w-56 max-md:w-28 md:max-xl:w-full"
           :class="open ? 'ring-focus-ring-accent ring-2 ring-inset' : ''"
         >
-          <template #icon-left>
+          <template #icon>
             <OIcon name="domain" size="sm" class="shrink-0 opacity-60" />
           </template>
           <OTruncatedText v-if="current?.label" class="flex-1 text-left">{{
@@ -219,11 +219,10 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           }}</OTruncatedText>
           <OSkeleton
             v-else
-            type="text"
             class="h-3 flex-1"
             data-test="navbar-organizations-select-placeholder"
           />
-          <template #icon-right>
+          <template #icon-end>
             <OIcon
               name="arrow-drop-down"
               size="sm"
@@ -255,9 +254,9 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         <!-- Search: ↑/↓ move highlight, Enter selects, Esc closes -->
         <div class="px-3 pb-3">
           <OSearchInput
+            size="sm"
             data-test="organization-search-input"
             v-model="searchQuery"
-            clearable
             :debounce="1"
             :placeholder="t('organization.searchByNameOrId')"
             @keydown="onSearchKeydown"

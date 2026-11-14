@@ -16,19 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OPageLayout :title="raw(headerBasedOnRoute())" icon="paid" bleed>
-    <template v-if="isUsageRoute" #title>
-      <span class="inline-flex items-center gap-2">
-        {{ raw(headerBasedOnRoute()) }}
-        <BetaBadge />
-      </span>
+  <OPageLayout :title="raw(headerBasedOnRoute())" bleed>
+    <template v-if="isUsageRoute" #status>
+      <BetaBadge />
     </template>
     <template #actions>
       <div v-if="isOrgGroupRoute" class="flex items-center gap-2">
         <OButton
           v-if="orgGroupInvite.canInvite"
           variant="primary"
-          size="sm-action"
           data-test="org-group-invite-org-btn"
           @click="orgGroupInvite.trigger++"
         >
@@ -47,8 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="h-full w-full ps-2.5 pt-2 pb-2.5">
           <div class="h-full overflow-y-auto">
             <OTabs v-model="billingtab" orientation="vertical" class="px-1">
-              <ORouteTab
-                exact
+              <OTab
                 name="plans"
                 data-test="billing-tab-plans"
                 :to="
@@ -57,8 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
                 :label="t('billing.plansLabel')"
               />
-              <ORouteTab
-                exact
+              <OTab
                 name="usage"
                 data-test="billing-tab-usage"
                 :to="
@@ -67,9 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
                 :label="t('billing.usageLabel')"
               />
-              <ORouteTab
+              <OTab
                 v-if="showInvoiceTab"
-                exact
                 name="invoice_history"
                 data-test="billing-tab-invoices"
                 :to="
@@ -79,9 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
                 :label="t('billing.invoiceHistoryLabel')"
               />
-              <ORouteTab
+              <OTab
                 v-if="config.isCloud == 'true'"
-                exact
                 name="billing_group"
                 data-test="billing-tab-group"
                 :to="
@@ -96,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-field-list-collapse-btn"
               :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
               variant="ghost"
-              size="icon-sm"
+              icon-only
               :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
               @click="collapseSidebar"
             >
@@ -129,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 // @ts-ignore
@@ -153,7 +145,7 @@ export default defineComponent({
   components: {
     OPageLayout,
     OTabs,
-    ORouteTab,
+    OTab,
     OSplitter,
     OButton,
     TrialPeriod,

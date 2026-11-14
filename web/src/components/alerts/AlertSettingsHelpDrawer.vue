@@ -291,7 +291,7 @@ defineExpose({ applyTemplate, previewTemplate });
   <ODrawer
     data-test="alert-settings-help-drawer"
     :open="open"
-    size="lg"
+    size="md"
     :title="title"
     @update:open="emit('update:open', $event)"
   >
@@ -480,6 +480,7 @@ defineExpose({ applyTemplate, previewTemplate });
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
             </p>
             <OButton
+              variant="primary"
               data-test="help-apply-template-btn"
               :disabled="applyDisabled"
               class="mt-3"
@@ -709,7 +710,7 @@ defineExpose({ applyTemplate, previewTemplate });
             data-test="help-row-template-type"
           >
             {{ t("alerts.alertSettings.helpRowTemplateTypeCurrent") }}
-            <OBadge variant="primary-soft" size="sm">{{ rowTemplateType }}</OBadge>
+            <OBadge tone="accent" size="sm">{{ rowTemplateType }}</OBadge>
           </p>
         </section>
 

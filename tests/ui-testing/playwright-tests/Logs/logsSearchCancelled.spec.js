@@ -25,7 +25,7 @@ const BASE_US = (Date.now() - 10 * 60 * 1000) * 1000;
 const editor = '[data-test="logs-search-bar-query-editor"] .monaco-editor';
 const runBtn = '[data-test="logs-search-bar-refresh-btn"]';
 const table = '[data-test="logs-search-result-logs-table"]';
-const pager = '[data-test="logs-search-result-pagination"]';
+const pagerNext = '[data-test="logs-search-result-pagination-next"]';
 const cancelledState = '[data-test="logs-search-cancelled-state"]';
 const cancelledNotice = '[data-test="logs-search-cancelled-notice"]';
 const noEvents = '[data-test="logs-search-no-events-found-text"]';
@@ -122,7 +122,7 @@ test.describe('Logs search cancelled before its first result (item 2)', () => {
 
     const release = await holdHits(page);
     const before = searches.hits().length;
-    await page.locator(`${pager} button`, { hasText: /^2$/ }).click();
+    await page.locator(pagerNext).click();
     await expect.poll(() => searches.hits().length, { timeout: 30000 }).toBeGreaterThan(before);
     await expect(page.locator(runBtn)).toContainText('Cancel', { timeout: 30000 });
     await page.locator(runBtn).click();

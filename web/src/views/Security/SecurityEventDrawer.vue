@@ -380,13 +380,13 @@ function copy(text: string) {
       />
       <OTag
         v-if="outcome.id === 1 || outcome.id === 2"
-        :variant="outcome.id === 2 ? 'error-soft' : 'success-soft'"
+        :tone="outcome.id === 2 ? 'err' : 'ok'"
         :icon="outcome.id === 2 ? 'cancel' : 'check-circle'"
         size="sm"
         >{{ t(`siem.outcome.${outcome.id === 2 ? "failure" : "success"}`) }}</OTag
       >
-      <OTag v-if="category" variant="primary-soft" size="sm">{{ category }}</OTag>
-      <OTag v-if="matched.length" variant="error-soft" icon="shield-alert-outline" size="sm">
+      <OTag v-if="category" tone="accent" size="sm">{{ category }}</OTag>
+      <OTag v-if="matched.length" tone="err" icon="shield-alert-outline" size="sm">
         {{ t("siem.drawer.matchedRules", matched.length) }}
       </OTag>
     </template>
@@ -417,27 +417,27 @@ function copy(text: string) {
               class="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
             >
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs"
-                icon-left="add-circle-outline"
+                icon="add-circle-outline"
                 :data-test="`security-event-drawer-entity-${entity.key}-include`"
                 @click="emit('add-filter', entity.field, pivotValue(entity), '=')"
               >
                 <OTooltip :content="t('siem.pivot.include')" />
               </OButton>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs"
-                icon-left="block"
+                icon="block"
                 :data-test="`security-event-drawer-entity-${entity.key}-exclude`"
                 @click="emit('add-filter', entity.field, pivotValue(entity), '!=')"
               >
                 <OTooltip :content="t('siem.pivot.exclude')" />
               </OButton>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs"
-                icon-left="content-copy"
+                icon="content-copy"
                 :data-test="`security-event-drawer-entity-${entity.key}-copy`"
                 @click="copy(entity.value)"
               >
@@ -460,7 +460,7 @@ function copy(text: string) {
         size="inline"
         icon="info-outline"
         :title="t('siem.drawer.noEntities')"
-        :description="t('siem.drawer.noEntitiesHint')"
+        :text="t('siem.drawer.noEntitiesHint')"
       />
 
       <div v-if="detected" class="bg-surface-subtle rounded-surface flex flex-col gap-1.5 p-3">
@@ -469,10 +469,10 @@ function copy(text: string) {
         }}</span>
         <div class="flex flex-wrap items-center gap-1.5">
           <span class="text-text-heading text-sm font-semibold">{{ detected.source.label }}</span>
-          <OTag variant="primary-soft" size="xs">
+          <OTag tone="accent" size="sm">
             {{ t("siem.events.confidence", { n: Math.round(detected.confidence * 100) }) }}
           </OTag>
-          <OTag v-if="normalized.classUid" variant="default-soft" size="xs" class="font-mono">
+          <OTag v-if="normalized.classUid" tone="neutral" mono size="sm">
             {{ t("siem.drawer.classUid", { n: normalized.classUid }) }}
           </OTag>
         </div>
@@ -481,7 +481,7 @@ function copy(text: string) {
 
     <template #tab-detections>
       <div v-if="matching" class="flex items-center justify-center gap-2 py-10">
-        <OSpinner size="sm" />
+        <OSpinner size="lg" />
         <span class="text-text-secondary text-sm">{{ t("siem.drawer.evaluating") }}</span>
       </div>
       <OEmptyState
@@ -489,21 +489,21 @@ function copy(text: string) {
         size="inline"
         icon="rule"
         :title="t('siem.drawer.noRules')"
-        :description="t('siem.drawer.noRulesHint')"
+        :text="t('siem.drawer.noRulesHint')"
       />
       <OEmptyState
         v-else-if="matchError"
         size="inline"
-        icon="error-outline"
+        kind="error"
         :title="t('siem.drawer.matchError')"
-        :description="raw(matchError)"
+        :text="raw(matchError)"
       />
       <OEmptyState
         v-else-if="!matched.length"
         size="inline"
         icon="task-alt"
         :title="t('siem.drawer.noMatches')"
-        :description="t('siem.drawer.noMatchesHint', runnable.length)"
+        :text="t('siem.drawer.noMatchesHint', runnable.length)"
       />
       <template v-else>
         <div
@@ -517,7 +517,7 @@ function copy(text: string) {
               type="severity"
               :value="severityTagValue(toneOfSigmaLevel(hit.rule.level))"
               :label="t(toneLabelKey(toneOfSigmaLevel(hit.rule.level)))"
-              size="xs"
+              size="sm"
             />
             <span class="text-text-heading min-w-0 flex-1 text-sm font-semibold">{{
               hit.rule.title
@@ -527,14 +527,9 @@ function copy(text: string) {
             {{ hit.rule.description }}
           </p>
           <div v-if="hit.rule.techniques.length" class="flex flex-wrap gap-1">
-            <OTag
-              v-for="tech in hit.rule.techniques"
-              :key="tech"
-              variant="purple-soft"
-              shape="rounded"
-              size="xs"
-              >{{ tech }}</OTag
-            >
+            <OTag v-for="tech in hit.rule.techniques" :key="tech" tone="neutral" size="sm">{{
+              tech
+            }}</OTag>
           </div>
         </div>
 
@@ -545,13 +540,12 @@ function copy(text: string) {
           <div class="flex flex-col gap-1">
             <div v-for="tech in techniques" :key="tech.id" class="flex items-center gap-2 text-xs">
               <OButton
-                as="a"
                 :href="techniqueUrl(tech.id)"
                 target="_blank"
                 rel="noopener"
-                variant="ghost-primary"
-                size="xs"
-                icon-right="open-in-new"
+                variant="accent-ghost"
+                size="sm"
+                icon-end="open-in-new"
                 :data-test="`security-event-drawer-technique-${tech.id}`"
                 >{{ tech.id }}</OButton
               >
@@ -586,13 +580,11 @@ function copy(text: string) {
           :placeholder="t('siem.drawer.pickCase')"
           :loading="openCases.isFetching.value"
           searchable
-          size="sm"
           data-test="security-event-drawer-case-pick"
         />
       </div>
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         :disabled="!targetCase"
         :loading="promote.isPending.value && !!targetCase"
         data-test="security-event-drawer-add-to-case"
@@ -603,8 +595,7 @@ function copy(text: string) {
       <div class="flex-1" />
       <OButton
         variant="primary"
-        size="sm-action"
-        icon-left="assignment"
+        icon="assignment"
         data-test="security-event-drawer-open-case"
         @click="caseDialogOpen = true"
       >

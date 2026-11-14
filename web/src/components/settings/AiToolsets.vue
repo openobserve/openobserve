@@ -17,18 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="flex h-full flex-col p-0">
-    <OPageLayout
-      v-if="!showAddDialog"
-      :title="t('aiToolset.header')"
-      icon="smart-toy"
-      :subtitle="t('settings.aiToolsetsPage.subtitle')"
-      bleed
-    >
+    <OPageLayout v-if="!showAddDialog" :title="t('aiToolset.header')" bleed>
       <template #actions>
         <OButton
           data-test="ai-toolsets-add-btn"
           variant="primary"
-          size="sm"
           :aria-label="
             toolsetDrafts.hasNew
               ? t('common.editorDraft.newDot', { label: t('aiToolset.add') })
@@ -48,11 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTable
           ref="oTableRef"
           :forbidden="forbidden"
-          :frame="false"
           :data="visibleRows"
           :columns="columns"
           :row-actions="rowActions"
-          row-actions-more-data-test="ai-toolsets-row-more-actions"
+          :row-menu="rowMenu"
+          row-menu-data-test="ai-toolsets-row-more-actions"
           row-key="id"
           :loading="loading"
           pagination="client"
@@ -67,14 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:sort-order="sortOrder = $event"
           sorting="client"
           :default-columns="false"
-          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-ai-toolsets"
-          :show-global-filter="false"
         >
           <template #toolbar>
             <OSearchInput
+              width="list"
               v-model="filterQuery"
               class="flex-1"
               :placeholder="t('aiToolset.search')"
@@ -82,21 +74,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="aiToolsetsRefresh"
+              shortcut="aiToolsetsRefresh"
               data-test="ai-toolsets-list-refresh-btn"
               @click="refreshData"
             />
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-ai-toolsets"
-              :filtered="!!filterQuery"
-              @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : addToolset())"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.aiToolsets') })
+                  : t('emptyState.noAiToolsets.title')
+              "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.aiToolsets') })
+                  : t('emptyState.noAiToolsets.description')
+              "
+              :action-label="filterQuery ? undefined : t('emptyState.noAiToolsets.action')"
+              @action="filterQuery ? (filterQuery = '') : addToolset()"
             />
           </template>
 
@@ -131,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('aiToolset.deleteTitle')"
     message-keypath="aiToolset.deleteMessage"
     :message-name="confirmDelete.data?.name"
-    ok-variant="destructive"
+    kind="destructive"
     @update:ok="deleteToolset"
     @update:cancel="cancelDelete"
     v-model="confirmDelete.visible"
@@ -156,7 +155,12 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ONameLinkCell from "@/lib/core/Table/cells/ONameLinkCell.vue";
-import { COL, type OTableColumnDef, type OTableRowAction } from "@/lib/core/Table/OTable.types";
+import {
+  COL,
+  type OTableColumnDef,
+  type OTableRowAction,
+  type OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
@@ -288,25 +292,22 @@ export default defineComponent({
         size: COL.description,
         meta: { align: "left" },
       },
-      {
-        id: "actions",
-        header: t("aiToolset.actions"),
-        isAction: true,
-        pinned: "right",
-      },
     ];
     const rowActions: OTableRowAction[] = [
       {
         id: "edit",
         label: t("common.edit"),
         icon: "edit",
-        onSelect: (row) => editToolset(row),
+        onClick: (row) => editToolset(row),
         dataTest: (row) => `ai-toolset-${row.name}-edit`,
       },
+    ];
+    const rowMenu: OTableRowMenuItem[] = [
       {
         id: "delete",
         label: t("common.delete"),
         icon: "delete",
+        destructive: true,
         onSelect: (row) => confirmDeleteToolset(row),
         dataTest: (row) => `ai-toolset-${row.name}-delete`,
       },
@@ -509,6 +510,7 @@ export default defineComponent({
       tabledata,
       columns,
       rowActions,
+      rowMenu,
       showAddDialog,
       resultTotal,
       filterQuery,

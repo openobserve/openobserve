@@ -573,9 +573,9 @@ function onKeydown(event: KeyboardEvent) {
         data-test="dependency-map-zoom"
       >
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="add"
+          icon="add"
           class="rounded-none"
           :aria-label="t('fleet.flow.zoomIn')"
           data-test="dependency-map-zoom-in"
@@ -585,9 +585,9 @@ function onKeydown(event: KeyboardEvent) {
         </OButton>
         <OSeparator />
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="remove"
+          icon="remove"
           class="rounded-none"
           :aria-label="t('fleet.flow.zoomOut')"
           data-test="dependency-map-zoom-out"
@@ -597,9 +597,9 @@ function onKeydown(event: KeyboardEvent) {
         </OButton>
         <OSeparator />
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="fullscreen"
+          icon="fullscreen"
           class="rounded-none"
           :aria-label="t('fleet.flow.fitView')"
           data-test="dependency-map-fit"

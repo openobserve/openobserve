@@ -12,7 +12,7 @@ describe("OContextMenuLabel", () => {
 
   it("applies label token class", () => {
     const wrapper = mount(OContextMenuLabel);
-    expect(wrapper.classes().join(" ")).toContain("text-dropdown-label");
+    expect(wrapper.classes().join(" ")).toContain("text-text-muted");
   });
 
   it("truncates long labels rather than widening the menu", () => {

@@ -35,9 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AutoObserveSettingsOwn />
     </DrawerSection>
     <OButton
-      variant="ghost-primary"
-      size="xs"
-      icon-right="arrow-forward"
+      variant="accent-ghost"
+      size="sm"
+      icon-end="arrow-forward"
       class="-ms-2 self-start"
       data-test="autoobserve-settings-how"
       @click="emit('how-it-works')"

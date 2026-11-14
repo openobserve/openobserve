@@ -32,7 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="fieldType"
           :value="tokenType"
           :label="raw(tokenType)"
-          class="wcp__type-badge shrink-0 font-mono font-bold"
+          class="wcp__type-badge shrink-0"
+          mono
         />
         <span class="wcp__title text-compact text-text-heading truncate font-semibold">{{
           t("logs.wildcardValuePopover.variableSlot", { type: tokenType })

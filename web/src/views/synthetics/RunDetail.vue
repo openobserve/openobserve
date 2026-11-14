@@ -40,30 +40,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════ HEADER ════════ -->
     <template #header v-if="!drawerMode">
       <OPageHeader
-        class=""
         :title="raw(displayMonitorName)"
         title-data-test="synthetics-run-detail-title"
-        :subtitle="raw(currentRun.timestamp)"
         :back="{
-          label: t('synthetics.results.monitors'),
+          label: t('synthetics.results.title'),
+          to: backTo,
           onClick: goBack,
           dataTest: 'synthetics-run-detail-back-btn',
         }"
       >
-        <template #title-trail>
+        <template #status>
           <OBadge
             v-if="hasRunStatus"
-            :variant="statusBadgeVariant"
+            :tone="statusBadgeVariant"
             size="sm"
             :icon="statusIcon"
             data-test="synthetics-run-detail-status-badge"
           >
             {{ statusLabel }}
           </OBadge>
-          <OSkeleton v-else-if="loading" type="text" class="h-6 w-16" />
+          <OSkeleton v-else-if="loading" class="h-6 w-16" />
           <OBadge
             v-if="currentRun.url"
-            variant="default"
+            tone="neutral"
             size="sm"
             icon="link"
             class="max-w-xs min-w-0"
@@ -71,40 +70,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTruncatedText class="block">{{ currentRun.url }}</OTruncatedText>
           </OBadge>
-          <div class="ms-1 flex">
+        </template>
+        <template #actions>
+          <div class="flex">
             <OButton
+              icon-only
               :aria-label="t('common.previous')"
               variant="ghost"
-              size="icon-xs"
-              icon-left="chevron-left"
+              icon="chevron-left"
               :disabled="true"
               data-test="synthetics-run-detail-prev-btn"
             />
             <OButton
+              icon-only
               :aria-label="t('common.next')"
               variant="ghost"
-              size="icon-xs"
-              icon-left="chevron-right"
+              icon="chevron-right"
               :disabled="true"
               data-test="synthetics-run-detail-next-btn"
             />
           </div>
-        </template>
-        <template #actions>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="open-in-new"
+            variant="secondary"
+            icon="open-in-new"
             data-test="synthetics-run-detail-trace-btn"
           >
             {{ t("synthetics.runDetail.openTrace") }}
           </OButton>
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="replay"
-            data-test="synthetics-run-detail-rerun-btn"
-          >
+          <OButton variant="secondary" icon="replay" data-test="synthetics-run-detail-rerun-btn">
             {{ t("synthetics.journey.reRun") }}
           </OButton>
         </template>
@@ -125,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="i"
               class="card-container rounded-default bg-surface-base border-border-default flex flex-row items-center gap-1.5 border px-3.5 py-2.5"
             >
-              <OSkeleton type="circle" class="h-4 w-4 shrink-0" />
-              <OSkeleton type="text" class="h-4 w-20" />
+              <OSkeleton shape="circle" class="h-4 w-4 shrink-0" />
+              <OSkeleton class="h-4 w-20" />
             </div>
           </div>
         </template>
@@ -165,7 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-model="selectedAttemptValue"
                 :options="attemptOptions"
-                size="md"
                 class="w-42!"
                 data-test="synthetics-run-detail-attempt-dropdown"
               />
@@ -184,10 +176,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTab name="steps" data-test="synthetics-run-detail-tab-steps">
               {{ t("synthetics.runs.tabSteps") }}
-              <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
+              <OBadge tone="neutral" size="sm">{{ steps.length }}</OBadge>
               <OBadge
                 v-if="skippedStepCount > 0"
-                variant="default"
+                tone="neutral"
                 size="sm"
                 data-test="synthetics-run-detail-skipped-count"
                 >{{ t("synthetics.runDetail.skippedCount", { n: skippedStepCount }) }}</OBadge
@@ -223,23 +215,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTabPanel name="steps">
               <!-- Steps skeleton -->
               <template v-if="loading">
-                <OCard class="gap-0 p-0">
-                  <OCardSection role="header" class="gap-2">
-                    <OSkeleton type="text" class="h-4 w-14" />
-                  </OCardSection>
-                  <OSeparator />
-                  <OCardSection role="body" class="flex flex-col gap-2 p-3">
+                <OCard>
+                  <template #header>
+                    <OSkeleton class="h-4 w-14" />
+                  </template>
+                  <div class="flex flex-col gap-2">
                     <div
                       v-for="i in 4"
                       :key="i"
                       class="rounded-default border-border-default flex items-center gap-2 border p-2"
                     >
-                      <OSkeleton type="rect" class="rounded-default h-12 w-18 shrink-0" />
-                      <OSkeleton type="circle" class="h-6 w-6 shrink-0" />
-                      <OSkeleton type="text" class="h-4 flex-1" />
-                      <OSkeleton type="text" class="h-4 w-16 shrink-0" />
+                      <OSkeleton shape="block" class="h-12 w-18 shrink-0" />
+                      <OSkeleton shape="circle" class="h-6 w-6 shrink-0" />
+                      <OSkeleton class="h-4 flex-1" />
+                      <OSkeleton class="h-4 w-16 shrink-0" />
                     </div>
-                  </OCardSection>
+                  </div>
                 </OCard>
               </template>
               <!-- Lambda execution error (no steps) -->
@@ -261,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <OBadge
                         v-if="errorSourceInfo"
-                        variant="error"
+                        tone="err"
                         size="sm"
                         data-test="synthetics-run-detail-error-source"
                       >
@@ -277,13 +268,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </p>
                     <OButton
                       v-if="currentRun.errorStack"
-                      variant="ghost-destructive"
-                      size="xs"
+                      variant="danger-ghost"
+                      size="sm"
                       class="mt-1"
                       data-test="synthetics-run-detail-error-expand-btn"
                       @click="stackOpen = !stackOpen"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <OIcon
                           name="expand-more"
                           size="xs"
@@ -307,10 +298,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- ══ Split: Replay Player (left) + Steps Timeline (right) ══ -->
               <div v-else-if="steps.length > 0 || startRow" class="flex min-h-0 flex-1 items-start">
                 <!-- ── Left: Session Replay Player ── -->
-                <OCard v-if="currentRun.hasReplay" class="w-[30%] min-w-[30rem] gap-0 p-0">
-                  <OCardSection role="header" class="gap-2">
+                <OCard v-if="currentRun.hasReplay" flush class="w-[30%] min-w-[30rem]">
+                  <template #header>
                     <OIcon name="smart_display" size="sm" class="text-accent" />
-                    <span class="text-text-heading text-sm font-bold">{{
+                    <span class="text-text-heading text-compact font-semibold">{{
                       t("synthetics.runDetail.sessionReplay")
                     }}</span>
                     <span class="flex-1" />
@@ -322,8 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         })
                       }}
                     </span>
-                  </OCardSection>
-                  <OSeparator />
+                  </template>
 
                   <div class="flex h-95 flex-col">
                     <div class="min-h-0 flex-1">
@@ -377,8 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <div v-if="row.screenshotKey" class="group relative h-full w-full">
                                   <OButton
                                     variant="ghost"
-                                    size="sm"
-                                    class="h-full! w-full rounded-none! border-0! p-0!"
+                                    class="w-full rounded-none! border-0! p-0!"
                                     data-test="synthetics-run-detail-step-screenshot-thumb"
                                     @click="openLightbox(row.id)"
                                   >
@@ -429,8 +418,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div v-if="row.screenshotKey" class="mt-2 flex justify-center">
                               <OButton
                                 variant="ghost"
-                                size="xs"
-                                icon-left="fullscreen"
+                                size="sm"
+                                icon="fullscreen"
                                 data-test="synthetics-run-detail-step-screenshot-expand-btn"
                                 @click="openLightbox(row.id)"
                               >
@@ -561,7 +550,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   <OButton
                                     v-if="(row.error?.length ?? 0) > 200"
                                     variant="ghost"
-                                    size="xs"
+                                    size="sm"
                                     class="text-text-link text-xs font-semibold"
                                     data-test="synthetics-run-detail-toggle-step-error-btn"
                                     @click="toggleStepError(row.id)"
@@ -574,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </OButton>
                                   <OButton
                                     variant="ghost"
-                                    size="xs"
+                                    size="sm"
                                     data-test="synthetics-run-detail-step-view-error-btn"
                                     @click="openErrorFullscreen(row.id)"
                                   >
@@ -671,7 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import { computed, nextTick, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
@@ -682,8 +671,6 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
 import { errorHeadline, locationDisplayLabel } from "@/utils/synthetics/format";
 import { syntheticsResultsRoute } from "@/utils/synthetics/routes";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import StepEvidence from "@/components/synthetics/StepEvidence.vue";
@@ -733,7 +720,7 @@ const emit = defineEmits<{
   (
     e: "update-status",
     status: {
-      variant: BadgeVariant;
+      variant: ChipTone;
       icon: string;
       label: I18nText;
       url: string;
@@ -1382,12 +1369,12 @@ function stepDotState(row: any): StepDotState | undefined {
 }
 
 /** Text label for the outcomes the dot colour alone cannot carry. */
-function stepStatusBadge(row: any): { label: string; variant: "default" | "error" } | null {
+function stepStatusBadge(row: any): { label: string; variant: "neutral" | "err" } | null {
   if (row.status === "skipped") {
-    return { label: t("synthetics.runDetail.stepStatusSkipped"), variant: "default" };
+    return { label: t("synthetics.runDetail.stepStatusSkipped"), variant: "neutral" };
   }
   if (row.status === "unknown") {
-    return { label: t("synthetics.runDetail.stepStatusUnknown"), variant: "default" };
+    return { label: t("synthetics.runDetail.stepStatusUnknown"), variant: "neutral" };
   }
   return null;
 }
@@ -1568,9 +1555,7 @@ watch(steps, (newSteps) => {
   }
 });
 
-const statusBadgeVariant = computed(() =>
-  isErrorRun.value ? "error-soft" : isFailed.value ? "error" : "success",
-);
+const statusBadgeVariant = computed(() => (isErrorRun.value || isFailed.value ? "err" : "ok"));
 const statusIcon = computed(() =>
   isErrorRun.value ? "error" : isFailed.value ? "cancel" : "check-circle",
 );
@@ -1622,6 +1607,16 @@ interface InfoChip {
 
 const infoChips = computed<InfoChip[]>(() => [
   statusChip.value,
+  // The drawer shows the run's time in its own header.
+  ...(props.drawerMode
+    ? []
+    : [
+        {
+          label: t("synthetics.protocolRun.started"),
+          value: currentRun.value.timestamp,
+          icon: "calendar-month",
+        },
+      ]),
   {
     label: t("synthetics.results.duration"),
     value: fmtDur(currentRun.value.duration),
@@ -1664,7 +1659,7 @@ watch(
     const isErr = status === "error";
     const isF = status === "failed" || isErr;
     emit("update-status", {
-      variant: isErr ? "error-soft" : isF ? "error" : "success",
+      variant: isF ? "err" : "ok",
       icon: isErr ? "error" : isF ? "cancel" : "check-circle",
       label: isErr
         ? t("synthetics.results.error")

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="compact" class="flex h-full min-h-0 flex-col">
     <div class="border-border-default shrink-0 border-b px-2">
-      <OTabs v-model="selectedCategory" dense>
+      <OTabs v-model="selectedCategory" size="compact">
         <OTab
           v-for="cat in aiCategories"
           :key="cat.slug"
@@ -33,11 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OButton
         variant="ghost"
-        size="sm"
         data-test="ai-integrations-list-mobile-btn"
         @click="listDrawerOpen = true"
       >
-        <template #icon-left><OIcon name="menu" size="sm" /></template>
+        <template #icon><OIcon name="menu" size="sm" /></template>
         {{ selectedIntegrationName || t("common.sidePanel") }}
       </OButton>
     </div>
@@ -61,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             data-test="ai-integrations-search-input"
             v-model="integrationFilter"
-            clearable
             class="indexlist-search-input w-full"
             :placeholder="t('common.search')"
             :aria-label="t('common.search')"
@@ -71,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabs
             v-model="selectedIntegration"
             orientation="vertical"
-            dense
+            size="compact"
             class="px-1"
             @update:model-value="onIntegrationPicked"
           >
@@ -113,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="h-full w-full">
         <div class="bg-surface-panel border-border-default h-full border-e">
           <div class="h-full overflow-y-auto pt-1.5">
-            <OTabs v-model="selectedCategory" orientation="vertical" dense class="px-1">
+            <OTabs v-model="selectedCategory" orientation="vertical" size="compact" class="px-1">
               <FirstSourcePickGroup
                 v-if="pickTab"
                 rail="ai"
@@ -143,7 +141,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSearchInput
                     data-test="ai-integrations-search-input"
                     v-model="integrationFilter"
-                    clearable
                     class="indexlist-search-input w-full"
                     :placeholder="t('common.search')"
                     :aria-label="t('common.search')"
@@ -153,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTabs
                     v-model="selectedIntegration"
                     orientation="vertical"
-                    dense
+                    size="compact"
                     class="px-1"
                     @update:model-value="navigateToIntegration"
                   >

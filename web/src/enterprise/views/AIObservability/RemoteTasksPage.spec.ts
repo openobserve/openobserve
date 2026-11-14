@@ -214,7 +214,7 @@ describe("RemoteTasksPage", () => {
       expect.objectContaining({
         messageKeypath: "aiObservability.remoteTasks.delete.message",
         messageName: "summarizer",
-        confirmVariant: "destructive",
+        kind: "destructive",
       }),
     );
 

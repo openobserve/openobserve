@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            not flash "no history yet" — the wrong answer — for a moment before
            the real one arrives. -->
       <div v-if="loading" class="flex flex-col gap-2" data-test="oncall-prior-causes-loading">
-        <OSkeleton type="text" class="h-4 w-2/3" />
-        <OSkeleton type="text" class="h-4 w-1/2" />
+        <OSkeleton class="h-4 w-2/3" />
+        <OSkeleton class="h-4 w-1/2" />
       </div>
 
       <!-- An org with no history yet is told plainly rather than being shown
@@ -33,9 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-else-if="!groups.length"
         size="inline"
-        variant="no-results"
+        kind="filtered"
         :title="t('oncall.priorCausesEmpty')"
-        hide-action
         data-test="oncall-prior-causes-empty"
       />
 
@@ -46,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-border-subtle flex items-start gap-3 border-b py-2 last:border-b-0"
           :data-test="`oncall-prior-cause-${group.cause}`"
         >
-          <OTag :variant="countVariant(group.cause)" size="sm">
+          <OTag :tone="countVariant(group.cause)" size="sm">
             {{ t("oncall.priorCauseCount", { count: group.count }) }}
           </OTag>
           <div class="flex-1">
@@ -56,8 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :data-test="`oncall-prior-cause-open-${group.cause}`"
             @click="emit('open', group.last_response_id)"
           >
@@ -87,8 +85,8 @@ const { t } = useI18nTyped();
 // A recurring genuine defect is worth a different colour from a recurring
 // maintenance window: one is a bug nobody has fixed, the other is expected.
 function countVariant(cause: ResolutionCause) {
-  if (cause === "genuine_defect") return "error-soft" as const;
-  if (cause === "expected_or_maintenance") return "success-soft" as const;
-  return "amber-soft" as const;
+  if (cause === "genuine_defect") return "err" as const;
+  if (cause === "expected_or_maintenance") return "ok" as const;
+  return "warn" as const;
 }
 </script>

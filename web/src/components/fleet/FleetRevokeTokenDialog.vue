@@ -19,12 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="token ? t('fleet.enrollment.revokeTitle', { name: raw(token.name) }) : undefined"
-    :primary-button-label="t('fleet.enrollment.revoke')"
-    primary-button-variant="destructive"
-    :primary-button-disabled="!token || typed !== token.name"
-    :primary-button-loading="loading"
-    :secondary-button-label="t('common.cancel')"
-    initial-focus="secondary"
+    :primary="{
+      label: t('fleet.enrollment.revoke'),
+      variant: 'danger',
+      disabled: !token || typed !== token.name,
+      loading: loading,
+    }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="fleet-revoke-token-dialog"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:secondary="emit('update:open', false)"
@@ -45,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="c.id"
             class="border-border-default flex items-center gap-2 border-b px-3 py-1.5 last:border-b-0"
           >
-            <OTag type="serviceStatus" :value="c.status" size="xs" />
+            <OTag type="serviceStatus" :value="c.status" size="sm" />
             <OTruncatedText class="flex-1">{{ c.name }}</OTruncatedText>
             <OText variant="meta">{{ c.fleetName }}</OText>
           </li>
@@ -53,7 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OInput
         v-model="typed"
-        size="sm"
         autocomplete="off"
         :label="t('confirmDialog.typeToConfirm', { text: raw(token.name) })"
         :placeholder="raw(token.name)"

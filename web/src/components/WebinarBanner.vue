@@ -18,47 +18,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Header variant: w-full top bar above the toolbar -->
   <OBanner
     v-if="webinarData && !isExpired && !isDismissed && variant === 'header'"
-    bar
-    dense
-    center
-    variant="promo"
-    role="banner"
+    tone="neutral"
+    icon="campaign"
+    dismissible
     data-test="webinar-header-banner"
+    @dismiss="dismiss"
   >
-    <div class="flex flex-wrap items-center justify-center gap-2">
-      <span class="webinar-top-bar-text text-center font-bold">
-        <strong>{{ webinarData.tag }}:</strong> {{ webinarData.title }}
-        <span v-if="webinarData.date" class="webinar-top-bar-date font-medium">
-          {{ formattedDate }}
-        </span>
+    <span class="webinar-top-bar-text">
+      <strong>{{ webinarData.tag }}:</strong> {{ webinarData.title }}
+      <span v-if="webinarData.date" class="webinar-top-bar-date text-text-secondary">
+        {{ formattedDate }}
       </span>
-
-      <a
-        v-if="webinarData.primaryButton"
+    </span>
+    <template v-if="webinarData.primaryButton" #actions>
+      <OButton
+        variant="link"
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
-        class="webinar-top-bar-link text-promo-webinar-link hover:text-promo-webinar-link-hover font-bold whitespace-nowrap underline"
         data-test="webinar-top-bar-register-link"
       >
         {{ webinarData.primaryButton.text }}
-      </a>
-
-      <span
-        class="webinar-top-bar-sep text-promo-webinar-sep font-normal opacity-60 select-none"
-        aria-hidden="true"
-        >|</span
-      >
-
-      <OButton
-        variant="webinar-dismiss"
-        :aria-label="t('components.webinarBanner.dismissBannerAriaLabel')"
-        @click="dismiss"
-        data-test="webinar-top-bar-dismiss-btn"
-      >
-        {{ t("components.webinarBanner.dismiss") }}
       </OButton>
-    </div>
+    </template>
   </OBanner>
 
   <!-- Home variant: larger banner -->
@@ -110,8 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="webinarData.primaryButton"
         variant="secondary"
-        size="sm"
-        as="a"
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
@@ -130,10 +110,9 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import type { I18nText } from "@/types/i18n";
 
 const store = useStore();
-const { t } = useI18nTyped();
 
 const props = defineProps<{
   variant: "header" | "home";

@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="destination"
     :is-importing="isDestinationImporting"
     container-class=""
-    @back="arrowBackFn"
-    @cancel="router.back()"
+    :back="{ label: t('alerts.header'), to: listRoute }"
+    @cancel="goBack"
     @import="importJson"
   >
     <!-- Output Section with Destination-specific Error Display -->
@@ -162,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ errorMessage.message }}
                     <div>
                       <OSelect
+                        searchable
                         data-test="destination-import-template-input"
                         :model-value="userSelectedTemplates[index] || ''"
                         @update:model-value="
@@ -273,6 +274,7 @@ import { defineComponent, ref, computed, reactive } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -710,14 +712,11 @@ export default defineComponent({
       }
     };
 
-    const arrowBackFn = () => {
-      router.push({
-        name: "alertDestinations",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
+    const listRoute = computed(() => ({
+      name: "alertDestinations",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    }));
+    const { goBack } = useSmartBack(() => listRoute.value);
 
     return {
       raw,
@@ -748,7 +747,8 @@ export default defineComponent({
       updateSkipTlsVerify,
       filterTemplates,
       getCorrectionRequiredError,
-      arrowBackFn,
+      listRoute,
+      goBack,
       isDestinationImporting,
       store,
       getFormattedTemplates,

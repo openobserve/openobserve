@@ -1,12 +1,12 @@
 <template>
   <ODrawer
+    size="xl"
     bleed
     :open="open"
     side="right"
-    :width="70"
     :title="raw(row?.name)"
     :title-data-test="'scorer-detail-name-badge'"
-    :sub-title="t('onlineEvals.scorer.detail.eyebrow')"
+    :subtitle="t('onlineEvals.scorer.detail.eyebrow')"
     data-test="scorer-detail"
     @update:open="handleOpenChange"
   >
@@ -27,9 +27,9 @@
           data-test="scorer-detail-runs-window"
         />
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          icon-only
+          variant="secondary"
+          icon="refresh"
           :loading="isLoadingRuns"
           :title="t('onlineEvals.scorer.detail.refresh')"
           data-test="scorer-detail-runs-refresh"
@@ -259,13 +259,9 @@
             row-key="id"
             :loading="isLoadingRuns"
             :loading-reset-key="scorerIdRef"
-            :show-global-filter="false"
-            :show-footer="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.scorer.detail.runs.empty')"
-            show-index
-            width="100%"
             class="w-full"
           >
             <template #cell-timestampMs="{ row }">

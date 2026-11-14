@@ -33,11 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="configQuery.isError.value" class="flex flex-col items-center gap-3">
       <span class="text-text-secondary text-sm">{{ t("announcements.settings.loadFailed") }}</span>
-      <OButton variant="outline" size="sm" @click="configQuery.refetch()">
+      <OButton variant="secondary" @click="configQuery.refetch()">
         {{ t("common.retry") }}
       </OButton>
     </div>
-    <OSpinner v-else />
+    <OSpinner v-else size="lg" />
   </div>
 </template>
 

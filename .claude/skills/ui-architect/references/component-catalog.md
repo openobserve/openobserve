@@ -17,7 +17,7 @@ markup — don't guess a prop name.
 | [references/forms-inputs.md](forms-inputs.md)               | Input/Textarea, Select, Combobox, SearchInput, Checkbox, Radio, Switch, OptionGroup                                                                                                                                 |
 | [references/forms-specialized.md](forms-specialized.md)     | **Form + useOForm**, Color, Date, DateTimeRange, Time, File, Range, Slider                                                                                                                                          |
 | [references/forms-validation.md](forms-validation.md)       | **Validating a form: OForm + Zod schema, binding rules, submit/loading, conditional rendering, field arrays, testing**                                                                                              |
-| [references/keyboard-shortcuts.md](keyboard-shortcuts.md)   | **Keyboard shortcuts: registry, `useShortcut`/`useShortcuts`, display via `OShortcut`/`shortcut-id`, cheatsheet**                                                                                                   |
+| [references/keyboard-shortcuts.md](keyboard-shortcuts.md)   | **Keyboard shortcuts: registry, `useShortcut`/`useShortcuts`, display via `OShortcut`/`shortcut`, cheatsheet**                                                                                                   |
 | [references/creating-components.md](creating-components.md) | **Building a NEW O2 component: lib vs components, folder contract, families, headless-first (reka-ui), no-UI-prop-leakage, strict TS, tokens, form wrappers, workflow, testing**                                    |
 | [references/design-tokens.md](design-tokens.md)             | **Design tokens: using `--color-*`, the token files, registering a new token, the `--o2-*` ban + full `--o2-*` → `--color-*` migration map**                                                                        |
 | [references/page-recipes.md](page-recipes.md)               | **Whole-page layouts: the listing/table page (full-height flush skeleton, mandatory search · refresh · column-visibility toggle, filtered-vs-first-run empty state) and the detail/editor page**                    |
@@ -35,11 +35,12 @@ markup — don't guess a prop name.
 
 | I need to…                                           | Use                                                                                                                  | Reference               |
 | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| Trigger an action (submit, add, open)                | `OButton` (`OButtonGroup` for a set)                                                                                 | core-controls-table     |
+| Trigger an action (submit, add, open)                | `OButton` (`OButtonGroup` for 2–4 equal actions, `OSplitButton` for a default action + its variants)                | core-controls-table     |
+| Copy a value (ID, token, URL, query, command)        | `OCopyButton` — every copy action, never a hand-built copy button                                                    | core-controls-table     |
 | Show a page/module header                            | `OPageHeader` (rule 1)                                                                                               | —                       |
 | Render tabular data                                  | `OTable` + `OTableColumnDef[]`                                                                                       | core-controls-table     |
 | Show a status label / count / tag                    | `OBadge`, `OTag`, `ODimensionChip`                                                                                   | core-display            |
-| Group content in a surface                           | `OCard` (+ `OCardSection`, `OCardActions`)                                                                           | core-display            |
+| Group content in a surface (the panel)               | `OCard` (`title`, `#actions`, `#footer`, `flush`)                                                                    | core-display            |
 | Body / heading / muted text                          | `OText` (pick the `variant`)                                                                                         | core-display            |
 | Text that may not fit (cut with "…")                 | `OTruncatedText` — full text on hover only when cut; `:tooltip="false"` for secrets / text shown elsewhere           | **core-display**        |
 | Cut text in a table cell                             | nothing — `OTable` shows it; secret column → `meta.cellOverflowTooltip: false`                                      | **core-controls-table** |
@@ -72,19 +73,19 @@ markup — don't guess a prop name.
 | Menu of actions                                      | `ODropdown` (+ `ODropdownItem`)                                                                                      | overlay-navigation      |
 | Freeform floating content                            | `OPopover`                                                                                                           | overlay-navigation      |
 | Hover hint (that adds information)                   | `OTooltip` — not for repeating cut text; use `OTruncatedText`                                                       | overlay-navigation      |
-| Switch between content sections                      | `OTabs` (+ `OTab`/`OTabPanel`); `ORouteTab` for route-driven                                                         | overlay-navigation      |
+| Switch between content sections                      | `OTabs` (+ `OTab`/`OTabPanel`); `OTab to` for route-driven                                                          | overlay-navigation      |
 | Multi-step wizard                                    | `OStepper` (+ `OStep`)                                                                                               | overlay-navigation      |
 | Paginate a list                                      | `OPagination`                                                                                                        | overlay-navigation      |
-| Persistent inline message                            | `OBanner`                                                                                                            | feedback-data           |
+| Lasting condition: page / one section                | `OBanner` (under the header) / `OInlineNotice` (in the section)                                                      | feedback-data           |
 | Transient notification (replaces `q-notify`)         | `useToast()` (+ `OToastProvider` at root)                                                                            | feedback-data           |
-| Loading state                                        | `OSkeleton` (placeholder) / `OSpinner` (bare) / `OInnerLoading` (over a container)                                   | feedback-data           |
+| Loading state                                        | `OSkeleton` (first load) / `OLoadingLine` (refresh) / `OSpinner` (a busy control)                                    | feedback-data           |
 | Progress indicator                                   | `OProgressBar`                                                                                                       | feedback-data           |
 | Segmented proportion / capacity bar with ticks       | `OSegmentedBar`                                                                                                      | feedback-data           |
 | Event timeline                                       | `OTimeline` (+ `OTimelineItem`)                                                                                      | feedback-data           |
 | Hierarchical / tree data                             | `OTree` (+ `OTreeNode`)                                                                                              | feedback-data           |
 | Label–value detail rows                              | `OFieldList` (+ `OFieldRow`, `OFieldLabel`)                                                                          | feedback-data           |
 | Confirm / destructive prompt                         | `ConfirmDialog` + `useConfirmDialog` (app-level, `@/components` + `@/composables`)                                   | —                       |
-| Add a keyboard shortcut                              | registry entry + `useShortcuts([{ id, handler }])`; display via `OShortcut`/`shortcut-id`                            | keyboard-shortcuts      |
+| Add a keyboard shortcut                              | registry entry + `useShortcuts([{ id, handler }])`; display via `OShortcut`/`shortcut`                               | keyboard-shortcuts      |
 | Build a NEW component (nothing fits)                 | new `O*` in `web/src/lib` (generic) or named component in `web/src/components` (app-specific) — never inline classes | **creating-components** |
 | Add a new page to the nav / menu / settings sub-menu | route composable + `linksList` / `navGroups.ts` / `settingsItems`, gated by env/role                                 | **navigation-menus**    |
 

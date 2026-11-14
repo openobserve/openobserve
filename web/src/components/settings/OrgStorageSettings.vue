@@ -19,8 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       v-if="currentAction === 'list'"
       :title="t('storage_settings.tabLabel')"
-      icon="cloud"
-      :subtitle="t('settings.orgStorageSettings.subtitle')"
+      :about="t('settings.orgStorageSettings.subtitle')"
       bleed
       scroll
     >
@@ -29,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="loading"
         class="flex min-h-[calc(100vh-var(--navbar-height)-7.5rem)] items-center justify-center"
       >
-        <OSpinner size="md" data-test="org-storage-settings-loading-indicator" />
+        <OSpinner size="lg" data-test="org-storage-settings-loading-indicator" />
       </div>
 
       <!-- Cloud: storage not enabled -->
@@ -62,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="storage-settings-configure-btn"
                 variant="primary"
-                size="sm-action"
                 @click="navigateToCreate"
               >
                 {{ t("storage_settings.configureStorage") }}
@@ -127,10 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="min-h-[calc(100vh-var(--navbar-height)-10rem)] w-full"
       >
         <OEmptyState
-          size="hero"
-          preset="no-storage-config"
+          :title="t('emptyState.noStorageConfig.title')"
+          :text="t('emptyState.noStorageConfig.description')"
           data-test="org-storage-settings-empty-state"
-          @action="(id) => id === 'configure' && navigateToCreate()"
+          :action-label="t('emptyState.noStorageConfig.action')"
+          @action="navigateToCreate()"
         >
           <template #extra>
             <!-- key fact chips -->
@@ -182,105 +181,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- ========== CONFIGURED ========== -->
       <div v-else>
         <div class="p-3">
-          <OCard class="storage-card rounded-default bg-surface-base max-w-170">
-            <!-- Card header: logo + name + badge | update button -->
-            <OCardSection role="header">
-              <div class="flex flex-1 flex-nowrap items-center gap-3.5">
-                <img
-                  :src="configuredProviderImage"
-                  :alt="configuredProviderLabel"
-                  class="h-11 w-11 shrink-0 object-contain"
-                />
-                <div>
-                  <div class="text-base leading-tight font-bold">
-                    {{ configuredProviderLabel }}
-                  </div>
-                  <OTag type="activeFlag" class="mt-1" />
-                </div>
-              </div>
+          <OCard class="storage-card max-w-170">
+            <template #header>
+              <img
+                :src="configuredProviderImage"
+                :alt="configuredProviderLabel"
+                class="size-6 shrink-0 object-contain"
+              />
+              <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+                {{ configuredProviderLabel }}
+              </h3>
+              <OTag type="activeFlag" class="shrink-0" />
+            </template>
+            <template #actions>
               <OButton
                 data-test="storage-settings-update-btn"
                 variant="primary"
-                size="sm-action"
                 @click="navigateToEdit"
               >
                 {{ t("storage_settings.updateStorage") }}
               </OButton>
-            </OCardSection>
+            </template>
 
-            <OSeparator />
-
-            <!-- Field grid -->
-            <OCardSection role="body">
-              <div class="storage-detail-grid grid grid-cols-2 gap-x-8 gap-y-5">
-                <div v-if="storageData.bucket_name" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.bucketName") }}
-                  </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.bucket_name }}
-                  </div>
+            <div class="storage-detail-grid grid grid-cols-2 gap-x-8 gap-y-5">
+              <div v-if="storageData.bucket_name" class="storage-field">
+                <div
+                  class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                >
+                  {{ t("storage_settings.bucketName") }}
                 </div>
-                <div v-if="storageData.region" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.region") }}
-                  </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.region }}
-                  </div>
-                </div>
-                <div v-if="storageData.server_url && !isCloud" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.serverUrl") }}
-                  </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.server_url }}
-                  </div>
-                </div>
-                <div v-if="storageData.access_key" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.accessKey") }}
-                  </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.access_key }}
-                  </div>
-                </div>
-                <div v-if="storageData.secret_key" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.secretKey") }}
-                  </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.secret_key }}
-                  </div>
-                </div>
-                <div v-if="storageData.role_arn" class="storage-field">
-                  <div
-                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
-                  >
-                    {{ t("storage_settings.roleArn") }}
-                  </div>
-                  <div class="storage-field__value text-text-body text-sm break-all">
-                    {{ storageData.role_arn }}
-                  </div>
+                <div class="storage-field__value text-text-body text-sm break-all">
+                  {{ storageData.bucket_name }}
                 </div>
               </div>
-            </OCardSection>
+              <div v-if="storageData.region" class="storage-field">
+                <div
+                  class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                >
+                  {{ t("storage_settings.region") }}
+                </div>
+                <div class="storage-field__value text-text-body text-sm break-all">
+                  {{ storageData.region }}
+                </div>
+              </div>
+              <div v-if="storageData.server_url && !isCloud" class="storage-field">
+                <div
+                  class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                >
+                  {{ t("storage_settings.serverUrl") }}
+                </div>
+                <div class="storage-field__value text-text-body text-sm break-all">
+                  {{ storageData.server_url }}
+                </div>
+              </div>
+              <div v-if="storageData.access_key" class="storage-field">
+                <div
+                  class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                >
+                  {{ t("storage_settings.accessKey") }}
+                </div>
+                <div class="storage-field__value text-text-body text-sm break-all">
+                  {{ storageData.access_key }}
+                </div>
+              </div>
+              <div v-if="storageData.secret_key" class="storage-field">
+                <div
+                  class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                >
+                  {{ t("storage_settings.secretKey") }}
+                </div>
+                <div class="storage-field__value text-text-body text-sm break-all">
+                  {{ storageData.secret_key }}
+                </div>
+              </div>
+              <div v-if="storageData.role_arn" class="storage-field">
+                <div
+                  class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                >
+                  {{ t("storage_settings.roleArn") }}
+                </div>
+                <div class="storage-field__value text-text-body text-sm break-all">
+                  {{ storageData.role_arn }}
+                </div>
+              </div>
+            </div>
 
-            <OSeparator v-if="configTimestamps" />
-
-            <!-- Timestamps -->
-            <OCardSection v-if="configTimestamps">
-              <div class="flex gap-10">
+            <template v-if="configTimestamps" #footer>
+              <div class="me-auto flex gap-10">
                 <div v-if="configTimestamps.created_at" class="flex items-center gap-1.5">
                   <span
                     class="storage-field__label text-text-label mb-0 text-xs font-medium capitalize"
@@ -296,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-sm">{{ configTimestamps.updated_at }}</span>
                 </div>
               </div>
-            </OCardSection>
+            </template>
           </OCard>
         </div>
       </div>
@@ -314,7 +301,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -325,7 +311,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OrgStorageEditor from "./OrgStorageEditor.vue";
 

@@ -13,35 +13,14 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
-<!--
-  AiPageShell — the ONE page header shared by every AI Observability page
-  (Sessions, Agent Graph, Agent Behavior, LLM Insights). It reproduces today's
-  per-page OPageLayout header EXACTLY — same markup, same class strings, same
-  `data-test` pattern — parameterizing only what differs between pages:
-
-    - `dataTest`  — the page prefix. Every page today derives its header
-                    data-test values as `${prefix}-page`, `${prefix}-date-time`,
-                    `${prefix}-refresh-btn` (e.g. Behavior = `ai-agent-behavior`,
-                    Sessions = `ai-sessions`, Graph = `ai-agent-graph`, LLM =
-                    `ai-llm-insights`). Passing the bare prefix reproduces all
-                    three unchanged.
-    - `title` / `subtitle` / `icon` — resolved header content (each page owns
-                    its own i18n keys / icon).
-    - `dateState` — the shared useAiDateRange() state bound to the picker.
-    - `lastRunAt` / `isLoading` — drive the refresh control.
-
-  The default slot is the page body; `#subnav` is the scope bar / tabs strip.
-  `date-change` / `refresh` are forwarded so each page wires its own effects.
--->
+<!-- The header shared by the AI pages with a date range; `dataTest` is the prefix of the page's data-test ids. -->
 <template>
   <OPageLayout
     :data-test="`${dataTest}-page`"
     :title="header?.title ?? title"
-    :subtitle="header?.subtitle ?? subtitle"
-    :icon="header?.icon ?? icon"
+    :about="header?.about ?? about"
     bleed
     :scroll="false"
-    :tabs-below="hasTabs"
   >
     <template v-if="hasTabs" #header-tabs><AiSectionTabs /></template>
     <template #actions>
@@ -62,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :content="raw(dateDisabledTooltip ?? '')"
         :disabled="!dateDisabled || !dateDisabledTooltip"
       >
-        <DateTime
+        <ODateTimeRange
           ref="dateTimeRef"
           auto-apply
           menu-align="end"
@@ -73,9 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             endTime: dateState.endTime ?? 0,
           }"
           :default-relative-time="dateState.relativeTimePeriod ?? ''"
-          :disable="dateDisabled"
+          :disabled="dateDisabled"
           :data-test="`${dataTest}-date-time`"
-          class="h-8"
           @on:date-change="$emit('date-change', $event)"
         />
       </OTooltip>
@@ -84,8 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            supported). -->
       <OButton
         variant="primary"
-        size="sm-toolbar"
-        icon-left="refresh"
+        icon="refresh"
         :disabled="isLoading"
         :loading="isLoading"
         :data-test="`${dataTest}-refresh-btn`"
@@ -105,8 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { ref } from "vue";
 import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import AiSectionTabs from "./AiSectionTabs.vue";
 import { useAiSectionTabs } from "./aiSectionTabs";
@@ -122,12 +98,8 @@ defineProps<{
       `${dataTest}-date-time`, `${dataTest}-refresh-btn` from it, reproducing
       each page's existing data-test values unchanged. */
   dataTest: string;
-  /** Resolved page title (each page passes its own t(...) value). */
   title: I18nText;
-  /** Resolved page subtitle. */
-  subtitle: I18nText;
-  /** OPageHeader icon name. */
-  icon: IconName;
+  about: I18nText;
   /** Shared AI date-range state (useAiDateRange().state) bound to the picker. */
   dateState: AiDateState;
   /** Epoch-ms of the last refresh, shown on the refresh control (or null). */
@@ -151,6 +123,6 @@ defineEmits<{
 // Exposed for parity with the per-page usage, which held a `dateTimeRef` to
 // the picker. Pages that need the imperative handle can access it via a
 // template ref on the shell's forwarded picker.
-const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
+const dateTimeRef = ref<InstanceType<typeof ODateTimeRange> | null>(null);
 defineExpose({ dateTimeRef });
 </script>

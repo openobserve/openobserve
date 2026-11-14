@@ -87,9 +87,8 @@ function onUpdateOpen(value: boolean) {
     :title="t('aiObservability.remoteTasks.credentialsDialog.title')"
     :persistent="isSubmitting"
     :show-close="!isSubmitting"
-    :primary-button-label="t('aiObservability.remoteTasks.credentialsDialog.submit')"
-    :secondary-button-label="t('common.cancel')"
-    secondary-button-variant="outline"
+    :primary="{ label: t('aiObservability.remoteTasks.credentialsDialog.submit') }"
+    :secondary="{ label: t('common.cancel'), variant: 'secondary' }"
     :form-id="FORM_ID"
     data-test="ai-remote-task-credentials-dialog"
     @update:open="onUpdateOpen"
@@ -112,7 +111,6 @@ function onUpdateOpen(value: boolean) {
         <OFormInput
           name="username"
           :label="t('aiObservability.remoteTasks.form.usernameLabel')"
-          size="sm"
           required
           autocomplete="off"
           data-test="ai-remote-task-credentials-username"
@@ -120,9 +118,7 @@ function onUpdateOpen(value: boolean) {
         <OFormInput
           name="password"
           type="password"
-          revealable
           :label="t('aiObservability.remoteTasks.form.passwordLabel')"
-          size="sm"
           required
           autocomplete="new-password"
           data-test="ai-remote-task-credentials-password"
@@ -132,10 +128,8 @@ function onUpdateOpen(value: boolean) {
         v-else
         name="token"
         type="password"
-        revealable
         :label="t('aiObservability.remoteTasks.form.tokenLabel')"
         :placeholder="t('aiObservability.remoteTasks.form.tokenPlaceholder')"
-        size="sm"
         required
         autocomplete="new-password"
         data-test="ai-remote-task-credentials-token"

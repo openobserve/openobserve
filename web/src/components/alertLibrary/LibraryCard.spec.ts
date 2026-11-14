@@ -54,11 +54,11 @@ describe("LibraryCard", () => {
     expect(mountCard().find('[data-test="alert-library-card-severity"]').text()).toBe("Critical");
   });
 
-  it("shows warning severity in the badge group's amber, matching its P3 install", () => {
+  it("shows warning severity in the badge group's warn tone, matching its P3 install", () => {
     const wrapper = mountCard({ entry: { ...entry, severity: "warning" } });
     const badge = wrapper.find('[data-test="alert-library-card-severity"]');
     expect(badge.text()).toBe("Warning");
-    expect(badge.html()).toContain("amber");
+    expect(badge.html()).toContain("badge-warning-soft");
   });
 
   it("shows the query language as a quiet neutral chip", () => {
@@ -83,18 +83,13 @@ describe("LibraryCard", () => {
   });
 
   it("marks the state in a tone that each theme can wear", () => {
-    // Warning and not error: an alert with no data is not broken, it is waiting.
-    //
-    // The chip uses warning-QUIET, whose tokens differ by theme, because 959 of
-    // 1242 alerts are not ingested on a typical org. Light wears the amber wash
-    // at a dozen per screen; dark, where the same ramp is full-chroma against
-    // near-black, turns the chip neutral and lets the icon carry the colour.
+    // No data is grey (C5) and most alerts are not ingested on a typical org,
+    // so the chip stays neutral and only its icon carries the warning colour.
     const wrapper = mountCard({ ready: false });
     const note = wrapper.find('[data-test="alert-library-card-needs-data"]');
     const mark = wrapper.find('[data-test="alert-library-card-needs-data-mark"]');
 
-    expect(note.classes().join(" ")).toMatch(/badge-warning-quiet/);
-    // Never the filled variant: that one is identical in both themes.
+    expect(note.classes().join(" ")).toMatch(/badge-default-soft-bg/);
     expect(note.classes().join(" ")).not.toMatch(/badge-warning-soft-bg/);
     expect(note.html()).not.toMatch(/badge-error/);
     // The icon stays amber in BOTH themes, so dark keeps a colour cue.
@@ -401,9 +396,9 @@ describe("LibraryCard", () => {
       const button = wrapper
         .findAllComponents({ name: "OButton" })
         .find((b) => b.attributes("data-test") === CUSTOMIZE_ID);
-      expect(button?.props("variant")).toBe("outline");
-      expect(button?.props("size")).toBe("icon-sm");
-      expect(button?.props("iconLeft")).toBe("edit");
+      expect(button?.props("variant")).toBe("secondary");
+      expect(button?.props("iconOnly")).toBe(true);
+      expect(button?.props("icon")).toBe("edit");
     });
 
     it("explains Customize in a tooltip and spells out Add on hover", () => {

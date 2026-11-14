@@ -23,9 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       pagination="none"
       sorting="none"
-      :show-global-filter="false"
-      :frame="false"
-      :dense="true"
     >
       <template #cell-label="{ row }">
         <span
@@ -52,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else-if="row.cells[k]"
           variant="ghost"
-          size="sm"
           class="w-full justify-center tabular-nums"
           :class="[
             tint(row.cells[k].pct),

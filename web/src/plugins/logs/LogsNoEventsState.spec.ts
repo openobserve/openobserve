@@ -23,7 +23,7 @@ import LogsNoEventsState from "./LogsNoEventsState.vue";
 const OEmptyStateStub = defineComponent({
   name: "OEmptyState",
   setup(_, { slots }) {
-    return () => h("div", { "data-test": "o-empty-state" }, [slots.description?.()]);
+    return () => h("div", { "data-test": "o-empty-state" }, [slots.text?.()]);
   },
 });
 

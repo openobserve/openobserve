@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButton
     v-if="show && visible"
-    variant="ghost-primary"
-    size="icon-xs"
+    icon-only
+    variant="accent-ghost"
     :aria-label="askLabel"
     :data-test="`overview-ask-ai-${kind}-${itemKey}`"
     @click.stop="emit('ask')"
   >
-    <template #icon-left>
+    <template #icon>
       <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
     </template>
     <OTooltip :content="label ? askLabel : t('overview.askAi.hint')" />

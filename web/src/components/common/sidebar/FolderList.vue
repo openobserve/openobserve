@@ -30,18 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OButton
         variant="ghost"
-        size="sm"
         data-test="folder-list-mobile-toggle"
         @click="mobileDrawerOpen = true"
       >
-        <template #icon-left><OIcon name="folder-outline" size="sm" /></template>
+        <template #icon><OIcon name="folder-outline" size="sm" /></template>
         <OTruncatedText class="max-w-52">{{
           activeFolderName || t(folderKey(type, "dashboard.folders"))
         }}</OTruncatedText>
       </OButton>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon"
+        size="xs"
         @click.stop="addFolder"
         data-test="dashboard-new-folder-btn"
         :title="t(folderKey(type, 'common.addFolder'))"
@@ -63,8 +63,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t(folderKey(type, "dashboard.folders")) }}
             <div>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon"
+                size="xs"
                 @click.stop="addFolder"
                 data-test="dashboard-new-folder-btn"
                 :title="t(folderKey(type, 'common.addFolder'))"
@@ -79,7 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchQuery"
               data-test="folder-search"
               :placeholder="t(folderKey(type, 'dashboard.searchFolder'))"
-              clearable
               class="w-full"
             />
           </div>
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="folders-tabs flex-1 overflow-y-auto px-1">
           <OTabs
             orientation="vertical"
-            dense
+            size="compact"
             v-model="activeFolderId"
             data-test="dashboards-folder-tabs"
           >
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="tab in filteredTabs"
               :key="tab.folderId"
               :name="tab.folderId"
-              class="test-class min-h-6"
+              class="test-class"
               :data-test="`dashboard-folder-tab-${tab.folderId}`"
               @click="onTabClick(tab.folderId)"
             >
@@ -128,11 +128,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ODropdown side="bottom" align="start">
                     <template #trigger>
                       <OButton
+                        icon-only
                         :aria-label="t('common.moreActions')"
-                        size="icon"
+                        size="xs"
                         variant="ghost"
-                        icon-left="more-vert"
-                        class="h-5 w-5"
+                        icon="more-vert"
                         data-test="dashboard-more-icon"
                       />
                     </template>
@@ -140,17 +140,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-edit-folder-icon"
                       @select="editFolder(tab.folderId)"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <OIcon name="edit" size="xs" />
                       </template>
                       {{ t("common.edit") }}
                     </ODropdownItem>
                     <ODropdownItem
-                      variant="destructive"
+                      tone="danger"
                       data-test="dashboard-delete-folder-icon"
                       @select="showDeleteFolderDialogFn(tab.folderId, tab.name)"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <OIcon name="delete" size="xs" />
                       </template>
                       {{ t("common.delete") }}
@@ -179,8 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :message-name="selectedFolderDeleteName"
     :confirm-text="deleteConfirmText"
     :ok-label="type === 'fleets' ? t('common.delete') : undefined"
-    ok-variant="destructive"
-    :focus-cancel="type === 'fleets'"
+    kind="typeToConfirm"
     @update:ok="deleteFolder"
     @update:cancel="confirmDeleteFolderDialog = false"
     v-model="confirmDeleteFolderDialog"

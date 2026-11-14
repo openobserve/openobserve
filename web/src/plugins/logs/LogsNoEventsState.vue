@@ -34,10 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   The "Ask AI" ghost button is only shown when aiEnabled is true.
 -->
 <template>
-  <OEmptyState illustration="logs" size="hero" :hide-action="true">
-    <template #title>{{ t("logs.noEvents.title") }}</template>
-
-    <template #description>
+  <OEmptyState icon="article" :title="t('logs.noEvents.title')">
+    <template #text>
       <!-- Filter applied within an overlapping window: relax the query. -->
       <span
         v-if="windowHasStreamData && hasFilters"
@@ -68,8 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
           variant="ghost"
-          size="sm"
-          icon-left="history"
+          icon="history"
           data-test="logs-no-events-open-history-btn"
           @click="emit('open-history')"
         >
@@ -78,11 +75,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="aiEnabled && windowHasStreamData && !jumpTarget"
           variant="ghost"
-          size="sm"
           data-test="logs-no-events-ask-ai-btn"
           @click="emit('ask-ai')"
         >
-          <template #icon-left>
+          <template #icon>
             <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
           </template>
           {{ t("logs.noEvents.askAi") }}

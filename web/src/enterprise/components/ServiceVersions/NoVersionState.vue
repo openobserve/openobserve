@@ -10,20 +10,14 @@
       <ServiceScopeChip v-if="where" facet="where" :where-key="where" :value="whereLabel" />
     </div>
     <OEmptyState
-      size="compact"
       :title="
         service
           ? t('serviceVersions.setup.titleFor', { service })
           : t('serviceVersions.setup.title')
       "
-      :description="t('serviceVersions.setup.intro')"
+      :text="t('serviceVersions.setup.intro')"
+      icon="flag"
     >
-      <template #illustration>
-        <span
-          class="bg-tabs-active-bg text-tabs-active-text rounded-surface flex size-12 items-center justify-center"
-          ><OIcon name="flag" size="md"
-        /></span>
-      </template>
       <template #extra>
         <div class="flex w-full max-w-208 flex-col items-center gap-3">
           <div class="flex w-full flex-wrap gap-3 text-start">
@@ -34,7 +28,7 @@
             >
               <div class="flex items-center gap-2">
                 <OTag
-                  :variant="kind === 'otel' ? 'teal-soft' : 'cyan-soft'"
+                  tone="neutral"
                   :icon="kind === 'otel' ? 'account-tree' : 'devices'"
                   :label="
                     kind === 'otel'
@@ -48,9 +42,9 @@
                     : t("serviceVersions.setup.sdkTitle")
                 }}</span>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs"
-                  icon-left="content-copy"
+                  icon="content-copy"
                   class="ms-auto"
                   :aria-label="t('serviceVersions.actions.copySnippet')"
                   :data-test="`svcver-copy-${kind}`"
@@ -74,17 +68,12 @@
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <OButton variant="secondary" data-test="svcver-setup-guide" @click="openGuide">{{
+              t("serviceVersions.setup.guide")
+            }}</OButton>
             <OButton
-              variant="outline"
-              size="sm"
-              data-test="svcver-setup-guide"
-              @click="openGuide"
-              >{{ t("serviceVersions.setup.guide") }}</OButton
-            >
-            <OButton
-              variant="ghost-primary"
-              size="sm"
-              icon-left="content-copy"
+              variant="accent-ghost"
+              icon="content-copy"
               data-test="svcver-copy-snippet"
               @click="copy('otel')"
               >{{ t("serviceVersions.actions.copySnippet") }}</OButton
@@ -100,7 +89,6 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ServiceEnvChip from "@/components/shared/ServiceEnvChip.vue";
 import ServiceScopeChip from "@/components/shared/ServiceScopeChip.vue";

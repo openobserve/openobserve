@@ -44,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OButton
           v-if="canView('logstreams')"
+          icon-only
           variant="ghost"
-          size="icon-circle"
           class="relative"
           :aria-label="t('home.viewButton')"
           :title="t('home.viewButton')"
@@ -63,99 +63,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></router-link>
         </OButton>
       </div>
-      <KpiCardRow class="mb-4 shrink-0" min-width="12rem">
+      <OStatStrip class="mb-4 shrink-0">
         <!-- Streams -->
-        <KpiCard
+        <OStatCard
           :label="t('home.streams')"
           icon="window"
-          icon-size="md"
-          label-class="text-sm font-medium text-text-secondary"
-          icon-class="bg-icon-chip-primary-bg text-icon-chip-primary-text"
+          size="lg"
+          :value="animatedStreamsCount || summary.streams_count"
         >
           <template #value>
-            <span
-              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
-              aria-live="polite"
-              data-test="home-usage-tab-streams-count"
-              >{{ animatedStreamsCount || summary.streams_count }}</span
-            >
+            <span aria-live="polite" data-test="home-usage-tab-streams-count">{{
+              animatedStreamsCount || summary.streams_count
+            }}</span>
           </template>
-        </KpiCard>
+        </OStatCard>
 
         <!-- Events -->
-        <KpiCard
+        <OStatCard
           :label="t('home.docsCountLbl')"
           icon="bar-chart"
-          icon-size="md"
-          label-class="text-sm font-medium text-text-secondary"
-          icon-class="bg-icon-chip-primary-bg text-icon-chip-primary-text"
+          size="lg"
+          :value="formattedAnimatedEventsCount"
         >
           <template #value>
-            <span
-              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
-              aria-live="polite"
-              data-test="home-usage-tab-events-count"
-              >{{ formattedAnimatedEventsCount }}</span
-            >
+            <span aria-live="polite" data-test="home-usage-tab-events-count">{{
+              formattedAnimatedEventsCount
+            }}</span>
           </template>
-        </KpiCard>
+        </OStatCard>
 
         <!-- Ingested size -->
-        <KpiCard
+        <OStatCard
           :label="t('home.totalDataIngested')"
           icon="download"
-          icon-size="md"
-          label-class="text-sm font-medium text-text-secondary"
-          icon-class="bg-icon-chip-warning-bg text-icon-chip-warning-text"
+          size="lg"
+          :value="formattedAnimatedIngestedSize"
         >
           <template #value>
-            <span
-              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
-              aria-live="polite"
-              data-test="home-usage-tab-ingested-size"
-              >{{ formattedAnimatedIngestedSize }}</span
-            >
+            <span aria-live="polite" data-test="home-usage-tab-ingested-size">{{
+              formattedAnimatedIngestedSize
+            }}</span>
           </template>
-        </KpiCard>
+        </OStatCard>
 
         <!-- Compressed size (self-hosted only) -->
-        <KpiCard
+        <OStatCard
           v-if="config.isCloud == 'false'"
           :label="t('home.totalDataCompressed')"
           icon="compress"
-          icon-size="md"
-          label-class="text-sm font-medium text-text-secondary"
-          icon-class="bg-icon-chip-success-bg text-icon-chip-success-text"
+          size="lg"
+          :value="formattedAnimatedCompressedSize"
         >
           <template #value>
-            <span
-              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
-              aria-live="polite"
-              data-test="home-usage-tab-compressed-size"
-              >{{ formattedAnimatedCompressedSize }}</span
-            >
+            <span aria-live="polite" data-test="home-usage-tab-compressed-size">{{
+              formattedAnimatedCompressedSize
+            }}</span>
           </template>
-        </KpiCard>
+        </OStatCard>
 
         <!-- Index size (self-hosted only) -->
-        <KpiCard
+        <OStatCard
           v-if="config.isCloud == 'false'"
           :label="t('home.indexSizeLbl')"
           icon="save"
-          icon-size="md"
-          label-class="text-sm font-medium text-text-secondary"
-          icon-class="bg-icon-chip-warning-bg text-icon-chip-warning-text"
+          size="lg"
+          :value="formattedAnimatedIndexSize"
         >
           <template #value>
-            <span
-              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
-              aria-live="polite"
-              data-test="home-usage-tab-index-size"
-              >{{ formattedAnimatedIndexSize }}</span
-            >
+            <span aria-live="polite" data-test="home-usage-tab-index-size">{{
+              formattedAnimatedIndexSize
+            }}</span>
           </template>
-        </KpiCard>
-      </KpiCardRow>
+        </OStatCard>
+      </OStatStrip>
 
       <!-- Main region — a filled resources rail beside the two status charts, so
            Functions/Dashboards live somewhere purposeful and the vertical space
@@ -326,8 +306,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OButton
               v-if="canView('alertList')"
+              icon-only
               variant="ghost"
-              size="icon-circle"
               class="relative"
               :aria-label="viewLabel('alerts')"
               :title="viewLabel('alerts')"
@@ -396,8 +376,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OButton
               v-if="canView('pipelines')"
+              icon-only
               variant="ghost"
-              size="icon-circle"
               class="relative"
               :aria-label="viewLabel('pipelines')"
               :title="viewLabel('pipelines')"
@@ -467,8 +447,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="home-usage-tab-load-error"
     >
       <OEmptyState
-        preset="load-error"
-        size="hero"
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
         data-test="usage-load-error-empty-state"
         @action="() => getSummary(store.state.selectedOrganization.identifier)"
       />
@@ -506,8 +487,8 @@ import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vu
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import KpiCard from "@/components/common/KpiCard.vue";
-import KpiCardRow from "@/components/common/KpiCardRow.vue";
+import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

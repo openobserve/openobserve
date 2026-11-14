@@ -155,7 +155,7 @@ onBeforeUnmount(() => clearTimeout(returnTimer));
     <div class="py-6">
       <SlackLinkCard
         v-if="linked"
-        illustration="check"
+        icon="task-alt"
         :title="t('slackApp.link.linkedTitle', { user: raw(linked.linked_as) })"
         :description="linkedDetail"
         data-test="slack-link-linked"
@@ -164,7 +164,6 @@ onBeforeUnmount(() => clearTimeout(returnTimer));
           <OButton
             v-if="returnUrl"
             variant="primary"
-            size="sm-action"
             data-test="slack-link-back-to-slack"
             @click="backToSlack"
           >
@@ -179,20 +178,20 @@ onBeforeUnmount(() => clearTimeout(returnTimer));
       </SlackLinkCard>
       <SlackLinkCard
         v-else-if="resent"
-        illustration="check"
+        icon="task-alt"
         :title="t('slackApp.link.resentTitle')"
         :description="t('slackApp.link.resentDetail')"
         data-test="slack-link-resent"
       />
       <SlackLinkCard
         v-else-if="cancelled"
-        illustration="connect"
+        icon="link"
         :title="t('slackApp.link.cancelledTitle')"
         :description="t('slackApp.link.cancelledDetail')"
         data-test="slack-link-cancelled"
       >
         <template v-if="remembered" #actions>
-          <OButton variant="primary" size="sm-action" data-test="slack-link-retry" @click="retry">
+          <OButton variant="primary" data-test="slack-link-retry" @click="retry">
             {{ t("slackApp.link.tryAgain") }}
           </OButton>
         </template>

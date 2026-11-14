@@ -23,11 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :is="container === 'drawer' ? 'ODrawer' : 'ODialog'"
     data-test="add-user-dialog"
     :open="open"
-    size="md"
+    :size="container === 'drawer' ? 'sm' : 'md'"
     :title="beingUpdated ? t('user.editUser') : t('user.add')"
-    :primaryButtonLabel="t('user.save')"
-    primary-button-data-test="add-user-submit-btn"
-    :secondaryButtonLabel="t('user.cancel')"
+    :primary="{ label: t('user.save'), dataTest: 'add-user-submit-btn' }"
+    :secondary="{ label: t('user.cancel') }"
     form-id="add-user-form"
     @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
@@ -67,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="showLabelOnTop"
             data-test="user-password-field"
           >
-            <template #icon-right>
+            <template #icon-end>
               <OIcon
                 :name="isPwd ? 'visibility-off' : 'visibility'"
                 size="sm"
@@ -124,30 +123,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OFormSelect
             name="custom_role"
-            :disabled="rbacLocked"
             :label="t('user.customRole')"
             :options="filterdOption"
             class="showLabelOnTop mt-2"
             multiple
             data-test="user-custom-role-field"
-            :disable="
-              isCloud ? filterdOption.length === 0 : filterdOption.length === 0 || !!isExternalUser
+            :disabled="
+              rbacLocked ||
+              (isCloud
+                ? filterdOption.length === 0
+                : filterdOption.length === 0 || !!isExternalUser)
             "
-            :hint="
+            :help-text="
               rbacLocked
-                ? ''
+                ? undefined
                 : isCloud
                   ? filterdOption.length === 0
                     ? t('user.noCustomRolesHint')
-                    : ''
+                    : undefined
                   : isExternalUser
                     ? t('user.externalUserCustomRoleHint')
                     : filterdOption.length === 0
                       ? t('user.noCustomRolesHint')
-                      : ''
+                      : undefined
             "
           >
-            <template v-if="rbacLocked" #icon-left>
+            <template v-if="rbacLocked" #icon>
               <OIcon name="lock" size="sm" class="lock-chip" />
             </template>
           </OFormSelect>
@@ -156,7 +157,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFormSwitch
             name="change_password"
             :label="t('user.changePassword')"
-            size="lg"
             data-test="user-change-password-field"
           />
 
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="showLabelOnTop mt-2"
             data-test="user-old-passoword-field"
           >
-            <template #icon-right>
+            <template #icon-end>
               <OIcon
                 :name="isOldPwd ? 'visibility-off' : 'visibility'"
                 size="sm"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="user-new-password-field"
             @update:model-value="clearServerErrors"
           >
-            <template #icon-right>
+            <template #icon-end>
               <OIcon
                 :name="isNewPwd ? 'visibility-off' : 'visibility'"
                 size="sm"
@@ -208,12 +208,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- Unlock is STAGED, not sent: one PUT carries it alongside any other edit. -->
-        <OBanner
+        <OInlineNotice
           v-if="lockout?.locked"
-          variant="warning"
+          tone="warn"
           icon="lock"
-          dense
-          inline-actions
           class="mt-4"
           data-test="user-lockout-banner"
         >
@@ -229,15 +227,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <template #actions>
             <OButton
-              :variant="unlockStaged ? 'ghost' : 'outline'"
-              size="sm"
+              :variant="unlockStaged ? 'ghost' : 'secondary'"
               data-test="user-lockout-unlock-btn"
               @click="unlockStaged = !unlockStaged"
             >
               {{ unlockStaged ? t("user.lockout.undo") : t("user.lockout.unlock") }}
             </OButton>
           </template>
-        </OBanner>
+        </OInlineNotice>
         <OFormInput
           v-if="!beingUpdated && userRole != 'member' && organization == 'other'"
           name="other_organization"
@@ -251,10 +248,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     data-test="add-user-logout-confirm-dialog"
     v-model:open="logout_confirm"
-    persistent
-    size="xs"
+    size="sm"
     :title="t('iam.addUser.passwordChanged')"
-    :primary-button-label="t('iam.addUser.ok')"
+    :primary="{ label: t('iam.addUser.ok') }"
     @click:primary="signout"
   >
     <div class="flex items-center gap-3">
@@ -293,7 +289,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -330,7 +326,7 @@ export default defineComponent({
   components: {
     ODialog,
     ODrawer,
-    OBanner,
+    OInlineNotice,
     OButton,
     OIcon,
     OForm,

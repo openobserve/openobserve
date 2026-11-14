@@ -235,17 +235,28 @@ export class IamFormValidationPage {
         await this.selectRoleStartFrom('readonly');
     }
 
-    // Delete the first role/group in the list via its row trash icon, keyed by name.
+    // Delete sits in the row's ⋯ menu (a portal): open the menu on the row its edit icon anchors.
+    async clickRowMenuItem(rowAnchor, menuButton, item) {
+        const row = this.page.locator('tr').filter({ has: this.page.locator(rowAnchor) });
+        await row.hover();
+        await row.locator(menuButton).click();
+        await this.page.locator(item).click();
+    }
+
     async clickDeleteRole(roleName) {
-        await this.page
-            .locator(`[data-test="iam-roles-delete-${roleName}-role-icon"]`)
-            .click();
+        await this.clickRowMenuItem(
+            `[data-test="iam-roles-edit-${roleName}-role-icon"]`,
+            '[data-test="iam-roles-row-more-actions"]',
+            `[data-test="iam-roles-delete-${roleName}-role-icon"]`,
+        );
     }
 
     async clickDeleteGroup(groupName) {
-        await this.page
-            .locator(`[data-test="iam-groups-delete-${groupName}-role-icon"]`)
-            .click();
+        await this.clickRowMenuItem(
+            `[data-test="iam-groups-edit-${groupName}-role-icon"]`,
+            '[data-test="iam-groups-row-more-actions"]',
+            `[data-test="iam-groups-delete-${groupName}-role-icon"]`,
+        );
     }
 
     // Toggle the first available permission checkbox on the Edit Role Permissions

@@ -11,8 +11,8 @@
     class="kpi-card-skeleton rounded-default bg-surface-base border-border-default flex flex-col gap-2 border px-3.5 pt-2.5 pb-2.5"
     data-test="kpi-cards-skeleton"
   >
-    <OSkeleton type="text" class="h-3 w-[55%]" />
-    <OSkeleton type="text" class="h-5.5 w-[45%]" />
+    <OSkeleton class="h-3 w-[55%]" />
+    <OSkeleton class="h-5.5 w-[45%]" />
   </div>
 </template>
 

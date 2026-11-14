@@ -30,9 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OTag type="aiMode" :value="aiUsage.mode" class="w-fit" />
         <OProgressBar
-          :value="aiUsageRatio"
-          size="sm"
-          :variant="aiUsageVariant"
+          :value="aiUsageRatio * 100"
+          :tone="aiUsageVariant"
           class="min-w-24 flex-1 max-md:order-last max-md:basis-full"
         />
         <div class="text-text-heading ms-auto text-sm leading-5 font-semibold">
@@ -63,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="aiUsage.requires_additional_credits"
           variant="ghost"
-          size="sm"
           class="ms-1"
           data-test="billing-ai-contact-sales"
           @click="contactSales"
@@ -130,12 +128,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OButton
         variant="primary"
-        class="h-10 px-6 py-0 font-semibold"
+        class="px-6 py-0 font-semibold"
         data-test="plans-view-org-group-btn"
         @click="goToOrgGroup"
       >
         {{ t("billing.billingGroup.viewOrgGroup") }}
-        <template #icon-right>
+        <template #icon-end>
           <OIcon name="arrow-forward" size="sm" class="ms-1" />
         </template>
       </OButton>
@@ -152,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ store.state.selectedOrganization.note }}
       </div>
       <div v-if="loading" class="text-center text-xl font-medium font-semibold">
-        <OSpinner size="md" class="mx-auto mt-3 block text-center" />
+        <OSpinner size="lg" class="mx-auto mt-3 block text-center" />
       </div>
       <div v-else class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3">
         <ProPlan
@@ -197,6 +195,7 @@ import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import { siteURL } from "@/constants/config";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { featureState } from "@/utils/featureGate";
@@ -439,11 +438,11 @@ export default defineComponent({
       return Math.min(aiUsage.value.credits_used / aiUsage.value.credits_limit, 1);
     });
     // A full bar is healthy once paid usage carries on; only a blocked org is in danger.
-    const aiUsageVariant = computed(() => {
+    const aiUsageVariant = computed<ProgressBarTone>(() => {
       const mode = aiUsage.value?.mode;
-      if (mode === "exhausted") return "danger";
-      if (mode === "consent_required") return "warning";
-      return mode === "free" && aiUsageRatio.value >= 0.8 ? "warning" : "default";
+      if (mode === "exhausted") return "err";
+      if (mode === "consent_required") return "warn";
+      return mode === "free" && aiUsageRatio.value >= 0.8 ? "warn" : "accent";
     });
     const proPlanFeatures: any = ref([]);
     const enterprisePlanFeatures: any = ref([]);

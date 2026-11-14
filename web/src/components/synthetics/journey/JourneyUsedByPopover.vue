@@ -56,15 +56,16 @@ function editRoute(reference: { id: string; folder_id: string }) {
 
 <template>
   <OPopover
+    size="md"
     align="end"
     :aria-label="t('synthetics.journey.usedBy.aria')"
-    content-class="w-[min(21rem,calc(100vw-1.5rem))] p-3"
+    content-class="p-3"
   >
     <template #trigger>
       <OButton
-        variant="outline"
-        size="xs"
-        icon-left="account-tree"
+        variant="secondary"
+        size="sm"
+        icon="account-tree"
         aria-haspopup="dialog"
         class="max-md:hidden"
         data-test="synthetics-journey-used-by-trigger"
@@ -97,7 +98,6 @@ function editRoute(reference: { id: string; folder_id: string }) {
       <OButton
         v-if="!expanded && references.length > VISIBLE_ROWS"
         variant="ghost"
-        size="sm"
         data-test="synthetics-journey-used-by-view-all"
         @click="expanded = true"
       >

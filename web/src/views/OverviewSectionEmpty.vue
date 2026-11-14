@@ -24,14 +24,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OEmptyState
         v-if="kind === 'forbidden'"
-        size="slim"
-        preset="no-access"
-        :description="t('overview.state.sectionForbidden')"
+        size="inline"
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('overview.state.sectionForbidden')"
         :data-test="`overview-${testSection}-${kind}-message`"
       />
       <OEmptyState
         v-else
-        size="slim"
+        size="inline"
         :title="message"
         :data-test="`overview-${testSection}-${kind}-message`"
       />

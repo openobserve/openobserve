@@ -47,9 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="pointer-events-none absolute right-5 bottom-5 z-1000 transition-all duration-300"
     >
       <OButton
-        round
+        icon-only
         variant="ghost"
-        size="icon-circle-sm"
+        size="sm"
         class="scroll-to-bottom-btn border-theme-accent! text-theme-accent! pointer-events-auto border-2! bg-[rgba(255,255,255,0.95)]! shadow-sm backdrop-blur-sm transition-all duration-300 ease-[ease] hover:scale-110 hover:bg-white! hover:opacity-80 hover:shadow-md active:scale-100 dark:bg-[rgba(30,30,30,0.9)]! dark:hover:bg-[rgba(40,40,40,0.95)]! dark:hover:opacity-80"
         @click="scrollToBottomSmooth"
       >

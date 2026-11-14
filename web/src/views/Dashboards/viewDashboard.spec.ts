@@ -703,7 +703,7 @@ describe("ViewDashboard", () => {
           plugins: [i18n, store],
           config: { globalProperties: { store } },
           stubs: {
-            OPageLayout: { template: "<div><slot /></div>" },
+            OPageLayout: { template: "<div><slot name='banner' /><slot /></div>" },
             OBanner: { template: "<div><slot /><slot name='actions' /></div>" },
           },
         },
@@ -1849,7 +1849,9 @@ describe("ViewDashboard", () => {
           plugins: [i18n, store],
           renderStubDefaultSlot: true,
           stubs: {
-            OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
+            OPageLayout: {
+              template: '<div><slot name="actions-overflow" /><slot name="actions" /></div>',
+            },
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
           },
         },
@@ -1935,7 +1937,7 @@ describe("ViewDashboard", () => {
           stubs: {
             OPageLayout: {
               template:
-                '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
+                '<div><slot name="status" /><slot name="actions-overflow" /><slot name="actions" /><slot name="banner" /><slot /></div>',
             },
             RenderDashboardCharts: RenderDashboardChartsStub,
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
@@ -2149,9 +2151,8 @@ describe("ViewDashboard", () => {
       expect(wrapper.vm.discardDialog.open).toBe(true);
       const dialog = wrapper.findComponent({ name: "ODialog" });
       expect(dialog.props("open")).toBe(true);
-      // Enter must keep the draft: the safe action takes the initial focus, not the destructive one.
-      expect(dialog.props("initialFocus")).toBe("secondary");
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      // Enter must keep the draft: a danger primary hands the initial focus to the safe action.
+      expect(dialog.props("primary")?.variant).toBe("danger");
 
       wrapper.vm.settleDiscard(true);
       await exiting;
@@ -2212,10 +2213,10 @@ describe("ViewDashboard", () => {
       await flushPromises();
       const dialog = wrapper.findComponent({ name: "ODialog" });
       expect(dialog.props("open")).toBe(true);
-      expect(dialog.props("secondaryButtonLabel")).toBeUndefined();
+      expect(dialog.props("secondary")?.label).toBeUndefined();
       expect(dialog.props("persistent")).toBe(true);
       expect(dialog.props("showClose")).toBe(false);
-      expect(dialog.props("primaryButtonLabel")).toBe("dashboard.layoutEdit.discardAndSignOut");
+      expect(dialog.props("primary")?.label).toBe("dashboard.layoutEdit.discardAndSignOut");
       expect(wrapper.vm.discardForced).toBe(true);
 
       wrapper.vm.settleDiscard(true);
@@ -2647,7 +2648,7 @@ describe("ViewDashboard", () => {
               name: "OPageLayout",
               props: ["headerClass"],
               template:
-                '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
+                '<div><slot name="status" /><slot name="actions-overflow" /><slot name="actions" /><slot name="banner" /><slot /></div>',
             },
             RenderDashboardCharts: {
               name: "RenderDashboardCharts",

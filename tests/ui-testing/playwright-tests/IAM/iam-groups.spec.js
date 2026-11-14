@@ -332,7 +332,7 @@ test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
 
             // The hero empty state renders inside a pane whose footer overlaps it;
             // on pentest the copy ended mid-sentence at "...Create a custom role to control".
-            const desc = page.locator('[data-test="o-empty-state-description"]').first();
+            const desc = page.locator('[data-test="o2-empty-state-text"]').first();
             await expect(desc).toBeVisible();
             const clipped = await desc.evaluate(
                 (el) => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1,
@@ -688,9 +688,7 @@ test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
 
         await pm.groupsPage.gotoGroups();
         await pm.groupsPage.searchGroups(name);
-        await pm.groupsPage.page
-            .locator(`[data-test="iam-groups-delete-${name}-role-icon"]`)
-            .click();
+        await pm.groupsPage.clickDeleteGroup(name);
 
         // Dismiss the confirm — the group must survive.
         await page.locator('[data-test="o-dialog-secondary-btn"]').first().click();
@@ -719,8 +717,7 @@ test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
         await pm.groupsPage.rolesTab.click();
         const row = page.locator('tr', { has: page.locator(`text="${ROLE_C}"`) }).first();
         await expect(row).toBeVisible({ timeout: 15000 });
-        // Columns: checkbox, #, Role Name, Users, Actions. Assert the Users cell
-        // itself — a bare toContainText('0') would also match the "01" index cell.
-        await expect(row.locator('td').nth(3)).toHaveText(String(direct.length));
+        // Assert the Users cell itself, not the whole row.
+        await expect(row.locator('[data-test="o2-table-cell-user_count"]')).toHaveText(String(direct.length));
     });
 });

@@ -1,12 +1,12 @@
 <template>
   <ODrawer
+    size="xl"
     bleed
     :open="open"
     side="right"
-    :width="70"
     :title="raw(row?.name)"
     :title-data-test="'eval-job-detail-name-badge'"
-    :sub-title="t('onlineEvals.job.detail.eyebrow')"
+    :subtitle="t('onlineEvals.job.detail.eyebrow')"
     data-test="eval-job-detail"
     @update:open="handleOpenChange"
   >
@@ -27,9 +27,9 @@
           data-test="eval-job-detail-window"
         />
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          icon-only
+          variant="secondary"
+          icon="refresh"
           :loading="isLoadingKpis || isLoadingRuns"
           :title="t('onlineEvals.job.detail.refresh')"
           data-test="eval-job-detail-refresh"
@@ -168,20 +168,12 @@
                 <span class="text-2xs text-text-secondary font-medium">{{
                   t("onlineEvals.job.detail.filterLabel")
                 }}</span>
-                <OButton
+                <OCopyButton
                   v-if="filterText"
-                  variant="ghost-muted"
-                  size="icon-xs-sq"
+                  size="sm"
                   data-test="eval-job-detail-filter-copy-btn"
-                  @click="
-                    copyToClipboard(filterText, t, {
-                      successMessage: t('common.copySuccess'),
-                    })
-                  "
-                >
-                  <OIcon name="content-copy" size="sm" />
-                  <OTooltip :content="t('common.copy')" />
-                </OButton>
+                  :value="filterText"
+                />
               </div>
               <!-- Hard cap the filter condition height; longer conditions scroll. -->
               <pre
@@ -393,13 +385,9 @@
             row-key="id"
             :loading="isLoadingRuns"
             :loading-reset-key="jobIdRef"
-            :show-global-filter="false"
-            :show-footer="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.job.detail.runs.empty')"
-            show-index
-            width="100%"
             class="w-full"
             v-on="rowClickListeners"
           >
@@ -463,13 +451,9 @@
             row-key="id"
             :loading="isLoadingRuns"
             :loading-reset-key="jobIdRef"
-            :show-global-filter="false"
-            :show-footer="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.job.detail.failures.recentEmpty')"
-            show-index
-            width="100%"
             class="w-full"
             v-on="rowClickListeners"
           >
@@ -522,6 +506,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -533,7 +518,6 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import JobWorkloadTab from "./job/JobWorkloadTab.vue";
-import { copyToClipboard } from "@/utils/clipboard";
 import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { useLicenseLock } from "@/composables/useFeatureLock";

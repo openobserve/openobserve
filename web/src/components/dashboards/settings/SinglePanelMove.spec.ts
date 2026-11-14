@@ -76,33 +76,33 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-disabled="String(primaryButtonDisabled)"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
+      :data-primary-disabled="String(primary?.disabled)"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -110,13 +110,13 @@ const ODialogStub = {
       <slot name="footer" />
       <button
         data-test="o-dialog-stub-primary"
-        :disabled="primaryButtonDisabled"
+        :disabled="primary?.disabled"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -227,13 +227,13 @@ describe("SinglePanelMove", () => {
     it("renders i18n label on the secondary (cancel) button", () => {
       wrapper = createWrapper();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog.props("secondary")?.label).toBe("Cancel");
     });
 
     it("renders the literal 'Move' label on the primary (confirm) button", () => {
       wrapper = createWrapper();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Move");
+      expect(dialog.props("primary")?.label).toBe("Move");
     });
 
     it("defaults open to false when modelValue is not provided", () => {
@@ -414,22 +414,22 @@ describe("SinglePanelMove", () => {
   });
 
   describe("Confirm Button Disabled State", () => {
-    it("should mark primaryButtonDisabled true when no tab is selected", async () => {
+    it("should mark primary?.disabled true when no tab is selected", async () => {
       wrapper = createWrapper();
       wrapper.vm.selectedMoveTabId = null;
       await wrapper.vm.$nextTick();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonDisabled")).toBe(true);
+      expect(dialog.props("primary")?.disabled).toBe(true);
     });
 
-    it("should mark primaryButtonDisabled false when a tab is selected", async () => {
+    it("should mark primary?.disabled false when a tab is selected", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonDisabled")).toBe(false);
+      expect(dialog.props("primary")?.disabled).toBeFalsy();
     });
   });
 

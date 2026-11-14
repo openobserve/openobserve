@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :style="{ left: seg.left, width: seg.width }"
         :data-test="`utc-hours-bar-segment-${i}`"
       >
-        <OTooltip side="top" :side-offset="6" :content="raw(seg.label)" />
+        <OTooltip side="top" :content="raw(seg.label)" />
       </div>
     </div>
     <div class="text-3xs flex justify-between font-mono opacity-45">

@@ -54,7 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   │  Slot #extra    — append content below the detail panel (hero only).    │
   │                                                                         │
   │  Props title / description override the i18n defaults.                  │
-  │  Prop  illustration overrides the "broken-panel" default.               │
   └─────────────────────────────────────────────────────────────────────────┘
 
   Usage examples:
@@ -95,19 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Illustration + title + description + action cards -->
     <OEmptyState
-      :illustration="illustration ?? codeIllustration ?? 'broken-panel'"
-      size="block"
-      :hide-action="true"
+      :kind="tone === 'error' ? 'denied' : 'error'"
+      :title="resolvedTitle"
+      :text="resolvedDescription"
       class="w-full shrink-0"
     >
-      <template #title>
-        <span
-          :class="tone === 'error' ? 'text-status-error-text' : undefined"
-          data-test="query-error-title"
-          >{{ resolvedTitle }}</span
-        >
-      </template>
-      <template #description>{{ resolvedDescription }}</template>
       <template #actions>
         <!-- Caller can replace all action cards via #actions slot -->
         <slot name="actions" v-bind="slotProps">
@@ -186,8 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
           variant="ghost"
-          size="sm"
-          :icon-left="copied ? 'check' : 'content-copy'"
+          :icon="copied ? 'check' : 'content-copy'"
           data-test="query-error-copy-btn"
           @click="handleCopy"
         >
@@ -196,12 +186,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="aiEnabled && (isQueryError || errorCode === 0)"
           variant="ghost"
-          size="sm"
           class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
           data-test="query-error-ask-ai-btn"
           @click="emit('ask-ai')"
         >
-          <template #icon-left>
+          <template #icon>
             <img
               :src="aiIconSrc"
               class="h-4 w-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
@@ -220,8 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OButton
         variant="ghost"
-        size="sm"
-        icon-left="bolt"
+        icon="bolt"
         class="text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
@@ -292,9 +280,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="actions" v-bind="slotProps">
         <OButton
           v-if="errorCode === 20003"
-          variant="outline"
-          size="sm"
-          icon-left="settings"
+          variant="secondary"
+          icon="settings"
           data-test="query-error-configure-resource-btn"
           @click="emit('configure-resource')"
         >
@@ -302,9 +289,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-else-if="isQueryError"
-          variant="outline"
-          size="sm"
-          icon-left="edit"
+          variant="secondary"
+          icon="edit"
           data-test="query-error-fix-query-btn"
           @click="emit('fix-query')"
         >
@@ -312,9 +298,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-else-if="errorCode === 20006"
-          variant="outline"
-          size="sm"
-          icon-left="schedule"
+          variant="secondary"
+          icon="schedule"
           data-test="query-error-expand-range-btn"
           @click="emit('widen-range')"
         >
@@ -324,8 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OButton
         variant="ghost"
-        size="sm"
-        :icon-left="copied ? 'check' : 'content-copy'"
+        :icon="copied ? 'check' : 'content-copy'"
         data-test="query-error-copy-btn"
         @click="handleCopy"
       >
@@ -334,8 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="aiEnabled && (isQueryError || errorCode === 0)"
         variant="ghost"
-        size="sm"
-        icon-left="bolt"
+        icon="bolt"
         class="text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
@@ -356,7 +339,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import type { IllustrationName } from "@/lib/core/EmptyState/illustrations/index";
 import { useQueryError } from "@/composables/useQueryError";
 import { useOrgId } from "@/composables/query";
 import ErrorDetailPanel from "./ErrorDetailPanel.vue";
@@ -380,8 +362,6 @@ const props = withDefaults(
      * block — compact inline layout for panels, cards, and form results.
      */
     size?: "hero" | "block";
-    /** Override the default "broken-panel" illustration (hero size only). */
-    illustration?: IllustrationName;
     /** Override the error code's default title. */
     title?: I18nText;
     /** Override the error code's default description. */
@@ -422,7 +402,6 @@ const {
   defaultTitle,
   defaultDescription,
   explanation,
-  illustration: codeIllustration,
   tone,
   calibrationEnabled,
   showDetail,

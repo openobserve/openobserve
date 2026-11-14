@@ -28,12 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dashboard.totalLegends", { count: legends.length }) }}
         </span>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           @click.stop="copyAllLegends"
           data-test="dashboard-show-legends-copy-all"
         >
-          <template #icon-left
+          <template #icon
             ><OIcon :name="isAllCopied ? 'check' : 'content-copy'" size="sm"
           /></template>
           {{ isAllCopied ? t("common.copied") : t("common.copyAll") }}
@@ -69,14 +68,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ legend.name }}
               </div>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon"
+                size="xs"
                 class="ms-1 shrink-0 opacity-0 transition-opacity duration-200 ease-in-out group-hover:opacity-100 max-md:opacity-100"
                 data-test="dashboard-legend-copy-btn"
                 :data-copied="isLegendCopied(Number(index)) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, Number(index))"
               >
-                <template #icon-left
+                <template #icon
                   ><OIcon
                     :name="isLegendCopied(Number(index)) ? 'check' : 'content-copy'"
                     size="sm"

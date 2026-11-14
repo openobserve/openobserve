@@ -22,8 +22,9 @@ import analytics from "@/services/product_analytics";
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const mockBack = vi.fn();
+const mockPush = vi.fn();
 vi.mock("vue-router", () => ({
-  useRouter: () => ({ back: mockBack, push: vi.fn() }),
+  useRouter: () => ({ back: mockBack, push: mockPush }),
   useRoute: () => ({ params: {}, query: {} }),
 }));
 
@@ -69,16 +70,16 @@ const ODialogStub = {
       v-if="open"
       :data-test="'o-dialog-stub'"
       :data-title="title"
-      :data-sub-title="subTitle"
+      :data-sub-title="subtitle"
       :data-size="size"
-      :data-primary-label="primaryButtonLabel"
+      :data-primary-label="primary?.label"
     >
       <slot name="header" />
       <slot />
       <slot name="footer" />
-      <button data-test="o-dialog-primary" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+      <button data-test="o-dialog-primary" @click="$emit('click:primary')">{{ primary?.label }}</button>
       <button data-test="o-dialog-secondary" @click="$emit('click:secondary')">secondary</button>
-      <button data-test="o-dialog-neutral" @click="$emit('click:neutral')">neutral</button>
+      <button data-test="o-dialog-neutral" @click="$emit('click:extra')">neutral</button>
       <button data-test="o-dialog-close" @click="$emit('update:open', false)">close</button>
     </div>
   `,
@@ -87,23 +88,23 @@ const ODialogStub = {
     "persistent",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 async function mountComp(props: Record<string, any> = {}) {
@@ -360,13 +361,13 @@ describe("ImportSemanticGroups - applyChanges", () => {
     expect(groups.some((g: any) => g.id === "unch-1")).toBe(true);
   });
 
-  it("calls handleBack after successful apply", async () => {
+  it("returns to Correlation settings after a successful apply from a deep link", async () => {
     const w = await mountComp();
     (w.vm as any).diffData = mockDiffData;
     (w.vm as any).selectedAdditions = ["add-1"];
     await (w.vm as any).applyChanges();
     await flushPromises();
-    expect(mockBack).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "correlationSettings" }));
   });
 
   // The groups are cached, and dimension analytics is computed from them, so an import expires the whole scope.
@@ -399,11 +400,13 @@ describe("ImportSemanticGroups - applyChanges", () => {
   });
 });
 
-describe("ImportSemanticGroups - handleBack", () => {
-  it("calls router.back()", async () => {
+describe("ImportSemanticGroups - back", () => {
+  it("pops in-app history instead of pushing the parent (N3)", async () => {
+    window.history.replaceState({ back: "/settings/correlation" }, "");
     const w = await mountComp();
-    (w.vm as any).handleBack();
+    (w.vm as any).goBack();
     expect(mockBack).toHaveBeenCalled();
+    window.history.replaceState(null, "");
   });
 });
 

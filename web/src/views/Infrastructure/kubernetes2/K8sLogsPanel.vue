@@ -238,29 +238,25 @@ onBeforeUnmount(stopPolling);
       <OSelect
         v-model="container"
         class="w-44"
-        size="sm"
         :options="containerOptions"
         :aria-label="t('infra.k8s2.logsContainer')"
         data-test="k8s2-logs-container"
       />
       <OSwitch
         v-model="previous"
-        size="sm"
         :disabled="!hasRestarts"
         :label="t('infra.k8s2.logsPrevious')"
         data-test="k8s2-logs-previous"
       />
-      <OSwitch v-model="timestamps" size="sm" :label="t('infra.k8s2.logsTimestamps')" />
+      <OSwitch v-model="timestamps" :label="t('infra.k8s2.logsTimestamps')" />
       <OSearchInput
         v-model="query"
         class="min-w-40 flex-1"
-        size="sm"
         :placeholder="t('infra.k8s2.logsFilter')"
         data-test="k8s2-logs-filter"
       />
       <OButton
         variant="ghost"
-        size="sm"
         class="gap-1.5"
         :aria-pressed="live"
         :disabled="absolute"
@@ -291,8 +287,8 @@ onBeforeUnmount(stopPolling);
       </OText>
       <OTooltip v-if="logsLock.locked.value" :content="logsLock.lockedReason.value">
         <span class="inline-flex">
-          <OButton variant="ghost-primary" size="sm" disabled data-test="k8s2-logs-open">
-            <template #icon-left>
+          <OButton variant="accent-ghost" disabled data-test="k8s2-logs-open">
+            <template #icon>
               <OIcon
                 name="lock"
                 class="text-icon-locked"
@@ -306,9 +302,8 @@ onBeforeUnmount(stopPolling);
       </OTooltip>
       <OButton
         v-else
-        variant="ghost-primary"
-        size="sm"
-        icon-right="arrow-forward"
+        variant="accent-ghost"
+        icon-end="arrow-forward"
         data-test="k8s2-logs-open"
         @click="openInLogs"
       >
@@ -317,12 +312,13 @@ onBeforeUnmount(stopPolling);
     </div>
 
     <div v-if="loading" class="flex flex-1 items-center justify-center">
-      <OSpinner size="md" data-test="k8s2-logs-loading" />
+      <OSpinner size="lg" data-test="k8s2-logs-loading" />
     </div>
     <OEmptyState
       v-else-if="failed && !lines.length"
       size="inline"
-      preset="load-error"
+      kind="error"
+      :text="t('emptyState.loadError.description')"
       :title="t('infra.k8s2.logsError')"
       data-test="k8s2-logs-error"
       @action="load"
@@ -330,14 +326,14 @@ onBeforeUnmount(stopPolling);
     <OEmptyState
       v-else-if="!link"
       size="inline"
-      preset="no-data"
+      :text="t('emptyState.noData.description')"
       :title="t('infra.k8s2.logsNoStream')"
       data-test="k8s2-logs-nostream"
     />
     <OEmptyState
       v-else-if="!visible.length"
       size="inline"
-      preset="no-data"
+      :text="t('emptyState.noData.description')"
       :title="t('infra.k8s2.logsEmpty')"
       data-test="k8s2-logs-empty"
     />

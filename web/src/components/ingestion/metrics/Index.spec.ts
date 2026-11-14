@@ -60,7 +60,7 @@ function buildMountOptions() {
           template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
         },
         OTabs: true,
-        ORouteTab: true,
+        OTab: true,
         "router-view": true,
       },
     },
@@ -138,7 +138,7 @@ describe("IngestMetrics Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -485,7 +485,7 @@ describe("IngestMetrics: Get started pick", () => {
     return mount(IngestMetrics, options);
   };
   const tabNames = (wrapper: any): string[] =>
-    wrapper.findAllComponents({ name: "ORouteTab" }).map((c: any) => c.props("name"));
+    wrapper.findAllComponents({ name: "OTab" }).map((c: any) => c.props("name"));
 
   afterEach(() => {
     localStorage.clear();

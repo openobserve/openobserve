@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="lg"
     :title="t('alert_library.install.title')"
-    :sub-title="t('alert_library.install.subtitle')"
+    :subtitle="t('alert_library.install.subtitle')"
     :persistent="isInstalling"
     :show-close="!isInstalling"
     data-test="alert-library-install-dialog"
@@ -47,8 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <p class="text-text-secondary text-sm">{{ t("alert_library.install.folderIntro") }}</p>
           <OSkeleton
             v-if="foldersLoading"
-            type="rect"
-            class="rounded-default h-9 w-full"
+            shape="block"
+            class="h-9 w-full"
             data-test="alert-library-install-folder-loading"
           />
           <SelectFolderDropDown
@@ -88,7 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </p>
           <OCheckbox
             :model-value="tuneEnabled"
-            size="sm"
             :label="t('alert_library.install.tuneToggle')"
             data-test="alert-library-install-tune-toggle"
             @update:model-value="tuneEnabled = $event === true"
@@ -97,7 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OInput
               :model-value="tuneFrequency"
               type="number"
-              size="sm"
               :label="t('alert_library.install.frequency')"
               :suffix="minutesSuffix"
               data-test="alert-library-install-tune-frequency"
@@ -106,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OInput
               :model-value="tuneSilence"
               type="number"
-              size="sm"
               :label="t('alert_library.install.silence')"
               :suffix="minutesSuffix"
               data-test="alert-library-install-tune-silence"
@@ -132,19 +129,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </dl>
 
-          <OBanner
+          <OInlineNotice
             v-if="anomalyInstalled"
-            variant="info"
+            tone="info"
             icon="query-stats"
-            dense
-            :content="t('alert_library.install.anomalyTrainingNote')"
+            :message="t('alert_library.install.anomalyTrainingNote')"
             data-test="alert-library-install-anomaly-note"
           />
 
           <!-- Select-all-in-view is one click, so the biggest runs are made deliberate. -->
           <OCheckbox
             v-if="needsLargeBatchConfirm"
-            size="sm"
             :model-value="largeBatchConfirmed"
             :label="largeBatchPrompt"
             :aria-label="largeBatchPrompt"
@@ -190,8 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #footer>
       <div class="flex w-full items-center justify-end gap-2">
         <OButton
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="isInstalling"
           data-test="alert-library-install-cancel"
           @click="onOpenChange(false)"
@@ -200,8 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="step > 1 && !hasRun"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="isInstalling"
           data-test="alert-library-install-back"
           @click="goBack"
@@ -211,7 +204,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="step < 3"
           variant="primary"
-          size="sm-action"
           data-test="alert-library-install-next"
           @click="goNext"
         >
@@ -220,7 +212,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="step === 3 && !hasRun"
           variant="primary"
-          size="sm-action"
           :loading="isInstalling"
           :disabled="candidates.length === 0 || (needsLargeBatchConfirm && !largeBatchConfirmed)"
           data-test="alert-library-install-run"
@@ -231,9 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="step === 3 && hasRun && failedIds.length > 0"
           variant="primary"
-          size="sm-action"
           :loading="isInstalling"
-          icon-left="refresh"
+          icon="refresh"
           data-test="alert-library-install-retry"
           @click="install(failedIds)"
         >
@@ -243,8 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="step === 3 && hasRun"
-          :variant="failedIds.length > 0 ? 'outline' : 'primary'"
-          size="sm-action"
+          :variant="failedIds.length > 0 ? 'secondary' : 'primary'"
           :disabled="isInstalling"
           data-test="alert-library-install-done"
           @click="onOpenChange(false)"
@@ -265,7 +254,7 @@ import { useAlertLibrary, useAnomalyLibraryAccess } from "@/composables/alerts/u
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

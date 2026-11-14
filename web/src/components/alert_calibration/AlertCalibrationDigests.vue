@@ -17,9 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('alertCalibration.title')"
-    :subtitle="t('alertCalibration.subtitle')"
-    icon="tune"
-    tabs-below
+    :about="t('alertCalibration.subtitle')"
     bleed
     data-test="alert-calibration-digests-page"
   >
@@ -49,28 +47,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           sorting="client"
-          :show-global-filter="false"
-          :frame="false"
           table-id="alert-calibration-digests"
           class="h-full w-full"
           data-test="alert-calibration-digests-table"
           @row-click="open"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2 max-md:contents">
+            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
               <OToggleGroup
                 :model-value="scope"
                 mobile-dropdown
                 data-test="alert-calibration-digests-scope"
                 @update:model-value="onScope"
               >
-                <OToggleGroupItem value="all" size="sm">{{
+                <OToggleGroupItem value="all">{{
                   t("alertCalibration.digests.scopeAll")
                 }}</OToggleGroupItem>
-                <OToggleGroupItem value="findings" size="sm">
+                <OToggleGroupItem value="findings">
                   {{ t("alertCalibration.digests.scopeFindings") }}
                 </OToggleGroupItem>
-                <OToggleGroupItem value="gaps" size="sm">{{
+                <OToggleGroupItem value="gaps">{{
                   t("alertCalibration.digests.scopeGaps")
                 }}</OToggleGroupItem>
               </OToggleGroup>
@@ -79,21 +75,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="min-w-0 flex-1 max-md:min-w-40"
                 :placeholder="t('alertCalibration.digests.searchPlaceholder')"
                 :debounce="300"
-                clearable
                 data-test="alert-calibration-digests-search"
               />
             </div>
           </template>
 
           <template #subheader>
-            <OStatStrip :items="stats" row data-test="alert-calibration-digests-stats" />
+            <div class="px-page-edge border-table-row-divider border-b py-1.5">
+              <OStatStrip :items="stats" data-test="alert-calibration-digests-stats" />
+            </div>
           </template>
 
           <template #toolbar-trailing>
             <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              icon-only
+              variant="secondary"
+              icon="refresh"
               :aria-label="t('alertCalibration.refresh')"
               :loading="runs.loading.value"
               data-test="alert-calibration-digests-refresh"
@@ -114,32 +111,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-findings="{ row }">
-            <OBadge v-if="isClean(row)" variant="success-soft" size="sm" shape="rounded">
+            <OBadge v-if="isClean(row)" tone="ok" size="sm">
               {{ t("alertCalibration.digests.clean") }}
             </OBadge>
-            <OBadge
-              v-else-if="row.finding_count === 0"
-              variant="default-soft"
-              size="sm"
-              shape="rounded"
-            >
+            <OBadge v-else-if="row.finding_count === 0" tone="neutral" size="sm">
               {{ t("alertCalibration.digests.noneFound") }}
             </OBadge>
-            <OBadge
-              v-else-if="row.finding_count === null"
-              variant="warning-soft"
-              size="sm"
-              shape="rounded"
-            >
+            <OBadge v-else-if="row.finding_count === null" tone="warn" size="sm">
               {{ visibilityCopy(t, row).pending.badge }}
             </OBadge>
-            <OBadge
-              v-else
-              variant="warning-soft"
-              size="sm"
-              shape="rounded"
-              :count="row.finding_count ?? undefined"
-            >
+            <OBadge v-else tone="warn" size="sm">
               {{ t("alertCalibration.digests.findings") }}
               <template #trailing>{{ countOrDash(row.finding_count, locale) }}</template>
             </OBadge>
@@ -147,10 +128,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-coverage="{ row }">
             <span class="relative inline-flex">
-              <OBadge :variant="coverageBadge(row).variant" size="sm" shape="rounded">
+              <OBadge :tone="coverageBadge(row).variant" size="sm">
                 {{ t(COVERAGE_BADGE[coverageVerdict(row)].labelKey) }}
               </OBadge>
-              <OTooltip v-if="coverageNotes(t, row).length" side="left" max-width="25rem">
+              <OTooltip v-if="coverageNotes(t, row).length" side="left">
                 <template #content>
                   <span v-for="note in coverageNotes(t, row)" :key="note" class="block">{{
                     note
@@ -162,26 +143,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #empty>
             <OEmptyState
-              size="hero"
-              illustration="history"
+              :kind="isFiltered ? 'filtered' : 'first-run'"
+              :icon="isFiltered ? undefined : 'history'"
               :title="
                 isFiltered
                   ? t('alertCalibration.digests.filteredTitle')
                   : t('alertCalibration.digests.emptyTitle', { days: RUNS_LOOKBACK_DAYS })
               "
-              :description="
+              :text="
                 isFiltered
                   ? t('alertCalibration.digests.filteredDescription')
                   : t('alertCalibration.digests.emptyDescription')
               "
-              :filtered="isFiltered"
-              hide-action
             />
           </template>
 
           <template #error>
             <LiveNoticeState
-              size="block"
+              size="page"
               :notice="
                 readNotice(t, runs.error.value, t('alertCalibration.digests.loadFailedTitle'))
               "
@@ -313,12 +292,12 @@ const stats = computed<StatItem[]>(() => {
       ...countTile(run?.finding_count, locale.value),
       sub: run ? t(coverageBadge(run).labelKey) : undefined,
       icon: "fact-check",
-      tone: (run?.finding_count ?? 0) > 0 ? "warning" : "neutral",
+      tone: (run?.finding_count ?? 0) > 0 ? "warn" : "neutral",
     },
     {
       key: "window",
       label: t("alertCalibration.digests.window"),
-      value: c ? window.count : raw("—"),
+      value: c ? window.count : null,
       sub: c ? window.unit : t("alertCalibration.digests.notConfigured"),
       icon: "calendar-month",
     },
@@ -328,7 +307,7 @@ const stats = computed<StatItem[]>(() => {
       label: c?.enabled
         ? t("alertCalibration.digests.betweenRuns", { unit: cadence.unit })
         : t("alertCalibration.digests.schedule"),
-      value: c ? (c.enabled ? cadence.count : t("alertCalibration.digests.off")) : raw("—"),
+      value: c ? (c.enabled ? cadence.count : t("alertCalibration.digests.off")) : null,
       sub: c
         ? c.enabled
           ? undefined

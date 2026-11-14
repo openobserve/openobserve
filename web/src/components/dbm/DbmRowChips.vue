@@ -19,8 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OTag
     v-for="chip in chips"
     :key="chip.id"
-    :variant="DBM_SOFT_VARIANTS[chip.tone]"
-    size="xs"
+    :tone="DBM_SOFT_VARIANTS[chip.tone]"
+    size="sm"
     class="whitespace-nowrap"
     :data-test="`dbm-row-chip-${chip.id}`"
   >

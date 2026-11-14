@@ -13,20 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { Tone } from "./kubernetesModel";
 
 export interface TonePill {
-  variant: BadgeVariant;
+  variant: ChipTone;
   icon: IconName;
 }
 
 // Every pill carries an icon, so state never rests on colour alone.
 export const TONE_PILL: Record<Tone, TonePill> = {
-  success: { variant: "success-soft", icon: "check-circle" },
-  error: { variant: "error-soft", icon: "error" },
-  warning: { variant: "warning-soft", icon: "warning" },
-  info: { variant: "default-soft", icon: "info" },
-  neutral: { variant: "default-soft", icon: "schedule" },
+  success: { variant: "ok", icon: "check-circle" },
+  error: { variant: "err", icon: "error" },
+  warning: { variant: "warn", icon: "warning" },
+  info: { variant: "neutral", icon: "info" },
+  neutral: { variant: "neutral", icon: "schedule" },
 };

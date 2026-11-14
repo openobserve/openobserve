@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OBadge
       size="sm"
-      :variant="warning ? 'warning-soft' : 'success-soft'"
+      :tone="warning ? 'warn' : 'ok'"
       class="shrink-0"
       :data-test="`query-plan-analyze-bar-${warning ? 'warning' : 'success'}`"
     >
@@ -32,9 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       summary
     }}</OTruncatedText>
     <OButton
-      variant="outline"
-      size="sm"
-      icon-left="refresh"
+      variant="secondary"
+      icon="refresh"
       :disabled="busy"
       data-test="query-plan-analyze-rerun"
       @click="emit('rerun')"

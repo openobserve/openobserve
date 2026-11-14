@@ -24,11 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="html-renderer"
     ></div>
     <Teleport v-for="embed in refusedEmbeds" :key="embed.key" :to="embed.slot">
-      <OBanner
-        variant="info"
-        dense
+      <OInlineNotice
+        tone="info"
         icon="block"
-        :content="t('dashboard.htmlPanelEmbedBlocked')"
+        :message="t('dashboard.htmlPanelEmbedBlocked')"
         data-test="html-renderer-blocked-embed"
       />
     </Teleport>
@@ -39,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, onMounted, ref, shallowRef, watch } from "vue";
 import { useTheme } from "@/composables/useTheme";
 import { useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import {
   escapeHtmlValue,
   processVariableContent,
@@ -52,7 +51,7 @@ let refusedEmbedSeq = 0;
 
 export default defineComponent({
   name: "HTMLRenderer",
-  components: { OBanner },
+  components: { OInlineNotice },
   props: {
     htmlContent: {
       type: String,

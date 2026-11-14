@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     @update:open="onDrawerOpenChange"
     :title="isEditMode ? t('alert_sources.editTitle') : t('alert_sources.addTitle')"
-    size="lg"
+    size="md"
     :form-id="created ? undefined : FORM_ID"
-    :primary-button-label="created ? t('alert_sources.done') : t('alert_sources.save')"
-    :secondary-button-label="created ? undefined : t('alert_sources.cancel')"
+    :primary="{ label: created ? t('alert_sources.done') : t('alert_sources.save') }"
+    :secondary="{ label: created ? undefined : t('alert_sources.cancel') }"
     data-test="add-alert-source-drawer"
     @click:primary="onPrimaryClick"
     @click:secondary="cancel"
@@ -63,8 +63,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OFormSelect>
             </div>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-circle-sm"
+              size="sm"
               :disabled="created"
               :title="t('alerts.alertSettings.refreshDestinations')"
               data-test="add-alert-source-refresh-destinations-btn"
@@ -73,8 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="refresh" size="sm" />
             </OButton>
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :disabled="created"
               data-test="add-alert-source-create-destination-btn"
               @click="routeToCreateDestination"
@@ -123,13 +123,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="created" class="flex items-center gap-2">
             <OTag
               v-if="waitingForEvent"
-              variant="primary-soft"
+              tone="accent"
               dot
               data-test="add-alert-source-waiting-pill"
             >
               {{ t("alert_sources.waitingForEvent") }}
             </OTag>
-            <OTag v-else variant="success-soft" dot data-test="add-alert-source-connected-pill">
+            <OTag v-else tone="ok" dot data-test="add-alert-source-connected-pill">
               {{ connectedLabel }}
             </OTag>
             <span class="text-text-secondary text-xs">{{ t("alert_sources.setupStep3Body") }}</span>

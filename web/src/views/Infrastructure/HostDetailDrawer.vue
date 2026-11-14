@@ -27,8 +27,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import DateTime from "@/components/DateTime.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { durationParts } from "./curated/resolve";
@@ -65,7 +65,7 @@ const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
 /**
  * ViewDashboard never caches a range: it holds this ref and calls
  * getConsumableDateTime() at every point of use, because a RELATIVE window
- * recomputes against the wall clock per call (DateTime.vue:855).
+ * recomputes against the wall clock per call (ODateTimeRange.getConsumableDateTime).
  */
 const dateTimePicker = ref<{
   getConsumableDateTime?: () => { startTime: number; endTime: number };
@@ -213,7 +213,7 @@ const currentTimeObj = computed(() => ({
 const onDateChange = (date: { startTime: number; endTime: number; userChangedValue?: boolean }) => {
   // The payload is a snapshot; the picker is the source of truth, so seed from it first.
   drawerRange.value = { from: date.startTime, to: date.endTime };
-  // DateTime replays on mount with userChangedValue:false — "do not fetch" (DateTime.vue contract).
+  // DateTime replays on mount with userChangedValue:false — "do not fetch" (ODateTimeRange contract).
   if (date.userChangedValue === false) return;
   void resolveMetrics(false);
 };
@@ -236,11 +236,7 @@ watch(
 );
 
 const statusVariant = computed(() =>
-  props.status === "ACTIVE"
-    ? "success-soft"
-    : props.status === "INACTIVE"
-      ? "default-soft"
-      : "amber-soft",
+  props.status === "ACTIVE" ? "ok" : props.status === "INACTIVE" ? "neutral" : "warn",
 );
 const statusLabel = computed(() =>
   props.status === "ACTIVE"
@@ -255,7 +251,7 @@ const statusLabel = computed(() =>
   <ODrawer
     :open="true"
     side="right"
-    size="xxl"
+    size="xl"
     :title="raw(displayName || hostName)"
     data-test="host-detail-drawer"
     @update:open="(open: boolean) => !open && emit('close')"
@@ -263,12 +259,12 @@ const statusLabel = computed(() =>
     <div class="flex h-full flex-col">
       <div class="flex items-center justify-between gap-2 pb-2">
         <div class="flex items-center gap-2">
-          <OTag :variant="statusVariant" size="sm">{{ statusLabel }}</OTag>
-          <OTag v-if="osType" variant="default-soft" size="sm" data-test="host-drawer-os-chip">{{
+          <OTag :tone="statusVariant" size="sm">{{ statusLabel }}</OTag>
+          <OTag v-if="osType" tone="neutral" size="sm" data-test="host-drawer-os-chip">{{
             raw(osType)
           }}</OTag>
         </div>
-        <DateTime
+        <ODateTimeRange
           ref="dateTimePicker"
           auto-apply
           menu-align="end"
@@ -286,8 +282,7 @@ const statusLabel = computed(() =>
         >
           <OText variant="meta">{{ t("infra.curated.pageError") }}</OText>
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="host-drawer-metrics-retry"
             @click="resolveMetrics(true)"
           >
@@ -299,7 +294,7 @@ const statusLabel = computed(() =>
           class="flex justify-center py-6"
           data-test="host-drawer-metrics-spinner"
         >
-          <OSpinner size="md" />
+          <OSpinner size="lg" />
         </div>
         <!-- The streams exist and merely stopped reporting: "install a collector"
              is the wrong instruction for a host that already had one. -->
@@ -312,12 +307,11 @@ const statusLabel = computed(() =>
             t("infra.curated.dormantHeadline", { workload: t("menu.hosts") })
           }}</OText>
           <OText variant="meta">{{ t("infra.curated.dormantBody") }}</OText>
-          <OBanner
+          <OInlineNotice
             v-if="dormantStreams.length"
-            variant="warning"
-            dense
+            tone="warn"
             data-test="host-drawer-metrics-dormant-streams"
-            :content="
+            :message="
               t('infra.curated.streamsStale', {
                 list: raw(dormantStreams.map((entry) => entry.name).join(', ')),
                 date: dormantDate,
@@ -367,13 +361,12 @@ const statusLabel = computed(() =>
                 }}</OText
               >
             </div>
-            <OBanner
+            <OInlineNotice
               v-for="stale in staleBanners"
               :key="stale.id"
-              variant="warning"
-              dense
+              tone="warn"
               data-test="curated-stale-banner"
-              :content="
+              :message="
                 t(stale.key as never, {
                   capability: stale.capability,
                   duration: stale.duration,

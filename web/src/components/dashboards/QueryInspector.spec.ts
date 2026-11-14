@@ -46,34 +46,34 @@ const ODialogStub = {
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test-stub="o-dialog"
       :data-open="open"
       :data-title="title"
-      :data-sub-title="subTitle"
+      :data-sub-title="subtitle"
       :data-width="width"
     >
       <div data-test-stub="o-dialog-header">
         <span data-test-stub="o-dialog-title">{{ title }}</span>
-        <span data-test-stub="o-dialog-subtitle">{{ subTitle }}</span>
+        <span data-test-stub="o-dialog-subtitle">{{ subtitle }}</span>
         <slot name="header-left" />
         <slot name="header-right" />
       </div>
@@ -93,7 +93,7 @@ const OButtonStub = {
     :data-test="$attrs['data-test']"
     :disabled="disabled"
     @click="$emit('click', $event)"
-  ><slot name="icon-left" /><slot /></button>`,
+  ><slot name="icon" /><slot /></button>`,
 };
 
 describe("QueryInspector", () => {
@@ -245,9 +245,9 @@ describe("QueryInspector", () => {
       const dialog = wrapper.findComponent({ name: "ODialog" });
       expect(dialog.exists()).toBe(true);
       expect(dialog.props("title")).toBe("Query Inspector");
-      expect(dialog.props("subTitle")).toContain("Panel : Error Analysis Dashboard");
-      expect(dialog.props("subTitle")).toContain("Total Queries: 2");
-      expect(dialog.props("width")).toBe(50);
+      expect(dialog.props("subtitle")).toContain("Panel : Error Analysis Dashboard");
+      expect(dialog.props("subtitle")).toContain("Total Queries: 2");
+      expect(dialog.props("size")).toBe("lg");
     });
 
     it("should forward open prop to ODialog", async () => {
@@ -299,7 +299,7 @@ describe("QueryInspector", () => {
       await flushPromises();
 
       const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.props("subTitle")).toContain("Panel : New Dashboard");
+      expect(dialog.props("subtitle")).toContain("Panel : New Dashboard");
     });
 
     it("should update subtitle reactively when queries change", async () => {
@@ -312,7 +312,7 @@ describe("QueryInspector", () => {
       await flushPromises();
 
       const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.props("subTitle")).toContain("Total Queries: 1");
+      expect(dialog.props("subtitle")).toContain("Total Queries: 1");
     });
   });
 
@@ -330,7 +330,7 @@ describe("QueryInspector", () => {
       await flushPromises();
 
       const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.props("subTitle")).toContain("Panel : Error Analysis Dashboard");
+      expect(dialog.props("subtitle")).toContain("Panel : Error Analysis Dashboard");
     });
 
     it("should display total queries count via ODialog subtitle", async () => {
@@ -338,7 +338,7 @@ describe("QueryInspector", () => {
       await flushPromises();
 
       const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.props("subTitle")).toContain("Total Queries: 2");
+      expect(dialog.props("subtitle")).toContain("Total Queries: 2");
     });
 
     it("should render search input in header-right slot", async () => {
@@ -424,7 +424,7 @@ describe("QueryInspector", () => {
       await flushPromises();
 
       const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.props("subTitle")).toContain("Panel :");
+      expect(dialog.props("subtitle")).toContain("Panel :");
     });
   });
 

@@ -121,7 +121,7 @@ describe("FunctionList", () => {
   const ODialogStub = {
     name: "ODialog",
     props: ["open", "persistent", "size", "title"],
-    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
     template:
       '<div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-size="size" :data-persistent="persistent">' +
       '<span data-test-stub="o-dialog-title">{{ title }}</span>' +
@@ -374,7 +374,7 @@ describe("FunctionList", () => {
       const dialog = wrapper
         .findAllComponents({ name: "ConfirmDialog" })
         .find((c) => c.props("messageKeypath") === "function.deleteTransformConfirmMessage");
-      expect(dialog?.props()).toMatchObject({ messageName: "func1", okVariant: "destructive" });
+      expect(dialog?.props()).toMatchObject({ messageName: "func1", kind: "destructive" });
     });
 
     it("should call delete API with correct parameters", async () => {
@@ -556,7 +556,7 @@ describe("FunctionList", () => {
         .find(
           (c: any) => c.props("title") === i18n.global.t("function.deleteFunctionsDialogTitle"),
         );
-      expect(dialog!.props("okVariant")).toBe("destructive");
+      expect(dialog!.props("kind")).toBe("destructive");
     });
 
     it("should call bulkDelete API with selected function names", async () => {
@@ -901,7 +901,7 @@ describe("FunctionList", () => {
       expect(dialog.attributes("data-title")).toBe("Pipelines Associated with func1");
     });
 
-    it("should set ODialog size=md and persistent attributes", async () => {
+    it("should set ODialog size=md and leave it dismissable (no persistent)", async () => {
       const wrapper = mount(FunctionList, {
         global: { plugins: [i18n, store, router], stubs: globalStubs },
       });
@@ -909,8 +909,7 @@ describe("FunctionList", () => {
       await flushPromises();
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
       expect(dialog.attributes("data-size")).toBe("md");
-      // boolean attribute with `true` renders as the empty string in DOM
-      expect(dialog.attributes("data-persistent")).toBe("");
+      expect(dialog.attributes("data-persistent")).toBeUndefined();
     });
 
     it("should reflect confirmForceDelete=true on ODialog data-open", async () => {

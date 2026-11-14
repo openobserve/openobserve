@@ -31,6 +31,7 @@ const list = '[data-test="traces-search-result-list"]';
 const listRow = (n) => `${list} [data-test="o2-table-row-${n}"]`;
 const spanRow = (id) => `[data-test="trace-tree-span-container-${id}"]`;
 const pager = '[data-test="traces-search-result-pagination"]';
+const pagerNext = '[data-test="traces-search-result-pagination-next"]';
 
 const hex = (bytes) => crypto.randomBytes(bytes).toString("hex");
 const apiBase = () =>
@@ -253,7 +254,8 @@ test.describe("Traces J/K navigation (item 4a)", () => {
       await openList(page);
       await page.locator(listRow(24)).focus();
       await page.keyboard.press("j");
-      await expect(page.locator(`${pager} [aria-current="page"]`)).toHaveText(
+      await expect(page.locator(pager)).toHaveAttribute(
+        "data-test-page",
         "2",
         { timeout: 30000 },
       );
@@ -279,8 +281,9 @@ test.describe("Traces J/K navigation (item 4a)", () => {
         "aria-current",
         "true",
       );
-      await page.locator(`${pager} button`, { hasText: /^2$/ }).click();
-      await expect(page.locator(`${pager} [aria-current="page"]`)).toHaveText(
+      await page.locator(pagerNext).click();
+      await expect(page.locator(pager)).toHaveAttribute(
+        "data-test-page",
         "2",
         { timeout: 30000 },
       );

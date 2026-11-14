@@ -26,23 +26,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-vi.mock("@/components/common/AppTabs.vue", () => ({
-  default: {
-    name: "AppTabs",
-    template: `
-      <div data-test="app-tabs">
-        <div v-for="tab in tabs" :key="tab.value"
-             @click="$emit('update:active-tab', tab.value)"
-             data-test="tab-button">
-          {{ tab.label }}
-        </div>
-      </div>
-    `,
-    props: ["tabs", "activeTab"],
-    emits: ["update:active-tab"],
-  },
-}));
-
 const stubs = {
   OInput: {
     template: `
@@ -168,8 +151,8 @@ describe("PlayerEventsSidebar", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render AppTabs component on mount", () => {
-      expect(wrapper.find('[data-test="app-tabs"]').exists()).toBe(true);
+    it("should render OTabs component on mount", () => {
+      expect(wrapper.find('[data-test="player-events-tabs"]').exists()).toBe(true);
     });
 
     it("should accept events, sessionDetails and trace-related props", () => {
@@ -188,13 +171,14 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Tabs Integration", () => {
-    it("should render AppTabs component", () => {
-      expect(wrapper.findComponent({ name: "AppTabs" }).exists()).toBe(true);
+    it("should render OTabs component", () => {
+      expect(wrapper.findComponent({ name: "OTabs" }).exists()).toBe(true);
     });
 
-    it("should pass exactly 3 tabs to AppTabs with labels Breadcrumbs, Tags, and Traces", () => {
-      const appTabs = wrapper.findComponent({ name: "AppTabs" });
-      const tabs = appTabs.props("tabs");
+    it("should pass exactly 3 tabs to OTabs with labels Breadcrumbs, Tags, and Traces", () => {
+      const tabs = wrapper
+        .findAllComponents({ name: "OTab" })
+        .map((c) => ({ value: c.props("name") }));
 
       expect(tabs).toHaveLength(3);
       expect(tabs[0].value).toBe("breadcrumbs");
@@ -203,8 +187,9 @@ describe("PlayerEventsSidebar", () => {
     });
 
     it("should include a traces tab in the tabs list", () => {
-      const appTabs = wrapper.findComponent({ name: "AppTabs" });
-      const tabs = appTabs.props("tabs");
+      const tabs = wrapper
+        .findAllComponents({ name: "OTab" })
+        .map((c) => ({ value: c.props("name") }));
       const traceTab = tabs.find((t: any) => t.value === "traces");
 
       expect(traceTab).toBeDefined();
@@ -215,10 +200,10 @@ describe("PlayerEventsSidebar", () => {
       expect(wrapper.find('[data-test="search-input"]').exists()).toBe(true);
     });
 
-    it("should switch to tags tab content when AppTabs emits update:active-tab with tags", async () => {
-      const appTabs = wrapper.findComponent({ name: "AppTabs" });
+    it("should switch to tags tab content when OTabs emits update:modelValue with tags", async () => {
+      const tabStrip = wrapper.findComponent({ name: "OTabs" });
 
-      await appTabs.vm.$emit("update:active-tab", "tags");
+      await tabStrip.vm.$emit("update:modelValue", "tags");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find('[data-test="event-metadata"]').exists()).toBe(true);
@@ -226,7 +211,7 @@ describe("PlayerEventsSidebar", () => {
 
     it("tracks a sidebar tab switch with the tab name", async () => {
       vi.mocked(analytics.track).mockClear();
-      await wrapper.findComponent({ name: "AppTabs" }).vm.$emit("update:active-tab", "tags");
+      await wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "tags");
       await flushPromises();
 
       expect(analytics.track).toHaveBeenCalledWith("rum_session_sidebar_tab_switched", {
@@ -234,12 +219,12 @@ describe("PlayerEventsSidebar", () => {
       });
     });
 
-    it("should switch back to breadcrumbs content when AppTabs emits update:active-tab with breadcrumbs", async () => {
-      const appTabs = wrapper.findComponent({ name: "AppTabs" });
-      await appTabs.vm.$emit("update:active-tab", "tags");
+    it("should switch back to breadcrumbs content when OTabs emits update:modelValue with breadcrumbs", async () => {
+      const tabStrip = wrapper.findComponent({ name: "OTabs" });
+      await tabStrip.vm.$emit("update:modelValue", "tags");
       await wrapper.vm.$nextTick();
 
-      await appTabs.vm.$emit("update:active-tab", "breadcrumbs");
+      await tabStrip.vm.$emit("update:modelValue", "breadcrumbs");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find('[data-test="search-input"]').exists()).toBe(true);
@@ -250,9 +235,9 @@ describe("PlayerEventsSidebar", () => {
     });
 
     it("should not render search input when tags tab is active", async () => {
-      const appTabs = wrapper.findComponent({ name: "AppTabs" });
+      const tabStrip = wrapper.findComponent({ name: "OTabs" });
 
-      await appTabs.vm.$emit("update:active-tab", "tags");
+      await tabStrip.vm.$emit("update:modelValue", "tags");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find('[data-test="search-input"]').exists()).toBe(false);
@@ -277,17 +262,17 @@ describe("PlayerEventsSidebar", () => {
         global: { plugins: [i18n], stubs: { ...stubs, PlayerTracesTab: CountingTracesTab } },
       });
       await wrapper.vm.$nextTick();
-      const appTabs = wrapper.findComponent({ name: "AppTabs" });
+      const tabStrip = wrapper.findComponent({ name: "OTabs" });
 
-      await appTabs.vm.$emit("update:active-tab", "traces");
+      await tabStrip.vm.$emit("update:modelValue", "traces");
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="counting-traces-tab"]').exists()).toBe(true);
 
-      await appTabs.vm.$emit("update:active-tab", "breadcrumbs");
+      await tabStrip.vm.$emit("update:modelValue", "breadcrumbs");
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="counting-traces-tab"]').exists()).toBe(false);
 
-      await appTabs.vm.$emit("update:active-tab", "traces");
+      await tabStrip.vm.$emit("update:modelValue", "traces");
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="counting-traces-tab"]').exists()).toBe(true);
 
@@ -309,7 +294,7 @@ describe("PlayerEventsSidebar", () => {
       });
       await wrapper.vm.$nextTick();
 
-      await wrapper.findComponent({ name: "AppTabs" }).vm.$emit("update:active-tab", "traces");
+      await wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "traces");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.findComponent(TracesTab).props("rumWindowUs")).toEqual(rumWindowUs);
@@ -322,8 +307,8 @@ describe("PlayerEventsSidebar", () => {
 
   describe("Tags Tab Content", () => {
     beforeEach(async () => {
-      const appTabs = wrapper.findComponent({ name: "AppTabs" });
-      await appTabs.vm.$emit("update:active-tab", "tags");
+      const tabStrip = wrapper.findComponent({ name: "OTabs" });
+      await tabStrip.vm.$emit("update:modelValue", "tags");
       await wrapper.vm.$nextTick();
     });
 
@@ -343,6 +328,12 @@ describe("PlayerEventsSidebar", () => {
 
     it("should display date text in metadata when sessionDetails has date", () => {
       expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("2024-01-01 10:00:00");
+    });
+
+    it("should display the session duration only when sessionDetails has one", async () => {
+      expect(wrapper.find('[data-test="session-viewer-duration"]').exists()).toBe(false);
+      await wrapper.setProps({ sessionDetails: { ...mockSessionDetails, duration: "7m 35s" } });
+      expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("7m 35s");
     });
 
     it("should render schedule icon in metadata when tags tab is active", () => {
@@ -475,7 +466,9 @@ describe("PlayerEventsSidebar", () => {
     });
 
     it("should keep the time and type badge outside the name's cut-text tooltip", () => {
-      const names = wrapper.findAllComponents(OTruncatedText);
+      const names = wrapper
+        .findAllComponents(OTruncatedText)
+        .filter((name: any) => !name.classes().includes("o-tab__label"));
 
       expect(names).toHaveLength(mockEvents.length);
       names.forEach((name: any, index: number) => {
@@ -672,8 +665,8 @@ describe("PlayerEventsSidebar", () => {
     });
 
     it("should update session details display when sessionDetails prop changes", async () => {
-      const appTabs = wrapper.findComponent({ name: "AppTabs" });
-      await appTabs.vm.$emit("update:active-tab", "tags");
+      const tabStrip = wrapper.findComponent({ name: "OTabs" });
+      await tabStrip.vm.$emit("update:modelValue", "tags");
       await wrapper.vm.$nextTick();
 
       await wrapper.setProps({
@@ -701,7 +694,10 @@ describe("PlayerEventsSidebar", () => {
 
       await wrapper.setProps({ events: [longEvent] });
 
-      expect(wrapper.findComponent(OTruncatedText).text()).toBe(longEvent.name);
+      const names = wrapper
+        .findAllComponents(OTruncatedText)
+        .filter((name: any) => !name.classes().includes("o-tab__label"));
+      expect(names[0].text()).toBe(longEvent.name);
     });
   });
 

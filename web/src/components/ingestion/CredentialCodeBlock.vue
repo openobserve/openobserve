@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, inject, toRef } from "vue";
 import { useRoute } from "vue-router";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import type { CodeBlockChrome, CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
+import type { CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
 import { useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { OPEN_TOKEN_PICKER, useCredentialSnippet } from "@/composables/useCredentialSnippet";
@@ -33,11 +33,10 @@ const props = withDefaults(
     /** Names the block in its data-test prefix, `ingestion-<slug>-code-block`. */
     slug: string;
     lang?: string;
-    chrome?: CodeBlockChrome;
     filename?: string;
     wrap?: boolean;
   }>(),
-  { lang: undefined, chrome: undefined, filename: undefined, wrap: true },
+  { lang: undefined, filename: undefined, wrap: true },
 );
 
 const { t } = useI18nTyped();
@@ -68,21 +67,21 @@ const onCopy = ({ partial }: CodeBlockCopyPayload) => {
 <template>
   <OSkeleton
     v-if="awaitingCredential"
-    type="rect"
+    shape="block"
     class="my-3 h-20"
     :data-test="`${dataTest}-loading`"
   />
-  <OBanner
+  <OInlineNotice
     v-else-if="forbidden && needsPasscode"
-    variant="warning"
+    tone="warn"
     :data-test="`${dataTest}-passcode-forbidden`"
-    :content="t('ingestion.passcodeForbiddenMessage')"
+    :message="t('ingestion.passcodeForbiddenMessage')"
   />
-  <OBanner
+  <OInlineNotice
     v-else-if="credentialUnavailable"
-    variant="warning"
+    tone="warn"
     :data-test="`${dataTest}-passcode-unavailable`"
-    :content="t('ingestion.passcodeUnavailableMessage')"
+    :message="t('ingestion.passcodeUnavailableMessage')"
   />
   <div v-else :data-test="`${dataTest}-container`">
     <OCodeBlock
@@ -90,11 +89,9 @@ const onCopy = ({ partial }: CodeBlockCopyPayload) => {
       :code-masked="masked"
       :token-name="needsPasscode ? tokenName : undefined"
       :lang="lang"
-      :chrome="chrome"
       :filename="filename"
       :wrap="wrap"
       :data-test="dataTest"
-      inset
       class="mb-1"
       @copy="onCopy"
       @token-click="openTokenPicker?.()"

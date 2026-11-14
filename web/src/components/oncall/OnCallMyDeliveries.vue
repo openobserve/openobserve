@@ -26,10 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OEmptyState
       v-else-if="loadError !== null"
       size="inline"
-      variant="error"
+      kind="error"
       :title="t('oncall.myDeliveriesLoadFailed')"
-      :description="raw(loadError)"
-      :action-label="t('oncall.retry')"
+      :text="raw(loadError)"
       data-test="oncall-my-deliveries-error"
       @action="refresh"
     />
@@ -52,10 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="openRows"
           :columns="openColumns"
           row-key="response_id"
-          :frame="false"
           :loading="loading && !openRows.length"
           :skeleton-rows="PAGE_ROWS"
-          :show-global-filter="false"
           :pagination="openPaged ? 'client' : 'none'"
           :page-size="openPageSize"
           :page-size-options="PAGE_SIZES"
@@ -78,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag type="oncallResponseState" :value="row.response_state" size="sm" />
           </template>
           <template #cell-team="{ row }">
-            <OSkeleton v-if="teamsPending(row.team_id)" class="h-4 w-24" />
+            <OSkeleton v-if="teamsPending(row.team_id)" shape="block" class="h-4 w-24" />
             <OTruncatedText v-else class="text-text-secondary">
               {{ raw(teamName(row.team_id)) }}
             </OTruncatedText>
@@ -92,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center justify-center">
               <OButton
                 v-if="isEscalating(row.response_state)"
-                variant="ghost-warning"
-                size="icon-sm"
+                icon-only
+                variant="ghost"
                 :loading="ackingId === row.response_id"
                 :aria-label="t('oncall.acknowledge')"
                 :data-test="`oncall-my-needs-you-ack-${row.response_id}`"
@@ -114,12 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="flex min-h-12 shrink-0 flex-wrap items-center gap-2 px-4 py-2">
           <OText variant="card-title" as="h2">{{ t("oncall.myHistoryTitle") }}</OText>
-          <OTag
-            v-if="unread"
-            variant="primary-soft"
-            size="sm"
-            data-test="oncall-my-deliveries-unread"
-          >
+          <OTag v-if="unread" tone="accent" size="sm" data-test="oncall-my-deliveries-unread">
             {{ t("oncall.myDeliveriesUnread", { count: unread }, unread) }}
           </OTag>
 
@@ -136,8 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="(v: CheckboxModelValue) => setUnreadOnly(!!v)"
             />
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :class="unread ? '' : 'invisible'"
               :loading="marking"
               data-test="oncall-my-deliveries-read-all"
@@ -157,14 +148,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="historyRows"
           :columns="historyColumns"
           row-key="key"
-          :frame="false"
           :loading="loading"
           :skeleton-rows="HISTORY_SKELETON_ROWS"
           :pagination="historyPaged ? 'client' : 'none'"
           :page-size="pageSize"
           :page-size-options="PAGE_SIZES"
           :current-page="currentPage"
-          :show-global-filter="false"
           table-id="oncall-my-deliveries"
           data-test="oncall-my-deliveries-table"
           @row-click="(row: HistoryRow) => openResponse(row.latest)"
@@ -186,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTruncatedText>
               <OTag
                 v-if="row.pages > 1"
-                variant="default-soft"
+                tone="neutral"
                 size="sm"
                 :data-test="`oncall-my-delivery-count-${row.latest.event_id}`"
               >
@@ -195,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
           <template #cell-team="{ row }">
-            <OSkeleton v-if="teamsPending(...row.teams)" class="h-4 w-24" />
+            <OSkeleton v-if="teamsPending(...row.teams)" shape="block" class="h-4 w-24" />
             <OTruncatedText v-else class="text-text-body">
               {{ raw(row.teams.map(teamName).join(", ")) }}
             </OTruncatedText>
@@ -240,9 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-row-actions="{ row }">
             <div class="flex items-center justify-center">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                :icon-left="row.unread ? 'check-circle' : 'mark-email-unread'"
+                :icon="row.unread ? 'check-circle' : 'mark-email-unread'"
                 :loading="marking"
                 :aria-label="
                   row.unread ? t('oncall.myDeliveriesMarkRead') : t('oncall.myDeliveriesMarkUnread')
@@ -265,11 +254,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div v-else :class="FIXED_EMPTY" data-test="oncall-my-deliveries-empty-frame">
           <OEmptyState
-            size="block"
             icon="notifications-active"
             :title="unreadOnly ? t('oncall.myDeliveriesNoUnread') : t('oncall.myDeliveriesNone')"
             :action-label="emptyAction?.label"
-            :action-icon="emptyAction?.icon"
             data-test="oncall-my-deliveries-empty"
             @action="emptyAction?.run()"
           />

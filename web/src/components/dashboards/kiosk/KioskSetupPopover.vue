@@ -15,20 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPopover v-model:open="open" align="end">
+  <OPopover size="md" v-model:open="open" align="end">
     <template #trigger>
       <slot name="trigger" />
     </template>
 
-    <div
-      class="flex w-[min(18.5rem,calc(100vw-1.5rem))] flex-col gap-3 p-3"
-      data-test="dashboard-kiosk-popover"
-    >
+    <div class="flex flex-col gap-3 p-3" data-test="dashboard-kiosk-popover">
       <OSelect
         :label="t('dashboard.kiosk.refresh')"
         :model-value="refreshSeconds"
         :options="refreshOptions"
-        size="md"
         :searchable="false"
         data-test="dashboard-kiosk-refresh"
         @update:model-value="(value) => (refreshSeconds = Number(value) || 0)"
@@ -50,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="option in themeOptions"
           :key="option.value"
           :value="option.value"
-          size="sm"
           :data-test="`dashboard-kiosk-theme-${option.value}`"
         >
           {{ option.label }}
@@ -65,8 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OButton
         variant="primary"
-        size="sm"
-        icon-left="tv"
+        icon="tv"
         block
         data-test="dashboard-kiosk-open"
         @click="openKiosk"

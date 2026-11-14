@@ -15,18 +15,35 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { computed, defineComponent, h, ref, shallowRef, type Component } from "vue";
-import { createMemoryHistory, createRouter } from "vue-router";
+import {
+  computed,
+  defineComponent,
+  h,
+  nextTick,
+  ref,
+  shallowRef,
+  unref,
+  type Component,
+  type Ref,
+} from "vue";
+import { createMemoryHistory, createRouter, type Router } from "vue-router";
 import i18n from "@/locales";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import { providePageHeaderStatus } from "@/lib/core/PageHeader/pageHeaderStatus";
+import { providePageNavContext } from "@/lib/core/PageHeader/pageContext";
 import { raw } from "@/types/i18n";
 import OAccessHeaderChip from "@/components/access/OAccessHeaderChip.vue";
 import { viewDenial } from "@/composables/useAccessStore";
+import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 
 const lgUp = ref(true);
+const smUp = ref(true);
 vi.mock("@/composables/useBreakpoint", () => ({
-  default: () => ({ isMobile: computed(() => false), lgUp: computed(() => lgUp.value) }),
+  default: () => ({
+    isMobile: computed(() => false),
+    smUp: computed(() => smUp.value),
+    lgUp: computed(() => lgUp.value),
+  }),
 }));
 
 const entries = shallowRef([viewDenial("templates", "list", ["GET /api/default/templates"])]);
@@ -35,11 +52,26 @@ vi.mock("@/composables/useAccessStore", async (importOriginal) => {
   return { ...actual, useAccessBoundary: () => ({ sectionEntries: entries }) };
 });
 
-const Status = defineComponent({ setup: () => () => h("button", { "data-test": "status" }) });
-const ROW_FLOORS = ["md:max-lg:min-w-40", "max-md:min-w-24"];
+const Page = { render: () => null };
+const ROUTES = [
+  { path: "/", name: "home", component: Page },
+  { path: "/logs", name: "logs", component: Page },
+  { path: "/alerts", name: "alertList", component: Page },
+  { path: "/alerts/destinations", name: "alertDestinations", component: Page },
+  { path: "/alerts/detail/:id", name: "alertDetail", component: Page },
+  { path: "/streams", name: "logstreams", component: Page },
+  { path: "/pipelines", name: "pipelines", component: Page },
+  { path: "/settings", name: "settings", component: Page },
+  { path: "/settings/correlation/services", name: "correlationServices", component: Page },
+  { path: "/iam", name: "iam", component: Page },
+  { path: "/iam/users", name: "users", component: Page },
+  { path: "/ai", name: "aiObservability", component: Page },
+  { path: "/ai/model-pricing", name: "modelPricing", component: Page },
+  { path: "/security/overview", name: "securityOverview", component: Page },
+  { path: "/alert-destinations", name: "alertDestinationsShared", component: Page },
+];
 
 let wrapper: VueWrapper | null = null;
-
 let resizeCallbacks: ResizeObserverCallback[] = [];
 class MockResizeObserver {
   constructor(cb: ResizeObserverCallback) {
@@ -49,63 +81,54 @@ class MockResizeObserver {
   disconnect = vi.fn();
 }
 
-// Mounts inside a page container of `pageWidth` px when given, as OPageLayout provides one.
-async function mountHeader(
-  withStatus: boolean,
-  desktop: boolean,
-  pageWidth?: number,
-  status: Component = Status,
-) {
-  lgUp.value = desktop;
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [{ path: "/", component: { render: () => null } }],
-  });
+const makeRouter = () => createRouter({ history: createMemoryHistory(), routes: ROUTES });
+
+async function mountAt(
+  path: string,
+  props: Record<string, unknown>,
+  slots: Record<string, () => unknown> = {},
+  links?: NavItem[] | Ref<NavItem[]>,
+  flat = false,
+): Promise<Router> {
+  const router = makeRouter();
+  await router.push(path);
   const Host = defineComponent({
     setup() {
-      providePageHeaderStatus(
-        () => (withStatus ? status : null),
-        () => "/",
-      );
-      return () => {
-        const header = h(
-          OPageHeader,
-          { title: raw("Alerts") },
-          { actions: () => h("button", "New alert") },
-        );
-        return pageWidth === undefined
-          ? header
-          : h("div", { class: "@container/page", ref: setPageWidth }, [header]);
-      };
+      if (links)
+        providePageNavContext({
+          links: computed(() => unref(links)),
+          flat: computed(() => flat),
+        });
+      return () => h(OPageHeader, props, slots);
     },
   });
-  const setPageWidth = (el: unknown) => {
-    if (el instanceof HTMLElement)
-      Object.defineProperty(el, "clientWidth", { configurable: true, value: pageWidth });
-  };
   wrapper = mount(Host, { attachTo: document.body, global: { plugins: [i18n, router] } });
   await flushPromises();
+  return router;
 }
 
-const titleBlock = () => wrapper!.find("h1").element.closest(".flex-1")!;
-// The status is one element in the title block; on one row CSS order moves it beside the actions.
-const statusInTitleRow = () => {
-  const status = titleBlock().querySelector('[data-test="status"]');
-  return status !== null && !status.parentElement!.classList.contains("order-last");
-};
-const pageEl = () =>
-  wrapper!.element.parentElement!.querySelector<HTMLElement>('[class~="@container/page"]')!;
-async function resizePage(width: number) {
-  Object.defineProperty(pageEl(), "clientWidth", { configurable: true, value: width });
-  for (const cb of resizeCallbacks) cb([], {} as ResizeObserver);
-  await flushPromises();
+const byTest = (id: string) => wrapper!.find(`[data-test="${id}"]`);
+const contextText = () => byTest("o-page-header-context").text();
+
+// Every box from the header down to the <h1>, with its classes: identical chains give identical rects.
+function titleChain(): string[] {
+  const chain: string[] = [];
+  let el: Element | null = wrapper!.find("h1").element;
+  while (el && el !== wrapper!.element.parentElement) {
+    const preceding = Array.from(el.parentElement?.children ?? [])
+      .slice(0, Array.from(el.parentElement?.children ?? []).indexOf(el))
+      .map((s) => s.className);
+    chain.push(`${el.tagName}.${el.className} after [${preceding.join(" | ")}]`);
+    if (el.classList.contains("app-page-header")) break;
+    el = el.parentElement;
+  }
+  return chain;
 }
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-// Classes this header adds only for a status; a chipless header must render as it did before.
-const STATUS_ONLY = /@max-4xl\/page:min-w-|\border-last\b|-me-2/;
 
 beforeEach(() => {
   resizeCallbacks = [];
+  lgUp.value = true;
+  smUp.value = true;
   vi.stubGlobal("ResizeObserver", MockResizeObserver);
 });
 
@@ -115,101 +138,332 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("OPageHeader with a status", () => {
-  it("shows the status with the actions on desktop", async () => {
-    await mountHeader(true, true);
-    expect(wrapper!.findAll('[data-test="status"]')).toHaveLength(1);
-    expect(statusInTitleRow()).toBe(false);
+describe("OPageHeader anatomy (H1)", () => {
+  it("stacks a 16 px context line over a 24 px title in a fixed 56 px band", async () => {
+    await mountAt("/logs", { title: raw("Logs") });
+    expect(byTest("o-page-header-band").classes()).toContain("h-14");
+    expect(byTest("o-page-header-context").classes()).toContain("h-4");
+    expect(byTest("o-page-header-title-row").classes()).toContain("h-6");
+    const title = wrapper!.find("h1");
+    expect(title.text()).toBe("Logs");
+    expect(title.classes()).toEqual(expect.arrayContaining(["text-base", "font-semibold"]));
   });
 
-  it("puts the status beside the title below lg, keeping the row's wrap floors", async () => {
-    await mountHeader(true, false);
-    expect(wrapper!.findAll('[data-test="status"]')).toHaveLength(1);
-    expect(statusInTitleRow()).toBe(true);
-    for (const floor of ROW_FLOORS) expect(titleBlock().className).toContain(floor);
-    expect(wrapper!.html()).not.toContain("md:max-lg:min-w-32");
+  it("renders no icon tile and no subtitle paragraph (H2)", async () => {
+    await mountAt("/logs", { title: raw("Logs"), icon: "search", subtitle: raw("Explore logs") });
+    expect(wrapper!.text()).not.toContain("Explore logs");
+    expect(wrapper!.findAll("svg").length).toBe(0);
   });
 
-  it("puts the status beside the title when a narrow page container wraps the row on a wide viewport", async () => {
-    await mountHeader(true, true, 700);
-    expect(wrapper!.findAll('[data-test="status"]')).toHaveLength(1);
-    expect(statusInTitleRow()).toBe(true);
-    // The container floor is what makes the actions wrap instead of the title collapsing under the status.
-    expect(titleBlock().className).toContain("md:@max-4xl/page:min-w-40");
+  it("puts help behind an About button beside the title (H2)", async () => {
+    await mountAt("/logs", { title: raw("Logs"), about: raw("Search every log line.") });
+    const about = byTest("o-page-header-about");
+    expect(about.exists()).toBe(true);
+    expect(about.attributes("aria-label")).toBe("About this page");
+    expect(byTest("o-page-header-title-row").element.contains(about.element)).toBe(true);
   });
 
-  it("moves the status back to the actions once the page container widens", async () => {
-    await mountHeader(true, true, 700);
-    const page = wrapper!.element.parentElement!.querySelector<HTMLElement>(
-      '[class~="@container/page"]',
-    )!;
-    Object.defineProperty(page, "clientWidth", { configurable: true, value: 1200 });
-    for (const cb of resizeCallbacks) cb([], {} as ResizeObserver);
-    await flushPromises();
-    expect(wrapper!.findAll('[data-test="status"]')).toHaveLength(1);
-    expect(statusInTitleRow()).toBe(false);
-  });
-
-  it("keeps the status with the actions in a wide page container", async () => {
-    await mountHeader(true, true, 1200);
-    expect(statusInTitleRow()).toBe(false);
-  });
-
-  /// L2: a header whose trail competes for the row can keep the title readable at every width.
-  it("floors the title at every width when asked", async () => {
-    const header = mount(OPageHeader, {
-      props: { title: raw("A long page title"), titleMinWidth: true },
-      global: { plugins: [i18n, createRouter({ history: createMemoryHistory(), routes: [] })] },
-    });
-    expect(header.find("h1").element.closest(".flex-col")!.className).toContain("min-w-40");
-    header.unmount();
-  });
-
-  it("keeps the title's own floor when no status is shown", async () => {
-    await mountHeader(false, false);
-    expect(wrapper!.html()).toContain("md:max-lg:min-w-32");
-  });
-
-  it("adds no status class to a chipless header in a narrow page container", async () => {
-    await mountHeader(false, true, 700);
-    expect(wrapper!.html()).not.toMatch(STATUS_ONLY);
-    expect(titleBlock().className).not.toContain("md:@max-4xl/page:min-w-40");
+  it("shows the status after the title (H5)", async () => {
+    await mountAt(
+      "/alerts",
+      { title: raw("Alerts") },
+      { status: () => h("span", { "data-test": "firing" }, "3 firing") },
+    );
+    const row = byTest("o-page-header-title-row").element;
+    const status = byTest("firing").element;
+    expect(row.contains(status)).toBe(true);
+    expect(wrapper!.find("h1").element.compareDocumentPosition(status)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 });
 
-describe("OPageHeader with the access chip", () => {
-  const chip = () => document.querySelector<HTMLElement>('[data-test="access-header-chip"]')!;
-  const card = () => document.querySelector('[data-test="access-header-popover"]');
-  const announcer = () =>
-    document.querySelector<HTMLElement>('[data-test="access-header-chip-announcer"]')!;
+describe("OPageHeader context line (H4)", () => {
+  const links: NavItem[] = [
+    { title: raw("Logs"), icon: "search", link: "/logs", name: "logs" },
+    { title: raw("Alerts"), icon: "alert", link: "/alerts", name: "alertList" },
+    { title: raw("Incidents"), icon: "alert", link: "/incidents", name: "incidentList" },
+    { title: raw("Streams"), icon: "db", link: "/streams", name: "streams" },
+    { title: raw("Pipelines"), icon: "db", link: "/pipelines", name: "pipeline" },
+  ];
 
-  it("sizes the chip by the row's wrap, not the viewport", async () => {
-    await mountHeader(true, true, 700, OAccessHeaderChip);
-    expect(chip().className).toContain("h-6");
-    expect(chip().textContent).not.toContain("Access denied");
-    await resizePage(1200);
-    expect(chip().className).not.toContain("h-6");
-    expect(chip().textContent).toContain("Access denied");
+  it("names the rail group of a grouped page, from the nav model", async () => {
+    await mountAt("/alerts/destinations", { title: raw("Alerts") }, {}, links);
+    expect(contextText()).toBe("Reliability");
   });
 
-  it("moves one chip when the row's wrap flips, keeping its card open and its announcement", async () => {
-    await mountHeader(true, true, 1200, OAccessHeaderChip);
-    await wait(400);
-    const before = { chip: chip(), announcer: announcer(), text: announcer().textContent };
-    chip().click();
+  it("names the group of a drill-down by its deepest section", async () => {
+    await mountAt("/pipelines", { title: raw("Pipelines") }, {}, links);
+    expect(contextText()).toBe("Data");
+  });
+
+  it("names the org on an ungrouped page", async () => {
+    await mountAt("/logs", { title: raw("Logs") }, {}, links);
+    expect(contextText()).toBe("");
+    expect(byTest("o-page-header-context-label").exists()).toBe(true);
+  });
+
+  it("names the org when the rail does not emit the group", async () => {
+    const lone: NavItem[] = [{ title: raw("Alerts"), icon: "a", link: "/alerts", name: "logs" }];
+    await mountAt("/alerts", { title: raw("Alerts") }, {}, lone);
+    expect(contextText()).not.toBe("Reliability");
+  });
+
+  it("takes an explicit context over the derived one", async () => {
+    await mountAt("/alerts", { title: raw("Alerts"), context: raw("Playground") }, {}, links);
+    expect(contextText()).toBe("Playground");
+  });
+
+  const securityLinks: NavItem[] = [
+    { title: raw("Overview"), icon: "chart", link: "/security/overview", name: "securityOverview" },
+  ];
+
+  it.each([
+    ["/settings/correlation/services", "Settings"],
+    ["/iam/users", "IAM"],
+    ["/ai/model-pricing", "AI Observability"],
+  ])("names the module whose section rail holds %s, in either solution", async (path, label) => {
+    await mountAt(path, { title: raw("Page") }, {}, links);
+    expect(contextText()).toBe(label);
+    wrapper!.unmount();
+    await mountAt(path, { title: raw("Page") }, {}, securityLinks, true);
+    expect(contextText()).toBe(label);
+  });
+
+  it("names the Security solution on a page of its flat rail", async () => {
+    await mountAt("/security/overview", { title: raw("Overview") }, {}, securityLinks, true);
+    expect(contextText()).toBe("Security");
+  });
+
+  it("names the org on a shared page the flat rail does not hold", async () => {
+    await mountAt("/alert-destinations", { title: raw("Destinations") }, {}, securityLinks, true);
+    expect(contextText()).toBe("");
+  });
+
+  it.each([
+    ["/iam/users", "IAM", false],
+    ["/security/overview", "Security", true],
+  ])("keeps %s on its label while the rail's links load", async (path, label, flat) => {
+    const pending = ref<NavItem[]>([]);
+    await mountAt(path, { title: raw("Page") }, {}, pending, flat);
+    expect(contextText()).toBe(label);
+    pending.value = flat ? securityLinks : links;
     await flushPromises();
-    expect(card()).not.toBeNull();
-    const changes: MutationRecord[] = [];
-    const observer = new MutationObserver((records) => changes.push(...records));
-    observer.observe(announcer(), { childList: true, characterData: true, subtree: true });
-    await resizePage(700);
-    await wait(400);
-    observer.disconnect();
-    expect(titleBlock().contains(chip())).toBe(true);
-    expect(chip()).toBe(before.chip);
-    expect(announcer()).toBe(before.announcer);
-    expect(announcer().textContent).toBe(before.text);
-    expect(changes).toHaveLength(0);
-    expect(card()).not.toBeNull();
+    expect(contextText()).toBe(label);
+  });
+
+  it("turns into a real ‹ Parent link on a detail page", async () => {
+    await mountAt("/alerts/detail/1", {
+      title: raw("payments-5xx-rate"),
+      back: { label: raw("Alerts"), to: { name: "alertList" } },
+    });
+    const link = byTest("app-page-header-back");
+    expect(link.element.tagName).toBe("A");
+    expect(link.attributes("href")).toBe("/alerts");
+    expect(link.text()).toBe("Alerts");
+    expect(link.attributes("aria-label")).toBe("Back to Alerts");
+  });
+
+  it("goes to the parent on a deep link with no history (N3)", async () => {
+    const router = await mountAt("/alerts/detail/1", {
+      title: raw("payments-5xx-rate"),
+      back: { label: raw("Alerts"), to: { name: "alertList" } },
+    });
+    const back = vi.spyOn(router, "back");
+    await byTest("app-page-header-back").trigger("click");
+    await flushPromises();
+    expect(back).not.toHaveBeenCalled();
+    expect(router.currentRoute.value.name).toBe("alertList");
+  });
+
+  it("returns through history when there is a previous entry (N3)", async () => {
+    window.history.replaceState({ back: "/alerts" }, "");
+    const router = await mountAt("/alerts/detail/1", {
+      title: raw("payments-5xx-rate"),
+      back: { label: raw("Alerts"), to: { name: "alertList" } },
+    });
+    const back = vi.spyOn(router, "back").mockImplementation(() => undefined);
+    await byTest("app-page-header-back").trigger("click");
+    expect(back).toHaveBeenCalledOnce();
+    window.history.replaceState(null, "");
+  });
+
+  it("lets a modified click open the parent in a new tab", async () => {
+    const onClick = vi.fn();
+    await mountAt("/alerts/detail/1", {
+      title: raw("x"),
+      back: { label: raw("Alerts"), to: { name: "alertList" }, onClick },
+    });
+    await byTest("app-page-header-back").trigger("click", { ctrlKey: true });
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("runs onClick for an in-page parent with no route", async () => {
+    const onClick = vi.fn();
+    await mountAt("/alerts", { title: raw("Edit"), back: { label: raw("Roles"), onClick } });
+    const link = byTest("app-page-header-back");
+    expect(link.element.tagName).toBe("BUTTON");
+    await link.trigger("click");
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+});
+
+describe("OPageHeader actions (H3, R2)", () => {
+  const slots = {
+    actions: () => h("button", { "data-test": "primary" }, "New alert"),
+    "actions-overflow": () => h("button", { "data-test": "secondary" }, "Import"),
+  };
+
+  it("orders secondary, then primary", async () => {
+    await mountAt("/alerts", { title: raw("Alerts") }, slots);
+    const secondary = byTest("secondary").element;
+    const primary = byTest("primary").element;
+    expect(secondary.compareDocumentPosition(primary)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(byTest("app-page-header-more-btn").exists()).toBe(false);
+  });
+
+  it("folds the secondaries into ⋯ More, after the primary, under 640 px", async () => {
+    smUp.value = false;
+    await mountAt("/alerts", { title: raw("Alerts") }, slots);
+    expect(byTest("secondary").exists()).toBe(false);
+    const more = byTest("app-page-header-more-btn").element;
+    expect(byTest("primary").element.compareDocumentPosition(more)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+});
+
+describe("OPageHeader stability (H1, H8, header-spec test)", () => {
+  const Tabs = defineComponent({
+    props: { active: { type: String, required: true } },
+    setup: (props) => () =>
+      h("div", { role: "tablist" }, [
+        h("button", { role: "tab", "aria-selected": props.active === "a" }, "All alerts"),
+        h("button", { role: "tab", "aria-selected": props.active === "b" }, "Destinations"),
+      ]),
+  });
+
+  it("keeps the title box and the band height across a tab switch", async () => {
+    const active = ref("a");
+    const router = makeRouter();
+    await router.push("/alerts");
+    wrapper = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            OPageHeader,
+            { title: raw("Alerts") },
+            {
+              actions: () => h("button", active.value === "a" ? "New alert" : "New destination"),
+              tabs: () => h(Tabs, { active: active.value }),
+            },
+          ),
+      }),
+      { attachTo: document.body, global: { plugins: [i18n, router] } },
+    );
+    await flushPromises();
+    const title = wrapper.find("h1").element;
+    const before = titleChain();
+    active.value = "b";
+    await nextTick();
+    expect(wrapper.find("h1").element).toBe(title);
+    expect(wrapper.find("h1").text()).toBe("Alerts");
+    expect(titleChain()).toEqual(before);
+    // The tab row is a sibling after the band, never inside the title's line.
+    const band = byTest("o-page-header-band").element;
+    const tabRow = byTest("o-page-header-tabs").element;
+    expect(band.contains(tabRow)).toBe(false);
+    expect(band.compareDocumentPosition(tabRow)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(tabRow.className).toContain("h-10");
+  });
+
+  it("puts the title in the same box with a context label, a back link or tabs", async () => {
+    await mountAt("/alerts", { title: raw("Alerts") });
+    const plain = titleChain();
+    wrapper!.unmount();
+    await mountAt("/alerts/detail/1", {
+      title: raw("payments-5xx-rate"),
+      back: { label: raw("Alerts"), to: { name: "alertList" } },
+    });
+    expect(titleChain()).toEqual(plain);
+    wrapper!.unmount();
+    await mountAt("/alerts", { title: raw("Alerts") }, { tabs: () => h(Tabs, { active: "a" }) });
+    expect(titleChain()).toEqual(plain);
+  });
+
+  it("never sizes a box above the title by its content", async () => {
+    await mountAt(
+      "/alerts",
+      { title: raw("A very long alert name that keeps going and going") },
+      {
+        actions: () => h("button", "New alert"),
+        status: () => h("span", "Firing"),
+      },
+    );
+    const contentSized = /\b(h-auto|min-h-|flex-wrap|max-lg:h-|@max-4xl\/page:h-)/;
+    for (const box of titleChain()) expect(box).not.toMatch(contentSized);
+    expect(byTest("o-page-header-band").classes()).toEqual(
+      expect.arrayContaining(["grid", "h-14", "grid-cols-[minmax(0,1fr)_auto]"]),
+    );
+  });
+});
+
+describe("OPageHeader with a provided status", () => {
+  const Status = defineComponent({
+    props: { compact: Boolean },
+    setup: (props) => () =>
+      h("button", { "data-test": "status", "data-compact": String(props.compact) }),
+  });
+
+  async function mountWithStatus(status: Component, pageWidth?: number) {
+    const router = makeRouter();
+    await router.push("/alerts");
+    const setWidth = (el: unknown) => {
+      if (el instanceof HTMLElement)
+        Object.defineProperty(el, "clientWidth", { configurable: true, value: pageWidth });
+    };
+    wrapper = mount(
+      defineComponent({
+        setup() {
+          providePageHeaderStatus(
+            () => status,
+            () => "/",
+          );
+          return () => {
+            const header = h(OPageHeader, { title: raw("Alerts") });
+            return pageWidth === undefined
+              ? header
+              : h("div", { class: "@container/page", ref: setWidth }, [header]);
+          };
+        },
+      }),
+      { attachTo: document.body, global: { plugins: [i18n, router] } },
+    );
+    await flushPromises();
+  }
+
+  it("shows the status once, after the title", async () => {
+    await mountWithStatus(Status);
+    const status = wrapper!.findAll('[data-test="status"]');
+    expect(status).toHaveLength(1);
+    expect(byTest("o-page-header-title-row").element.contains(status[0].element)).toBe(true);
+    expect(status[0].attributes("data-compact")).toBe("false");
+  });
+
+  it("compacts the status in a narrow page container on a wide window", async () => {
+    await mountWithStatus(Status, 700);
+    expect(byTest("status").attributes("data-compact")).toBe("true");
+  });
+
+  it("sizes the access chip by the page width and keeps it after the title", async () => {
+    await mountWithStatus(OAccessHeaderChip, 700);
+    const chip = () => document.querySelector<HTMLElement>('[data-test="access-header-chip"]')!;
+    expect(chip().className).toContain("h-control-xs");
+    const page = wrapper!.element as HTMLElement;
+    Object.defineProperty(page, "clientWidth", { configurable: true, value: 1200 });
+    for (const cb of resizeCallbacks) cb([], {} as ResizeObserver);
+    await flushPromises();
+    expect(chip().className).not.toContain("h-control-xs");
+    expect(byTest("o-page-header-title-row").element.contains(chip())).toBe(true);
   });
 });

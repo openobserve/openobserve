@@ -503,7 +503,7 @@ defineExpose({ seekTo, play, pause, togglePlay, playbackState });
       class="text-text-secondary flex h-full flex-col items-center justify-center gap-2"
       data-test="rum-mobile-replay-loading"
     >
-      <OSpinner size="md" />
+      <OSpinner size="lg" />
       <span>{{ t("rum.loadingSessionReplay") }}</span>
       <span v-if="retryAttempt > 1" class="text-xs" data-test="rum-mobile-replay-retrying">
         {{ t("rum.sessionReplayRetrying", { attempt: retryAttempt, total: MAX_ATTEMPTS }) }}

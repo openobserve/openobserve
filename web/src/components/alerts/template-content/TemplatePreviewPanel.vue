@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="channel"
             :label="t('alert_templates.previewChannel')"
             :options="channelOptions"
-            width="sm"
+            width="s"
             :searchable="false"
             data-test="template-preview-panel-channel-select"
           />
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="severity"
             :label="t('alert_templates.previewSeverity')"
             :options="severityOptions"
-            width="sm"
+            width="s"
             :searchable="false"
             data-test="template-preview-panel-severity-select"
           />
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="previewKind"
             :label="t('alert_templates.previewKind')"
             :options="kindOptions"
-            width="sm"
+            width="s"
             :searchable="false"
             data-test="template-preview-panel-kind-select"
           />
@@ -88,13 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="selectedDestination"
             :label="t('alert_templates.testSendDestinationLabel')"
             :options="destinationOptions"
-            width="sm"
+            width="s"
             clearable
             data-test="template-preview-panel-destination-select"
           />
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="!selectedDestination"
             :loading="isTestSending"
             data-test="template-preview-panel-test-send-btn"
@@ -132,8 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         t("alert_templates.previewFailed", { message: previewError })
       }}</span>
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         data-test="template-preview-panel-retry-btn"
         @click="fetchPreview"
         >{{ t("common.retry") }}</OButton
@@ -146,8 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="template-preview-panel-unknown-variables-warning"
     >
       <OTag
-        variant="warning-soft"
-        class="max-w-full leading-snug! wrap-anywhere whitespace-normal!"
+        tone="warn"
+        class="max-w-full wrap-anywhere whitespace-normal!"
         data-test="template-preview-panel-unknown-variables-chip"
       >
         {{ t("alert_templates.unknownVariables") }}: {{ unknownVariables.join(", ") }}
@@ -160,8 +158,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="template-preview-panel-empty-variables-warning"
     >
       <OTag
-        variant="warning-soft"
-        class="max-w-full leading-snug! wrap-anywhere whitespace-normal!"
+        tone="warn"
+        class="max-w-full wrap-anywhere whitespace-normal!"
         data-test="template-preview-panel-empty-variables-chip"
       >
         {{
@@ -196,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-secondary flex items-center gap-2 p-3 text-sm"
         data-test="template-preview-panel-loading"
       >
-        <OSpinner size="xs" />
+        <OSpinner />
         {{ t("common.loading") }}
       </div>
 
@@ -284,8 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-for="(link, index) in previewModel.links"
               :key="`${link.label}-${index}`"
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               :data-test="`template-preview-panel-link-${index}`"
               @click="openLink(link.url)"
               >{{ link.label }}</OButton
@@ -303,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  the exact per-channel styling. -->
             <OButton
               v-if="previewModel.footer"
-              variant="preview-action"
+              variant="secondary"
               data-test="template-preview-panel-default-link"
               @click="openLink(previewModel.footer)"
               >{{ t("alert_templates.viewAlertLinkLabel") }}</OButton
@@ -332,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </p>
         <OEmptyState
           v-else
-          preset="no-data"
+          :text="t('emptyState.noData.description')"
           :title="t('alert_templates.previewEmptyTitle')"
           data-test="template-preview-panel-empty"
         />

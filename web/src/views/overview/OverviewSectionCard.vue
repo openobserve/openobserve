@@ -29,8 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       <OButton
         v-if="linkLabel && (view === 'ok' || view === 'empty')"
-        variant="ghost-primary"
-        size="sm"
+        variant="accent-ghost"
         class="ms-auto shrink-0"
         :aria-label="linkAriaLabel"
         :data-test="`overview-${section}-view-all`"

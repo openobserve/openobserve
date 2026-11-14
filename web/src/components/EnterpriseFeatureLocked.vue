@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   as the disabled nav entry, not a 404 or the real feature.
 -->
 <template>
-  <OPageLayout :title="title" icon="lock" constrained data-test="enterprise-feature-locked">
-    <OEmptyState size="hero" icon="lock" :title="title" :description="description" />
+  <OPageLayout :title="title" constrained data-test="enterprise-feature-locked">
+    <OEmptyState icon="lock" :title="title" :text="description" />
   </OPageLayout>
 </template>
 

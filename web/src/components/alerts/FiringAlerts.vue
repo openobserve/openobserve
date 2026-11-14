@@ -15,31 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    bleed
-    :title="t('alerts.header')"
-    icon="shield-alert-outline"
-    :subtitle="t('alerts.subtitle')"
-    tabs-below
-  >
+  <OPageLayout bleed :title="t('alerts.header')">
     <template #header-tabs>
       <AlertSectionTabs />
     </template>
 
-    <div class="flex min-h-0 flex-1 flex-col" data-test="alerts-firing-page">
-      <OBanner
-        v-if="refreshFailed || statusUnavailable"
-        variant="warning"
-        inline-actions
-        dense
-        role="alert"
-        :content="bannerContent"
-        data-test="alerts-firing-stale-banner"
-      >
+    <template v-if="refreshFailed || statusUnavailable" #banner>
+      <OBanner tone="warn" :message="bannerContent" data-test="alerts-firing-stale-banner">
         <template #actions>
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :loading="fetching"
             data-test="alerts-firing-retry"
             @click="refresh"
@@ -48,10 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </OBanner>
+    </template>
 
+    <div class="flex min-h-0 flex-1 flex-col" data-test="alerts-firing-page">
       <OTable
         class="min-h-0 flex-1"
-        :frame="false"
         data-test="alerts-firing-table"
         table-id="alerts-firing-list"
         row-key="alert_id"
@@ -66,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:selected-ids="selectedIds"
         pagination="client"
         sorting="client"
-        :show-global-filter="false"
         :enable-column-resize="true"
         :persist-columns="true"
         :row-rail-tone="rowRailTone"
@@ -85,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="chip in chips"
                 :key="chip.value"
                 :value="chip.value"
-                size="sm"
                 :data-test="`alerts-firing-chip-${chip.value}`"
               >
                 {{ chip.label }}
@@ -94,7 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               v-model="search"
               class="min-w-40 flex-1 basis-40 max-md:min-w-24 max-md:basis-24"
-              clearable
               :placeholder="t('alerts.firing.searchPlaceholder')"
               data-test="alerts-firing-search"
             />
@@ -103,14 +86,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="priority"
                 :options="priorityOptions"
                 :aria-label="t('alerts.firing.priorityLabel')"
-                width="xs"
+                width="s"
                 data-test="alerts-firing-priority"
               />
               <OSelect
                 v-model="folder"
                 :options="folderOptions"
                 :aria-label="t('alerts.firing.folderLabel')"
-                width="xs"
+                width="s"
                 data-test="alerts-firing-folder"
               />
             </template>
@@ -120,17 +103,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar-trailing>
           <OTag
             v-if="refreshFailed"
-            variant="warning-soft"
+            tone="warn"
             size="sm"
             :label="t('alerts.firing.stale')"
             data-test="alerts-firing-stale"
           />
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="updatedAt || null"
             :loading="fetching"
-            shortcut-id="alertsRefresh"
+            shortcut="alertsRefresh"
             data-test="alerts-firing-refresh"
             @click="refresh"
           />
@@ -150,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop
           >
             <OTag
-              variant="default-soft"
+              tone="neutral"
               icon="notifications-paused"
               size="sm"
               :label="t('alerts.firing.chipMuted')"
@@ -158,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </router-link>
           <OTag
             v-else-if="stateTag(row, state) === 'muted'"
-            variant="default-soft"
+            tone="neutral"
             icon="notifications-paused"
             size="sm"
             :label="t('alerts.firing.chipMuted')"
@@ -200,7 +181,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="selectedRows.some(canAcknowledge)"
             variant="primary"
-            size="sm"
             :loading="bulkAck.isPending.value"
             data-test="alerts-firing-bulk-ack"
             @click="acknowledgeSelected"
@@ -209,19 +189,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             v-if="bulkMuteRow"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             data-test="alerts-firing-bulk-mute"
             @click="openBulkMute"
           >
             {{ t("alerts.firing.mute") }}
           </OButton>
-          <OButton
-            variant="ghost"
-            size="sm"
-            data-test="alerts-firing-bulk-clear"
-            @click="selectedIds = []"
-          >
+          <OButton variant="ghost" data-test="alerts-firing-bulk-clear" @click="selectedIds = []">
             {{ t("alerts.firing.clear") }}
           </OButton>
         </template>
@@ -233,18 +207,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alerts-firing-empty"
           >
             <OEmptyState
-              size="hero"
               icon="notifications-active"
+              :kind="filtered ? 'filtered' : 'first-run'"
+              :text="
+                filtered
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.filtered.fallbackNoun'),
+                    })
+                  : undefined
+              "
               :title="filtered ? undefined : emptyTitle"
-              :filtered="filtered"
-              :hide-action="!filtered"
               @action="clearFilters"
             />
           </div>
         </template>
 
         <template #error="{ message }">
-          <OEmptyState preset="load-error" :description="raw(message)" @action="refresh" />
+          <OEmptyState
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="raw(message)"
+            @action="refresh"
+          />
         </template>
       </OTable>
     </div>

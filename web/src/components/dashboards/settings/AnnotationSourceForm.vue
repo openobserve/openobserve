@@ -32,7 +32,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormTemplateInput from "@/lib/forms/TemplateInput/OFormTemplateInput.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
@@ -494,52 +494,43 @@ const title = computed(() =>
             >
               <OToggleGroupItem
                 value="builder"
-                size="sm"
                 data-test="dashboard-annotation-source-mode-builder"
                 >{{ t("dashboard.annotationSources.builder") }}</OToggleGroupItem
               >
-              <OToggleGroupItem
-                value="sql"
-                size="sm"
-                data-test="dashboard-annotation-source-mode-sql"
-                >{{ t("dashboard.annotationSources.customSql") }}</OToggleGroupItem
-              >
+              <OToggleGroupItem value="sql" data-test="dashboard-annotation-source-mode-sql">{{
+                t("dashboard.annotationSources.customSql")
+              }}</OToggleGroupItem>
             </OToggleGroup>
           </template>
 
           <div class="flex flex-col gap-4 py-2">
-            <OBanner
+            <OInlineNotice
               v-if="confirmDiscardSql"
-              variant="warning"
-              dense
-              inline-actions
-              :content="t('dashboard.annotationSources.discardSqlConfirm')"
+              tone="warn"
+              :message="t('dashboard.annotationSources.discardSqlConfirm')"
               data-test="dashboard-annotation-source-discard-sql"
             >
               <template #actions>
                 <OButton
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   data-test="dashboard-annotation-source-discard-sql-cancel"
                   @click="confirmDiscardSql = false"
                   >{{ t("dashboard.cancel") }}</OButton
                 >
                 <OButton
-                  variant="destructive"
-                  size="sm"
+                  variant="danger"
                   data-test="dashboard-annotation-source-discard-sql-confirm"
                   @click="discardSql"
                   >{{ t("dashboard.annotationSources.discard") }}</OButton
                 >
               </template>
-            </OBanner>
+            </OInlineNotice>
 
             <template v-if="mode === 'builder'">
-              <OBanner
+              <OInlineNotice
                 v-if="streamLoadError"
-                variant="error-soft"
-                dense
-                :content="raw(streamLoadError)"
+                tone="err"
+                :message="raw(streamLoadError)"
                 data-test="dashboard-annotation-source-stream-load-error"
               />
               <div class="flex items-start gap-4 max-md:flex-col max-md:gap-2">
@@ -632,7 +623,6 @@ const title = computed(() =>
               <template #tooltip>
                 <OTooltip
                   :content="t('dashboard.annotationSources.templateHelp', { brace: raw('{') })"
-                  max-width="15.625rem"
                 />
               </template>
             </OFormTemplateInput>
@@ -647,7 +637,6 @@ const title = computed(() =>
               <template #tooltip>
                 <OTooltip
                   :content="t('dashboard.annotationSources.templateHelp', { brace: raw('{') })"
-                  max-width="15.625rem"
                 />
               </template>
             </OFormTemplateInput>
@@ -672,10 +661,7 @@ const title = computed(() =>
                   @blur="field.handleBlur"
                 >
                   <template #tooltip>
-                    <OTooltip
-                      :content="t('dashboard.annotationSources.endTimeFieldHelp')"
-                      max-width="15.625rem"
-                    />
+                    <OTooltip :content="t('dashboard.annotationSources.endTimeFieldHelp')" />
                   </template>
                 </OSelect>
               </template>
@@ -704,10 +690,7 @@ const title = computed(() =>
                   @blur="field.handleBlur"
                 >
                   <template #tooltip>
-                    <OTooltip
-                      :content="t('dashboard.annotationSources.panelsTooltip')"
-                      max-width="15.625rem"
-                    />
+                    <OTooltip :content="t('dashboard.annotationSources.panelsTooltip')" />
                   </template>
                 </OSelect>
               </template>
@@ -722,9 +705,8 @@ const title = computed(() =>
           >
             <template #actions>
               <OButton
-                variant="outline"
-                size="sm"
-                icon-left="play-arrow"
+                variant="secondary"
+                icon="play-arrow"
                 :loading="isPreviewing"
                 data-test="dashboard-annotation-source-run"
                 @click="runPreview"
@@ -745,8 +727,7 @@ const title = computed(() =>
         class="border-border-default bg-dialog-bg shadow-sticky-footer sticky bottom-0 z-10 flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
       >
         <OButton
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="isSubmitting"
           data-test="dashboard-annotation-source-cancel"
           @click="emit('cancel')"
@@ -754,7 +735,6 @@ const title = computed(() =>
         >
         <OButton
           variant="primary"
-          size="sm-action"
           type="submit"
           :disabled="hasBlockingError"
           :loading="isSubmitting"

@@ -286,8 +286,8 @@
      OPageHeader/OPageLayout header, an OTable's first/last cell content (via
      --spacing-table-edge below), and the left rails (folder lists, field lists).
      Change it here and the whole app's left/right alignment moves together.
-     See SPACING_AUDIT.md §7. */
-  --spacing-page-edge: var(--spacing-3);
+     One 16 px gutter, applied once by the page layout (guideline L3). */
+  --spacing-page-edge: var(--spacing-4);
 
   /* Table content edge inset. The page grid line plus a 2px optical nudge: a
      table's first/last cell content (a 14px checkbox box, index digits, short
@@ -524,6 +524,14 @@
   --color-toast-action-text: var(--color-primary-600);
   --color-toast-action-hover: var(--color-primary-700);
   --shadow-toast: var(--shadow-lg);
+  /* v2 toast: one line on the inverse surface; status lives in the icon colour only. */
+  --color-toast-inverse-bg: var(--color-grey-900);
+  --color-toast-inverse-text: var(--color-grey-0);
+  --color-toast-inverse-text-secondary: var(--color-grey-300);
+  --color-toast-inverse-icon: var(--color-blue-300);
+  --color-toast-inverse-icon-ok: var(--color-success-400);
+  --color-toast-inverse-icon-err: var(--color-error-300);
+  --color-toast-inverse-action: var(--color-primary-300);
 
   /* Spinner */
   --color-spinner: var(--color-primary-600);
@@ -571,16 +579,10 @@
   --color-pagination-nav-hover-bg: var(--color-surface-subtle-hover);
   --color-pagination-nav-disabled-text: var(--color-text-disabled);
 
-  /* Field semantic widths (OInput, OTextarea, OSelect) */
-  /* xs  ~120px — zip codes, CVV, short numbers          */
-  /* sm  ~200px — dates, narrow labels                   */
-  /* md  ~280px — names, phone numbers (default narrow)  */
-  /* lg  ~400px — emails, full addresses                 */
-  /* full is 100% — no token needed, handled in CSS var  */
-  --spacing-field-width-xs: 7.5rem;
-  --spacing-field-width-sm: 12.5rem;
-  --spacing-field-width-md: 17.5rem;
-  --spacing-field-width-lg: 25rem;
+  /* Field widths by the expected value (guideline S7): s 160, m 240, l 360; full needs no token. */
+  --spacing-field-width-s: 10rem;
+  --spacing-field-width-m: 15rem;
+  --spacing-field-width-l: 22.5rem;
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
@@ -785,8 +787,8 @@
   --color-option-group-error-text: var(--color-error-600);
 
   /* OTable */
-  /* Near-white header, barely distinct from the white body, not a grey band. */
-  --color-table-header-bg: var(--color-surface-panel);
+  /* The header shares the body's surface: no coloured band (D1). */
+  --color-table-header-bg: var(--color-table-cell-bg);
   --color-table-header-text: var(--color-text-secondary);
   --color-table-header-border: var(--color-border-default);
   /* Hover clears ~1.19:1 on white and selected sits ~1.08:1 above it, so both read without sinking secondary text. */
@@ -818,10 +820,9 @@
   --color-table-row-expanded-bg: var(--color-surface-subtle);
   /* Subtle amber wash for warning/flagged rows (theme-aware). */
   --color-warning-surface: color-mix(in srgb, var(--color-warning-400) 10%, transparent);
-  /* Row height tokens: change these to resize all OTable rows globally. */
-  --table-row-height-dense: 2.375rem; /* 38px */
-  --table-row-height-normal: 2.75rem; /* 44px */
-  --table-row-height-compact: 1.5625rem; /* 25px */
+  /* OTable row heights by density (L7, D1); TABLE_ROW_HEIGHT_PX mirrors them. */
+  --table-row-height-default: 2.25rem; /* 36px */
+  --table-row-height-compact: 1.75rem; /* 28px */
 
   /* ── Chart panel bar ───────────────────────────────────────
      The title strip at the top of every chart panel (dashboard panels via
@@ -1550,10 +1551,9 @@
   --spacing-tabs-height-dense: var(--spacing-tabs-height-dense);
 
   /* Field semantic widths (used by OInput, OTextarea, OSelect) */
-  --spacing-field-width-xs: var(--spacing-field-width-xs);
-  --spacing-field-width-sm: var(--spacing-field-width-sm);
-  --spacing-field-width-md: var(--spacing-field-width-md);
-  --spacing-field-width-lg: var(--spacing-field-width-lg);
+  --spacing-field-width-s: var(--spacing-field-width-s);
+  --spacing-field-width-m: var(--spacing-field-width-m);
+  --spacing-field-width-l: var(--spacing-field-width-l);
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-input-bg);
@@ -1964,6 +1964,13 @@
   --color-toast-action-text: var(--color-toast-action-text);
   --color-toast-action-hover: var(--color-toast-action-hover);
   --shadow-toast: var(--shadow-toast);
+  --color-toast-inverse-bg: var(--color-toast-inverse-bg);
+  --color-toast-inverse-text: var(--color-toast-inverse-text);
+  --color-toast-inverse-text-secondary: var(--color-toast-inverse-text-secondary);
+  --color-toast-inverse-icon: var(--color-toast-inverse-icon);
+  --color-toast-inverse-icon-ok: var(--color-toast-inverse-icon-ok);
+  --color-toast-inverse-icon-err: var(--color-toast-inverse-icon-err);
+  --color-toast-inverse-action: var(--color-toast-inverse-action);
 
   /* Stepper */
   --color-stepper-indicator-default: var(--color-stepper-indicator-default);
@@ -2324,6 +2331,8 @@
   --text-compact: var(--text-compact);
   --text-sm: var(--text-sm);
   --text-sm--line-height: calc(1.25 / 0.875);
+  --text-title: var(--text-title);
+  --text-title--line-height: calc(1.375 / 0.9375);
   --text-base: var(--text-base);
   --text-base--line-height: calc(1.5 / 1);
   --text-lg: var(--text-lg);

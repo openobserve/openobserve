@@ -1,17 +1,14 @@
 <template>
   <div ref="userGuideBtnRef">
     <OButton
+      icon-only
       variant="ghost"
-      size="icon"
+      size="xs"
       @click="onUserGuideClick"
       data-test="dashboard-drilldown-help-btn"
-      icon-left="help-outline"
+      icon="help-outline"
     >
-      <OTooltip
-        :content="t('dashboard.drilldownUserGuide.userGuide')"
-        side="bottom"
-        align="center"
-      />
+      <OTooltip :content="t('dashboard.drilldownUserGuide.userGuide')" side="bottom" />
     </OButton>
   </div>
   <Teleport to="body">

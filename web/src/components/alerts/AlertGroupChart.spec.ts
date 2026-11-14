@@ -305,7 +305,7 @@ describe("AlertGroupChart — loading", () => {
     query_condition: { type: "sql", sql: "SELECT 1" },
     trigger_condition: { threshold: 500 },
   };
-  const line = (w: any) => w.findComponent({ name: "LoadingProgress" });
+  const line = (w: any) => w.findComponent({ name: "OLoadingLine" });
   const placeholder = (w: any) => w.find('[data-test="alerts-alertgroupchart-placeholder"]');
   const panel = (w: any) => w.findComponent({ name: "PanelSchemaRenderer" });
   const deferred = () => {
@@ -325,7 +325,7 @@ describe("AlertGroupChart — loading", () => {
     wrapper = await mountChart(null as any);
 
     expect(placeholder(wrapper).exists()).toBe(true);
-    expect(line(wrapper).props("loading")).toBe(true);
+    expect(line(wrapper).props("active")).toBe(true);
     expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain(i18n.global.t("alerts.groups.chartUnavailable"));
     expect(alertsService.generate_sql).not.toHaveBeenCalled();
@@ -337,14 +337,14 @@ describe("AlertGroupChart — loading", () => {
     wrapper = await mountChart(alert);
 
     expect(placeholder(wrapper).exists()).toBe(true);
-    expect(line(wrapper).props("loading")).toBe(true);
+    expect(line(wrapper).props("active")).toBe(true);
     expect(wrapper.text()).not.toContain(i18n.global.t("alerts.groups.chartUnavailable"));
 
     sql.resolve(sqlResponse);
     await flushPromises();
     expect(panel(wrapper).exists()).toBe(true);
     expect(placeholder(wrapper).exists()).toBe(false);
-    expect(line(wrapper).props("loading")).toBe(false);
+    expect(line(wrapper).props("active")).toBe(false);
   });
 
   it("shows the unavailable text only once the build has settled without a chart", async () => {
@@ -356,25 +356,25 @@ describe("AlertGroupChart — loading", () => {
     sql.resolve({ data: { sql: "" } });
     await flushPromises();
     expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(true);
-    expect(line(wrapper).props("loading")).toBe(false);
+    expect(line(wrapper).props("active")).toBe(false);
   });
 
   it("draws the line over the kept chart while a range change rebuilds it", async () => {
     wrapper = await mountChart(alert);
     expect(panel(wrapper).exists()).toBe(true);
-    expect(line(wrapper).props("loading")).toBe(false);
+    expect(line(wrapper).props("active")).toBe(false);
 
     const sql = deferred();
     vi.mocked(alertsService.generate_sql).mockReturnValue(sql.promise as any);
     await pickRange(wrapper, "6h");
 
-    expect(line(wrapper).props("loading")).toBe(true);
+    expect(line(wrapper).props("active")).toBe(true);
     expect(panel(wrapper).exists()).toBe(true);
     expect(placeholder(wrapper).exists()).toBe(false);
 
     sql.resolve(sqlResponse);
     await flushPromises();
-    expect(line(wrapper).props("loading")).toBe(false);
+    expect(line(wrapper).props("active")).toBe(false);
   });
 
   it("keeps the line until the newest of two overlapping rebuilds settles", async () => {
@@ -389,10 +389,10 @@ describe("AlertGroupChart — loading", () => {
 
     first.resolve(sqlResponse);
     await flushPromises();
-    expect(line(wrapper).props("loading")).toBe(true);
+    expect(line(wrapper).props("active")).toBe(true);
 
     second.resolve(sqlResponse);
     await flushPromises();
-    expect(line(wrapper).props("loading")).toBe(false);
+    expect(line(wrapper).props("active")).toBe(false);
   });
 });

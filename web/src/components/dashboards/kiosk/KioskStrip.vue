@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OBadge
         v-if="position"
-        variant="default-outline"
-        size="lg"
+        tone="outline"
+        size="md"
         class="shrink-0 tabular-nums"
         data-test="dashboard-kiosk-position"
         >{{ position }}</OBadge
@@ -34,8 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="flex-1" />
       <OBadge
         v-if="status"
-        :variant="status.variant"
-        size="lg"
+        :tone="status.variant"
+        size="md"
         dot
         class="shrink-0"
         data-test="dashboard-kiosk-health"
@@ -75,14 +75,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
       <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="close"
+        icon-only
+        variant="secondary"
+        icon="close"
         :aria-label="t('dashboard.kiosk.exit')"
         data-test="dashboard-kiosk-exit-btn"
         @click="emit('exit')"
       >
-        <OTooltip :content="t('dashboard.kiosk.exit')" shortcut-id="dashboardKioskExit" />
+        <OTooltip :content="t('dashboard.kiosk.exit')" shortcut="dashboardKioskExit" />
       </OButton>
     </div>
   </div>
@@ -95,7 +95,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { KioskCountdown, KioskHealth } from "@/composables/dashboard/useKioskRefresh";
 import { formatClockTime } from "@/utils/dashboard/kiosk";
@@ -158,28 +158,28 @@ const ringTooltip = computed(() => {
 
 interface StripStatus {
   kind: string;
-  variant: BadgeVariant;
+  variant: ChipTone;
   text: I18nText;
 }
 
 const healthStatus = (health: KioskHealth): StripStatus | null => {
   if (health.level === "paused") {
-    return { kind: "paused", variant: "default-soft", text: t("dashboard.kiosk.paused") };
+    return { kind: "paused", variant: "neutral", text: t("dashboard.kiosk.paused") };
   }
   if (health.level === "warn" && health.kind === "hung") {
-    return { kind: "warn", variant: "warning-soft", text: t("dashboard.kiosk.hung") };
+    return { kind: "warn", variant: "warn", text: t("dashboard.kiosk.hung") };
   }
   if (health.level === "warn") {
     const text = t("dashboard.kiosk.panelsFailing", { count: health.count }, health.count);
-    return { kind: "warn", variant: "warning-soft", text };
+    return { kind: "warn", variant: "warn", text };
   }
   if (health.level === "bad" && health.kind === "stale") {
     const text = t("dashboard.kiosk.staleSince", { time: formatTime(health.since) });
-    return { kind: "bad", variant: "error-soft", text };
+    return { kind: "bad", variant: "err", text };
   }
   if (health.level === "bad") {
     const text = t("dashboard.kiosk.unreachable", { seconds: health.retryInSeconds });
-    return { kind: "bad", variant: "error-soft", text };
+    return { kind: "bad", variant: "err", text };
   }
   return null;
 };
@@ -190,6 +190,6 @@ const status = computed<StripStatus | null>(
     healthStatus(props.health) ??
     (props.refreshSeconds > 0
       ? null
-      : { kind: "refresh-off", variant: "warning-soft", text: t("dashboard.kiosk.refreshOff") }),
+      : { kind: "refresh-off", variant: "warn", text: t("dashboard.kiosk.refreshOff") }),
 );
 </script>

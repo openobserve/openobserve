@@ -98,10 +98,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Not seamless: the scrim gives tap-outside-to-close a target. -->
       <ODrawer
+        size="sm"
         v-if="!focusMode"
         v-model:open="mobileNavOpen"
         side="left"
-        :width="30"
         bleed
         :show-close="false"
         data-test="main-layout-mobile-nav-drawer"
@@ -122,10 +122,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :alt="raw('OpenObserve')"
             />
             <OButton
+              icon-only
               :aria-label="t('common.close')"
               variant="ghost"
-              size="icon"
-              icon-left="close"
+              size="xs"
+              icon="close"
               data-test="main-layout-mobile-nav-close"
               @click="mobileNavOpen = false"
             />
@@ -210,9 +211,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               aria-busy="true"
               class="flex h-full flex-1 flex-col gap-3 overflow-hidden p-4"
             >
-              <OSkeleton type="text" class="h-6 w-48" />
-              <OSkeleton class="h-8 w-full" />
-              <OSkeleton v-for="n in 8" :key="n" class="h-9 w-full" />
+              <OSkeleton class="h-6 w-48" />
+              <OSkeleton shape="block" class="h-8 w-full" />
+              <OSkeleton v-for="n in 8" :key="n" shape="block" class="h-9 w-full" />
             </div>
           </div>
         </main>
@@ -355,6 +356,7 @@ import SampleDataProgressDock from "@/components/sampleData/SampleDataProgressDo
 import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
 import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import { providePageNavContext } from "@/lib/core/PageHeader/pageContext";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { confirmLeave, releaseLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
@@ -764,6 +766,10 @@ export default defineComponent({
           ? securityNavLinks.value
           : linksList.value,
     );
+    providePageNavContext({
+      links: navLinks,
+      flat: computed(() => store.state.solutionMode === "security"),
+    });
 
     const langList = [
       {

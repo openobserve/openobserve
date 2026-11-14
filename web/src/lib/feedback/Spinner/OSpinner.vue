@@ -1,94 +1,35 @@
 <script setup lang="ts">
-import type { SpinnerProps } from "./OSpinner.types";
-import { computed } from "vue";
+import type { SpinnerProps, SpinnerSize } from "./OSpinner.types";
 import { useI18nTyped } from "@/types/i18n";
 import { LOADER_REVEAL } from "@/lib/styles/motion";
 
 const { t } = useI18nTyped();
 
-const props = withDefaults(defineProps<SpinnerProps>(), {
-  variant: "ring",
+withDefaults(defineProps<SpinnerProps>(), {
   size: "md",
   instant: false,
 });
 
-const visibilityClass = computed(() => (props.instant ? "" : LOADER_REVEAL));
-
-// px dimensions per size token
-const sizeClasses: Record<NonNullable<SpinnerProps["size"]>, string> = {
-  xs: "size-4", // 16px
-  sm: "size-5", // 20px
-  md: "size-8", // 32px
-  lg: "size-12", // 48px
-  xl: "size-16", // 64px
+// o2-motion-keep: a spinner frozen by reduced motion reads as a hung page.
+// The reveal and the spin are both animations, so they sit on two elements.
+const SIZE_CLASSES: Record<SpinnerSize, string> = {
+  sm: "size-3",
+  md: "size-4",
+  lg: "size-5",
 };
-
-// Dot sizes are scaled-down from the ring size
-const dotSizeClasses: Record<NonNullable<SpinnerProps["size"]>, string> = {
-  xs: "size-1",
-  sm: "size-1.5",
-  md: "size-2",
-  lg: "size-3",
-  xl: "size-4",
-};
-
-const containerClasses = computed(() => [
-  "inline-flex items-center justify-center shrink-0",
-  sizeClasses[props.size ?? "md"],
-  visibilityClass.value,
-]);
 </script>
 
 <template>
-  <!-- Ring variant -->
   <span
-    v-if="variant === 'ring'"
-    :class="containerClasses"
-    role="status"
-    :aria-label="t('components.spinner.loading')"
-    aria-live="polite"
-  >
-    <svg
-      class="text-spinner o2-motion-keep size-full animate-spin"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <!-- Track -->
-      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-20" />
-      <!-- Spinning arc -->
-      <path
-        d="M12 2a10 10 0 0 1 10 10"
-        stroke="currentColor"
-        stroke-width="3"
-        stroke-linecap="round"
-        class="text-spinner"
-      />
-    </svg>
-  </span>
-
-  <!-- Dots variant -->
-  <span
-    v-else
-    :class="[
-      'inline-flex shrink-0 items-center justify-center gap-1',
-      sizeClasses[size ?? 'md'],
-      visibilityClass,
-    ]"
+    :class="['inline-flex shrink-0', SIZE_CLASSES[size], instant ? '' : LOADER_REVEAL]"
     role="status"
     :aria-label="t('components.spinner.loading')"
     aria-live="polite"
   >
     <span
-      v-for="i in 3"
-      :key="i"
-      :class="[
-        'bg-spinner o2-motion-keep animate-bounce rounded-full',
-        dotSizeClasses[size ?? 'md'],
-      ]"
-      :style="{ animationDelay: `${(i - 1) * 0.15}s` }"
+      class="border-border-default border-t-spinner o2-motion-keep inline-block size-full animate-spin rounded-full border-2"
       aria-hidden="true"
+      data-test="o-spinner-ring"
     />
   </span>
 </template>

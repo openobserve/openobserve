@@ -20,16 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="lg"
     :title="t('aiAlertPack.title')"
-    :sub-title="t('aiAlertPack.subtitle')"
-    :primary-button-label="
-      toInstall.length
+    :subtitle="t('aiAlertPack.subtitle')"
+    :primary="{
+      label: toInstall.length
         ? t('aiAlertPack.install', { n: toInstall.length }, toInstall.length)
-        : t('aiAlertPack.allInstalled')
-    "
-    :primary-button-disabled="!stream || loading || toInstall.length === 0"
-    :primary-button-loading="installing"
-    primary-button-data-test="ai-alert-pack-install"
-    :secondary-button-label="t('common.cancel')"
+        : t('aiAlertPack.allInstalled'),
+      disabled: !stream || loading || toInstall.length === 0,
+      loading: installing,
+      dataTest: 'ai-alert-pack-install',
+    }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="ai-alert-pack-dialog"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:primary="install"
@@ -74,17 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-2xs text-text-secondary min-w-0 flex-1">{{ t(rule.whenKey) }}</span>
           <OBadge
             v-if="isInstalled(rule)"
-            variant="primary-soft"
+            tone="accent"
             size="sm"
             data-test="ai-alert-pack-rule-installed"
           >
             {{ t("aiAlertPack.installed") }}
           </OBadge>
-          <OBadge
-            v-else
-            :variant="readiness(rule) === 'ready' ? 'success-soft' : 'default-soft'"
-            size="sm"
-          >
+          <OBadge v-else :tone="readiness(rule) === 'ready' ? 'ok' : 'neutral'" size="sm">
             {{
               readiness(rule) === "ready" ? t("aiAlertPack.runsNow") : t(ruleWaitsKey(rule, stream))
             }}

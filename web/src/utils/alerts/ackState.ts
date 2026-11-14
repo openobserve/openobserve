@@ -143,7 +143,7 @@ export function refusalToast(
           ? t("alerts.ack.refused.canAct", { people: canAct })
           : null;
   return people
-    ? { variant: "error", title: reason, message: people }
+    ? { variant: "error", message: t("alerts.ack.refused.withPeople", { reason, people }) }
     : { variant: "error", message: reason };
 }
 

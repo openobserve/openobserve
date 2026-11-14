@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OToggleGroup
     v-if="show"
     :model-value="activeTab"
+    :size="size"
     :mobile-dropdown="mobileDropdown"
     @update:model-value="onSelect"
   >
@@ -26,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="tab.value"
       :value="tab.value"
       :disabled="tab.disabled ?? false"
-      :size="size"
       :title="tab.title ?? tab.label"
       :style="tab.style"
       :data-test="`tab-${tab.value}`"
@@ -56,7 +56,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type { ToggleGroupItemSize } from "@/lib/core/ToggleGroup/OToggleGroupItem.types";
+import type { ToggleGroupSize } from "@/lib/core/ToggleGroup/OToggleGroup.types";
 
 interface Tab {
   label: I18nText;
@@ -79,14 +79,14 @@ const props = withDefaults(
     show?: boolean;
     tabs: Tab[];
     activeTab: string;
-    size?: ToggleGroupItemSize;
+    size?: ToggleGroupSize;
     // Tooltip shown when hovering an unsaved-changes dot (optional).
     dirtyTitle?: I18nText;
     mobileDropdown?: boolean;
   }>(),
   {
     show: true,
-    size: "sm",
+    size: "md",
     dirtyTitle: raw(""),
     mobileDropdown: false,
   },

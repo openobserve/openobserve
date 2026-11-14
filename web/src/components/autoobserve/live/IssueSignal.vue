@@ -91,8 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ usualNote.text }}
         <OButton
           v-if="usualNote.tone === 'error' && baselineState.kind === 'failed'"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           data-test="autoobserve-issue-signal-usual-retry"
           @click.stop="volume.retry()"
           >{{ t("autoobserve.issueLive.spark.retry") }}</OButton

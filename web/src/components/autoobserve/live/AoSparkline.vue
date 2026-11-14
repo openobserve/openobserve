@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OSkeleton
       v-if="state === 'loading'"
-      animation="pulse"
+      shape="block"
       class="absolute inset-0 size-full"
       data-test="ao-sparkline-loading"
     />
@@ -37,8 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="min-w-0 truncate">{{ errorText }}</span>
       <OButton
         v-if="retryable"
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="ao-sparkline-retry"
         @click.stop="emit('retry')"
         >{{ t("autoobserve.issueLive.spark.retry") }}</OButton

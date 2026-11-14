@@ -38,7 +38,7 @@
         <template v-if="isNavigationAction">
           <OButton
             ref="yesButtonRef"
-            variant="outline"
+            variant="secondary"
             :block="true"
             class="confirmation-btn rounded-default text-theme-accent border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent w-full border-2 text-sm font-semibold tracking-normal normal-case transition-all duration-200"
             :class="
@@ -54,7 +54,7 @@
           >
           <OButton
             ref="alwaysButtonRef"
-            variant="outline"
+            variant="secondary"
             :block="true"
             class="confirmation-btn rounded-default text-status-positive border-border-default bg-surface-base hover:bg-button-ghost-success-hover-bg hover:border-status-positive w-full border-2 text-sm font-semibold tracking-normal normal-case transition-all duration-200"
             :class="
@@ -70,7 +70,7 @@
           >
           <OButton
             ref="noButtonRef"
-            variant="outline"
+            variant="secondary"
             :block="true"
             class="confirmation-btn rounded-default text-text-body border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative w-full border-2 text-sm font-semibold tracking-normal normal-case transition-all duration-200"
             :class="
@@ -91,7 +91,7 @@
           <OButton
             v-if="isDeleteAction"
             ref="yesButtonRef"
-            variant="destructive"
+            variant="danger"
             :block="true"
             data-test="o2-ai-confirm-dialog-confirm"
             class="confirmation-btn rounded-default w-full text-sm font-semibold tracking-normal normal-case"
@@ -105,7 +105,7 @@
           <OButton
             v-else
             ref="yesButtonRef"
-            variant="outline"
+            variant="secondary"
             :block="true"
             class="confirmation-btn rounded-default text-theme-accent border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent w-full border-2 text-sm font-semibold tracking-normal normal-case transition-all duration-200"
             :class="
@@ -121,7 +121,7 @@
           >
           <OButton
             ref="noButtonRef"
-            variant="outline"
+            variant="secondary"
             :block="true"
             class="confirmation-btn rounded-default text-text-body border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative w-full border-2 text-sm font-semibold tracking-normal normal-case transition-all duration-200"
             :class="

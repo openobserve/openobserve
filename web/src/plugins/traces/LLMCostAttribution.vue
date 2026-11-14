@@ -27,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="d in DIMS"
           :key="d"
           :value="d"
-          size="sm"
           :tooltip="about(d)"
           :data-test="`llm-cost-attribution-tab-${d}`"
         >
@@ -54,8 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- A model comes from the instrumentation; there is no field to map. -->
       <OButton
         v-if="dim !== 'model'"
-        variant="outline"
-        size="sm"
+        variant="secondary"
         data-test="llm-cost-attribution-map-link"
         @click="openMapping"
       >
@@ -72,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="key"
         :loading="loading"
-        :show-global-filter="false"
         :fill-height="false"
         pagination="none"
         :empty-message="failed ? t('llmAttribution.loadFailed') : t('llmAttribution.empty')"

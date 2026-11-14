@@ -38,8 +38,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
-import DateTime from "@/components/DateTime.vue";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import HostDetailDrawer from "./HostDetailDrawer.vue";
 import HostsDependenciesView from "./HostsDependenciesView.vue";
@@ -142,7 +142,7 @@ const onDateChange = (date: {
     end: date.endTime,
     relative: date.valueType !== "absolute",
   };
-  // DateTime replays on mount with userChangedValue:false — "do not fetch" (DateTime.vue contract).
+  // DateTime replays on mount with userChangedValue:false — "do not fetch" (ODateTimeRange contract).
   if (date.userChangedValue === false && !reAnchoring) return;
   if (!reAnchoring) {
     analytics.track("infra_time_range_changed", {
@@ -435,12 +435,12 @@ const tintClass = (value: number | null) => {
 };
 
 // Bar tone reads the same utilizationTint as the number, so the two can never disagree.
-const tintVariant = (value: number | null): ProgressBarVariant => {
+const tintVariant = (value: number | null): ProgressBarTone => {
   const tint = utilizationTint(value);
-  return tint === "critical" ? "danger" : tint === "warn" ? "warning" : "default";
+  return tint === "critical" ? "err" : tint === "warn" ? "warn" : "accent";
 };
 
-const barValue = (value: number | null) => (value == null ? 0 : value / 100);
+const barValue = (value: number | null) => value ?? 0;
 
 const pct = (value: number | null) => (value == null ? raw("—") : raw(`${Math.round(value)}%`));
 const num = (value: number | null) => (value == null ? raw("—") : raw(value.toFixed(2)));
@@ -471,9 +471,9 @@ const osToggleLabel = (slug: string) =>
 </script>
 
 <template>
-  <OPageLayout :title="t('menu.hosts')" icon="dns" bleed>
+  <OPageLayout :title="t('menu.hosts')" bleed>
     <template v-if="hostsState === 'detected'" #header-tabs>
-      <OTabs :model-value="view" align="left" data-test="hosts-view-tabs" @change="onViewChange">
+      <OTabs :model-value="view" data-test="hosts-view-tabs" @change="onViewChange">
         <OTab
           name="table"
           :label="t('infra.hosts.viewTable')"
@@ -504,7 +504,7 @@ const osToggleLabel = (slug: string) =>
             )
           }}
         </OText>
-        <DateTime
+        <ODateTimeRange
           ref="dateTimePickerRef"
           auto-apply
           menu-align="end"
@@ -515,9 +515,8 @@ const osToggleLabel = (slug: string) =>
         />
         <!-- Icon-only on phones so the actions share the title row; sr-only keeps the button named. -->
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="refresh"
+          variant="secondary"
+          icon="refresh"
           class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
           data-test="hosts-refresh"
           :loading="view === 'dependencies' ? mapLoading : loading"
@@ -545,8 +544,7 @@ const osToggleLabel = (slug: string) =>
           <OButton
             v-for="slug in OS_SLUGS"
             :key="slug"
-            :variant="osSlug === slug ? 'primary' : 'outline'"
-            size="sm-action"
+            :variant="osSlug === slug ? 'primary' : 'secondary'"
             :data-test="`hosts-os-toggle-${slug}`"
             @click="osSlug = slug"
           >
@@ -585,7 +583,7 @@ const osToggleLabel = (slug: string) =>
     >
       <OText class="text-lg font-semibold">{{ t("infra.hosts.pageError") }}</OText>
       <OText variant="meta">{{ raw(pageError) }}</OText>
-      <OButton variant="outline" size="sm-action" data-test="hosts-retry" @click="refreshList">
+      <OButton variant="secondary" data-test="hosts-retry" @click="refreshList">
         {{ t("infra.hosts.retry") }}
       </OButton>
     </div>
@@ -602,7 +600,7 @@ const osToggleLabel = (slug: string) =>
         data-test="hosts-liveness-banner"
       >
         <OText variant="meta">{{ t("infra.hosts.livenessBanner") }}</OText>
-        <OButton variant="outline" size="sm-action" data-test="hosts-retry" @click="refreshList">
+        <OButton variant="secondary" data-test="hosts-retry" @click="refreshList">
           {{ t("infra.hosts.retry") }}
         </OButton>
       </div>
@@ -639,7 +637,6 @@ const osToggleLabel = (slug: string) =>
             >
               <OCheckbox
                 :model-value="statusFilter.includes(facet.value)"
-                size="sm"
                 class="min-w-0 flex-1"
                 @update:model-value="toggleStatus(facet.value)"
               >
@@ -647,9 +644,7 @@ const osToggleLabel = (slug: string) =>
                   <span class="truncate text-xs">{{ statusLabel(facet.value) }}</span>
                 </template>
               </OCheckbox>
-              <OTag type="countChip" value="neutral" size="xs" shape="rounded">{{
-                facet.count
-              }}</OTag>
+              <OTag type="countChip" value="neutral" size="sm">{{ facet.count }}</OTag>
             </div>
           </section>
           <section v-if="facets.os.length" class="flex flex-col gap-1">
@@ -663,7 +658,6 @@ const osToggleLabel = (slug: string) =>
             >
               <OCheckbox
                 :model-value="osFilter.includes(facet.value)"
-                size="sm"
                 class="min-w-0 flex-1"
                 @update:model-value="toggleOs(facet.value)"
               >
@@ -671,9 +665,7 @@ const osToggleLabel = (slug: string) =>
                   <OTruncatedText class="block text-xs">{{ raw(facet.value) }}</OTruncatedText>
                 </template>
               </OCheckbox>
-              <OTag type="countChip" value="neutral" size="xs" shape="rounded">{{
-                facet.count
-              }}</OTag>
+              <OTag type="countChip" value="neutral" size="sm">{{ facet.count }}</OTag>
             </div>
           </section>
           <OText variant="meta" class="px-1 pb-2" data-test="hosts-range-note">{{
@@ -694,14 +686,13 @@ const osToggleLabel = (slug: string) =>
             :page-size="50"
             :current-page="page"
             :total-count="filteredRows.length"
-            :show-global-filter="false"
             @sort-change="onSortChange"
             @pagination-change="(p) => (page = p.page)"
           >
             <template #cell-host="{ row }">
               <OButton
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 :data-test="`hosts-row-${row.host_name}`"
                 @click="openDrawer(row.host_name)"
               >
@@ -713,14 +704,10 @@ const osToggleLabel = (slug: string) =>
             </template>
             <template #cell-status="{ row }">
               <OTag
-                :variant="
-                  row.status === 'ACTIVE'
-                    ? 'success-soft'
-                    : row.status === 'INACTIVE'
-                      ? 'default-soft'
-                      : 'amber-soft'
+                :tone="
+                  row.status === 'ACTIVE' ? 'ok' : row.status === 'INACTIVE' ? 'neutral' : 'warn'
                 "
-                size="xs"
+                size="sm"
                 >{{ statusLabel(row.status) }}</OTag
               >
             </template>
@@ -732,10 +719,9 @@ const osToggleLabel = (slug: string) =>
               >
                 <OProgressBar
                   v-if="row.cpu != null"
-                  size="xs"
                   class="min-w-0 flex-1"
                   :value="barValue(row.cpu)"
-                  :variant="tintVariant(row.cpu)"
+                  :tone="tintVariant(row.cpu)"
                   :data-test="`hosts-bar-cpu-${row.host_name}`"
                 />
                 <span class="shrink-0 tabular-nums" :class="tintClass(row.cpu)">{{
@@ -752,10 +738,9 @@ const osToggleLabel = (slug: string) =>
                 <div class="flex w-full min-w-0 items-center justify-end gap-2">
                   <OProgressBar
                     v-if="row.memoryPct != null"
-                    size="xs"
                     class="min-w-0 flex-1"
                     :value="barValue(row.memoryPct)"
-                    :variant="tintVariant(row.memoryPct)"
+                    :tone="tintVariant(row.memoryPct)"
                     :data-test="`hosts-bar-memory-${row.host_name}`"
                   />
                   <span class="shrink-0 tabular-nums" :class="tintClass(row.memoryPct)">{{
@@ -779,10 +764,9 @@ const osToggleLabel = (slug: string) =>
               >
                 <OProgressBar
                   v-if="row.disk != null"
-                  size="xs"
                   class="min-w-0 flex-1"
                   :value="barValue(row.disk)"
-                  :variant="tintVariant(row.disk)"
+                  :tone="tintVariant(row.disk)"
                   :data-test="`hosts-bar-disk-${row.host_name}`"
                 />
                 <span class="shrink-0 tabular-nums" :class="tintClass(row.disk)">{{

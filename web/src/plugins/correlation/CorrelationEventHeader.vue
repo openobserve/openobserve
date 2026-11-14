@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
     class="px-page-edge border-card-glass-border bg-card-glass-bg flex items-start gap-3 border-b border-solid py-2"
   >
-    <OTag
+    <OSeverity
       v-if="sourceEvent.severity"
-      type="logLevel"
-      :value="sourceEvent.severity"
-      class="shrink-0"
+      :level="toSeverityLevel(sourceEvent.severity)"
+      mark
+      data-test="correlation-source-severity"
     />
     <span class="text-typography-meta shrink-0 font-mono text-xs">
       {{ formatEventTimestamp(sourceEvent.timestamp) }}
@@ -105,8 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OToggleGroup
         :model-value="activeSubject ?? undefined"
         type="single"
-        size="xs"
-        class="h-7!"
+        size="sm"
         @update:model-value="
           (v: boolean | AcceptableValue | AcceptableValue[]) =>
             emit('update:activeSubject', typeof v === 'string' ? v : null)
@@ -116,8 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="chip in subjectChips"
           :key="chip.key"
           :value="chip.key"
-          size="sm"
-          class="h-5.5!"
           :disabled="!!chip.disabled"
           :data-test="`correlation-event-header-subject-${chip.key}`"
         >
@@ -155,6 +152,8 @@ import { ref, computed, watch, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import OSeverity from "@/lib/core/Badge/OSeverity.vue";
+import { toSeverityLevel } from "@/lib/core/Badge/severityLevel";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";

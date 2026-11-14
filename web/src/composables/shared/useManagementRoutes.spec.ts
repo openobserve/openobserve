@@ -436,7 +436,7 @@ describe("useManagementRoutes", () => {
       );
       expect(domainRoute.meta).toEqual({
         keepAlive: true,
-        titleKey: "routeTitles.domainManagement",
+        titleKey: "settings.ssoDomainRestrictions",
       });
     });
 
@@ -445,7 +445,7 @@ describe("useManagementRoutes", () => {
       const regexRoute = routes[0].children.find((child: any) => child.name === "regexPatterns");
       expect(regexRoute.meta).toEqual({
         keepAlive: true,
-        titleKey: "routeTitles.regexPatterns",
+        titleKey: "regex_patterns.title",
       });
     });
 
@@ -468,7 +468,7 @@ describe("useManagementRoutes", () => {
       expect(synthRoute.path).toBe("synthetics_locations");
       expect(synthRoute.meta).toEqual({
         keepAlive: true,
-        titleKey: "routeTitles.syntheticsLocations",
+        titleKey: "synthetics.locations.title",
         allowOnEmptyData: true,
         licenseFeature: "synthetics",
       });

@@ -35,9 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-center gap-3">
       <div class="w-64 flex-shrink-0">
         <OSelect
+          width="full"
           :model-value="a"
           :label="t('aiObservability.versionCompare.bar.versionA')"
-          label-position="inside"
+          variant="filter"
           :options="optionsWithoutUnset"
           labelKey="label"
           valueKey="value"
@@ -49,9 +50,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="w-64 flex-shrink-0">
         <OSelect
+          width="full"
           :model-value="b"
           :label="t('aiObservability.versionCompare.bar.versionB')"
-          label-position="inside"
+          variant="filter"
           :options="optionsWithoutUnset"
           labelKey="label"
           valueKey="value"

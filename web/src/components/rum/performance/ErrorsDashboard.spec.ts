@@ -108,7 +108,8 @@ function createWrapper(props: Record<string, any> = {}) {
         OSpinner: { template: '<div data-test="spinner" />' },
         OEmptyState: {
           name: "OEmptyState",
-          template: '<div><slot name="title" /><slot name="description" /></div>',
+          props: ["title", "text"],
+          template: "<div>{{ title }}{{ text }}</div>",
         },
       },
     },

@@ -98,7 +98,7 @@ export class EditionFeaturesPage {
     await expect(this.primaryButton).toContainText(primaryButtonText);
     await expect(this.featuresTitle).toHaveText(featuresTitle);
     if (hasLearnMore) {
-      await expect(this.learnMoreButton).toContainText('Learn More');
+      await expect(this.learnMoreButton).toContainText('Learn more');
     }
   }
 

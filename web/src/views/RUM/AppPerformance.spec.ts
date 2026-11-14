@@ -625,7 +625,7 @@ describe("AppPerformance.vue", () => {
 
       expect(wrapper.vm.isAutoRunOn).toBe(false);
       expect(wrapper.vm.isVariablesChanged).toBe(true);
-      expect(refreshButton().props("variant")).toBe("warning");
+      expect(refreshButton().props("variant")).toBe("primary");
       expect(refreshTooltip().props("disabled")).toBe(false);
     });
   });

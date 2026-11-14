@@ -9,7 +9,7 @@ import CompositeExpressionBuilder from "./CompositeExpressionBuilder.vue";
 import alertsService from "@/services/alerts";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import type {
   CompositeAlertChild,
   CompositeAlertDraft,
@@ -202,7 +202,7 @@ watch(
           </span>
         </div>
         <div class="flex flex-col gap-3 px-3 py-2">
-          <OBanner variant="info" dense :content="t('alerts.composite.banner')" />
+          <OInlineNotice tone="info" :message="t('alerts.composite.banner')" />
           <CompositeExpressionBuilder
             :model-value="draft.composite_condition.expression"
             :selected-children="selectedChildren"

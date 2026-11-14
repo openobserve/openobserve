@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="flex-1" />
       <OBadge
         v-if="held"
-        variant="error-soft"
-        size="lg"
+        tone="err"
+        size="md"
         dot
         class="shrink-0"
         data-test="dashboard-playlist-held"
@@ -78,51 +78,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="flex shrink-0 items-center gap-1.5" data-test="dashboard-playlist-controls">
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="navigate-before"
+          icon-only
+          variant="secondary"
+          icon="navigate-before"
           :aria-label="t('dashboard.playlist.previous')"
           data-test="dashboard-playlist-prev"
           @click="emit('prev')"
         >
-          <OTooltip
-            :content="t('dashboard.playlist.previous')"
-            shortcut-id="dashboardPlaylistPrev"
-          />
+          <OTooltip :content="t('dashboard.playlist.previous')" shortcut="dashboardPlaylistPrev" />
         </OButton>
         <OButton
-          variant="outline"
-          size="icon-sm"
-          :icon-left="paused ? 'play-arrow' : 'pause'"
+          icon-only
+          variant="secondary"
+          :icon="paused ? 'play-arrow' : 'pause'"
           :aria-label="paused ? t('dashboard.playlist.resume') : t('dashboard.playlist.pause')"
           data-test="dashboard-playlist-pause"
           @click="emit('toggle-pause')"
         >
           <OTooltip
             :content="paused ? t('dashboard.playlist.resume') : t('dashboard.playlist.pause')"
-            shortcut-id="dashboardPlaylistPause"
+            shortcut="dashboardPlaylistPause"
           />
         </OButton>
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="navigate-next"
+          icon-only
+          variant="secondary"
+          icon="navigate-next"
           :aria-label="t('dashboard.playlist.next')"
           data-test="dashboard-playlist-next"
           @click="emit('next')"
         >
-          <OTooltip :content="t('dashboard.playlist.next')" shortcut-id="dashboardPlaylistNext" />
+          <OTooltip :content="t('dashboard.playlist.next')" shortcut="dashboardPlaylistNext" />
         </OButton>
       </span>
       <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="close"
+        icon-only
+        variant="secondary"
+        icon="close"
         :aria-label="t('dashboard.playlist.exit')"
         data-test="dashboard-playlist-exit"
         @click="emit('exit')"
       >
-        <OTooltip :content="t('dashboard.playlist.exit')" shortcut-id="dashboardPlaylistExit" />
+        <OTooltip :content="t('dashboard.playlist.exit')" shortcut="dashboardPlaylistExit" />
       </OButton>
     </div>
   </div>

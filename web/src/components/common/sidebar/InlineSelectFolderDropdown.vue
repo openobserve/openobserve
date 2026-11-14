@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSelect
       :model-value="modelValue"
       :options="folderOptions"
-      appearance="inline"
+      variant="filter"
       labelKey="label"
       valueKey="value"
       searchable
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="inline-select-folder-dropdown"
       @update:model-value="$emit('update:modelValue', $event)"
     >
-      <template v-if="modelValue" #icon-left>
+      <template v-if="modelValue" #icon>
         <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
       </template>
       <template v-if="!disable" #after-options>
@@ -44,9 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              the action that leaves the list. -->
         <div class="p-2">
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="add"
+            variant="secondary"
+            icon="add"
             block
             data-test="inline-select-folder-dropdown-add"
             @click="showDialog = true"
@@ -80,14 +79,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :disabled="disable"
       @update:model-value="$emit('update:modelValue', $event)"
     >
-      <template v-if="modelValue" #icon-left>
+      <template v-if="modelValue" #icon>
         <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
       </template>
     </OSelect>
     <OButton
       v-if="!disable"
-      variant="outline"
-      size="icon"
+      icon-only
+      variant="secondary"
+      size="xs"
       class="shrink-0"
       :title="t('common.addFolder')"
       @click="showDialog = true"

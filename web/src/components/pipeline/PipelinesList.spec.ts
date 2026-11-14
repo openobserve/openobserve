@@ -127,39 +127,39 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-sub-title="subTitle"
-      :data-primary-label="primaryButtonLabel"
+      :data-sub-title="subtitle"
+      :data-primary-label="primary?.label"
     >
       <slot name="header-left" />
       <slot />
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
     </div>
   `,
 };
@@ -170,15 +170,15 @@ const ODrawerStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-drawer-stub"
@@ -321,10 +321,10 @@ describe("PipelinesList", () => {
       expect(wrapper.vm.confirmDialogMeta.data).toStrictEqual(mockRealtimePipeline);
       expect(wrapper.vm.confirmDialogMeta.messageKeypath).toBe("pipeline.deletePipelineConfirm");
       expect(wrapper.vm.confirmDialogMeta.messageName).toBe(mockRealtimePipeline.name);
-      expect(wrapper.vm.confirmDialogMeta.okVariant).toBe("destructive");
+      expect(wrapper.vm.confirmDialogMeta.kind).toBe("destructive");
     });
 
-    it("names the pipeline in bold with a destructive OK in the real ConfirmDialog", async () => {
+    it("names the pipeline in bold with a destructive Delete in the real ConfirmDialog", async () => {
       const w = createWrapper({ ConfirmDialog, "i18n-t": false });
       await flushPromises();
       w.vm.openDeleteDialog(mockRealtimePipeline);
@@ -338,8 +338,8 @@ describe("PipelinesList", () => {
         `Are you sure you want to delete the ${mockRealtimePipeline.name} pipeline?`,
       );
       const dialog = confirm.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
-      expect(dialog.props("primaryButtonLabel")).toBe(i18n.global.t("confirmDialog.ok"));
+      expect(dialog.props("primary")?.variant).toBe("danger");
+      expect(dialog.props("primary")?.label).toBe(i18n.global.t("common.delete"));
       w.unmount();
     });
   });
@@ -726,7 +726,7 @@ describe("PipelinesList", () => {
       wrapper.vm.openBulkDeleteDialog();
 
       expect(wrapper.vm.confirmDialogMeta.messageKeypath).toBeUndefined();
-      expect(wrapper.vm.confirmDialogMeta.okVariant).toBe("destructive");
+      expect(wrapper.vm.confirmDialogMeta.kind).toBe("destructive");
     });
   });
 

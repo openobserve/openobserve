@@ -342,12 +342,10 @@ describe("WorkflowRuns", () => {
     expect(box()).toEqual(before);
   });
 
-  it("back returns to the workflows list", async () => {
+  it("back links to the workflows list", async () => {
     const wrapper = await mountRuns();
-    await wrapper.find(".back-btn").trigger("click");
-    expect(mockRouter.push).toHaveBeenCalledWith({
-      name: "workflows",
-      query: { org_identifier: "default", folder: "default" },
+    expect(wrapper.findComponent({ name: "OPageHeader" }).props("back")).toMatchObject({
+      to: { name: "workflows", query: { org_identifier: "default", folder: "default" } },
     });
   });
 });
@@ -420,7 +418,7 @@ describe("WorkflowRuns — HTTP endpoint", () => {
     w
       .findAllComponents({ name: "OTag" })
       .find((c: any) => c.find('[data-test="workflow-runs-http-endpoint-chip"]').exists())
-      ?.props("variant");
+      ?.props("tone");
   const httpPanel = (w: any) => w.findComponent({ name: "WorkflowHttpEndpointPanel" });
 
   beforeEach(() => {
@@ -448,7 +446,7 @@ describe("WorkflowRuns — HTTP endpoint", () => {
     const wrapper = await mountRuns();
     expect(workflowObj.readOnly).toBe(true);
     expect(button(wrapper).text()).toContain(i18n.global.t("workflow.http.editorButton"));
-    expect(chipVariant(wrapper)).toBe("success-soft");
+    expect(chipVariant(wrapper)).toBe("ok");
     const html = wrapper.html();
     const at = (id: string) => html.indexOf(`data-test="${id}"`);
     expect(at("workflow-runs-http-endpoint")).toBeLessThan(at("workflow-runs-test"));
@@ -459,7 +457,7 @@ describe("WorkflowRuns — HTTP endpoint", () => {
   it("shows the neutral Off chip for an endpoint that is switched off", async () => {
     getHttpTrigger.mockResolvedValue(httpConfig({ enabled: false }));
     const wrapper = await mountRuns();
-    expect(chipVariant(wrapper)).toBe("default-soft");
+    expect(chipVariant(wrapper)).toBe("neutral");
     expect(chip(wrapper).text()).toBe(i18n.global.t("workflow.http.editorButtonOff"));
     wrapper.unmount();
   });
@@ -467,7 +465,7 @@ describe("WorkflowRuns — HTTP endpoint", () => {
   it("shows a paused workflow's live endpoint as a warning", async () => {
     workflowObj.currentSelectedWorkflow.enabled = false;
     const wrapper = await mountRuns();
-    expect(chipVariant(wrapper)).toBe("warning-soft");
+    expect(chipVariant(wrapper)).toBe("warn");
     wrapper.unmount();
   });
 

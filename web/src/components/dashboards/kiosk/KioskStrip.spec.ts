@@ -112,15 +112,17 @@ describe("KioskStrip", () => {
     expect(
       wrapper.find('[data-test="dashboard-kiosk-title"]').element.parentElement?.classList,
     ).toContain("text-xl");
-    expect(wrapper.findComponent(OBadge).props("size")).toBe("lg");
-    expect(wrapper.find('[data-test="dashboard-kiosk-exit-btn"]').classes()).toContain("h-8");
+    expect(wrapper.findComponent(OBadge).props("size")).toBe("md");
+    expect(wrapper.find('[data-test="dashboard-kiosk-exit-btn"]').classes()).toContain(
+      "size-control-md",
+    );
   });
 
   it("warns that auto-refresh is off, since that screen will go stale", () => {
     const wrapper = mountStrip({ level: "ok" }, { refreshSeconds: 0, countdown: null });
     const badge = wrapper.findComponent(OBadge);
     expect(badge.attributes("data-health")).toBe("refresh-off");
-    expect(badge.props("variant")).toBe("warning-soft");
+    expect(badge.props("tone")).toBe("warn");
     expect(badge.text()).toBe("Auto-refresh off");
     expect(ring(wrapper).props("state")).toBe("off");
   });
@@ -132,13 +134,13 @@ describe("KioskStrip", () => {
 
   it("flags failing panels as a warning", () => {
     const badge = mountStrip({ level: "warn", kind: "failing", count: 2 }).findComponent(OBadge);
-    expect(badge.props("variant")).toBe("warning-soft");
+    expect(badge.props("tone")).toBe("warn");
     expect(badge.text()).toBe("2 panels failing");
   });
 
   it("flags a stale screen as an error with the time it stopped", () => {
     const badge = mountStrip({ level: "bad", kind: "stale", since: LAST }).findComponent(OBadge);
-    expect(badge.props("variant")).toBe("error-soft");
+    expect(badge.props("tone")).toBe("err");
     expect(badge.text()).toBe("Not updating since 14:05:09");
   });
 

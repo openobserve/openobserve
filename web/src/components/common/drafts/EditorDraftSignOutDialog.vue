@@ -19,10 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="sm"
     :title="t('common.editorDraft.signOutTitle')"
-    :primary-button-label="t('common.editorDraft.signOutConfirm')"
-    primary-button-variant="destructive"
-    primary-button-data-test="editor-draft-signout-confirm"
-    :secondary-button-label="t('common.cancel')"
+    :primary="{
+      label: t('common.editorDraft.signOutConfirm'),
+      variant: 'danger',
+      dataTest: 'editor-draft-signout-confirm',
+    }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="editor-draft-signout-dialog"
     @update:open="emit('update:open', $event)"
     @click:primary="confirm"

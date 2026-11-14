@@ -39,12 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OEmptyState
     v-if="filtered"
     :size="size"
-    variant="no-results"
-    illustration="no-results"
+    kind="filtered"
     :title="t('dbm.empty.filtered.title')"
-    :description="t('dbm.empty.filtered.description')"
+    :text="t('dbm.empty.filtered.description')"
     :action-label="t('dbm.empty.filtered.action')"
-    action-icon="filter-list"
     data-test="dbm-empty-state-filtered"
     @action="emit('action', 'filtered')"
   />
@@ -57,9 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OEmptyState
     v-else
     :size="size"
-    illustration="data-scene"
+    icon="database"
     :title="t('dbm.empty.title')"
-    :description="diagnosticDescription"
+    :text="diagnosticDescription"
     data-test="dbm-empty-state-diagnostic"
   >
     <template #actions>
@@ -98,6 +96,7 @@ import type { Store } from "vuex";
 import DbmCheckList, { type DbmCheckRow, type DbmCheckStatus } from "./DbmCheckList.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { EmptyStateSize } from "@/lib/core/EmptyState/OEmptyState.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatCount } from "@/utils/dbm/format";
 
@@ -140,7 +139,7 @@ const props = withDefaults(
     filtered?: boolean;
     /** The org identifier, for the access check's detail line. */
     org?: string;
-    size?: "hero" | "block" | "inline";
+    size?: EmptyStateSize;
   }>(),
   {
     permissionOk: true,
@@ -148,7 +147,7 @@ const props = withDefaults(
     traceCount: null,
     neverAggregated: false,
     filtered: false,
-    size: "hero",
+    size: "page",
   },
 );
 const store = inject<Store<any> | null>("store", null);

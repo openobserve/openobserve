@@ -21,10 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <header class="flex flex-wrap items-center gap-2">
       <OText variant="label" as="h2">{{ t("insight.decisions.list.title") }}</OText>
-      <OBadge v-if="page.data.value" variant="default-soft" data-test="decision-dismissed-total">
+      <OBadge v-if="page.data.value" tone="neutral" data-test="decision-dismissed-total">
         {{ copy.count(total) }}
       </OBadge>
       <OToggleGroup
+        size="sm"
         :model-value="kind"
         class="ms-auto shrink-0"
         data-test="decision-dismissed-filter"
@@ -34,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="option in KINDS"
           :key="option"
           :value="option"
-          size="xs"
           :data-test="`decision-dismissed-filter-${option}`"
         >
           {{ t(KIND_FILTER_LABEL[option]) }}
@@ -43,8 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </header>
 
     <div v-if="page.isPending.value" class="flex flex-col gap-2">
-      <OSkeleton class="rounded-surface h-12 w-full" />
-      <OSkeleton class="rounded-surface h-12 w-full" />
+      <OSkeleton shape="block" class="h-12 w-full" />
+      <OSkeleton shape="block" class="h-12 w-full" />
     </div>
 
     <p
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OIcon name="error" size="xs" />
       <span>{{ t("insight.decisions.list.loadFailed") }}</span>
-      <OButton variant="outline" size="xs" @click="page.refetch()">
+      <OButton variant="secondary" size="sm" @click="page.refetch()">
         {{ copy.retry() }}
       </OButton>
     </p>
@@ -100,8 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(KIND_LABEL[row.family]) }}
         </OText>
         <OButton
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           :loading="route.isUndoing(row.decision_id)"
           data-test="decision-dismissed-undo"
           @click="route.undo([{ org: orgId, view: row, title: row.subject?.title ?? null }])"
@@ -126,18 +126,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </OText>
       <OButton
-        variant="outline"
-        size="icon-xs"
-        icon-left="chevron-left"
+        icon-only
+        variant="secondary"
+        icon="chevron-left"
         :aria-label="t('insight.decisions.list.previous')"
         :disabled="offset === 0"
         data-test="decision-dismissed-previous"
         @click="offset = Math.max(0, offset - PAGE_SIZE)"
       />
       <OButton
-        variant="outline"
-        size="icon-xs"
-        icon-left="chevron-right"
+        icon-only
+        variant="secondary"
+        icon="chevron-right"
         :aria-label="t('insight.decisions.list.next')"
         :disabled="offset + PAGE_SIZE >= total"
         data-test="decision-dismissed-next"

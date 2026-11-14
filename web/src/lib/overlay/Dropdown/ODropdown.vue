@@ -39,6 +39,7 @@ import {
   setActiveOverlay,
   clearActiveOverlay,
 } from "./ODropdown.context";
+import { MENU_SURFACE } from "@/lib/overlay/shared/menuItem";
 
 const { lgUp } = useBreakpoint();
 
@@ -328,12 +329,9 @@ onBeforeUnmount(() => {
         @close-auto-focus="(event: Event) => emit('close-auto-focus', event)"
         :style="{ zIndex: contentZIndex }"
         :class="[
-          'min-w-40 p-1 max-lg:max-w-[calc(100vw-1rem)]',
+          MENU_SURFACE,
+          'max-lg:max-w-[calc(100vw-1rem)]',
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
-          // Surface
-          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
-          // Typography
-          'text-dropdown-item-text text-sm',
           // Animation — clip-path reveal: the menu is unveiled at full size from
           // its trigger edge (no scale/squish). Wipes down by default; top-placed
           // menus wipe up. Soft ease-out-expo in, quick wipe out.

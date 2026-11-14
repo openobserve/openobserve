@@ -88,14 +88,14 @@ describe("RunningQueriesList.vue", () => {
               "size",
               "persistent",
               "title",
-              "subTitle",
+              "subtitle",
               "showClose",
               "width",
-              "primaryButtonLabel",
-              "secondaryButtonLabel",
-              "neutralButtonLabel",
+              "primary",
+              "secondary",
+              "extra",
             ],
-            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+            emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
             template:
               '<div data-test="o-drawer-stub" :data-open="open" :data-size="size"><slot /><slot name="header" /><slot name="footer" /></div>',
           },
@@ -184,7 +184,7 @@ describe("RunningQueriesList.vue", () => {
     });
 
     it("should have correct number of columns", () => {
-      expect(wrapper.vm.columns).toHaveLength(10);
+      expect(wrapper.vm.columns).toHaveLength(9);
     });
 
     // Row numbering moved to OTable's built-in show-index (no '#' column).
@@ -252,11 +252,23 @@ describe("RunningQueriesList.vue", () => {
       expect(column.sortable).toBe(true);
     });
 
-    it("should have correct column for actions", () => {
-      const column = wrapper.vm.columns.find((col: any) => col.id === "actions");
-      expect(column).toBeDefined();
-      expect(column.isAction).toBe(true);
-      expect(column.pinned).toBe("right");
+    it("keeps the query list inline and the cancel in the row menu, where OTable draws them", () => {
+      expect(wrapper.vm.columns.find((col: any) => col.id === "actions")).toBeUndefined();
+      const row = { trace_id: "t1" };
+
+      const [list] = wrapper.vm.rowActions;
+      expect([list.id, list.dataTest]).toEqual(["query-list", "queryList-btn"]);
+      list.onClick(row);
+      expect(wrapper.emitted("show:schema")?.[0]).toEqual([row]);
+
+      const [cancel] = wrapper.vm.rowMenu;
+      expect([cancel.id, cancel.destructive, cancel.dataTest]).toEqual([
+        "cancel",
+        true,
+        "cancelQuery-btn",
+      ]);
+      cancel.onSelect(row);
+      expect(wrapper.emitted("delete:query")?.[0]).toEqual([row]);
     });
   });
 
@@ -498,9 +510,9 @@ describe("RunningQueriesList.vue", () => {
       expect(drawer.exists()).toBe(true);
     });
 
-    it('should pass size="lg" to ODrawer', () => {
+    it('should pass size="md" to ODrawer', () => {
       const drawer = wrapper.find('[data-test="list-schema-dialog"]');
-      expect(drawer.attributes("data-size")).toBe("lg");
+      expect(drawer.attributes("data-size")).toBe("md");
     });
 
     it("should pass showListSchemaDialog state as ODrawer open prop (false by default)", () => {

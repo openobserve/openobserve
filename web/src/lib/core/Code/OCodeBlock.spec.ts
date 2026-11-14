@@ -52,15 +52,21 @@ describe("OCodeBlock", () => {
     highlight.mockRestore();
   });
 
-  it("insets the code only when padded", () => {
-    expect(mountBlock({ code: "x" }).find("pre").classes()).not.toContain("px-3");
-    expect(mountBlock({ code: "x", padded: true }).find("pre").classes()).toContain("px-3");
+  it("pads the code 12 px inside the frame", () => {
+    expect(mountBlock({ code: "x" }).find("pre").classes()).toContain("p-3");
   });
 
-  it("renders the code and the language label", () => {
+  it("renders the code and names the language in the 36 px head", () => {
     const wrapper = mountBlock({ code: "echo hello", lang: "bash" });
     expect(wrapper.text()).toContain("echo hello");
-    expect(wrapper.find(".o2-code-lang").text()).toBe("bash");
+    expect(wrapper.find('[data-test="code-block-name"]').text()).toBe("bash");
+    expect(wrapper.find(".o2-code-toolbar").classes()).toContain("h-9");
+  });
+
+  it("names the file and shows the language beside it", () => {
+    const wrapper = mountBlock({ code: "a: 1", lang: "yaml", filename: "otel.yaml" });
+    expect(wrapper.find('[data-test="code-block-name"]').text()).toBe("otel.yaml");
+    expect(wrapper.find(".o2-code-toolbar").text()).toContain("yaml");
   });
 
   it("copies the raw code (not the highlighted markup) on click", () => {
@@ -88,7 +94,7 @@ describe("OCodeBlock", () => {
 
   it("falls back to 'text' label when no language is given", () => {
     const wrapper = mountBlock({ code: "plain", lang: "" });
-    expect(wrapper.find(".o2-code-lang").text()).toBe("text");
+    expect(wrapper.find('[data-test="code-block-name"]').text()).toBe("text");
   });
 
   it("namespaces the copy button data-test via the dataTest prop", () => {
@@ -136,15 +142,35 @@ describe("OCodeBlock", () => {
       expect(pre(wrapper).classes()).toContain("o2-code-pre--wrap");
     });
 
-    it("caps the height at the requested number of lines and scrolls past it", () => {
-      const wrapper = mountBlock({ code: "SELECT 1", maxLines: 4 });
-      const style = pre(wrapper).attributes("style") ?? "";
+    const sixLines = ["a", "b", "c", "d", "e", "f"].join("\n");
 
-      // Expressed in em so the cap tracks the code font size rather than
-      // assuming a pixel height.
-      expect(style).toContain("max-height");
-      expect(style).toContain("em");
-      expect(style).toContain("overflow-y: auto");
+    it("collapses past maxLines behind Show all N lines, and expands on click", async () => {
+      const wrapper = mountBlock({ code: sixLines, maxLines: 4 });
+      expect(pre(wrapper).attributes("style") ?? "").toContain("max-height");
+      expect(pre(wrapper).classes()).toContain("overflow-y-hidden");
+      const toggle = wrapper.find('[data-test="code-block-show-all"]');
+      expect(toggle.exists()).toBe(true);
+      await toggle.trigger("click");
+      expect(pre(wrapper).attributes("style") ?? "").not.toContain("max-height");
+    });
+
+    it("collapses at 12 lines by default", () => {
+      const thirteen = Array.from({ length: 13 }, (_, i) => `line ${i}`).join("\n");
+      expect(
+        mountBlock({ code: thirteen }).find('[data-test="code-block-show-all"]').exists(),
+      ).toBe(true);
+      expect(
+        mountBlock({ code: sixLines }).find('[data-test="code-block-show-all"]').exists(),
+      ).toBe(false);
+    });
+
+    it("offers a wrap toggle only when a line is long", async () => {
+      expect(
+        mountBlock({ code: "SELECT 1" }).find('[data-test="code-block-wrap-btn"]').exists(),
+      ).toBe(false);
+      const wrapper = mountBlock({ code: "x".repeat(80) });
+      await wrapper.find('[data-test="code-block-wrap-btn"]').trigger("click");
+      expect(pre(wrapper).classes()).toContain("o2-code-pre--wrap");
     });
 
     it("leaves the height uncapped when maxLines is not given", () => {
@@ -153,33 +179,14 @@ describe("OCodeBlock", () => {
     });
 
     it("publishes the line-height so the cap and the leading cannot drift apart", () => {
-      const wrapper = mountBlock({ code: "SELECT 1", maxLines: 4 });
+      const wrapper = mountBlock({ code: sixLines, maxLines: 4 });
       const style = pre(wrapper).attributes("style") ?? "";
 
       const lineHeight = Number(/--code-line-height:\s*([\d.]+)/.exec(style)?.[1]);
       expect(lineHeight).toBeGreaterThan(0);
 
-      // The cap must be the published line-height times the requested lines —
-      // if the stylesheet and the maths ever diverge, this catches it.
-      const capped = /max-height:\s*calc\(([\d.]+)em\)/.exec(style)?.[1];
-      expect(Number(capped)).toBeCloseTo(4 * lineHeight, 5);
-    });
-  });
-
-  describe("inset", () => {
-    const style = (w: any) => w.find("pre").attributes("style") ?? "";
-
-    it("keeps the code flush with the border by default", () => {
-      expect(style(mountBlock({ code: "SELECT 1" }))).not.toContain("padding");
-    });
-
-    it("pads the code away from the border when asked", () => {
-      expect(style(mountBlock({ code: "SELECT 1", inset: true }))).toContain("padding: 0.75rem");
-    });
-
-    it("adds the inset to the height cap so the same number of lines stays visible", () => {
-      const capped = style(mountBlock({ code: "SELECT 1", inset: true, maxLines: 4 }));
-      expect(capped).toMatch(/max-height:\s*calc\([^)]*em \+ 1\.5rem\)/);
+      // The cap is the published line-height times the lines, plus the 12 px padding on each side.
+      expect(style).toContain(`max-height: calc(${4 * lineHeight}em + 1.5rem)`);
     });
   });
 
@@ -285,7 +292,6 @@ describe("OCodeBlock", () => {
       await flushPromises();
       expect(copyMock).toHaveBeenCalledTimes(1);
       expect(copyMock.mock.calls[0][0]).toBe(code);
-      expect(copyMock.mock.calls[0][2].successMessage).toBe("Copied with org token prod-ingest");
       expect(wrapper.emitted("copy")).toEqual([[{ partial: false }]]);
       wrapper.unmount();
     });

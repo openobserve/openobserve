@@ -49,7 +49,6 @@
       <div class="eval-test-panel__actions mt-3.5 flex flex-col items-start gap-1.5">
         <OButton
           variant="primary"
-          size="sm-action"
           :loading="state === 'running'"
           :disabled="state === 'running' || !canRun"
           :title="canRun ? undefined : disabledHint"

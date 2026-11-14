@@ -11,8 +11,8 @@
       />
 
       <OButton
-        size="xs"
-        variant="outline"
+        size="sm"
+        variant="secondary"
         class="me-2 mb-1.5"
         data-test="logs-json-preview-copy-btn"
         @click="copyLogToClipboard"
@@ -26,13 +26,13 @@
       >
         <span class="inline-flex">
           <OButton
-            size="xs"
-            variant="outline"
+            size="sm"
+            variant="secondary"
             class="me-2 mb-1.5"
             disabled
             data-test="log-correlation-btn"
           >
-            <template #icon-left>
+            <template #icon>
               <OIcon name="lock" class="lock-chip" size="sm" data-test="log-correlation-btn-lock" />
             </template>
             {{ t("search.viewRelated") }}
@@ -41,8 +41,8 @@
       </OTooltip>
       <OButton
         v-else-if="showViewRelatedBtn"
-        size="xs"
-        variant="outline"
+        size="sm"
+        variant="secondary"
         class="me-2 mb-1.5"
         @click="openCorrelation"
         data-test="log-correlation-btn"
@@ -65,9 +65,9 @@
           <span class="inline-flex">
             <OButton
               data-test="trace-view-logs-btn"
-              size="xs"
-              variant="outline"
-              icon-left="lock"
+              size="sm"
+              variant="secondary"
+              icon="lock"
               disabled
               >{{ t("search.viewTrace") }}</OButton
             >
@@ -82,13 +82,12 @@
             class="w-auto shrink-0"
             :loading="isTracesStreamsLoading"
             :disabled="isTracesStreamsLoading"
-            size="sm"
           />
           <OButton
             data-test="trace-view-logs-btn"
-            size="xs"
-            variant="outline"
-            icon-left="account-tree"
+            size="sm"
+            variant="secondary"
+            icon="account-tree"
             @click="redirectToTraces"
             >{{ t("search.viewTrace") }}</OButton
           >
@@ -96,7 +95,7 @@
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="ps-3">
-      <OSpinner size="md" />
+      <OSpinner size="lg" />
       <div v-if="!loading">
         <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
              every .monaco-editor app-wide. The focus-border is left off so this
@@ -130,9 +129,9 @@
           <template #trigger>
             <OButton
               data-test="log-details-include-exclude-field-btn"
-              size="xs"
+              size="sm"
               variant="ghost"
-              class="ms-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
+              class="ms-2 w-5! min-w-5! p-0! align-middle"
               :aria-label="t('logs.jsonPreview.addIcon')"
             >
               <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
@@ -143,7 +142,7 @@
             data-test="log-details-include-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'include')"
           >
-            <template #icon-left><EqualIcon class="size-2.5" /></template>
+            <template #icon><EqualIcon class="size-2.5" /></template>
             {{ t("common.includeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
@@ -151,14 +150,14 @@
             data-test="log-details-exclude-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'exclude')"
           >
-            <template #icon-left><NotEqualIcon class="size-2.5" /></template>
+            <template #icon><NotEqualIcon class="size-2.5" /></template>
             {{ t("common.excludeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
             v-if="key !== store.state.zoConfig.timestamp_column && !hideAddFieldToTable"
             data-test="log-details-add-field-btn"
             @select.stop="addFieldToTable(key)"
-            icon-left="visibility"
+            icon="visibility"
           >
             {{ addOrRemoveLabel(key) }}
           </ODropdownItem>
@@ -170,7 +169,7 @@
               :key="crossLink.name"
               :data-test="`log-details-cross-link-${crossLink.name}`"
               @select.stop="openCrossLink(crossLink.resolvedUrl)"
-              icon-left="open-in-new"
+              icon="open-in-new"
             >
               {{ crossLink.name }}
             </ODropdownItem>
@@ -180,11 +179,11 @@
             data-test="send-to-ai-chat-btn"
             @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
           >
-            <template #icon-left>
+            <template #icon>
               <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
             {{ t("logs.jsonPreview.sendToAiChat") }}
-            <template v-if="!aiAssistantAccess.allowed" #icon-right>
+            <template v-if="!aiAssistantAccess.allowed" #end>
               <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
             </template>
           </ODropdownItem>
@@ -192,11 +191,11 @@
             data-test="redirect-to-regex-pattern-btn"
             @select.stop="createRegexPatternFromLogs(key, value[key])"
           >
-            <template #icon-left>
+            <template #icon>
               <img :src="regexIcon" width="14" height="14" alt="" />
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
-            <template v-if="!regexPatternsAccess.allowed" #icon-right>
+            <template v-if="!regexPatternsAccess.allowed" #end>
               <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
             </template>
           </ODropdownItem>
@@ -258,8 +257,8 @@
       v-model:open="typeOfRegexPattern"
       size="lg"
       :title="t('logs.jsonPreview.regexPatternTypeTitle')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('confirmDialog.ok')"
+      :secondary="{ label: t('confirmDialog.cancel') }"
+      :primary="{ label: t('confirmDialog.ok') }"
       @click:secondary="typeOfRegexPattern = false"
       @click:primary="confirmRegexPatternType"
     >

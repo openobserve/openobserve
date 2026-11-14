@@ -186,11 +186,14 @@ export class CipherKeys {
 
     }
 
+    // Delete renders in the row's ⋯ menu (a portal), so open the menu before clicking it.
     async deletedCipherKeys(cipherName) {
-        const deleteButtonLocator = this.page.locator(this.deleteButton(cipherName));
-        await deleteButtonLocator.waitFor({ state: 'visible', timeout: 30000 });
-        await deleteButtonLocator.click({ force: true });
-
+        const updateButtonLocator = this.page.locator(this.updateButton(cipherName));
+        await updateButtonLocator.waitFor({ state: 'visible', timeout: 30000 });
+        const row = this.page.locator('tr').filter({ has: updateButtonLocator });
+        await row.hover();
+        await row.locator('[data-test="cipher-keys-row-more-actions"]').click();
+        await this.page.locator(this.deleteButton(cipherName)).click();
     }
 
     async requestCipherKeysOk() {

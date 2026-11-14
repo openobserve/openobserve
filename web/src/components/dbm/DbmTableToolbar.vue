@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSearchInput
         :model-value="search"
         :placeholder="placeholder"
-        clearable
         :debounce="debounce"
         :data-test="searchDataTest"
         @update:model-value="onSearch"

@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type {
@@ -100,13 +100,7 @@ const warningText = (code: string) => {
     >
       <span class="text-text-secondary text-sm">{{ t("alerts.composite.previewResult") }}</span>
       <OTag
-        :variant="
-          preview.valid && preview.result
-            ? 'success-soft'
-            : preview.valid
-              ? 'default-soft'
-              : 'error-soft'
-        "
+        :tone="preview.valid && preview.result ? 'ok' : preview.valid ? 'neutral' : 'err'"
         :icon="preview.valid && preview.result ? 'check-circle' : 'cancel'"
         size="sm"
         :label="resultLabel"
@@ -121,15 +115,15 @@ const warningText = (code: string) => {
               type="alertLevel"
               :value="levelFor(token.id)"
               :label="raw(letterById.get(token.id) ?? '?')"
-              size="xs"
+              size="sm"
             />
             <span v-else class="text-text-secondary mx-1 font-semibold">{{ raw(token.text) }}</span>
           </template>
           <span class="text-text-secondary mx-1 font-semibold">{{ raw("→") }}</span>
           <OTag
-            :variant="preview.result ? 'error-soft' : 'success-soft'"
+            :tone="preview.result ? 'err' : 'ok'"
             :label="preview.result ? t('alerts.composite.firing') : t('alerts.composite.normal')"
-            size="xs"
+            size="sm"
           />
         </span>
       </template>
@@ -163,7 +157,7 @@ const warningText = (code: string) => {
               <OTruncatedText class="text-text-heading">{{ nameFor(token.id) }}</OTruncatedText>
             </span>
             <span class="text-text-secondary flex items-center gap-1.5 text-xs">
-              <OTag type="alertLevel" :value="levelFor(token.id)" size="xs" />
+              <OTag type="alertLevel" :value="levelFor(token.id)" size="sm" />
               <span>{{ raw("→") }}</span>
               <span class="text-text-heading font-mono font-semibold">
                 {{ raw(String(!!truthFor(token.id))) }}
@@ -186,13 +180,13 @@ const warningText = (code: string) => {
               <span class="font-mono">{{ raw(letteredExpression) }}</span>
               <span>{{ raw("→") }}</span>
               <OTag
-                :variant="preview.result ? 'error-soft' : 'success-soft'"
+                :tone="preview.result ? 'err' : 'ok'"
                 :label="
                   preview.result
                     ? t('alerts.composite.trueResult')
                     : t('alerts.composite.falseResult')
                 "
-                size="xs"
+                size="sm"
               />
             </span>
           </div>
@@ -200,34 +194,31 @@ const warningText = (code: string) => {
       </ol>
     </div>
 
-    <OBanner
+    <OInlineNotice
       v-for="warning in value.warnings"
       :key="`${warning.code}-${warning.child_alert_id ?? ''}`"
-      variant="warning"
-      dense
+      tone="warn"
       :data-test="`alerts-composite-preview-warning-${warning.code}`"
-      :content="warningText(warning.code)"
+      :message="warningText(warning.code)"
     />
-    <OBanner
+    <OInlineNotice
       v-for="child in staleChildren"
       :key="`stale-${child.alert_id}`"
-      variant="warning"
-      dense
+      tone="warn"
       :data-test="`alerts-composite-preview-stale-${child.alert_id}`"
-      :content="
+      :message="
         t('alerts.composite.warningChildStaleNamed', {
           name: child.name,
           level: child.level ?? raw('—'),
         })
       "
     />
-    <OBanner
+    <OInlineNotice
       v-for="error in value.errors"
       :key="`${error.code}-${error.child_alert_id ?? ''}`"
-      variant="error-soft"
-      dense
+      tone="err"
       :data-test="`alerts-composite-preview-error-${error.code}`"
-      :content="error.message ? raw(error.message) : raw(error.code)"
+      :message="error.message ? raw(error.message) : raw(error.code)"
     />
   </section>
 </template>

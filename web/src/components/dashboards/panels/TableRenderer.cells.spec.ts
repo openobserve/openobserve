@@ -179,14 +179,14 @@ describe("TableRenderer cell types and footer (real converter, OTable and cells)
     expect(cells("requests")).toEqual(["40", "20"]);
   });
 
-  it("has no footer and today's row height without the keys", async () => {
+  it("has no footer and compact rows without the keys", async () => {
     await mountTable({});
     expect(wrapper!.find('[data-test="o2-table-pivot-total-foot"]').exists()).toBe(false);
-    expect(wrapper!.findComponent({ name: "OTable" }).props("rowHeight")).toBe(22);
+    expect(wrapper!.findComponent({ name: "OTable" }).props("density")).toBe("compact");
   });
 
-  it("passes the density row height to the table", async () => {
+  it("passes the panel's density to the table", async () => {
     await mountTable({}, "comfortable");
-    expect(wrapper!.findComponent({ name: "OTable" }).props("rowHeight")).toBe(36);
+    expect(wrapper!.findComponent({ name: "OTable" }).props("density")).toBe("default");
   });
 });

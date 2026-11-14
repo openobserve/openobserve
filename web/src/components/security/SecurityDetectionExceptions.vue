@@ -7,7 +7,7 @@ import { computed, ref } from "vue";
 import { securityTime } from "@/utils/security/time";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -166,9 +166,8 @@ const opLabel = (op: string) =>
       }}</span>
       <OButton
         v-if="canAuthor && !adding"
-        variant="outline"
-        size="sm"
-        icon-left="add"
+        variant="secondary"
+        icon="add"
         data-test="security-detection-exceptions-add"
         @click="startAdding"
         >{{ t("siem.detections.exceptions.add") }}</OButton
@@ -244,19 +243,14 @@ const opLabel = (op: string) =>
         </div>
         <div class="flex justify-end gap-2">
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="security-detection-exceptions-cancel"
             @click="adding = false"
             >{{ t("siem.detections.cancel") }}</OButton
           >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            data-test="security-detection-exceptions-save"
-            >{{ t("siem.detections.exceptions.save") }}</OButton
-          >
+          <OButton variant="primary" type="submit" data-test="security-detection-exceptions-save">{{
+            t("siem.detections.exceptions.save")
+          }}</OButton>
         </div>
       </OForm>
     </div>
@@ -264,20 +258,18 @@ const opLabel = (op: string) =>
     <div v-if="list.isLoading.value" class="flex items-center justify-center py-6">
       <OSpinner size="sm" />
     </div>
-    <OBanner
+    <OInlineNotice
       v-else-if="list.isError.value && !isForbiddenError(list.error.value)"
-      variant="error-soft"
-      icon="error-outline"
-      dense
+      tone="err"
       data-test="security-detection-exceptions-error"
-      >{{ t("siem.detections.exceptions.loadError") }}</OBanner
+      >{{ t("siem.detections.exceptions.loadError") }}</OInlineNotice
     >
     <OEmptyState
       v-else-if="!exceptions.length && !adding"
       size="inline"
       icon="rule"
       :title="t('siem.detections.exceptions.empty')"
-      :description="t('siem.detections.exceptions.emptyHint')"
+      :text="t('siem.detections.exceptions.emptyHint')"
       data-test="security-detection-exceptions-empty"
     />
     <ul
@@ -298,22 +290,22 @@ const opLabel = (op: string) =>
             <OTag
               v-for="v in ex.values.slice(0, 6)"
               :key="v"
-              variant="default-soft"
-              size="xs"
+              tone="neutral"
+              size="sm"
               class="font-mono"
               >{{ valueLabel(ex, v) }}</OTag
             >
             <span v-if="ex.values.length > 6" class="text-text-secondary">{{
               t("siem.detections.exceptions.moreValues", { n: ex.values.length - 6 })
             }}</span>
-            <OTag v-if="ex.expired" variant="warning-soft" size="xs">{{
+            <OTag v-if="ex.expired" tone="warn" size="sm">{{
               t("siem.detections.exceptions.expired")
             }}</OTag>
             <span
               v-if="ex.not_enforced?.length"
               :data-test="`security-detection-exception-not-enforced-${ex.id}`"
             >
-              <OTag variant="warning-soft" size="xs">{{
+              <OTag tone="warn" size="sm">{{
                 t(
                   "siem.detections.exceptions.notEnforced",
                   { n: ex.not_enforced.length },
@@ -337,15 +329,13 @@ const opLabel = (op: string) =>
         </div>
         <OButton
           v-if="canAdmin"
-          variant="ghost-destructive"
-          size="icon-sm"
-          icon-left="delete"
-          :aria-label="t('siem.detections.exceptions.delete')"
+          variant="danger-ghost"
+          icon-only
+          icon="delete"
+          :label="t('siem.detections.exceptions.delete')"
           :data-test="`security-detection-exception-delete-${ex.id}`"
           @click="onDelete(ex)"
-        >
-          <OTooltip :content="t('siem.detections.exceptions.delete')" />
-        </OButton>
+        />
       </li>
     </ul>
   </div>

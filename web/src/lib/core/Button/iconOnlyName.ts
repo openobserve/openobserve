@@ -22,6 +22,6 @@ export const UNNAMED_ICON_ONLY_DELAY_MS = 1000;
 export function warnIfUnnamedIconOnly(el: Element | null | undefined) {
   if (!el || !import.meta.env.DEV || import.meta.env.MODE === "test") return;
   if (isUnnamedIconOnly(el)) {
-    console.warn("[OButton] icon-only button has no accessible name; pass aria-label", el);
+    console.warn("[OButton] icon-only button has no accessible name; pass label or aria-label", el);
   }
 }

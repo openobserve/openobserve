@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <span class="flex size-5 items-center justify-center" :data-test="dataTest">
     <OCheckbox
       v-if="!result"
-      size="sm"
       :model-value="checked"
       :disabled="disabled"
       :aria-label="label"
@@ -26,7 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <OSpinner
       v-else-if="result.status === 'creating'"
-      size="xs"
       :aria-label="t('insight.bulk.status.creating')"
     />
     <OIcon

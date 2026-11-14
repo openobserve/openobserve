@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </span>
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="workflow-trigger-http-link-action"
         @click="emit('open-http-endpoint')"
       >

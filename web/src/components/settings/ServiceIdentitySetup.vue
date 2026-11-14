@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="service-identity-setup mt-2 w-full max-w-5xl">
     <!-- Loading skeleton while fetching recommendations -->
     <div v-if="loading" class="flex flex-col gap-4 py-4">
-      <OSkeleton class="rounded-default h-14 w-full" />
-      <OSkeleton class="rounded-default h-14 w-full" />
-      <OSkeleton class="rounded-default h-10 w-40" />
+      <OSkeleton shape="block" class="h-14 w-full" />
+      <OSkeleton shape="block" class="h-14 w-full" />
+      <OSkeleton shape="block" class="h-10 w-40" />
     </div>
 
     <div v-else>
@@ -196,13 +196,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("settings.serviceIdentitySetup.noFieldsConfiguredYet") }}
                   </span>
                   <OButton
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     class="mt-1"
                     data-test="service-identity-add-distinguish-btn"
                     @click="addingToEnv = activeEnvironment"
                   >
-                    <template #icon-left><OIcon name="add" size="xs" /></template>
+                    <template #icon><OIcon name="add" size="xs" /></template>
                     {{ t("settings.correlation.addField") }}
                   </OButton>
                 </div>
@@ -247,9 +246,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         side="top"
                       />
                       <OButton
+                        icon-only
                         :aria-label="t('common.remove')"
                         variant="ghost"
-                        size="icon-xs-sq"
+                        size="sm"
                         @click="removeFieldByIdFromEnv(envKey, fieldId)"
                       >
                         <svg
@@ -281,14 +281,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchable
                         :placeholder="t('settings.correlation.selectField')"
                         style="width: 13.75rem"
-                        :dropdown-style="{ minWidth: '18.75rem' }"
                         data-test="service-identity-add-distinguish-btn"
                         @update:model-value="onAddFieldToEnv(envKey, $event)"
                       />
                       <OButton
+                        icon-only
                         :aria-label="t('common.cancel')"
                         variant="ghost"
-                        size="icon-xs-sq"
+                        size="sm"
                         @click="
                           addingToEnv = '';
                           addFieldValue = undefined;
@@ -315,17 +315,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- + Add field button -->
                     <OButton
                       v-else-if="(setDistinguishBy[envKey] ?? []).filter(Boolean).length < 5"
-                      variant="outline"
-                      size="sm"
+                      variant="secondary"
                       @click="addingToEnv = envKey"
-                      icon-left="add"
+                      icon="add"
                     >
                       {{ t("settings.correlation.addField") }}
-                      <OTooltip
-                        side="top"
-                        :content="t('settings.correlation.addFieldTooltip')"
-                        max-width="15rem"
-                      />
+                      <OTooltip side="top" :content="t('settings.correlation.addFieldTooltip')" />
                     </OButton>
                   </div>
                 </div>
@@ -342,14 +337,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchable
                       :placeholder="t('settings.correlation.selectField')"
                       style="width: 13.75rem"
-                      :dropdown-style="{ minWidth: '18.75rem' }"
                       data-test="service-identity-add-distinguish-btn"
                       @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
                     />
                     <OButton
+                      icon-only
                       :aria-label="t('common.cancel')"
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="sm"
                       @click="
                         addingToEnv = '';
                         addFieldValue = undefined;
@@ -376,18 +371,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Add group -->
                 <div v-if="!addingToEnv" class="flex items-center justify-between px-4 py-3">
-                  <OButton
-                    variant="outline"
-                    size="sm"
-                    @click="addingToEnv = generateGroupId()"
-                    icon-left="add"
-                  >
+                  <OButton variant="secondary" @click="addingToEnv = generateGroupId()" icon="add">
                     {{ t("settings.correlation.addGroup") }}
-                    <OTooltip
-                      side="top"
-                      :content="t('settings.correlation.addGroupTooltip')"
-                      max-width="15rem"
-                    />
+                    <OTooltip side="top" :content="t('settings.correlation.addGroupTooltip')" />
                   </OButton>
                 </div>
               </template>
@@ -407,8 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #actions>
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="service-identity-go-to-services"
             @click="emit('navigate-to-services')"
           >
@@ -446,8 +431,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-3 text-xs" :class="'text-text-secondary'">
                   {{ t("settings.serviceIdentitySetup.workloadTrackedHelp") }}
                   <OButton
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     class="mx-1 align-middle"
                     @click="emit('navigate-to-aliases', 'service')"
                     >{{ t("settings.serviceIdentitySetup.goToFieldAliases") }}</OButton
@@ -464,9 +449,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <span>{{ alias.label }}</span>
                     <OButton
+                      icon-only
                       :aria-label="t('common.remove')"
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="sm"
                       @click="trackedAliasIds = trackedAliasIds.filter((id) => id !== alias.id)"
                     >
                       <svg
@@ -497,13 +483,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchable
                       :placeholder="t('settings.serviceIdentitySetup.selectAliasGroup')"
                       style="width: 13.75rem"
-                      :dropdown-style="{ minWidth: '18.75rem' }"
                       @update:model-value="onAddTrackedAlias($event)"
                     />
                     <OButton
+                      icon-only
                       :aria-label="t('common.cancel')"
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="sm"
                       @click="
                         addingTrackedAlias = false;
                         addTrackedAliasValue = undefined;
@@ -527,13 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                   <!-- Add field button -->
-                  <OButton
-                    v-else
-                    variant="outline"
-                    size="sm"
-                    @click="addingTrackedAlias = true"
-                    icon-left="add"
-                  >
+                  <OButton v-else variant="secondary" @click="addingTrackedAlias = true" icon="add">
                     {{ t("settings.correlation.addField") }}
                   </OButton>
                 </div>
@@ -725,13 +705,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}
             </div>
             <div class="flex shrink-0 items-center gap-1">
-              <OButton variant="outline" size="sm" @click="applySuggestion">
+              <OButton variant="secondary" @click="applySuggestion">
                 {{ t("settings.serviceIdentitySetup.apply") }}
               </OButton>
               <OButton
+                icon-only
                 :aria-label="t('common.dismiss')"
                 variant="ghost"
-                size="icon"
+                size="xs"
                 class="opacity-40 hover:opacity-100"
                 @click="dismissSuggestion"
               >
@@ -745,7 +726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-identity-setup-insight-drawer"
             v-model:open="insightDialogOpen"
             :title="insightDrawerName"
-            :width="insightPanelWidthPct"
+            size="lg"
           >
             <!-- #header kept: first line combines plain subtitle text with an inline theme-colored badge
                containing the title + tooltip; second line is a conditional coverage flex with icon.
@@ -795,8 +776,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OSkeleton
                     v-if="coverageLineState(insightData) === 'loading'"
-                    type="text"
-                    animation="none"
                     class="h-3 w-28"
                     data-test="service-identity-setup-insight-coverage-loading"
                   />
@@ -968,13 +947,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Section 3: Warnings -->
       <div v-if="warnings.length > 0" class="mb-6">
-        <OBanner variant="warning" icon="warning" data-test="service-identity-warnings-banner">
+        <OInlineNotice tone="warn" data-test="service-identity-warnings-banner">
           <div class="flex flex-col gap-1">
             <div v-for="(warn, idx) in warnings" :key="idx" class="text-sm">
               {{ warn }}
             </div>
           </div>
-        </OBanner>
+        </OInlineNotice>
       </div>
 
       <!-- Field Details Dialog -->
@@ -992,9 +971,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         size="md"
         :title="raw(primaryDim?.display)"
-        :sub-title="raw(popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined)"
+        :subtitle="raw(popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined)"
       >
-        <OCardSection class="flex flex-col gap-4 border-t p-0">
+        <div class="flex flex-col gap-4 border-t p-0">
           <!-- Header section with cardinality details -->
           <div class="flex items-center gap-3 border-b p-4">
             <span class="font-medium">{{ t("settings.serviceIdentitySetup.cardinality") }}</span>
@@ -1150,7 +1129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="text-text-muted p-4 text-center italic">
             {{ t("settings.serviceIdentitySetup.noSampleData") }}
           </div>
-        </OCardSection>
+        </div>
       </ODialog>
     </div>
   </div>
@@ -1158,7 +1137,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from "vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
@@ -1175,7 +1153,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
@@ -1193,7 +1171,7 @@ import type {
 } from "@/services/service_streams";
 import { groupEnvKey } from "@/utils/serviceStreamEnvs";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
@@ -2078,15 +2056,6 @@ const insightRelatedDimensions = computed<RelatedDimension[]>(() => {
   return data.relatedDimensions ?? [];
 });
 
-/** Chart data for insight dialog — stream contribution donut */
-const insightPanelWidthPct = computed(() => {
-  const dims = (insightData.value as any)?.relatedDimensions;
-  const colCount = dims?.length ?? 0;
-  if (colCount <= 2) return 37;
-  if (colCount === 3) return 50;
-  return 63; // 4+
-});
-
 const STREAM_TYPE_COLORS: Record<string, string> = {
   logs: "#3b82f6",
   traces: "#f59e0b",
@@ -2653,16 +2622,16 @@ function pluralize(val: string): string {
   return val + "s";
 }
 
-/** Returns a BadgeVariant token for a cardinality class */
-function cardinalityColor(cardClass: string): BadgeVariant {
-  const map: Record<string, BadgeVariant> = {
-    VeryLow: "success",
-    Low: "success",
-    Medium: "warning",
-    High: "error",
-    VeryHigh: "error",
+/** Returns a ChipTone token for a cardinality class */
+function cardinalityColor(cardClass: string): ChipTone {
+  const map: Record<string, ChipTone> = {
+    VeryLow: "ok",
+    Low: "ok",
+    Medium: "warn",
+    High: "err",
+    VeryHigh: "err",
   };
-  return map[cardClass] ?? "default";
+  return map[cardClass] ?? "neutral";
 }
 
 /** Get which stream types a specific value was found in for a dimension group */

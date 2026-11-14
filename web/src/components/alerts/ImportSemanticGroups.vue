@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :is-importing="isImporting"
     :show-splitter="false"
     container-class="h-[calc(100vh-var(--navbar-height))]!"
-    @back="handleBack"
-    @cancel="handleBack"
+    :back="{ label: t('settings.correlationSettings'), to: parentRoute }"
+    @cancel="goBack"
     @import="handleImport"
     @update:jsonArray="handleJsonUpdate"
   >
@@ -38,31 +38,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="jsonFile"
                 :label="t('correlation.importSemanticGroups.selectJsonFile')"
                 accept=".json"
+                variant="compact"
                 @update:model-value="loadFile"
+                @clear="clearFile"
                 data-test="semantic-groups-import-file"
-                class="compact-file-input"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="cloud-upload" size="sm" />
-                </template>
-                <template v-slot:append>
-                  <OIcon
-                    v-if="jsonFile"
-                    name="close"
-                    size="sm"
-                    @click.stop="clearFile"
-                    class="cursor-pointer"
-                  />
-                </template>
-              </OFile>
+              />
             </div>
             <div class="col-md-4 w-full ps-2 text-right">
               <OButton
                 v-if="diffData"
                 variant="primary"
-                size="sm"
                 @click="applyChanges"
-                :disable="!hasSelectedChanges"
+                :disabled="!hasSelectedChanges"
                 :loading="isApplying"
                 >{{ t("correlation.importSemanticGroups.applyChanges") }}</OButton
               >
@@ -76,32 +63,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="bg-card-glass-bg mb-2 p-2">
             <div class="flex items-center gap-2">
               <div class="col-auto">
-                <OTag type="diffCategory" value="new" class="text-sm!">
+                <OTag type="diffCategory" value="new">
                   <strong class="text-sm">{{ diffData.additions.length }}</strong
                   >&nbsp;{{ t("correlation.importSemanticGroups.new") }}
                 </OTag>
               </div>
               <div class="col-auto">
-                <OTag type="diffCategory" value="modified" class="text-sm!">
+                <OTag type="diffCategory" value="modified">
                   <strong class="text-sm">{{ diffData.modifications.length }}</strong
                   >&nbsp;{{ t("correlation.importSemanticGroups.modified") }}
                 </OTag>
               </div>
               <div class="col-auto">
-                <OTag type="diffCategory" value="unchanged" class="text-sm!">
+                <OTag type="diffCategory" value="unchanged">
                   {{ diffData.unchanged.length }}
                   {{ t("correlation.importSemanticGroups.unchanged") }}
                 </OTag>
               </div>
               <div class="flex flex-col">
                 <OButtonGroup class="float-right">
-                  <OButton variant="ghost-primary" size="xs" @click="selectAllAdditions">{{
+                  <OButton variant="accent-ghost" size="sm" @click="selectAllAdditions">{{
                     t("correlation.importSemanticGroups.selectAllNew")
                   }}</OButton>
-                  <OButton variant="ghost-warning" size="xs" @click="selectAllModifications">{{
+                  <OButton variant="ghost" size="sm" @click="selectAllModifications">{{
                     t("correlation.importSemanticGroups.selectAllModified")
                   }}</OButton>
-                  <OButton variant="ghost-muted" size="xs" @click="deselectAll">{{
+                  <OButton variant="ghost" size="sm" @click="deselectAll">{{
                     t("correlation.importSemanticGroups.clearAll")
                   }}</OButton>
                 </OButtonGroup>
@@ -152,9 +139,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="ms-auto flex shrink-0 items-center">
                     <OButton
+                      icon-only
                       :aria-label="t('common.view')"
                       variant="ghost"
-                      size="icon-circle-sm"
+                      size="sm"
                       @click.stop="viewGroup(group)"
                     >
                       <OIcon name="visibility" size="sm" />
@@ -199,9 +187,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="ms-auto flex shrink-0 items-center">
                     <OButton
+                      icon-only
                       :aria-label="t('common.compare')"
                       variant="ghost"
-                      size="icon-circle-sm"
+                      size="sm"
                       @click.stop="viewModification(mod)"
                     >
                       <OIcon name="compare" size="sm" />
@@ -214,9 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Unchanged (Collapsed) -->
             <div v-if="diffData.unchanged.length > 0">
               <OCollapsible
-                v-model="unchangedOpen"
-                :label="t('common.unchangedCount', { count: diffData.unchanged.length })"
-                icon="check-circle"
+                v-model:open="unchangedOpen"
+                :title="t('common.unchangedCount', { count: diffData.unchanged.length })"
               >
                 <ul class="divide-border rounded-default mb-0 flex flex-col divide-y border">
                   <li
@@ -258,8 +246,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="showGroupDialog"
     size="md"
     :title="raw(selectedGroup?.display)"
-    :sub-title="t('common.idPrefix', { id: selectedGroup?.id })"
-    :primary-button-label="t('common.close')"
+    :subtitle="t('common.idPrefix', { id: selectedGroup?.id })"
+    :primary="{ label: t('common.close') }"
     @click:primary="showGroupDialog = false"
   >
     <div>
@@ -289,8 +277,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="showModificationDialog"
     size="lg"
     :title="raw(selectedModification?.proposed.display)"
-    :sub-title="t('correlation.importSemanticGroups.compareChanges')"
-    :primary-button-label="t('common.close')"
+    :subtitle="t('correlation.importSemanticGroups.compareChanges')"
+    :primary="{ label: t('common.close') }"
     @click:primary="showModificationDialog = false"
   >
     <div class="flex gap-3">
@@ -356,7 +344,7 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
-import { useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
@@ -386,8 +374,12 @@ interface SemanticGroupDiff {
 }
 
 const { t } = useI18nTyped();
-const router = useRouter();
 const store = useStore();
+const parentRoute = computed(() => ({
+  name: "correlationSettings",
+  query: { org_identifier: store.state.selectedOrganization.identifier },
+}));
+const { goBack } = useSmartBack(() => parentRoute.value);
 
 const jsonFile = ref<File | null>(null);
 const importedGroups = ref<SemanticGroup[]>([]);
@@ -560,8 +552,7 @@ const applyChanges = async () => {
       variant: "success",
     });
 
-    // Go back
-    handleBack();
+    goBack();
   } catch (error: any) {
     toast({
       message: t("toastMessages.alerts.failedToSaveChanges", {
@@ -572,10 +563,6 @@ const applyChanges = async () => {
   } finally {
     isApplying.value = false;
   }
-};
-
-const handleBack = () => {
-  router.back();
 };
 
 const handleImport = () => {

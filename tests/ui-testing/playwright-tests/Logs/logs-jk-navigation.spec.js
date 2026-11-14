@@ -29,6 +29,7 @@ const TOTAL = 130;
 const editor = '[data-test="logs-search-bar-query-editor"] .monaco-editor';
 const table = '[data-test="logs-search-result-logs-table"]';
 const pager = '[data-test="logs-search-result-pagination"]';
+const pagerNext = '[data-test="logs-search-result-pagination-next"]';
 const jsonContent = '[data-test="log-detail-json-content"]';
 // Syntax-highlight colours are tuned for white rows, not the selected fill; AC8.2 covers the J/K surfaces, not log colouring.
 const activeRowLogText = `${table} [data-active-row] .log-cell-html`;
@@ -294,7 +295,8 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       );
       await page.waitForLoadState("networkidle");
       expect(schemaReads).toEqual([]);
-      await expect(page.locator(`${pager} [aria-current="page"]`)).toHaveText(
+      await expect(page.locator(pager)).toHaveAttribute(
+        "data-test-page",
         "2",
       );
       await logs.expectActiveLogRow(0);
@@ -346,7 +348,7 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       const pm = new PageManager(page);
       const logs = pm.logsPage;
       const searches = await openResults(page);
-      await page.locator(`${pager} button`, { hasText: /^3$/ }).click();
+      await logs.goToResultPage(3);
       await expect(logs.logResultsRow(29)).toBeAttached({ timeout: 30000 });
       await expect(logs.logResultsRow(30)).toHaveCount(0);
       await openRow(page, logs, 29);
@@ -442,7 +444,7 @@ test.describe("Logs J/K navigation (item 4a)", () => {
         if (/\/streams\/[^/]+\/schema/.test(req.url()))
           schemaReads.push(req.url());
       });
-      await page.locator(`${pager} button`, { hasText: /^2$/ }).click();
+      await page.locator(pagerNext).click();
       await expect(logs.logResultsRow(0)).toContainText("jk-79", {
         timeout: 30000,
       });

@@ -15,12 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard variant="outlined" class="rounded-surface p-6" data-test="rum-analytics-retention-unlock">
+  <OCard data-test="rum-analytics-retention-unlock">
     <OEmptyState
-      illustration="lock"
-      size="block"
+      icon="lock"
       :title="t('rum.analytics.retention.unlockTitle')"
-      :description="t('rum.analytics.retention.unlockDescription', { reason })"
+      :text="t('rum.analytics.retention.unlockDescription', { reason })"
     >
       <template #actions>
         <div class="flex w-full max-w-xl flex-col gap-3 text-start">
@@ -42,9 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span
           >
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="open-in-new"
+            variant="secondary"
+            icon="open-in-new"
             class="self-start"
             data-test="rum-analytics-retention-unlock-docs-link"
             @click="openDocs"

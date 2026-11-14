@@ -55,8 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-1 px-3.5 py-2">
       <div class="flex items-center gap-1">
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
           :disabled="!canScrollLeft"
           data-test="synthetics-timeline-scroll-left-btn"
           :aria-label="t('synthetics.timeline.scrollLeft')"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'bg-border-default/40',
               ]"
             >
-              <OTooltip v-if="cell.seg" side="top" :delay="0" :max-width="'auto'">
+              <OTooltip v-if="cell.seg" side="top">
                 <template #content>
                   <div class="min-w-50 py-0.5">
                     <div
@@ -210,8 +210,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
           :disabled="!canScrollRight"
           data-test="synthetics-timeline-scroll-right-btn"
           :aria-label="t('synthetics.timeline.scrollRight')"

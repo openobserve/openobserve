@@ -63,17 +63,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="close"
+        icon="close"
         :aria-label="t('dashboard.markAreaRemove')"
         :data-test="`dashboard-config-mark-area-remove-${index}`"
         @click="remove(index)"
       />
     </div>
     <OButton
-      variant="outline"
-      size="sm"
+      variant="secondary"
       class="self-start"
       data-test="dashboard-config-mark-area-add"
       @click="add"

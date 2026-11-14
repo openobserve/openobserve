@@ -135,7 +135,7 @@ export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): Ri
             labelKey: "ingestion.setupCard.portLabel",
             default: "27017",
             placeholder: raw("27017"),
-            width: "sm",
+            width: "s",
           },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),

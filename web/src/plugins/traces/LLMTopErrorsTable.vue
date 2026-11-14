@@ -25,7 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="columns"
       row-key="message"
       :loading="loading"
-      :show-global-filter="false"
       :fill-height="false"
       :default-columns="false"
       pagination="none"

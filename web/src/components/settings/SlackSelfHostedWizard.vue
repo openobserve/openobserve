@@ -25,7 +25,7 @@ import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -548,22 +548,16 @@ const nextBlocked = computed(() => {
       data-test="slack-wizard-take-over"
     >
       <div class="flex flex-col gap-3">
-        <OBanner v-if="takeOverRefusal" variant="error-soft" dense icon="error-outline">
+        <OInlineNotice v-if="takeOverRefusal" tone="err">
           {{ raw(takeOverRefusal.message) }}
-        </OBanner>
-        <OBanner
-          v-if="takeOverError"
-          variant="error-soft"
-          dense
-          icon="error-outline"
-          data-test="slack-wizard-take-over-error"
-        >
+        </OInlineNotice>
+        <OInlineNotice v-if="takeOverError" tone="err" data-test="slack-wizard-take-over-error">
           {{ raw(takeOverError) }}
-        </OBanner>
+        </OInlineNotice>
         <div
           v-for="option in takeOverOptions"
           :key="option.installation_id"
-          class="border-border-default flex flex-wrap items-center justify-between gap-3 border-t pt-3"
+          class="border-border-subtle flex flex-wrap items-center justify-between gap-3 border-t pt-3 first:border-t-0 first:pt-0"
         >
           <div class="flex min-w-0 flex-col gap-0.5">
             <span class="text-text-body text-sm font-medium">{{ raw(option.team_name) }}</span>
@@ -572,8 +566,7 @@ const nextBlocked = computed(() => {
             </span>
           </div>
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :loading="takingOver === option.installation_id"
             :disabled="takingOver !== null && takingOver !== option.installation_id"
             :data-test="`slack-wizard-take-over-${option.installation_id}`"
@@ -592,13 +585,12 @@ const nextBlocked = computed(() => {
             {{ t("slackApp.prereq.title") }}
           </h3>
           <p class="text-text-secondary m-0 text-sm">{{ t("slackApp.prereq.subtitle") }}</p>
-          <OSpinner v-if="prerequisites.isPending.value" size="sm" />
+          <OSpinner v-if="prerequisites.isPending.value" size="lg" />
           <OEmptyState
             v-else-if="prerequisites.isError.value"
-            size="compact"
-            preset="load-error"
+            kind="error"
+            :text="t('emptyState.loadError.description')"
             :title="t('slackApp.prereq.loadFailed')"
-            :backdrop="false"
             data-test="slack-wizard-prereq-error"
             @action="prerequisites.refetch()"
           />
@@ -619,19 +611,15 @@ const nextBlocked = computed(() => {
           <p class="text-text-secondary m-0 text-sm">
             {{ t("slackApp.wizard.connection.description") }}
           </p>
-          <OSpinner v-if="connectivity.isPending.value" size="sm" />
+          <OSpinner v-if="connectivity.isPending.value" size="lg" />
           <template v-else-if="connectivityResult">
-            <OBanner
-              :variant="connectivityBlocked ? 'error-soft' : 'success'"
-              dense
-              :icon="connectivityBlocked ? 'error-outline' : 'check-circle'"
-            >
+            <OInlineNotice :tone="connectivityBlocked ? 'err' : 'ok'">
               {{
                 connectivityBlocked
                   ? t("slackApp.wizard.connection.someFailed")
                   : t("slackApp.wizard.connection.allPassed")
               }}
-            </OBanner>
+            </OInlineNotice>
             <SlackCheckList :items="connectivityItems" />
             <ul class="text-text-secondary m-0 flex list-none flex-col gap-1 p-0 text-xs">
               <li v-if="connectivityResult.proxy">
@@ -652,9 +640,8 @@ const nextBlocked = computed(() => {
             </ul>
           </template>
           <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="refresh"
+            variant="secondary"
+            icon="refresh"
             class="w-fit"
             :loading="connectivity.isPending.value"
             @click="runConnectivity"
@@ -678,11 +665,9 @@ const nextBlocked = computed(() => {
           <h3 class="text-text-heading m-0 text-base font-semibold">
             {{ t("slackApp.wizard.create.title") }}
           </h3>
-          <OBanner
+          <OInlineNotice
             v-if="createRefusal && !createRefusal.candidates.length"
-            variant="error-soft"
-            icon="error-outline"
-            :role="createRefusal.unreachable ? 'alert' : undefined"
+            tone="err"
             :data-test="
               createRefusal.unreachable
                 ? 'slack-wizard-unreachable'
@@ -703,13 +688,8 @@ const nextBlocked = computed(() => {
               {{ t("slackApp.wizard.noAppCreated") }}
             </template>
             <template v-else>{{ raw(createRefusal.message) }}</template>
-          </OBanner>
-          <OBanner
-            v-if="leftApp"
-            variant="warning"
-            icon="warning"
-            data-test="slack-wizard-app-left"
-          >
+          </OInlineNotice>
+          <OInlineNotice v-if="leftApp" tone="warn" data-test="slack-wizard-app-left">
             <div class="flex flex-col gap-0.5">
               <span class="font-medium">
                 {{ t("slackApp.wizard.install.appLeftTitle", { appId: leftApp.appId }) }}
@@ -730,19 +710,17 @@ const nextBlocked = computed(() => {
             </div>
             <template #actions>
               <OButton
-                as="a"
                 :href="leftApp.url"
                 target="_blank"
                 rel="noopener noreferrer"
-                variant="outline"
-                size="sm-action"
-                icon-right="open-in-new"
+                variant="secondary"
+                icon-end="open-in-new"
                 data-test="slack-wizard-delete-app"
               >
                 {{ t("slackApp.uninstall.deleteApp") }}
               </OButton>
             </template>
-          </OBanner>
+          </OInlineNotice>
           <OFormRadioGroup
             name="mode"
             :label="t('slackApp.wizard.create.modeLabel')"
@@ -775,18 +753,17 @@ const nextBlocked = computed(() => {
             :label="t('slackApp.wizard.create.channelHistory')"
             data-test="slack-wizard-channel-history"
           />
-          <OBanner variant="info" dense icon="verified-user" data-test="slack-wizard-consent">
+          <OInlineNotice tone="info" icon="verified-user" data-test="slack-wizard-consent">
             {{
               channelHistory ? t("slackApp.connect.consent") : t("slackApp.connect.consentPrivate")
             }}
-          </OBanner>
+          </OInlineNotice>
 
           <template v-if="!manual">
             <div class="flex flex-col gap-1">
               <OFormInput
                 name="config_refresh_token"
                 type="password"
-                revealable
                 autocomplete="off"
                 :label="t('slackApp.wizard.create.tokenLabel')"
                 required
@@ -800,20 +777,19 @@ const nextBlocked = computed(() => {
               </p>
               <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
                 <OButton
-                  as="a"
                   :href="SLACK_APPS_URL"
                   target="_blank"
                   rel="noopener noreferrer"
-                  variant="ghost-primary"
-                  size="xs"
-                  icon-right="open-in-new"
+                  variant="accent-ghost"
+                  size="sm"
+                  icon-end="open-in-new"
                 >
                   {{ t("slackApp.wizard.create.generateToken") }}
                 </OButton>
                 <span class="text-text-label max-md:hidden" aria-hidden="true">·</span>
                 <OButton
-                  variant="ghost-primary"
-                  size="xs"
+                  variant="accent-ghost"
+                  size="sm"
                   data-test="slack-wizard-manual"
                   @click="manual = true"
                 >
@@ -827,14 +803,12 @@ const nextBlocked = computed(() => {
               {{ t("slackApp.wizard.create.manualHelp") }}
             </p>
             <OButton
-              as="a"
               :href="manifestUrl"
               :disabled="!manifestUrl"
               target="_blank"
               rel="noopener noreferrer"
-              variant="outline"
-              size="sm-action"
-              icon-right="open-in-new"
+              variant="secondary"
+              icon-end="open-in-new"
               class="w-fit"
               data-test="slack-wizard-open-manifest"
             >
@@ -844,7 +818,6 @@ const nextBlocked = computed(() => {
               v-if="manifestCode"
               :code="manifestCode"
               lang="json"
-              chrome="editor"
               filename="manifest.json"
               :max-lines="12"
             />
@@ -858,7 +831,6 @@ const nextBlocked = computed(() => {
               <OFormInput
                 name="client_secret"
                 type="password"
-                revealable
                 autocomplete="off"
                 :label="t('slackApp.wizard.create.clientSecret')"
                 required
@@ -868,7 +840,6 @@ const nextBlocked = computed(() => {
                 v-if="mode === 'http'"
                 name="signing_secret"
                 type="password"
-                revealable
                 autocomplete="off"
                 :label="t('slackApp.wizard.create.signingSecret')"
                 required
@@ -878,15 +849,14 @@ const nextBlocked = computed(() => {
                 v-else
                 name="app_token"
                 type="password"
-                revealable
                 autocomplete="off"
                 :label="t('slackApp.wizard.create.appToken')"
                 data-test="slack-wizard-app-token"
               />
             </div>
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               class="w-fit"
               data-test="slack-wizard-manual"
               @click="manual = false"
@@ -896,15 +866,10 @@ const nextBlocked = computed(() => {
           </template>
 
           <div class="flex flex-wrap items-center justify-end gap-2">
-            <OButton variant="outline" size="sm-action" @click="step = 1">
+            <OButton variant="secondary" @click="step = 1">
               {{ t("slackApp.wizard.back") }}
             </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              type="submit"
-              data-test="slack-wizard-create"
-            >
+            <OButton variant="primary" type="submit" data-test="slack-wizard-create">
               {{
                 manual
                   ? t("slackApp.wizard.create.saveManual")
@@ -926,10 +891,9 @@ const nextBlocked = computed(() => {
             {{ t("slackApp.wizard.install.title") }}
           </h3>
           <template v-if="installRefusal">
-            <OBanner
+            <OInlineNotice
               v-if="installRefusal.instanceTeam"
-              variant="error-soft"
-              icon="error-outline"
+              tone="err"
               data-test="slack-wizard-instance-team"
             >
               <div class="flex flex-col gap-1">
@@ -941,13 +905,12 @@ const nextBlocked = computed(() => {
                   </template>
                 </span>
               </div>
-            </OBanner>
+            </OInlineNotice>
             <div class="flex flex-wrap justify-end gap-2">
               <OButton
                 v-if="installRefusal.instanceTeam"
-                variant="outline"
-                size="sm-action"
-                icon-left="content-copy"
+                variant="secondary"
+                icon="content-copy"
                 data-test="slack-copy-request"
                 @click="copyRequest"
               >
@@ -955,7 +918,6 @@ const nextBlocked = computed(() => {
               </OButton>
               <OButton
                 variant="primary"
-                size="sm-action"
                 data-test="slack-wizard-start-over"
                 @click="startOverOpen = true"
               >
@@ -963,9 +925,9 @@ const nextBlocked = computed(() => {
               </OButton>
             </div>
           </template>
-          <OBanner
+          <OInlineNotice
             v-else-if="pendingInstall"
-            variant="warning"
+            tone="warn"
             icon="schedule"
             data-test="slack-wizard-pending"
           >
@@ -977,16 +939,15 @@ const nextBlocked = computed(() => {
                 }}
               </span>
             </div>
-          </OBanner>
+          </OInlineNotice>
           <span v-else class="flex items-center gap-2 text-sm">
             <OIcon name="check-circle" size="sm" class="text-status-positive" />
             {{ t("slackApp.wizard.install.created", { appId: current?.app_id ?? "" }) }}
           </span>
 
-          <OBanner
+          <OInlineNotice
             v-if="alreadyInstalled"
-            variant="warning"
-            icon="info"
+            tone="warn"
             data-test="slack-wizard-already-installed"
           >
             {{
@@ -997,7 +958,6 @@ const nextBlocked = computed(() => {
             <template #actions>
               <OButton
                 variant="primary"
-                size="sm-action"
                 :loading="connectInstallation.isPending.value || uninstall.isPending.value"
                 data-test="slack-wizard-connect-ticket"
                 @click="connectWithTicket"
@@ -1005,38 +965,34 @@ const nextBlocked = computed(() => {
                 {{ t("slackApp.connect.connectExisting") }}
               </OButton>
             </template>
-          </OBanner>
-          <OCard
-            v-else-if="installedTeam === null && !installRefusal"
-            variant="outlined"
-            class="gap-3 p-4"
-          >
-            <p class="text-text-secondary m-0 text-sm">
-              {{ t("slackApp.wizard.install.allowHint") }}
-            </p>
-            <div class="flex flex-wrap gap-2">
-              <OButton
-                variant="primary"
-                size="sm-action"
-                :loading="installPopup.connecting.value"
-                data-test="slack-wizard-allow"
-                @click="installPopup.open()"
-              >
-                {{
-                  pendingInstall
-                    ? t("slackApp.wizard.install.finishInstall")
-                    : t("slackApp.wizard.install.allow")
-                }}
-              </OButton>
-              <OButton
-                v-if="pendingInstall"
-                variant="outline-destructive"
-                size="sm-action"
-                data-test="slack-wizard-start-over"
-                @click="startOverOpen = true"
-              >
-                {{ t("slackApp.wizard.install.startOver") }}
-              </OButton>
+          </OInlineNotice>
+          <OCard v-else-if="installedTeam === null && !installRefusal">
+            <div class="flex flex-col gap-3">
+              <p class="text-text-secondary m-0 text-sm">
+                {{ t("slackApp.wizard.install.allowHint") }}
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <OButton
+                  variant="primary"
+                  :loading="installPopup.connecting.value"
+                  data-test="slack-wizard-allow"
+                  @click="installPopup.open()"
+                >
+                  {{
+                    pendingInstall
+                      ? t("slackApp.wizard.install.finishInstall")
+                      : t("slackApp.wizard.install.allow")
+                  }}
+                </OButton>
+                <OButton
+                  v-if="pendingInstall"
+                  variant="danger-ghost"
+                  data-test="slack-wizard-start-over"
+                  @click="startOverOpen = true"
+                >
+                  {{ t("slackApp.wizard.install.startOver") }}
+                </OButton>
+              </div>
             </div>
           </OCard>
           <span
@@ -1059,7 +1015,6 @@ const nextBlocked = computed(() => {
             <OFormInput
               name="app_token"
               type="password"
-              revealable
               autocomplete="off"
               :label="t('slackApp.wizard.create.appToken')"
               :help-text="t('slackApp.wizard.install.appTokenHelp')"
@@ -1068,18 +1023,16 @@ const nextBlocked = computed(() => {
             />
             <div class="flex flex-wrap gap-2">
               <OButton
-                as="a"
                 :href="appUrl('general')"
                 target="_blank"
                 rel="noopener noreferrer"
-                variant="ghost-primary"
-                size="sm-action"
-                icon-right="open-in-new"
+                variant="accent-ghost"
+                icon-end="open-in-new"
                 data-test="slack-wizard-basic-info"
               >
                 {{ t("slackApp.wizard.install.openBasicInfo") }}
               </OButton>
-              <OButton variant="primary" size="sm-action" type="submit">
+              <OButton variant="primary" type="submit">
                 {{ t("slackApp.wizard.install.saveAppToken") }}
               </OButton>
             </div>
@@ -1089,13 +1042,11 @@ const nextBlocked = computed(() => {
             class="flex flex-col gap-1"
           >
             <OButton
-              as="a"
               :href="appUrl('app-manifest')"
               target="_blank"
               rel="noopener noreferrer"
-              variant="outline"
-              size="sm-action"
-              icon-right="open-in-new"
+              variant="secondary"
+              icon-end="open-in-new"
               class="w-fit"
               data-test="slack-wizard-verify"
             >
@@ -1105,9 +1056,9 @@ const nextBlocked = computed(() => {
               t("slackApp.wizard.install.verifyHelp")
             }}</span>
           </div>
-          <OBanner v-if="!installRefusal" variant="info" dense icon="info">
+          <OInlineNotice v-if="!installRefusal" tone="info">
             {{ t("slackApp.wizard.install.collaborator") }}
-          </OBanner>
+          </OInlineNotice>
         </div>
       </OStep>
 
@@ -1118,8 +1069,7 @@ const nextBlocked = computed(() => {
           </h3>
           <div class="flex flex-wrap gap-2">
             <OButton
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               :loading="testInstallation.isPending.value"
               data-test="slack-wizard-run-checks"
               @click="runChecks"
@@ -1127,8 +1077,7 @@ const nextBlocked = computed(() => {
               {{ t("slackApp.wizard.test.run") }}
             </OButton>
             <OButton
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               :loading="signInPopup.connecting.value"
               data-test="slack-wizard-signin-test"
               @click="signInPopup.open()"
@@ -1142,13 +1091,11 @@ const nextBlocked = computed(() => {
           <SlackCheckList v-if="testItems.length" :items="testItems" />
           <OButton
             v-if="testVerifyUrl"
-            as="a"
             :href="testVerifyUrl"
             target="_blank"
             rel="noopener noreferrer"
-            variant="outline"
-            size="sm-action"
-            icon-right="open-in-new"
+            variant="secondary"
+            icon-end="open-in-new"
             class="w-fit"
             data-test="slack-wizard-test-verify"
           >
@@ -1159,7 +1106,7 @@ const nextBlocked = computed(() => {
             {{ t("slackApp.wizard.test.signInPassed") }}
           </span>
 
-          <OSpinner v-if="linking.isPending.value" size="sm" />
+          <OSpinner v-if="linking.isPending.value" size="lg" />
           <OForm
             v-else
             :key="linkingDefaults.domains.join(',')"
@@ -1180,8 +1127,7 @@ const nextBlocked = computed(() => {
             <p class="text-text-secondary m-0 text-xs">{{ t("slackApp.linking.domainsHelp") }}</p>
             <OButton
               v-if="matches > 0"
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               class="w-fit"
               :loading="linkAll.isPending.value"
               data-test="slack-wizard-link-all"
@@ -1190,15 +1136,10 @@ const nextBlocked = computed(() => {
               {{ t("slackApp.linking.linkAllMatches", { count: matches }) }}
             </OButton>
             <div class="flex justify-end gap-2">
-              <OButton variant="outline" size="sm-action" @click="step = 3">
+              <OButton variant="secondary" @click="step = 3">
                 {{ t("slackApp.wizard.back") }}
               </OButton>
-              <OButton
-                variant="primary"
-                size="sm-action"
-                type="submit"
-                data-test="slack-wizard-finish"
-              >
+              <OButton variant="primary" type="submit" data-test="slack-wizard-finish">
                 {{ t("slackApp.wizard.finish") }}
               </OButton>
             </div>
@@ -1213,19 +1154,17 @@ const nextBlocked = computed(() => {
     >
       <OButton
         v-if="step === 0"
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         data-test="slack-wizard-cancel"
         @click="emit('cancel')"
       >
         {{ t("common.cancel") }}
       </OButton>
-      <OButton v-else-if="step === 1" variant="outline" size="sm-action" @click="step = 0">
+      <OButton v-else-if="step === 1" variant="secondary" @click="step = 0">
         {{ t("slackApp.wizard.back") }}
       </OButton>
       <OButton
         variant="primary"
-        size="sm-action"
         :disabled="nextBlocked"
         data-test="slack-wizard-next"
         @click="step += 1"
@@ -1240,8 +1179,7 @@ const nextBlocked = computed(() => {
       message-keypath="slackApp.wizard.install.startOverMessage"
       :message-name="current?.app_id"
       :ok-label="t('slackApp.wizard.install.startOver')"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       @update:ok="startOver"
     />
   </div>

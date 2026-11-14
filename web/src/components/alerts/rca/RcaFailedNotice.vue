@@ -16,13 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- Every analysis attempt failed and none succeeded: a failure, so red; Retry stays secondary. -->
 <template>
-  <OBanner
-    data-test="rca-failed-notice"
-    data-variant="error-soft"
-    variant="error-soft"
-    icon="error-outline"
-    inline-actions
-  >
+  <OInlineNotice data-test="rca-failed-notice" tone="err">
     <p data-test="rca-failed-title" class="text-banner-error-soft-text m-0 text-sm font-semibold">
       {{ title }}
     </p>
@@ -37,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="!short">
       <OButton
         data-test="rca-failed-reasons-toggle"
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         class="mt-1 self-start"
         :aria-expanded="reasonsOpen"
         :aria-controls="reasonsId"
@@ -73,9 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="short"
         data-test="rca-failed-open-analysis"
-        variant="outline"
-        size="sm"
-        icon-left="arrow-forward"
+        variant="secondary"
+        icon="arrow-forward"
         @click="$emit('open-analysis')"
       >
         {{ t("alerts.incidents.rcaLight.goToAnalysis") }}
@@ -84,9 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="inline-flex">
           <OButton
             data-test="rca-failed-retry"
-            variant="outline"
-            size="sm"
-            :icon-left="startLockedReason ? 'lock' : 'refresh'"
+            variant="secondary"
+            :icon="startLockedReason ? 'lock' : 'refresh'"
             :loading="retrying"
             :disabled="!!startLockedReason"
             @click="$emit('retry')"
@@ -96,13 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTooltip>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";

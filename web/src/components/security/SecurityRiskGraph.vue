@@ -90,14 +90,13 @@ function onNodeClick({ node }: { node: { data?: RiskNode } }) {
     </div>
 
     <div v-if="loading && !graph.nodes.length" class="flex flex-1 items-center justify-center">
-      <OSpinner size="sm" />
+      <OSpinner size="lg" />
     </div>
     <OEmptyState
       v-else-if="!graph.nodes.length"
-      size="hero"
       icon="share"
       :title="t('siem.entities.riskGraph.empty')"
-      :description="t('siem.entities.riskGraph.emptyHint')"
+      :text="t('siem.entities.riskGraph.emptyHint')"
       data-test="security-risk-graph-empty"
     />
     <div v-else class="mt-2 min-h-100 flex-1" data-test="security-risk-graph-canvas">
@@ -133,8 +132,8 @@ function onNodeClick({ node }: { node: { data?: RiskNode } }) {
                 >{{ data.value }}</span
               >
               <OTag
-                :variant="data.score ? 'error-soft' : 'default-soft'"
-                size="xs"
+                :tone="data.score ? 'err' : 'neutral'"
+                size="sm"
                 :data-test="`risk-node-score-${data.id}`"
                 >{{ data.score
                 }}<OTooltip

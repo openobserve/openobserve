@@ -19,11 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="performance-fields-dialog"
     :open="modelValue"
     @update:open="(v) => $emit('update:modelValue', v)"
-    persistent
     size="md"
     :title="t('logStream.performanceFieldsDialog.title')"
-    :secondary-button-label="t('logStream.performanceFieldsDialog.skipButton')"
-    :primary-button-label="t('logStream.performanceFieldsDialog.addFieldsButton')"
+    :dirty="fieldsRemoved"
+    :secondary="{ label: t('logStream.performanceFieldsDialog.skipButton') }"
+    :primary="{ label: t('logStream.performanceFieldsDialog.addFieldsButton') }"
     @click:secondary="$emit('skip')"
     @click:primary="$emit('add-fields')"
   >
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, PropType } from "vue";
+import { defineComponent, computed, ref, watch, PropType } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -128,9 +128,20 @@ export default defineComponent({
       };
     });
 
+    // A field the user took off the list is an edit a stray dismiss must not drop (V5).
+    const openedWithCount = ref(props.missingFields.length);
+    watch(
+      () => props.modelValue,
+      (open) => {
+        if (open) openedWithCount.value = props.missingFields.length;
+      },
+    );
+    const fieldsRemoved = computed(() => props.missingFields.length < openedWithCount.value);
+
     return {
       t,
       fieldsByType,
+      fieldsRemoved,
     };
   },
 });

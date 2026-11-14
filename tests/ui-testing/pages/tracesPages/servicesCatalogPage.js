@@ -68,8 +68,8 @@ export class ServicesCatalogPage {
 
     // =====================================================================
     // Pagination locators — OTable's built-in bottom pagination bar. OTable
-    // uses first/prev/next/last buttons (NOT numbered pages) and a "Showing
-    // X - Y of Z" info line; the current page is derived from that info.
+    // uses prev/next buttons (first/last only past 10 pages, NOT numbered pages) and an
+    // "X–Y of Z" info line; the current page is derived from that info.
     // =====================================================================
     this.paginationBar = page.locator('[data-test="o2-table-pagination-bottom"]');
     this.paginationInfo = page.locator('[data-test="o2-table-pagination-info"]');
@@ -320,7 +320,7 @@ export class ServicesCatalogPage {
 
   async getServiceCount() {
     // The old "N services" total pill was removed; the OTable footer/pagination
-    // reports the true total ("Showing X - Y of Z"). Fall back to the rendered
+    // reports the true total ("X–Y of Z"). Fall back to the rendered
     // row count if the pagination bar isn't present (few rows / empty).
     try {
       const { total } = await this._getPaginationInfo();
@@ -479,16 +479,16 @@ export class ServicesCatalogPage {
   // PAGINATION
   // =========================================================================
 
-  // OTable's pagination is prev/next based with a "Showing X - Y of Z" line —
+  // OTable's pagination is prev/next based with an "X–Y of Z" line —
   // there are no numbered page buttons. Page number / count are derived from
   // that info line together with the current page size.
 
-  /** Parse the "Showing X - Y of Z" info into { from, to, total }. */
+  /** Parse the "X–Y of Z" info into { from, to, total }. */
   async _getPaginationInfo() {
     await this.paginationInfo.waitFor({ state: 'attached', timeout: 5000 });
-    const text = (await this.paginationInfo.textContent()) || '';
-    // e.g. "Showing 1 - 25 of 42"
-    const m = text.match(/(\d+)\s*-\s*(\d+)\s+\D+\s*(\d+)/);
+    // e.g. "1–25 of 42"; totals are locale-formatted ("1,234").
+    const text = ((await this.paginationInfo.textContent()) || '').replace(/,/g, '');
+    const m = text.match(/(\d+)\s*[-–]\s*(\d+)\s+of\s+(\d+)/);
     if (!m) {
       // Fallback: any three trailing numbers.
       const nums = (text.match(/\d+/g) || []).map((n) => parseInt(n, 10));
@@ -561,7 +561,7 @@ export class ServicesCatalogPage {
   }
 
   async getCurrentPage() {
-    // Derived from the "Showing from" index and the current page size:
+    // Derived from the range's "from" index and the current page size:
     // page = floor((from - 1) / pageSize) + 1.
     const { from } = await this._getPaginationInfo();
     const pageSize = await this.getRowsPerPage();

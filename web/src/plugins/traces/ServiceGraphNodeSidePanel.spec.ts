@@ -199,15 +199,15 @@ const ODrawerStub = {
     "modal",
     "portalTarget",
     "title",
-    "subTitle",
+    "subtitle",
     "size",
     "showClose",
     "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       v-if="open"
@@ -2049,7 +2049,7 @@ describe("ServiceGraphNodeSidePanel — license locks", () => {
     await flushPromises();
     await wrapper.find(METRICS_TAB).trigger("click");
     await flushPromises();
-    expect(wrapper.find(METRICS_TAB).attributes("suffix-icon")).toBe("lock");
+    expect(wrapper.find(METRICS_TAB).attributes("locked")).toBe("true");
     expect(
       wrapper.find('[data-test="service-graph-side-panel-metrics-license-denied"]').exists(),
     ).toBe(true);
@@ -2066,7 +2066,7 @@ describe("ServiceGraphNodeSidePanel — license locks", () => {
     await flushPromises();
     await wrapper.find(METRICS_TAB).trigger("click");
     await flushPromises();
-    expect(wrapper.find(METRICS_TAB).attributes("suffix-icon")).toBeUndefined();
+    expect(wrapper.find(METRICS_TAB).attributes("locked")).toBe("false");
     expect(correlateStreams).toHaveBeenCalled();
   });
 

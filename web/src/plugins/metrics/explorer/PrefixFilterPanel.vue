@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="px-2 pb-2">
       <OInput
         v-model="search"
-        size="sm"
         clearable
         :placeholder="searchPlaceholder"
         :aria-label="searchAriaLabel"
@@ -43,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("metrics.explorer.facets.selectedCount", { count: selected.size }) }}
       </span>
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :disabled="!hasSelection"
         :data-test="`metrics-explorer-${mode}-clear`"
         @click="emit('clear')"
@@ -67,7 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'bg-surface-subtle': selected.has(facet.id) }"
       >
         <OCheckbox
-          size="sm"
           class="min-w-0 flex-1"
           :model-value="selected.has(facet.id)"
           :data-test="`metrics-explorer-${mode}-facet-${facet.id}`"
@@ -88,8 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           type="countChip"
           value="neutral"
-          size="xs"
-          shape="rounded"
+          size="sm"
           :data-test="`metrics-explorer-${mode}-count-${facet.id}`"
           >{{ facet.count }}</OTag
         >
@@ -101,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         aria-busy="true"
         :data-test="`metrics-explorer-${mode}-loading`"
       >
-        <OSkeleton v-for="i in 6" :key="i" type="text" />
+        <OSkeleton v-for="i in 6" :key="i" />
       </div>
       <OEmptyState
         v-else-if="!visibleFacets.length"

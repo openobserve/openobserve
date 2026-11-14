@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="md"
     v-model:open="show"
-    :width="40"
     :title="t('pipeline.backfillJobDetailsTitle')"
     data-test="backfill-job-details-dialog"
   >
@@ -33,8 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTag>
         <OButton
           v-if="canCancelJob"
-          variant="outline-destructive"
-          size="sm-action"
+          variant="danger-ghost"
           @click="confirmCancelJob"
           data-test="cancel-job-btn"
           >{{ t("pipeline.cancelJob") }}</OButton
@@ -77,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-sm font-medium">{{ t("pipeline.overallProgress") }}</div>
               <div class="text-xl font-semibold">{{ job.progress_percent }}%</div>
             </div>
-            <OProgressBar :value="job.progress_percent / 100" variant="default" size="sm" />
+            <OProgressBar :value="job.progress_percent" />
           </div>
 
           <div class="grid grid-cols-2 gap-x-6 gap-y-3">

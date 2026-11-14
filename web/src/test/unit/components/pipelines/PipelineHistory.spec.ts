@@ -87,7 +87,7 @@ describe("PipelineHistory.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          DateTime: {
+          ODateTimeRange: {
             template: '<div data-test="pipeline-history-date-picker"></div>',
             emits: ["on:date-change"],
           },

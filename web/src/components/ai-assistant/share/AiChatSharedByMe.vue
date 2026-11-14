@@ -70,14 +70,14 @@ const { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, co
 <template>
   <ODrawer
     v-model:open="open"
-    size="md"
+    size="sm"
     :title="showAll ? t('aiChatShare.allShares') : t('aiChatShare.sharedByMe')"
     data-test="ai-chat-shared-by-me"
   >
     <template #header-right>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
         :loading="fetching"
         data-test="ai-chat-shared-by-me-refresh"
         :aria-label="t('common.refresh')"
@@ -96,15 +96,15 @@ const { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, co
         data-test="ai-chat-shared-by-me-scope"
         @update:model-value="setScope"
       >
-        <OToggleGroupItem value="mine" size="sm" data-test="ai-chat-shared-by-me-scope-mine">
+        <OToggleGroupItem value="mine" data-test="ai-chat-shared-by-me-scope-mine">
           {{ t("aiChatShare.scopeMine") }}
         </OToggleGroupItem>
-        <OToggleGroupItem value="all" size="sm" data-test="ai-chat-shared-by-me-scope-all">
+        <OToggleGroupItem value="all" data-test="ai-chat-shared-by-me-scope-all">
           {{ t("aiChatShare.scopeAll") }}
         </OToggleGroupItem>
       </OToggleGroup>
       <div v-if="loading" class="flex justify-center py-6">
-        <OSpinner size="sm" />
+        <OSpinner size="lg" />
       </div>
       <OEmptyState
         v-else-if="forbidden"
@@ -116,9 +116,8 @@ const { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, co
       <OEmptyState
         v-else-if="failed"
         size="inline"
-        icon="error"
+        kind="error"
         :title="t('aiChatShare.loadFailed')"
-        :action-label="t('common.retry')"
         data-test="ai-chat-shared-by-me-error"
         @action="refreshShares"
       />

@@ -118,7 +118,8 @@ async function showList(wrapper: any) {
 const stubs = {
   ODrawer: {
     name: "ODrawer",
-    props: ["open", "title", "persistent"],
+    props: ["open", "title", "dirty"],
+    emits: ["update:open", "discard"],
     template: "<div v-if='open'><slot name='header-right' /><slot /><slot name='footer' /></div>",
   },
   // Renders the real cell slots, so the tests exercise what the page draws.
@@ -135,7 +136,7 @@ const stubs = {
   },
   ConfirmDialog: {
     name: "ConfirmDialog",
-    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
+    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "kind"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
     template: "<div v-if='modelValue'>{{ title }} {{ message }}</div>",
   },
@@ -145,10 +146,9 @@ const stubs = {
     emits: ["confirm", "update:open", "open-policy"],
     template: "<div v-if='open' />",
   },
-  OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
+  OEmptyState: { name: "OEmptyState", props: ["text"], template: "<div />" },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
-  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   // Always renders its slot: the fold is a display choice, and these tests are
   // about what the rule stores, not about whether the section is open.
@@ -1004,19 +1004,17 @@ describe("OnCallScheduleEditor", () => {
     // The draft baseline is taken on the user's first pointer or key input, which emitted stub events skip.
     const touch = () => window.dispatchEvent(new Event("pointerdown"));
 
-    const exits: Record<string, (wrapper: any) => Promise<void>> = {
-      "Esc or backdrop (update:open)": async (wrapper) => {
-        drawer(wrapper).vm.$emit("update:open", false);
-      },
-      "the drawer's ✕": async (wrapper) => {
-        await wrapper.find('[data-test="o-drawer-close-btn"]').trigger("click");
-      },
-      "the footer Cancel": async (wrapper) => {
-        const cancel = drawer(wrapper)
-          .findAll("button")
-          .find((b: any) => b.text() === "Cancel");
-        await cancel.trigger("click");
-      },
+    const cancel = async (wrapper: any) => {
+      const button = drawer(wrapper)
+        .findAll("button")
+        .find((b: any) => b.text() === "Cancel");
+      await button.trigger("click");
+    };
+    // ✕, Escape and the backdrop go through the drawer's own "Discard changes?" footer, which emits these.
+    const dismiss = async (wrapper: any, discarded = false) => {
+      if (discarded) drawer(wrapper).vm.$emit("discard");
+      drawer(wrapper).vm.$emit("update:open", false);
+      await flushPromises();
     };
 
     async function openDrawerOnly() {
@@ -1029,45 +1027,67 @@ describe("OnCallScheduleEditor", () => {
       return wrapper;
     }
 
-    for (const [exit, close] of Object.entries(exits)) {
-      it(`drawer-only, unedited: ${exit} closes at once`, async () => {
-        const wrapper = await openDrawerOnly();
-        expect(drawer(wrapper).props("persistent")).toBe(false);
+    it("drawer-only, unedited: the drawer is not dirty and a dismiss closes at once", async () => {
+      const wrapper = await openDrawerOnly();
+      expect(drawer(wrapper).props("dirty")).toBe(false);
 
-        await close(wrapper);
-        await flushPromises();
+      await dismiss(wrapper);
 
-        expect(drawer(wrapper).props("open")).toBe(false);
-        expect(discardConfirm(wrapper).props("modelValue")).toBe(false);
-      });
+      expect(drawer(wrapper).props("open")).toBe(false);
+      expect(leaveDialog()).toBeNull();
+      expect(discardConfirm(wrapper).props("modelValue")).toBe(false);
+    });
 
-      it(`drawer-only, edited: ${exit} asks through the leave dialog`, async () => {
-        const wrapper = await openDrawerOnly();
-        touch();
-        await addPerson(wrapper, 0, "bob@o2.ai");
+    it("drawer-only, unedited: the footer Cancel closes at once", async () => {
+      const wrapper = await openDrawerOnly();
 
-        await close(wrapper);
-        await flushPromises();
+      await cancel(wrapper);
+      await flushPromises();
 
-        expect(drawer(wrapper).props("open")).toBe(true);
-        expect(leaveDialog()).not.toBeNull();
-        expect(discardConfirm(wrapper).props("modelValue")).toBe(false);
-        await leaveChoice("o-dialog-neutral-btn");
-      });
-    }
+      expect(drawer(wrapper).props("open")).toBe(false);
+      expect(leaveDialog()).toBeNull();
+    });
 
-    it("asks before dropping an edited new rotation in the bulk editor", async () => {
+    it("drawer-only, edited: the drawer is dirty, and its Discard drops the edits without a dialog", async () => {
+      const wrapper = await openDrawerOnly();
+      touch();
+      await addPerson(wrapper, 0, "bob@o2.ai");
+      expect(drawer(wrapper).props("dirty")).toBe(true);
+
+      await dismiss(wrapper, true);
+
+      expect(drawer(wrapper).props("open")).toBe(false);
+      expect(leaveDialog()).toBeNull();
+      expect(discardConfirm(wrapper).props("modelValue")).toBe(false);
+    });
+
+    it("drawer-only, edited: the footer Cancel asks through the leave dialog", async () => {
+      const wrapper = await openDrawerOnly();
+      touch();
+      await addPerson(wrapper, 0, "bob@o2.ai");
+
+      await cancel(wrapper);
+      await flushPromises();
+
+      expect(drawer(wrapper).props("open")).toBe(true);
+      expect(leaveDialog()).not.toBeNull();
+      await leaveChoice("o-dialog-neutral-btn");
+    });
+
+    it("marks an edited new rotation in the bulk editor dirty, and Cancel drops it", async () => {
       const wrapper = render({ schedule: null });
       await flushPromises();
       await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
       await flushPromises();
       await addPerson(wrapper, 0, "ana@o2.ai");
+      expect(drawer(wrapper).props("dirty")).toBe(true);
 
-      await exits["the footer Cancel"](wrapper);
+      await cancel(wrapper);
       await flushPromises();
 
-      expect(drawer(wrapper).props("open")).toBe(true);
-      expect(discardConfirm(wrapper).props("modelValue")).toBe(true);
+      expect(drawer(wrapper).props("open")).toBe(false);
+      expect(discardConfirm(wrapper).props("modelValue")).toBe(false);
+      expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(0);
     });
 
     it("closes an unedited new rotation in the bulk editor at once", async () => {
@@ -1076,7 +1096,7 @@ describe("OnCallScheduleEditor", () => {
       await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
       await flushPromises();
 
-      await exits["the footer Cancel"](wrapper);
+      await cancel(wrapper);
       await flushPromises();
 
       expect(drawer(wrapper).props("open")).toBe(false);
@@ -1087,7 +1107,7 @@ describe("OnCallScheduleEditor", () => {
       const wrapper = await openDrawerOnly();
       touch();
       await addPerson(wrapper, 0, "bob@o2.ai");
-      await exits["the footer Cancel"](wrapper);
+      await cancel(wrapper);
       await flushPromises();
 
       await leaveChoice("o-dialog-close-btn");
@@ -1159,7 +1179,7 @@ describe("OnCallScheduleEditor", () => {
       await flushPromises();
       await leaveChoice("o-dialog-close-btn");
 
-      await exits["the footer Cancel"](wrapper);
+      await cancel(wrapper);
       await flushPromises();
       await leaveChoice("o-dialog-neutral-btn");
       expect(drawer(wrapper).props("open")).toBe(false);
@@ -1170,7 +1190,7 @@ describe("OnCallScheduleEditor", () => {
       const wrapper = await openDrawerOnly();
       touch();
       await addPerson(wrapper, 0, "bob@o2.ai");
-      await exits["the footer Cancel"](wrapper);
+      await cancel(wrapper);
       await flushPromises();
 
       await leaveChoice("o-dialog-neutral-btn");
@@ -1205,7 +1225,7 @@ describe("OnCallScheduleEditor", () => {
       await flushPromises();
       expect(stored).toEqual(before);
 
-      await exits["the footer Cancel"](wrapper);
+      await cancel(wrapper);
       await flushPromises();
       await leaveChoice("o-dialog-neutral-btn");
       await wrapper.setProps({ intent: { mode: "edit", id: "rot_primary" } });

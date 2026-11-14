@@ -190,8 +190,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="featureFlag" value="ha" data-test="enterprise-upgrade-feature-ha-badge" />
               <OTooltip
                 side="top"
-                align="center"
-                :sideOffset="8"
                 :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')"
               />
             </span>

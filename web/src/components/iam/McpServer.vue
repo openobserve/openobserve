@@ -46,9 +46,8 @@ const subs = computed<CardSubstitutions>(() => ({
 <template>
   <OPageLayout
     data-test="iam-mcp-server"
-    :title="t('iam.mcpServerHeader')"
-    icon="mcp"
-    :subtitle="t('iam.mcpServerHeaderSubtitle')"
+    :title="t('iam.mcpServerLabel')"
+    :about="t('iam.mcpServerHeaderSubtitle')"
     scroll
     pad-y
   >

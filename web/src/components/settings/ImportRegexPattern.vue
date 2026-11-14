@@ -25,15 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         @click="arrowBackFn"
         data-test="regex-pattern-import-cancel-btn"
         >{{ t("function.cancel") }}</OButton
       >
       <OButton
         variant="primary"
-        size="sm-action"
         type="submit"
         @click="handleImportClick"
         :loading="isImporting"

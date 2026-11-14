@@ -67,7 +67,6 @@ const onSelect = (value: unknown) => {
 <template>
   <OSelect
     class="w-full"
-    size="md"
     searchable
     :model-value="active"
     :options="options"

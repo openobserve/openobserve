@@ -27,32 +27,32 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -61,11 +61,11 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -126,8 +126,8 @@ describe("ColumnOrderPopUp", () => {
       wrapper = createWrapper();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toContain("Save");
-      expect(dialog.props("secondaryButtonLabel")).toContain("Cancel");
+      expect(dialog.props("primary")?.label).toContain("Save");
+      expect(dialog.props("secondary")?.label).toContain("Cancel");
     });
 
     it("should render the description text", () => {
@@ -699,8 +699,8 @@ describe("ColumnOrderPopUp", () => {
       });
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toContain("Save");
-      expect(dialog.props("secondaryButtonLabel")).toContain("Cancel");
+      expect(dialog.props("primary")?.label).toContain("Save");
+      expect(dialog.props("secondary")?.label).toContain("Cancel");
     });
   });
 });

@@ -17,13 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="md"
+    size="sm"
     :title="t('autoobserve2.historyDrawer.title')"
     data-test="autoobserve2-history-drawer"
     @update:open="(v) => emit('update:open', v)"
   >
     <div class="flex flex-col gap-4">
       <OToggleGroup
+        size="sm"
         :model-value="filter"
         mobile-dropdown
         :aria-label="t('autoobserve.activityLive.historyFilter')"
@@ -34,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="f in HISTORY_FILTERS"
           :key="f"
           :value="f"
-          size="xs"
           :data-test="`autoobserve2-history-filter-${f}`"
         >
           {{ t(HISTORY_FILTER_LABEL[f]) }}

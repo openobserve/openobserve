@@ -189,12 +189,18 @@ export class GroupsPage {
         await expect(this.groupRow(name)).toHaveCount(0, { timeout: 15000 });
     }
 
+    /** Delete renders in the row's ⋯ menu (a portal), so open the menu before clicking it. */
+    async clickDeleteGroup(name) {
+        const row = this.page.locator('tr').filter({ has: this.groupRow(name) });
+        await row.hover();
+        await row.locator('[data-test="iam-groups-row-more-actions"]').click();
+        await this.page.locator(`[data-test="iam-groups-delete-${name}-role-icon"]`).click();
+    }
+
     async deleteGroup(name) {
         await this.searchGroups(name);
-        await this.page
-            .locator(`[data-test="iam-groups-delete-${name}-role-icon"]`)
-            .waitFor({ state: 'visible', timeout: 15000 });
-        await this.page.locator(`[data-test="iam-groups-delete-${name}-role-icon"]`).click();
+        await this.groupRow(name).waitFor({ state: 'visible', timeout: 15000 });
+        await this.clickDeleteGroup(name);
         await this.page.locator('[data-test="o-dialog-primary-btn"]').click();
         await this.expectGroupAbsent(name);
     }

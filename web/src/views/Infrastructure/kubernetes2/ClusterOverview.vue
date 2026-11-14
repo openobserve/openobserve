@@ -214,17 +214,17 @@ const nodesTile = computed(() => {
   const nodes = scopedNodes.value;
   const ready = nodes.filter((n) => n.ready === "true").length;
   const tone: StatTone = nodes.some((n) => n.ready === "false")
-    ? "error"
+    ? "err"
     : ready < nodes.length
-      ? "warning"
+      ? "warn"
       : nodes.length
-        ? "success"
+        ? "ok"
         : "neutral";
   return { value: `${ready} / ${nodes.length}`, tone };
 });
 
 const podsTone = computed<StatTone>(() =>
-  buckets.value.failing ? "error" : buckets.value.pending ? "warning" : "success",
+  buckets.value.failing ? "err" : buckets.value.pending ? "warn" : "ok",
 );
 
 const alertsTile = computed(() => {
@@ -233,7 +233,7 @@ const alertsTile = computed(() => {
   if (!signals.alertsAvailable.value && !signals.incidentsAvailable.value) {
     const locked = signals.alertsLocked.value;
     return {
-      value: "—",
+      value: null,
       sub: locked ? signals.alertsLockedReason.value : t("infra.k8s2.overviewKpiUnavailable"),
       tone: "neutral" as StatTone,
       locked,
@@ -246,7 +246,7 @@ const alertsTile = computed(() => {
   return {
     value: firing,
     sub,
-    tone: (firing || incidents ? "error" : "success") as StatTone,
+    tone: (firing || incidents ? "err" : "ok") as StatTone,
     locked: false,
   };
 });
@@ -380,12 +380,19 @@ function onAlertsTile() {
       />
     </div>
 
-    <OEmptyState v-if="forbidden" preset="no-access" data-test="k8s2-overview-forbidden" />
+    <OEmptyState
+      v-if="forbidden"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
+      data-test="k8s2-overview-forbidden"
+    />
 
     <template v-else>
       <div class="grid grid-cols-2 gap-3 lg:grid-cols-4" data-test="k8s2-overview-kpis">
         <OStatCard
           clickable
+          size="lg"
           icon="dns"
           :label="t('infra.k8s2.overviewKpiNodes')"
           :value="nodesTile.value"
@@ -397,6 +404,7 @@ function onAlertsTile() {
         />
         <OStatCard
           clickable
+          size="lg"
           icon="hub"
           :label="t('infra.k8s2.overviewPods')"
           :value="`${buckets.ready} / ${buckets.total}`"
@@ -414,18 +422,20 @@ function onAlertsTile() {
         />
         <OStatCard
           clickable
+          size="lg"
           icon="notifications"
           :label="t('infra.k8s2.overviewKpiWarnings')"
           :value="warningRows.length"
           sub-icon="info"
           :sub="t('infra.k8s2.overviewKpiWarningsSub')"
-          :tone="warningRows.length ? 'warning' : 'success'"
+          :tone="warningRows.length ? 'warn' : 'ok'"
           :loading="awaiting"
           data-test="k8s2-overview-kpi-warnings"
           @click="emit('navigate', { view: 'events', status: 'warnings' })"
         />
         <OStatCard
           :clickable="!alertsTile.locked"
+          size="lg"
           icon="campaign"
           :label="t('infra.k8s2.overviewKpiAlerts')"
           :value="alertsTile.value"
@@ -468,16 +478,19 @@ function onAlertsTile() {
                 class="ms-auto"
                 data-test="k8s2-overview-chart-toggle"
               >
-                <OToggleGroupItem value="cpu" size="sm">{{
-                  t("infra.k8s2.overviewCpu")
-                }}</OToggleGroupItem>
-                <OToggleGroupItem value="memory" size="sm">{{
+                <OToggleGroupItem value="cpu">{{ t("infra.k8s2.overviewCpu") }}</OToggleGroupItem>
+                <OToggleGroupItem value="memory">{{
                   t("infra.k8s2.overviewMemory")
                 }}</OToggleGroupItem>
               </OToggleGroup>
             </div>
             <div class="h-60 min-w-0" data-test="k8s2-overview-chart">
-              <OSkeleton v-if="awaiting" class="h-full" data-test="k8s2-overview-chart-loading" />
+              <OSkeleton
+                v-if="awaiting"
+                shape="block"
+                class="h-full"
+                data-test="k8s2-overview-chart-loading"
+              />
               <PanelSchemaRenderer
                 v-else-if="hasStream(USAGE[resource].stream)"
                 :key="`${resource}-${refreshNonce}`"
@@ -490,7 +503,7 @@ function onAlertsTile() {
               <OEmptyState
                 v-else
                 size="inline"
-                preset="no-data"
+                :text="t('emptyState.noData.description')"
                 :title="t('infra.k8s2.overviewMetricsUnavailable')"
               />
             </div>
@@ -512,6 +525,7 @@ function onAlertsTile() {
             <OSkeleton
               v-for="n in 3"
               :key="n"
+              shape="block"
               class="h-32"
               data-test="k8s2-overview-side-loading"
             />
@@ -521,7 +535,11 @@ function onAlertsTile() {
             class="bg-surface-panel border-border-default rounded-surface flex min-w-0 items-center justify-center border p-3"
             data-test="k8s2-overview-no-nodes"
           >
-            <OEmptyState size="inline" preset="no-data" :title="t('infra.k8s2.overviewNoNodes')" />
+            <OEmptyState
+              size="inline"
+              :text="t('emptyState.noData.description')"
+              :title="t('infra.k8s2.overviewNoNodes')"
+            />
           </section>
           <template v-else>
             <OText
@@ -599,17 +617,13 @@ function onAlertsTile() {
           }}
         </OText>
         <div v-if="awaiting" class="flex flex-col gap-2" data-test="k8s2-overview-warnings-loading">
-          <OSkeleton v-for="n in 3" :key="n" type="text" class="h-6" />
+          <OSkeleton v-for="n in 3" :key="n" class="h-6" />
         </div>
         <OTable
           v-else
           :data="warningRows"
           :columns="columns"
           row-key="key"
-          dense
-          :row-height="32"
-          :frame="false"
-          :show-global-filter="false"
           pagination="none"
           :max-height="TABLE_MAX_HEIGHT"
           enable-column-resize
@@ -646,9 +660,8 @@ function onAlertsTile() {
           <template #empty>
             <OEmptyState
               size="inline"
-              preset="no-data"
               :title="t('infra.k8s2.overviewNoIssues')"
-              :description="t('infra.k8s2.overviewNoIssuesDesc')"
+              :text="t('infra.k8s2.overviewNoIssuesDesc')"
             />
           </template>
         </OTable>

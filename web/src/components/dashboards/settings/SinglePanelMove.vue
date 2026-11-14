@@ -22,9 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="open"
     size="sm"
     :title="title"
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('dashboard.singlePanelMove.move')"
-    :primary-button-disabled="selectedMoveTabId === null"
+    :secondary="{ label: t('confirmDialog.cancel') }"
+    :primary="{ label: t('dashboard.singlePanelMove.move'), disabled: selectedMoveTabId === null }"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
@@ -37,12 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="moveTabOptions"
           class="flex-1"
           data-test="dashboard-tab-move-select"
-          label-position="inside"
+          variant="filter"
         />
 
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           @click="
             () => {
               isTabEditMode = false;
@@ -50,9 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           "
           data-test="dashboard-tab-move-add-tab-btn"
-          icon-left="add"
+          icon="add"
         >
-          <template #icon-left><OIcon name="add" size="sm" /></template>
+          <template #icon><OIcon name="add" size="sm" /></template>
           <OTooltip :content="t('dashboard.singlePanelMove.addTab')" />
         </OButton>
         <AddTab

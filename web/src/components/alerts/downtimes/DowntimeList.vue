@@ -16,22 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="downtime-list-page" class="flex h-full flex-col">
-    <OPageLayout
-      bleed
-      :title="t('alerts.downtimes.title')"
-      icon="notifications-paused"
-      :subtitle="t('alerts.downtimes.subtitle')"
-    >
-      <template #title>
-        <span class="inline-flex max-w-full min-w-0 items-center gap-2">
-          <span class="truncate">{{ t("alerts.downtimes.title") }}</span>
-          <BetaBadge class="shrink-0" />
-        </span>
+    <OPageLayout bleed :title="t('alerts.downtimes.title')" :about="t('alerts.downtimes.subtitle')">
+      <template #status>
+        <BetaBadge />
       </template>
       <template v-if="!forbidden" #actions>
         <OButton
           variant="primary"
-          size="sm"
           data-test="downtime-list-add-btn"
           :aria-label="
             downtimeDrafts.hasNew
@@ -60,16 +51,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-          <div class="bg-card-glass-bg @container/downtime-toolbar flex h-full flex-col">
+          <div class="bg-card-glass-bg flex h-full flex-col">
             <OTable
               v-model:selected-ids="selectedIds"
               class="min-h-0 flex-1"
-              :frame="false"
               selection="multiple"
               data-test="downtime-list-table"
               :data="displayedRows"
               :columns="columns"
-              show-index
               row-key="id"
               :loading="loading"
               :loading-reset-key="activeFolderId"
@@ -77,7 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               pagination="client"
               :page-size="20"
               :page-size-options="[20, 50, 100]"
-              :show-global-filter="false"
               :enable-column-resize="true"
               :persist-columns="true"
               :column-visibility="defaultColumnVisibility"
@@ -85,19 +73,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :get-row-style="rowStyle"
               @row-click="openDetail"
             >
-              <template v-if="truncatedNotice" #subheader>
-                <div class="px-page-edge border-table-row-divider border-b py-1.5">
-                  <OBanner
-                    variant="info"
-                    dense
-                    :content="truncatedNotice"
+              <template #subheader>
+                <div
+                  class="px-page-edge border-table-row-divider border-b py-1.5"
+                  data-test="downtime-list-summary"
+                >
+                  <OStatStrip
+                    :items="summaryStats"
+                    :loading="loading"
+                    stacked
+                    selectable
+                    multiple
+                    :selected-keys="statFilters"
+                    @update:selected-keys="onStatKeys"
+                  />
+                  <OInlineNotice
+                    v-if="truncatedNotice"
+                    class="mt-1.5"
+                    tone="info"
+                    :message="truncatedNotice"
                     data-test="downtime-list-truncated"
                   />
                 </div>
               </template>
 
               <template #toolbar>
-                <div class="contents">
+                <div
+                  class="@container/downtime-toolbar flex min-w-0 flex-1 items-center gap-2 max-md:contents"
+                >
                   <OToggleGroup
                     mobile-dropdown
                     :model-value="typeFilter"
@@ -108,82 +111,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="option in typeOptions"
                       :key="option.value"
                       :value="option.value"
-                      size="sm"
                       :icon-left="option.icon"
                       :data-test="`downtime-list-type-${option.value}`"
                     >
-                      <span class="@max-[48rem]/downtime-toolbar:hidden">{{ option.label }}</span>
+                      <span class="@max-[38rem]/downtime-toolbar:hidden">{{ option.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
-                    <OInput
+                  <div class="min-w-0 flex-1 max-md:min-w-40">
+                    <OSearchInput
                       v-model="search"
                       :placeholder="
                         searchAcrossFolders
                           ? t('alerts.downtimes.searchAcross')
                           : t('alerts.downtimes.search')
                       "
-                      clearable
                       class="w-full"
                       data-test="downtime-list-search"
-                    >
-                      <template #icon-left>
-                        <OIcon name="search" size="sm" />
-                      </template>
-                      <template #icon-right>
-                        <OToggleGroup
-                          :model-value="searchAcrossFolders ? 'all' : 'this'"
-                          class="me-1 self-center"
-                          @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
-                        >
-                          <OToggleGroupItem
-                            value="this"
-                            size="xs"
-                            icon-left="folder-outline"
-                            :title="t('alerts.downtimes.thisFolderTooltip')"
-                            data-test="downtime-list-scope-this"
-                          >
-                            <span class="max-md:hidden @max-[52rem]/downtime-toolbar:hidden">{{
-                              t("alerts.downtimes.thisFolder")
-                            }}</span>
-                          </OToggleGroupItem>
-                          <OToggleGroupItem
-                            value="all"
-                            size="xs"
-                            icon-left="search"
-                            :title="t('alerts.downtimes.allFoldersTooltip')"
-                            data-test="downtime-list-scope-all"
-                          >
-                            <span class="max-md:hidden @max-[52rem]/downtime-toolbar:hidden">{{
-                              t("alerts.downtimes.allFolders")
-                            }}</span>
-                          </OToggleGroupItem>
-                        </OToggleGroup>
-                      </template>
-                    </OInput>
+                      :scope="searchAcrossFolders ? 'all' : 'this'"
+                      :scope-options="[
+                        {
+                          value: 'this',
+                          label: t('alerts.downtimes.thisFolder'),
+                          icon: 'folder-outline',
+                          tooltip: t('alerts.downtimes.thisFolderTooltip'),
+                          dataTest: 'downtime-list-scope-this',
+                        },
+                        {
+                          value: 'all',
+                          label: t('alerts.downtimes.allFolders'),
+                          icon: 'search',
+                          tooltip: t('alerts.downtimes.allFoldersTooltip'),
+                          dataTest: 'downtime-list-scope-all',
+                        },
+                      ]"
+                      @update:scope="(v) => (searchAcrossFolders = v === 'all')"
+                    />
                   </div>
-                  <OStatStrip
-                    :items="summaryStats"
-                    :loading="loading"
-                    selectable
-                    :row="false"
-                    multiple
-                    :selected-keys="statFilters"
-                    default-key="total"
-                    class="max-md:order-last"
-                    data-test="downtime-list-summary"
-                    @update:selected-keys="onStatKeys"
-                  />
                 </div>
               </template>
 
               <template #toolbar-trailing>
                 <ORefreshButton
-                  layout="inline"
-                  variant="outline"
                   :last-run-at="lastUpdatedAt"
                   :loading="fetching"
-                  shortcut-id="downtimesRefresh"
+                  shortcut="downtimesRefresh"
                   data-test="downtime-list-refresh"
                   @click="refreshAll"
                 />
@@ -338,9 +309,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="inline-flex size-8 max-md:hidden">
                     <OButton
                       v-if="row.status === 'scheduled'"
-                      variant="ghost-destructive"
-                      size="icon-xs-sq"
-                      icon-left="cancel"
+                      icon-only
+                      variant="danger-ghost"
+                      size="sm"
+                      icon="cancel"
                       :data-test="`downtime-list-${row.id}-cancel`"
                       @click.stop="askCancel([row.id])"
                     >
@@ -348,9 +320,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       v-else
-                      variant="ghost-destructive"
-                      size="icon-xs-sq"
-                      icon-left="stop-circle"
+                      icon-only
+                      variant="danger-ghost"
+                      size="sm"
+                      icon="stop-circle"
                       :disabled="row.status !== 'active'"
                       :aria-label="t('alerts.downtimes.actions.endNow')"
                       :data-test="`downtime-list-${row.id}-end-now`"
@@ -366,9 +339,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="inline-flex size-8 max-md:hidden">
                     <OButton
                       v-if="isEditable(row)"
+                      icon-only
                       variant="ghost"
-                      size="icon-xs-sq"
-                      icon-left="edit"
+                      size="sm"
+                      icon="edit"
                       :data-test="`downtime-list-${row.id}-edit`"
                       @click.stop="editDowntime(row)"
                     >
@@ -377,9 +351,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <span class="inline-flex size-8 max-md:hidden">
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon-xs-sq"
-                      icon-left="content-copy"
+                      size="sm"
+                      icon="content-copy"
                       :data-test="`downtime-list-${row.id}-duplicate`"
                       :aria-label="
                         downtimeDrafts.hasNewVariant(`clone:${row.id}`)
@@ -412,9 +387,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ODropdown align="end">
                     <template #trigger>
                       <OButton
+                        icon-only
                         variant="ghost"
-                        size="icon-xs-sq"
-                        icon-left="more-vert"
+                        size="sm"
+                        icon="more-vert"
                         :aria-label="moreActionsLabel(row)"
                         :data-test="`downtime-list-${row.id}-more`"
                         @click.stop
@@ -438,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownItem
                       v-if="row.status === 'active'"
                       class="md:hidden"
-                      icon-left="stop-circle"
+                      icon="stop-circle"
                       :data-test="`downtime-list-${row.id}-end-now-menu`"
                       @select="askEndNow(row)"
                     >
@@ -447,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownItem
                       v-if="row.status === 'scheduled'"
                       class="md:hidden"
-                      icon-left="cancel"
+                      icon="cancel"
                       :data-test="`downtime-list-${row.id}-cancel-menu`"
                       @select="askCancel([row.id])"
                     >
@@ -456,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownItem
                       v-if="isEditable(row)"
                       class="md:hidden"
-                      icon-left="edit"
+                      icon="edit"
                       :data-test="`downtime-list-${row.id}-edit-menu`"
                       @select="editDowntime(row)"
                     >
@@ -464,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </ODropdownItem>
                     <ODropdownItem
                       class="md:hidden"
-                      icon-left="content-copy"
+                      icon="content-copy"
                       :data-test="`downtime-list-${row.id}-duplicate-menu`"
                       @select="duplicateDowntime(row)"
                     >
@@ -477,7 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </ODropdownItem>
                     <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
-                      icon-left="drive-file-move"
+                      icon="drive-file-move"
                       :data-test="`downtime-list-${row.id}-move`"
                       @select="openMove([row.id], row.folder_id)"
                     >
@@ -486,8 +462,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="isFinished(row)">
                       <ODropdownSeparator />
                       <ODropdownItem
-                        variant="destructive"
-                        icon-left="delete"
+                        tone="danger"
+                        icon="delete"
                         :data-test="`downtime-list-${row.id}-delete`"
                         @select="askDelete(row)"
                       >
@@ -500,33 +476,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #empty>
                 <div v-if="loadFailed" data-test="downtime-list-error" class="h-full">
-                  <OEmptyState size="hero" preset="load-error" @action="refreshAll" />
+                  <OEmptyState
+                    kind="error"
+                    :title="t('emptyState.loadError.title')"
+                    :text="t('emptyState.loadError.description')"
+                    @action="refreshAll"
+                  />
                 </div>
                 <div v-else data-test="downtime-list-empty" class="h-full">
                   <OEmptyState
                     v-if="!loading"
-                    size="hero"
-                    preset="no-downtimes"
-                    :filtered="isFiltered"
-                    @action="onEmptyAction"
+                    :kind="isFiltered ? 'filtered' : 'first-run'"
+                    :title="
+                      isFiltered
+                        ? t('emptyState.filtered.title', {
+                            noun: t('emptyState.filtered.fallbackNoun'),
+                          })
+                        : t('emptyState.noDowntimes.title')
+                    "
+                    :text="
+                      isFiltered
+                        ? t('emptyState.filtered.description', {
+                            noun: t('emptyState.filtered.fallbackNoun'),
+                          })
+                        : t('emptyState.noDowntimes.description')
+                    "
+                    :icon="isFiltered ? undefined : 'schedule'"
+                    :action-label="isFiltered ? undefined : t('emptyState.noDowntimes.action')"
+                    @action="onEmptyAction(isFiltered ? 'clear-filters' : 'create')"
                   />
                 </div>
               </template>
 
               <template #selection-actions>
                 <OButton
-                  variant="outline"
-                  size="sm"
-                  icon-left="drive-file-move"
+                  variant="secondary"
+                  icon="drive-file-move"
                   data-test="downtime-list-bulk-move"
                   @click="openMove(selectedIds, activeFolderId)"
                 >
                   {{ t("alerts.downtimes.actions.moveToFolder") }}
                 </OButton>
                 <OButton
-                  variant="outline-destructive"
-                  size="sm"
-                  icon-left="cancel"
+                  variant="danger-ghost"
+                  icon="cancel"
                   :disabled="cancellableSelection.length === 0"
                   data-test="downtime-list-bulk-cancel"
                   @click="askCancel(cancellableSelection)"
@@ -553,8 +546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="cancelOpen"
       :title="t('alerts.downtimes.confirmCancel.title')"
       :message="cancelMessage"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       :ok-label="
         t(
           'alerts.downtimes.confirmCancel.confirm',
@@ -587,8 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : t('alerts.downtimes.confirmEndNow.ok')
       "
       :cancel-label="t('alerts.downtimes.confirmEndNow.keep')"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       @update:ok="confirmEndNow"
       @update:cancel="endNowOpen = false"
     />
@@ -604,7 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.downtimes.confirmDelete.title')"
       message-keypath="alerts.downtimes.confirmDelete.message"
       :message-name="pendingDeleteName"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="confirmDelete"
       @update:cancel="deleteOpen = false"
     />
@@ -649,10 +640,10 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -919,7 +910,7 @@ const summaryStats = computed<StatItem[]>(() => {
   const server = serverCounts.value;
   const hasData = rows.length > 0 || !!server;
   const count = (key: keyof DowntimeCounts, pred: (r: DowntimeListItem) => boolean) =>
-    server ? (server.counts?.[key] ?? 0) : hasData ? rows.filter(pred).length : "—";
+    server ? (server.counts?.[key] ?? 0) : hasData ? rows.filter(pred).length : null;
   const total = server ? server.total : rows.length;
   const share = hasData ? total : undefined;
   return [
@@ -928,7 +919,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("alerts.downtimes.stats.active"),
       value: count("active", (r) => r.status === "active"),
       icon: "notifications-paused",
-      tone: "warning",
+      tone: "warn",
       max: share,
       dataTest: "downtime-summary-active",
     },
@@ -937,7 +928,6 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("alerts.downtimes.stats.scheduled"),
       value: count("scheduled", (r) => r.status === "scheduled"),
       icon: "schedule",
-      tone: "blue",
       max: share,
       dataTest: "downtime-summary-scheduled",
     },
@@ -980,9 +970,9 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "total",
       label: t("common.allStatuses"),
-      value: hasData ? total : "—",
+      value: hasData ? total : null,
       icon: "format-list-bulleted",
-      tone: "primary",
+      all: true,
       dataTest: "downtime-summary-total",
     },
   ];

@@ -124,10 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("traces.tracesAnalysisDashboard.dimensions")
                   }}</span>
                   <OButton
-                    variant="outline"
-                    size="icon-xs-sq"
+                    icon-only
+                    variant="secondary"
+                    size="sm"
                     class="rotate-90"
-                    icon-left="unfold-less"
+                    icon="unfold-less"
                     :title="t('traces.tracesAnalysisDashboard.collapseDimensions')"
                     data-test="dimension-selector-collapse-btn"
                     @click="toggleDimensionSelector"
@@ -138,7 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSearchInput
                     v-model="dimensionSearchText"
                     :placeholder="t('search.searchDimension')"
-                    clearable
                     class="w-full"
                     data-test="dimension-search-input"
                   />
@@ -156,7 +156,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OCheckbox
                           :model-value="selectedDimensions.includes(dimension.value)"
                           @update:model-value="toggleDimension(dimension.value)"
-                          size="xs"
                           :data-test="`dimension-checkbox-${dimension.value}`"
                         />
                       </div>
@@ -237,8 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="text-text-secondary text-sm">{{ error }}</div>
                   <OButton
-                    variant="outline"
-                    size="sm-action"
+                    variant="secondary"
                     class="mt-4"
                     data-test="traces-analysis-dashboard-retry-btn"
                     @click="loadAnalysis"
@@ -250,7 +248,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Every dimension removed (sidebar or panel X) -->
                 <OEmptyState
                   v-else-if="selectedDimensions.length === 0"
-                  size="hero"
                   icon="bar-chart"
                   :title="t('latencyInsights.noDimensionsSelected')"
                   data-test="traces-analysis-dashboard-no-dimensions"

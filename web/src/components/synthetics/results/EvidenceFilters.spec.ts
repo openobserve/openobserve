@@ -70,7 +70,7 @@ describe("EvidenceFilters", () => {
   it("marks the wrap button active when wrapping, and only then", () => {
     // The only OButton here is the wrap toggle, so its `active` prop is the
     // narrowest stable signal — narrower than parsing the generated classes.
-    expect(mountFilters({ wrap: true }).findComponent(OButton).props("active")).toBe(true);
-    expect(mountFilters({ wrap: false }).findComponent(OButton).props("active")).toBe(false);
+    expect(mountFilters({ wrap: true }).findComponent(OButton).props("pressed")).toBe(true);
+    expect(mountFilters({ wrap: false }).findComponent(OButton).props("pressed")).toBe(false);
   });
 });

@@ -105,34 +105,24 @@ const ODrawerStub = {
   inheritAttrs: false,
   props: [
     "open",
-    "width",
     "title",
-    "subTitle",
+    "subtitle",
     "size",
     "persistent",
     "showClose",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
     "formId",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-drawer-stub"
       :data-open="String(open)"
       :data-title="title"
       :data-size="size"
-      :data-primary-label="primaryButtonLabel"
+      :data-primary-label="primary?.label"
     >
       <slot name="header-right" />
       <slot />
@@ -661,11 +651,17 @@ describe("AddRegexPattern", () => {
       expect(wrapper.vm.testStringValue).toBe("Test value");
     });
 
-    it("should widen the drawer to a size preset when AI chat is open", async () => {
+    it("opens the drawer at xl beside AI chat or in full screen, and at md otherwise", async () => {
       mockStore.state.isAiChatEnabled = true;
+      expect(createWrapper().find('[data-test="o-drawer-stub"]').attributes("data-size")).toBe(
+        "xl",
+      );
+      mockStore.state.isAiChatEnabled = false;
       const wrapper = createWrapper();
-      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
-      expect(drawer.attributes("data-size")).toBe("xxl");
+      expect(wrapper.find('[data-test="o-drawer-stub"]').attributes("data-size")).toBe("md");
+      wrapper.vm.toggleFullScreen();
+      await nextTick();
+      expect(wrapper.find('[data-test="o-drawer-stub"]').attributes("data-size")).toBe("xl");
     });
 
     it("should handle full screen mode", async () => {

@@ -8,8 +8,9 @@
   >
     <span class="mx-1">
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-xs-circle"
+        size="xs"
         data-test="logs-cell-actions-copy-btn"
         @click.prevent.stop="copyLogToClipboard(cellValue)"
         :title="t('logs.cellActions.copy')"
@@ -20,8 +21,9 @@
     </span>
     <span v-if="isStreamField && !hideSearchTermActions" class="me-1">
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-xs-circle"
+        size="xs"
         @click.prevent.stop="addSearchTerm(column.id, cellValue, 'include')"
         :data-test="`log-details-include-field-${cellValue}`"
         :title="t('logs.cellActions.includeTerm')"
@@ -33,8 +35,9 @@
     </span>
     <span v-if="isStreamField && !hideSearchTermActions" class="me-1">
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-xs-circle"
+        size="xs"
         @click.prevent.stop="addSearchTerm(column.id, cellValue, 'exclude')"
         :title="t('logs.cellActions.excludeTerm')"
         :data-test="`log-details-exclude-field-${cellValue}`"

@@ -824,9 +824,13 @@
   --color-toast-loading-border: var(--color-border-default);
   --color-toast-action-text: var(--color-primary-400);
   --color-toast-action-hover: var(--color-primary-300);
+  /* A raised grey rather than a white flip, so the toast does not glare on a dark page. */
+  --color-toast-inverse-bg: var(--color-grey-700);
+  --color-toast-inverse-text: var(--color-grey-100);
+  --color-toast-inverse-text-secondary: var(--color-grey-300);
 
   /* OTable (dark) */
-  --color-table-header-bg: var(--d-overlay); /* header band lifts off rows */
+  --color-table-header-bg: var(--color-table-cell-bg); /* no header band (D1) */
   --color-table-row-hover-bg: var(--d-hover); /* neutral hover (not teal-washed) */
   --color-table-row-action-hover-bg: var(--color-surface-accent-hover);
   --color-table-row-selected-bg: var(--d-selected); /* teal-tinted selection */

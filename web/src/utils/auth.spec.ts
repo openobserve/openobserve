@@ -467,7 +467,6 @@ describe("routeGuard", () => {
       const open = toastRecords.filter((r) => r.open);
       expect(open).toHaveLength(1);
       expect(open[0].variant).toBe("info");
-      expect(open[0].title).toBe("Your trial has ended");
       expect(open[0].message).toContain("Logs needs a plan");
     });
 

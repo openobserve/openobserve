@@ -428,7 +428,7 @@ const useRoutes = () => {
       component: SearchSchedulersList,
       meta: {
         keepAlive: false,
-        titleKey: "routeTitles.searchScheduler",
+        titleKey: "search_scheduler_job.title",
         licenseFeatureFromStreamType: true,
       },
       beforeEnter(to: any, from: any, next: any) {
@@ -857,6 +857,9 @@ const useRoutes = () => {
           path: "functions",
           name: "functionList",
           component: FunctionList,
+          meta: {
+            titleKey: "function.header",
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -876,6 +879,9 @@ const useRoutes = () => {
           path: "enrichment-tables",
           name: "enrichmentTables",
           component: EnrichmentTableList,
+          meta: {
+            titleKey: "function.enrichmentTables",
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -885,6 +891,7 @@ const useRoutes = () => {
           name: "pipelines",
           component: PipelinesList,
           meta: {
+            titleKey: "function.streamPipeline",
             accessResource: "pipelines",
           },
           beforeEnter(to: any, from: any, next: any) {
@@ -912,6 +919,9 @@ const useRoutes = () => {
               path: "import",
               name: "importPipeline",
               component: ImportPipeline,
+              meta: {
+                titleKey: "pipeline.importPipelineTitle",
+              },
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -1124,7 +1134,7 @@ const useRoutes = () => {
       path: "alert-calibration/settings",
       name: "alertCalibrationSettings",
       component: () => import("@/components/alert_calibration/AlertCalibrationSettings.vue"),
-      meta: { titleKey: "menu.alertCalibration", licenseFeature: "alerts" },
+      meta: { titleKey: "alertCalibration.settings.title", licenseFeature: "alerts" },
       beforeEnter: alertCalibrationRouteGuard,
     },
     {
@@ -1329,7 +1339,7 @@ const useRoutes = () => {
       name: "RUM",
       component: RealUserMonitoring,
       meta: {
-        titleKey: "rum.title",
+        titleKey: "menu.rum",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -1679,7 +1689,7 @@ const useRoutes = () => {
         component: CreateReport,
         props: true,
         meta: {
-          titleKey: "routeTitles.createReport",
+          titleKey: "reports.add",
           licenseFeature: "reports",
         },
         beforeEnter(to: any, from: any, next: any) {

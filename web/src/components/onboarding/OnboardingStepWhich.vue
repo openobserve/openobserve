@@ -25,9 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mx-auto flex w-full max-w-176 flex-col">
         <div class="mb-2 flex min-h-8.5 items-center gap-3">
           <OButton
-            variant="ghost-muted"
-            size="sm"
-            icon-left="arrow-back"
+            variant="ghost"
+            icon="arrow-back"
             data-test="onboarding-step-which-back"
             @click="emit('back')"
           >
@@ -43,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="total > 8"
           v-model="query"
           class="mt-5"
-          size="md"
           :placeholder="t('onboarding.searchGuides', total)"
           data-test="onboarding-step-which-search"
         />
@@ -68,8 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ul>
             <OButton
               v-if="group.extra"
-              variant="ghost-primary"
-              size="sm"
+              variant="accent-ghost"
               class="mt-2"
               data-test="onboarding-step-which-show-more"
               @click="showMore(group.gi)"
@@ -79,9 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </section>
           <OButton
             v-if="row.agent"
-            variant="ghost-primary"
-            size="xs"
-            icon-left="terminal"
+            variant="accent-ghost"
+            size="sm"
+            icon="terminal"
             class="-ms-2.5 self-start"
             data-test="onboarding-step-which-agent"
             @click="emit('agent')"
@@ -101,8 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ul class="mt-1 grid gap-1">
               <li v-for="h in hits" :key="`${h.choice.id}/${h.row.id}/${h.guide.id}`">
                 <OButton
-                  variant="ghost-primary"
-                  size="sm"
+                  variant="accent-ghost"
                   data-test="onboarding-step-which-hit"
                   @click="emit('open', { row: h.row, guide: h.guide, choice: h.choice.id })"
                 >
@@ -124,8 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #link>
               <OButton
-                variant="ghost-primary"
-                size="sm"
+                variant="accent-ghost"
                 data-test="onboarding-step-which-curl"
                 @click="emit('open', { row: curlRow, choice: 'logs' })"
               >
@@ -134,8 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </i18n-t>
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             class="mt-3"
             data-test="onboarding-step-which-clear"
             @click="clearSearch"

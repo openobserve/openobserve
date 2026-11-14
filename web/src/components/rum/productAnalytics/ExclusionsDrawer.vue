@@ -17,23 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="lg"
+    size="md"
     :title="t('rum.analytics.exclusions.title', { app: raw(pa.state.app) })"
-    :sub-title="t('rum.analytics.exclusions.subtitle')"
+    :subtitle="t('rum.analytics.exclusions.subtitle')"
     :form-id="readOnly ? undefined : FORM_ID"
-    :primary-button-label="readOnly ? undefined : t('common.save')"
-    :primary-button-disabled="!base"
-    :secondary-button-label="readOnly ? t('common.close') : t('common.cancel')"
+    :primary="{ label: readOnly ? undefined : t('common.save'), disabled: !base }"
+    :secondary="{ label: readOnly ? t('common.close') : t('common.cancel') }"
     data-test="rum-analytics-exclusions-drawer"
     @update:open="(v) => emit('update:open', v)"
     @click:secondary="emit('update:open', false)"
   >
     <div class="flex flex-col gap-4">
-      <OBanner
+      <OInlineNotice
         v-if="conflicted"
-        variant="warning"
-        dense
-        :content="t('rum.analytics.exclusions.conflict')"
+        tone="warn"
+        :message="t('rum.analytics.exclusions.conflict')"
         data-test="rum-analytics-exclusions-conflict"
       />
       <p class="text-text-secondary text-xs" data-test="rum-analytics-exclusions-audit">
@@ -88,9 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-for="s in suggestions"
               :key="`${s.rule.field}:${s.value}`"
-              variant="outline"
-              size="sm"
-              icon-left="add"
+              variant="secondary"
+              icon="add"
               :data-test="`rum-analytics-exclusions-suggestion-${s.value}`"
               @click="addRule(s.rule)"
               >{{ t("rum.analytics.exclusions.exclude", { value: raw(s.value) }) }}
@@ -128,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     field: filterFieldLabel(t, rule.field),
                   })
                 "
-                variant="warning-soft"
+                tone="warn"
                 size="sm"
                 :data-test="`rum-analytics-exclusions-rule-${index}-missing`"
               />
@@ -146,9 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="(page, i) in draft.pages"
                 :key="i"
                 :label="pageLabel(page)"
-                variant="primary-outline"
-                size="sm"
-                clickable
+                toggle
                 removable
                 class="max-w-full min-w-0"
                 :remove-label="t('rum.analytics.exclusions.remove')"
@@ -160,19 +155,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTag>
             </span>
             <OPopover
+              size="lg"
               :open="pageOpen"
               side="bottom"
               align="start"
-              content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
+              content-class="p-3"
               @update:open="setPageOpen"
             >
               <template #trigger>
                 <span class="self-start">
                   <OButton
-                    variant="outline"
-                    size="sm"
-                    icon-left="add"
-                    :active="pageOpen"
+                    variant="secondary"
+                    icon="add"
+                    :pressed="pageOpen"
                     :disabled="draft.pages.length >= MAX_PAGE_RULES"
                     data-test="rum-analytics-exclusions-add-page"
                     @click="pageEditing = null"
@@ -217,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag
                 v-if="!pa.schema.value[rule.field]"
                 :label="t('rum.analytics.exclusions.fieldMissing')"
-                variant="warning-soft"
+                tone="warn"
                 size="sm"
               />
             </li>
@@ -264,7 +259,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { formatInTimeZone } from "date-fns-tz";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";

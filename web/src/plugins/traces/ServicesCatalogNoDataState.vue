@@ -14,24 +14,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  ServicesCatalogNoDataState — empty state for the services catalog panel.
-
-  Uses the hero size so the illustration and copy match the other traces empty
-  states. No widen-range action (the panel aggregates across the window, so
-  widening wouldn't reliably surface data), but when the stream has data outside
-  the current window we offer a precise "jump to latest data" action, consistent
-  with the traces search "no events" state.
--->
+<!-- No widen-range action: the panel aggregates across the window, so only a precise
+     jump to the stream's latest data can help. -->
 <template>
   <OEmptyState
     v-if="noTraceStream"
-    preset="no-services-catalog"
-    size="hero"
-    :description="t('emptyState.noServicesCatalog.noTraceStream')"
-    :hide-action="true"
+    icon="lan"
+    :title="t('emptyState.noServicesCatalog.title')"
+    :text="t('emptyState.noServicesCatalog.noTraceStream')"
   />
-  <OEmptyState v-else-if="jumpTarget" preset="no-services-catalog" size="hero">
+  <OEmptyState
+    v-else-if="jumpTarget"
+    kind="filtered"
+    :title="t('emptyState.noServicesCatalog.title')"
+    :text="t('emptyState.noServicesCatalog.description')"
+  >
     <template #actions>
       <EmptyStateActionCard
         icon="schedule"
@@ -42,7 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
   </OEmptyState>
-  <OEmptyState v-else preset="no-services-catalog" size="hero" :hide-action="true" />
+  <OEmptyState
+    v-else
+    kind="filtered"
+    :title="t('emptyState.noServicesCatalog.title')"
+    :text="t('emptyState.noServicesCatalog.description')"
+  />
 </template>
 
 <script setup lang="ts">

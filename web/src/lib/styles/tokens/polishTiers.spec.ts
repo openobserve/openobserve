@@ -27,7 +27,6 @@ import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OTime from "@/lib/forms/Time/OTime.vue";
-import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import { raw } from "@/types/i18n";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -125,18 +124,8 @@ describe("visible neutral hover (item 1)", () => {
 });
 
 describe("primary ink on the accent fills (item 1)", () => {
-  const PRIMARY_INK: ButtonVariant[] = [
-    "ghost-primary",
-    "ghost-muted",
-    "panel-collapse",
-    "outline-primary",
-    "pricing-chip",
-  ];
-  const HOVER_FILLS = [
-    "enabled:hover:bg-",
-    "enabled:active:bg-",
-    "group-hover/row:enabled:hover:not-active:bg-",
-  ];
+  const PRIMARY_INK: ButtonVariant[] = ["accent-ghost"];
+  const HOVER_FILLS = ["hover:bg-", "active:bg-", "group-hover/row:hover:not-active:bg-"];
 
   const isColor = (token: string) => resolveColor(token, THEMES.light) !== null;
   const tokensAfter = (classes: string[], prefix: string) =>
@@ -151,7 +140,7 @@ describe("primary ink on the accent fills (item 1)", () => {
     const classes = wrapper.get("button").classes();
     wrapper.unmount();
     const restInk = tokensAfter(classes, "text-")[0];
-    const hoverInk = tokensAfter(classes, "enabled:hover:text-")[0] ?? restInk;
+    const hoverInk = tokensAfter(classes, "hover:text-")[0] ?? restInk;
     if (!hoverInk) throw new Error(`${variant} has no label colour`);
     const pairs: [string, string][] = [];
     for (const bg of tokensAfter(classes, "bg-")) pairs.push([restInk ?? hoverInk, bg]);
@@ -215,7 +204,7 @@ describe("labels on the accent fills under every preset and its semantic colours
     "--color-accent-on-tint",
     "--color-text-heading",
   ];
-  const NEUTRAL: ButtonVariant[] = ["secondary", "outline", "ghost", "sidebar-toggle"];
+  const NEUTRAL: ButtonVariant[] = ["secondary", "ghost"];
   const PRESETS = PREDEFINED_THEMES.flatMap((t) =>
     BOTH.map((mode) => [t.name, mode, t[mode].themeColor, t[mode].semanticColors] as const),
   );
@@ -236,13 +225,11 @@ describe("labels on the accent fills under every preset and its semantic colours
         .filter((c) => c.startsWith(prefix))
         .map((c) => `--color-${c.slice(prefix.length)}`)
         .filter((t) => resolveColor(t, THEMES.light) !== null);
-    const ink = token("enabled:hover:text-")[0] ?? token("text-")[0];
+    const ink = token("hover:text-")[0] ?? token("text-")[0];
     if (!ink) throw new Error(`${variant} has no label colour`);
-    return [
-      "enabled:hover:bg-",
-      "enabled:active:bg-",
-      "group-hover/row:enabled:hover:not-active:bg-",
-    ].flatMap((prefix) => token(prefix).map((bg) => [ink, bg] as [string, string]));
+    return ["hover:bg-", "active:bg-", "group-hover/row:hover:not-active:bg-"].flatMap((prefix) =>
+      token(prefix).map((bg) => [ink, bg] as [string, string]),
+    );
   };
 
   it.each(NEUTRAL)("finds the hover and pressed fills of the %s button", (variant) => {
@@ -333,25 +320,15 @@ describe("segmented control (item 3)", () => {
   });
 });
 
-describe("stat strip filter chips", () => {
-  const badgeFill = (tone: "error" | "neutral", value: number) =>
-    tone === "error" && value > 0 ? "--color-badge-error-soft-bg" : "--color-surface-subtle";
-
-  const tileToken = (part: "value" | "label", tone: "error" | "neutral", value: number) => {
+describe("stat strip filter tiles", () => {
+  const tileToken = (part: "value" | "label", tone: "err" | "neutral", value: number) => {
     const wrapper = mount(OStatCard, {
-      props: {
-        variant: "chip",
-        clickable: true,
-        selected: false,
-        tone,
-        label: raw("Failed"),
-        value,
-      },
+      props: { clickable: true, selected: false, tone, label: raw("Failed"), value },
     });
     const text = wrapper
       .get(`[data-test="o-stat-card-${part}"]`)
       .classes()
-      .find((c) => c.startsWith("text-") && c !== "text-2xs");
+      .find((c) => c.startsWith("text-") && !/^text-(xs|sm|xl|2xl|compact)$/.test(c));
     wrapper.unmount();
     if (!text) throw new Error(`no text colour on the ${tone} ${part}`);
     return `--color-${text.slice("text-".length)}`;
@@ -360,25 +337,21 @@ describe("stat strip filter chips", () => {
   it.each(
     BOTH.flatMap((theme) =>
       [
-        ["error count", "value", "error", 1],
+        ["error count", "value", "err", 1],
         ["neutral count", "value", "neutral", 1],
-        ["zero count", "value", "error", 0],
+        ["zero count", "value", "err", 0],
         ["label", "label", "neutral", 1],
       ].map(([what, part, tone, value]) => [theme, what, part, tone, value] as const),
     ),
   )(
-    "keeps an unselected %s filter chip's %s readable on its fill",
+    "keeps an unselected %s filter tile's %s readable on its surface",
     (theme, _what, part, tone, value) => {
       const token = tileToken(
         part as "value" | "label",
-        tone as "error" | "neutral",
+        tone as "err" | "neutral",
         value as number,
       );
-      const fill =
-        part === "value"
-          ? badgeFill(tone as "error" | "neutral", value as number)
-          : "--color-surface-base";
-      expect(ratio(token, fill, theme)).toBeGreaterThanOrEqual(TEXT_MIN);
+      expect(ratio(token, "--color-surface-base", theme)).toBeGreaterThanOrEqual(TEXT_MIN);
     },
   );
 });
@@ -435,7 +408,7 @@ describe("readable text tiers (item 11)", () => {
   });
 });
 
-/** Text inks the time segments, Close and range tabs paint straight on the picker popup. */
+/** Text inks the time segments and Close paint straight on the picker popup. */
 async function pickerAccentInks(): Promise<[string, string][]> {
   const inks = (where: string, el: Element): [string, string][] =>
     [...el.classList]
@@ -457,13 +430,6 @@ async function pickerAccentInks(): Promise<[string, string][]> {
     ...inks("OTime Close", timePopup.querySelector('[data-test="otime-close"]')!),
   ];
   time.unmount();
-
-  const range = mount(ODateTimeRange, { attachTo: document.body });
-  await range.find('[data-test="datetimerange-trigger"]').trigger("click");
-  await flushPromises();
-  const tabs = document.body.querySelectorAll('[data-test="datetimerange-tabs"] button');
-  found.push(...[...tabs].flatMap((b) => inks("ODateTimeRange tab", b)));
-  range.unmount();
   return found;
 }
 

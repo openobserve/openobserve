@@ -16,7 +16,7 @@ const { t } = useI18nTyped();
     class="tool-call-indicator rounded-default border-border-default my-2 flex items-center border px-4 py-3 [background:var(--color-chat-bubble-user)]"
   >
     <div class="tool-call-content flex w-full items-center gap-3">
-      <OSpinner variant="dots" size="xs" />
+      <OSpinner />
       <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
         <span class="tool-call-message text-text-secondary text-sm font-semibold">{{
           message

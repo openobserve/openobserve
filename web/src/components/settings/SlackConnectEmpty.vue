@@ -27,7 +27,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OnCallHint from "@/components/oncall/OnCallHint.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
 import {
   confirmConnectionMutation,
@@ -210,13 +210,7 @@ const nextSteps = computed<I18nText[]>(() =>
 
 <template>
   <div class="flex flex-col gap-4" data-test="slack-connect-empty">
-    <OBanner
-      v-if="instance"
-      variant="info"
-      icon="info"
-      inline-actions
-      data-test="slack-not-included"
-    >
+    <OInlineNotice v-if="instance" tone="info" data-test="slack-not-included">
       <div class="flex flex-col gap-0.5">
         <span class="font-semibold">
           {{ t("slackApp.connect.notIncludedTitle", { team: instance.team_name, org }) }}
@@ -231,20 +225,19 @@ const nextSteps = computed<I18nText[]>(() =>
       </div>
       <template #actions>
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="content-copy"
+          variant="secondary"
+          icon="content-copy"
           data-test="slack-copy-request"
           @click="copyRequest"
         >
           {{ t("slackApp.connect.copyRequest") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
-    <OBanner
+    <OInlineNotice
       v-if="isCloud && candidate"
-      variant="info"
+      tone="info"
       icon="sync"
       data-test="slack-upgrade-banner"
     >
@@ -263,8 +256,7 @@ const nextSteps = computed<I18nText[]>(() =>
       <template #actions>
         <OButton
           variant="primary"
-          size="sm-action"
-          icon-left="sync"
+          icon="sync"
           :loading="
             popup.connecting.value &&
             action.kind === 'install' &&
@@ -276,14 +268,9 @@ const nextSteps = computed<I18nText[]>(() =>
           {{ t("slackApp.connect.upgradeButton") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
-    <OBanner
-      v-if="alreadyInstalled"
-      variant="warning"
-      icon="info"
-      data-test="slack-already-installed"
-    >
+    <OInlineNotice v-if="alreadyInstalled" tone="warn" data-test="slack-already-installed">
       {{
         t("slackApp.connect.alreadyInstalled", {
           team: alreadyInstalled.already_installed.team_name,
@@ -292,8 +279,7 @@ const nextSteps = computed<I18nText[]>(() =>
       <template #actions>
         <OButton
           variant="primary"
-          size="sm-action"
-          icon-left="link"
+          icon="link"
           :loading="connectInstallation.isPending.value"
           data-test="slack-connect-ticket"
           @click="connectWithTicket"
@@ -301,7 +287,7 @@ const nextSteps = computed<I18nText[]>(() =>
           {{ t("slackApp.connect.connectExisting") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
     <OFormSection
       v-if="!isCloud && offered.length"
@@ -323,8 +309,7 @@ const nextSteps = computed<I18nText[]>(() =>
         </template>
         <OButton
           variant="primary"
-          size="sm-action"
-          icon-left="link"
+          icon="link"
           :loading="popup.connecting.value && connectingId === item.installation_id"
           @click="runPopup({ kind: 'connect', installationId: item.installation_id })"
         >
@@ -333,9 +318,9 @@ const nextSteps = computed<I18nText[]>(() =>
       </OSettingRow>
     </OFormSection>
 
-    <OCard variant="outlined">
-      <OEmptyState size="block" preset="slack-not-connected" :backdrop="false">
-        <template v-if="autoobserveEdition" #description>
+    <OCard>
+      <OEmptyState icon="link" :title="t('emptyState.slackNotConnected.title')">
+        <template v-if="autoobserveEdition" #text>
           <span data-test="slack-connect-autoobserve">{{
             t("slackApp.connect.autoobserveHint")
           }}</span>
@@ -344,7 +329,6 @@ const nextSteps = computed<I18nText[]>(() =>
           <OButton
             v-if="isCloud"
             variant="ghost"
-            size="md"
             :loading="
               popup.connecting.value && action.kind === 'install' && action.source === 'settings'
             "
@@ -360,9 +344,8 @@ const nextSteps = computed<I18nText[]>(() =>
           </OButton>
           <OButton
             v-else
-            :variant="offered.length ? 'outline' : 'primary'"
-            size="md"
-            icon-left="settings"
+            :variant="offered.length ? 'secondary' : 'primary'"
+            icon="settings"
             data-test="slack-setup-app"
             @click="emit('setup')"
           >

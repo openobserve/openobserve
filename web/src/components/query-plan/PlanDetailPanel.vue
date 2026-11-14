@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-4 px-4 pt-3">
       <section v-if="entries.length">
         <ProfileSectionTitle :title="t('search.queryProfile.details')" />
-        <ODescriptionList dense data-test="query-plan-detail-entries">
+        <ODescriptionList data-test="query-plan-detail-entries">
           <ODescriptionItem v-for="(e, i) in entries" :key="i" :label="e.label">
             <span class="font-mono text-xs wrap-anywhere">{{ e.value }}</span>
           </ODescriptionItem>
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <section>
         <ProfileSectionTitle :title="t('search.queryProfile.raw')" />
-        <OCodeBlock :code="op.detail" wrap padded data-test="query-plan-detail-raw" />
+        <OCodeBlock :code="op.detail" wrap data-test="query-plan-detail-raw" />
       </section>
 
       <div class="text-text-secondary text-xs leading-normal" data-test="query-plan-detail-note">

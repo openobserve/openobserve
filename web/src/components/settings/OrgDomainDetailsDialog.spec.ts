@@ -22,7 +22,7 @@ import OrgDomainDetailsDialog from "./OrgDomainDetailsDialog.vue";
 
 const DialogStub = defineComponent({
   name: "ODialog",
-  props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel", "primaryButtonLoading"],
+  props: ["open", "title", "primary", "secondary"],
   template: "<div><slot /></div>",
 });
 
@@ -73,7 +73,7 @@ describe("OrgDomainDetailsDialog", () => {
     });
 
     expect(dialogProp(wrapper, "title")).toBe("Verify acme.com");
-    expect(dialogProp(wrapper, "primaryButtonLabel")).toBe("Verify now");
+    expect(dialogProp(wrapper, "primary")?.label).toBe("Verify now");
     expect(wrapper.text()).toContain("Last check failed: DNS resolution failed");
     expect(wrapper.findComponent({ name: "OrgDomainVerification" }).exists()).toBe(true);
   });
@@ -82,14 +82,14 @@ describe("OrgDomainDetailsDialog", () => {
     const wrapper = mountDialog({ link: link(1), request: null });
 
     expect(dialogProp(wrapper, "title")).toBe("DNS record for acme.com");
-    expect(dialogProp(wrapper, "primaryButtonLabel")).toBeUndefined();
+    expect(dialogProp(wrapper, "primary")?.label).toBeUndefined();
   });
 
   it("explains an approved link and who approved it, without a DNS record", () => {
     const wrapper = mountDialog({ link: link(1, true), request: request(1) });
 
     expect(dialogProp(wrapper, "title")).toBe("Link details for acme.com");
-    expect(dialogProp(wrapper, "primaryButtonLabel")).toBeUndefined();
+    expect(dialogProp(wrapper, "primary")?.label).toBeUndefined();
     expect(wrapper.text()).toContain("No DNS record is needed");
     expect(wrapper.text()).toContain("owner@acme.com");
     expect(wrapper.text()).toContain("staff@o2.test");

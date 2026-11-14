@@ -102,9 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-drawer-anchor="panel-editor-fields"
                   >
                     <OButton
-                      variant="outline"
-                      size="sm"
-                      icon-left="add"
+                      variant="secondary"
+                      icon="add"
                       data-test="panel-editor-mobile-fields-btn"
                       @click="mobileFieldsOpen = true"
                     >
@@ -130,10 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OButton
                             data-test="panel-editor-add-to-dashboard-btn"
                             variant="primary"
-                            size="xs"
+                            size="sm"
                             disabled
                           >
-                            <template #icon-left>
+                            <template #icon>
                               <OIcon
                                 name="lock"
                                 class="lock-chip"
@@ -147,22 +146,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OTooltip>
                       <OButton
                         v-else-if="resolvedConfig.showAddToDashboardButton"
+                        :disabled-reason="addToDashboardDisabledReason ?? undefined"
                         data-test="panel-editor-add-to-dashboard-btn"
                         variant="primary"
-                        size="xs"
+                        size="sm"
                         :disabled="!!addToDashboardDisabledReason"
-                        focusable-unavailable
                         @click="emit('addToDashboard')"
                         :title="
                           addToDashboardDisabledReason ? undefined : t('search.addToDashboard')
                         "
                       >
                         {{ t("search.addToDashboard") }}
-                        <OTooltip
-                          v-if="addToDashboardDisabledReason"
-                          :content="addToDashboardDisabledReason"
-                        />
-                        <template #unavailable-reason>{{ addToDashboardDisabledReason }}</template>
                       </OButton>
                     </div>
                   </div>
@@ -248,17 +242,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'maps',
                         ].includes(dashboardPanelData.data.type)
                       "
+                      icon-only
                       :class="{ invisible: panelSchemaRendererRef?.noData }"
                       variant="ghost"
-                      size="icon"
+                      size="xs"
                       @click="showLegendsDialog = true"
-                      icon-left="format-list-bulleted"
+                      icon="format-list-bulleted"
                       data-test="panel-editor-show-legends-btn"
                     >
                       <OTooltip
                         :content="t('dashboard.panelContainer.showLegends')"
                         side="bottom"
-                        align="end"
                       />
                     </OButton>
 
@@ -281,8 +275,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ].includes(dashboardPanelData.data.type) &&
                         panelSchemaRendererRef?.checkIfPanelIsTimeSeries === true
                       "
+                      icon-only
                       variant="ghost"
-                      size="icon"
+                      size="xs"
                       @click="panelSchemaRendererRef?.toggleAddAnnotationMode()"
                       data-test="panel-editor-annotation-btn"
                     >
@@ -299,7 +294,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : t('dashboard.addAnnotations')
                         "
                         side="bottom"
-                        align="end"
                       />
                     </OButton>
 
@@ -612,9 +606,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-drawer-anchor="panel-editor-fields"
                 >
                   <OButton
-                    variant="outline"
-                    size="sm"
-                    icon-left="add"
+                    variant="secondary"
+                    icon="add"
                     data-test="panel-editor-mobile-fields-btn"
                     @click="mobileFieldsOpen = true"
                   >
@@ -645,18 +638,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <OButton
                             variant="primary"
-                            size="sm"
                             @click="showCustomChartTypeSelector = true"
                             data-test="custom-chart-type-selector-btn"
                           >
-                            <template #icon-left><OIcon name="bar-chart" size="sm" /></template>
+                            <template #icon><OIcon name="bar-chart" size="sm" /></template>
                             {{ t("panel.exampleCharts") }}
                           </OButton>
                           <ODialog
+                            size="full"
                             data-test="panel-editor-custom-chart-type-selector-dialog"
                             v-model:open="showCustomChartTypeSelector"
                             :show-close="false"
-                            :width="95"
                           >
                             <CustomChartTypeSelector
                               @select="handleChartTypeSelection"

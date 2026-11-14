@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="prebuilt-form"
               />
               <div v-else-if="isUpdatingDestination" class="p-3 text-center">
-                <OSpinner size="md" data-test="add-destination-loading-indicator" />
+                <OSpinner size="lg" data-test="add-destination-loading-indicator" />
                 <div class="text-text-muted mt-2">{{ t("alert_destinations.loadingData") }}</div>
               </div>
 
@@ -214,21 +214,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div class="ms-0 w-1/6">
                       <OButton
+                        icon-only
                         :data-test="`add-destination-header-${header['key']}-delete-btn`"
                         class="ms-1"
                         variant="ghost"
-                        size="icon-circle-sm"
+                        size="sm"
                         :title="t('alert_templates.edit')"
                         @click="deleteApiHeader(index)"
                       >
                         <OIcon name="delete" size="sm" />
                       </OButton>
                       <OButton
-                        data-test="add-destination-add-header-btn"
                         v-if="index === apiHeaders.length - 1"
+                        icon-only
+                        data-test="add-destination-add-header-btn"
                         class="ms-1"
                         variant="ghost"
-                        size="icon-circle-sm"
+                        size="sm"
                         :title="t('alert_templates.edit')"
                         @click="addApiHeader()"
                       >
@@ -279,8 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("alert_destinations.noEmailTemplates") }}
               </div>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 data-test="add-destination-create-email-template-btn"
                 @click="createEmailTemplate"
                 >{{ t("alert_destinations.createEmailTemplate") }}</OButton
@@ -381,21 +382,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="ms-0 w-1/6">
                     <OButton
+                      icon-only
                       :data-test="`add-destination-header-${header['key']}-delete-btn`"
                       class="ms-1"
                       variant="ghost"
-                      size="icon-circle-sm"
+                      size="sm"
                       :title="t('alert_templates.edit')"
                       @click="deleteApiHeader(index)"
                     >
                       <OIcon name="delete" size="sm" />
                     </OButton>
                     <OButton
-                      data-test="add-destination-add-header-btn"
                       v-if="index === apiHeaders.length - 1"
+                      icon-only
+                      data-test="add-destination-add-header-btn"
                       class="ms-1"
                       variant="ghost"
-                      size="icon-circle-sm"
+                      size="sm"
                       :title="t('alert_templates.edit')"
                       @click="addApiHeader()"
                     >
@@ -458,10 +461,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #after-options>
                   <OButton
-                    variant="ghost-primary"
-                    size="sm"
+                    variant="accent-ghost"
                     class="w-full justify-start"
-                    icon-left="person-add"
+                    icon="person-add"
                     data-test="add-destination-create-user-btn"
                     @click="openCreateUser"
                   >
@@ -482,20 +484,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OButton
               data-test="destination-preview-button"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               @click="showPreview"
-              icon-left="preview"
+              icon="preview"
             >
               {{ t("alert_destinations.preview") }}
             </OButton>
             <OButton
               data-test="destination-test-button"
               :loading="isTestInProgress"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               @click="handleTestDestination"
-              icon-left="send"
+              icon="send"
             >
               {{ t("alert_destinations.test") }}
             </OButton>
@@ -507,8 +507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="add-destination-cancel-btn"
               v-close-popup="true"
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               @click="closeEditor"
               >{{ t("alerts.cancel") }}</OButton
             >
@@ -516,7 +515,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="(!isNewSlackDestination && dtVal !== 'jira') || showPrebuiltAdvancedSettings"
               data-test="add-destination-submit-btn"
               variant="primary"
-              size="sm-action"
               type="submit"
               form="add-destination-form"
               @click="onSaveClick"

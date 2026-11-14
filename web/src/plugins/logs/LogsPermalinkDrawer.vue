@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="xl"
     bleed
     lazy
     data-test="logs-permalink-detail-dialog"
     :open="open"
-    :width="85"
     :title="t('search.rowDetail')"
     @update:open="onOpenChange"
   >

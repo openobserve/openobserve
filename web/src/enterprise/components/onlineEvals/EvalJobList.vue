@@ -5,20 +5,18 @@
         v-model:selected-ids="selectedIds"
         selection="multiple"
         data-test="eval-job-list-table"
-        :data="numberedRows"
+        :data="filteredRows"
         :columns="columns"
         row-key="id"
         :loading="loading"
         :forbidden="forbidden"
         :global-filter="search"
-        :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="eval-job-list"
-        width="100%"
         class="h-full w-full"
         :get-row-style="evalJobRowStyle"
         :row-class="evalJobRowClass"
@@ -27,39 +25,37 @@
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="min-w-0 flex-1 md:min-w-48"
+            class="min-w-0 flex-1"
             :placeholder="t('onlineEvals.job.searchPlaceholder')"
             data-test="eval-job-list-search-input"
-            clearable
             @update:model-value="$emit('update:search', $event as string)"
-          />
-          <OStatStrip
-            :items="summaryStats"
-            :loading="loading"
-            selectable
-            :row="false"
-            multiple
-            :selected-keys="statusFilters"
-            default-key="all"
-            class="max-md:order-last"
-            data-test="eval-job-list-summary"
-            @update:selected-keys="statusFilters = $event as EvalJobStatus[]"
           />
         </template>
 
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastRunAt"
             :loading="refreshing || loading"
-            shortcut-id="evalJobsRefresh"
+            shortcut="evalJobsRefresh"
             data-test="eval-job-list-refresh-btn"
             @click="emit('refresh')"
           />
         </template>
 
-        <template v-if="budgetPausedRows.length" #subheader>
+        <template #subheader>
+          <div
+            class="px-page-edge border-table-row-divider border-b py-1.5"
+            data-test="eval-job-list-summary"
+          >
+            <OStatStrip
+              :items="summaryStats"
+              :loading="loading"
+              selectable
+              multiple
+              :selected-keys="statusFilters"
+              @update:selected-keys="statusFilters = $event as EvalJobStatus[]"
+            />
+          </div>
           <!-- Keep paused makes the pause the user's, so 00:00 UTC does not resume it. -->
           <div
             v-for="row in budgetPausedRows"
@@ -67,12 +63,11 @@
             class="px-page-edge pt-2"
             :data-test="`eval-job-budget-banner-${row.name}`"
           >
-            <OBanner variant="warning" icon="pause" inline-actions dense>
+            <OInlineNotice tone="warn" icon="pause">
               {{ budgetPausedText(row) }}
               <template #actions>
                 <OButton
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   :loading="pendingStatusId === row.id"
                   :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
                   :data-test="`eval-job-budget-resume-${row.name}`"
@@ -81,8 +76,7 @@
                   {{ t("evalSpend.list.resumeToday") }}
                 </OButton>
                 <OButton
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   :title="t('evalSpend.list.keepPausedHint')"
                   :disabled="pendingStatusId !== null"
                   :data-test="`eval-job-budget-keep-paused-${row.name}`"
@@ -92,34 +86,42 @@
                 </OButton>
                 <OButton
                   variant="ghost"
-                  size="sm"
                   :data-test="`eval-job-budget-edit-${row.name}`"
                   @click="$emit('edit', row, 'budget')"
                 >
                   {{ t("evalSpend.list.editBudget") }}
                 </OButton>
               </template>
-            </OBanner>
+            </OInlineNotice>
           </div>
         </template>
 
         <template #empty>
           <div class="flex items-center justify-center py-8">
             <OEmptyState
-              size="hero"
-              preset="no-eval-jobs"
-              :filtered="hasFilters"
+              :kind="hasFilters ? 'filtered' : 'first-run'"
+              :title="
+                hasFilters
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.evalJobs') })
+                  : t('emptyState.noEvalJobs.title')
+              "
+              :text="
+                hasFilters
+                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.evalJobs') })
+                  : t('emptyState.noEvalJobs.description')
+              "
+              :icon="hasFilters ? undefined : 'schedule'"
               data-test="eval-job-empty-state"
-              @action="onEmptyAction"
+              :action-label="hasFilters ? undefined : t('emptyState.noEvalJobs.action')"
+              @action="onEmptyAction(hasFilters ? 'clear-filters' : 'create')"
             />
           </div>
         </template>
 
         <template #selection-actions>
           <OButton
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
+            variant="danger-ghost"
+            icon="delete"
             data-test="eval-job-bulk-delete-btn"
             :loading="actionLoading"
             @click="handleBulkDelete"
@@ -169,7 +171,7 @@
           <span v-else class="inline-flex min-w-0 items-center gap-1.5">
             <span class="truncate">{{ lastErrorKind(row) }}</span>
             <span class="text-text-secondary shrink-0">{{ lastErrorAgo(row) }}</span>
-            <OTooltip :content="lastErrorMessage(row)" max-width="30rem" hoverable />
+            <OTooltip :content="lastErrorMessage(row)" hoverable />
           </span>
         </template>
 
@@ -256,15 +258,15 @@
           <div class="actions-container flex items-center">
             <OButton
               v-if="canActivate(row.status)"
+              icon-only
               :data-test="`eval-job-list-${row.name}-activate-btn`"
-              variant="ghost-success"
-              size="icon-sm"
+              variant="ghost"
               :title="
                 isBudgetPaused(row)
                   ? t('evalSpend.list.resumeToday')
                   : t('onlineEvals.actions.activate')
               "
-              icon-left="play-arrow"
+              icon="play-arrow"
               :loading="pendingStatusId === row.id"
               :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
               class="max-md:hidden"
@@ -272,41 +274,42 @@
             />
             <OButton
               v-if="canPause(row.status)"
+              icon-only
               :data-test="`eval-job-list-${row.name}-pause-btn`"
-              variant="ghost-destructive"
-              size="icon-sm"
+              variant="danger-ghost"
               :title="t('onlineEvals.actions.pause')"
-              icon-left="pause"
+              icon="pause"
               :loading="pendingStatusId === row.id"
               :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
               class="max-md:hidden"
               @click.stop="$emit('pause', row)"
             />
             <OButton
+              icon-only
               :data-test="`eval-job-list-${row.name}-edit-btn`"
               variant="ghost"
-              size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
-              icon-left="edit"
+              icon="edit"
               class="max-md:hidden"
               @click.stop="$emit('edit', row)"
             />
             <OButton
+              icon-only
               :data-test="`eval-job-list-${row.name}-delete-btn`"
-              variant="ghost-destructive"
-              size="icon-sm"
+              variant="danger-ghost"
               :title="t('onlineEvals.actions.delete')"
-              icon-left="delete"
+              icon="delete"
               class="max-md:hidden"
               @click.stop="$emit('delete', row)"
             />
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  icon-only
                   :aria-label="t('common.moreActions')"
-                  icon-left="more-vert"
+                  icon="more-vert"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   data-test="eval-job-list-row-more-actions"
                   @click.stop
@@ -314,7 +317,7 @@
               </template>
               <ODropdownItem
                 v-if="canActivate(row.status)"
-                icon-left="play-arrow"
+                icon="play-arrow"
                 class="md:hidden"
                 :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
                 :data-test="`eval-job-list-${row.name}-activate-btn-menu`"
@@ -324,8 +327,8 @@
               </ODropdownItem>
               <ODropdownItem
                 v-if="canPause(row.status)"
-                icon-left="pause"
-                variant="destructive"
+                icon="pause"
+                tone="danger"
                 class="md:hidden"
                 :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
                 :data-test="`eval-job-list-${row.name}-pause-btn-menu`"
@@ -334,7 +337,7 @@
                 <span>{{ t("onlineEvals.actions.pause") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="edit"
+                icon="edit"
                 class="md:hidden"
                 :data-test="`eval-job-list-${row.name}-edit-btn-menu`"
                 @select="$emit('edit', row)"
@@ -342,8 +345,8 @@
                 <span>{{ t("onlineEvals.actions.edit") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
+                icon="delete"
+                tone="danger"
                 class="md:hidden"
                 :data-test="`eval-job-list-${row.name}-delete-btn-menu`"
                 @select="$emit('delete', row)"
@@ -388,11 +391,10 @@ import { formatDate } from "@/utils/date";
 import type { ForbiddenState } from "@/utils/featureGate";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
-import { useNumberedRows } from "./composables/useNumberedRows";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import { pricingGapsRoute } from "@/plugins/traces/llmDataTrust.utils";
 import {
@@ -469,14 +471,6 @@ watch(
 
 const columns = computed(() =>
   [
-    {
-      id: "#",
-      header: raw("#"),
-      accessorKey: "#",
-      sortable: false,
-      size: 56,
-      meta: { align: "left" },
-    },
     {
       id: "name",
       header: t("onlineEvals.job.columns.name"),
@@ -572,7 +566,7 @@ const columns = computed(() =>
     ...c,
     // Every column except the row index, the name (row identity) and the
     // actions column is offered in OTable's "Manage columns" chooser.
-    hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
+    hideable: c.id !== "name" && !c.isAction,
   })),
 );
 
@@ -581,8 +575,6 @@ const filteredRows = computed(() =>
     matchesAnyKey(statusFilters.value, row, (r, key) => statusOf(r) === key),
   ),
 );
-
-const numberedRows = useNumberedRows(filteredRows);
 
 // Summary strip — colour-coded status counts that double as quick filters
 // (syncs with the status dropdown via `statusFilters`).
@@ -603,7 +595,7 @@ const statusCounts = computed(() => {
 const summaryStats = computed<StatItem[]>(() => {
   const c = statusCounts.value;
   const has = c.total > 0;
-  const v = (n: number): string | number => (has ? n : "—");
+  const v = (n: number): number | null => (has ? n : null);
   const share = has ? c.total : undefined;
   return [
     {
@@ -611,7 +603,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.jobStatus.paused"),
       value: v(c.paused),
       icon: "pause",
-      tone: "warning",
+      tone: "warn",
       max: share,
       dataTest: "eval-job-summary-paused",
     },
@@ -620,7 +612,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.jobStatus.active"),
       value: v(c.active),
       icon: "play-arrow",
-      tone: "success",
+      tone: "ok",
       max: share,
       dataTest: "eval-job-summary-active",
     },
@@ -638,7 +630,6 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("onlineEvals.summaryAll"),
       value: v(c.total),
       icon: "format-list-bulleted",
-      tone: "primary",
       dataTest: "eval-job-summary-all",
     },
   ];

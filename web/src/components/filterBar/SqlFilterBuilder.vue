@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { emptyFilterGroup, filterTreeToSql, type FilterGroup } from "@/utils/query/filterBar";
@@ -80,14 +80,7 @@ defineExpose<SqlFilterBuilderExpose>({ activate: () => barRef.value?.activate() 
 
 <template>
   <div class="flex w-full min-w-0 flex-col gap-1" :data-test="dataTest">
-    <OBanner
-      v-if="unparsable"
-      variant="warning"
-      icon="warning"
-      dense
-      inline-actions
-      :data-test="`${dataTest}-unparsable`"
-    >
+    <OInlineNotice v-if="unparsable" tone="warn" :data-test="`${dataTest}-unparsable`">
       <div class="flex min-w-0 items-baseline gap-1.5">
         <span class="shrink-0">{{ t("filterBar.queryNotParsableShort") }}</span>
         <code
@@ -98,22 +91,17 @@ defineExpose<SqlFilterBuilderExpose>({ activate: () => barRef.value?.activate() 
         >
       </div>
       <template #actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          :data-test="`${dataTest}-keep-query`"
-          @click="emit('exit')"
-          >{{ t("filterBar.query") }}</OButton
-        >
+        <OButton variant="secondary" :data-test="`${dataTest}-keep-query`" @click="emit('exit')">{{
+          t("filterBar.query")
+        }}</OButton>
         <OButton
           variant="primary"
-          size="sm"
           :data-test="`${dataTest}-clear-and-build`"
           @click="clearAndBuild"
           >{{ t("filterBar.clearAndBuild") }}</OButton
         >
       </template>
-    </OBanner>
+    </OInlineNotice>
     <template v-else>
       <QueryFilterBar
         ref="barRef"

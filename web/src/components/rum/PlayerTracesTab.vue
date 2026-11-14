@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex h-full flex-col items-center justify-center gap-3"
       data-test="rum-player-traces-tab-loading"
     >
-      <OSpinner size="md" />
+      <OSpinner size="lg" />
       <small>{{ t("rum.loadingErrorDetails") }}</small>
     </div>
 
@@ -34,12 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OIcon name="error-outline" size="lg" class="text-status-error-text" />
       <p class="text-center">{{ error }}</p>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        @click="fetchTraces"
-        data-test="rum-player-traces-tab-retry-btn"
-      >
+      <OButton variant="secondary" @click="fetchTraces" data-test="rum-player-traces-tab-retry-btn">
         {{ t("common.retry") }}
       </OButton>
     </div>
@@ -71,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButton
           variant="ghost"
-          size="xs"
+          size="sm"
           @click="closeTraceDetail"
           data-test="rum-player-traces-tab-back-btn"
           :aria-label="t('common.back')"
@@ -124,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
           </span>
           <OButton
-            variant="outline"
-            size="chip"
+            variant="secondary"
+            size="xs"
             @click="traceDetailsRef?.handleExpandToFullView()"
             data-test="rum-player-traces-tab-open-full-btn"
             :aria-label="t('traces.openInFullView')"
@@ -236,11 +231,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTable
           :data="visibleViews"
           :columns="traceColumns"
-          :row-height="32"
           :default-columns="false"
           :enable-column-reorder="true"
           :row-class="traceRowClass"
-          :show-global-filter="false"
           pagination="none"
           @row-click="handleTraceRowClick"
         >

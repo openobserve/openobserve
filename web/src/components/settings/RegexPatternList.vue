@@ -19,16 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="!showImportRegexPatternDialog">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <OPageLayout
-        overflow-first
         :title="t('regex_patterns.title')"
-        icon="pattern"
-        :subtitle="t('settings.regexPatternList.subtitle')"
+        :about="t('settings.regexPatternList.subtitle')"
         bleed
       >
         <template #actions-overflow>
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             @click="importRegexPattern"
             data-test="regex-pattern-list-import"
             >{{ t("regex_patterns.import") }}</OButton
@@ -38,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="regex-pattern-list-add-pattern-btn"
             variant="primary"
-            size="sm"
             :aria-label="
               regexDrafts.hasNew
                 ? t('common.editorDraft.newDot', { label: t('regex_patterns.create_pattern') })
@@ -56,12 +52,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
           <OTable
             ref="oTableRef"
-            :frame="false"
             data-test="regex-pattern-list-table"
             :data="visibleRows"
             :columns="columns"
             :row-actions="rowActions"
-            row-actions-more-data-test="regex-pattern-list-row-more-actions"
+            :row-menu="rowMenu"
+            row-menu-data-test="regex-pattern-list-row-more-actions"
             row-key="id"
             :selected-ids="selectedPatternIds"
             selection="multiple"
@@ -78,11 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sorting="client"
             filter-mode="client"
             :default-columns="false"
-            show-index
             :enable-column-resize="true"
             :persist-columns="true"
             table-id="settings-regex-patterns"
-            :show-global-filter="false"
             :loading="listLoading"
             :forbidden="forbidden"
             @update:selected-ids="handleSelectedIdsUpdate"
@@ -96,11 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #toolbar-trailing>
               <ORefreshButton
-                layout="inline"
-                variant="outline"
                 :last-run-at="lastUpdatedAt"
                 :loading="fetching"
-                shortcut-id="regexPatternsRefresh"
+                shortcut="regexPatternsRefresh"
                 data-test="regex-pattern-list-refresh-btn"
                 @click="refreshRegexPatterns"
               />
@@ -108,17 +100,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #empty>
               <OEmptyState
                 v-if="!listLoading"
-                size="hero"
-                preset="no-regex-patterns"
-                :filtered="filterQuery !== ''"
-                @action="
-                  (id) =>
-                    id === 'clear-filters'
-                      ? (filterQuery = '')
-                      : id === 'import'
-                        ? importRegexPattern()
-                        : createRegexPattern()
+                :kind="filterQuery !== '' ? 'filtered' : 'first-run'"
+                :title="
+                  filterQuery !== ''
+                    ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.regexPatterns') })
+                    : t('emptyState.noRegexPatterns.title')
                 "
+                :text="
+                  filterQuery !== ''
+                    ? t('emptyState.filtered.description', {
+                        noun: t('emptyState.nouns.regexPatterns'),
+                      })
+                    : t('emptyState.noRegexPatterns.description')
+                "
+                :action-label="
+                  filterQuery !== '' ? undefined : t('emptyState.noRegexPatterns.action')
+                "
+                :secondary-action-label="
+                  filterQuery !== '' ? undefined : t('emptyState.noRegexPatterns.import')
+                "
+                @action="filterQuery !== '' ? (filterQuery = '') : createRegexPattern()"
+                @secondary-action="importRegexPattern()"
               />
             </template>
             <template #cell-name="{ row }">
@@ -147,9 +149,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #selection-actions>
               <OButton
                 data-test="regex-pattern-list-delete-patterns-btn"
-                variant="outline-destructive"
-                size="sm"
-                icon-left="delete"
+                variant="danger-ghost"
+                icon="delete"
                 :loading="bulkDeleteLoading"
                 @click="openBulkDeleteDialog"
               >
@@ -171,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('settings.regexPatternList.deleteTitle')"
       message-keypath="settings.regexPatternList.deleteMessage"
       :message-name="deleteDialog.name"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="deleteRegexPattern"
       @update:cancel="deleteDialog.show = false"
     />
@@ -179,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('settings.regexPatternList.bulkDeleteTitle')"
       :message="t('settings.regexPatternList.bulkDeleteMessage', { n: selectedPatterns.length })"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="bulkDeleteRegexPatterns"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -220,7 +221,11 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import ONameLinkCell from "@/lib/core/Table/cells/ONameLinkCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -318,32 +323,29 @@ export default defineComponent({
         size: COL.updatedAt,
         meta: { align: "left" },
       },
-      {
-        id: "actions",
-        header: t("regex_patterns.actions"),
-        isAction: true,
-        pinned: "right",
-      },
     ];
     const rowActions: OTableRowAction[] = [
       {
         id: "edit",
         label: t("regex_patterns.edit"),
         icon: "edit",
-        onSelect: (row) => editRegexPattern(row),
+        onClick: (row) => editRegexPattern(row),
         dataTest: (row) => `regex-pattern-list-${row.id}-update-regex-pattern`,
       },
       {
         id: "export",
         label: t("settings.regexPatternList.exportTitle"),
         icon: "download",
-        onSelect: (row) => exportRegexPattern(row),
+        onClick: (row) => exportRegexPattern(row),
         dataTest: (row) => `regex-pattern-list-${row.id}-export-regex-pattern`,
       },
+    ];
+    const rowMenu: OTableRowMenuItem[] = [
       {
         id: "delete",
         label: t("regex_patterns.delete"),
         icon: "delete",
+        destructive: true,
         onSelect: (row) => confirmDeleteRegexPattern(row),
         dataTest: (row) => `regex-pattern-list-${row.id}-delete-regex-pattern`,
       },
@@ -660,6 +662,7 @@ export default defineComponent({
       oTableRef,
       columns,
       rowActions,
+      rowMenu,
       regexPatterns,
       filterData,
       createRegexPattern,

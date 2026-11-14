@@ -114,12 +114,14 @@ import {
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
 import VariableSuggestionRow from "@/components/synthetics/variables/VariableSuggestionRow.vue";
 import ExtensionSetupChecklist from "@/components/synthetics/ExtensionSetupChecklist.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -142,7 +144,6 @@ import useCheckWizardUi, {
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyBrowserCheck from "@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 const router = useRouter();
@@ -199,19 +200,7 @@ const headerTitle = computed(() => {
   if (loadError.value) return t("synthetics.createBrowserTest.loadFailedTitle");
   return check.value.name || t("synthetics.createBrowserTest.untitledCheck");
 });
-const folderName = computed(() => {
-  const fid = check.value.folder;
-  if (!fid || fid === "default") return "";
-  return folders.value.find((f) => f.folderId === fid)?.name ?? "";
-});
 const { isMobile } = useBreakpoint();
-/** A phone has no room for the header's Used by button, so the count joins the subtitle. */
-const headerSubtitle = computed(() => {
-  const count = referencedByCount.value;
-  if (!isMobile.value || count === 0) return raw(folderName.value);
-  if (!folderName.value) return t("synthetics.journey.usedBy.subtitleNoFolder", { count }, count);
-  return t("synthetics.journey.usedBy.subtitle", { folder: folderName.value, count }, count);
-});
 /**
  * Where every exit from this wizard lands.
  *
@@ -1995,7 +1984,6 @@ function onClearResults() {
   <OPageLayout
     :title="raw(headerTitle)"
     class="bg-surface-base"
-    :subtitle="headerSubtitle"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: backTo,
@@ -2003,6 +1991,12 @@ function onClearResults() {
     }"
     bleed
   >
+    <!-- A phone has no room for the header's Used by button, so its count rides beside the title. -->
+    <template v-if="isMobile && referencedByCount > 0" #status>
+      <OBadge size="sm" icon="account-tree" data-test="synthetics-journey-used-by-count">{{
+        t("synthetics.save.usedByCount", { count: referencedByCount }, referencedByCount)
+      }}</OBadge>
+    </template>
     <template v-if="referencedByCount > 0 || showStartControls" #actions>
       <JourneyUsedByPopover
         v-if="referencedByCount > 0"
@@ -2023,9 +2017,11 @@ function onClearResults() {
           @update:selected-ids="onConfigureUpdate({ ...check, environments: $event })"
         />
         <OButton
+          icon-only
+          :pressed="variablesPanelOpen"
           ref="variablesToggleRef"
-          :variant="variablesPanelOpen ? 'outline-primary' : 'outline'"
-          size="icon-xs-sq"
+          variant="secondary"
+          size="sm"
           :aria-label="variablesToggleLabel"
           :aria-pressed="variablesPanelOpen"
           data-test="synthetics-journey-toggle-variables-btn"
@@ -2040,7 +2036,12 @@ function onClearResults() {
     <main v-if="phase === 'gate'" class="flex flex-1 flex-col items-center justify-center">
       <div class="mx-auto w-full max-w-[48rem] px-4 py-4">
         <div class="mb-6 flex justify-center">
-          <EmptyBrowserCheck :width="140" />
+          <span
+            class="rounded-surface bg-surface-subtle text-text-secondary inline-flex size-10 items-center justify-center"
+            aria-hidden="true"
+          >
+            <OIcon name="web" size="sm" class="size-5!" />
+          </span>
         </div>
         <p class="mb-4 pb-4">
           {{ t("synthetics.createBrowserTest.gateDescription") }}
@@ -2054,6 +2055,7 @@ function onClearResults() {
           <OTemplateInput
             id="synthetics-start-url"
             v-model="startUrl"
+            icon="link"
             :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
             :error="!!urlError"
             :error-message="raw(urlError)"
@@ -2062,9 +2064,6 @@ function onClearResults() {
             @update:model-value="clearUrlError"
             @blur="validateGateUrl"
           >
-            <template #prefix>
-              <OIcon name="link" size="sm" />
-            </template>
             <template #suggestion="{ suggestion, active }">
               <VariableSuggestionRow :suggestion="suggestion" :active="active" />
             </template>
@@ -2095,18 +2094,18 @@ function onClearResults() {
             data-test="synthetics-create-record-btn"
             @click="onRecordClick"
           >
-            <template #icon-left>
+            <template #icon>
               <OIcon name="smart-display" size="sm" />
             </template>
             {{ t("synthetics.journey.recordJourney") }}
           </OButton>
           <OButton
-            variant="outline"
+            variant="secondary"
             :disabled="!isGateUrlValid"
             data-test="synthetics-create-build-btn"
             @click="buildManually"
           >
-            <template #icon-left>
+            <template #icon>
               <OIcon name="edit" size="sm" />
             </template>
             {{ t("synthetics.createBrowserTest.buildManually") }}
@@ -2151,7 +2150,7 @@ function onClearResults() {
           class="mb-3 w-full"
           :disabled="!setupAllDone"
           data-test="synthetics-setup-open-record-btn"
-          icon-left="smart-display"
+          icon="smart-display"
           @click="onExtensionSetupRecord"
         >
           {{ setupCtaLabel }}
@@ -2164,7 +2163,6 @@ function onClearResults() {
         <div class="text-center">
           <OButton
             variant="ghost"
-            size="sm"
             class="text-text-link text-sm underline"
             data-test="synthetics-setup-skip-link"
             @click="onExtensionSetupSkip"
@@ -2180,8 +2178,9 @@ function onClearResults() {
       <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
       <div v-else-if="loadError" class="flex flex-1 flex-col items-center justify-center">
         <OEmptyState
-          preset="load-error"
-          size="block"
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="t('emptyState.loadError.description')"
           data-test="synthetics-create-load-error"
           @action="onLoadRetry"
         />
@@ -2371,22 +2370,20 @@ function onClearResults() {
                 t("synthetics.journey.selectedCount", { count: journeySelectionState.count })
               }}</span>
               <OButton
-                variant="outline-destructive"
-                size="sm"
+                variant="danger-ghost"
                 data-test="synthetics-journey-delete-selected-btn"
                 @click="showBulkDeleteDialog = true"
               >
-                <template #icon-left><OIcon name="delete" size="sm" /></template>
+                <template #icon><OIcon name="delete" size="sm" /></template>
                 {{ t("synthetics.journey.delete") }}
               </OButton>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 :aria-disabled="!extractEligibilityResult.ok"
                 data-test="synthetics-extract-open-btn"
                 @click="openExtractDialog"
               >
-                <template #icon-left><OIcon name="git-branch" size="sm" /></template>
+                <template #icon><OIcon name="git-branch" size="sm" /></template>
                 {{ t("synthetics.journey.extract.action") }}
               </OButton>
               <span
@@ -2402,7 +2399,6 @@ function onClearResults() {
                 <OButton
                   v-if="extractEligibilityResult.reason === 'referenced-unknown'"
                   variant="ghost"
-                  size="sm"
                   data-test="synthetics-extract-retry-btn"
                   @click="retryReferencedBy"
                 >
@@ -2422,7 +2418,6 @@ function onClearResults() {
 
             <OButton
               variant="ghost"
-              size="sm"
               data-test="synthetics-create-cancel-btn"
               @click="router.push(backTo)"
             >
@@ -2431,8 +2426,7 @@ function onClearResults() {
             <!-- Create mode: nothing to save yet — Configure holds the required fields -->
             <OButton
               v-if="!props.editId"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               data-test="synthetics-create-continue-btn"
               @click="onContinueToConfigure"
             >
@@ -2440,8 +2434,7 @@ function onClearResults() {
             </OButton>
             <template v-else>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 :loading="isSaving"
                 data-test="synthetics-create-save-continue-btn"
                 @click="onSaveAndContinue"
@@ -2450,7 +2443,6 @@ function onClearResults() {
               </OButton>
               <OButton
                 variant="primary"
-                size="sm"
                 :loading="isSaving"
                 data-test="synthetics-create-save-exit-btn"
                 @click="onSaveAndExit"
@@ -2473,15 +2465,13 @@ function onClearResults() {
             <span class="flex-1" aria-hidden="true" />
             <OButton
               variant="ghost"
-              size="sm"
               data-test="synthetics-create-cancel-btn"
               @click="router.push(backTo)"
             >
               {{ t("common.cancel") }}
             </OButton>
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               data-test="synthetics-create-back-to-journey-btn"
               @click="currentStep = 1"
             >
@@ -2489,7 +2479,6 @@ function onClearResults() {
             </OButton>
             <OButton
               variant="primary"
-              size="sm"
               :loading="isSaving"
               data-test="synthetics-create-save-btn"
               @click="onSaveAndExit"
@@ -2519,23 +2508,19 @@ function onClearResults() {
         />
 
         <!-- Bulk delete confirmation dialog — moved from BrowserJourney -->
-        <ODialog
-          v-model:open="showBulkDeleteDialog"
-          size="sm"
+        <ConfirmDialog
+          v-model="showBulkDeleteDialog"
+          kind="destructive"
           :title="t('synthetics.journey.bulkDeleteStepsTitle')"
-          :primary-button-label="t('synthetics.journey.delete')"
-          :secondary-button-label="t('common.cancel')"
-          primary-button-variant="destructive"
+          :message="
+            t('synthetics.journey.bulkDeleteStepsBody', { count: journeySelectionState.count })
+          "
+          :ok-label="t('synthetics.journey.delete')"
+          :cancel-label="t('common.cancel')"
           data-test="synthetics-journey-bulk-delete-dialog"
-          @click:primary="onDeleteSelected"
-          @click:secondary="showBulkDeleteDialog = false"
-        >
-          <p class="py-2">
-            {{
-              t("synthetics.journey.bulkDeleteStepsBody", { count: journeySelectionState.count })
-            }}
-          </p>
-        </ODialog>
+          @update:ok="onDeleteSelected"
+          @update:cancel="showBulkDeleteDialog = false"
+        />
       </div>
     </template>
 
@@ -2549,8 +2534,8 @@ function onClearResults() {
           count: usedByInfo?.references.length ?? 0,
         })
       "
-      :primary-button-label="t('common.save')"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{ label: t('common.save') }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="synthetics-create-used-by-dialog"
       @click:primary="confirmUsedBySave"
       @click:secondary="usedByDialogOpen = false"
@@ -2573,7 +2558,7 @@ function onClearResults() {
       v-model:open="saveBlockedOpen"
       size="sm"
       :title="t('synthetics.delete.blockedTitle', { name: check.name })"
-      :primary-button-label="t('common.close')"
+      :primary="{ label: t('common.close') }"
       data-test="synthetics-create-save-blocked-dialog"
       @click:primary="saveBlockedOpen = false"
     >

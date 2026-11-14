@@ -22,45 +22,39 @@
   owns every change.
 -->
 <template>
-  <div class="flex flex-col gap-4" data-test="slos-sloconfigsummary">
-    <OCard v-for="section in sections" :key="section.key">
-      <OCardSection role="body">
-        <h3 class="text-text-heading mb-3 text-lg">{{ section.title }}</h3>
-        <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-          <div
-            v-for="field in section.fields"
-            :key="field.key"
-            class="flex flex-col gap-1"
-            :data-test="`slos-sloconfigsummary-${field.key}`"
+  <div class="flex flex-col gap-3" data-test="slos-sloconfigsummary">
+    <OCard v-for="section in sections" :key="section.key" :title="section.title">
+      <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+        <div
+          v-for="field in section.fields"
+          :key="field.key"
+          class="flex flex-col gap-1"
+          :data-test="`slos-sloconfigsummary-${field.key}`"
+        >
+          <dt class="text-text-secondary text-xs">{{ field.label }}</dt>
+          <dd
+            class="text-text-heading text-sm"
+            :class="field.mono ? 'font-mono [overflow-wrap:anywhere] whitespace-pre-wrap' : ''"
           >
-            <dt class="text-text-secondary text-xs">{{ field.label }}</dt>
-            <dd
-              class="text-text-heading text-sm"
-              :class="field.mono ? 'font-mono [overflow-wrap:anywhere] whitespace-pre-wrap' : ''"
-            >
-              {{ field.value }}
-            </dd>
-          </div>
-        </dl>
-      </OCardSection>
+            {{ field.value }}
+          </dd>
+        </div>
+      </dl>
     </OCard>
 
-    <OCard>
-      <OCardSection role="body">
-        <h3 class="text-text-heading mb-3 text-lg">{{ t("slos.section.definition") }}</h3>
-        <OCodeBlock
-          :code="configJson"
-          lang="json"
-          wrap
-          :max-lines="20"
-          data-test="slos-sloconfigsummary-json"
-        />
-        <!-- `{}` on its own is indistinguishable from a rendering fault, so the
+    <OCard :title="t('slos.section.definition')">
+      <OCodeBlock
+        :code="configJson"
+        lang="json"
+        wrap
+        :max-lines="20"
+        data-test="slos-sloconfigsummary-json"
+      />
+      <!-- `{}` on its own is indistinguishable from a rendering fault, so the
              empty case says which one it is rather than leaving two braces. -->
-        <p v-if="!hasConfigJson" class="text-text-secondary mt-2 text-xs">
-          {{ t("slos.section.definitionEmpty") }}
-        </p>
-      </OCardSection>
+      <p v-if="!hasConfigJson" class="text-text-secondary mt-2 text-xs">
+        {{ t("slos.section.definitionEmpty") }}
+      </p>
     </OCard>
   </div>
 </template>
@@ -71,7 +65,6 @@ import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import type { Slo } from "@/ts/interfaces/slo";
 import {

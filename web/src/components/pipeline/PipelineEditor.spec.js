@@ -28,6 +28,12 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
 
+// Pin the OSS edition: a developer's gitignored web/.env may turn enterprise on.
+vi.mock("@/aws-exports", async (importOriginal) => {
+  const actual = (await importOriginal()).default;
+  return { default: { ...actual, isEnterprise: "false", isCloud: "false" } };
+});
+
 const mockAddNode = vi.fn();
 
 vi.mock("@/plugins/pipelines/useDnD", () => ({
@@ -102,6 +108,7 @@ const ODrawerStub = {
     title: { type: String, default: undefined },
     subTitle: { type: String, default: undefined },
     persistent: { type: Boolean, default: false },
+    dirty: { type: Boolean, default: false },
     showClose: { type: Boolean, default: true },
     width: { type: [String, Number], default: undefined },
     primaryButtonLabel: { type: String, default: undefined },
@@ -283,8 +290,8 @@ describe("PipelineEditor", () => {
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Enterprise gating — locked, not hidden", () => {
-    // Test env is OSS (isEnterprise=false, isCloud=false, see web/.env) —
-    // neither entitlement applies, so both surfaces below should be locked.
+    // The edition is pinned to OSS above, so neither entitlement applies and
+    // both surfaces below should be locked.
     it("shows the JSON-editor AI button locked instead of hiding it", () => {
       expect(wrapper.vm.aiAccess.allowed).toBe(false);
       expect(wrapper.vm.jsonEditorAiButtonVisible).toBe(true);
@@ -742,15 +749,20 @@ describe("PipelineEditor", () => {
       expect(drawers.length).toBe(1);
     });
 
-    it("JSON-editor ODrawer is closed by default and uses width 70, persistent=true", () => {
+    it("JSON-editor ODrawer is closed by default, xl, and guards an edited JSON from dismissal", async () => {
       const drawers = wrapper.findAllComponents(ODrawerStub);
       const jsonDrawer = drawers[0];
 
       expect(jsonDrawer.props("open")).toBe(false);
-      expect(jsonDrawer.props("width")).toBe(70);
-      expect(jsonDrawer.props("persistent")).toBe(true);
+      expect(jsonDrawer.props("size")).toBe("xl");
       // showClose is not explicitly set on the ODrawer, defaults to true
       expect(jsonDrawer.props("showClose")).toBe(true);
+      expect(jsonDrawer.props("persistent")).toBe(false);
+      expect(jsonDrawer.props("dirty")).toBe(false);
+
+      wrapper.findComponent({ name: "JsonEditor" }).vm.$emit("update:dirty", true);
+      await flushPromises();
+      expect(jsonDrawer.props("dirty")).toBe(true);
     });
 
     it("JSON-editor ODrawer opens when openJsonEditor() is invoked", async () => {

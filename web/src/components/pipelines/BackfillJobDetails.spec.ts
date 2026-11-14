@@ -68,27 +68,23 @@ const ODrawerStub = {
   name: "ODrawer",
   props: [
     "open",
-    "width",
     "title",
-    "subTitle",
-    "primaryButtonLabel",
-    "primaryButtonLoading",
-    "primaryButtonDisabled",
-    "secondaryButtonLabel",
-    "secondaryButtonDisabled",
-    "neutralButtonLabel",
+    "subtitle",
+    "primary",
+    "secondary",
+    "extra",
     "showClose",
     "persistent",
     "size",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test-stub="o-drawer"
       :data-test="$attrs['data-test']"
       :data-open="open"
       :data-title="title"
-      :data-width="width"
+      :data-size="size"
     >
       <div data-test-stub="o-drawer-header"><slot name="header" /></div>
       <div data-test-stub="o-drawer-body"><slot /></div>
@@ -137,10 +133,10 @@ describe("BackfillJobDetails – mount", () => {
     expect(drawer.attributes("data-title")).toBe("Backfill Job Details");
   });
 
-  it("passes width=55 to ODrawer", () => {
+  it("opens the ODrawer at the fixed md 640 size", () => {
     const wrapper = createWrapper();
     const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-    expect(drawer.attributes("data-width")).toBe("40");
+    expect(drawer.attributes("data-size")).toBe("md");
   });
 
   it("renders ODrawer with open=true when modelValue is true", async () => {

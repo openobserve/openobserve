@@ -40,7 +40,7 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import KioskCountdownRing from "@/components/dashboards/kiosk/KioskCountdownRing.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import PoweredByOpenObserve from "@/components/common/PoweredByOpenObserve.vue";
 import { getPanelDisplayTitle } from "@/utils/dashboard/panelTitle";
 
@@ -269,11 +269,11 @@ describe("PublicDashboard viewer", () => {
     await flushPromises();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(grid(w).props("injectedPanelData").p1.data).toEqual([[{ y: 1 }]]);
-    const banner = w.findComponent<typeof OBanner>({ name: "OBanner" });
-    expect(banner.props("content")).toBe("Too many requests. Trying again in 1:00.");
+    const banner = w.findComponent<typeof OInlineNotice>({ name: "OInlineNotice" });
+    expect(banner.props("message")).toBe("Too many requests. Trying again in 1:00.");
     await vi.advanceTimersByTimeAsync(60_000);
     expect(grid(w).props("injectedPanelData").p1.data).toEqual([[{ y: 2 }]]);
-    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(false);
+    expect(w.findComponent({ name: "OInlineNotice" }).exists()).toBe(false);
   });
 
   it("drops the hold banner once the next answer is not a 429 or a 503", async () => {
@@ -291,13 +291,13 @@ describe("PublicDashboard viewer", () => {
     const w = buildWrapper();
     await flushPromises();
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(true);
+    expect(w.findComponent({ name: "OInlineNotice" }).exists()).toBe(true);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(service.getData).toHaveBeenCalledTimes(3);
-    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(false);
+    expect(w.findComponent({ name: "OInlineNotice" }).exists()).toBe(false);
     await vi.advanceTimersByTimeAsync(5_000);
     expect(service.getData).toHaveBeenCalledTimes(4);
-    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(false);
+    expect(w.findComponent({ name: "OInlineNotice" }).exists()).toBe(false);
     expect(grid(w).props("injectedPanelData").p1.data).toEqual([[{ y: 1 }]]);
   });
 
@@ -332,9 +332,9 @@ describe("PublicDashboard viewer", () => {
     await flushPromises();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(grid(shown).props("injectedPanelData").p1.data).toEqual([[{ y: 1 }]]);
-    expect(shown.findComponent<typeof OBanner>({ name: "OBanner" }).props("content")).toBe(
-      "Can't load this dashboard right now. Trying again in 1:00.",
-    );
+    expect(
+      shown.findComponent<typeof OInlineNotice>({ name: "OInlineNotice" }).props("message"),
+    ).toBe("Can't load this dashboard right now. Trying again in 1:00.");
     expect(shown.text()).not.toContain("turned off");
     shown.unmount();
 
@@ -1156,7 +1156,7 @@ describe("PublicDashboard viewer", () => {
     expect(message(w)).toMatch(
       /^The last update failed at \d{1,2}:04( [AP]M)?\. Trying again at \d{1,2}:09( [AP]M)?\.$/,
     );
-    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(false);
+    expect(w.findComponent({ name: "OInlineNotice" }).exists()).toBe(false);
     // A retry time already passed is not promised again.
     const late = await show(Date.UTC(2027, 0, 15, 12, 5) * 1000);
     expect(message(late)).toMatch(
@@ -1194,7 +1194,7 @@ describe("PublicDashboard viewer", () => {
     expect(grid(w).props("injectedPanelData").masked.errorDetail.message).toMatch(
       /^The last update failed at .+\. Trying again at .+\.$/,
     );
-    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(false);
+    expect(w.findComponent({ name: "OInlineNotice" }).exists()).toBe(false);
   });
 
   it("leaves the failure to the banner while other panels still show data", async () => {
@@ -1227,9 +1227,9 @@ describe("PublicDashboard viewer", () => {
     expect(grid(w).props("injectedPanelData").masked.errorDetail.message).toBe(
       "This panel will appear after the next update.",
     );
-    expect(w.findComponent<typeof OBanner>({ name: "OBanner" }).props("content")).toMatch(
-      /^Some panels could not be refreshed at /,
-    );
+    expect(
+      w.findComponent<typeof OInlineNotice>({ name: "OInlineNotice" }).props("message"),
+    ).toMatch(/^Some panels could not be refreshed at /);
   });
 
   it("keeps the preparing text on a masked panel while a new build runs", async () => {
@@ -1335,9 +1335,9 @@ describe("PublicDashboard viewer", () => {
     } as never);
     const w = buildWrapper();
     await flushPromises();
-    const banner = w.findComponent<typeof OBanner>({ name: "OBanner" });
-    expect(banner.props("variant")).toBe("warning");
-    expect(banner.props("content")).toMatch(
+    const banner = w.findComponent<typeof OInlineNotice>({ name: "OInlineNotice" });
+    expect(banner.props("tone")).toBe("warn");
+    expect(banner.props("message")).toMatch(
       /^Some panels could not be refreshed at .+\. They show older data\. Next try in 1:00\.$/,
     );
     expect(grid(w).exists()).toBe(true);

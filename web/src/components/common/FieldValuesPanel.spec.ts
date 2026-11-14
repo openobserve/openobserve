@@ -117,18 +117,12 @@ describe("FieldValuesPanel.vue", () => {
       expect(loading.exists()).toBe(true);
     });
 
-    it("confines the loading overlay to its own box via a positioned wrapper", () => {
-      // Regression: OInnerLoading is `absolute inset-0`, so its wrapper must be a
-      // positioning context. Without `relative` the overlay escaped to the
-      // nearest positioned ancestor (`.o-field-list__row`) and covered the field
-      // row, blocking the click that collapses/cancels the request.
+    it("shows skeleton lines in place of the values on first load", () => {
       wrapper = createWrapper({
         fieldValues: { isLoading: true, values: [], errMsg: "" },
       });
       const loading = wrapper.find('[data-test="field-values-panel-loading-indicator"]');
-      expect(loading.exists()).toBe(true);
-      const wrapperEl = loading.element.parentElement as HTMLElement;
-      expect(wrapperEl.classList.contains("relative")).toBe(true);
+      expect(loading.findAllComponents({ name: "OSkeleton" }).length).toBeGreaterThan(0);
     });
 
     it("hides values list while loading with no interim cache", () => {

@@ -28,9 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-for="chip in chips" :key="chip.channel">
       <OButton
         v-if="chip.link"
-        variant="dashed"
-        size="icon-chip"
-        :icon-left="chip.icon"
+        icon-only
+        variant="ghost"
+        size="xs"
+        :icon="chip.icon"
         :aria-label="chip.tip"
         :data-test="`oncall-channel-${email}-${chip.channel}-link`"
         @click="openMine"

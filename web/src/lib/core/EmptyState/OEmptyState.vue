@@ -14,412 +14,139 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  OEmptyState — the single, app-wide empty-state primitive.
-
-  Three SIZES for the three contexts an empty state lives in:
-    • hero   full page / section (dashboards list, alerts page) — big
-             illustration, rich copy, fills its container, dot-grid backdrop
-    • block  inside a card or panel — medium illustration, tighter copy
-    • slim    one text line inside a card section — no icon, no illustration
-    • inline  inside a table body / dropdown — tiny: just icon + one line
-
-  Driven by a PRESET (the common path) or by props/slots (the escape hatch):
-    <OEmptyState preset="no-search-results" @action="clearFilters" />
-    <OEmptyState size="block" title="…" description="…" />
-    <OEmptyState> <template #illustration>…</template> … </OEmptyState>
-
-  Motion: animated illustrations honour prefers-reduced-motion automatically —
-  the `animated` flag is computed here and passed down to the illustration.
--->
 <template>
   <div
     :class="[
-      // Safe centering keeps the top reachable once the stack overflows its pane and scrolls.
-      'o2-empty-state relative flex flex-col items-center justify-center overflow-hidden',
-      'max-lg:justify-center-safe max-lg:overflow-x-hidden max-lg:overflow-y-auto',
-      '[--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]',
-      sizeClass.root,
-      { 'o2-empty-state--hero': size === 'hero' },
+      'flex w-full min-w-0 flex-col items-center justify-center text-center',
+      isInline ? 'gap-1 px-4 py-6' : 'gap-2 px-6 py-10 max-md:px-4 max-md:py-6',
     ]"
+    :data-kind="kind"
     data-test="o2-empty-state"
   >
-    <!-- decorative dot-grid backdrop (hero, block and compact only) -->
-    <div
-      v-if="showBackdrop"
+    <span
       aria-hidden="true"
-      class="pointer-events-none absolute inset-0"
-      :style="dotGridStyle"
-    />
-
-    <!-- max-w-full: the stack otherwise sizes to its widest child (the no-wrap action-card row). -->
-    <div
       :class="[
-        'relative flex w-full max-w-full min-w-0 flex-col items-center text-center',
-        sizeClass.stack,
+        'mb-1 inline-flex shrink-0 items-center justify-center',
+        isInline ? 'rounded-menu size-8' : 'rounded-surface size-10',
+        kind === 'error'
+          ? 'bg-status-error-bg text-status-error-text'
+          : 'bg-surface-subtle text-text-secondary',
       ]"
+      data-test="o2-empty-state-icon"
     >
-      <!-- illustration (hero/block) — preset/illustration prop or slot -->
-      <div v-if="hasIllustration" :class="['shrink-0', sizeClass.illustration]">
-        <slot name="illustration">
-          <component
-            :is="illustrationComponent"
-            v-if="illustrationComponent"
-            :width="sizeClass.illustrationWidth"
-            :animated="animated"
-          />
-        </slot>
-      </div>
+      <OIcon :name="resolvedIcon" size="sm" :class="isInline ? '' : 'size-5!'" />
+    </span>
 
-      <!-- inline size shows a compact icon instead of a full illustration -->
-      <span
-        v-else-if="inlineIcon"
-        :class="[
-          'o2-empty-state__inline-icon inline-flex items-center justify-center rounded-full',
-          sizeClass.iconWrap,
-          inlineIconTone,
-        ]"
-      >
-        <OIcon :name="inlineIcon" :size="size === 'inline' ? 'lg' : 'xl'" />
-      </span>
+    <component
+      :is="isInline ? 'p' : 'h2'"
+      v-if="title"
+      :class="[
+        'text-text-heading font-semibold wrap-break-word',
+        isInline ? 'text-sm' : 'text-base',
+      ]"
+      data-test="o2-empty-state-title"
+    >
+      {{ title }}
+    </component>
 
-      <div :class="['flex max-w-xl flex-col', sizeClass.copy]">
-        <component
-          :is="isInlineCopy ? 'p' : 'h2'"
-          :class="['text-text-heading font-medium tracking-[-0.01em]', sizeClass.title]"
+    <p
+      v-if="text || $slots.text"
+      :class="[
+        'text-text-secondary max-w-[44ch] wrap-break-word',
+        isInline ? 'text-compact' : 'text-sm',
+      ]"
+      data-test="o2-empty-state-text"
+    >
+      <slot name="text">{{ text }}</slot>
+    </p>
+
+    <p
+      v-if="contact"
+      :class="['text-text-secondary max-w-[44ch]', isInline ? 'text-compact' : 'text-sm']"
+      data-test="o2-empty-state-contact"
+    >
+      {{ contact }}
+    </p>
+
+    <p
+      v-if="requestId"
+      class="text-text-muted font-mono text-xs"
+      data-test="o2-empty-state-request-id"
+    >
+      {{ t("emptyState.requestId", { id: raw(requestId) }) }}
+    </p>
+
+    <div
+      v-if="$slots.actions || primaryLabel || secondaryActionLabel"
+      class="mt-2 flex flex-wrap items-center justify-center gap-2"
+    >
+      <slot name="actions">
+        <OButton
+          v-if="primaryLabel"
+          size="lg"
+          :variant="kind === 'first-run' ? 'primary' : 'secondary'"
+          :icon="primaryIcon"
+          data-test="o2-empty-state-action"
+          @click="onAction?.()"
         >
-          <slot name="title">{{ resolvedTitle }}</slot>
-        </component>
-        <p
-          v-if="resolvedDescription || $slots.description"
-          :class="['text-text-secondary leading-relaxed', sizeClass.description]"
+          {{ primaryLabel }}
+        </OButton>
+        <OButton
+          v-if="secondaryActionLabel"
+          size="lg"
+          variant="secondary"
+          data-test="o2-empty-state-secondary-action"
+          @click="onSecondaryAction?.()"
         >
-          <slot name="description">{{ resolvedDescription }}</slot>
-        </p>
-      </div>
+          {{ secondaryActionLabel }}
+        </OButton>
+      </slot>
+    </div>
 
-      <!-- actions: a custom #actions slot wins; otherwise the resolved primary
-           (+ optional secondary) button(s) from preset/props -->
-      <div
-        v-if="$slots.actions || showCards || resolvedActionLabel || secondaryActionLabel"
-        :class="[
-          props.columns
-            ? 'flex flex-wrap justify-center'
-            : 'flex flex-wrap items-stretch justify-center',
-          sizeClass.actions,
-        ]"
-      >
-        <!-- Every action carries `data-test="o2-empty-state-action-<id>"` (RUM
-             uses data-test as the click's action name, so a CTA click reads
-             apart from a dead click on the illustration) and
-             `data-empty-state-action="<id>"`. -->
-        <slot name="actions">
-          <template v-if="showCards">
-            <EmptyStateActionCard
-              v-for="(a, i) in resolvedActions"
-              :key="a.id || i"
-              :icon="a.icon"
-              :label="t(a.titleKey, a.titleParams ?? {})"
-              :sublabel="
-                a.descriptionKey ? t(a.descriptionKey, a.descriptionParams ?? {}) : undefined
-              "
-              :data-test="`o2-empty-state-action-${a.id}`"
-              :data-empty-state-action="a.id"
-              @click="emit('action', a.id)"
-            />
-          </template>
-          <template v-else>
-            <OButton
-              v-if="resolvedActionLabel"
-              :variant="actionVariant"
-              :size="isInlineCopy ? 'sm' : 'md'"
-              :icon-left="resolvedActionIcon"
-              :data-test="`o2-empty-state-action-${actionId}`"
-              :data-empty-state-action="actionId"
-              @click="emit('action')"
-            >
-              {{ resolvedActionLabel }}
-            </OButton>
-            <OButton
-              v-if="secondaryActionLabel"
-              variant="ghost"
-              :size="isInlineCopy ? 'sm' : 'md'"
-              :data-test="`o2-empty-state-action-${secondaryActionId}`"
-              :data-empty-state-action="secondaryActionId"
-              @click="emit('secondaryAction')"
-            >
-              {{ secondaryActionLabel }}
-            </OButton>
-          </template>
-        </slot>
-      </div>
-
-      <div v-if="$slots.extra" :class="sizeClass.extra">
-        <slot name="extra" />
-      </div>
+    <div v-if="$slots.extra" class="mt-2 flex w-full flex-col items-center gap-2">
+      <slot name="extra" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, useSlots } from "vue";
+import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
-import EmptyStateActionCard from "./EmptyStateActionCard.vue";
-import { illustrations, type IllustrationName } from "./illustrations";
-import {
-  emptyStatePresets,
-  presetNouns,
-  type EmptyStateAction,
-  type EmptyStatePreset,
-  type EmptyStatePresetName,
-  type EmptyStateVariant,
-} from "./presets";
+import type { EmptyStateKind, EmptyStateProps, EmptyStateSlots } from "./OEmptyState.types";
 
-type Size = "hero" | "block" | "compact" | "inline" | "slim";
+const KIND_ICON: Record<EmptyStateKind, IconName> = {
+  "first-run": "inbox",
+  filtered: "search-off",
+  denied: "lock",
+  error: "warning-amber",
+};
 
-const props = withDefaults(
-  defineProps<{
-    /** Named scenario from the catalog (fills illustration + copy + action). */
-    preset?: EmptyStatePresetName;
-    /** Visual scale, including compact content above an inline form. */
-    size?: Size;
-    /** Tone; defaults from the preset, else "neutral". */
-    variant?: EmptyStateVariant;
-    /** Illustration by name (ignored if a preset or #illustration slot is set). */
-    illustration?: IllustrationName;
-    /** Icon for the compact `inline` size (when no illustration). */
-    icon?: IconName;
-    /** Copy — overrides preset i18n when provided. */
-    title?: I18nText;
-    description?: I18nText;
-    /** Rich action cards; overrides the preset's actions when provided. */
-    actions?: EmptyStateAction[];
-    /** Simple primary button (used instead of cards); emits `action` on click. */
-    actionLabel?: I18nText;
-    actionIcon?: IconName;
-    /** Stable id of the simple primary button, for its `data-test` (see the actions block). */
-    actionId?: string;
-    /** Secondary action; emits `secondaryAction` on click. */
-    secondaryActionLabel?: I18nText;
-    /** Stable id of the secondary button, for its `data-test`. */
-    secondaryActionId?: string;
-    /** Suppress the preset's actions (e.g. table empties with no CTA). */
-    hideAction?: boolean;
-    /**
-     * Whether to wrap action cards onto multiple rows (flex-wrap) instead of
-     * forcing a single row (flex-nowrap). Use when you have more than 2-3 cards.
-     */
-    columns?: boolean;
-    /**
-     * The underlying list HAS items but the current filter/search matched none.
-     * Switches to a "no results" treatment (magnifier + "No {noun} found" +
-     * Clear filters) instead of the preset's first-run copy. The `clear-filters`
-     * action id is emitted on `action`.
-     */
-    filtered?: boolean;
-    /** Force the dot-grid backdrop on/off (default: on for hero/block). */
-    backdrop?: boolean;
-    /** Tint the `inline` icon red for an `error` variant; off keeps the grey circle. */
-    toneIcon?: boolean;
-  }>(),
-  { size: "block", actionId: "primary", secondaryActionId: "secondary" },
-);
+const props = withDefaults(defineProps<EmptyStateProps>(), {
+  kind: "first-run",
+  size: "page",
+});
 
-const emit = defineEmits<{
-  (e: "action", id?: string): void;
-  (e: "secondaryAction"): void;
-}>();
+defineSlots<EmptyStateSlots>();
 
-const slots = useSlots();
 const { t } = useI18nTyped();
 
-// Widen to the interface: the `satisfies` map keeps per-key literal types,
-// and unioning 25 literals breaks `?.actions` on entries without actions.
-const preset = computed<EmptyStatePreset | undefined>(() =>
-  props.preset ? emptyStatePresets[props.preset] : undefined,
-);
+const isInline = computed(() => props.size === "inline");
+const resolvedIcon = computed<IconName>(() => props.icon ?? KIND_ICON[props.kind]);
 
-const size = computed(() => props.size);
-const isInlineCopy = computed(() => size.value === "inline" || size.value === "slim");
-
-// --- filtered (search/filter matched nothing) vs first-run ------------------
-const isFiltered = computed(() => !!props.filtered);
-// The thing being listed, for "No {noun} found" copy (e.g. "pipelines").
-const noun = computed(() => {
-  const key = props.preset ? presetNouns[props.preset] : undefined;
-  return key ? t(key) : t("emptyState.filtered.fallbackNoun");
+// A default label only appears when someone listens, so a dead button never renders.
+const primaryLabel = computed<I18nText | undefined>(() => {
+  if (props.actionLabel) return props.actionLabel;
+  if (!props.onAction) return undefined;
+  if (props.kind === "error") return t("emptyState.loadError.action");
+  if (props.kind === "filtered") return t("emptyState.filtered.action");
+  return undefined;
 });
-const FILTERED_ACTION: EmptyStateAction = {
-  id: "clear-filters",
-  icon: "filter-list",
-  titleKey: "emptyState.filtered.action",
-  descriptionKey: "emptyState.filtered.actionDesc",
-};
-
-// --- copy resolution: filtered > explicit prop > preset i18n key ------------
-const resolvedTitle = computed(() => {
-  if (props.title) return props.title;
-  if (isFiltered.value) return t("emptyState.filtered.title", { noun: noun.value });
-  return preset.value ? t(preset.value.titleKey) : "";
-});
-const resolvedDescription = computed(() => {
-  if (props.description) return props.description;
-  if (isFiltered.value) return t("emptyState.filtered.description", { noun: noun.value });
-  const key = preset.value?.descriptionKey;
-  return key ? t(key) : "";
-});
-// Rich action cards. Suppressed by `hideAction` and on inline size. In the
-// filtered state the only action is "Clear filters".
-const resolvedActions = computed<EmptyStateAction[]>(() => {
-  if (props.hideAction) return [];
-  if (isFiltered.value) return [FILTERED_ACTION];
-  return props.actions ?? preset.value?.actions ?? [];
-});
-const showCards = computed(() => !isInlineCopy.value && resolvedActions.value.length > 0);
-
-// Simple button fallback (only when a call site passes actionLabel directly and
-// there are no cards).
-const resolvedActionLabel = computed(() => (props.hideAction ? "" : (props.actionLabel ?? "")));
-const resolvedActionIcon = computed<IconName | undefined>(() => props.actionIcon);
-
-// --- variant / illustration -------------------------------------------------
-const variant = computed<EmptyStateVariant>(() =>
-  isFiltered.value ? "no-results" : (props.variant ?? preset.value?.variant ?? "neutral"),
+const primaryIcon = computed<IconName | undefined>(() =>
+  props.kind === "error" && !props.actionLabel ? "refresh" : undefined,
 );
-const actionVariant = computed(() => (variant.value === "error" ? "outline" : "primary"));
-
-// Filtered always uses the magnifier so it reads as "search found nothing".
-const illustrationName = computed<IllustrationName | undefined>(() =>
-  isFiltered.value ? "no-results" : (props.illustration ?? preset.value?.illustration),
-);
-const illustrationComponent = computed(() =>
-  illustrationName.value ? illustrations[illustrationName.value] : undefined,
-);
-// inline never shows the full illustration — it uses a compact icon instead.
-const hasIllustration = computed(
-  () => !isInlineCopy.value && (!!slots.illustration || !!illustrationComponent.value),
-);
-const inlineIcon = computed<IconName | undefined>(() => {
-  if (size.value !== "inline") return undefined; // slim is text only
-  if (props.icon) return props.icon;
-  // sensible default icon per tone
-  return variant.value === "error" ? "error-outline" : "search-off";
-});
-const inlineIconTone = computed(() =>
-  props.toneIcon && variant.value === "error"
-    ? "bg-status-error-bg text-status-error-text"
-    : "bg-surface-subtle text-text-secondary",
-);
-
-// --- prefers-reduced-motion -------------------------------------------------
-const animated = ref(true);
-let mq: MediaQueryList | undefined;
-const syncMotion = () => {
-  animated.value = !(mq?.matches ?? false);
-};
-onMounted(() => {
-  if (typeof window !== "undefined" && window.matchMedia) {
-    mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    syncMotion();
-    mq.addEventListener?.("change", syncMotion);
-  }
-});
-onBeforeUnmount(() => mq?.removeEventListener?.("change", syncMotion));
-
-// --- backdrop ---------------------------------------------------------------
-const showBackdrop = computed(() => props.backdrop ?? !isInlineCopy.value);
-const dotGridStyle =
-  // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
-  "background-image: radial-gradient(var(--empty-dot) 1.25px, transparent 1.25px);" +
-  "background-size: 1.875rem 1.875rem;" +
-  "-webkit-mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);" +
-  "mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);";
-
-// --- per-size class map -----------------------------------------------------
-// One place that defines how each size scales: container, gaps, illustration
-// width, and the type ramp. Keeps the three sizes visually consistent.
-const SIZE_MAP: Record<
-  Size,
-  {
-    root: string;
-    stack: string;
-    copy: string;
-    actions: string;
-    extra: string;
-    title: I18nText;
-    description: I18nText;
-    illustrationWidth: number;
-    illustration: string;
-    iconWrap: string;
-  }
-> = {
-  // The max-md: half shrinks each size so the whole state, action included, fits one phone screen.
-  hero: {
-    root: "w-full h-full min-h-80 px-6 py-12 max-md:min-h-0 max-md:px-4 max-md:py-5",
-    stack: "gap-7 max-md:gap-3.5",
-    copy: "gap-2.5 max-md:gap-1.5",
-    actions: "gap-3 pt-1 max-md:gap-2 max-md:pt-0",
-    extra: "w-full flex flex-col items-center gap-3 pt-2 max-md:gap-2 max-md:pt-0",
-    title: raw("text-2xl! max-md:text-lg!"),
-    description: raw("text-base max-md:text-sm"),
-    illustrationWidth: 300,
-    // CSS width beats the SVG width attribute; h-auto keeps the viewBox ratio.
-    illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-36",
-    iconWrap: "",
-  },
-  block: {
-    root: "w-full min-h-65 px-6 py-10 max-md:min-h-0 max-md:px-4 max-md:py-5",
-    stack: "gap-5 max-md:gap-3",
-    copy: "gap-2 max-md:gap-1.5",
-    actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
-    extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
-    title: raw("text-lg! max-md:text-base!"),
-    description: raw("text-sm"),
-    illustrationWidth: 150,
-    illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-28",
-    iconWrap: "",
-  },
-  compact: {
-    root: "w-full min-h-0 px-6 py-4 max-md:px-4",
-    stack: "gap-3",
-    copy: "gap-2 max-md:gap-1.5",
-    actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
-    extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
-    title: raw("text-lg! max-md:text-base!"),
-    description: raw("text-sm"),
-    illustrationWidth: 150,
-    illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-28",
-    iconWrap: "",
-  },
-  slim: {
-    root: "w-full min-h-0 px-4 py-3",
-    stack: "gap-0",
-    copy: "gap-0",
-    actions: "gap-2 pt-1",
-    extra: "w-full flex flex-col items-center gap-1.5 pt-1",
-    title: raw("text-sm!"),
-    description: raw("text-xs"),
-    illustrationWidth: 0,
-    illustration: "",
-    iconWrap: "",
-  },
-  inline: {
-    root: "w-full min-h-40 px-4 py-8 max-md:min-h-0 max-md:py-5",
-    stack: "gap-3",
-    copy: "gap-1",
-    actions: "gap-2 pt-1",
-    extra: "w-full flex flex-col items-center gap-1.5 pt-1",
-    title: raw("text-sm!"),
-    description: raw("text-xs"),
-    illustrationWidth: 0,
-    illustration: "",
-    iconWrap: "w-12 h-12 mb-0.5",
-  },
-};
-const sizeClass = computed(() => SIZE_MAP[size.value]);
 </script>

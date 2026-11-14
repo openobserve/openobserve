@@ -15,8 +15,9 @@
       <span class="text-text-heading text-sm font-bold">{{ label }}</span>
       <div class="flex items-center gap-1">
         <OButton
-          variant="outline"
-          size="icon"
+          icon-only
+          variant="secondary"
+          size="xs"
           :data-test="`ai-review-content-copy-${contentType}`"
           :title="t('aiObservability.queues.workbench.copyContent', { label })"
           @click="copy"
@@ -24,8 +25,9 @@
           <OIcon name="content-copy" size="xs" />
         </OButton>
         <OButton
-          variant="outline"
-          size="icon"
+          icon-only
+          variant="secondary"
+          size="xs"
           :data-test="`ai-review-content-expand-${contentType}`"
           :title="
             fullscreen
@@ -47,10 +49,10 @@
         class="flex flex-col gap-2"
         :data-test="`ai-review-content-skeleton-${contentType}`"
       >
-        <OSkeleton type="text" class="h-3 w-11/12" />
-        <OSkeleton type="text" class="h-3 w-full" />
-        <OSkeleton type="text" class="h-3 w-4/5" />
-        <OSkeleton type="text" class="h-3 w-2/3" />
+        <OSkeleton class="h-3 w-11/12" />
+        <OSkeleton class="h-3 w-full" />
+        <OSkeleton class="h-3 w-4/5" />
+        <OSkeleton class="h-3 w-2/3" />
       </div>
       <div
         v-else-if="!content && emptyText"

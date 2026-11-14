@@ -520,7 +520,7 @@ describe("TracesComparison", () => {
       await mountPanel(null);
       const page = wrapper.findComponent({ name: "TracesDrillDownPage" });
       expect(page.props()).toMatchObject({ open: true, title: i18n.global.t("traces.drillDown") });
-      expect(back().attributes("aria-label")).toBe("Back to results");
+      expect(back().attributes("aria-label")).toBe("Back to Traces");
       expect(wrapper.text()).not.toMatch(/comparison|compare selection/i);
     });
 

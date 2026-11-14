@@ -4,8 +4,8 @@
       <span class="text-text-secondary text-xs font-medium">{{ title }}</span>
       <OButton
         class="ms-auto"
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :disabled="busy"
         data-test="svcver-evidence-podEvents-pods"
         @click="openEvents"
@@ -18,9 +18,7 @@
       row-key="id"
       pagination="none"
       sorting="none"
-      :show-global-filter="false"
       :fill-height="false"
-      frame
       data-test="svcver-pods-table"
       ><template #cell-pod="{ row }"
         ><span class="truncate font-mono text-xs" :data-test="`svcver-pod-${row.id}`">{{
@@ -47,8 +45,8 @@
         ><span class="text-xs tabular-nums">{{ formatTime(row.pod.since) }}</span></template
       ><template #cell-link="{ row }"
         ><OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :disabled="busy"
           :data-test="`svcver-evidence-podLogs-${row.id}`"
           @click="openLogs(row.pod)"

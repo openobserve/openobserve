@@ -10,7 +10,8 @@ export class RumSessionsPage {
         this.tableRow = page.locator('[data-test^="o2-table-row-"]');
         this.sessionViewerNoReplay = '[data-test="session-viewer-no-replay"]';
         this.sessionViewerEventsOnly = '[data-test="session-viewer-events-only"]';
-        this.sessionViewerSubtitle = '[data-test="session-viewer-subtitle"]';
+        // The header has no subtitle; the session's metadata (ip, date, duration) lives in the sidebar.
+        this.sessionViewerSubtitle = '[data-test="event-metadata"]';
         this.sessionViewerShareLinkBtn = '[data-test="session-viewer-share-link-btn"]';
         this.sessionViewerBackBtn = '[data-test="session-viewer-back-btn"]';
         this.sessionIdCells = page.locator('[data-test="rum-app-sessions-session-id-text"]');

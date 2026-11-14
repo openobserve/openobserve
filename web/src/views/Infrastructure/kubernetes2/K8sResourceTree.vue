@@ -128,7 +128,6 @@ const setOpen = (id: string, open: boolean) => {
       </div>
       <OSearchInput
         v-model="query"
-        size="sm"
         :placeholder="t('infra.k8s2.treeFilter')"
         data-test="k8s2-tree-filter"
       />
@@ -143,16 +142,14 @@ const setOpen = (id: string, open: boolean) => {
       >
         <template v-for="group in visible" :key="group.id">
           <OCollapsible
-            variant="sidebar"
-            trigger-class="ps-0.5! gap-1!"
-            :model-value="isOpen(group.id)"
+            :open="isOpen(group.id)"
             :data-test="`k8s2-tree-group-${group.id}`"
-            @update:model-value="(open: boolean) => setOpen(group.id, open)"
+            @update:open="(open: boolean) => setOpen(group.id, open)"
           >
             <template #trigger>
               <OText class="text-text-secondary text-xs font-semibold">{{ t(group.label) }}</OText>
             </template>
-            <div class="flex flex-col ps-3">
+            <div class="flex flex-col">
               <OTab
                 v-for="item in group.items"
                 :key="item.view"
@@ -167,8 +164,8 @@ const setOpen = (id: string, open: boolean) => {
                   }}</OTruncatedText>
                   <OBadge
                     v-if="item.bad > 0"
-                    variant="error-soft"
-                    size="xs"
+                    tone="err"
+                    size="sm"
                     class="tabular-nums"
                     :data-test="`k8s2-tree-bad-${item.view}`"
                     >{{ item.bad }}</OBadge

@@ -67,23 +67,23 @@ const ODialogStub = {
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral", "close"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra", "close"],
   inheritAttrs: false,
   template: `
     <div
@@ -143,7 +143,7 @@ describe("PanelContainer", () => {
       values: [],
       isLoading: false,
     },
-    DateTime: {
+    ODateTimeRange: {
       start_time: new Date("2023-01-01T00:00:00Z"),
       end_time: new Date("2023-01-01T23:59:59Z"),
     },
@@ -904,10 +904,10 @@ describe("PanelContainer", () => {
       const refreshTooltip = () =>
         refreshButton().findComponent({ name: "OTooltip" }).props("content");
 
-      it("marks the refresh icon with the variables warning look and says why", () => {
+      it("marks the refresh icon with the stale dot and says why", () => {
         wrapper = createWrapper({ isTimeRangeWaiting: true });
 
-        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost-warning");
+        expect(refreshButton().find(".bg-warning-500").exists()).toBe(true);
         expect(refreshTooltip()).toBe("Refresh to apply the time range");
       });
 
@@ -923,13 +923,13 @@ describe("PanelContainer", () => {
         });
         await wrapper.vm.$nextTick();
 
-        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost-warning");
+        expect(refreshButton().find(".bg-warning-500").exists()).toBe(true);
         expect(refreshTooltip()).toBe("Refresh to apply the time range and variable changes");
       });
 
       it("keeps the marker outside layout edit mode, where the refresh icon is hidden", () => {
         wrapper = createWrapper({ isTimeRangeWaiting: true, layoutMode: "view" });
-        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost-warning");
+        expect(refreshButton().find(".bg-warning-500").exists()).toBe(true);
         wrapper.unmount();
 
         wrapper = createWrapper({ isTimeRangeWaiting: true, layoutMode: "edit" });
@@ -940,6 +940,7 @@ describe("PanelContainer", () => {
         wrapper = createWrapper({ isTimeRangeWaiting: false });
 
         expect(refreshButton().attributes("data-o2-variant")).toBe("ghost");
+        expect(refreshButton().find(".bg-warning-500").exists()).toBe(false);
         expect(refreshTooltip()).toBe("Refresh");
       });
     });
@@ -962,7 +963,7 @@ describe("PanelContainer", () => {
       await wrapper.vm.$nextTick();
 
       const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
-      expect(dialog.props("okVariant")).toBe("destructive");
+      expect(dialog.props("kind")).toBe("destructive");
       // e2e page objects locate the panel delete dialog by this id.
       expect(dialog.findComponent({ name: "ODialog" }).vm.$attrs["data-test"]).toBe(
         "confirm-dialog",
@@ -1499,7 +1500,7 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.goToLogsLockedReason).toBeTruthy();
     });
 
-    it("go to logs shows as a disabled, focusable menu item with the reason as description", async () => {
+    it("go to logs shows as a disabled menu item that says why", async () => {
       (store.state as any).zoConfig.features = { logs: "locked" };
       wrapper = createWrapper(
         { data: mockPanelData },
@@ -1512,9 +1513,8 @@ describe("PanelContainer", () => {
             name: "ODropdownItem",
             props: {
               disabled: Boolean,
-              focusableUnavailable: Boolean,
-              iconLeft: String,
-              description: String,
+              disabledReason: String,
+              icon: String,
             },
             template: "<div><slot /></div>",
           },
@@ -1526,9 +1526,8 @@ describe("PanelContainer", () => {
         .findAllComponents({ name: "ODropdownItem" })
         .find((c: any) => c.attributes("data-test") === "dashboard-move-to-logs-module");
       expect(item?.props("disabled")).toBe(true);
-      expect(item?.props("focusableUnavailable")).toBe(true);
-      expect(item?.props("iconLeft")).toBe("lock");
-      expect(item?.props("description")).toBe(wrapper.vm.goToLogsLockedReason);
+      expect(item?.props("icon")).toBe("lock");
+      expect(item?.props("disabledReason")).toBe(wrapper.vm.goToLogsLockedReason);
     });
 
     it("go to logs stays live while another signal is locked or the stream type is free", () => {
@@ -2291,13 +2290,7 @@ describe("PanelContainer", () => {
   });
 
   describe("Theme Support", () => {
-    // Theme is now handled globally via CSS custom property tokens
-    // (e.g. panel-bar-border / panel-bar-bg) that switch with the body--dark
-    // class, rather than a per-component dark-mode class. We assert the panel
-    // bar uses the theme-aware token classes and renders consistently in both
-    // themes. The bar's border is `panel-bar-border`, not the app-wide
-    // `border-default`: at the header's fill those two are the same colour in
-    // light mode, so the divider would vanish.
+    // Theme switches through token classes, never a per-component dark-mode class.
     it("should use theme-aware token classes on the panel bar in dark mode", async () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
@@ -2305,8 +2298,7 @@ describe("PanelContainer", () => {
 
       const qBar = wrapper.find('[data-test="dashboard-panel-bar"]');
       expect(qBar.exists()).toBe(true);
-      expect(qBar.classes()).toContain("border-panel-bar-border");
-      expect(qBar.classes()).toContain("bg-panel-bar-bg");
+      expect(qBar.classes()).toContain("border-border-subtle");
       expect(qBar.classes()).not.toContain("dark-mode");
     });
 
@@ -2317,8 +2309,7 @@ describe("PanelContainer", () => {
 
       const qBar = wrapper.find('[data-test="dashboard-panel-bar"]');
       expect(qBar.exists()).toBe(true);
-      expect(qBar.classes()).toContain("border-panel-bar-border");
-      expect(qBar.classes()).toContain("bg-panel-bar-bg");
+      expect(qBar.classes()).toContain("border-border-subtle");
       expect(qBar.classes()).not.toContain("dark-mode");
     });
   });
@@ -3005,7 +2996,7 @@ describe("PanelContainer", () => {
       ODropdownItem: {
         name: "ODropdownItem",
         template:
-          '<div role="menuitem" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
+          '<div role="menuitem" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon" /><slot /><slot name="end" /></div>',
         emits: ["select"],
       },
       OTooltip: { template: "<slot />" },

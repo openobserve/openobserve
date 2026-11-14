@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="mt-3 h-72" data-test="rum-overview-chart-plot">
-      <OSkeleton v-if="chartLoading" class="h-full w-full" />
+      <OSkeleton v-if="chartLoading" shape="block" class="h-full w-full" />
       <PanelSchemaRenderer
         v-show="!chartLoading"
         :key="rendererKey"
@@ -53,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="mt-2">
       <OButton
         variant="ghost"
-        size="sm"
         :aria-expanded="showTable"
         data-test="rum-overview-chart-table-toggle"
         @click="showTable = !showTable"
@@ -71,8 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="ts"
         pagination="none"
         sorting="none"
-        :show-global-filter="false"
-        :frame="false"
         data-test="rum-overview-chart-table"
       />
     </div>

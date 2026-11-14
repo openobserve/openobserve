@@ -19,22 +19,18 @@
     <div class="mb-2 flex items-center font-semibold">
       <span>{{ t("dashboard.colorBySeriesTitle") }}</span>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon"
+        size="xs"
         data-test="dashboard-addpanel-config-color-by-series"
-        icon-left="info-outline"
+        icon="info-outline"
       >
-        <template #icon-left><OIcon name="info-outline" size="sm" /></template>
-        <OTooltip
-          :content="t('dashboard.colorBySeriesTooltip')"
-          side="bottom"
-          max-width="15.625rem"
-        />
+        <template #icon><OIcon name="info-outline" size="sm" /></template>
+        <OTooltip :content="t('dashboard.colorBySeriesTooltip')" side="bottom" />
       </OButton>
     </div>
     <OButton
-      variant="outline"
-      size="sm"
+      variant="secondary"
       @click="openColorBySeriesPopUp"
       data-test="dashboard-addpanel-config-colorBySeries-add-btn"
     >

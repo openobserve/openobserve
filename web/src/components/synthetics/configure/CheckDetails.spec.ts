@@ -99,6 +99,7 @@ const OIconStub = {
 
 const STUBS = {
   OInput: OInputStub,
+  OTextarea: OInputStub,
   OSelect: OSelectStub,
   OSwitch: OSwitchStub,
   OButton: OButtonStub,

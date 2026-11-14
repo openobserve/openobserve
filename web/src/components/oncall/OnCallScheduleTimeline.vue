@@ -39,17 +39,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
       <span class="flex items-center gap-1">
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="chevron-left"
+          icon-only
+          variant="secondary"
+          icon="chevron-left"
           :aria-label="t('oncall.calendarPrev')"
           data-test="oncall-timeline-prev"
           @click="offsetDays -= days"
         />
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="chevron-right"
+          icon-only
+          variant="secondary"
+          icon="chevron-right"
           :aria-label="t('oncall.calendarNext')"
           data-test="oncall-timeline-next"
           @click="offsetDays += days"
@@ -59,10 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OText variant="panel-title" data-test="oncall-timeline-range">{{ rangeLabel }}</OText>
 
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         :disabled="offsetDays === 0"
-        icon-left="event"
+        icon="event"
         data-test="oncall-timeline-today"
         @click="offsetDays = 0"
       >
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Only when the reader is elsewhere: a handover time is ambiguous only then. -->
       <OTooltip v-if="zoneDiffers" side="bottom" :content="zoneLine">
         <OTag
-          variant="default-outline"
+          tone="outline"
           size="sm"
           icon="schedule"
           tabindex="0"
@@ -94,7 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="option in RANGES"
             :key="option.key"
             :value="option.key"
-            size="sm"
             :data-test="`oncall-timeline-range-${option.key}`"
           >
             {{ t(option.labelKey) }}
@@ -105,42 +104,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdown align="end">
           <template #trigger>
             <OButton
-              variant="outline"
-              size="sm-action"
-              icon-left="add"
-              icon-right="arrow-drop-down"
+              variant="secondary"
+              icon="add"
+              icon-end="arrow-drop-down"
               data-test="oncall-timeline-add"
             >
               {{ t("oncall.addRotation") }}
             </OButton>
           </template>
           <ODropdownItem
-            icon-left="dashboard-customize"
+            icon="dashboard-customize"
             data-test="oncall-timeline-add-template"
             @select="emit('presets')"
           >
             {{ t("oncall.addRotationFromTemplate") }}
           </ODropdownItem>
-          <ODropdownItem
-            icon-left="edit"
-            data-test="oncall-timeline-add-scratch"
-            @select="emit('add')"
-          >
+          <ODropdownItem icon="edit" data-test="oncall-timeline-add-scratch" @select="emit('add')">
             {{ t("oncall.addRotationFromScratch") }}
           </ODropdownItem>
         </ODropdown>
       </span>
     </div>
 
-    <OInnerLoading v-if="loading" showing />
+    <OSkeleton v-if="loading" preset="tableRows" :rows="3" />
 
     <!-- The only place a template is the main road: a team with nothing to replace. -->
     <OEmptyState
       v-else-if="!rotationTracks.length"
-      size="block"
-      preset="no-oncall-schedule"
+      :title="t('emptyState.noOncallSchedule.title')"
+      icon="schedule"
       data-test="oncall-timeline-empty"
-      @action="(id) => (id === 'presets' ? emit('presets') : emit('add'))"
+      :action-label="t('emptyState.noOncallSchedule.presetsAction')"
+      :secondary-action-label="t('emptyState.noOncallSchedule.action')"
+      @action="emit('presets')"
+      @secondary-action="emit('add')"
     />
 
     <OScheduleTimeline
@@ -205,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  load figure somebody has to convert into one. -->
             <OTag
               v-if="laneOf(track).notPaging"
-              variant="error-soft"
+              tone="err"
               size="sm"
               :data-test="`oncall-lane-not-paging-${track.key}`"
             >
@@ -214,9 +211,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTag>
 
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="edit"
+              icon="edit"
               :aria-label="t('oncall.edit')"
               :data-test="`oncall-lane-edit-${track.key}`"
               @click="emit('edit', laneOf(track).id)"
@@ -232,37 +229,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #trigger>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-sm"
-                  icon-left="more-vert"
+                  icon="more-vert"
                   :aria-label="t('oncall.laneMore', { name: track.label })"
                   :data-test="`oncall-lane-menu-${track.key}`"
                 />
               </template>
               <ODropdownItem
-                icon-left="restart-alt"
+                icon="restart-alt"
                 :data-test="`oncall-lane-presets-${track.key}`"
                 @select="emit('presets', laneOf(track).id)"
               >
                 {{ t("oncall.presetsReplaceRules") }}
               </ODropdownItem>
               <ODropdownItem
-                icon-left="person-add"
+                icon="person-add"
                 :data-test="`oncall-lane-override-${track.key}`"
                 @select="emit('override', laneOf(track).id)"
               >
                 {{ t("oncall.railOverride") }}
               </ODropdownItem>
               <ODropdownItem
-                icon-left="content-copy"
+                icon="content-copy"
                 :data-test="`oncall-lane-duplicate-${track.key}`"
                 @select="emit('duplicate', laneOf(track).id)"
               >
                 {{ t("oncall.railDuplicate") }}
               </ODropdownItem>
               <ODropdownItem
-                icon-left="delete-outline"
-                variant="destructive"
+                icon="delete-outline"
+                tone="danger"
                 :data-test="`oncall-lane-delete-${track.key}`"
                 @select="emit('delete', laneOf(track).id)"
               >
@@ -285,9 +282,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="laneOf(track).notPaging"
             variant="primary"
-            size="xs"
+            size="sm"
             class="ms-auto"
-            icon-left="person-add"
+            icon="person-add"
             :data-test="`oncall-lane-assign-${track.key}`"
             @click="emit('assign-people', laneOf(track).id)"
           >
@@ -315,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownItem
             v-for="action in bandActions(band.key)"
             :key="action.id"
-            :icon-left="action.icon"
+            :icon="action.icon"
             :data-test="`oncall-shift-menu-${action.id}`"
             @select="onBandAction(action.id, band.key)"
           >
@@ -387,10 +384,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OButton
               v-if="canCover"
-              variant="outline"
-              size="xs"
+              variant="secondary"
+              size="sm"
               class="ms-auto"
-              icon-left="person-add"
+              icon="person-add"
               data-test="oncall-timeline-fill-gap"
               @click="emit('fill-gap', firstGap)"
             >
@@ -421,7 +418,7 @@ import type {
   ScheduleTrack,
 } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
 import { SCHEDULE_BAND_TONE_COUNT } from "@/lib/data/ScheduleTimeline/OScheduleTimeline.types";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

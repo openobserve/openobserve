@@ -15,7 +15,7 @@ A listing/table page is **full-bleed**, not a padded card: root `flex flex-col
 h-full p-0`, the `OPageHeader` owns the padding — it **bakes in `px-page-edge`
 itself**, so the consumer adds only `shrink-0 border-b` (never a `px-*`), and
 the table wrapper runs flush (`card-container flex-1 min-h-0 overflow-hidden`
-around `<OTable :frame="false">`). **Reserve `p-6`/`gap-6` for form/detail
+around `<OTable>`). **Reserve `p-6`/`gap-6` for form/detail
 views** — a page inset breaks the flush table. The full skeleton, the mandatory
 search · refresh · column-toggle toolbar, and the empty-state contract are in
 [§ Page anatomy & the listing-page recipe](#page-anatomy--the-listing-page-recipe)
@@ -48,14 +48,14 @@ rounded-default` (synthetics). Copy the class string from the sibling family
 
 - Title comes from the `:title` prop — don't render a manual `<h*>` title.
 - ODialog already pads its body — **don't add a wrapper with extra padding.**
-- **Field spacing lives on `<OForm>`:** `class="flex flex-col gap-5"`. Its
+- **Field spacing lives on `<OForm>`:** `class="flex flex-col gap-4"` (L4, V1). Its
   `class` falls through to the root `<form>`, so the `OFormInput`/`OFormSelect`
   children space evenly. **Omitting this is why a dialog looks cramped with no
   spacing between fields** — the single most common bug.
 - Tight sub-groups (a label + its custom control, header key/value rows): wrap in
   `class="flex flex-col gap-2"` or `class="flex items-end gap-2"`.
-- Footer: use ODialog's `:primary-button-label` / `:secondary-button-label` +
-  `:form-id` — never hand-roll or restyle footer buttons.
+- Footer: use ODialog's `:primary` / `:secondary` (and `:extra` on the left) action
+  objects + `:form-id` — never hand-roll or restyle footer buttons (O7).
 
 ### Drawer Spacing (`ODrawer`)
 
@@ -65,9 +65,9 @@ rounded-default` (synthetics). Copy the class string from the sibling family
 - **Separate detail from the edit form** with a divider on the detail wrapper:
   `class="… mb-8 pb-8 border-b border-border-default"`.
 - **Section heading** for the form: `class="text-base font-semibold mb-4"`.
-- **Edit form**: same as a dialog — `class="flex flex-col gap-5"` on `<OForm>`.
-- Footer: same `:primary-button-label` / `:secondary-button-label` + `:form-id`
-  pattern as ODialog. Don't restyle the buttons.
+- **Edit form**: same as a dialog — `class="flex flex-col gap-4"` on `<OForm>`.
+- Footer: same `:primary` / `:secondary` / `:extra` + `:form-id` pattern as
+  ODialog. Don't restyle the buttons.
 
 ### Keyboard Shortcuts Pattern
 
@@ -107,8 +107,9 @@ patching it from outside. Banned on an O2 component:
 Decision flow for any visual that differs from the default:
 
 1. Expressible via `variant` / `size`? → use the prop.
-2. No variant covers it? → add a new named variant to the component source, then
-   use it.
+2. No variant covers it? → the variant and size sets are fixed by the guidelines
+   (B2, S1). A new one is a design-system change landed in `web/src/lib` with its
+   `local/o2-*-api` rule, never a class at the call site.
 3. Layout/position only (`margin`, `flex-shrink`, a parent-hover reveal)? → wrap
    in a plain `<span>`/`<div>` and put the rule on the **wrapper**, never on the
    O2 component.
@@ -119,22 +120,26 @@ Every cancel/save pair in a form, dialog, or drawer follows this exact shape —
 it's what makes action rows look identical everywhere:
 
 ```vue
-<div class="flex gap-2">
-  <OButton variant="outline" size="sm-action" @click="cancel">
+<div class="flex justify-end gap-2">
+  <OButton @click="cancel">
     {{ t("common.cancel") }}
   </OButton>
-  <OButton variant="primary" size="sm-action" type="submit" @click="save">
+  <OButton variant="primary" type="submit" @click="save">
     {{ t("common.save") }}
   </OButton>
 </div>
 ```
 
-- Cancel is **always** `variant="outline"` — never `secondary` or
-  `ghost-primary`. Save/Submit/OK is **always** `variant="primary"`.
-- Both use `size="sm-action"`. Space them with `gap-2` on the parent — use
-  `gap-*` on the parent container instead of per-child margins or spacer elements.
-- Other actions in the same row (Delete, Reject) keep their own `variant`
-  (e.g. `destructive`) but match `size="sm-action"` for alignment.
+- Right-aligned, Cancel first, then the primary (O7). Cancel is `secondary`,
+  OButton's default variant; the primary is **always** `variant="primary"` and is
+  the only one in the row (B1). Its label is verb + noun ("Create folder",
+  "Save"), never "OK" or "Submit" (B3).
+- Both keep the default `md` size (32). Space them with `gap-2` on the parent —
+  use `gap-*` on the parent container instead of per-child margins or spacer
+  elements.
+- Extra actions in the same row (Test connection, Delete, Discard) sit at the
+  **left** of the footer (O7), same size. A destructive one is `danger-ghost`;
+  solid `danger` belongs only inside a confirmation (B2).
 - When the button row lives in an `ODialog`/`ODrawer` footer, prefer the
   overlay's built-in `primary`/`secondary`/`neutralButtonLabel` props, which
   already apply this standard.
@@ -196,11 +201,12 @@ recognises it without reading:
 
 | Job                              | Component                                                            |
 | -------------------------------- | -------------------------------------------------------------------- |
-| Refresh with "last run" age      | `ORefreshButton layout="inline" variant="outline"`                   |
+| Refresh with "last run" age (F9) | `ORefreshButton` (`size` sm/md, optional auto-refresh menu)         |
+| Copy a value (K1, T4)            | `OCopyButton` — every copy action; inline check, never a toast       |
 | Explain a set of numbers / chart | `OPopover` info recipe (overlay-navigation.md), label "About …"      |
 | Expandable item in a list        | `OCollapsible` rich-row recipe (core-display.md)                     |
 | View toggle in a toolbar         | `OToggleGroup` with `mobile-dropdown`                                |
-| "Stopped" / "nothing yet" screen | `OEmptyState` + `EmptyStateActionCard`, one line per affected source |
+| "Stopped" / "nothing yet" screen | `OEmptyState` (`kind="first-run"`), one line per affected source in `#extra` |
 
 ### No component fits? Build a reusable one — don't assemble raw classes
 
@@ -261,16 +267,15 @@ Lay out a whole page from a recipe, not from scratch — full recipes in
   `px-page-edge`) and the **table runs flush** to the content edges — root
   `flex flex-col h-full p-0`, header
   `shrink-0 border-b border-border-default` (no `px-*` — the header self-insets), table wrapper
-  `card-container flex-1 min-h-0 overflow-hidden` around `<OTable :frame="false">`.
+  `card-container flex-1 min-h-0 overflow-hidden` around `<OTable>`.
   **Not** a `gap-6 p-6` padded container (that's for form/detail views).
 - **A listing/table page always carries three toolbar affordances** on its
   `OTable` — don't ship a list without them:
   - **Search (+ filters)** — put the search box and any filter controls
-    (`OToggleGroup`, dropdowns) together in the `#toolbar` slot with
-    `:show-global-filter="false"`. Only a search-only list with no other filters
-    uses the built-in `show-global-filter` + `v-model:global-filter`.
-  - **Refresh** — an `OButton variant="outline" size="icon-sm" icon-left="refresh"
-    :loading` in the `#toolbar-trailing` slot, with a tooltip carrying the `r`
+    (`OToggleGroup`, dropdowns) together in the `#toolbar` slot; bind the search's
+    text to `:global-filter` for a client-side list. OTable has no search box.
+  - **Refresh** — one `ORefreshButton` showing the data age (F9), last in the
+    `#toolbar-trailing` slot, with `:loading` and a `shortcut-id` carrying the `r`
     shortcut. It calls a named handler that **forces** every read on the view
     (never the plain mount fetch, which serves the cache) — see
     [data-fetching.md § The refresh rule](data-fetching.md#the-refresh-rule).
@@ -281,9 +286,9 @@ Lay out a whole page from a recipe, not from scratch — full recipes in
 - **Hide non-essential columns by default** via `:column-visibility="{ id: false }"`
   (keep name/status visible; hide timestamps/ids/counts) — the user can re-show
   them and the choice persists per `table-id`.
-- **Empty state = one `OEmptyState`** in `#empty` with a `preset` + `:filtered`
-  prop; it swaps to "No results found" + Clear-filters automatically when search/a
-  filter is active. Provide `#error` too if fetch can fail. Put row actions in an
+- **Empty state = one `OEmptyState`** in `#empty`, `kind="filtered"` while search or
+  a filter is active (its default action clears them) and `first-run` otherwise.
+  Provide `#error` with `kind="error"` too if fetch can fail (K5). Put row actions in an
   `isAction` column, register `n`/`/`/`r` shortcuts.
 - **Register the page in navigation** (route + rail item / Settings sub-page /
   flyout child) and **gate it** for the right env/role — a page that renders but
@@ -296,14 +301,14 @@ Lay out a whole page from a recipe, not from scratch — full recipes in
 (`@/lib/core/Table/OTable.vue`) — never hand-build a `<table>`.
 
 **How.** Columns are `OTableColumnDef[]` (`:columns` + `:data`); reuse the shared
-width constants (`COL.*`, `TABLE_INDEX_COL_SIZE`) and the prebuilt cell renderers
+width constants (`COL.*`) and the prebuilt cell renderers
 (`OTimeCell`, `OUserCell`, `ONumberCell`, `OCodeCell`, `ODataBarCell`) rather than
 hand-formatting values. `OTable` paginates/sorts/filters **client-side by
 default** — switch to `pagination="server"` / `sorting="server"` **only** when the
 backend paginates a dataset too large to fetch whole; don't wire server mode for a
 list you fetched entire. For user-facing lists set `persist-columns` + a stable
-`tableId`. Render a listing table **flush**: `:frame="false"` (already its
-default) and **never** wrap it in a bordered/`bg-*` box — that double-frames it, so
+`tableId`. Render a listing table **flush**: OTable has one frame and no frame
+props, and **never** wrap it in a bordered/`bg-*` box — that double-frames it, so
 fix a stray border by removing the parent's, not by adding a frame. The full
 prop/slot/emit list and the cell renderers are in
 [references/core-controls-table.md](core-controls-table.md).
@@ -435,8 +440,8 @@ Rules of thumb:
 - **Use the built-ins, don't hand-roll:** `persistent` on forms (prevents
   accidental dismissal), `formId` for Enter-to-submit, and the built-in
   `primary` / `secondary` / `neutralButtonLabel` footer API instead of a manual
-  button row — while still honoring the cancel=`outline` / save=`primary`
-  standard (see [§ Working with O2 components](#working-with-o2-components)).
+  button row — while still honoring the Cancel-then-primary
+  standard (O7) (see [§ Working with O2 components](#working-with-o2-components)).
 - Use `ODialog` / `ODrawer` for these.
 
 **Why.** Users learn a spatial grammar: a small ask is a centered modal, a
@@ -487,7 +492,7 @@ The essentials:
   `shortcutRegistry.ts` (`@/lib/vue-shortcut-manager`) with an `id`, its
   key(s)/platform variants, and an i18n `descriptionKey`. Bind behavior in
   `setup()` with `useShortcuts([{ id, handler }])`. Display the keycap with
-  `<OShortcut id>` or a `shortcut-id` prop on `ODropdownItem`/`OTooltip`.
+  `<OShortcut id>` or the `shortcut` prop (a registry id) on `ODropdownItem`/`OTooltip`/`OButton`.
 - **Never hand-roll** `window.addEventListener("keydown", …)` for an app
   shortcut, and never hardcode `⌘N` text in a template — the registry owns key,
   platform mapping, scope, cheatsheet entry, and display.

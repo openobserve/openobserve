@@ -58,17 +58,10 @@ import analytics from "@/services/product_analytics";
 
 const ODrawerStub = {
   name: "ODrawer",
-  props: [
-    "open",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "formId",
-  ],
-  emits: ["update:open", "click:secondary", "click:primary", "click:neutral"],
+  props: ["open", "title", "primary", "secondary", "extra", "formId"],
+  emits: ["update:open", "click:secondary", "click:primary", "click:extra"],
   template:
-    '<div data-test="o-drawer-stub" :data-title="title" :data-primary-label="primaryButtonLabel" :data-secondary-label="secondaryButtonLabel"><slot /></div>',
+    '<div data-test="o-drawer-stub" :data-title="title" :data-primary-label="primary?.label" :data-secondary-label="secondary?.label"><slot /></div>',
 };
 
 // ── Form field stubs ─────────────────────────────────────────────────────────
@@ -158,8 +151,8 @@ describe("SyntheticsLocationForm", () => {
     const drawer = wrapper.findComponent({ name: "ODrawer" });
     expect(drawer.exists()).toBe(true);
     expect(drawer.props("title")).toBe("New location");
-    expect(drawer.props("primaryButtonLabel")).toBe("Create and close");
-    expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+    expect(drawer.props("primary")?.label).toBe("Create and close");
+    expect(drawer.props("secondary")?.label).toBe("Cancel");
   });
 
   // ── 2. Edit mode with pre-filled data ──────────────────────────────────────
@@ -179,7 +172,7 @@ describe("SyntheticsLocationForm", () => {
     // The ODrawer renders edit-mode title and button labels.
     const drawer = wrapper.findComponent({ name: "ODrawer" });
     expect(drawer.props("title")).toBe("Edit Location");
-    expect(drawer.props("primaryButtonLabel")).toBe("Update & Close");
+    expect(drawer.props("primary")?.label).toBe("Update & Close");
 
     // Defaults computed seeds the form values for edit mode.
     expect(wrapper.vm.locationFormDefaults).toEqual({

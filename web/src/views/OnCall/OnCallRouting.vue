@@ -20,28 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     data-test="oncall-routing-page"
     :title="t('oncall.routingTitle')"
-    icon="alt-route"
+    :about="t('oncall.routingPrecedence')"
   >
-    <template #title-trail>
+    <template #status>
       <BetaBadge class="shrink-0" />
-      <OTooltip side="bottom" :content="t('oncall.routingPrecedence')">
-        <OIcon
-          name="info-outline"
-          size="sm"
-          tabindex="0"
-          :label="t('oncall.routingPrecedence')"
-          class="text-text-secondary cursor-help"
-          data-test="oncall-routing-precedence-info"
-        />
-      </OTooltip>
     </template>
     <template #actions>
       <OButton
         v-if="ready && !isMobile"
-        variant="outline"
-        size="sm"
-        icon-left="manage-search"
-        :active="tester.open.value"
+        variant="secondary"
+        icon="manage-search"
+        :pressed="tester.open.value"
         data-test="oncall-routing-test-signal"
         @click="tester.openTester()"
       >
@@ -50,8 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="ready && tab === 'rules' && canConfigure"
         variant="primary"
-        size="sm"
-        icon-left="add"
+        icon="add"
         data-test="oncall-routing-add-rule"
         @click="openAdd"
       >
@@ -60,8 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="ready && tab === 'signals' && canConfigure && claimableCount"
         variant="primary"
-        size="sm"
-        icon-left="alt-route"
+        icon="alt-route"
         :loading="claimingAll"
         data-test="oncall-routing-claim-all"
         @click="openClaimAll"
@@ -72,10 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions-overflow>
       <OButton
         v-if="ready && isMobile"
-        variant="outline"
-        size="sm"
-        icon-left="manage-search"
-        :active="tester.open.value"
+        variant="secondary"
+        icon="manage-search"
+        :pressed="tester.open.value"
         data-test="oncall-routing-test-signal"
         @click="tester.openTester()"
       >
@@ -86,10 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- 404 (feature off) and 403 "Not Supported" (OSS) are deployment facts, not failures. -->
     <OEmptyState
       v-if="unavailable"
-      size="hero"
       icon="cloud-off"
       :title="t('oncall.notAvailableTitle')"
-      :description="t('oncall.notAvailableDescription')"
+      :text="t('oncall.notAvailableDescription')"
       data-test="oncall-routing-unavailable"
     />
 
@@ -101,19 +86,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-else-if="loadError"
-      size="hero"
-      preset="load-error"
+      kind="error"
       :title="t('oncall.routingLoadFailed')"
-      :description="loadError ? raw(loadError) : undefined"
+      :text="loadError ? raw(loadError) : t('emptyState.loadError.description')"
       data-test="oncall-routing-error"
       @action="refreshPage"
     />
 
     <OEmptyState
       v-else-if="loaded && !teams.length"
-      size="hero"
-      preset="no-oncall-teams"
+      :title="t('emptyState.noOncallTeams.title')"
+      icon="group"
       data-test="oncall-routing-empty"
+      :action-label="t('emptyState.noOncallTeams.action')"
       @action="goToTeams"
     />
 
@@ -137,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @clear-search="clearSearch"
       >
         <template #toolbar>
-          <div class="flex w-full min-w-0 flex-wrap items-center gap-2 max-md:contents">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-md:contents">
             <OToggleGroup
               :model-value="tab"
               type="single"
@@ -145,25 +130,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="oncall-routing-tabs"
               @update:model-value="setTab"
             >
-              <OToggleGroupItem value="rules" size="sm" data-test="oncall-routing-tab-rules">
+              <OToggleGroupItem value="rules" data-test="oncall-routing-tab-rules">
                 {{ t("oncall.ownershipRules") }}
-                <OTag variant="default-soft" size="sm">{{ rules.length }}</OTag>
+                <OCountBadge :count="rules.length" />
               </OToggleGroupItem>
-              <OToggleGroupItem value="signals" size="sm" data-test="oncall-routing-tab-signals">
+              <OToggleGroupItem value="signals" data-test="oncall-routing-tab-signals">
                 {{ t("oncall.routingTabNeedsRule") }}
-                <OTag
-                  :variant="openSignalCount ? 'error-soft' : 'default-soft'"
-                  size="sm"
+                <OCountBadge
+                  :count="openSignalCount"
+                  :tone="openSignalCount ? 'err' : 'neutral'"
                   data-test="oncall-routing-tab-signals-count"
-                >
-                  {{ openSignalCount }}
-                </OTag>
+                />
               </OToggleGroupItem>
             </OToggleGroup>
             <OSearchInput
               v-model="search"
               class="min-w-48 flex-1 max-md:min-w-24"
-              clearable
               :placeholder="t('oncall.routingSearchRules')"
               data-test="oncall-routing-search"
             />
@@ -171,8 +153,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastFetchedAt"
             :loading="refreshing"
             data-test="oncall-routing-refresh"
@@ -203,19 +183,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="oncall-routing-tabs"
               @update:model-value="setTab"
             >
-              <OToggleGroupItem value="rules" size="sm" data-test="oncall-routing-tab-rules">
+              <OToggleGroupItem value="rules" data-test="oncall-routing-tab-rules">
                 {{ t("oncall.ownershipRules") }}
-                <OTag variant="default-soft" size="sm">{{ rules.length }}</OTag>
+                <OCountBadge :count="rules.length" />
               </OToggleGroupItem>
-              <OToggleGroupItem value="signals" size="sm" data-test="oncall-routing-tab-signals">
+              <OToggleGroupItem value="signals" data-test="oncall-routing-tab-signals">
                 {{ t("oncall.routingTabNeedsRule") }}
-                <OTag
-                  :variant="openSignalCount ? 'error-soft' : 'default-soft'"
-                  size="sm"
+                <OCountBadge
+                  :count="openSignalCount"
+                  :tone="openSignalCount ? 'err' : 'neutral'"
                   data-test="oncall-routing-tab-signals-count"
-                >
-                  {{ openSignalCount }}
-                </OTag>
+                />
               </OToggleGroupItem>
             </OToggleGroup>
             <div class="bg-border-default h-4 w-px shrink-0 max-md:hidden" />
@@ -229,7 +207,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OToggleGroupItem
                 value="both"
-                size="sm"
                 icon-left="format-list-bulleted"
                 data-test="oncall-unrouted-filter-both"
               >
@@ -237,7 +214,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
               <OToggleGroupItem
                 value="nobody"
-                size="sm"
                 icon-left="notifications-paused"
                 data-test="oncall-unrouted-filter-nobody"
               >
@@ -245,7 +221,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
               <OToggleGroupItem
                 value="default_team"
-                size="sm"
                 icon-left="group-work"
                 data-test="oncall-unrouted-filter-default"
               >
@@ -263,7 +238,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               v-model="search"
               class="min-w-48 flex-1 max-md:min-w-24"
-              clearable
               :placeholder="t('oncall.routingSearchSignals')"
               data-test="oncall-routing-search"
             />
@@ -271,8 +245,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastFetchedAt"
             :loading="refreshing"
             data-test="oncall-routing-refresh"
@@ -293,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODrawer
       :open="tester.open.value"
-      size="lg"
+      size="md"
       :title="t('oncall.routingTestRouting')"
       data-test="oncall-routing-tester-drawer"
       @update:open="(v: boolean) => (tester.open.value = v)"
@@ -338,10 +310,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :open="claimAllOpen"
       size="sm"
       :title="t('oncall.unroutedClaimAllTitlePlain', { count: claimableCount }, claimableCount)"
-      :primary-button-label="t('oncall.unroutedClaimAll', { count: claimableCount })"
-      :secondary-button-label="t('oncall.cancel')"
-      :primary-button-disabled="!claimAllTeam"
-      :primary-button-loading="claimingAll"
+      :primary="{
+        label: t('oncall.unroutedClaimAll', { count: claimableCount }),
+        disabled: !claimAllTeam,
+        loading: claimingAll,
+      }"
+      :secondary="{ label: t('oncall.cancel') }"
       data-test="oncall-routing-claim-all-dialog"
       @update:open="(v: boolean) => (claimAllOpen = v)"
       @click:primary="claimAll"
@@ -353,7 +327,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('oncall.ruleEditorWake')"
           :options="teamOptions"
           :placeholder="t('oncall.ruleEditorWakePlaceholder')"
-          size="sm"
           searchable
           data-test="oncall-routing-claim-all-team"
           @update:model-value="(v: unknown) => (claimAllTeam = v === null ? '' : String(v))"
@@ -369,9 +342,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('oncall.removeRuleTitle')"
       message-keypath="oncall.removeRuleMessageNamed"
       :message-name="ruleToDelete ? readable(ruleToDelete.dimensions) : ''"
-      ok-variant="destructive"
+      kind="destructive"
       :ok-label="t('oncall.removeRule')"
-      focus-cancel
       @update:ok="deleteRule"
       @update:cancel="ruleToDelete = null"
     />
@@ -396,17 +368,15 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import OCountBadge from "@/lib/core/Badge/OCountBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";

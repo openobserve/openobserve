@@ -66,7 +66,7 @@ A compound family is one folder with multiple members that share a `provide`/`in
 | Family   | Members (co-located)                                       |
 | -------- | ---------------------------------------------------------- |
 | Button   | `OButton`, `OButtonGroup`                                  |
-| Tabs     | `OTabs`, `OTab`, `ORouteTab`, `OTabPanels`, `OTabPanel`    |
+| Tabs     | `OTabs`, `OTab`, `OTabPanels`, `OTabPanel`                 |
 | Select   | `OSelect`, `OSelectItem`, `OSelectGroup` (+ `OFormSelect`) |
 | Dropdown | `ODropdown` + item/group/separator members                 |
 
@@ -91,7 +91,7 @@ A component bakes its design in. It exposes **intent**, never **appearance**. On
 
 | Category             | Examples                                    | Why                            |
 | -------------------- | ------------------------------------------- | ------------------------------ |
-| Semantic **variant** | `variant="primary" \| "ghost" \| "outline"` | communicates intent            |
+| Semantic **variant** | `variant="primary" \| "secondary" \| "ghost"` | communicates intent          |
 | Semantic **size**    | `size="sm" \| "md" \| "lg"`                 | adapts without exposing pixels |
 | **State**            | `disabled`, `loading`, `readonly`           | behavioral flags               |
 
@@ -129,8 +129,8 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 ```ts
 // OButton.types.ts
 export type ButtonVariant =
-  "primary" | "secondary" | "outline" | "ghost" | "destructive";
-export type ButtonSize = "sm" | "md" | "lg" | "icon";
+  "primary" | "secondary" | "ghost" | "accent-ghost" | "danger" | "danger-ghost" | "link";
+export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
 export interface ButtonProps {
   /** Visual style variant */

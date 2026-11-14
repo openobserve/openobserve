@@ -646,7 +646,7 @@ describe("Starred chip", () => {
     await chip(wrapper, "no_results").trigger("click");
     await wrapper.find('[data-test="recent-searches-scope-page"]').trigger("click");
     await flushPromises();
-    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
+    expect(chip(wrapper, "any").attributes("aria-pressed")).toBe("true");
     const metricsCalls = api.list.mock.calls.filter(([, p]) => p.source === "metrics");
     expect(metricsCalls.every(([, p]) => p.status === undefined)).toBe(true);
   });
@@ -676,13 +676,13 @@ describe("Starred chip", () => {
     expect(chip(wrapper, "any").text()).toBe("Any status");
     expect(chip(wrapper, "starred").text()).toBe("Starred");
     expect(wrapper.find('[data-test="recent-searches-scope-page"]').text()).toBe("Logs");
-    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
+    expect(chip(wrapper, "any").attributes("aria-pressed")).toBe("true");
     expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("false");
 
     await chip(wrapper, "starred").trigger("click");
     await flushPromises();
     expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("true");
-    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
+    expect(chip(wrapper, "any").attributes("aria-pressed")).toBe("true");
     expect(api.list).toHaveBeenLastCalledWith(
       "default",
       expect.objectContaining({ starred: true }),
@@ -714,10 +714,10 @@ describe("Starred chip", () => {
     await reset().trigger("click");
     await flushPromises();
     expect(reset().exists()).toBe(false);
-    expect(chip(wrapper, "any").attributes("aria-checked")).toBe("true");
+    expect(chip(wrapper, "any").attributes("aria-pressed")).toBe("true");
     expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("false");
     expect(
-      wrapper.find('[data-test="recent-searches-scope-page"]').attributes("aria-checked"),
+      wrapper.find('[data-test="recent-searches-scope-page"]').attributes("aria-pressed"),
     ).toBe("true");
     expect(shownRows(wrapper)).toBe(3);
   });
@@ -732,10 +732,10 @@ describe("Starred chip", () => {
       "default",
       expect.objectContaining({ status: "error", starred: true }),
     );
-    expect(chip(wrapper, "error").attributes("aria-checked")).toBe("true");
+    expect(chip(wrapper, "error").attributes("aria-pressed")).toBe("true");
     expect(chip(wrapper, "starred").attributes("aria-pressed")).toBe("true");
     const group = wrapper.find('[data-test="recent-searches-status"]');
-    expect(group.attributes("role")).toBe("radiogroup");
+    expect(group.attributes("role")).toBe("group");
     expect(group.attributes("aria-label")).toBe("Run status");
     expect(wrapper.find('[data-test="recent-searches-scope"]').attributes("aria-label")).toBe(
       "Search scope",

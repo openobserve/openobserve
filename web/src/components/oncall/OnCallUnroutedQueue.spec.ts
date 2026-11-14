@@ -28,7 +28,6 @@ const stubs = {
     props: ["type", "value"],
     template: "<span><slot>{{ value }}</slot></span>",
   },
-  OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OButton: { name: "OButton", template: "<button><slot /></button>" },
   OToggleGroup: {
     name: "OToggleGroup",

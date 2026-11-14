@@ -83,7 +83,11 @@ const mountPage = async () => {
     global: {
       provide: { store },
       plugins: [i18n, router],
-      stubs: { OPageLayout: { template: "<div><slot name='header-tabs' /><slot /></div>" } },
+      stubs: {
+        OPageLayout: {
+          template: "<div><slot name='header-tabs' /><slot name='banner' /><slot /></div>",
+        },
+      },
     },
   });
   await flushPromises();

@@ -21,17 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t('alertCalibration.detail.title', { time: formatTime(run.window_end) })
         : t('alertCalibration.detail.titleLoading')
     "
-    :subtitle="
-      run
-        ? t('alertCalibration.detail.subtitle', {
-            start: formatDay(run.window_start),
-            end: formatDay(run.window_end),
-            time: formatAgo(run.emitted_at),
-          })
-        : raw('')
-    "
-    icon="tune"
-    :back="{ label: t('alertCalibration.detail.back'), to: digestsRoute }"
+    :back="{ label: t('alertCalibration.title'), to: digestsRoute }"
     scroll
     pad-y
     data-test="alert-calibration-digest-page"
@@ -40,13 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="(records.loading.value && !run) || !dismissals.settled.value"
       class="flex flex-col gap-3"
     >
-      <OSkeleton class="rounded-default h-16 w-full" />
-      <OSkeleton class="rounded-default h-40 w-full" />
+      <OSkeleton shape="block" class="h-16 w-full" />
+      <OSkeleton shape="block" class="h-40 w-full" />
     </div>
 
     <LiveNoticeState
       v-else-if="loadError"
-      size="block"
+      size="page"
       :notice="{
         ...readNotice(
           t,
@@ -62,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <div v-else-if="run" class="flex flex-col gap-4">
-      <OBanner v-if="partial" variant="warning" data-test="alert-calibration-digest-partial">
+      <OInlineNotice v-if="partial" tone="warn" data-test="alert-calibration-digest-partial">
         <div class="flex min-w-0 flex-col gap-0.5">
           <span class="text-sm font-medium">{{ t(partialTitleKey) }}</span>
           <span v-if="!measuredNothing" class="text-xs">{{
@@ -70,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</span>
           <span v-for="note in notes" :key="note" class="text-xs">{{ note }}</span>
         </div>
-      </OBanner>
+      </OInlineNotice>
 
       <OStatStrip :items="stats" data-test="alert-calibration-digest-stats" />
 
@@ -87,19 +77,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText variant="meta" as="p">{{ t("alertCalibration.detail.suggestionsOnly") }}</OText>
           </div>
           <OToggleGroup
+            size="sm"
             :model-value="ruleFilter"
             mobile-dropdown
             data-test="alert-calibration-digest-rule-filter"
             @update:model-value="onRuleFilter"
           >
-            <OToggleGroupItem value="all" size="xs">{{
+            <OToggleGroupItem value="all">{{
               t("alertCalibration.detail.filterAll")
             }}</OToggleGroupItem>
             <OToggleGroupItem
               v-for="rule in rulesOfVersion(version)"
               :key="rule"
               :value="rule"
-              size="xs"
               :disabled="!presentRules.includes(rule)"
             >
               {{ t(ruleLabelKey(rule, version)) }}
@@ -123,25 +113,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alertCalibration.detail.perSubjectNote") }}
         </OText>
         <div class="flex flex-col gap-3">
-          <OBanner
+          <OInlineNotice
             v-if="dismissals.unknown.value"
-            variant="error"
-            icon="error"
-            inline-actions
+            tone="err"
             data-test="alert-calibration-digest-states-unknown"
           >
             {{ t("alertCalibration.dismiss.statesUnknown") }}
             <template #actions>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 data-test="alert-calibration-digest-states-retry"
                 @click="dismissals.query.refetch()"
               >
                 {{ t("alertCalibration.retry") }}
               </OButton>
             </template>
-          </OBanner>
+          </OInlineNotice>
           <AlertCalibrationFindingCard
             v-for="finding in visibleFindings"
             :key="finding.finding_id ?? `${finding.rule_id}:${finding.alert_id}`"
@@ -152,31 +139,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <OBanner
+      <OInlineNotice
         v-else-if="run.finding_count === null"
-        variant="warning"
+        tone="warn"
         data-test="alert-calibration-digest-counts-pending"
       >
         {{ visibilityCopy(t, run).pending.banner }}
-      </OBanner>
+      </OInlineNotice>
 
       <OEmptyState
         v-else-if="isQuiet(run, uncheckedSkips)"
-        size="block"
-        :illustration="isScoped(run) ? 'radar' : 'check'"
+        :icon="isScoped(run) ? 'radar' : 'task-alt'"
         :title="t('alertCalibration.detail.nothingTitle')"
-        :description="visibilityCopy(t, run).nothingDescription"
-        hide-action
+        :text="visibilityCopy(t, run).nothingDescription"
         data-test="alert-calibration-digest-clean"
       />
 
       <OEmptyState
         v-else
-        size="block"
-        illustration="radar"
+        icon="radar"
         :title="t('alertCalibration.detail.noneFoundTitle')"
-        :description="noneFoundReason"
-        hide-action
+        :text="noneFoundReason"
         data-test="alert-calibration-digest-none-found"
       />
 
@@ -213,17 +196,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             })
           }}</span>
         </OText>
-        <OCard v-if="flatSkips.length" variant="glass">
-          <OCardSection role="body" class="flex flex-col gap-1.5 py-2">
+        <OCard v-if="flatSkips.length">
+          <div class="flex flex-col gap-1.5">
             <div
               v-for="{ skip, detail } in skipRows"
               :key="skipKey(skip)"
               class="flex min-w-0 flex-wrap items-baseline gap-x-2"
               data-test="alert-calibration-digest-skip"
             >
-              <OBadge variant="default-outline" size="sm" shape="rounded">{{
-                ruleLabel(skip.rule_id)
-              }}</OBadge>
+              <OBadge tone="outline" size="sm">{{ ruleLabel(skip.rule_id) }}</OBadge>
               <span class="text-text-body text-xs font-medium">{{
                 skip.alert_name ?? skip.alert_id
               }}</span>
@@ -236,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ detail }}</OText
               >
             </div>
-          </OCardSection>
+          </div>
         </OCard>
         <OText v-if="omittedRoutine > 0" variant="meta" as="div">
           {{
@@ -256,12 +237,11 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -480,7 +460,7 @@ const stats = computed<StatItem[]>(() => {
       ...countTile(r.finding_count, locale.value),
       sub: t(verdict.labelKey),
       icon: "fact-check",
-      tone: hasFindings.value ? "warning" : "neutral",
+      tone: hasFindings.value ? "warn" : "neutral",
     },
     {
       key: "scope",
@@ -503,6 +483,11 @@ const stats = computed<StatItem[]>(() => {
       key: "window",
       label: t("alertCalibration.detail.statWindow"),
       value: formatMinutes(t, windowMinutes),
+      sub: t("alertCalibration.detail.subtitle", {
+        start: formatDay(r.window_start),
+        end: formatDay(r.window_end),
+        time: formatAgo(r.emitted_at),
+      }),
       icon: "calendar-month",
     },
   ];

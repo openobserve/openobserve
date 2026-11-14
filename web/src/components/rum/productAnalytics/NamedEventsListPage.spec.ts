@@ -284,7 +284,7 @@ describe("NamedEventsListPage (AC-44)", () => {
       "Delete the Event 0 named event? Funnels that use it will show a deleted-step tag.",
     );
     expect(q("o-dialog-primary-btn")?.textContent?.trim()).toBe("Delete");
-    expect(q("o-dialog-primary-btn")?.getAttribute("data-o2-variant")).toBe("destructive");
+    expect(q("o-dialog-primary-btn")?.getAttribute("data-o2-variant")).toBe("danger");
     expect(api.service.deleteEvent).not.toHaveBeenCalled();
     await answerDelete(true);
     expect(api.service.deleteEvent.mock.calls).toEqual([["org1", "web", ev.id, false]]);
@@ -377,7 +377,7 @@ describe("NamedEventsListPage (AC-44)", () => {
     expect(confirmMock.mock.calls[0][0].message).toBe(
       "Delete 2 named events? Saved funnels will show a Deleted event step for: Event 1 (Signup).",
     );
-    expect(confirmMock.mock.calls[0][0].confirmVariant).toBe("destructive");
+    expect(confirmMock.mock.calls[0][0].kind).toBe("destructive");
     expect(api.service.deleteEvent.mock.calls).toEqual([
       ["org1", "web", a.id, false],
       ["org1", "web", b.id, true],

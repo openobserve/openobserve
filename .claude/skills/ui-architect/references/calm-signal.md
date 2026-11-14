@@ -38,19 +38,21 @@ All token-backed and dark-mode-safe. Reuse these before inventing anything.
   KPI-tile primitive** — new stat tiles use this, never a hand-rolled tile or the
   legacy `KpiCard`/`KpiCardRow` (being migrated onto `OStatStrip`). A row of KPI
   tiles at the top of a list/dashboard. Data-driven via `:items`
-  (`{ key, label, value, icon, tone, max?, trend?, selectable?, dataTest }`);
-  `tone` (`success | warning | error | primary | info | orange | neutral`) is the
-  single colour knob. Pass `:loading` so values hold a skeleton until the first
-  load lands instead of reading "0" (copy-and-values.md § Loading is not zero).
-  `max` draws a proportion bar (share of total). The tone icon
-  sits in a **rounded-square chip** (`rounded-default`) — every icon chip in the
-  app is a rounded square, never a circle (`rounded-full`). A strip has three
-  looks, picked by its job: **filter chips** (`selectable`: counts that filter the
-  table), an **inline KPI line** (`inline`: read-only counts in a toolbar row), and
-  **cards** (read-only overview tiles, or `selectable :tray="false"` tiles that
-  navigate). Compose `<OStatCard>` directly (with the `#chart` slot) for sparklines
-  on overviews. See **Summary-strip conventions** below for placement, selection
-  and overflow.
+  (`{ key, label, value, icon, tone, max?, delta?, selectable?, all?, dataTest }`);
+  `tone` (`neutral | ok | warn | err | crit | info` — status only, C2) is the
+  single colour knob, applied only while the value is above 0. Pass `:loading` so
+  values hold a skeleton until the first load lands instead of reading "0"
+  (copy-and-values.md § Loading is not zero); a failed load passes `value: null`
+  ("—"), never `0` (C4). The 3 px proportion track is always drawn; `max` fills it
+  (share of total). The tone icon sits in a **rounded-square chip**
+  (`rounded-default`) — every icon chip in the app is a rounded square, never a
+  circle (`rounded-full`). Set `selectable` + `:selected-key` + `@select` to make
+  tiles **double as filters** (F7); add `multiple` with `:selected-keys` +
+  `@update:selected-keys` when picks OR together. Compose
+  `<OStatCard>` directly (with the `#chart` slot) for sparklines on overviews.
+  Place it via `OTable`'s **`#subheader`** slot (wrapped in
+  `px-page-edge py-1.5 border-b border-table-row-divider`) to sit below the
+  search/tabs. See **Summary-strip conventions** below for ordering + selection.
 - **Status / category chips** — `OTag` with a `type=` group from
   `badgeGroups.ts` (`alertStatus`, `alertType`, `severity`, `streamType`,
   `userRole`, `serviceStatus`, …). One registry → the same value is the same
@@ -59,24 +61,38 @@ All token-backed and dark-mode-safe. Reuse these before inventing anything.
   back to a generic chip) — and don't set `size` on the group: a group-level size
   silently overrides the call sites, so its chips end up a different size from the
   Status chip beside them. Pass `size` at the call site, matching its siblings.
+  Chip tones are `neutral | outline | accent | ok | warn | err | crit | info`;
+  categories are `neutral` or `outline`, never a decorative hue (C1), and a status
+  tone always carries a dot or an icon (C2). Priorities use `OPriority` (weight, not
+  hue) and log levels `OSeverity`.
 - **Row state signal** — an extreme-left colour **rail** via `OTable`'s
-  per-row `getRowStyle` (inset box-shadow, rem width, token colour) + a **light
-  exception highlight** via `row-class`. The rail and the wash are two different
-  strengths of the same signal, and the rail is the default:
+  `rowRailTone` (token tone per state) or per-row `getRowStyle` (inset box-shadow,
+  rem width, token colour) + a **light exception highlight** via `rowState` (C3).
+  The rail and the wash are two different strengths of the same signal, and the
+  rail is the default:
 
-  |         | Rail (`getRowStyle`)     | Wash (`row-class`)       |
-  | ------- | ------------------------ | ------------------------ |
-  | Cost    | a few px at the row edge | ~the whole row           |
-  | Use for | **every** state, always  | only the two cases below |
+  |         | Rail (`rowRailTone` / `getRowStyle`) | Wash (`rowState`)        |
+  | ------- | ------------------------------------ | ------------------------ |
+  | Cost    | a few px at the row edge             | ~the whole row           |
+  | Use for | **every** state, always              | only the two cases below |
+
+  `rowState` returns `"exception"` (error rail + error wash), `"warn"` (warning
+  rail, no wash), `"paused"` (recedes), `"recent"` (a soft tint for what just
+  arrived) or `null`. A page that draws its own rail keeps it, and the state adds
+  only its fill; selection paints over the fill. No `!important` row class.
 
   A full-row wash is the loudest thing on a list, so it earns its place only when
   **all three** hold: the state means **act now** (not merely "not green"), it is
   **rare in a healthy system**, and **the row is the unit of action**. In practice
   that leaves exactly two washes:
-  - `!bg-status-error-bg` — failing/errored/offline. _Alerts_ failed, _Pipelines_
-    errored, _Nodes_ offline, _Synthetics_ failed.
-  - `!bg-surface-panel` — paused/disabled. This one is **de-emphasis, not alarm**:
-    the row is deliberately inert, so it recedes rather than shouts.
+  - `rowState` `"exception"` (the error wash) — failing/errored/offline. _Alerts_
+    failed, _Pipelines_ errored, _Nodes_ offline, _Synthetics_ failed.
+  - `rowState` `"paused"` (the panel fill) — paused/disabled. This one is
+    **de-emphasis, not alarm**: the row is deliberately inert, so it recedes
+    rather than shouts.
+
+  Lists that still pass `!bg-status-error-bg` / `!bg-surface-panel` through
+  `row-class` predate `rowState`; move them when you next touch the page.
 
   Everything else keeps a clean row and reads from the rail — including states
   that are "bad but not urgent": **degraded/warning** (worth noticing, not worth
@@ -99,84 +115,53 @@ Reference implementation of most of the above: the Alerts list,
 
 ### Summary-strip conventions
 
-A strip that filters the table is a row of **filter chips**: icon, label and a
-count badge, one click each. Reference: the Pipelines and Alerts lists
-([PipelinesList.vue](../../../web/src/components/pipeline/PipelinesList.vue)).
+Once a strip is `selectable`, four rules keep every strip behaving identically
+(reference strips: Alerts, Incidents, Eval Jobs):
 
-```vue
-<!-- #toolbar, right after the search box -->
-<OStatStrip
-  :items="summaryStats"
-  :loading="loading"
-  selectable
-  multiple
-  :row="false"
-  :selected-keys="stateFilters"
-  default-key="total"
-  class="max-md:order-last"
-  data-test="pipeline-list-summary"
-  @update:selected-keys="stateFilters = $event"
-/>
-```
-
+- **Order attention-first, left → right.** The most critical / attention-worthy
+  tile is leftmost, descending to the calm/inert ones — e.g. `failed → recent →
+active → paused`, `P1 → P2 → P3 → P4`, `degraded → paused → active → draft →
+archived`. This mirrors the row rail's "critical colour on the left edge": what
+  needs attention lives on the left, everywhere.
+- **The "All" / "Total" tile is LAST, stays CLICKABLE, and is never highlighted.**
+  Give it the key `all` (or `all: true`): the strip then emits `null` for it and
+  never draws it selected. Wire `:selected-key` to the _raw filter value_ (`null`
+  when unfiltered). `defaultKey` is gone (F7). **Never put `selectable: false` on
+  it** — that turns it into a read-out, so the strip has no way back to
+  unfiltered; `selectable: false` is only for a tile with no matching filter.
+- **Selection toggles off.** The strip emits `null` when the selected tile is
+  clicked again, so the handler is just `filter = key` (`@select="filter = $event"`).
+- **Selected state is an accent border, not a fill** — the `OStatCard` default;
+  there is no tray look (C6, Step 3).
 - **Stats and filters are one control.** Never a stat row plus a separate filter
-  dropdown for the same facet, never a tab strip (tabs switch views, they don't
-  filter), never a grey tray behind the chips.
-- **Multi-select, OR'ed.** Filter chips are `multiple`: a click toggles that chip,
-  and rows matching ANY picked chip show. State is a `string[]` (empty means
-  unfiltered), filtered with `matchesAnyKey` from
+  select for the same facet, and never a tab strip (tabs switch views, they don't
+  filter).
+- **Multi-select ORs.** With `multiple`, a click toggles that tile and rows matching
+  ANY picked tile show; "All" and Esc empty the selection. State is a `string[]`
+  (empty means unfiltered), filtered with `matchesAnyKey` from
   [utils/filterKeys.ts](../../../web/src/utils/filterKeys.ts). A filter kept in the
   URL or view state is read with `readFilterKeys` (it still accepts an old single
-  value) and written with `filterKeysToQuery`. Stay single-select only when the
-  backend takes one value and can't OR, or when the chips split the whole set
-  (picking both equals All).
-- **The reset chip comes FIRST and carries the total.** Its item is the
-  `default-key`; it reads as selected (quietly) while nothing is picked, and a
-  click empties the selection. There is **no Clear button**: the reset chip and Esc
-  do that. Never put `selectable: false` on it (that turns it into a `<div>` and
-  leaves no way back to unfiltered).
-- **Name the reset chip as a filter, not a stat.** "All", never "Total" ("Total"
-  is a read-out). When another "All" sits beside it (a type toggle), name the chip
-  by its facet, "All states" / "All statuses" (`common.allStates`,
-  `common.allStatuses`), and leave the toggle's "All" as it is.
-- **Then attention-first, left → right.** After the reset chip, the most critical
-  chip is leftmost, descending to the calm ones (`failed → firing → … → paused`,
-  `P1 → P4`). This mirrors the row rail's critical colour on the left edge.
-- **Placement: the search row.** Put the strip in `OTable`'s `#toolbar` right
-  after the search (and any filter beside it), before refresh, with `:row="false"`,
-  as a direct flex child of the toolbar (page wrappers are `contents`). Search is
-  `flex-1` with a `md:min-w-48` floor and **no desktop max-width**, so it fills the
-  row. The strip stays beside search only when **every** chip fits; otherwise it
-  takes its own full-width toolbar line under refresh (`useInlineFit` decides;
-  phones are always own-line). Never squeeze chips into a sliver.
-- **Overflow scrolls on one line, never wraps.** When even the full line is too
-  narrow, the chips scroll sideways: a flat edge block with a plain chevron and a
-  surface fade shows only on the side that can scroll, and the chips never shift.
-  Touch swipe, trackpad and mouse wheel all scroll it. Don't add your own arrows.
-- **Size and look come from the component.** Chips are 32px, the height of the
-  search box and toolbar buttons. Selected is an accent border plus soft fill with
-  a primary count badge; error/warning chips with a count above 0 get a tinted
-  badge. The tooltip says what a click does ("Show only / Also show / Stop
-  showing …").
-- **Read-only counts are not chips.** Info-only stats above a list are an `inline`
-  KPI line (icon · value · label, no border, no hover) in the toolbar row, or their
-  own compact `row` above the table header when the toolbar is full (DB
-  monitoring). A strip whose only clickable item would be the reset chip renders
-  as KPIs. Overview/dashboard tiles stay cards; tiles that **navigate** use
-  `selectable :tray="false"` cards, not chips.
-- **A strip in the table toolbar is a CLAIM ABOUT THE ROWS — scope decides position.**
+  value) and written with `filterKeysToQuery`. Stay single-select when the backend
+  takes one value and can't OR, or when the tiles split the whole set (picking both
+  equals All).
+- **Name the reset tile as a filter, not a stat.** "All", never "Total" ("Total" is a
+  read-out). When another "All" sits beside it (a type toggle), name the tile by its
+  facet, "All states" / "All statuses" (`common.allStates`, `common.allStatuses`).
+- **The tooltip says what a click does** ("Show only / Also show / Stop showing …");
+  the strip sets it. A strip whose only filter would be "All" renders display-only.
+- **A strip in `#subheader` is a CLAIM ABOUT THE ROWS — scope decides position.**
   Inside the table frame, a strip promises "these numbers describe the list below",
   so it must be computed from the same filtered set _and_ be facet-clickable. Before
   writing one, check the fetch: **if the list is server-paginated you only hold one
   page**, so page-local sums are not totals — never sum the visible page and label
   it "Total". When the numbers genuinely can't meet the promise (server pagination,
   or totals that come from a different, wider endpoint such as an org-summary API),
-  do **not** put them in the table toolbar — lift them to the page level as a read-only
+  do **not** put them in `#subheader` — lift them to the page level as a read-only
   strip in `OPageLayout`'s **`#subnav`**, where they read as page context instead of
   a row summary, and label them for their real scope ("Total Streams", not
   "Streams"). What stays honest under pagination is anything derived from the single
   row in front of you: relative recency, a state rail, a per-row ratio. Reference:
-  Alerts (client-side list → filter chips in the toolbar) vs Streams
+  Alerts (client-side list → filterable `#subheader` strip) vs Streams
   (server-paginated list → org footprint in `#subnav`).
 - **`ODataBarCell` needs the whole set — client-paginated tables only.** Its bar is
   a share of the `max` the caller computes over the rendered rows, so on a
@@ -231,7 +216,7 @@ Colour only earns attention if most of the screen stays quiet:
     tile is a label with a number stuck to it;
   - _almost always zero_ — "New this week" on a list that gains an item a quarter;
   - _derivable from its neighbours_ — "In use" beside "Unused" and "Total";
-  - _already in the footer_ — the pager prints "x – y of N" under every table,
+  - _already in the footer_ — the pager prints "1–20 of 143" under every table,
     so a Total tile alone is not a reason to have a strip.
     A page whose only candidates fail these gets **no strip** — keep the per-row
     signals (relative recency, a state rail, a count column) and stop. Dashboards,
@@ -260,7 +245,7 @@ Colour only earns attention if most of the screen stays quiet:
 
 ## Per-archetype quick recipe
 
-- **Monitoring** → `OStatStrip` filter chips (state counts) in the `#toolbar`;
+- **Monitoring** → `OStatStrip` (state counts, filter tiles) in `#subheader`;
   `OTag` status chips; row rail + exception tint; relative recency. _(Alerts.)_
 - **Catalog** → `OStatStrip` counting totals (Total · Folders · Favourites ·
   Updated-this-week, `max` optional); category `OTag` (folder/type/language);

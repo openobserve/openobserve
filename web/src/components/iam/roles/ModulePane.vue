@@ -19,27 +19,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageHeader
       :title="trail[trail.length - 1]"
       title-data-test="edit-role-module-pane-title"
-      :icon="backTarget ? undefined : icon"
+      :context="context"
       :back="backTarget"
     >
-      <template #title-trail>
-        <OBadge v-if="grantedRowCount" variant="primary-soft" size="sm">
+      <template #status>
+        <OBadge v-if="grantedRowCount" tone="accent" size="sm">
           {{ t("iam.editRole.moduleGrantedCount", { count: grantedRowCount }) }}
         </OBadge>
-        <OBadge
-          v-if="added"
-          variant="success-soft"
-          size="sm"
-          data-test="edit-role-module-pane-added"
-        >
+        <OBadge v-if="added" tone="ok" size="sm" data-test="edit-role-module-pane-added">
           {{ t("iam.editRole.modulePendingAdded", { count: added }) }}
         </OBadge>
-        <OBadge
-          v-if="removed"
-          variant="error-soft"
-          size="sm"
-          data-test="edit-role-module-pane-removed"
-        >
+        <OBadge v-if="removed" tone="err" size="sm" data-test="edit-role-module-pane-removed">
           {{ t("iam.editRole.modulePendingRemoved", { count: removed }) }}
         </OBadge>
       </template>
@@ -53,9 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2"
     >
       <OSearchInput
+        width="list"
         :model-value="query"
-        clearable
-        class="w-72 max-md:w-full"
+        class="max-md:w-full"
         :placeholder="
           listsModules
             ? t('iam.editRole.filterModulesTasks')
@@ -68,14 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="scope"
         @update:model-value="(value) => setFilter(query, String(value ?? 'all'))"
       >
-        <OToggleGroupItem value="all" size="sm" data-test="edit-role-module-pane-filter-all">
+        <OToggleGroupItem value="all" data-test="edit-role-module-pane-filter-all">
           {{ t("iam.editRole.moduleScopeAll") }}
         </OToggleGroupItem>
-        <OToggleGroupItem
-          value="granted"
-          size="sm"
-          data-test="edit-role-module-pane-filter-granted"
-        >
+        <OToggleGroupItem value="granted" data-test="edit-role-module-pane-filter-granted">
           {{ t("iam.editRole.moduleScopeGranted") }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -88,9 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="rowKey"
         :default-columns="false"
-        :show-global-filter="false"
         :row-class="(row: PaneRow) => (row.kind === 'scope' ? 'bg-surface-subtle' : '')"
-        dense
         :fill-height="!noResources"
         :key="paginationMode"
         :pagination="paginationMode"
@@ -117,9 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Pulled back by its own padding, so the name lines up with the column title and plain rows. -->
             <OButton
-              variant="ghost-primary"
-              size="sm"
-              icon-right="chevron-right"
+              variant="accent-ghost"
+              icon-end="chevron-right"
               class="-ms-3 min-w-0"
               :data-test="`edit-role-module-pane-open-${row.node.name}`"
               @click="emit('open', row.node)"
@@ -132,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               side="right"
             >
               <OBadge
-                variant="default-soft"
+                tone="neutral"
                 size="sm"
                 tabindex="0"
                 :data-test="`edit-role-module-pane-inside-${row.node.name}`"
@@ -169,11 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-if="noResources"
         class="flex-1"
-        size="block"
-        preset="no-data"
-        hide-action
         :title="t('iam.editRole.moduleHasNoResources')"
-        :description="t('iam.editRole.moduleHasNoResourcesHint')"
+        :text="t('iam.editRole.moduleHasNoResourcesHint')"
         data-test="edit-role-module-pane-no-resources"
       />
     </div>
@@ -191,8 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         listsModules ? t("iam.editRole.noGrantedModule") : t("iam.editRole.noMatchingResources")
       }}</span>
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="edit-role-module-pane-clear-filter"
         @click="clearFilter"
       >
@@ -211,7 +191,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ModulePaneBulkHeader from "@/components/iam/roles/ModulePaneBulkHeader.vue";
 import { GROUP_LABEL_KEYS, matchModule, moduleGroup } from "@/components/iam/roles/roleModules";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -252,7 +231,8 @@ const props = defineProps<{
   isPendingRemoval: (node: any, action: string) => boolean;
   added?: number;
   removed?: number;
-  icon?: IconName;
+  /** The role being edited, shown above the module name while no parent level offers a back link. */
+  context?: I18nText;
   /** Rows are whole modules (All Modules view): each action header gets a select-all box, and every row opens its module. */
   listsModules?: boolean;
 }>();

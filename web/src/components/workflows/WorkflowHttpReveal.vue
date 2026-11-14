@@ -16,12 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="workflow-http-reveal" data-o2-privacy="mask" class="flex flex-col gap-4">
-    <OBanner variant="success" icon="check-circle" data-test="workflow-http-reveal-banner">
+    <OInlineNotice tone="ok" data-test="workflow-http-reveal-banner">
       <div class="flex flex-col gap-1">
         <OText variant="body-strong">{{ bannerTitle }}</OText>
         <OText variant="meta" as="p" class="leading-snug">{{ bannerBody }}</OText>
       </div>
-    </OBanner>
+    </OInlineNotice>
 
     <WorkflowHttpUrl
       v-if="config && !rotated"
@@ -35,10 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :code="secret"
         :code-masked="maskedSecret"
         lang="text"
-        padded
-        :reveal-tooltip="t('ingestion.setupCard.revealToken')"
-        :hide-tooltip="t('ingestion.setupCard.hideToken')"
-        :copy-message="isSigned ? t('workflow.http.secretCopied') : t('workflow.http.tokenCopied')"
         data-test="workflow-http-token"
         data-o2-privacy="mask"
       />
@@ -71,9 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!rotated && refusal !== 'draft'" class="flex flex-wrap items-center gap-3">
       <OButton
         v-if="!isSigned"
-        variant="outline"
-        size="sm-action"
-        icon-left="send"
+        variant="secondary"
+        icon="send"
         :loading="sending"
         data-test="workflow-http-send-test"
         @click="send"
@@ -104,8 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OText v-if="accepted" variant="meta">{{ resultMeta }}</OText>
           <OButton
             v-if="refusedByState && canRunTestHere"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             data-test="workflow-http-run-test-instead"
             @click="emit('run-test')"
           >
@@ -114,11 +109,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OCollapsible
           v-if="result.input"
-          :label="t('workflow.http.dryRunInput')"
+          :title="t('workflow.http.dryRunInput')"
           default-open
           data-test="workflow-http-test-input"
         >
-          <OCodeBlock :code="inputText" lang="json" padded wrap />
+          <OCodeBlock :code="inputText" lang="json" wrap />
         </OCollapsible>
       </template>
     </div>
@@ -126,12 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <slot />
 
     <div class="flex justify-end">
-      <OButton
-        variant="primary"
-        size="sm-action"
-        data-test="workflow-http-reveal-done"
-        @click="endReveal"
-      >
+      <OButton variant="primary" data-test="workflow-http-reveal-done" @click="endReveal">
         {{ t("workflow.http.done") }}
       </OButton>
     </div>
@@ -141,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";

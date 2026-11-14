@@ -25,13 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="ai-datasets-page"
     :title="t('aiObservability.nav.datasets')"
-    :subtitle="t('aiObservability.subtitle.datasets')"
-    icon="table-chart"
+    :about="t('aiObservability.subtitle.datasets')"
     bleed
     :scroll="false"
   >
     <template #actions>
-      <OButton variant="primary" size="sm" data-test="ai-datasets-new-btn" @click="openCreate">
+      <OButton variant="primary" data-test="ai-datasets-new-btn" @click="openCreate">
         {{ t("aiObservability.datasets.newButton") }}
       </OButton>
     </template>
@@ -39,27 +38,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="bg-card-glass-bg flex h-full min-h-0 flex-col" data-test="ai-datasets-list-page">
       <OTable
         data-test="ai-datasets-list-table"
-        :data="numberedRows"
+        :data="datasets"
         :columns="columns"
         row-key="id"
         :loading="loading"
         :forbidden="forbidden"
         @row-click="openDetail"
         :global-filter="search"
-        :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="ai-datasets-list"
-        width="100%"
         class="h-full w-full"
       >
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastUpdatedAt"
             :loading="fetching"
             data-test="ai-datasets-refresh-btn"
@@ -73,18 +68,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="min-w-0 flex-1"
             :placeholder="t('aiObservability.datasets.searchPlaceholder')"
             data-test="ai-datasets-list-search-input"
-            clearable
           />
         </template>
 
         <template #empty>
           <div class="flex items-center justify-center py-8">
             <OEmptyState
-              size="hero"
-              preset="no-datasets"
-              :filtered="Boolean(search)"
+              :kind="search ? 'filtered' : 'first-run'"
+              :title="
+                search
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+                  : t('emptyState.noDatasets.title')
+              "
+              :text="
+                search
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.filtered.fallbackNoun'),
+                    })
+                  : t('emptyState.noDatasets.description')
+              "
+              :icon="search ? undefined : 'database'"
               data-test="ai-datasets-empty-state"
-              @action="openCreate"
+              :action-label="search ? undefined : t('emptyState.noDatasets.action')"
+              @action="search ? (search = '') : openCreate()"
             />
           </div>
         </template>
@@ -100,13 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex flex-nowrap items-center gap-1"
             :tooltip="tagsLabel(row.tags)"
           >
-            <OTag
-              v-for="tag in row.tags"
-              :key="tag"
-              variant="default-soft"
-              shape="rounded"
-              class="shrink-0"
-            >
+            <OTag v-for="tag in row.tags" :key="tag" tone="neutral" class="shrink-0">
               {{ tag }}
             </OTag>
           </OTruncatedText>
@@ -119,14 +119,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex flex-nowrap items-center gap-1.5"
             :tooltip="sourcesLabel(row)"
           >
-            <OTag variant="blue-soft" :count="row.sources.trace">
+            <OTag tone="neutral">
               {{ t("aiObservability.datasets.source.trace") }}
+              <template #trailing>{{ row.sources.trace }}</template>
             </OTag>
-            <OTag variant="purple-soft" :count="row.sources.annotation">
+            <OTag tone="neutral">
               {{ t("aiObservability.datasets.source.annotation") }}
+              <template #trailing>{{ row.sources.annotation }}</template>
             </OTag>
-            <OTag variant="orange-soft" :count="row.sources.manual">
+            <OTag tone="neutral">
               {{ t("aiObservability.datasets.source.manual") }}
+              <template #trailing>{{ row.sources.manual }}</template>
             </OTag>
           </OTruncatedText>
         </template>
@@ -146,9 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <div class="actions-container flex items-center justify-center">
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="edit"
+              icon="edit"
               class="max-md:hidden"
               :data-test="`ai-datasets-edit-${row.id}`"
               @click.stop="openEdit(row)"
@@ -156,9 +159,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="bottom" :content="t('common.edit')" />
             </OButton>
             <OButton
-              variant="ghost-destructive"
-              size="icon-sm"
-              icon-left="delete"
+              icon-only
+              variant="danger-ghost"
+              icon="delete"
               class="max-md:hidden"
               :data-test="`ai-datasets-delete-${row.id}`"
               @click.stop="removeDataset(row)"
@@ -168,17 +171,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  icon-only
                   :aria-label="t('common.moreActions')"
-                  icon-left="more-vert"
+                  icon="more-vert"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   data-test="ai-datasets-row-more-actions"
                   @click.stop
                 />
               </template>
               <ODropdownItem
-                icon-left="edit"
+                icon="edit"
                 class="md:hidden"
                 :data-test="`ai-datasets-edit-${row.id}-menu`"
                 @select="openEdit(row)"
@@ -186,8 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{ t("common.edit") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
+                icon="delete"
+                tone="danger"
                 class="md:hidden"
                 :data-test="`ai-datasets-delete-${row.id}-menu`"
                 @select="removeDataset(row)"
@@ -203,16 +207,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODrawer
       v-model:open="createOpen"
       side="right"
-      size="lg"
+      size="md"
       :title="
         editingId
           ? t('aiObservability.datasets.editTitle')
           : t('aiObservability.datasets.create.title')
       "
       form-id="new-dataset-form"
-      :primary-button-label="t('common.save')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-loading="isSubmitting"
+      :primary="{ label: t('common.save'), loading: isSubmitting }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="ai-datasets-create-drawer"
       @click:secondary="createOpen = false"
     >
@@ -295,7 +298,6 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState } from "@/utils/featureGate";
-import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
 
@@ -353,17 +355,7 @@ const forbidden = computed(() => {
 });
 const search = ref("");
 
-const numberedRows = useNumberedRows(datasets);
-
 const columns = computed<OTableColumnDef[]>(() => [
-  {
-    id: "#",
-    header: raw("#"),
-    accessorKey: "#",
-    sortable: false,
-    size: 56,
-    meta: { align: "left" },
-  },
   {
     id: "name",
     header: t("aiObservability.datasets.columns.name"),
@@ -519,7 +511,7 @@ async function removeDataset(row: LlmDataset) {
     messageName: row.name,
     confirmLabel: t("common.delete"),
     cancelLabel: t("common.cancel"),
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (!ok) return;
   try {

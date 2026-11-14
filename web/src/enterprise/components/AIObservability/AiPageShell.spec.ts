@@ -9,9 +9,9 @@ import AiPageShell from "./AiPageShell.vue";
 // event forwarding) rather than the internals of the shared components —
 // those are covered by their own specs.
 const OPageLayout = {
-  props: ["dataTest", "title", "subtitle", "icon", "bleed", "scroll"],
+  props: ["dataTest", "title", "about", "bleed", "scroll"],
   template:
-    '<div class="o-page-layout" :data-test="dataTest" :data-title="title" :data-subtitle="subtitle" :data-icon="icon"><slot name="actions" /><slot name="subnav" /><slot /></div>',
+    '<div class="o-page-layout" :data-test="dataTest" :data-title="title" :data-about="about"><slot name="actions" /><slot name="subnav" /><slot /></div>',
 };
 const DateTime = {
   props: {
@@ -36,7 +36,7 @@ const AiLastRefreshed = {
     '<span class="ai-last-refreshed" :data-test="dataTest" :data-loading="loading" :data-last-run-at="lastRunAt" />',
 };
 
-const stubs = { OPageLayout, DateTime, AiLastRefreshed };
+const stubs = { OPageLayout, ODateTimeRange: DateTime, AiLastRefreshed };
 
 const baseDateState = {
   valueType: "relative" as const,
@@ -48,8 +48,7 @@ const baseDateState = {
 const baseProps = {
   dataTest: "ai-agent-behavior",
   title: "Agent Behavior",
-  subtitle: "Understand agent behavior",
-  icon: "troubleshoot",
+  about: "Understand agent behavior",
   dateState: baseDateState,
   lastRunAt: 1234,
   isLoading: false,
@@ -63,13 +62,12 @@ const mountShell = (overrides: Record<string, unknown> = {}, slots: Record<strin
   });
 
 describe("AiPageShell", () => {
-  it("renders the page layout with the title/subtitle/icon and the exact page data-test (`${dataTest}-page`)", () => {
+  it("renders the page layout with the title/about and the exact page data-test (`${dataTest}-page`)", () => {
     const w = mountShell();
     const layout = w.find('[data-test="ai-agent-behavior-page"]');
     expect(layout.exists()).toBe(true);
     expect(layout.attributes("data-title")).toBe("Agent Behavior");
-    expect(layout.attributes("data-subtitle")).toBe("Understand agent behavior");
-    expect(layout.attributes("data-icon")).toBe("troubleshoot");
+    expect(layout.attributes("data-about")).toBe("Understand agent behavior");
   });
 
   it("derives the date-time and refresh data-test values from the dataTest prefix", () => {
@@ -105,7 +103,7 @@ describe("AiPageShell", () => {
 
   it("forwards the date-time on:date-change as a date-change event", async () => {
     const w = mountShell();
-    expect(w.find(".date-time").classes()).toContain("h-8");
+    expect(w.find(".date-time").classes()).not.toContain("h-8");
     await w.find(".date-time").trigger("click");
     expect(w.emitted("date-change")).toBeTruthy();
     expect(w.emitted("date-change")![0][0]).toEqual({ valueType: "relative" });

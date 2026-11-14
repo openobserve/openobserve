@@ -1046,6 +1046,36 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "the copy bubble's label is painted on the bubble's own inverse fill",
   },
   {
+    fg: "--color-toast-inverse-text",
+    bg: "--color-toast-inverse-bg",
+    category: "text",
+    why: "a toast's message is painted on the toast's own inverse fill",
+  },
+  {
+    fg: "--color-toast-inverse-text-secondary",
+    bg: "--color-toast-inverse-bg",
+    category: "text",
+    why: "a toast's count and dismiss glyph sit on the toast's inverse fill",
+  },
+  {
+    fg: "--color-toast-inverse-icon",
+    bg: "--color-toast-inverse-bg",
+    category: "non-text",
+    why: "a neutral toast's kind icon sits on the toast's inverse fill",
+  },
+  {
+    fg: "--color-toast-inverse-icon-ok",
+    bg: "--color-toast-inverse-bg",
+    category: "non-text",
+    why: "a success toast's kind icon sits on the toast's inverse fill",
+  },
+  {
+    fg: "--color-toast-inverse-icon-err",
+    bg: "--color-toast-inverse-bg",
+    category: "non-text",
+    why: "an error toast's kind icon sits on the toast's inverse fill",
+  },
+  {
     fg: "--color-dag-node-agent-text",
     bg: "--color-dag-node-agent-bg",
     category: "text",

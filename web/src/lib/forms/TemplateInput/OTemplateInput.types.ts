@@ -42,7 +42,7 @@ export interface TemplateSuggestProps<T extends TemplateSuggestion> {
 // Each omitted key makes the caret and the emitted text disagree, so the list cannot support it.
 export interface TemplateInputProps<T extends TemplateSuggestion>
   extends
-    Omit<InputProps, "modelValue" | "type" | "debounce" | "mask" | "modelModifiers" | "revealable">,
+    Omit<InputProps, "modelValue" | "type" | "debounce" | "mask" | "modelModifiers">,
     TemplateSuggestProps<T> {
   /** `selectionStart` is `null` on every other input type. */
   type?: "text" | "url";

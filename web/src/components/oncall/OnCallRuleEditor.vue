@@ -20,10 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="title"
-    :primary-button-label="t('oncall.saveRule')"
-    :secondary-button-label="t('oncall.cancel')"
-    :primary-button-disabled="!!saveProblem || !!duplicateOf"
-    :primary-button-loading="saving"
+    :primary="{
+      label: t('oncall.saveRule'),
+      disabled: !!saveProblem || !!duplicateOf,
+      loading: saving,
+    }"
+    :secondary="{ label: t('oncall.cancel') }"
     data-test="oncall-rule-editor"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:primary="save"
@@ -36,10 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('oncall.ruleEditorStartFrom')"
         :options="startOptions"
         :placeholder="t('oncall.ruleEditorStartPlaceholder')"
-        size="sm"
         searchable
         icon-key="icon"
-        :dropdown-style="START_PICKER_DROPDOWN_STYLE"
         data-test="oncall-rule-editor-signals"
         @update:model-value="startFrom"
       >
@@ -96,13 +96,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #link>
             <OButton
-              as="a"
               :href="fieldGroupsHref"
               target="_blank"
               rel="noopener noreferrer"
-              variant="ghost-primary"
-              size="xs"
-              icon-right="open-in-new"
+              variant="accent-ghost"
+              size="sm"
+              icon-end="open-in-new"
               data-test="oncall-rule-editor-field-groups-link"
             >
               {{ t("oncall.ruleEditorManageFieldGroups") }}
@@ -120,7 +119,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('oncall.ruleEditorWake')"
           :options="teamOptions"
           :placeholder="t('oncall.ruleEditorWakePlaceholder')"
-          size="sm"
           searchable
           data-test="oncall-rule-editor-team"
           @update:model-value="(v: unknown) => (team = v === null ? '' : String(v))"
@@ -192,7 +190,6 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { licenseDeniedFeatures } from "@/utils/featureGate";
 import {
-  START_PICKER_DROPDOWN_STYLE,
   claimableDimensions,
   readableConditions,
   ownershipPath,

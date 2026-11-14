@@ -9,7 +9,7 @@
         value-key="value"
         :placeholder="t('aiObservability.promptManagement.traceStream')"
         searchable
-        width="sm"
+        width="s"
         data-test="prompt-traffic-stream"
       />
       <OSelect
@@ -17,7 +17,7 @@
         :options="windowOptions"
         label-key="label"
         value-key="value"
-        width="xs"
+        width="s"
         data-test="prompt-traffic-window"
       />
       <ORefreshButton :loading="loading" data-test="prompt-traffic-refresh" @click="refresh" />
@@ -25,31 +25,24 @@
 
     <OEmptyState
       v-if="error"
-      preset="load-error"
-      size="block"
-      :description="raw(error)"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="raw(error)"
       @action="refresh"
     />
     <OEmptyState
       v-else-if="!streamName"
-      size="block"
       :title="t('aiObservability.promptManagement.selectTraceStream')"
     />
 
     <template v-else>
-      <OSkeleton v-if="loading && !isDesktop" class="h-20" />
-      <ODescriptionList v-else-if="!isDesktop" dense data-test="prompt-traffic-stats">
+      <OSkeleton v-if="loading && !isDesktop" shape="block" class="h-20" />
+      <ODescriptionList v-else-if="!isDesktop" data-test="prompt-traffic-stats">
         <ODescriptionItem v-for="card in cards" :key="card.key" :label="card.label">{{
-          card.value
+          card.value ?? raw("—")
         }}</ODescriptionItem>
       </ODescriptionList>
-      <OStatStrip
-        v-else
-        :items="cards"
-        :loading="loading"
-        inline
-        data-test="prompt-traffic-stats"
-      />
+      <OStatStrip v-else :items="cards" :loading="loading" data-test="prompt-traffic-stats" />
 
       <section>
         <h4 class="text-text-heading mb-2 text-sm font-semibold">
@@ -59,7 +52,6 @@
           :data="breakdown"
           :columns="breakdownColumns"
           :row-key="(row) => JSON.stringify([row.label, row.model])"
-          :show-global-filter="false"
           pagination="none"
           :fill-height="false"
           :default-columns="false"
@@ -76,8 +68,6 @@
           :data="recent"
           :columns="recentColumns"
           row-key="id"
-          :show-global-filter="false"
-          :show-footer="false"
           :page-size="20"
           :loading="loading"
           data-test="prompt-traffic-recent"
@@ -92,7 +82,7 @@
               <OTag
                 v-for="score in row.scores"
                 :key="`${score.name}-${score.value}`"
-                variant="default-soft"
+                tone="neutral"
               >
                 {{ score.name }}: {{ score.value }}
               </OTag>
@@ -117,7 +107,7 @@
           <OTruncatedText class="text-text-heading flex-1 font-medium">{{
             entry.experiment.name
           }}</OTruncatedText>
-          <OTag v-if="entry.kind === 'content_match'" variant="default-soft">
+          <OTag v-if="entry.kind === 'content_match'" tone="neutral">
             {{ t("aiObservability.promptManagement.contentMatch") }}
           </OTag>
           <span class="text-text-secondary">{{ entry.experiment.status }}</span>
@@ -198,22 +188,22 @@ const cards = computed(() => [
   {
     key: "errorRate",
     label: t("aiObservability.promptManagement.errorRate"),
-    value: kpis.value.errorRate == null ? "—" : `${kpis.value.errorRate.toFixed(1)}%`,
+    value: kpis.value.errorRate == null ? null : `${kpis.value.errorRate.toFixed(1)}%`,
   },
   {
     key: "p50Latency",
     label: t("aiObservability.promptManagement.p50Latency"),
-    value: kpis.value.p50LatencyMs == null ? "—" : `${kpis.value.p50LatencyMs.toFixed(0)} ms`,
+    value: kpis.value.p50LatencyMs == null ? null : `${kpis.value.p50LatencyMs.toFixed(0)} ms`,
   },
   {
     key: "p95Latency",
     label: t("aiObservability.promptManagement.p95Latency"),
-    value: kpis.value.p95LatencyMs == null ? "—" : `${kpis.value.p95LatencyMs.toFixed(0)} ms`,
+    value: kpis.value.p95LatencyMs == null ? null : `${kpis.value.p95LatencyMs.toFixed(0)} ms`,
   },
   {
     key: "cost",
     label: t("aiObservability.promptManagement.cost"),
-    value: kpis.value.cost == null ? "—" : `$${kpis.value.cost.toFixed(4)}`,
+    value: kpis.value.cost == null ? null : `$${kpis.value.cost.toFixed(4)}`,
   },
 ]);
 function displayMilliseconds(value: unknown): string {

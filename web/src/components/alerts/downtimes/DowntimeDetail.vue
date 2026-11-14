@@ -18,42 +18,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     bleed
     :title="title"
-    :subtitle="subtitle"
-    icon="notifications-paused"
     :back="{
       label: t('alerts.downtimes.title'),
-      onClick: goBack,
+      to: listRoute,
       dataTest: 'downtime-detail-back',
     }"
-    tabs-below
     title-data-test="downtime-detail-title"
   >
-    <template #title>
-      <span class="inline-flex max-w-full min-w-0 items-center gap-2">
-        <span class="truncate">{{ title }}</span>
-        <BetaBadge class="shrink-0" />
-      </span>
-    </template>
-
-    <template v-if="downtime" #title-trail>
-      <OTag type="downtimeStatus" :value="downtime.status" data-test="downtime-detail-status" />
+    <template #status>
+      <BetaBadge />
+      <OTag
+        v-if="downtime"
+        type="downtimeStatus"
+        :value="downtime.status"
+        data-test="downtime-detail-status"
+      />
     </template>
 
     <template v-if="downtime" #actions-overflow>
       <OButton
         v-if="isEditable(downtime)"
-        variant="outline"
-        size="sm"
-        icon-left="edit"
+        variant="secondary"
+        icon="edit"
         data-test="downtime-detail-edit"
         @click="editDowntime"
       >
         {{ t("alerts.downtimes.actions.edit") }}
       </OButton>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="notifications-paused"
+        variant="secondary"
+        icon="notifications-paused"
         :loading="muteMutation.isPending.value"
         data-test="downtime-detail-mute-hour"
         @click="muteForHour"
@@ -70,8 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @until="extendOpen = true"
       />
       <OButton
-        variant="destructive"
-        size="sm"
+        variant="danger"
         :data-test="endsNow ? 'downtime-detail-end-now' : 'downtime-detail-cancel'"
         @click="cancelOpen = true"
       >
@@ -113,22 +106,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OEmptyState
           v-else-if="notFound"
-          size="block"
-          illustration="no-results"
+          icon="search-off"
           :title="t('alerts.downtimes.detail.notFoundTitle')"
-          :description="t('alerts.downtimes.detail.notFoundDescription')"
+          :text="t('alerts.downtimes.detail.notFoundDescription')"
           :action-label="t('alerts.downtimes.detail.backToList')"
           data-test="downtime-detail-not-found"
           @action="goBack"
         />
         <OEmptyState
           v-else-if="detailQuery.isError.value"
-          preset="load-error"
-          size="block"
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="t('emptyState.loadError.description')"
           data-test="downtime-detail-error"
           @action="detailQuery.refetch()"
         />
-        <OInnerLoading v-else :showing="detailQuery.isPending.value" size="sm" />
+        <OSkeleton v-else-if="detailQuery.isPending.value" preset="tableRows" :rows="4" />
       </div>
 
       <template v-else-if="activeTab === 'overview'">
@@ -136,8 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <h2 class="text-text-heading text-sm font-semibold">
             {{ t("alerts.downtimes.detail.details") }}
           </h2>
-          <ODescriptionList :columns="2">
-            <ODescriptionItem :label="t('alerts.downtimes.detail.condition')" stacked>
+          <ODescriptionList>
+            <ODescriptionItem :label="t('alerts.downtimes.detail.condition')">
               <OTag
                 v-if="conditionText"
                 type="downtimeTarget"
@@ -240,7 +233,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="affectedColumns"
             row-key="id"
             :fill-height="false"
-            :show-global-filter="false"
             :page-size="20"
             :page-size-options="[20, 50, 100]"
           >
@@ -276,9 +268,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ notifySentence(downtime.notifications, t) }}
             </span>
             <OButton
-              variant="outline"
-              size="sm"
-              icon-left="send"
+              variant="secondary"
+              icon="send"
               :disabled="testDestinations.length === 0"
               :loading="testMutation.isPending.value"
               data-test="downtime-detail-send-test"
@@ -292,7 +283,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="notificationColumns"
             row-key="key"
             :fill-height="false"
-            :show-global-filter="false"
             :page-size="20"
             :page-size-options="[20, 50]"
             data-test="downtime-detail-notifications-table"
@@ -307,11 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #empty>
               <div data-test="downtime-detail-notifications-empty">
-                <OEmptyState
-                  size="block"
-                  illustration="history"
-                  :title="t('alerts.downtimes.notify.log.empty')"
-                />
+                <OEmptyState icon="history" :title="t('alerts.downtimes.notify.log.empty')" />
               </div>
             </template>
           </OTable>
@@ -326,7 +312,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="historyQuery.isLoading.value"
           :loading-reset-key="id"
           :fill-height="false"
-          :show-global-filter="false"
           :page-size="20"
           :page-size-options="[20, 50, 100]"
           data-test="downtime-detail-suppressed-table"
@@ -336,11 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #empty>
             <div data-test="downtime-detail-suppressed-empty">
-              <OEmptyState
-                size="block"
-                illustration="history"
-                :title="t('alerts.downtimes.detail.noSuppressed')"
-              />
+              <OEmptyState icon="history" :title="t('alerts.downtimes.detail.noSuppressed')" />
             </div>
           </template>
         </OTable>
@@ -362,8 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : t('alerts.downtimes.confirmEndNow.ok')
       "
       :cancel-label="t('alerts.downtimes.confirmEndNow.keep')"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       @update:ok="confirmCancel"
       @update:cancel="cancelOpen = false"
     />
@@ -377,8 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : t('alerts.downtimes.confirmCancel.message')
       "
       :ok-label="t('alerts.downtimes.confirmCancel.confirm', { count: 1 }, 1)"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       :cancel-label="t('alerts.downtimes.confirmCancel.keep', { count: 1 }, 1)"
       @update:ok="confirmCancel"
       @update:cancel="cancelOpen = false"
@@ -463,7 +442,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -554,28 +533,14 @@ const title = computed<I18nText>(() =>
   downtime.value ? raw(downtime.value.name) : t("alerts.downtimes.detailTitle"),
 );
 // After an End now or a cancel, the planned schedule is not what happened, so the real stop is shown too.
-const stoppedAt = computed<{ label: I18nText; time: string; line: I18nText } | null>(() => {
+const stoppedAt = computed<{ label: I18nText; time: string } | null>(() => {
   const d = downtime.value;
   if (!d?.cancelled_at || (d.status !== "ended_early" && d.status !== "cancelled")) return null;
   const time = formatWindowTime(d.cancelled_at, viewerZone.value);
   const zoned = t("alerts.downtimes.detail.stoppedTime", { time, zone: viewerZone.value });
   return d.status === "ended_early"
-    ? {
-        label: t("alerts.downtimes.detail.endedEarlyAt"),
-        time: zoned,
-        line: t("alerts.downtimes.detail.endedEarlyAtTime", { time: zoned }),
-      }
-    : {
-        label: t("alerts.downtimes.detail.cancelledAt"),
-        time: zoned,
-        line: t("alerts.downtimes.detail.cancelledAtTime", { time: zoned }),
-      };
-});
-
-const subtitle = computed<I18nText | undefined>(() => {
-  if (!downtime.value) return undefined;
-  const planned = scheduleSentence(downtime.value.schedule, t);
-  return stoppedAt.value ? raw(`${planned} · ${stoppedAt.value.line}`) : planned;
+    ? { label: t("alerts.downtimes.detail.endedEarlyAt"), time: zoned }
+    : { label: t("alerts.downtimes.detail.cancelledAt"), time: zoned };
 });
 
 const repeats = computed(() => !!downtime.value && downtime.value.schedule.repeat !== "none");
@@ -837,11 +802,11 @@ const sendTest = async () => {
 // ── Actions ─────────────────────────────────────────────────────────────────
 const orgQuery = () => ({ org_identifier: orgId.value });
 
-const goBack = () =>
-  router.push({
-    name: "downtimes",
-    query: { ...orgQuery(), folder: downtime.value?.folder_id ?? "default" },
-  });
+const listRoute = computed(() => ({
+  name: "downtimes",
+  query: { ...orgQuery(), folder: downtime.value?.folder_id ?? "default" },
+}));
+const goBack = () => router.push(listRoute.value);
 
 const editDowntime = () =>
   router.push({

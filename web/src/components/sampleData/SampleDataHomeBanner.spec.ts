@@ -51,7 +51,7 @@ vi.mock("@/composables/sampleData/useSampleDataPresence", async () => {
 });
 
 const ConfirmStub = defineComponent({
-  props: { modelValue: Boolean, focusCancel: Boolean },
+  props: { modelValue: Boolean, kind: String },
   emits: ["update:ok", "update:cancel"],
   setup:
     (props, { emit }) =>
@@ -119,8 +119,8 @@ describe("SampleDataHomeBanner", () => {
     session.closeRemoveDialog();
   });
 
-  it("puts the focus on Cancel in the delete confirmation", () => {
-    expect(wrapper.findComponent(ConfirmStub).props("focusCancel")).toBe(true);
+  it("asks with a destructive confirm, which starts on Cancel", () => {
+    expect(wrapper.findComponent(ConfirmStub).props("kind")).toBe("destructive");
   });
 
   it("disables Remove while a removal started anywhere runs", async () => {

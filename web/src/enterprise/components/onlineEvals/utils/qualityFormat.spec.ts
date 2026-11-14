@@ -98,21 +98,21 @@ describe("status rank and default sort", () => {
 describe("unhealthy bar tone", () => {
   it("bands the share: under 25% green, under 75% orange, 75% and up red", () => {
     const cases: [number, string][] = [
-      [0, "success"],
-      [0.249, "success"],
-      [0.25, "warning"],
-      [0.749, "warning"],
-      [0.75, "danger"],
-      [1, "danger"],
+      [0, "ok"],
+      [0.249, "ok"],
+      [0.25, "warn"],
+      [0.749, "warn"],
+      [0.75, "err"],
+      [1, "err"],
     ];
     for (const [share, tone] of cases) expect(unhealthyTone(share)).toBe(tone);
   });
 
   it("bands on the shown one-decimal percent, so the colour matches the text", () => {
     // 0.24996 shows as 25.0% and 0.74996 as 75.0%.
-    expect(unhealthyTone(0.24996)).toBe("warning");
-    expect(unhealthyTone(0.74996)).toBe("danger");
-    expect(unhealthyTone(0.24949)).toBe("success");
+    expect(unhealthyTone(0.24996)).toBe("warn");
+    expect(unhealthyTone(0.74996)).toBe("err");
+    expect(unhealthyTone(0.24949)).toBe("ok");
   });
 
   it("has no tone without a threshold or without scores, where the cell shows no bar", () => {

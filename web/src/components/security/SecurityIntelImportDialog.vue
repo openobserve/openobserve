@@ -173,14 +173,14 @@ async function onSubmit(value: IntelImportForm) {
     :open="shown"
     size="md"
     :title="mode === 'url' ? t('siem.intel.form.feedTitle') : t('siem.intel.form.importTitle')"
-    :sub-title="
+    :subtitle="
       mode === 'url' ? t('siem.intel.form.feedSubtitle') : t('siem.intel.form.importSubtitle')
     "
     :form-id="FORM_ID"
-    :primary-button-label="
-      mode === 'url' ? t('siem.intel.form.feedSubmit') : t('siem.intel.form.importSubmit')
-    "
-    :secondary-button-label="t('siem.intel.form.cancel')"
+    :primary="{
+      label: mode === 'url' ? t('siem.intel.form.feedSubmit') : t('siem.intel.form.importSubmit'),
+    }"
+    :secondary="{ label: t('siem.intel.form.cancel') }"
     data-test="security-intel-import-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"

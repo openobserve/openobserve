@@ -422,7 +422,7 @@ describe("MetricCard (ported to @/lib)", () => {
       expect(wrapper.emitted("refresh")).toBeTruthy();
     });
 
-    it("turns the refresh action warning-colored when the data was fetched for a different window", () => {
+    it("marks the refresh action stale when the data was fetched for a different window", () => {
       // Same contract as the dashboard's refresh button with unapplied variable
       // changes: the button itself carries the "this is out of date" signal.
       wrapper = createWrapper({
@@ -431,7 +431,7 @@ describe("MetricCard (ported to @/lib)", () => {
       const btn = wrapper.find(
         '[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]',
       );
-      expect(btn.classes().join(" ")).toContain("bg-button-warning");
+      expect(btn.find(".bg-warning-500").exists()).toBe(true);
     });
 
     it("has no refresh action when the data matches the selected window: the toolbar Refresh covers it", () => {
@@ -699,10 +699,10 @@ describe("MetricCard (ported to @/lib)", () => {
       wrapper = createWrapper();
 
       expect(wrapper.props()).not.toHaveProperty("rowsView");
-      // Header bar (the shared PanelBar's box — tinted and bordered), footer,
+      // Header bar (the shared PanelBar's box), footer,
       // and the badge in the footer where it cannot truncate the name it
       // describes.
-      expect(wrapper.find(".min-h-7.border-b.border-panel-bar-border").exists()).toBe(true);
+      expect(wrapper.find(".min-h-10.border-b.border-border-subtle").exists()).toBe(true);
       expect(
         wrapper.find('[data-test="metrics-explorer-card-badge-node_cpu_seconds_total"]').exists(),
       ).toBe(true);
@@ -923,23 +923,22 @@ describe("MetricCard (ported to @/lib)", () => {
   });
 
   describe("its own progress line, the one a dashboard panel draws", () => {
-    const loadingProgress = (w: VueWrapper<any>) => w.findComponent({ name: "LoadingProgress" });
+    const loadingProgress = (w: VueWrapper<any>) => w.findComponent({ name: "OLoadingLine" });
 
     it("draws its own line by default", () => {
       wrapper = createWrapper({ preview: preview({ status: "loading", results: [] }) });
       expect(loadingProgress(wrapper).exists()).toBe(true);
-      expect(loadingProgress(wrapper).props("loading")).toBe(true);
+      expect(loadingProgress(wrapper).props("active")).toBe(true);
     });
 
     it("keeps it on over a kept chart through a refresh or time change, and off once the answer lands", async () => {
       const series = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] }];
       wrapper = createWrapper({ preview: preview({ status: "done", results: series }) });
-      expect(loadingProgress(wrapper).props("loading")).toBe(false);
+      expect(loadingProgress(wrapper).props("active")).toBe(false);
       await wrapper.setProps({ preview: preview({ status: "loading", results: series }) });
-      expect(loadingProgress(wrapper).props("loading")).toBe(true);
-      expect(loadingProgress(wrapper).props("indeterminate")).toBe(false);
+      expect(loadingProgress(wrapper).props("active")).toBe(true);
       await wrapper.setProps({ preview: preview({ status: "done", results: series }) });
-      expect(loadingProgress(wrapper).props("loading")).toBe(false);
+      expect(loadingProgress(wrapper).props("active")).toBe(false);
     });
   });
 

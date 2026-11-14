@@ -38,8 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OEmptyState
             size="inline"
-            preset="no-access"
-            :description="fleetsForbidden ? undefined : t('fleet.fleets.noAccess')"
+            kind="denied"
+            :title="t('emptyState.noAccess.title')"
+            :text="
+              fleetsForbidden ? t('emptyState.noAccess.description') : t('fleet.fleets.noAccess')
+            "
           />
         </div>
         <div
@@ -47,21 +50,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="px-page-edge border-border-default shrink-0 border-b py-3"
           data-test="fleet-fleets-load-error"
         >
-          <OEmptyState size="inline" preset="load-error" @action="fleets.refetch()" />
+          <OEmptyState
+            size="inline"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('emptyState.loadError.description')"
+            @action="fleets.refetch()"
+          />
         </div>
         <div
           v-else-if="!fleet && fleets.loading.value"
           class="px-page-edge border-border-default flex shrink-0 justify-center border-b py-3"
           data-test="fleet-fleets-loading"
         >
-          <OSpinner />
+          <OSpinner size="lg" />
         </div>
         <div
           v-else-if="!fleet"
           class="px-page-edge border-border-default shrink-0 border-b py-3"
           data-test="fleet-fleets-not-found"
         >
-          <OEmptyState size="inline" preset="no-data" :title="t('fleet.fleets.notFound')" />
+          <OEmptyState
+            size="inline"
+            :text="t('emptyState.noData.description')"
+            :title="t('fleet.fleets.notFound')"
+          />
         </div>
         <div
           v-else
@@ -81,8 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="ms-auto flex flex-wrap items-center gap-2">
               <OButton
                 variant="ghost"
-                size="sm"
-                icon-left="add"
+                icon="add"
                 data-test="fleet-fleets-add-collector"
                 @click="installOpen = true"
               >
@@ -90,8 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="ghost"
-                size="sm"
-                icon-left="key"
+                icon="key"
                 data-test="fleet-fleets-tokens"
                 @click="tokensOpen = true"
               >
@@ -99,8 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="ghost"
-                size="sm"
-                icon-left="history"
+                icon="history"
                 data-test="fleet-fleets-rollouts"
                 @click="openRollouts(null)"
               >
@@ -108,17 +118,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="ghost"
-                size="sm"
-                icon-left="settings"
+                icon="settings"
                 data-test="fleet-fleets-settings"
                 @click="settingsOpen = true"
               >
                 {{ t("fleet.fleets.settings") }}
               </OButton>
               <OButton
-                variant="outline"
-                size="sm"
-                icon-left="rocket-launch"
+                variant="secondary"
+                icon="rocket-launch"
                 data-test="fleet-fleets-change-version"
                 @click="changeOpen = true"
               >
@@ -155,8 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     progressText(activeRollout)
                   }}</OText>
                   <OButton
-                    variant="ghost-primary"
-                    size="sm"
+                    variant="accent-ghost"
                     data-test="fleet-fleets-open-rollout"
                     @click="openRollouts(activeRollout.id)"
                   >

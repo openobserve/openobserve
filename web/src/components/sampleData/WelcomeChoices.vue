@@ -25,9 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <strong class="text-text-heading text-base">{{
             t("login.getStarted.connect.title")
           }}</strong>
-          <OBadge variant="primary-soft" size="sm">{{
-            t("ingestion.firstSource.recommended")
-          }}</OBadge>
+          <OBadge tone="accent" size="sm">{{ t("ingestion.firstSource.recommended") }}</OBadge>
         </div>
         <ul class="m-0 flex flex-1 list-none flex-col gap-1.5 p-0">
           <li
@@ -80,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OButton
           variant="primary"
-          icon-right="arrow-forward"
-          size="cta"
+          icon-end="arrow-forward"
+          size="lg"
           class="w-full"
           data-test="onboarding-get-started-choose-btn"
           @click="emit('browse')"
@@ -109,8 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ul>
         <SampleLivePreview class="h-[10.25rem]" data-test="onboarding-get-started-sample-preview" />
         <OButton
-          variant="outline"
-          size="cta"
+          variant="secondary"
+          size="lg"
           class="w-full"
           :disabled="sampleBusy"
           data-test="onboarding-get-started-sample-btn"
@@ -123,8 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="mt-auto flex items-center justify-end gap-2">
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         data-test="onboarding-get-started-skip-btn"
         @click="emit('skip')"
       >

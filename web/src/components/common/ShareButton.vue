@@ -16,34 +16,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton
+    :disabled-reason="
+      isWebUrlNotConfigured || (disabled && !!tooltip)
+        ? isWebUrlNotConfigured
+          ? t('search.webUrlNotConfigured')
+          : tooltip
+        : undefined
+    "
     ref="buttonRef"
     :data-test="dataTest"
     :aria-label="t('search.shareLink')"
     :class="buttonClass"
     :variant="variant"
     :size="size"
+    :icon-only="!showLabel"
     :loading="isLoading"
     :disabled="disabled || !url || isWebUrlNotConfigured"
-    :focusable-unavailable="isWebUrlNotConfigured || (disabled && !!tooltip)"
     @click="handleShareClick"
-    icon-left="share"
+    icon="share"
   >
-    <template #unavailable-reason>{{
-      isWebUrlNotConfigured ? t("search.webUrlNotConfigured") : tooltip
-    }}</template>
-    <span v-if="showLabel" class="ms-1">{{ t("search.shareLink") }}</span>
-    <OTooltip v-if="isWebUrlNotConfigured">
-      <template #content
-        ><OIcon name="warning" size="sm" class="me-1" />{{
-          t("search.webUrlNotConfigured")
-        }}</template
-      >
-    </OTooltip>
+    <span v-if="showLabel">{{ t("search.shareLink") }}</span>
     <OTooltip
-      v-else-if="tooltip || !showLabel"
+      v-if="!isWebUrlNotConfigured && !(disabled && tooltip) && (tooltip || !showLabel)"
       :content="tooltip || t('search.shareLink')"
-      :shortcut="shortcut || undefined"
-      :shortcut-id="shortcutId || undefined"
+      :keys="shortcut || undefined"
+      :shortcut="shortcutId || undefined"
     />
   </OButton>
 </template>
@@ -55,14 +52,13 @@ import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { ButtonVariant, ButtonSize } from "@/lib/core/Button/OButton.types";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import shortURLService from "@/services/short_url";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ShareButton",
-  components: { OButton, OIcon, OTooltip },
+  components: { OButton, OTooltip },
   props: {
     // The long URL to be copied and shortened
     url: {
@@ -77,12 +73,12 @@ export default defineComponent({
     // OButton variant
     variant: {
       type: String as PropType<ButtonVariant>,
-      default: "outline",
+      default: "secondary",
     },
     // OButton size
     size: {
       type: String as PropType<ButtonSize>,
-      default: "icon-xs",
+      default: "md",
     },
     // Show "Share" label text next to icon
     showLabel: {

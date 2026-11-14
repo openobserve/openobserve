@@ -28,17 +28,15 @@
 <template>
   <OPageLayout
     :title="notFound ? t('slos.notFound') : raw(slo?.name || sloId)"
-    icon="target"
-    :subtitle="notFound ? raw('') : subtitle"
     :back="{ to: backTarget, label: t('slos.title') }"
     title-data-test="slos-slodetail-title"
     bleed
   >
-    <template #title-trail>
+    <template #status>
       <div class="flex items-center gap-2">
         <OTag
           v-if="slo"
-          :variant="healthVariant"
+          :tone="healthVariant"
           :icon="healthIcon(health)"
           size="sm"
           :label="t(`slos.health.${health}`)"
@@ -54,8 +52,8 @@
         <OTag
           v-for="tag in slo?.tags || []"
           :key="tag"
-          variant="default-soft"
-          size="xs"
+          tone="neutral"
+          size="sm"
           :label="raw(tag)"
         />
       </div>
@@ -66,30 +64,22 @@
            is one click away from the page that reports them. -->
       <OButton
         v-if="sourceAlertId"
-        variant="outline"
-        size="sm-action"
-        icon-left="shield"
+        variant="secondary"
+        icon="shield"
         data-test="slos-slodetail-source-alert"
         @click="goToSourceAlert"
       >
         {{ t("slos.alertSli.sourceLink") }}
       </OButton>
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="notifications"
+        variant="secondary"
+        icon="notifications"
         data-test="slos-slodetail-new-alert"
         @click="goToNewAlert"
       >
         {{ t("slos.newAlert") }}
       </OButton>
-      <OButton
-        variant="primary"
-        size="sm-action"
-        icon-left="edit"
-        data-test="slos-slodetail-edit"
-        @click="goToEdit"
-      >
+      <OButton variant="primary" icon="edit" data-test="slos-slodetail-edit" @click="goToEdit">
         {{ t("common.edit") }}
       </OButton>
     </template>
@@ -103,22 +93,21 @@
     <OContent y v-if="!notFound">
       <!-- Not a subtle indicator: a frozen SLO's alerts neither fire nor
            resolve, and mistaking that for healthy is the failure mode. -->
-      <OBanner
+      <OInlineNotice
         v-if="frozenBanner"
-        variant="warning"
+        tone="warn"
         :icon="frozenBanner.icon"
         class="mb-3"
         data-test="slos-slodetail-frozen-banner"
       >
         <span class="font-bold">{{ frozenBanner.title }}</span>
         {{ frozenBanner.body }}
-      </OBanner>
+      </OInlineNotice>
 
-      <OBanner
+      <OInlineNotice
         v-if="corrections.length"
-        variant="info"
+        tone="info"
         icon="notifications-paused"
-        dense
         class="mb-3"
         data-test="slos-slodetail-corrections-banner"
       >
@@ -126,8 +115,8 @@
           <span>{{ t("alerts.downtimes.sloCorrections.title") }}</span>
           <template v-for="c in corrections" :key="c.downtime_id">
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :data-test="`slos-slodetail-correction-${c.downtime_id}`"
               @click="openDowntime(c.downtime_id)"
             >
@@ -147,7 +136,7 @@
             </span>
           </template>
         </span>
-      </OBanner>
+      </OInlineNotice>
 
       <OStatStrip v-if="slo" :items="stats" data-test="slos-slodetail-stats" />
     </OContent>
@@ -249,9 +238,7 @@
               :columns="groupColumns"
               row-key="group_key"
               :loading="groupsLoading"
-              :frame="false"
               :page-size="25"
-              :show-global-filter="false"
               table-id="slo-groups"
               data-test="slos-slodetail-groups-table"
             >
@@ -289,7 +276,7 @@
                 <OEmptyState
                   icon="layers"
                   :title="t('slos.groups.emptyTitle')"
-                  :description="t('slos.groups.emptyDescription')"
+                  :text="t('slos.groups.emptyDescription')"
                 />
               </template>
             </OTable>
@@ -306,9 +293,8 @@
 
     <OContent v-if="notFound" class="py-6">
       <OEmptyState
-        size="hero"
         :title="t('slos.notFound')"
-        :description="t('slos.notFoundDescription')"
+        :text="t('slos.notFoundDescription')"
         data-test="slos-slodetail-not-found"
       />
     </OContent>
@@ -318,12 +304,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -349,12 +336,10 @@ import {
   formatBurn,
   formatCoverage,
   formatSli,
-  formatSlice,
   formatTarget,
   formatTimeToExhaust,
   formatWindow,
   healthIcon,
-  sliTypeLabel,
   sloHealth,
 } from "@/composables/useSloFormat";
 
@@ -457,7 +442,7 @@ const measuringSince = computed(() => {
   };
 });
 
-const FROZEN_ICON = "ac_unit";
+const FROZEN_ICON: IconName = "pause-circle-filled";
 
 /** Which freeze the SLO is in, and therefore what the banner may claim.
  *
@@ -487,9 +472,9 @@ const frozenBanner = computed(() => {
   // over 28 — the exact reading this banner exists to replace.
   if (measuringSince.value) {
     return {
-      // Not the snowflake: a window that is still filling is not frozen, and
+      // Not the frozen glyph: a window that is still filling is not frozen, and
       // this banner now shows while the SLO is publishing figures.
-      icon: "hourglass-empty",
+      icon: "hourglass-empty" as IconName,
       title: t("slos.frozen.measuringSinceTitle", { since: measuringSince.value.since }),
       body: t("slos.frozen.measuringSinceBody", measuringSince.value),
     };
@@ -514,26 +499,16 @@ const backTarget = computed(() => {
   };
 });
 
-const subtitle = computed(() => {
-  if (!slo.value) return raw("");
-  const parts = [
-    sliTypeLabel(slo.value.sli_type, t),
-    t("slos.overRolling", { window: formatWindow(slo.value.window_secs) }),
-    formatSlice(slo.value.slice_interval_secs),
-  ];
-  return raw(parts.join(" · "));
-});
-
 const healthVariant = computed(() => {
   switch (health.value) {
     case "budget_blown":
-      return "error-soft";
+      return "err";
     case "at_risk":
-      return "warning-soft";
+      return "warn";
     case "meeting":
-      return "success-soft";
+      return "ok";
     default:
-      return "default-soft";
+      return "neutral";
   }
 });
 
@@ -545,35 +520,34 @@ const stats = computed<StatItem[]>(() => {
       key: "sli",
       dataTest: "slos-slodetail-stat-sli",
       label: t("slos.stat.status", { window: formatWindow(slo.value?.window_secs ?? 0) }),
-      value: frozen ? ABSENT : formatSli(s!.sli),
-      tone: frozen ? "neutral" : health.value === "meeting" ? "success" : "error",
+      value: frozen ? null : formatSli(s!.sli),
+      tone: frozen ? "neutral" : health.value === "meeting" ? "ok" : "err",
     },
     {
       key: "target",
       dataTest: "slos-slodetail-stat-target",
       label: t("slos.stat.target"),
-      value: slo.value ? formatTarget(slo.value.target) : ABSENT,
-      tone: "primary",
+      value: slo.value ? formatTarget(slo.value.target) : null,
     },
     {
       key: "budget",
       dataTest: "slos-slodetail-stat-budget",
       label: t("slos.stat.budgetRemaining"),
-      value: frozen ? ABSENT : formatBudget(s!.error_budget_remaining),
-      tone: frozen ? "neutral" : (s!.error_budget_remaining ?? 0) <= 0 ? "error" : "success",
+      value: frozen ? null : formatBudget(s!.error_budget_remaining),
+      tone: frozen ? "neutral" : (s!.error_budget_remaining ?? 0) <= 0 ? "err" : "ok",
     },
     {
       key: "burn",
       dataTest: "slos-slodetail-stat-burn",
       label: t("slos.stat.burnRate"),
-      value: frozen ? ABSENT : formatBurn(s!.burn_rate),
-      tone: frozen ? "neutral" : (s!.burn_rate ?? 0) > 1 ? "error" : "success",
+      value: frozen ? null : formatBurn(s!.burn_rate),
+      tone: frozen ? "neutral" : (s!.burn_rate ?? 0) > 1 ? "err" : "ok",
     },
     {
       key: "exhaust",
       dataTest: "slos-slodetail-stat-exhaust",
       label: t("slos.stat.timeToExhaust"),
-      value: frozen ? ABSENT : formatTimeToExhaust(s!.time_to_exhaust_secs),
+      value: frozen ? null : formatTimeToExhaust(s!.time_to_exhaust_secs),
       tone: "neutral",
     },
     {
@@ -581,7 +555,7 @@ const stats = computed<StatItem[]>(() => {
       dataTest: "slos-slodetail-stat-coverage",
       label: t("slos.stat.coverage"),
       value: formatCoverage(s?.coverage),
-      tone: frozen ? "warning" : "neutral",
+      tone: frozen ? "warn" : "neutral",
     },
   ];
 });

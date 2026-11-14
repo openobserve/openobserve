@@ -44,6 +44,13 @@ export class AlertFiringPage {
     return this.page.locator(`[data-test="alert-section-tab-${key}"]`);
   }
 
+  // OTab keeps its count slot mounted but invisible until the count loads, so wait for it to show.
+  async tabCount(key) {
+    const count = this.tab(key).locator('[data-test="o-tab-count"]');
+    await expect(count).toBeVisible({ timeout: 30000 });
+    return Number((await count.textContent()).trim());
+  }
+
   tabOrder() {
     return this.tabs.locator('[data-test^="alert-section-tab-alert"]').evaluateAll((tabs) =>
       tabs

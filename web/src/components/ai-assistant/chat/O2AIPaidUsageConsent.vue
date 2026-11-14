@@ -13,8 +13,7 @@
 
     <div class="border-border-default flex justify-end gap-2 border-t pt-3.5">
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         :disabled="isSubmitting"
         data-test="o2-ai-paid-usage-consent-cancel"
         @click="decline"
@@ -24,7 +23,6 @@
       <OButton
         v-if="canEnable"
         variant="primary"
-        size="sm"
         :disabled="!acknowledgementChecked"
         :loading="isSubmitting"
         data-test="o2-ai-paid-usage-consent-enable"

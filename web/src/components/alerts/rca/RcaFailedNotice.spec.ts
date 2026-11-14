@@ -40,7 +40,7 @@ describe("RcaFailedNotice", () => {
   it("names the attempts and the last try in the app's zone, amber, with Retry", async () => {
     const wrapper = mountNotice();
 
-    expect(wrapper.attributes("data-variant")).toBe("error-soft");
+    expect(wrapper.attributes("data-tone")).toBe("err");
     expect(wrapper.get('[data-test="rca-failed-title"]').text()).toMatch(
       /8 times.*Jul 18, 20:43 GMT\+5:30/,
     );

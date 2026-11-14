@@ -4,8 +4,6 @@ import type { I18nText } from "@/types/i18n";
 
 import type { FieldWidth } from "../Input/OInput.types";
 
-export type TextareaSize = "sm" | "md";
-
 export interface TextareaProps {
   /** Bound value */
   modelValue?: string;
@@ -45,8 +43,8 @@ export interface TextareaProps {
   name?: string;
   /** HTML autocomplete */
   autocomplete?: string;
-  /** Control size */
-  size?: TextareaSize;
+  /** Monospace text for JSON, VRL, regex and SQL snippets (T4) */
+  mono?: boolean;
   /**
    * Semantic field width — controls how wide the component renders.
    * Defaults to `"full"` (fills the container).

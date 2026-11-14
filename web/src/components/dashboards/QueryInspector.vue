@@ -1,11 +1,11 @@
 <template>
   <ODialog
+    size="lg"
     data-test="query-inspector"
     :open="open"
     @update:open="$emit('update:open', $event)"
     :title="t('dashboard.queryInspector.title')"
-    :sub-title="t('dashboard.queryInspector.subTitle', { dataTitle, totalQueries })"
-    :width="50"
+    :subtitle="t('dashboard.queryInspector.subTitle', { dataTitle, totalQueries })"
   >
     <!-- search input: sits left of the close button via #header-right -->
     <template #header-right>
@@ -14,7 +14,7 @@
           v-model="searchQuery"
           :placeholder="t('dashboard.queryInspector.searchKeywords')"
           data-test="query-inspector-search"
-          size="xs"
+          size="sm"
         />
       </div>
     </template>
@@ -65,21 +65,19 @@
               <span :data-test="`query-inspector-stat-${stat.key}-${index}`">{{ stat.text }}</span>
             </template>
           </div>
-          <OBanner
+          <OInlineNotice
             v-if="index === 0 && seriesLimit"
-            variant="warning"
+            tone="warn"
             icon="stacked-line-chart"
-            dense
             :data-test="`query-inspector-notice-series-cap-${index}`"
           >
             {{ seriesLimitBody }}
-          </OBanner>
-          <OBanner
+          </OInlineNotice>
+          <OInlineNotice
+            class="wrap-anywhere whitespace-pre-line"
             v-if="diagnosticsFor(index)?.serverPartial"
-            variant="warning"
+            tone="warn"
             icon="sync-problem"
-            dense
-            preserve-whitespace
             :data-test="`query-inspector-notice-partial-${index}`"
           >
             <div>{{ t("dashboard.panelErrorButtons.partialBody") }}</div>
@@ -90,13 +88,11 @@
             >
               {{ reason }}
             </div>
-          </OBanner>
-          <OBanner
+          </OInlineNotice>
+          <OInlineNotice
+            class="wrap-anywhere whitespace-pre-line"
             v-if="diagnosticsFor(index)?.functionErrors?.length"
-            variant="error-soft"
-            icon="error-outline"
-            dense
-            preserve-whitespace
+            tone="err"
             :data-test="`query-inspector-notice-function-error-${index}`"
           >
             <div class="font-semibold">
@@ -109,7 +105,7 @@
             >
               {{ message }}
             </div>
-          </OBanner>
+          </OInlineNotice>
           <!-- Original Query -->
           <div v-if="query.originalQuery">
             <div class="flex items-center justify-between">
@@ -117,10 +113,9 @@
                 t("dashboard.queryInspector.originalQuery")
               }}</label>
               <OButton
-                variant="ghost-primary"
-                size="sm"
+                variant="accent-ghost"
                 @click="copyText(query.originalQuery)"
-                icon-left="content-copy"
+                icon="content-copy"
               >
                 {{ t("dashboard.queryInspector.copy") }}
               </OButton>
@@ -145,12 +140,7 @@
               <label class="text-xs font-bold tracking-wider">{{
                 t("dashboard.queryInspector.executedQuery")
               }}</label>
-              <OButton
-                variant="ghost-primary"
-                size="sm"
-                @click="copyText(query.query)"
-                icon-left="content-copy"
-              >
+              <OButton variant="accent-ghost" @click="copyText(query.query)" icon="content-copy">
                 {{ t("dashboard.queryInspector.copy") }}
               </OButton>
             </div>
@@ -271,7 +261,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import DOMPurify from "dompurify";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
@@ -301,7 +291,7 @@ interface QueryInspectorQuery {
 export default defineComponent({
   name: "QueryInspector",
   emits: ["update:open"],
-  components: { OBanner, OButton, ODialog, OSearchInput, OIcon },
+  components: { OInlineNotice, OButton, ODialog, OSearchInput, OIcon },
   props: {
     open: {
       type: Boolean,

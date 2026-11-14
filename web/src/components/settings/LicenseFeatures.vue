@@ -41,9 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </i18n-t>
       <OButton
         v-if="!hideRequestAccess && (split.missing.length || split.addedLocked.length)"
-        variant="ghost-primary"
-        size="xs"
-        icon-right="arrow-forward"
+        variant="accent-ghost"
+        size="sm"
+        icon-end="arrow-forward"
         class="shrink-0"
         data-test="settings-license-features-request-access"
         @click="emit('request-access')"
@@ -70,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="option in filterOptions"
           :key="option.id"
           :value="option.id"
-          size="sm"
           :data-test="`settings-license-features-filter-${option.id}`"
         >
           {{ option.label }}
@@ -133,7 +132,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="inline"
         icon="search"
         :title="search.trim() ? t('about.features_no_match') : t('about.features_none')"
-        :backdrop="false"
         data-test="settings-license-features-empty"
       />
     </div>

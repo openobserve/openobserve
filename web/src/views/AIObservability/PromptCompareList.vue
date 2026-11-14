@@ -14,7 +14,7 @@
           <span class="text-text-secondary">{{ row.left }}</span>
           <OIcon name="arrow-forward" size="xs" class="text-text-secondary" />
           <span class="text-text-heading font-medium">{{ row.right }}</span>
-          <OTag variant="amber-soft">{{ t("aiObservability.promptManagement.changed") }}</OTag>
+          <OTag tone="warn">{{ t("aiObservability.promptManagement.changed") }}</OTag>
         </template>
         <template v-else>{{ row.left }}</template>
       </dd>

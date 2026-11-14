@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="xl"
     data-test="alert-history-drawer"
     bleed
     :open="open"
-    :width="65"
     :title="alertDetails?.name"
     :title-data-test="'alert-history-name-badge'"
-    :sub-title="t('alert_list.alert_history')"
+    :subtitle="t('alert_list.alert_history')"
     @update:open="emit('update:open', $event)"
   >
     <!-- The alert name is the drawer title and "History" its subtitle (matching
@@ -59,13 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="activeTab"
           @update:model-value="activeTab = $event as string"
         >
-          <OToggleGroupItem value="history" size="sm" data-test="alert-history-tab-history">
+          <OToggleGroupItem value="history" data-test="alert-history-tab-history">
             <template #icon-left>
               <OIcon name="history" size="sm" />
             </template>
             {{ t("alert_list.alert_history") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="condition" size="sm" data-test="alert-history-tab-condition">
+          <OToggleGroupItem value="condition" data-test="alert-history-tab-condition">
             <template #icon-left>
               <OIcon name="code" size="sm" />
             </template>
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #header-right>
       <div class="col-auto flex items-center gap-1">
-        <DateTime
+        <ODateTimeRange
           :class="activeTab !== 'history' ? 'invisible' : ''"
           ref="dateTimeRef"
           auto-apply
@@ -106,11 +106,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Empty state -->
             <OEmptyState
               v-if="!isLoadingHistory && alertHistory.length === 0"
-              size="block"
-              illustration="history"
+              icon="history"
               :title="t('alerts.alertDetails.noHistoryAvailable')"
-              :description="t('alerts.alertDetails.tryExpandingTimeRange')"
-              :hide-action="true"
+              :text="t('alerts.alertDetails.tryExpandingTimeRange')"
               class="flex-1"
             />
 
@@ -135,17 +133,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :loading-reset-key="alertId"
                   :row-class="getRowClass"
                   :default-columns="false"
-                  :show-global-filter="false"
                   class="history-table flex-1 overflow-hidden !border-0 !shadow-none"
                   data-test="alert-details-history-table"
                   @pagination-change="onPaginationChange"
                 >
-                  <template #[`cell-#`]="{ row }">
-                    <span class="text-compact tabular-nums" :class="'text-text-secondary'">
-                      {{ row._displayIndex ?? "—" }}
-                    </span>
-                  </template>
-
                   <template #cell-status="{ row }">
                     <!-- Flapping group row -->
                     <div v-if="row._flappingGroup" class="flex items-center gap-1.5">
@@ -155,12 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="shrink-0 cursor-pointer opacity-50"
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
-                      <OTag
-                        type="alertState"
-                        value="flapping"
-                        class="shrink-0 cursor-pointer"
-                        @click="toggleFlappingGroup(row.timestamp)"
-                      />
+                      <OTag type="alertState" value="flapping" class="shrink-0" />
                       <span class="text-2xs text-text-secondary truncate">
                         {{ row._children.length }} {{ t("alerts.alertDetails.rowsSeparator") }}
                         {{ row._duration }}
@@ -173,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="row.status"
                         data-test="alert-history-status-chip"
                       />
-                      <OTooltip v-if="row.error" :max-width="'18.75rem'" :content="row.error" />
+                      <OTooltip v-if="row.error" :content="row.error" />
                     </span>
                   </template>
 
@@ -261,21 +247,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("alerts.alertDetails.sql") }}
                     </span>
                   </div>
-                  <OButton
+                  <OCopyButton
                     v-if="anomalySql"
-                    @click="
-                      copyToClipboard(anomalySql, t, {
-                        successMessage: t('common.itemCopiedSuccessfully', { item: 'SQL' }),
-                        timeout: 3000,
-                      })
-                    "
-                    variant="ghost-muted"
-                    size="icon-xs-sq"
+                    size="sm"
                     data-test="anomaly-details-copy-sql-btn"
-                  >
-                    <OIcon name="content-copy" size="sm" />
-                    <OTooltip :content="t('alerts.alertDetails.copy')" />
-                  </OButton>
+                    :label="t('alerts.alertDetails.copy')"
+                    :value="anomalySql"
+                  />
                 </div>
                 <pre
                   class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[0.625rem_0.875rem] font-mono leading-relaxed whitespace-pre-wrap"
@@ -305,31 +283,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }}
                     </span>
                   </div>
-                  <OButton
+                  <OCopyButton
                     v-if="
                       alertDetails.conditions &&
                       alertDetails.conditions !== '' &&
                       alertDetails.conditions !== '--'
                     "
-                    @click="
-                      copyToClipboard(alertDetails.conditions, t, {
-                        successMessage: t('common.itemCopiedSuccessfully', {
-                          item:
-                            alertDetails.type === 'sql'
-                              ? t('alerts.alertDetails.sqlQuery')
-                              : alertDetails.type === 'promql'
-                                ? t('alerts.alertDetails.promqlQuery')
-                                : t('alerts.alertDetails.conditions'),
-                        }),
-                      })
-                    "
-                    variant="ghost-muted"
-                    size="icon-xs-sq"
+                    size="sm"
                     data-test="alert-details-copy-conditions-btn"
-                  >
-                    <OIcon name="content-copy" size="sm" />
-                    <OTooltip :content="t('alerts.alertDetails.copy')" />
-                  </OButton>
+                    :label="t('alerts.alertDetails.copy')"
+                    :value="alertDetails.conditions"
+                  />
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
@@ -382,13 +346,13 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { conditionSummary, isFiringOutcome, isOkOutcome } from "@/utils/alerts/runOutcome";
 import { formatTimestamp } from "@/utils/date";
-import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { AlertHistoryQuery } from "@/services/alerts";
@@ -398,7 +362,6 @@ import type { Ref } from "vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { copyToClipboard } from "@/utils/clipboard";
 import AlertHistoryTimeline from "./AlertHistoryTimeline.vue";
 
 // Composables
@@ -636,14 +599,6 @@ const onPaginationChange = async (params: { page: number; size: number }) => {
 // Columns
 const alertHistoryColumns = [
   {
-    id: "#",
-    header: raw("#"),
-    accessorFn: () => null,
-    sortable: false,
-    size: 48,
-    meta: { align: "left" as const },
-  },
-  {
     id: "timestamp",
     header: t("alerts.historyTable.timestamp"),
     accessorKey: "timestamp",
@@ -695,14 +650,6 @@ const alertHistoryColumns = [
 ];
 
 const anomalyHistoryColumns = [
-  {
-    id: "#",
-    header: raw("#"),
-    accessorFn: () => null,
-    sortable: false,
-    size: 48,
-    meta: { align: "left" as const },
-  },
   {
     id: "timestamp",
     header: t("alerts.historyTable.timestamp"),

@@ -18,7 +18,6 @@ the Free Software Foundation, either version 3 of the License, or
             v-model="selectedProviderId"
             :options="providerOptions"
             :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
-            size="md"
             class="w-full"
             data-test="scorer-library-provider-select"
           />
@@ -26,7 +25,6 @@ the Free Software Foundation, either version 3 of the License, or
         <OSearchInput
           v-model="searchQuery"
           :placeholder="t('onlineEvals.scorerLibrary.searchPlaceholder')"
-          clearable
           class="min-w-0 flex-1"
           data-test="scorer-library-search"
         />
@@ -120,7 +118,7 @@ the Free Software Foundation, either version 3 of the License, or
         >
           <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
           <div class="text-status-error-text">{{ loadError }}</div>
-          <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
+          <OButton variant="primary" class="mt-4" @click="loadCatalog">
             {{ t("common.retry") }}
           </OButton>
         </div>

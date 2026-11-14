@@ -32,16 +32,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('pipeline.associateFunction')"
-    :width="creating ? 97 : 30"
+    :size="creating ? 'xl' : 'sm'"
     :bleed="creating"
     @keydown.stop
-    :primaryButtonLabel="!creating ? t('alerts.save') : undefined"
-    :secondaryButtonLabel="!creating ? t('alerts.cancel') : undefined"
-    :neutralButtonLabel="!creating && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
-    neutralButtonVariant="outline-destructive"
+    :primary="{ label: !creating ? t('alerts.save') : undefined }"
+    :secondary="{ label: !creating ? t('alerts.cancel') : undefined }"
+    :extra="{
+      label: !creating && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined,
+      variant: 'danger-ghost',
+    }"
     @click:primary="saveFunction"
     @click:secondary="openCancelDialog"
-    @click:neutral="openDeleteDialog"
+    @click:extra="openDeleteDialog"
   >
     <!-- Padding drops away once the inline editor expands, so it can run
          full-bleed and the picker's toggle row supplies its own spacing —

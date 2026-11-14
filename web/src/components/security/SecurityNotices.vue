@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { computed, ref, useId, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -28,7 +28,7 @@ const expanded = ref(false);
 const listId = useId();
 
 const RANK: Record<NoticeTone, number> = { error: 0, warning: 1, info: 2 };
-const VARIANT = { error: "error-soft", warning: "warning", info: "info" } as const;
+const TONE = { error: "err", warning: "warn", info: "info" } as const;
 const ICON: Record<NoticeTone, string> = {
   error: "error-outline",
   warning: "warning-amber",
@@ -52,18 +52,7 @@ const toneLabel = (tone: NoticeTone) => t(`siem.notices.tone.${tone}`);
 
 <template>
   <!-- Polite: the bar's text changes as data loads, and an assertive region would re-announce each time. -->
-  <OBanner
-    v-if="lead"
-    :variant="VARIANT[lead.tone]"
-    :icon="ICON[lead.tone]"
-    dense
-    inline-actions
-    role="status"
-    :data-test="dataTest"
-  >
-    <template #icon>
-      <OIcon :name="ICON[lead.tone]" :label="toneLabel(lead.tone)" size="sm" />
-    </template>
+  <OInlineNotice v-if="lead" :tone="TONE[lead.tone]" :data-test="dataTest">
     <div :id="listId" class="flex min-w-0 flex-col gap-1">
       <div
         v-for="(notice, index) in expanded ? ordered : [lead]"
@@ -71,8 +60,9 @@ const toneLabel = (tone: NoticeTone) => t(`siem.notices.tone.${tone}`);
         class="flex min-w-0 items-center gap-2"
         :data-test="notice.dataTest"
       >
+        <span v-if="index === 0" class="sr-only">{{ toneLabel(notice.tone) }}</span>
         <OIcon
-          v-if="index > 0"
+          v-else
           :name="ICON[notice.tone]"
           :label="toneLabel(notice.tone)"
           size="xs"
@@ -84,8 +74,8 @@ const toneLabel = (tone: NoticeTone) => t(`siem.notices.tone.${tone}`);
         /></span>
         <OButton
           v-if="notice.actionLabel && notice.onAction"
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           class="shrink-0"
           :data-test="notice.dataTest ? `${notice.dataTest}-action` : undefined"
           @click="notice.onAction"
@@ -97,8 +87,8 @@ const toneLabel = (tone: NoticeTone) => t(`siem.notices.tone.${tone}`);
     <template v-if="canExpand" #actions>
       <OButton
         variant="ghost"
-        size="xs"
-        :icon-right="expanded ? 'expand-less' : 'expand-more'"
+        size="sm"
+        :icon-end="expanded ? 'expand-less' : 'expand-more'"
         :aria-expanded="expanded"
         :aria-controls="listId"
         data-test="security-notices-toggle"
@@ -113,5 +103,5 @@ const toneLabel = (tone: NoticeTone) => t(`siem.notices.tone.${tone}`);
         }}
       </OButton>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>

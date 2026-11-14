@@ -96,7 +96,7 @@ export const OSwitchStub = {
 
 export const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "size", "title", "subTitle", "side", "persistent"],
+  props: ["open", "size", "title", "subtitle", "side", "persistent"],
   emits: ["update:open"],
   template: `<div class="o-drawer" v-bind="$attrs" :data-open="String(open)">
     <button class="o-drawer-close" @click="$emit('update:open', false)" />

@@ -134,8 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mt-2 text-center">
           <OButton
-            variant="ghost-primary"
-            size="sm"
+            variant="accent-ghost"
             data-test="traces-llm-content-renderer-expand-btn"
             @click="isExpanded = true"
           >
@@ -232,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div v-if="contentStats.shouldTruncate" class="mt-2 text-center">
-          <OButton variant="ghost-primary" size="sm" @click="isExpanded = false">
+          <OButton variant="accent-ghost" @click="isExpanded = false">
             {{ t("traces.lLMContentRenderer.collapse") }}
           </OButton>
         </div>

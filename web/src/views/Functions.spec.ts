@@ -13,8 +13,8 @@ vi.mock("@/lib/core/PageHeader/OPageHeader.vue", () => ({
   default: {
     name: "OPageHeader",
     template:
-      '<div class="app-page-header" data-test="app-page-header"><slot name="tabs" /><slot name="title-trail" /><slot name="actions" /></div>',
-    props: ["title", "subtitle", "icon", "back", "tabsBelow"],
+      '<div class="app-page-header" data-test="app-page-header"><slot name="tabs" /><slot name="status" /><slot name="actions" /></div>',
+    props: ["title", "about", "back"],
   },
 }));
 
@@ -43,7 +43,7 @@ vi.mock("@/lib/core/Button/OButton.vue", () => ({
     name: "OButton",
     template:
       "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click', $event)\"><slot /></button>",
-    props: ["variant", "size", "iconLeft", "disabled"],
+    props: ["variant", "size", "icon", "disabled"],
     emits: ["click"],
   },
 }));

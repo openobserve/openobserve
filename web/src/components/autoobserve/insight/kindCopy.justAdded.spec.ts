@@ -113,7 +113,7 @@ describe("the home Coverage gap card knows what was just added", () => {
     const parts = rail(20)[0].insight;
     expect(parts.cta).toBeNull();
     expect(parts.chip.label).toBe("Added");
-    expect(parts.chip.variant).toBe("default-soft");
+    expect(parts.chip.variant).toBe("neutral");
     expect(parts.headline).toBe("Added alerts for 20 services");
     expect(parts.why).toBe("svc-0, svc-1, svc-2, and 17 more.");
     expect(parts.note).toBe(

@@ -51,10 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span class="text-sm font-semibold">{{ t("pipeline.buildQuery") }}</span>
                 <OButton
-                  variant="outline"
-                  size="icon-xs-sq"
+                  icon-only
+                  variant="secondary"
+                  size="sm"
                   class="rotate-90"
-                  icon-left="unfold-less"
+                  icon="unfold-less"
                   :title="t('search.collapseFields')"
                   data-test="scheduled-pipeline-collapse-btn"
                   @click="collapseFieldList"
@@ -151,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       v-if="durationPercentilesLoading"
                                       class="flex justify-center py-2"
                                     >
-                                      <OSpinner size="xs" />
+                                      <OSpinner />
                                     </div>
                                     <template v-else-if="hasDurationPercentiles">
                                       <div
@@ -166,8 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                         <div class="flex w-[2.7rem]">
                                           <OButton
                                             v-if="p.key !== 'max'"
+                                            icon-only
                                             variant="ghost"
-                                            size="icon-xs-circle"
+                                            size="xs"
                                             :title="
                                               t('common.durationGte', {
                                                 value: formatPercentile(durationPercentiles[p.key]),
@@ -187,8 +189,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                             />
                                           </OButton>
                                           <OButton
+                                            icon-only
                                             variant="ghost"
-                                            size="icon-xs-circle"
+                                            size="xs"
                                             :title="
                                               t('common.durationLte', {
                                                 value: formatPercentile(durationPercentiles[p.key]),
@@ -242,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="flex w-40 shrink-0 items-center gap-1 font-bold">
                           <span>{{ t("pipeline.trigger") }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="18.75rem">
+                            <OTooltip side="right">
                               <template #content>
                                 <span class="text-sm">
                                   {{ t("pipeline.triggerConditionInfoLine1") }} <br />
@@ -256,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="query_condition.promql_condition.operator"
                           :options="triggerOperators"
                           :searchable="false"
-                          width="xs"
+                          width="s"
                           class="no-case"
                           data-test="scheduled-pipeline-promlq-condition-operator-select"
                         />
@@ -265,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           type="number"
                           :min="0"
                           :placeholder="t('pipeline.value')"
-                          width="xs"
+                          width="s"
                           data-test="scheduled-pipeline-promlq-condition-value"
                         />
                       </div>
@@ -311,24 +314,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 />
                               </div>
                               <OButton
+                                icon-only
                                 data-test="scheduled-pipeline-group-by-delete-btn"
-                                variant="ghost-destructive"
-                                size="icon-xs-sq"
+                                variant="danger-ghost"
+                                size="sm"
                                 class="ms-1 me-2 mb-2"
                                 :title="t('alert_templates.delete')"
                                 @click="deleteGroupByColumn(Number(index))"
-                                icon-left="delete"
+                                icon="delete"
                               />
                             </div>
                           </template>
                           <OButton
+                            icon-only
                             data-test="scheduled-pipeline-group-by-add-btn"
                             variant="ghost"
-                            size="icon-xs-sq"
+                            size="sm"
                             class="ms-1 me-2 mb-2"
                             :title="t('common.add')"
                             @click="addGroupByColumn()"
-                            icon-left="add"
+                            icon="add"
                           />
                         </div>
                       </div>
@@ -349,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="ms-1 cursor-pointer"
                             :class="'text-text-secondary'"
                           >
-                            <OTooltip side="right" max-width="18.75rem">
+                            <OTooltip side="right">
                               <template #content>
                                 <span style="font-size: var(--text-sm)"
                                   >{{ t("pipeline.thresholdInfoLine1") }} <br />
@@ -478,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <span>{{ t("alerts.crontitle") + " *" }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="18.75rem">
+                            <OTooltip side="right">
                               <template #content>
                                 <span class="text-sm">
                                   {{ t("pipeline.cronToggleInfo") }}
@@ -553,7 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     store.state?.zoConfig?.min_auto_refresh_interval / 60,
                                   ) || 1
                                 "
-                                width="xs"
+                                width="s"
                               >
                                 <template #error />
                               </OFormInput>
@@ -578,7 +583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 data-test="scheduled-pipeline-cron-input-field"
                                 name="trigger_condition.cron"
                                 :placeholder="t('reports.cronExpression')"
-                                width="xs"
+                                width="s"
                                 required
                               />
                               <OFormSelect
@@ -586,7 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 name="trigger_condition.timezone"
                                 :options="timezoneSelectOptions"
                                 :placeholder="raw(t('logStream.timezone') + ' *')"
-                                width="xs"
+                                width="s"
                               />
                             </div>
                           </template>
@@ -599,7 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <span>{{ t("alerts.period") + " *" }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="18.75rem">
+                            <OTooltip side="right">
                               <template #content>
                                 <span class="text-sm">
                                   {{ t("pipeline.periodInfoLine1") }}<br />
@@ -627,7 +632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :readonly="triggerData.frequency_type == 'minutes'"
                               :disabled="triggerData.frequency_type == 'minutes'"
                               class="silence-notification-input"
-                              width="xs"
+                              width="s"
                             >
                               <template #error />
                             </OFormInput>
@@ -664,7 +669,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <span>{{ t("pipeline.delay") }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="18.75rem">
+                            <OTooltip side="right">
                               <template #content>
                                 <span class="text-sm"
                                   >{{ t("pipeline.delayInfoLine1") }}<br />
@@ -682,7 +687,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             name="delay"
                             type="number"
                             :min="0"
-                            width="xs"
+                            width="s"
                           />
                           <div
                             data-test="scheduled-pipeline-delay-unit"
@@ -778,7 +783,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex items-center justify-center"
                     >
                       <!-- eslint-enable local/no-hardcoded-px -->
-                      <OSpinner size="md" />
+                      <OSpinner size="lg" />
                     </div>
 
                     <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
@@ -790,8 +795,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data="rows"
                       row-key="_timestamp"
                       :default-columns="false"
-                      :row-height="28"
-                      :show-global-filter="false"
+                      density="compact"
                       pagination="none"
                       :enable-cell-copy="true"
                       expansion="multiple"
@@ -876,19 +880,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     v-if="pipelineObj.isEditNode"
                     data-test="stream-routing-query-delete-btn"
-                    variant="outline-destructive"
-                    size="sm-action"
+                    variant="danger-ghost"
                     @mousedown.prevent
                     @click="$emit('delete:node')"
-                    icon-left="delete"
+                    icon="delete"
                   >
                     {{ t("pipeline.deleteNode") }}
                   </OButton>
 
                   <OButton
                     data-test="stream-routing-query-cancel-btn"
-                    variant="outline"
-                    size="sm-action"
+                    variant="secondary"
                     @mousedown.prevent
                     @click="$emit('cancel:form')"
                   >
@@ -897,7 +899,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     data-test="stream-routing-query-save-btn"
                     variant="primary"
-                    size="sm-action"
                     type="submit"
                     :disabled="formIsSubmitting"
                     @mousedown.prevent

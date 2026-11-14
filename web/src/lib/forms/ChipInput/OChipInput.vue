@@ -91,9 +91,9 @@ const fieldClasses = computed(() => [
 ]);
 
 const sizeClasses = computed(() => {
-  const text = props.size === "sm" ? "text-xs" : "text-sm";
-  if (props.appearance === "plain") return `${text} min-h-7.5`;
-  return `${text} ${props.size === "sm" ? "min-h-8" : "min-h-9"}`;
+  const text = props.size === "sm" ? "text-xs" : "text-compact";
+  if (props.appearance === "plain") return `${text} min-h-control-sm`;
+  return `${text} ${props.size === "sm" ? "min-h-control-sm" : "min-h-control-md"}`;
 });
 
 const testId = (suffix: string) => (props.dataTest ? `${props.dataTest}-${suffix}` : undefined);
@@ -613,10 +613,10 @@ function onFieldFocusOut() {
             @input="onInput"
             @keydown="onKeydown"
           />
-          <OSpinner v-if="loading" size="xs" />
+          <OSpinner v-if="loading" />
         </div>
         <div v-else-if="loading" class="flex justify-end px-2.5 pt-1.5">
-          <OSpinner size="xs" />
+          <OSpinner />
         </div>
         <div
           :id="listId"
@@ -658,7 +658,7 @@ function onFieldFocusOut() {
                   v-if="multiple"
                   aria-hidden="true"
                   :class="[
-                    'rounded-checkbox flex size-3.5 shrink-0 items-center justify-center border transition-colors',
+                    'rounded-chip flex size-4 shrink-0 items-center justify-center border transition-colors',
                     suggestion.selected
                       ? 'bg-checkbox-checked-bg border-checkbox-checked-border text-checkbox-checked-fg'
                       : 'bg-checkbox-bg border-checkbox-border',

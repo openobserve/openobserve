@@ -13,9 +13,8 @@
       <div class="flex flex-wrap items-center gap-1">
         <OTooltip :content="t('serviceVersions.actions.shareWaiting')" :disabled="!!result"
           ><OButton
-            variant="outline"
-            size="sm"
-            icon-left="link"
+            variant="secondary"
+            icon="link"
             :disabled="!result"
             data-test="svcver-panel-share"
             @click="share"
@@ -24,8 +23,7 @@
         >
         <OButton
           v-if="result?.stored_verdict && !restricted"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :disabled="pending"
           data-test="svcver-panel-incident"
           @click="incident"
@@ -49,7 +47,12 @@
           missing === 'pre_existing' ? 'svcver-card-pre-existing' : 'svcver-card-no-verdict'
         "
       />
-      <OSkeleton v-else-if="query.isPending.value" class="h-24" data-test="svcver-card-loading" />
+      <OSkeleton
+        v-else-if="query.isPending.value"
+        shape="block"
+        class="h-24"
+        data-test="svcver-card-loading"
+      />
       <p v-else-if="denied" class="text-text-secondary text-sm" data-test="svcver-card-denied">
         {{ t("serviceVersions.compare.denied") }}
       </p>
@@ -59,13 +62,9 @@
         data-test="svcver-card-error"
       >
         <span>{{ t("serviceVersions.compare.error") }}</span>
-        <OButton
-          variant="outline"
-          size="sm"
-          data-test="svcver-card-retry"
-          @click="query.refetch()"
-          >{{ t("serviceVersions.actions.retry") }}</OButton
-        >
+        <OButton variant="secondary" data-test="svcver-card-retry" @click="query.refetch()">{{
+          t("serviceVersions.actions.retry")
+        }}</OButton>
       </div>
       <div v-if="result && !denied && !missing" class="flex flex-col gap-2">
         <VersionVerdictBanner :result="result" :last-good="lastGood" />
@@ -80,18 +79,14 @@
           data-test="svcver-card-error"
         >
           <span>{{ t("serviceVersions.compare.error") }}</span>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="svcver-card-retry"
-            @click="query.refetch()"
-            >{{ t("serviceVersions.actions.retry") }}</OButton
-          >
+          <OButton variant="secondary" data-test="svcver-card-retry" @click="query.refetch()">{{
+            t("serviceVersions.actions.retry")
+          }}</OButton>
         </div>
         <div class="flex flex-wrap items-center gap-2 text-sm">
           <template v-if="!restricted && newError">
             <OTag
-              :variant="newErrorEarly ? 'default-outline' : 'error-soft'"
+              :tone="newErrorEarly ? 'outline' : 'err'"
               :label="t('serviceVersions.panel.newError')"
               data-test="svcver-card-new-error-tag"
             />
@@ -109,20 +104,15 @@
             <OButton
               v-if="sessionsLink"
               variant="ghost"
-              size="sm"
               data-test="svcver-card-sessions"
               @click="router.push(sessionsLink)"
               >{{ t("serviceVersions.evidence.sessions") }}</OButton
             >
           </template>
           <span class="flex-1" />
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="svcver-panel-open-compare"
-            @click="open"
-            >{{ t("serviceVersions.panel.seeWhatChanged") }}</OButton
-          >
+          <OButton variant="secondary" data-test="svcver-panel-open-compare" @click="open">{{
+            t("serviceVersions.panel.seeWhatChanged")
+          }}</OButton>
         </div>
       </div>
     </div>

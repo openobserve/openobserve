@@ -186,33 +186,23 @@ const ODrawerStub = {
     "side",
     "persistent",
     "size",
-    "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "seamless",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-drawer-stub"
       :data-open="String(open)"
       :data-side="side"
-      :data-width="width"
+      :data-size="size"
       :data-title="title"
-      :data-sub-title="subTitle"
+      :data-sub-title="subtitle"
     >
       <slot name="header-left" />
       <slot name="header" />
@@ -232,24 +222,14 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
@@ -877,10 +857,10 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       expect(drawer.attributes("data-side")).toBe("right");
     });
 
-    it("should forward width to ODrawer", () => {
+    it("should open the ODrawer at the fixed xl size", () => {
       wrapper = createWrapper({ mode: "dialog" });
       const drawer = wrapper.find("[data-test='o-drawer-stub']");
-      expect(drawer.attributes("data-width")).toBe("90");
+      expect(drawer.attributes("data-size")).toBe("xl");
     });
 
     it("should compose ODrawer title with serviceName", () => {

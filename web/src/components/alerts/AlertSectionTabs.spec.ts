@@ -75,10 +75,14 @@ describe("AlertSectionTabs", () => {
     } as any);
     const wrapper = mountTabs();
     await flushPromises();
-    expect(wrapper.find('[data-test="alert-section-tab-alertFiring-badge"]').text()).toBe("2");
+    const count = wrapper.get(
+      '[data-test="alert-section-tab-alertFiring"] [data-test="o-tab-count"]',
+    );
+    expect(count.text()).toBe("2");
+    expect(count.classes()).toContain("bg-badge-error-soft-bg");
   });
 
-  it("hides the badge when the run state is unavailable, rather than showing 0", async () => {
+  it("keeps the count's place but shows no number when the run state is unavailable", async () => {
     const org = store.state.selectedOrganization.identifier;
     queryClient.setQueryData(firingAlertsQuery(org).queryKey, {
       list: [],
@@ -86,7 +90,11 @@ describe("AlertSectionTabs", () => {
     });
     const wrapper = mountTabs();
     await flushPromises();
-    expect(wrapper.find('[data-test="alert-section-tab-alertFiring-badge"]').exists()).toBe(false);
+    const count = wrapper.get(
+      '[data-test="alert-section-tab-alertFiring"] [data-test="o-tab-count"]',
+    );
+    expect(count.text()).toBe("");
+    expect(count.classes()).toContain("invisible");
   });
 
   it("shares one list read with the Firing page", async () => {

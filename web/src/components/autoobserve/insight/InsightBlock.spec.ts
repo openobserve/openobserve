@@ -46,7 +46,7 @@ const logs: InsightCta = {
 
 const insight = (over: Partial<InsightParts> = {}): InsightParts => ({
   id: "f1",
-  chip: { label: raw("Not working"), variant: "error-soft", tone: "failure" },
+  chip: { label: raw("Not working"), variant: "err", tone: "failure" },
   headline: raw("payments-latency filters on duration_ms, a field its stream no longer has"),
   why: raw("4 of 9 runs failed in the last calibration window."),
   whyDetail: null,
@@ -208,11 +208,11 @@ describe("InsightBlock card (test 8)", () => {
 
   it("draws a gap amber and information neutral", () => {
     const amber = mountBlock(
-      insight({ chip: { label: raw("Coverage gap"), variant: "amber-soft", tone: "gap" } }),
+      insight({ chip: { label: raw("Coverage gap"), variant: "warn", tone: "gap" } }),
     );
     expect(amber.find("article > span").classes()).toContain("bg-badge-amber-soft-text");
     const neutral = mountBlock(
-      insight({ chip: { label: raw("Other"), variant: "default-soft", tone: "info" } }),
+      insight({ chip: { label: raw("Other"), variant: "neutral", tone: "info" } }),
     );
     expect(neutral.find("article > span").classes()).toContain("bg-border-default");
   });
@@ -225,10 +225,10 @@ describe("InsightBlock fact hints", () => {
         facts: [
           {
             label: raw("Confirmed condition"),
-            variant: "default-soft",
+            variant: "neutral",
             hint: raw("What A means."),
           },
-          { label: raw("High"), variant: "warning-soft" },
+          { label: raw("High"), variant: "warn" },
         ],
       }),
       "details",
@@ -253,8 +253,8 @@ describe("InsightBlock details only (drawer row)", () => {
 
   it("draws the CTA as a card's one outline button, the size of the rail's (T5-8)", () => {
     const button = mountBlock(insight(), "details").findComponent(sel("cta"));
-    expect(button.props("variant")).toBe("outline");
-    expect(button.props("size")).toBe("sm");
+    expect(button.props("variant")).toBe("secondary");
+    expect(button.attributes("data-o2-size")).toBe("md");
   });
 
   it("prefers the longer Details why when a kind has one", () => {
@@ -280,9 +280,9 @@ describe("InsightBlock details under a row that shows the CTA itself (T5-N7)", (
   it("draws link-like actions ghost-primary xs and Dismiss ghost-muted at the row's xs size", () => {
     const wrapper = mountRow();
     const logs = wrapper.getComponent(sel("secondary-logs-app"));
-    expect([logs.props("variant"), logs.props("size")]).toEqual(["ghost-primary", "xs"]);
+    expect([logs.props("variant"), logs.props("size")]).toEqual(["accent-ghost", "sm"]);
     const dismiss = wrapper.getComponent(sel("dismiss"));
-    expect([dismiss.props("variant"), dismiss.props("size")]).toEqual(["ghost-muted", "xs"]);
+    expect([dismiss.props("variant"), dismiss.props("size")]).toEqual(["ghost", "sm"]);
   });
 
   it("keeps the note under a details block that shows its own CTA", () => {

@@ -3,7 +3,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
 import type { I18nText, TranslateFn } from "@/types/i18n";
 
-type NotificationOptions = Pick<ToastOptions, "timeout" | "position">;
+type NotificationOptions = Pick<ToastOptions, "timeout">;
 
 const useNotifications = () => {
   const showErrorNotification = (message: I18nText, options?: NotificationOptions) => {
@@ -32,11 +32,11 @@ const useNotifications = () => {
   };
 
   const showPositiveNotification = (message: I18nText, options?: NotificationOptions) => {
-    return toast({ variant: "success", message, timeout: 5000, ...options });
+    return toast({ variant: "success", message, ...options });
   };
 
   const showInfoNotification = (message: I18nText, options?: NotificationOptions) => {
-    return toast({ variant: "info", message, timeout: 5000, ...options });
+    return toast({ variant: "info", message, ...options });
   };
 
   return {

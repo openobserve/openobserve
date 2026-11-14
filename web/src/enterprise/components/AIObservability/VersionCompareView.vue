@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6"
         data-test="version-compare-strip-skeleton"
       >
-        <OSkeleton v-for="n in 6" :key="n" type="rect" class="rounded-surface h-20" />
+        <OSkeleton v-for="n in 6" :key="n" shape="block" class="h-20" />
       </div>
       <VersionDeltaStrip v-else-if="result" :result="result" />
       <VersionErrorDiff
@@ -119,13 +119,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('aiObservability.versionCompare.bar.align')"
             @update:model-value="(v: unknown) => onAlignChange(v as AlignMode)"
           >
-            <OToggleGroupItem value="sinceRollout" size="sm">
+            <OToggleGroupItem value="sinceRollout">
               {{ t("aiObservability.versionCompare.bar.alignSinceRollout") }}
             </OToggleGroupItem>
-            <OToggleGroupItem value="sameWallClock" size="sm">
+            <OToggleGroupItem value="sameWallClock">
               {{ t("aiObservability.versionCompare.bar.alignSameWallClock") }}
             </OToggleGroupItem>
-            <OToggleGroupItem value="manual" size="sm">
+            <OToggleGroupItem value="manual">
               {{ t("aiObservability.versionCompare.bar.alignManual") }}
             </OToggleGroupItem>
           </OToggleGroup>
@@ -133,21 +133,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Manual: per-arm editable date windows. In aligned modes, a compact
                "auto: 8m" caption per arm instead (so the row height is stable). -->
           <template v-if="align === 'manual'">
-            <DateTime
+            <ODateTimeRange
               auto-apply
               disable-relative
               :default-type="'absolute'"
               :default-absolute-time="manualDefaultA"
-              class="h-8"
               data-test="version-compare-manual-a-window"
               @on:date-change="(v: unknown) => onManualDateChange('a', v)"
             />
-            <DateTime
+            <ODateTimeRange
               auto-apply
               disable-relative
               :default-type="'absolute'"
               :default-absolute-time="manualDefaultB"
-              class="h-8"
               data-test="version-compare-manual-b-window"
               @on:date-change="(v: unknown) => onManualDateChange('b', v)"
             />
@@ -163,8 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OSkeleton
         v-if="loading && !windows"
-        type="rect"
-        class="rounded-surface h-55 w-full"
+        shape="block"
+        class="h-55 w-full"
         data-test="version-compare-chart-skeleton"
       />
       <!-- A line needs >=2 points per series. In sameWallClock mode a wide page
@@ -201,7 +199,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import VersionCompareBar from "./VersionCompareBar.vue";
 import VersionCompareBanner from "./VersionCompareBanner.vue";

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="true"
     side="right"
-    size="lg"
+    size="md"
     seamless
     :modal="false"
     :anchor="anchor"
@@ -50,9 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="inline-flex">
             <OButton
-              variant="outline"
-              size="sm-action"
-              :icon-left="tracesLock.locked.value ? 'lock' : 'timeline'"
+              variant="secondary"
+              :icon="tracesLock.locked.value ? 'lock' : 'timeline'"
               :disabled="tracesLock.locked.value"
               :aria-label="t('autoobserve.coverage.openTraces')"
               data-test="autoobserve-coverage-drawer-traces"
@@ -65,9 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTooltip>
         <OButton
           v-else
-          variant="outline"
-          size="sm-action"
-          icon-left="search"
+          variant="secondary"
+          icon="search"
           :aria-label="t('autoobserve.coverage.openLogs')"
           data-test="autoobserve-coverage-drawer-logs"
           @click="openTraces()"
@@ -80,9 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="inline-flex">
             <OButton
-              variant="outline"
-              size="sm-action"
-              :icon-left="tracesLock.locked.value ? 'lock' : 'hub'"
+              variant="secondary"
+              :icon="tracesLock.locked.value ? 'lock' : 'hub'"
               :disabled="tracesLock.locked.value"
               :aria-label="t('autoobserve.coverage.openCatalog')"
               data-test="autoobserve-coverage-drawer-catalog"
@@ -112,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <h3 :class="HEADING">{{ t("autoobserve.coverage.signalsWatched") }}</h3>
           <OTag
             class="ms-auto"
-            :variant="STATE_VARIANT[state]"
+            :tone="STATE_VARIANT[state]"
             size="sm"
             :label="stateLabel"
             data-test="autoobserve-coverage-drawer-state"
@@ -200,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-2">
           <h3 :class="HEADING">{{ t("autoobserve.coverage.signals") }}</h3>
           <OToggleGroup
+            size="sm"
             :model-value="range"
             class="ms-auto"
             :aria-label="t('autoobserve.coverage.rangeLabel')"
@@ -210,7 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="r in RANGES"
               :key="r"
               :value="r"
-              size="xs"
               :data-test="`autoobserve-coverage-drawer-range-${r}`"
               >{{ raw(r) }}</OToggleGroupItem
             >
@@ -331,7 +328,7 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import CoverageMetricChart from "./CoverageMetricChart.vue";
 import CoverageSignalDetail from "./CoverageSignalDetail.vue";
 import { libraryOf, metricsFor, type ChartRange } from "./coverageSeries";
@@ -413,11 +410,11 @@ const LIVE_CELL: Record<LiveChartSignal, LiveCheck> = {
   latency: "latency",
 };
 const NO_DATA = new Set<ServiceChartStatus>(["noField", "noMatch", "empty"]);
-const STATE_VARIANT: Record<ServiceState, BadgeVariant> = {
-  watched: "success-soft",
-  partial: "warning-outline",
-  learning: "default-soft",
-  gap: "warning-soft",
+const STATE_VARIANT: Record<ServiceState, ChipTone> = {
+  watched: "ok",
+  partial: "outline",
+  learning: "neutral",
+  gap: "warn",
 };
 const STATE_FILL: Record<ServiceState, string> = {
   watched: "fill-badge-success-soft-text",

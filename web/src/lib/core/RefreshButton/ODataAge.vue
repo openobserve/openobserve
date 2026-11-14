@@ -89,11 +89,7 @@ const failedText = computed(() =>
     @click="emit('activate', $event)"
   >
     <!-- First child, so the tooltip binds to this button, not to its hidden text. -->
-    <OTooltip
-      :content="raw(`${failedText}\n\n${detail}`)"
-      content-class="whitespace-pre-line"
-      max-width="22.5rem"
-    />
+    <OTooltip :content="raw(`${failedText}\n\n${detail}`)" content-class="whitespace-pre-line" />
     <OIcon name="error-outline" size="xs" />
     <span v-if="!iconOnly" aria-hidden="true">{{ t("dataAge.refreshFailedShort") }}</span>
     <span class="sr-only">{{ failedText }}</span>

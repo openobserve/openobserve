@@ -1,12 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 <template>
-  <ODialog
-    v-model:open="open"
-    size="xl"
-    :show-close="false"
-    :max-height="85"
-    data-test="shortcut-cheatsheet-dialog"
-  >
+  <ODialog v-model:open="open" size="lg" :show-close="false" data-test="shortcut-cheatsheet-dialog">
     <!-- ── Sticky header ── -->
     <template #header>
       <div class="flex w-full flex-col gap-2.5">
@@ -39,9 +33,10 @@
           </div>
 
           <OButton
+            icon-only
             variant="ghost"
-            icon-left="close"
-            size="icon"
+            icon="close"
+            size="xs"
             class="shrink-0"
             :aria-label="t('common.close')"
             data-test="shortcut-cheatsheet-close-btn"
@@ -58,8 +53,8 @@
           <OButton
             v-for="m in filteredModules"
             :key="m.title"
-            variant="outline"
-            size="chip"
+            variant="secondary"
+            size="xs"
             class="shrink-0"
             :data-test="`shortcut-cheatsheet-chip-${m.title.toLowerCase().replace(/[\s()—/]+/g, '-')}`"
             @click="onModuleClick(m.title)"

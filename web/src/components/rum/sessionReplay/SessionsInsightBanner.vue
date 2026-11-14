@@ -17,11 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Soft variants only — an insight is a hint, not an alarm. The solid
        `error` banner stays reserved for hard failures. -->
-  <OBanner
-    :variant="insight.kind === 'frustration' ? 'warning' : 'error-soft'"
+  <OInlineNotice
+    :tone="insight.kind === 'frustration' ? 'warn' : 'err'"
     :icon="insight.kind === 'frustration' ? 'sentiment-very-dissatisfied' : 'error-outline'"
-    dense
-    inline-actions
     data-test="rum-sessions-insight-banner"
   >
     <span data-test="rum-sessions-insight-text">{{ message }}</span>
@@ -60,13 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </button>
       </div>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 
 export interface InsightPayload {
   kind: "frustration" | "error" | "errorSpike";

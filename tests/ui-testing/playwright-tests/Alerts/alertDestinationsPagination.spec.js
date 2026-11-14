@@ -63,7 +63,7 @@ test.describe("Alert Destinations Pagination Reset testcases", () => {
       await pm.alertDestinationsPage.gotoDestinationsWithPageParam(stalePage);
 
       await pm.alertDestinationsPage.expectPaginationInfoToMatch(
-        new RegExp(`Showing 1 - \\d+ of \\d+`),
+        new RegExp(`^1–\\d+ of [\\d,]+$`),
       );
       await pm.alertDestinationsPage.expectAtLeastOneListRow();
       await pm.alertDestinationsPage.expectUrlHasPageParam("1");
@@ -88,7 +88,7 @@ test.describe("Alert Destinations Pagination Reset testcases", () => {
       await pm.alertDestinationsPage.waitForDestinationListReady();
 
       await pm.alertDestinationsPage.clickNextPage();
-      await pm.alertDestinationsPage.expectPaginationInfoToMatch(/Showing 21 - /);
+      await pm.alertDestinationsPage.expectPaginationInfoToMatch(/^21–/);
       await pm.alertDestinationsPage.expectUrlHasPageParam("2");
       await pm.alertDestinationsPage.expectAtLeastOneListRow();
       testLogger.info("Test completed");

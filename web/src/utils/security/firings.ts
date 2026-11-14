@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { isErrorOutcome, isFiringOutcome } from "@/utils/alerts/runOutcome";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { SeverityTone } from "./severity";
 import type { HistoryRow } from "./history";
 import type { NormalizedEvent } from "./ocsf";
@@ -27,13 +27,13 @@ export function firingStatus(status: string | null | undefined): FiringStatus {
   return "other";
 }
 
-export const STATUS_VARIANT: Record<FiringStatus, BadgeVariant> = {
-  firing: "error-soft",
-  notify_failed: "orange-soft",
-  error: "amber-soft",
-  normal: "success-soft",
-  skipped: "default-soft",
-  other: "default-soft",
+export const STATUS_VARIANT: Record<FiringStatus, ChipTone> = {
+  firing: "err",
+  notify_failed: "warn",
+  error: "warn",
+  normal: "ok",
+  skipped: "neutral",
+  other: "neutral",
 };
 
 /** A row's `level` is the threshold that matched, the closest an ordinary alert has to a severity. */

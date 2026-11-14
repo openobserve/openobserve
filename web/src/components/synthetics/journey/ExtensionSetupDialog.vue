@@ -111,7 +111,7 @@ defineExpose({ revokeIncognitoAck });
     :open="open"
     size="md"
     :title="t('synthetics.createBrowserTest.setupRecorder')"
-    :sub-title="
+    :subtitle="
       action === 'record'
         ? t('synthetics.createBrowserTest.setupSubtitleRecord')
         : t('synthetics.createBrowserTest.setupSubtitleReplay')
@@ -120,7 +120,7 @@ defineExpose({ revokeIncognitoAck });
     @update:open="emit('update:open', $event)"
   >
     <template #header-right>
-      <OBadge variant="default-soft" data-test="synthetics-setup-progress">
+      <OBadge tone="neutral" data-test="synthetics-setup-progress">
         {{ t("synthetics.createBrowserTest.setupProgress", { done: doneCount, total: 3 }) }}
       </OBadge>
     </template>
@@ -138,7 +138,7 @@ defineExpose({ revokeIncognitoAck });
           size="lg"
           class="w-full"
           :disabled="!allDone"
-          :icon-left="action === 'record' ? 'smart-display' : 'replay'"
+          :icon="action === 'record' ? 'smart-display' : 'replay'"
           data-test="synthetics-setup-continue-btn"
           @click="onContinue"
         >
@@ -150,7 +150,6 @@ defineExpose({ revokeIncognitoAck });
         <div v-if="action === 'record'" class="text-center">
           <OButton
             variant="ghost"
-            size="sm"
             class="text-text-link underline"
             data-test="synthetics-setup-dialog-skip"
             @click="emit('update:open', false)"

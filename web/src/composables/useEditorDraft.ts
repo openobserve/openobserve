@@ -115,6 +115,8 @@ export interface UseEditorDraftOptions<T> {
   serverDraftItem?: boolean;
   /** The leave dialog's Save label, when the editor's save is not a plain save (e.g. it publishes). */
   saveLabel?: () => I18nText;
+  /** Why Save cannot run now (an invalid form); the leave dialog shows Save disabled with it (V4). */
+  saveDisabledReason?: () => I18nText | null | undefined;
   /** Blanks secrets the built-in redaction cannot see in `base` before it is hashed (the hash is stored with the draft); `redact` never runs on the base, whose shape may differ. */
   redactBase?: (base: unknown) => unknown;
   /** Whether a same-component route update leaves this item; defaults to a path change. */
@@ -147,6 +149,8 @@ export interface EditorDraftDialogState {
   readonly serverDraftItem: boolean;
   /** The leave dialog's Save label override. */
   readonly saveLabel: I18nText | null;
+  /** Why Save is disabled in the leave dialog, if it is. */
+  readonly saveDisabledReason: I18nText | null;
 }
 
 export interface EditorDraftController {
@@ -325,6 +329,7 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     ),
     serverDraftItem: !!options.serverDraftItem,
     saveLabel: computed(() => options.saveLabel?.() ?? null),
+    saveDisabledReason: computed(() => options.saveDisabledReason?.() ?? null),
   });
 
   const scope = (): EditorDraftScope => ({
@@ -655,7 +660,8 @@ export const useEditorDraft = <T>(options: UseEditorDraftOptions<T>): EditorDraf
     });
 
   const chooseLeave = (choice: EditorDraftLeaveChoice) => {
-    if (state.leaveSaving || (choice === "save" && !state.canSave)) return;
+    if (state.leaveSaving || (choice === "save" && (!state.canSave || !!state.saveDisabledReason)))
+      return;
     const resolve = leaveResolver;
     leaveResolver = null;
     // Save keeps the dialog up with its spinner until the save settles.

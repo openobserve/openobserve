@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 items-center gap-1.5">
         <span class="text-text-secondary shrink-0"><OIcon name="unfold-more" size="xs" /></span>
         <OTruncatedText class="text-text-heading text-xs font-semibold">{{ title }}</OTruncatedText>
-        <OBadge v-if="straggler" size="xs" shape="rounded" variant="error-soft">{{
+        <OBadge v-if="straggler" size="sm" tone="err">{{
           t("search.queryProfile.straggler")
         }}</OBadge>
       </div>

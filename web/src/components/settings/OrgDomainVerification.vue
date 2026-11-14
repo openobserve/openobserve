@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 items-center gap-1">
         <OCode truncate class="min-w-0">{{ raw(txtName) }}</OCode>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="content-copy"
+          icon="content-copy"
           :data-test="`settings-org-domain-copy-txt-name-${domain.domain}`"
           @click="copy(txtName, t('settings.orgDomainMapping.txtNameCopied'))"
         >
@@ -43,9 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 items-center gap-1">
         <OCode truncate class="min-w-0">{{ raw(domain.verification_token) }}</OCode>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="content-copy"
+          icon="content-copy"
           :data-test="`settings-org-domain-copy-txt-value-${domain.domain}`"
           @click="copy(domain.verification_token, t('settings.orgDomainMapping.txtValueCopied'))"
         >

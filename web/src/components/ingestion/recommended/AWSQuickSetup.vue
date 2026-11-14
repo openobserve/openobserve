@@ -71,10 +71,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTag>
           </div>
           <div class="flex gap-2 max-md:ms-auto max-md:shrink-0" @click.stop>
-            <OButton variant="ghost-primary" size="xs" @click="selectAll">{{
+            <OButton variant="accent-ghost" size="sm" @click="selectAll">{{
               t("ingestion.selectAll")
             }}</OButton>
-            <OButton variant="ghost-primary" size="xs" @click="deselectAll">{{
+            <OButton variant="accent-ghost" size="sm" @click="deselectAll">{{
               t("ingestion.deselectAll")
             }}</OButton>
           </div>
@@ -157,10 +157,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </div>
             <div class="flex gap-2 max-md:ms-auto max-md:shrink-0" @click.stop>
-              <OButton variant="ghost-primary" size="xs" @click="selectAllRegions">{{
+              <OButton variant="accent-ghost" size="sm" @click="selectAllRegions">{{
                 t("ingestion.selectAll")
               }}</OButton>
-              <OButton variant="ghost-primary" size="xs" @click="targetRegions = []">{{
+              <OButton variant="accent-ghost" size="sm" @click="targetRegions = []">{{
                 t("ingestion.clear")
               }}</OButton>
             </div>
@@ -215,7 +215,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-6 flex items-center gap-3">
         <OButton
           variant="primary"
-          size="sm"
           :disabled="
             enabledServices.length === 0 ||
             (deploymentMode === 'stackset' && targetRegions.length === 0)
@@ -225,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             deploymentMode === 'single' ? 'aws-quick-setup-deploy-btn' : 'aws-stackset-launch-btn'
           "
         >
-          <template #icon-left><OIcon name="cloud-upload" size="sm" /></template>
+          <template #icon><OIcon name="cloud-upload" size="sm" /></template>
           {{
             deploymentMode === "single"
               ? t("ingestion.launchCloudFormationStack")
@@ -269,9 +268,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("ingestion.parametersToEnterInAwsWizard") }}
                 </div>
                 <OButton
+                  icon-only
                   :aria-label="t('common.close')"
                   variant="ghost"
-                  size="icon-circle-sm"
+                  size="sm"
                   @click="showParamHelper = false"
                 >
                   <OIcon name="close" size="sm" />
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="paramValTextClass"
                       >{{ param.secret ? maskSecret(param.value) : param.value }}</OTruncatedText
                     >
-                    <OButton variant="ghost" size="icon-xs-circle" @click="copyParam(param.value)">
+                    <OButton icon-only variant="ghost" size="xs" @click="copyParam(param.value)">
                       <OIcon name="content-copy" size="sm" />
                       <OTooltip :content="t('common.copy')" />
                     </OButton>

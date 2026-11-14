@@ -39,13 +39,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="i"
             class="border-border-subtle rounded-default flex flex-col gap-2 border py-3.5 ps-4 pe-3.5"
           >
-            <OSkeleton animation="none" class="h-4.5 w-20" />
-            <OSkeleton animation="none" class="h-3.5 w-[90%]" />
-            <OSkeleton animation="none" class="h-3 w-full" />
-            <OSkeleton animation="none" class="h-3 w-[70%]" />
+            <OSkeleton shape="block" class="h-4.5 w-20" />
+            <OSkeleton shape="block" class="h-3.5 w-[90%]" />
+            <OSkeleton shape="block" class="h-3 w-full" />
+            <OSkeleton shape="block" class="h-3 w-[70%]" />
             <div class="flex min-h-8 items-center gap-2 pt-1">
-              <OSkeleton animation="none" class="h-7 w-28" />
-              <OSkeleton animation="none" class="ms-auto h-4 w-14" />
+              <OSkeleton shape="block" class="h-7 w-28" />
+              <OSkeleton shape="block" class="ms-auto h-4 w-14" />
             </div>
           </li>
         </ul>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="inline"
         icon="task-alt"
         :title="t('autoobserveLive.notice.suggestions.pageEmptyTitle')"
-        :description="t('autoobserveLive.notice.suggestions.pageEmptyDesc')"
+        :text="t('autoobserveLive.notice.suggestions.pageEmptyDesc')"
         data-test="autoobserve2-suggestions-page-empty"
       />
       <OEmptyState
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="inline"
         icon="task-alt"
         :title="t('autoobserveLive.notice.suggestions.emptyTitle')"
-        :description="t('autoobserveLive.notice.suggestions.emptyDesc')"
+        :text="t('autoobserveLive.notice.suggestions.emptyDesc')"
         data-test="autoobserve2-suggestions-empty"
       />
     </div>
@@ -126,9 +126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ more }}</span
         >
         <OButton
-          variant="ghost-primary"
-          size="xs"
-          icon-right="arrow-forward"
+          variant="accent-ghost"
+          size="sm"
+          icon-end="arrow-forward"
           class="ms-auto"
           data-test="autoobserve2-suggestions-see-all"
           @click="emit('see-all')"

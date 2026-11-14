@@ -1,9 +1,9 @@
 ﻿<template>
   <ODropdown v-model:open="showUserGuide" side="left" align="start" :side-offset="8">
     <template #trigger>
-      <OButton variant="ghost" size="icon-sm" class="ms-2" data-test="cross-link-help-btn">
+      <OButton icon-only variant="ghost" class="ms-2" data-test="cross-link-help-btn">
         <OIcon name="help" size="sm" class="size-4" />
-        <OTooltip :content="t('crossLinks.userGuide')" side="bottom" align="center" />
+        <OTooltip :content="t('crossLinks.userGuide')" side="bottom" />
       </OButton>
     </template>
 

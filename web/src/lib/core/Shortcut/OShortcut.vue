@@ -4,20 +4,16 @@ import { computed } from "vue";
 import { isMacOS } from "@/utils/keyboardShortcuts";
 import { getShortcutDisplay } from "@/lib/vue-shortcut-manager/shortcutRegistry";
 
-const props = withDefaults(defineProps<ShortcutProps>(), {
-  size: "sm",
-});
+const props = defineProps<ShortcutProps>();
 
 const isMac = isMacOS();
 
-/** Explicit `keys` win; otherwise resolve from the registry by `id`. */
 const resolvedKeys = computed<string | string[]>(() => {
   if (props.keys != null) return props.keys;
   if (props.id) return getShortcutDisplay(props.id) ?? "";
   return "";
 });
 
-/** Token → display symbol. Modifier glyphs are platform-aware. */
 const SYMBOLS: Record<string, string> = {
   ctrl: isMac ? "⌘" : "Ctrl",
   cmd: "⌘",
@@ -44,48 +40,30 @@ const SYMBOLS: Record<string, string> = {
   pagedown: "PgDn",
 };
 
-/** Symbolise a single token (e.g. "ctrl" → "⌘", "a" → "A"). */
 function symbolizeToken(token: string): string {
   const t = token.trim();
   if (!t) return "";
   return SYMBOLS[t.toLowerCase()] ?? (t.length === 1 ? t.toUpperCase() : t);
 }
 
-/** Symbolise a combo like "ctrl+shift+a" → "⌘⇧A" (joined into one keycap). */
-function symbolizeCombo(combo: string): string {
-  return combo.split("+").map(symbolizeToken).filter(Boolean).join("");
+// A lone "+" is a key, not a separator, so only split combos longer than one character.
+function splitCombo(combo: string): string[] {
+  return combo.length > 1 ? combo.split("+") : [combo];
 }
 
-/**
- * A combo string renders as ONE keycap (matching `⌘⇧A` style); an array
- * renders one keycap per element (each element is itself symbolised).
- */
 const caps = computed<string[]>(() => {
   const keys = resolvedKeys.value;
-  if (Array.isArray(keys)) {
-    return keys.map(symbolizeCombo).filter(Boolean);
-  }
-  const combo = symbolizeCombo(keys);
-  return combo ? [combo] : [];
+  const combos = Array.isArray(keys) ? keys : [keys];
+  return combos.flatMap(splitCombo).map(symbolizeToken).filter(Boolean);
 });
-
-const sizeClasses: Record<NonNullable<ShortcutProps["size"]>, string> = {
-  sm: "h-5 min-w-5 px-1.5 text-2xs",
-  md: "h-6 min-w-6 px-1.5 text-xs",
-};
 </script>
 
 <template>
-  <span class="inline-flex items-center gap-1" data-test="o-shortcut">
+  <span v-if="caps.length" class="inline-flex items-center gap-0.75" data-test="o-shortcut">
     <kbd
       v-for="(cap, i) in caps"
       :key="i"
-      :class="[
-        'inline-flex items-center justify-center',
-        'rounded-default border-kbd-border bg-kbd-bg text-kbd-text border',
-        'leading-none font-medium whitespace-nowrap shadow-md',
-        sizeClasses[size],
-      ]"
+      class="rounded-chip border-kbd-border bg-kbd-bg text-kbd-text text-2xs inline-flex h-4.5 min-w-4.5 items-center justify-center border border-b-2 px-1 font-mono leading-none font-medium whitespace-nowrap"
       >{{ cap }}</kbd
     >
   </span>

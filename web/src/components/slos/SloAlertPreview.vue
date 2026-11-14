@@ -47,7 +47,7 @@
         class="flex h-16 items-center justify-center"
         data-test="slos-sloalertpreview-loading"
       >
-        <OSpinner size="sm" />
+        <OSpinner size="lg" />
       </div>
       <div
         v-else-if="error"

@@ -16,16 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OToggleGroup
+    size="sm"
     :model-value="modelValue"
     mobile-dropdown
     class="shrink-0"
     data-test="alert-calibration-dashboard-findings-filter"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <OToggleGroupItem value="open" size="xs" data-test="alert-calibration-filter-open">{{
+    <OToggleGroupItem value="open" data-test="alert-calibration-filter-open">{{
       t("alertCalibration.dismiss.filterOpen")
     }}</OToggleGroupItem>
-    <OToggleGroupItem value="dismissed" size="xs" data-test="alert-calibration-filter-dismissed">{{
+    <OToggleGroupItem value="dismissed" data-test="alert-calibration-filter-dismissed">{{
       dismissedLabel
     }}</OToggleGroupItem>
   </OToggleGroup>

@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="border-border-default rounded-default flex shrink-0 flex-col gap-3 border p-3"
   >
     <div class="text-text-body text-sm font-semibold">{{ t("workflow.http.request") }}</div>
-    <ODescriptionList :columns="2" dense>
-      <ODescriptionItem :label="t('workflow.http.requestReceived')" stacked>
+    <ODescriptionList layout="stacked">
+      <ODescriptionItem :label="t('workflow.http.requestReceived')">
         <OTimeCell
           :value="receivedAt"
           unit="us"
@@ -31,25 +31,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :empty-label="dash"
         />
       </ODescriptionItem>
-      <ODescriptionItem :label="t('workflow.http.requestToken')" stacked>
+      <ODescriptionItem :label="t('workflow.http.requestToken')">
         <span v-if="facts.credential_prefix" class="font-mono">{{ facts.credential_prefix }}</span>
       </ODescriptionItem>
-      <ODescriptionItem :label="t('workflow.http.requestCallerIp')" stacked>
+      <ODescriptionItem :label="t('workflow.http.requestCallerIp')">
         <span v-if="facts.caller_ip" class="font-mono">{{ facts.caller_ip }}</span>
       </ODescriptionItem>
-      <ODescriptionItem :label="t('workflow.http.requestIdempotencyKey')" stacked>
+      <ODescriptionItem :label="t('workflow.http.requestIdempotencyKey')">
         <span v-if="facts.idempotency_key" class="font-mono">{{ facts.idempotency_key }}</span>
       </ODescriptionItem>
-      <ODescriptionItem :label="t('workflow.http.requestContentType')" stacked>
+      <ODescriptionItem :label="t('workflow.http.requestContentType')">
         <span v-if="facts.content_type" class="font-mono">{{ facts.content_type }}</span>
       </ODescriptionItem>
-      <ODescriptionItem :label="t('workflow.http.requestBodySize')" stacked>
+      <ODescriptionItem :label="t('workflow.http.requestBodySize')">
         {{ bodySize }}
       </ODescriptionItem>
     </ODescriptionList>
     <OCollapsible
-      :label="t('workflow.http.headers')"
-      :caption="t('workflow.http.headersKept', { count: headerRows.length }, headerRows.length)"
+      :title="t('workflow.http.headers')"
+      :summary="t('workflow.http.headersKept', { count: headerRows.length }, headerRows.length)"
       default-open
       data-test="workflow-run-headers"
     >
@@ -58,10 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="headerColumns"
         row-key="name"
         pagination="none"
-        :show-global-filter="false"
         :show-header="false"
-        :frame="false"
-        dense
       />
     </OCollapsible>
   </section>

@@ -44,13 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-if="failed" class="flex items-center gap-2" data-test="svcver-rum-chart-error">
       <p class="text-text-body text-compact">{{ t("serviceVersions.compare.error") }}</p>
-      <OButton
-        variant="outline"
-        size="sm"
-        data-test="svcver-rum-chart-retry"
-        @click="emit('retry')"
-        >{{ t("serviceVersions.actions.retry") }}</OButton
-      >
+      <OButton variant="secondary" data-test="svcver-rum-chart-retry" @click="emit('retry')">{{
+        t("serviceVersions.actions.retry")
+      }}</OButton>
     </div>
     <template v-else>
       <VersionOverlayChart

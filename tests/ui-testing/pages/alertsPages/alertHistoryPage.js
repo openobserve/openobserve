@@ -49,11 +49,13 @@ export class AlertHistoryPage {
     const popover = this.page.locator('[data-test="alert-history-search-select-popover"]');
     await popover.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Type the alert name to filter — avoids virtualiser rendering only visible rows
+    // OSelect renders its search box only past eight options; a short list shows every row.
+    await popover.locator('[data-test-value]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     const searchInput = this.page.locator('[data-test="alert-history-search-select-search"]');
-    await searchInput.waitFor({ state: 'visible', timeout: 5000 });
-    await searchInput.fill(alertName);
-    await this.page.waitForTimeout(300);
+    if (await searchInput.count()) {
+      await searchInput.fill(alertName);
+      await this.page.waitForTimeout(300);
+    }
 
     const option = this.page.locator(`[data-test="alert-history-search-select-option"][data-test-label="${alertName}"]`);
     await option.waitFor({ state: 'visible', timeout: 5000 });

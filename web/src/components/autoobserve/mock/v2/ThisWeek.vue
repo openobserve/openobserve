@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="selectRange(option)"
           >
             <span class="flex-1">{{ t(RANGE_LABEL[option]) }}</span>
-            <template #icon-right>
+            <template #end>
               <OIcon
                 name="check"
                 size="sm"
@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-if="ranged.length" #actions>
       <OToggleGroup
+        size="sm"
         :model-value="priority"
         :aria-label="t('autoobserve2.recent.priorityLabel')"
         data-test="autoobserve2-priority-filter"
@@ -60,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="option in FILTERS"
           :key="option"
           :value="option"
-          size="xs"
           :disabled="!counts[option]"
           :data-test="`autoobserve2-priority-${option}`"
         >
@@ -112,9 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div ref="footerEl" class="flex flex-wrap items-center gap-2">
         <OButton
           v-if="remaining"
-          variant="ghost-primary"
-          size="sm"
-          icon-right="expand-more"
+          variant="accent-ghost"
+          icon-end="expand-more"
           data-test="autoobserve2-problems-show-more"
           @click="expand(visible.length + Math.min(remaining, STEP))"
         >
@@ -122,18 +121,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-else-if="filtered.length > base"
-          variant="ghost-primary"
-          size="sm"
-          icon-right="expand-less"
+          variant="accent-ghost"
+          icon-end="expand-less"
           data-test="autoobserve2-problems-show-fewer"
           @click="expand(0)"
         >
           {{ t("autoobserve2.showFewer") }}
         </OButton>
         <OButton
-          variant="ghost-primary"
-          size="sm"
-          icon-right="arrow-forward"
+          variant="accent-ghost"
+          icon-end="arrow-forward"
           class="ms-auto"
           data-test="autoobserve2-all-issues"
           @click="emit('open-issues')"

@@ -19,10 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data="rows"
     :columns="columns"
     row-key="id"
-    :frame="false"
     pagination="client"
     :page-size="10"
-    :show-global-filter="false"
     :loading="loading"
     :error="error"
     :forbidden="forbidden"
@@ -48,9 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex w-full min-w-0 flex-col gap-1">
         <span class="text-xs tabular-nums">{{ progressText(row) }}</span>
         <OProgressBar
-          :value="row.total ? row.running / row.total : 0"
-          :variant="barVariant(row)"
-          size="xs"
+          :value="row.total ? (row.running / row.total) * 100 : 0"
+          :tone="barVariant(row)"
         />
         <span
           v-if="row.status === 'halted' && row.halt"
@@ -70,13 +67,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #empty>
       <div data-test="fleet-rollout-table-empty">
-        <OEmptyState size="block" preset="no-data" />
+        <OEmptyState
+          :title="t('emptyState.noData.title')"
+          :text="t('emptyState.noData.description')"
+        />
       </div>
     </template>
 
     <template #error>
       <div data-test="fleet-rollout-table-error">
-        <OEmptyState size="block" preset="load-error" @action="emit('retry')" />
+        <OEmptyState
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="t('emptyState.loadError.description')"
+          @action="emit('retry')"
+        />
       </div>
     </template>
   </OTable>
@@ -89,6 +94,7 @@ import type { OTableColumnDef, RowRailTone } from "@/lib/core/Table/OTable.types
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRolloutText } from "./rolloutText";
@@ -137,9 +143,9 @@ function railTone(row: RolloutRow): RowRailTone | null {
   return null;
 }
 
-function barVariant(row: RolloutRow) {
-  if (row.status === "halted") return "danger";
-  if (row.status === "completed" && row.total > 0) return "success";
-  return "default";
+function barVariant(row: RolloutRow): ProgressBarTone {
+  if (row.status === "halted") return "err";
+  if (row.status === "completed" && row.total > 0) return "ok";
+  return "accent";
 }
 </script>

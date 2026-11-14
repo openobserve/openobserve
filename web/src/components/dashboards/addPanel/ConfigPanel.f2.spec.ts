@@ -270,7 +270,7 @@ describe(
       mountPanel("pie", {}, true);
       await flushPromises();
       expect(wrapper!.find('[data-test="dashboard-config-pie_label_content"]').text()).toBe(
-        "Slice labelsNameValuePercentDefault (Name, Value, Percent)",
+        "Slice labelsNameValue +1Default (Name, Value, Percent)",
       );
     });
 

@@ -16,21 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OBanner
-    bar
-    :variant="bannerVariant(variant)"
+    :tone="customColors ? 'neutral' : bannerTone(variant)"
     :icon="bannerIcon(variant, icon)"
-    :text-size="textSize ?? DEFAULT_TEXT_SIZE"
-    :colors="bannerColorsFor(colors, mode)"
+    :style="customColors"
     :data-test="dataTest"
   >
-    <slot>
-      <!-- eslint-disable-next-line vue/no-v-html -- renderBannerMessage sanitizes to inline emphasis and http(s) links -->
-      <span class="announcement-message" v-html="html" />
-    </slot>
-
-    <template v-if="$slots.footer" #footer>
-      <slot name="footer" />
-    </template>
+    <div :class="TEXT_SIZE_CLASS[textSize ?? DEFAULT_TEXT_SIZE]">
+      <slot>
+        <!-- eslint-disable-next-line vue/no-v-html -- renderBannerMessage sanitizes to inline emphasis and http(s) links -->
+        <span class="announcement-message" v-html="html" />
+      </slot>
+      <div v-if="$slots.footer" class="mt-1">
+        <slot name="footer" />
+      </div>
+    </div>
 
     <template v-if="$slots.actions" #actions>
       <slot name="actions" />
@@ -53,7 +52,7 @@ import {
   DEFAULT_TEXT_SIZE,
   bannerColorsFor,
   bannerIcon,
-  bannerVariant,
+  bannerTone,
   type BannerColors,
   type BannerTextSize,
   type BannerThemeMode,
@@ -75,6 +74,23 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18nTyped();
+
+const TEXT_SIZE_CLASS: Record<BannerTextSize, string> = {
+  small: "text-xs",
+  medium: "text-compact",
+  large: "text-base",
+};
+
+// Operator-chosen colours are data, so they repaint the neutral tone's tokens on this banner only.
+const customColors = computed(() => {
+  const colors = bannerColorsFor(props.colors, props.mode);
+  return colors
+    ? {
+        "--color-banner-default-bg": colors.background,
+        "--color-banner-default-text": colors.text,
+      }
+    : undefined;
+});
 
 const html = computed(() => renderBannerMessage(props.message));
 </script>

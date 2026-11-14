@@ -20,15 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="open"
     :size="warningMessage?.length ? 'md' : 'sm'"
     :title="title"
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('confirmDialog.ok')"
+    :secondary="{ label: t('confirmDialog.cancel') }"
+    :primary="{ label: t('confirmDialog.ok') }"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
     <div data-test="dialog-box">
       <div class="para text-center">{{ message }}</div>
       <div v-if="warningMessage && warningMessage.length > 0" class="mt-4">
-        <OBanner variant="warning" icon="warning" :content="warningMessage" />
+        <OInlineNotice tone="warn" :message="warningMessage" />
       </div>
       <div v-if="hasQuery" class="mt-4">
         <OCheckbox
@@ -50,11 +50,11 @@ import { defineComponent, ref, computed, type PropType } from "vue";
 import { type I18nText, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 
 export default defineComponent({
   name: "CustomChartConfirmDialog",
-  components: { ODialog, OCheckbox, OBanner },
+  components: { ODialog, OCheckbox, OInlineNotice },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
     title: {

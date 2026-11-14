@@ -18,15 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('onlineEvals.disabled.title')"
-    icon="toggle-off"
     constrained
     data-test="online-evals-disabled"
   >
     <OEmptyState
-      size="hero"
       icon="toggle-off"
       :title="t('onlineEvals.disabled.title')"
-      :description="t('onlineEvals.disabled.description')"
+      :text="t('onlineEvals.disabled.description')"
     />
   </OPageLayout>
 </template>

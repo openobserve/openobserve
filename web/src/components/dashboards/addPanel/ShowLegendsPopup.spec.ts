@@ -37,7 +37,7 @@ const OButtonStub = {
   inheritAttrs: false,
   props: ["variant", "size", "disabled", "loading"],
   emits: ["click"],
-  template: `<button @click="$emit('click', $event)" v-bind="$attrs"><slot name="icon-left" /><slot /></button>`,
+  template: `<button @click="$emit('click', $event)" v-bind="$attrs"><slot name="icon" /><slot /></button>`,
 };
 
 describe("ShowLegendsPopup Component", () => {

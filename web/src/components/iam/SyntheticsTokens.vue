@@ -16,30 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-    :title="t('synthetics.tokens.title')"
+    :title="t('iam.syntheticsTokens')"
     title-data-test="synthetics-tokens-title-text"
-    icon="key"
+    :about="t('synthetics.tokens.explanation')"
     bleed
   >
-    <template #title-trail>
-      <span class="inline-flex items-center">
-        <OIcon
-          name="info-outline"
-          size="sm"
-          class="text-text-secondary cursor-help"
-          data-test="synthetics-tokens-info-icon"
-        />
-        <OTooltip :content="t('synthetics.tokens.explanation')" max-width="22.5rem" />
-      </span>
-    </template>
-    <template #subtitle>
-      <span class="min-w-0 truncate leading-normal">{{ t("synthetics.tokens.summary") }}</span>
-    </template>
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="refresh"
+        variant="secondary"
+        icon="refresh"
         data-test="synthetics-tokens-rotate-default-btn"
         @click="rotateDefault"
       >
@@ -47,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         variant="primary"
-        size="sm-action"
         data-test="synthetics-tokens-create-btn"
         @click="showCreateForm = true"
       >
@@ -58,14 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
-          :frame="false"
           :data="tokens"
           :columns="columns"
           row-key="name"
           :row-actions="rowActions"
           :loading="loading"
           v-model:global-filter="filterQuery"
-          :show-global-filter="false"
           :default-columns="false"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -75,10 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
           sorting="client"
-          show-index
         >
           <template #toolbar>
-            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('synthetics.tokens.searchPlaceholder')"
@@ -89,22 +70,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="syntheticsTokensRefresh"
+              shortcut="syntheticsTokensRefresh"
               data-test="synthetics-tokens-refresh-btn"
               @click="refreshTokens"
             />
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              illustration="browser-check"
-              :filtered="!!filterQuery"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :icon="filterQuery ? undefined : 'web'"
               :title="t('synthetics.tokens.empty.title')"
-              :description="t('synthetics.tokens.empty.description')"
+              :text="t('synthetics.tokens.empty.description')"
               data-test="synthetics-tokens-empty-state"
             />
           </template>
@@ -112,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-name="{ row }">
             <div class="flex min-w-0 items-center gap-2">
               <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
-              <OTag v-if="row.is_default" variant="primary-soft" size="xs" shape="rounded">
+              <OTag v-if="row.is_default" tone="accent" size="sm">
                 {{ t("synthetics.tokens.default") }}
               </OTag>
             </div>
@@ -122,9 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex min-w-0 items-center gap-1">
               <span class="text-text-secondary truncate font-mono text-xs">{{ row.token }}</span>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="content-copy"
+                icon="content-copy"
                 :title="t('synthetics.tokens.copyTokenBtn')"
                 :data-test="`synthetics-token-${row.name}-copy`"
                 @click.stop="copyToken(row.token)"
@@ -148,8 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showCreateForm"
       size="sm"
       :title="t('synthetics.tokens.createTokenTitle')"
-      :primary-button-label="t('common.create')"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{ label: t('common.create') }"
+      :secondary="{ label: t('common.cancel') }"
       form-id="create-synthetics-token-form"
       @click:secondary="showCreateForm = false"
     >
@@ -177,10 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Revealed token dialog (shown once) -->
     <ODialog
       v-model:open="showRevealedDialog"
-      :persistent="true"
       size="sm"
       :title="t('synthetics.tokens.newTokenRevealed')"
-      :secondary-button-label="t('common.close')"
+      :secondary="{ label: t('common.close') }"
       @click:secondary="showRevealedDialog = false"
     >
       <div class="text-text-label mb-1 text-xs font-medium">
@@ -203,9 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="synthetics-token-install-cmd"
             >{{ installCommand }}</pre>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="content-copy"
+            icon="content-copy"
             class="absolute top-1 right-1"
             :title="t('common.copy')"
             data-test="synthetics-token-copy-cmd-btn"
@@ -222,8 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex justify-end gap-2">
         <OButton
-          :variant="installCommand ? 'outline' : 'primary'"
-          size="sm-action"
+          :variant="installCommand ? 'secondary' : 'primary'"
           icon="content-copy"
           data-test="synthetics-token-copy-btn"
           @click="copyToken(revealedToken?.token || '')"
@@ -233,7 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="installCommand"
           variant="primary"
-          size="sm-action"
           icon="content-copy"
           data-test="synthetics-token-copy-cmd-primary-btn"
           @click="copyCommand"
@@ -260,9 +235,7 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -302,9 +275,7 @@ export default defineComponent({
     OPageLayout,
     OButton,
     OEmptyState,
-    OIcon,
     OSearchInput,
-    OTooltip,
     OTruncatedText,
     ORefreshButton,
     ODialog,
@@ -413,13 +384,6 @@ export default defineComponent({
         size: COL.owner,
         meta: { align: "left" },
       },
-      {
-        id: "actions",
-        header: t("common.actions"),
-        accessorKey: "actions",
-        sortable: false,
-        isAction: true,
-      },
     ];
 
     const rowActions: OTableRowAction<AgentToken>[] = [
@@ -427,12 +391,10 @@ export default defineComponent({
         id: "toggle",
         label: (row) => (row.enabled ? t("common.disable") : t("common.enable")),
         icon: (row) => (row.enabled ? "pause" : "play-arrow"),
-        tone: (row) => (row.enabled ? "destructive" : "success"),
-        onSelect: (row) => toggleEnabled(row.name, !row.enabled),
-        disabled: (row) =>
-          row.enabled && row.is_default
-            ? t("synthetics.tokens.disableDefaultBlocked")
-            : loading.value,
+        onClick: (row) => toggleEnabled(row.name, !row.enabled),
+        disabled: (row) => (row.enabled && row.is_default) || loading.value,
+        disabledReason: (row) =>
+          row.enabled && row.is_default ? t("synthetics.tokens.disableDefaultBlocked") : undefined,
         dataTest: (row) => `synthetics-token-${row.name}-toggle`,
       },
     ];

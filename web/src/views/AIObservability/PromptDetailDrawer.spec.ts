@@ -59,7 +59,7 @@ function version(number: number): PromptVersion {
 }
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "title", "primaryButtonLabel", "primaryButtonVariant"],
+  props: ["open", "title", "primary", "primary"],
   emits: ["click:primary", "click:secondary", "update:open"],
   template: "<div v-if='open'><slot /></div>",
 };
@@ -127,7 +127,7 @@ describe("prompt detail navigation and labels", () => {
 
     const dialog = wrapper.findComponent(ODialogStub);
     expect(dialog.props("open")).toBe(true);
-    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog.props("primary")?.variant).toBe("danger");
     expect(wrapper.find('[data-test="prompt-detail-delete-label-name"]').text()).toBe("production");
     expect(dialog.text()).toContain("Delete the protected production label from v1?");
     expect(mocks.deleteLabel).not.toHaveBeenCalled();

@@ -16,24 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-    icon="group-work"
-    :subtitle="t('settings.correlationSettingsPage.subtitle')"
+    :title="t('settings.correlationSettings')"
+    title-data-test="correlation-settings-page-title"
     data-test="correlation-settings-header"
-    tabs-below
     bleed
   >
-    <template #title>
-      <span data-test="correlation-settings-page-title">{{
-        t("settings.correlationSettings")
-      }}</span>
-    </template>
-
     <!-- Module tabs (Level-2 nav) -->
     <template #header-tabs>
       <OTabs
         :model-value="activeTab"
-        dense
-        align="left"
+        size="compact"
         data-test="correlation-settings-tabs"
         @update:model-value="onTabChange"
       >
@@ -41,26 +33,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="services"
           data-test="correlation-settings-services-tab"
           :label="t('settings.correlation.discoveredServicesTab')"
-          :suffix-icon="correlationLocked ? 'lock' : undefined"
+          :locked="correlationLocked"
         />
         <OTab
           name="discovery"
           data-test="correlation-settings-discovery-tab"
           :label="t('settings.correlation.serviceDiscoveryTab')"
-          :suffix-icon="correlationLocked ? 'lock' : undefined"
+          :locked="correlationLocked"
         />
         <OTab
           v-if="versionsEnabled"
           name="env-versions"
           data-test="svcver-correlation-settings-env-versions-tab"
           :label="t('serviceVersions.settings.tab')"
-          :suffix-icon="correlationLocked ? 'lock' : undefined"
+          :locked="correlationLocked"
         />
         <OTab
           name="field-aliases"
           data-test="correlation-settings-field-aliases-tab"
           :label="t('settings.correlation.fieldAliasesTab')"
-          :suffix-icon="alertsLocked ? 'lock' : undefined"
+          :locked="alertsLocked"
         />
       </OTabs>
     </template>

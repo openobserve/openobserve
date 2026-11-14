@@ -1,129 +1,121 @@
-// @vitest-environment jsdom
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import OBanner from "./OBanner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { BANNER_TONES } from "./OBanner.types";
 
-const stubs = { OIcon: true };
+const iconStub = { props: ["name"], template: '<i data-test="icon" :data-name="name" />' };
+const stubs = { OIcon: iconStub };
 
-describe("OBanner — preserveWhitespace", () => {
-  // Off by default: every existing caller of OBanner keeps its exact current
-  // layout unless it opts in.
-  it("does not force wrapping by default", () => {
-    const wrapper = mount(OBanner, {
-      props: { variant: "error" },
-      slots: { default: "a very long unbroken run of text" },
-      global: { stubs },
-    });
-    const row = wrapper.get(":scope > div:first-child");
-    const content = row.get(":scope > div:last-child");
-    expect(content.classes()).not.toContain("whitespace-pre-wrap");
-    expect(content.classes()).not.toContain("min-w-0");
-    expect(row.classes()).not.toContain("min-w-0");
-  });
+const mountBanner = (props: Record<string, unknown> = {}, slots: Record<string, string> = {}) =>
+  mount(OBanner, { props, slots, global: { stubs } });
 
-  // The actual fix: preserve newlines/spaces, allow a long unbroken token to
-  // wrap, and let the flex row shrink far enough for that wrapping to ever
-  // kick in (min-w-0) — without min-w-0 the wrap classes alone do nothing.
-  it("separates adjacent actions with the spacing scale", () => {
-    const wrapper = mount(OBanner, {
-      slots: { actions: "<button>Retry</button><button>Dismiss</button>" },
-      global: { stubs },
-    });
-    const actions = wrapper.get(":scope > div:last-child");
-    expect(actions.classes()).toEqual(
-      expect.arrayContaining(["flex", "flex-wrap", "items-center", "gap-2"]),
+describe("OBanner", () => {
+  it("is a full-width 36-high strip under the header: page gutter, bottom edge, no radius", () => {
+    const root = mountBanner({ message: "Sampling is on." }).get('[role="status"]');
+    expect(root.classes()).toEqual(
+      expect.arrayContaining([
+        "min-h-control-lg",
+        "w-full",
+        "border-b",
+        "px-page-edge",
+        "text-compact",
+      ]),
     );
+    expect(root.classes().some((c) => c.startsWith("rounded"))).toBe(false);
+    expect(root.text()).toBe("Sampling is on.");
   });
 
-  it("wraps content and lets the row shrink when set", () => {
+  it("defaults to info and paints each tone with its soft triplet", () => {
+    expect(mountBanner().attributes("data-tone")).toBe("info");
+    const fills = {
+      neutral: "bg-banner-default-bg",
+      info: "bg-banner-info-bg",
+      warn: "bg-banner-warning-bg",
+      err: "bg-banner-error-soft-bg",
+    } as const;
+    for (const tone of BANNER_TONES) {
+      const root = mountBanner({ tone });
+      expect(root.classes()).toContain(fills[tone]);
+    }
+  });
+
+  it("never paints a solid red fill for an error", () => {
+    const classes = mountBanner({ tone: "err" }).classes();
+    expect(classes).not.toContain("bg-banner-error-bg");
+    expect(classes).toContain("text-banner-error-soft-text");
+  });
+
+  it("derives the role from the tone: problems are alerts, the rest status", () => {
+    expect(mountBanner({ tone: "err" }).attributes("role")).toBe("alert");
+    expect(mountBanner({ tone: "warn" }).attributes("role")).toBe("alert");
+    expect(mountBanner({ tone: "info" }).attributes("role")).toBe("status");
+    expect(mountBanner({ tone: "neutral" }).attributes("role")).toBe("status");
+  });
+
+  it("shows the tone glyph unless an icon names the condition", () => {
+    expect(mountBanner({ tone: "warn" }).get('[data-test="icon"]').attributes("data-name")).toBe(
+      "warning",
+    );
+    expect(
+      mountBanner({ tone: "warn", icon: "lock" }).get('[data-test="icon"]').attributes("data-name"),
+    ).toBe("lock");
+  });
+
+  it("lets the default slot replace the message", () => {
+    const wrapper = mountBanner({ message: "plain" }, { default: "<b>rich</b> text" });
+    expect(wrapper.get('[data-test="o-banner-message"]').html()).toContain("<b>rich</b>");
+    expect(wrapper.text()).not.toContain("plain");
+  });
+
+  it("renders one small action from actionLabel and emits action", async () => {
+    const wrapper = mountBanner({ actionLabel: "View usage", actionDataTest: "usage" });
+    const button = wrapper.getComponent(OButton);
+    expect(button.props("variant")).toBe("secondary");
+    expect(wrapper.get('[data-test="usage"]').text()).toBe("View usage");
+    await wrapper.get('[data-test="usage"]').trigger("click");
+    expect(wrapper.emitted("action")).toHaveLength(1);
+  });
+
+  it("sizes a slotted action to the small height without the caller saying so", () => {
     const wrapper = mount(OBanner, {
-      props: { variant: "error", preserveWhitespace: true },
-      slots: { default: "a very long unbroken run of text" },
-      global: { stubs },
+      slots: { actions: '<OButton data-test="slotted">Retry</OButton>' },
+      global: { stubs, components: { OButton } },
     });
-    const row = wrapper.get(":scope > div:first-child");
-    const content = row.get(":scope > div:last-child");
-    expect(row.classes()).toContain("min-w-0");
-    expect(content.classes()).toContain("min-w-0");
-    expect(content.classes()).toContain("whitespace-pre-wrap");
-    expect(content.classes()).toContain("wrap-break-word");
-  });
-});
-
-describe("OBanner — textSize and colors", () => {
-  it("keeps the message at least 12rem wide on a phone, except for a centred bar", () => {
-    const bar = mount(OBanner, {
-      props: { bar: true },
-      slots: { default: "m" },
-      global: { stubs },
-    });
-    expect(bar.html()).toContain("max-md:min-w-48");
-    const centred = mount(OBanner, {
-      props: { bar: true, center: true },
-      slots: { default: "m" },
-      global: { stubs },
-    });
-    expect(centred.html()).not.toContain("max-md:min-w-48");
+    expect(wrapper.get('[data-test="slotted"]').classes()).toContain("h-control-sm");
   });
 
-  it("keeps the compact bar scale unless a size is asked for", () => {
-    const bar = mount(OBanner, {
-      props: { bar: true },
-      slots: { default: "m" },
-      global: { stubs },
-    });
-    expect(bar.classes()).not.toContain("text-base");
-    expect(bar.html()).toContain("text-compact");
-
-    const large = mount(OBanner, {
-      props: { bar: true, textSize: "large" },
-      slots: { default: "m" },
-      global: { stubs },
-    });
-    expect(large.classes()).toContain("text-base");
-    expect(large.html()).not.toContain("text-compact");
+  it("has no action area and no dismiss by default", () => {
+    const wrapper = mountBanner({ message: "m" });
+    expect(wrapper.find("button").exists()).toBe(false);
   });
 
-  it("matches the bar's default scale at medium", () => {
-    const medium = mount(OBanner, {
-      props: { bar: true, textSize: "medium" },
-      slots: { default: "m" },
-      global: { stubs },
-    });
-    expect(medium.classes()).toContain("text-compact");
-  });
-
-  it("paints runtime colours in place of the variant's tokens", () => {
+  it("dismisses through a named close button that follows the banner's data-test", async () => {
     const wrapper = mount(OBanner, {
-      props: { bar: true, variant: "info", colors: { background: "#1E3A8A", text: "#FFFFFF" } },
+      props: { dismissible: true },
+      attrs: { "data-test": "quota" },
       global: { stubs },
     });
-
-    expect(wrapper.classes()).not.toContain("bg-banner-info-bg");
-    expect(wrapper.classes()).toContain("bg-banner-custom-bg");
-    expect(wrapper.attributes("style")).toContain("--color-banner-custom-bg: #1E3A8A");
-  });
-});
-
-describe("OBanner — meta and footer slots", () => {
-  it("renders neither wrapper when the slots are not used", () => {
-    const wrapper = mount(OBanner, { slots: { default: "Message" }, global: { stubs } });
-    expect(wrapper.find('[data-test="o-banner-meta"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="o-banner-footer"]').exists()).toBe(false);
-  });
-
-  it("puts meta to the right of the message and footer under it", () => {
-    const wrapper = mount(OBanner, {
-      props: { variant: "warning" },
-      slots: { default: "Message", meta: "ends in 1 h", footer: "Alerts 7" },
-      global: { stubs },
-    });
-    const row = wrapper.get(":scope > div:first-child");
-    expect(row.get(":scope > div:last-child").text()).toBe("ends in 1 h");
-    const content = wrapper.get('[data-test="o-banner-footer"]');
-    expect(content.text()).toBe("Alerts 7");
-    expect(content.element.parentElement?.textContent).toContain("Message");
+    const close = wrapper.get('[data-test="quota-dismiss"]');
+    await close.trigger("click");
+    expect(wrapper.emitted("dismiss")).toHaveLength(1);
+    expect(mountBanner({ dismissible: true }).find('[data-test="o-banner-dismiss"]').exists()).toBe(
+      true,
+    );
   });
 });

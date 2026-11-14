@@ -3,5 +3,5 @@ import { ContextMenuSeparator } from "reka-ui";
 </script>
 
 <template>
-  <ContextMenuSeparator class="bg-dropdown-separator my-1 h-px" />
+  <ContextMenuSeparator class="bg-dropdown-separator -mx-1 my-1 h-px" />
 </template>

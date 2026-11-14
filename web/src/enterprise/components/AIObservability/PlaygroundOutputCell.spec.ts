@@ -27,8 +27,8 @@ const OTag = {
   props: ["variant", "size", "label"],
   template: '<span class="o-tag" :data-label="label" />',
 };
-const OBanner = {
-  props: ["variant", "dense", "preserveWhitespace"],
+const OInlineNotice = {
+  props: ["tone"],
   template: '<div v-bind="$attrs"><slot /></div>',
 };
 const OSpinner = {
@@ -39,7 +39,7 @@ const OSpinner = {
 function mountCell(cell: PlaygroundCell | undefined, props: Record<string, unknown> = {}) {
   return mount(PlaygroundOutputCell, {
     props: { cell, ...props },
-    global: { stubs: { OButton, OTag, OBanner, OSpinner } },
+    global: { stubs: { OButton, OTag, OInlineNotice, OSpinner } },
   });
 }
 

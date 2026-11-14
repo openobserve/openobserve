@@ -35,22 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="workflow-runs-page" class="flex h-full min-h-0 flex-col">
     <OPageHeader
-      :title="workflowName || t('workflow.runs.title')"
+      :title="workflowName ? raw(workflowName) : t('workflow.runs.title')"
       :back="{
-        label: t('workflow.header'),
-        onClick: goBack,
+        label: t('menu.workflows'),
+        to: workflowsListRoute(),
         dataTest: 'workflow-runs-back',
       }"
-      class="border-border-default border-b px-4"
-      overflow-first
     >
-      <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
-           after the title+subtitle column, stranding it far from the title). -->
-      <template #title>
-        <span class="flex min-w-0 items-center gap-2">
-          <OTruncatedText>{{ workflowName || t("workflow.runs.title") }}</OTruncatedText>
-          <BetaBadge />
-        </span>
+      <template #status>
+        <BetaBadge />
       </template>
       <template #actions-overflow>
         <WorkflowHttpEndpointButton
@@ -62,17 +55,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- Test is a read-only dry-run (it never edits the workflow), so it's
              offered here too — no need to switch to the editor just to test. -->
-        <OButton variant="outline" data-test="workflow-runs-test" @click="onTest">
+        <OButton variant="secondary" data-test="workflow-runs-test" @click="onTest">
           {{ t("workflow.test.button") }}
         </OButton>
-        <OButton variant="outline" data-test="workflow-runs-edit" @click="onEditWorkflow">
+        <OButton variant="secondary" data-test="workflow-runs-edit" @click="onEditWorkflow">
           {{ t("workflow.runs.edit") }}
         </OButton>
         <!-- Replaying is only possible for a run the backend persisted input for,
              so a Test/Retry run offers no button rather than a failing one. -->
         <OButton
           v-if="isRetryableRun(selectedRun)"
-          variant="outline"
+          variant="secondary"
           :loading="retrying"
           data-test="workflow-runs-retry"
           @click="onRetryRun"
@@ -109,8 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <OButton
-          variant="outline"
-          size="icon-sm"
+          icon-only
+          variant="secondary"
           class="absolute top-2 right-2 z-10"
           data-test="workflow-runs-panel-collapse"
           :aria-label="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
@@ -187,7 +180,6 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
@@ -285,12 +277,10 @@ const togglePanel = () => {
   }
 };
 
-const goBack = () => {
-  router.push({
-    name: "workflows",
-    query: { org_identifier: orgId.value, folder: activeFolderId.value },
-  });
-};
+const workflowsListRoute = () => ({
+  name: "workflows",
+  query: { org_identifier: orgId.value, folder: activeFolderId.value },
+});
 
 // Dry-run the current graph without leaving to the editor. Deselect the historical
 // run first — the canvas is about to show the LIVE test result instead, and a

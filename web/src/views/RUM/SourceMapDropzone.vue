@@ -75,10 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <OButton
+                icon-only
                 :aria-label="t('common.remove')"
                 variant="ghost"
-                size="icon"
-                icon-left="close"
+                size="xs"
+                icon="close"
                 @click.stop="removeFile(field)"
               />
             </div>

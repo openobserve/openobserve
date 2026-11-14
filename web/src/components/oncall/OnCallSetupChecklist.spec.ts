@@ -32,7 +32,7 @@ const push = vi.fn();
 vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
 
 const stubs = {
-  OBanner: { name: "OBanner", template: "<div><slot /><slot name='actions' /></div>" },
+  OInlineNotice: { name: "OInlineNotice", template: "<div><slot /><slot name='actions' /></div>" },
   OProgressBar: { name: "OProgressBar", props: ["value"], template: "<div />" },
   OIcon: { name: "OIcon", props: ["name"], template: "<i />" },
   OText: { name: "OText", template: "<span><slot /></span>" },

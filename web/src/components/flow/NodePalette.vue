@@ -100,7 +100,6 @@ export default {
         <div v-else class="o2vf_node rounded-default mb-3 transition-all last:mb-0">
           <OButton
             variant="ghost"
-            size="md"
             :class="[
               `o2vf_node_${node.io_type}`,
               node.locked || onItemClick ? 'cursor-pointer' : '',
@@ -111,7 +110,7 @@ export default {
             @dragstart="onDragStart && onDragStart($event, node)"
             @click="node.locked ? onLockedClick() : onItemClick && onItemClick(node)"
           >
-            <OTooltip v-if="!node.locked" side="right" :side-offset="10">
+            <OTooltip v-if="!node.locked" side="right">
               <template #content>
                 <div class="px-2.5 py-1.5">
                   <div class="text-2xs mb-0.5 font-medium capitalize">{{ node.label }}</div>

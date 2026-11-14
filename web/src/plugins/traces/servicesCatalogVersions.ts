@@ -58,7 +58,6 @@ export const CATALOG_COLUMN_SIZES = {
 } as const;
 const CATALOG_ENV_PICKED_SIZE = 157;
 export const CATALOG_SERVICE_MIN_SIZE = 112;
-export const CATALOG_ROW_HEIGHT = 54;
 const CATALOG_DEFAULT_HIDDEN = [
   "p50_latency_ns",
   "p99_latency_ns",

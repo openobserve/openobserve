@@ -70,10 +70,10 @@ async function onSubmit(value: StreamForm) {
     <OFormInput name="retention" type="number" :label="t('stream.retention')" />
 
     <div class="flex gap-2 mt-4">
-      <OButton variant="outline" size="sm-action" @click="$emit('cancel')">
+      <OButton variant="secondary" @click="$emit('cancel')">
         {{ t("common.cancel") }}
       </OButton>
-      <OButton variant="primary" size="sm-action" type="submit">
+      <OButton variant="primary" type="submit">
         {{ t("common.save") }}
       </OButton>
     </div>
@@ -180,6 +180,15 @@ refine; the prop and the schema rule go together.
 <!-- prop, not "Email *" -->
 ```
 
+**Field shape (S1, S3, S7, V1, V6).** Every `OForm*` field takes the default `md`
+height (32 px): never pass `size` to fit a row and never an `h-*` class
+(`local/o2-control-height`). The label sits above the field — 13 px medium,
+secondary, 4 px gap — and the error replaces the help text under it; there is no
+inside label (`label-position` is gone). Width signals the expected value:
+`width="s"` 160, `"m"` 240, `"l"` 360, or full. Multi-line text is
+`OFormTextarea` (`OFormInput type="textarea"` is gone); a unit goes in `suffix`
+("30 s"), not in the label. `local/o2-controls-api` rejects the removed props.
+
 ## 4. Submitting
 
 `OForm` renders a real `<form @submit>`. The submit path depends on where the
@@ -191,28 +200,33 @@ Save button lives:
   `<form>`): give `<OForm id="myForm">` an `id` (it falls through to the inner
   `<form>`) and set the overlay's `form-id="myForm"`. The footer's built-in Save
   button renders as `<button form="myForm" type="submit">`, so it submits the
-  form across the DOM boundary. Prefer the overlay's built-in
-  `primary-button-label`, `secondary-button-label`, and `@click:secondary` props
-  for Cancel.
+  form across the DOM boundary. Use the overlay's `:primary` and `:secondary`
+  action objects and `@click:secondary` for Cancel.
+- **Enter submits only a single-field form** (V7). In a dialog or drawer whose form
+  has more than one field, the overlay stops Enter from saving; the user presses
+  Save. Never add an `@keyup.enter` that saves a multi-field form.
 
-**Loading and enabled-state are automatic — don't manage them.** `OForm` awaits
-your `@submit` handler, so TanStack's `isSubmitting` stays true for the whole
-save and the Save button shows its spinner on its own. Therefore:
+**Loading, enabled-state and unsaved edits are automatic — don't manage them.**
+`OForm` awaits your `@submit` handler, so TanStack's `isSubmitting` stays true for
+the whole save and the Save button shows its spinner on its own. Inside an
+`ODialog`/`ODrawer` it also reports edits the user has not put back or saved, so
+Escape, ✕ and an outside click ask "Discard changes?" in the footer (V5). Therefore:
 
-- **Delete** any `useLoading` / `:loading` / `:primary-button-loading` wiring for
-  the submit — it's redundant.
-- **Do not** disable Save on invalid (`:primary-button-disabled` /
-  `:disabled`). Save stays enabled; clicking an invalid form reveals the errors.
-  That's the intended UX — a disabled button that never explains itself is worse.
-  The one disabled Save is `OSaveBar`'s clean state, which explains itself with
-  "No changes to save".
+- **Delete** any `useLoading` / `:loading` / `primary: { loading }` wiring for the
+  submit — it's redundant — and any `persistent` meant to protect typed input.
+- **Do not** disable Save on invalid (`primary: { disabled }`). Save stays enabled;
+  clicking an invalid form reveals the errors. Disable an action only when it will
+  become available, and then say why with `disabledReason` (B9). The one disabled
+  Save is `OSaveBar`'s clean state, which explains itself with "No changes to save".
 - The default slot also exposes `{ isSubmitting, canSubmit }` for an inline
   button that wants the spinner: `<OForm v-slot="{ isSubmitting }">`
 
 ### Dialog + OForm button pattern (required)
 
 When a form lives inside an `ODialog` or `ODrawer`, always use the overlay's
-**built-in button props** — never hand-roll buttons in a template slot:
+**footer action objects** — never hand-roll buttons in a template slot. The footer
+is fixed (O7): Cancel then the primary on the right, an extra action (Test
+connection, Delete) on the left via `:extra`.
 
 ```vue
 <!-- RIGHT: ODialog manages buttons, wired to form via form-id -->
@@ -220,9 +234,10 @@ When a form lives inside an `ODialog` or `ODrawer`, always use the overlay's
   :open="showDialog"
   @update:open="showDialog = $event"
   :title="t('common.edit')"
+  size="md"
   :form-id="FORM_ID"
-  :primary-button-label="t('common.save')"
-  :secondary-button-label="t('common.cancel')"
+  :primary="{ label: t('common.save') }"
+  :secondary="{ label: t('common.cancel') }"
   @click:secondary="showDialog = false"
 >
   <OForm
@@ -240,7 +255,7 @@ When a form lives inside an `ODialog` or `ODrawer`, always use the overlay's
   <OForm :schema="schema" @submit="onSubmit">
     <OFormInput name="title" />
     <div class="flex gap-2">
-      <OButton variant="outline" @click="showDialog = false">Cancel</OButton>
+      <OButton variant="secondary" @click="showDialog = false">Cancel</OButton>
       <OButton variant="primary" type="submit">Save</OButton>
     </div>
   </OForm>
@@ -258,9 +273,12 @@ When a form lives inside an `ODialog` or `ODrawer`, always use the overlay's
 **What the props do:**
 
 - `:form-id="FORM_ID"` — wires the footer buttons to the `<OForm id="FORM_ID">`
-- `:primary-button-label` — text on the Save button (localized, via `t()`)
-- `:secondary-button-label` — text on the Cancel button
+- `:primary="{ label }"` — the Save button, a verb + noun (B3); also takes
+  `variant`, `disabled`, `disabledReason`, `loading`, `dataTest`
+- `:secondary="{ label }"` — the Cancel button
+- `:extra="{ label, variant: 'danger-ghost' }"` + `@click:extra` — a left-side action
 - `@click:secondary="showDialog = false"` — close the dialog when Cancel is clicked
+  (Cancel is an explicit choice and does not ask; Escape, ✕ and outside clicks do)
 
 ## 5. Building the payload
 
@@ -344,7 +362,7 @@ map→rows at edit-prefill, rebuild the map at submit).
 <div v-for="(row, i) in rows" :key="i">
   <OFormInput :name="`rows[${i}].key`" />
   <OFormInput :name="`rows[${i}].value`" />
-  <OButton variant="ghost" icon-left="delete" @click="removeRow(i)" />
+  <OButton variant="danger-ghost" icon-only icon="delete" :label="t('common.remove')" @click="removeRow(i)" />
 </div>
 ```
 
@@ -440,9 +458,10 @@ export const notificationChannelDefaults = (): NotificationChannelForm => ({
 ```vue
 <template>
   <ODialog
+    size="md"
     :form-id="FORM_ID"
-    primary-button-label="Save"
-    secondary-button-label="Cancel"
+    :primary="{ label: t('alerts.saveChannel') }"
+    :secondary="{ label: t('common.cancel') }"
   >
     <OForm
       :id="FORM_ID"
@@ -483,8 +502,8 @@ export const notificationChannelDefaults = (): NotificationChannelForm => ({
            wrapper you'd use <OFormSecretInput name="auth_token" /> instead.
            auth_token stays schema-owned; the control is value-dumb -->
 
-      <div class="space-y-2">
-        <label class="text-sm font-medium">{{
+      <div class="space-y-1">
+        <label class="text-compact text-text-secondary font-medium">{{
           t("notificationChannels.authToken")
         }}</label>
         <SecretInput
@@ -497,13 +516,12 @@ export const notificationChannelDefaults = (): NotificationChannelForm => ({
       <!-- Dynamic field array: custom headers (map ↔ array conversion at edit/submit) -->
       <div class="space-y-3">
         <div class="flex justify-between">
-          <label class="text-sm font-medium">{{
+          <label class="text-compact text-text-secondary font-medium">{{
             t("notificationChannels.headers")
           }}</label>
           <OButton
             variant="ghost"
-            size="sm"
-            icon-left="add"
+            icon="add"
             type="button"
             @click="addHeader"
           >
@@ -521,10 +539,11 @@ export const notificationChannelDefaults = (): NotificationChannelForm => ({
             :placeholder="t('notificationChannels.headerValue')"
           />
           <OButton
-            variant="ghost"
-            size="sm"
-            icon-left="delete"
+            variant="danger-ghost"
+            icon-only
+            icon="delete"
             type="button"
+            :label="t('notificationChannels.removeHeader')"
             @click="removeHeader(idx)"
           />
         </div>
@@ -609,7 +628,9 @@ async function saveChannel(values: NotificationChannelForm) {
 | Mirror `ref` synced by `watch → setFieldValue`                | drift, post-save "required" flash              | owner: `useOForm` + `:form`; descendant: `inject` + `useStore` |
 | Per-field `:rules` / hand-rolled `validate()` / `xError` refs | forks validation off the schema                | one Zod schema on `<OForm :schema>`                            |
 | Hardcoded `*` in a label                                      | not accessible, drifts from the rule           | `required` prop + schema rule                                  |
-| `:primary-button-disabled` on invalid                         | dead-end UX; Save must explain itself          | leave Save enabled (submit reveals errors)                     |
+| `:primary="{ disabled: !valid }"` on invalid                  | dead-end UX; Save must explain itself          | leave Save enabled (submit reveals errors)                     |
+| `persistent` on a form dialog to keep typed input             | blocks Escape with no explanation              | nothing: the nested OForm makes Escape ask "Discard changes?" (V5) |
+| `@keyup.enter="save"` in a multi-field form                   | Enter saves half-filled forms (V7)             | Save button only; Enter submits single-field forms by itself   |
 | `useLoading` / `:loading` for submit                          | redundant                                      | `OForm` awaits `@submit` → auto spinner                        |
 | `{ ...value }` as the request body                            | leaks `.optional()` keys, ships string numbers | explicit keys + `Number()`/`z.coerce.number()`                 |
 | `uuid` `:key` on a field-array row                            | mid-list delete shifts/blanks inputs           | `:key="index"` + delete test                                   |

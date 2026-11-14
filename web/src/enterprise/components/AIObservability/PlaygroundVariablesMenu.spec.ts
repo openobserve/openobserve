@@ -15,7 +15,7 @@ const stubs = {
     emits: ["click"],
     template: `<button v-bind="$attrs" @click="$emit('click')"><slot /></button>`,
   },
-  OTag: { props: ["variant", "size"], template: `<span><slot /></span>` },
+  OTag: { props: ["tone", "size"], template: `<span><slot /></span>` },
   ODropdown: {
     props: ["open"],
     emits: ["update:open"],

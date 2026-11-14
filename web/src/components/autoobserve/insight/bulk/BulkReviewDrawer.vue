@@ -19,13 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="enterprise"
     :open="state.open"
     side="right"
-    size="xxl"
-    :close-guard="() => !running"
+    size="xl"
+    :persistent="running"
     :return-focus-to="() => state.opener"
     :title="title"
-    :sub-title="rule"
+    :subtitle="rule"
     title-data-test="bulk-review-title"
-    sub-title-data-test="bulk-review-rule"
+    subtitle-data-test="bulk-review-rule"
     data-test="bulk-review-drawer"
     @update:open="(open: boolean) => !open && closeBulkReview()"
   >
@@ -33,8 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-wrap items-center gap-3">
         <div class="w-44 max-md:w-full">
           <OSelect
-            size="sm"
-            label-position="inside"
+            variant="filter"
             :label="t('insight.bulk.groupBy')"
             :model-value="state.groupBy"
             :options="groupByOptions"
@@ -48,23 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </div>
 
-      <OBanner
-        v-if="rights"
-        variant="default"
-        icon="lock"
-        dense
-        role="status"
-        data-test="bulk-review-rights"
-      >
+      <OInlineNotice v-if="rights" tone="neutral" icon="lock" data-test="bulk-review-rights">
         {{ rights }}
-      </OBanner>
+      </OInlineNotice>
 
-      <OBanner
+      <OInlineNotice
         v-if="failures.length"
         ref="failureBanner"
-        variant="error-soft"
-        icon="error-outline"
-        role="alert"
+        tone="err"
         data-test="bulk-review-failures"
       >
         <p class="font-semibold">{{ partialBanner(t, failures.length, attempted) }}</p>
@@ -84,8 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-for="f in retryable"
             :key="f.row.key"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :disabled="running"
             :data-test="`bulk-review-retry-${f.row.key}`"
             @click="retry([f.row.key])"
@@ -94,8 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             v-if="retryable.length > 1"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :disabled="running"
             data-test="bulk-review-retry-all"
             @click="retry(retryable.map((f) => f.row.key))"
@@ -105,28 +93,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-for="f in duplicates"
             :key="`open-${f.row.key}`"
-            variant="ghost-primary"
-            size="sm"
+            variant="accent-ghost"
             :data-test="`bulk-review-open-existing-${f.row.key}`"
             @click="openExisting(f.row)"
           >
             {{ t("insight.bulk.openExisting") }}
           </OButton>
         </div>
-      </OBanner>
+      </OInlineNotice>
 
       <OTable
         :data="tableRows"
         :columns="columns"
-        :frame="false"
         :fill-height="false"
         row-key="key"
         pagination="none"
-        :show-global-filter="false"
         :cell-overflow-tooltip="false"
         :row-section="(row: ReviewRow) => sectionOf.get(row.key) ?? null"
         :section-order="groups.map((g) => g.key)"
-        :row-tone="(row: ReviewRow) => (isTickable(row) ? null : 'muted')"
+        :row-state="(row: ReviewRow) => (isTickable(row) ? null : 'paused')"
         :row-class="(row: ReviewRow) => (hidden.has(row.key) ? 'hidden' : '')"
         data-test="bulk-review-table"
       >
@@ -179,8 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ blockLine(t, row, reviewRows) }}
               </OTruncatedText>
               <OButton
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 class="shrink-0"
                 :data-test="`bulk-review-open-added-${row.key}`"
                 @click="openAdded(row.block.alert)"
@@ -224,7 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isMobile && asksThreshold(row)"
               :model-value="thresholdText(row)"
               type="number"
-              size="sm"
               class="mt-1 max-w-52"
               :label="t('insight.threshold.label')"
               :placeholder="t('insight.threshold.placeholder')"
@@ -256,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="asksThreshold(row)"
               :model-value="thresholdText(row)"
               type="number"
-              size="xs"
+              size="sm"
               :aria-label="t('insight.threshold.label')"
               :placeholder="t('insight.threshold.placeholderShort')"
               :suffix="String(t(`insight.threshold.${thresholdKind(row)}Suffix`))"
@@ -268,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OSkeleton
               v-else-if="waits(row)"
-              animation="pulse"
+              shape="block"
               class="h-4 w-36"
               role="status"
               :aria-label="
@@ -280,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-usually="{ row }">
-          <OSkeleton v-if="waits(row)" animation="pulse" class="h-4 w-20" aria-hidden="true" />
+          <OSkeleton v-if="waits(row)" shape="block" class="h-4 w-20" aria-hidden="true" />
           <span
             v-else-if="asksThreshold(row)"
             class="text-text-secondary"
@@ -307,17 +291,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ unreachableLine(t, reachGap, unreachable.length) }}
             <OButton
               v-if="reachGap === 'noTeam'"
-              variant="ghost-primary"
-              size="xs"
-              icon-right="arrow-forward"
+              variant="accent-ghost"
+              size="sm"
+              icon-end="arrow-forward"
               data-test="bulk-review-setup-oncall"
               @click="openSetup()"
               >{{ t("alerts.reach.setUpOncall") }}</OButton
             >
             <OButton
               v-if="reachGap === 'noTeam'"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :loading="checkingReach"
               data-test="bulk-review-check-oncall"
               @click="checkAgain()"
@@ -344,8 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </p>
         <div class="flex shrink-0 items-center gap-2">
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="running"
             data-test="bulk-review-cancel"
             @click="closeBulkReview()"
@@ -355,7 +338,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="!done"
             variant="primary"
-            size="sm-action"
             :disabled="toCreate.length === 0 || checking || unreachable.length > 0"
             :loading="running"
             :aria-describedby="FOOTER_ID"
@@ -382,7 +364,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";

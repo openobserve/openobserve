@@ -48,10 +48,15 @@ const CONTROLS = [
   "lib/core/Button/OButton.vue",
   "lib/core/ToggleGroup/OToggleGroupItem.vue",
   "lib/navigation/Tabs/OTab.vue",
+  "lib/overlay/shared/menuItem.ts",
+  "lib/forms/Select/OSelectItem.vue",
+];
+
+// The menu rows share one class builder, so its timing reaches every item.
+const MENU_ITEMS = [
   "lib/overlay/Dropdown/ODropdownItem.vue",
   "lib/overlay/Dropdown/ODropdownSub.vue",
   "lib/overlay/ContextMenu/OContextMenuItem.vue",
-  "lib/forms/Select/OSelectItem.vue",
 ];
 
 const MENUS = [
@@ -71,6 +76,10 @@ describe("one set of motion timings (item 9)", () => {
     expect(semantic).toMatch(/--ease-control:/);
     expect(semantic).toMatch(/--duration-dialog-in:\s*200ms/);
     expect(semantic).toMatch(/--duration-dialog-out:\s*150ms/);
+  });
+
+  it.each(MENU_ITEMS)("draws %s with the shared menu row classes", (file) => {
+    expect(read(file)).toContain("menuItemClasses(");
   });
 
   it.each(CONTROLS)("colours %s with the shared control timing", (file) => {

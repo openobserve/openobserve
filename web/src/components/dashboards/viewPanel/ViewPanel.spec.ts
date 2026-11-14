@@ -324,8 +324,8 @@ describe("ViewPanel", () => {
           OButton: {
             name: "OButton",
             template:
-              '<button @click="$emit(\'click\', $event)" :disabled="disabled" :data-test="$attrs[\'data-test\']"><slot name="icon-left" /><slot /></button>',
-            props: ["variant", "size", "disabled", "loading", "label"],
+              '<button @click="$emit(\'click\', $event)" :disabled="disabled" :data-test="$attrs[\'data-test\']"><slot name="icon" /><slot /></button>',
+            props: ["variant", "size", "disabled", "loading", "label", "stale", "icon", "iconOnly"],
             emits: ["click"],
             inheritAttrs: false,
           },
@@ -338,24 +338,24 @@ describe("ViewPanel", () => {
               "open",
               "size",
               "title",
-              "subTitle",
+              "subtitle",
               "showClose",
               "persistent",
               "width",
-              "primaryButtonLabel",
-              "secondaryButtonLabel",
-              "neutralButtonLabel",
-              "primaryButtonVariant",
-              "secondaryButtonVariant",
-              "neutralButtonVariant",
-              "primaryButtonDisabled",
-              "secondaryButtonDisabled",
-              "neutralButtonDisabled",
-              "primaryButtonLoading",
-              "secondaryButtonLoading",
-              "neutralButtonLoading",
+              "primary",
+              "secondary",
+              "extra",
+              "primary",
+              "secondary",
+              "extra",
+              "primary",
+              "secondary",
+              "extra",
+              "primary",
+              "secondary",
+              "extra",
             ],
-            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+            emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
           },
           ShowLegendsPopup: {
             name: "ShowLegendsPopup",
@@ -655,9 +655,9 @@ describe("ViewPanel", () => {
         const cancel = wrapper
           .findAllComponents({ name: "OButton" })
           .find((b) => b.attributes("data-test") === "dashboard-viewpanel-cancel-btn")!;
-        expect(cancel.props("variant")).toBe("cancel-query");
+        expect(cancel.props("variant")).toBe("secondary");
         expect(cancel.text()).toContain("Cancel");
-        expect(wrapper.vm.refreshOptionsVariant).toBe("cancel-query");
+        expect(wrapper.vm.refreshOptionsVariant).toBe("secondary");
         // No X icon on wide screens; a hidden Refresh label keeps the button width. The OButton
         // stub keeps icon-left in $attrs rather than on the DOM.
         expect(cancel.vm.$attrs["icon-left"]).toBeUndefined();
@@ -918,7 +918,8 @@ describe("ViewPanel", () => {
       await flushPromises();
       await changeAppliedVariables();
       expect(wrapper.vm.showApplyHint).toBe(true);
-      expect(refreshButton().props("variant")).toBe("pending");
+      expect(refreshButton().props("variant")).toBe("primary");
+      expect(refreshButton().props("stale")).toBe(true);
       expect(refreshTooltipWrapper().props("disabled")).toBe(false);
 
       wrapper.vm.disable = false;

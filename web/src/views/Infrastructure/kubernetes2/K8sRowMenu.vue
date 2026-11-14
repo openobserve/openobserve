@@ -59,9 +59,10 @@ const writes = computed(() => writeActionsFor(props.target.kind));
   <ODropdown side="bottom" align="end">
     <template #trigger>
       <OButton
-        icon-left="more-vert"
+        icon-only
+        icon="more-vert"
         variant="ghost"
-        size="icon-xs-sq"
+        size="sm"
         :aria-label="t('infra.k8s2.rowActions')"
         data-test="k8s2-row-menu-trigger"
         @click.stop
@@ -69,19 +70,16 @@ const writes = computed(() => writeActionsFor(props.target.kind));
     </template>
     <template v-for="type in reads" :key="type">
       <ODropdownItem
+        :icon="ITEMS[type].icon"
         v-if="isLocked(LICENSE_KEYS[type])"
         disabled
-        focusable-unavailable
         :data-test="`k8s2-row-menu-${type}`"
       >
-        <template #icon-left>
-          <OIcon :name="ITEMS[type].icon" size="sm" />
-        </template>
         <span class="min-w-0 flex-1">
           <OTooltip :content="lockedReason(LICENSE_KEYS[type] ?? '')" side="left" />
           {{ t(ITEMS[type].label) }}
         </span>
-        <template #icon-right>
+        <template #end>
           <OIcon
             name="lock"
             class="text-icon-locked"
@@ -92,7 +90,7 @@ const writes = computed(() => writeActionsFor(props.target.kind));
       </ODropdownItem>
       <ODropdownItem
         v-else
-        :icon-left="ITEMS[type].icon"
+        :icon="ITEMS[type].icon"
         :data-test="`k8s2-row-menu-${type}`"
         @select="emit('action', type, target)"
       >
@@ -101,20 +99,17 @@ const writes = computed(() => writeActionsFor(props.target.kind));
     </template>
     <ODropdownSeparator v-if="writes.length" />
     <ODropdownItem
+      :icon="ITEMS[type].icon"
       v-for="type in writes"
       :key="type"
       disabled
-      focusable-unavailable
       :data-test="`k8s2-row-menu-${type}`"
     >
-      <template #icon-left>
-        <OIcon :name="ITEMS[type].icon" size="sm" />
-      </template>
       <span class="min-w-0 flex-1">
         <OTooltip :content="t('infra.k8s2.readOnlyAccess')" side="left" />
         {{ t(ITEMS[type].label) }}
       </span>
-      <template #icon-right>
+      <template #end>
         <OIcon name="lock" class="lock-chip" size="sm" data-test="k8s2-row-menu-lock" />
       </template>
     </ODropdownItem>

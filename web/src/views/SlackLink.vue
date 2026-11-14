@@ -106,7 +106,7 @@ onMounted(() => {
     <div class="py-6">
       <SlackLinkCard
         v-if="resent"
-        illustration="check"
+        icon="task-alt"
         :title="t('slackApp.link.resentTitle')"
         :description="t('slackApp.link.resentDetail')"
         data-test="slack-link-resent"

@@ -23,12 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("dashboard.sectionFieldType") }}
       </div>
-      <OToggleGroup class="cf-seg h-8" type="single" v-model="colModel.fieldType">
+      <OToggleGroup type="single" v-model="colModel.fieldType">
         <OToggleGroupItem
           v-for="ft in fieldTypeOptions"
           :key="ft.value"
           :value="ft.value"
-          size="sm"
           :data-test="`o2-format-field-type-${ft.value}-${col.field}`"
         >
           {{ ft.label }}
@@ -66,8 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("dashboard.sectionAlignment") }}
       </div>
-      <OToggleGroup class="cf-seg h-8" type="single" v-model="alignmentModel">
-        <OToggleGroupItem v-for="a in alignOptions" :key="a.value" :value="a.value" size="sm">
+      <OToggleGroup type="single" v-model="alignmentModel">
+        <OToggleGroupItem
+          v-for="a in alignOptions"
+          :key="a.value"
+          :value="a.value"
+          :data-test="`o2-format-alignment-${a.value}-${col.field}`"
+        >
           {{ a.label }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -111,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`o2-format-unique-color-${col.field}`"
         @click="colModel.autoColor = !colModel.autoColor"
       >
-        <OCheckbox :model-value="col.autoColor" size="sm" class="pointer-events-none" />
+        <OCheckbox :model-value="col.autoColor" class="pointer-events-none" />
         <span
           class="o-input-label text-compact text-input-label-text cursor-pointer leading-tight font-medium"
           >{{ t("dashboard.overrideConfigUniqueValueColor") }}</span
@@ -152,9 +156,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs"
-            icon-left="close"
+            icon="close"
             :title="t('common.remove')"
             class="ms-auto shrink-0"
             @click="colModel.conditions.splice(ruleIdx, 1)"
@@ -184,8 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         class="mt-1"
         :data-test="`o2-format-add-rule-${col.field}`"
         @click="colModel.conditions.push(emptyConditionalRule())"
@@ -262,13 +265,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-/* keep(lib-override:o2-toggle-group): OToggleGroup renders its own <button>
-   children, so their intrinsic min-height can only be reset from the parent via
-   :deep() — no utility on this component can reach that generated element. */
-.cf-seg :deep(button) {
-  height: 100% !important;
-  min-height: 0 !important;
-}
-</style>

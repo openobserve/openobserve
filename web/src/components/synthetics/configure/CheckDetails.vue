@@ -19,6 +19,7 @@ import { computed, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserCheck, ProtocolCheck, SyntheticsFolder } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
 import VariableSuggestionRow from "../variables/VariableSuggestionRow.vue";
 import type { VariableSuggestion } from "../variables/suggestions";
@@ -218,8 +219,7 @@ function handleTagKeydown(event: KeyboardEvent) {
           />
           <OButton
             v-if="prefillView.preSaveRun"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :loading="testRunning"
             :disabled="!check.url"
             data-test="synthetics-prefill-test-now"
@@ -238,9 +238,8 @@ function handleTagKeydown(event: KeyboardEvent) {
         </p>
       </div>
 
-      <OInput
+      <OTextarea
         v-model="description"
-        type="textarea"
         :label="t('synthetics.checkDetails.description')"
         :placeholder="t('synthetics.checkDetails.descriptionPlaceholder')"
         :rows="3"
@@ -266,8 +265,7 @@ function handleTagKeydown(event: KeyboardEvent) {
             @keydown="handleTagKeydown"
           />
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             data-test="synthetics-check-details-add-tag-btn"
             @click="addTag"
           >
@@ -275,17 +273,11 @@ function handleTagKeydown(event: KeyboardEvent) {
           </OButton>
         </div>
         <div v-if="check.tags.length > 0" class="flex flex-wrap gap-2">
-          <OTag
-            v-for="(tag, index) in check.tags"
-            :key="tag"
-            size="xs"
-            class="px-2"
-            type="selectionChip"
-          >
+          <OTag v-for="(tag, index) in check.tags" :key="tag" size="sm" type="selectionChip">
             <span class="px-0.5">{{ tag }}</span>
             <OButton
               variant="ghost"
-              size="chip"
+              size="xs"
               :aria-label="t('synthetics.checkDetails.removeTag', { tag })"
               :data-test="`synthetics-check-details-remove-tag-${index}-btn`"
               class="text-text-muted hover:text-text-body transition-colors"

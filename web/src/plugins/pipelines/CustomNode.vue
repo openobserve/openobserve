@@ -446,7 +446,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           >
             {{ nodeErrorCount }}
           </span>
-          <OTooltip side="top" align="center" :sideOffset="10" max-width="37.5rem">
+          <OTooltip side="top">
             <template #content>
               <div class="max-h-75 overflow-y-auto">
                 {{ getNodeErrorInfo || t("common.errorOccurred") }}
@@ -464,10 +464,11 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           @mouseleave="handleActionButtonsLeave"
         >
           <OButton
+            icon-only
             variant="ghost"
-            size="icon"
+            size="xs"
             @click.stop="deleteNode(id)"
-            class="rounded-default! bg-surface-overlay/95! node-action-btn delete-btn h-5! w-5! min-w-5! border! border-(--node-color)! p-0! text-(--node-color)! transition-all! duration-200!"
+            class="rounded-default! bg-surface-overlay/95! node-action-btn delete-btn border! border-(--node-color)! text-(--node-color)! transition-all! duration-200!"
             :data-test="`pipeline-node-${io_type}-delete-btn`"
           >
             <OIcon name="delete" size="sm" />
@@ -475,12 +476,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
                  app). Replaced a hand-rolled `fixed`-positioned tooltip div that
                  drifted inside the transformed Vue Flow node — reka-ui/Floating
                  UI handles that correctly. -->
-            <OTooltip
-              :content="t('pipeline.deleteNodeTitle')"
-              side="top"
-              align="center"
-              :side-offset="8"
-            />
+            <OTooltip :content="t('pipeline.deleteNodeTitle')" side="top" />
           </OButton>
         </div>
       </template>

@@ -320,17 +320,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- view panel dialog -->
       <ODialog
+        size="full"
         data-test="render-dashboard-charts-view-panel-dialog"
         v-model:open="showViewPanel"
-        :width="98"
         :show-close="false"
       >
-        <!-- Explicit height wrapper: fills the dialog body's available space
-             (90vh − body padding) so ViewPanel can use height:100% and
-             flex:1 works all the way down without causing a body scrollbar. -->
-        <div
-          class="view-panel-height-wrapper -my-dialog-content-py -mx-dialog-content-px flex h-[calc(90vh-var(--spacing-dialog-content-py)*2)] flex-col overflow-hidden"
-        >
+        <!-- ViewPanel sizes itself with height:100%, so the full-screen body hands it the whole height. -->
+        <div class="view-panel-height-wrapper flex h-full flex-col overflow-hidden">
           <ViewPanel
             :folderId="folderId"
             :dashboardId="dashboardData.dashboardId"

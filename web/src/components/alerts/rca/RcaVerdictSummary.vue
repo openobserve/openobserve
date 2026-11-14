@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="openFindings.length > 0"
         data-test="rca-verdict-open-finding"
-        variant="ghost-warning"
-        size="xs"
-        icon-left="warning-amber"
+        variant="ghost"
+        size="sm"
+        icon="warning-amber"
         @click="$emit('open-hypothesis', openFindings[0].id)"
         >{{ openFindingsLabel
         }}<OTooltip :content="t('alerts.incidents.rcaLight.openFindingsHint')"
@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <span data-test="rca-verdict-band" :data-band="card.band ?? 'none'">{{ bandText }}</span>
         <OPopover
+          size="lg"
           v-if="breakdown"
           side="bottom"
           align="start"
@@ -54,17 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #trigger>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
-              icon-left="info-outline"
+              icon="info-outline"
               data-test="rca-verdict-band-info"
               :aria-label="t('alerts.incidents.rcaLight.whyConfidence')"
             />
           </template>
-          <div
-            data-test="rca-verdict-confidence-why"
-            class="flex w-96 max-w-[calc(100vw-1.5rem)] flex-col gap-2 p-3"
-          >
+          <div data-test="rca-verdict-confidence-why" class="flex flex-col gap-2 p-3">
             <span class="text-text-heading text-sm font-semibold">
               {{ t("alerts.incidents.rcaLight.whyBand", { band: bandWord(card.band) }) }}
             </span>
@@ -106,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="unverifiedCount > 0"
         data-test="rca-verdict-unverified-count"
-        variant="ghost-warning"
-        size="xs"
+        variant="ghost"
+        size="sm"
         @click="$emit('show-unverified')"
       >
         {{
@@ -134,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ pageWord }}
         </RcaPill>
         <OPopover
+          size="lg"
           v-if="pageAdvice.reason"
           side="bottom"
           align="start"
@@ -141,17 +140,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #trigger>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
-              icon-left="info-outline"
+              icon="info-outline"
               data-test="rca-verdict-page-info"
               :aria-label="t('alerts.incidents.rcaLight.whySuggestion')"
             />
           </template>
-          <div
-            data-test="rca-verdict-page-why"
-            class="flex w-96 max-w-[calc(100vw-1.5rem)] flex-col gap-1.5 p-3"
-          >
+          <div data-test="rca-verdict-page-why" class="flex flex-col gap-1.5 p-3">
             <span class="text-text-heading text-sm font-semibold">
               {{ t("alerts.incidents.rcaLight.whySuggestionTitle", { action: pageWord }) }}
             </span>
@@ -173,8 +169,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="headlineClamped || headlineOpen"
         data-test="rca-verdict-headline-toggle"
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :aria-expanded="headlineOpen"
         @click="headlineOpen = !headlineOpen"
       >
@@ -194,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <dt class="text-text-secondary flex items-center gap-1 text-xs">
           {{ t("alerts.incidents.rcaSummary.impact") }}
           <OPopover
+            size="lg"
             v-if="impactDetailsShown"
             side="bottom"
             align="start"
@@ -201,16 +198,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #trigger>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs"
-                icon-left="info-outline"
+                icon="info-outline"
                 data-test="rca-fact-impact-info"
                 :aria-label="t('alerts.incidents.rcaLight.impactDetails')"
               />
             </template>
             <dl
               data-test="rca-fact-impact-why"
-              class="text-compact m-0 grid w-96 max-w-[calc(100vw-1.5rem)] grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1 p-3"
+              class="text-compact m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1 p-3"
             >
               <template v-if="card.impact?.summary">
                 <dt class="text-text-secondary">{{ t("alerts.incidents.rcaSummary.impact") }}</dt>
@@ -323,9 +320,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <dd data-test="rca-fact-value" class="m-0">
           <OButton
             data-test="rca-fact-blind-spots"
-            variant="ghost-warning"
-            size="xs"
-            icon-left="visibility-off"
+            variant="ghost"
+            size="sm"
+            icon="visibility-off"
             @click="$emit('show-blind-spots')"
           >
             {{ formatCount(blindSpots.length) }}

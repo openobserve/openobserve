@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :disabled="disabled"
       @update:model-value="(value) => emit('update:modelValue', value as string)"
     >
-      <OToggleGroupItem value="table" size="sm" data-test="edit-role-permissions-show-table-btn">
+      <OToggleGroupItem value="table" data-test="edit-role-permissions-show-table-btn">
         {{ t("iam.editRole.table") }}
       </OToggleGroupItem>
-      <OToggleGroupItem value="json" size="sm" data-test="edit-role-permissions-show-json-btn">
+      <OToggleGroupItem value="json" data-test="edit-role-permissions-show-json-btn">
         {{ t("iam.editRole.json") }}
       </OToggleGroupItem>
     </OToggleGroup>

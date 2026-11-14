@@ -4909,8 +4909,8 @@ describe("ODialog Migration", () => {
     props: {
       open: { type: Boolean, default: false },
       title: { type: String, default: "" },
-      primaryButtonLabel: { type: String, default: "" },
-      secondaryButtonLabel: { type: String, default: "" },
+      primary: { type: Object, default: undefined },
+      secondary: { type: Object, default: undefined },
       size: { type: String, default: "md" },
     },
     emits: ["update:open", "click:primary", "click:secondary"],

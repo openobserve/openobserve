@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="relative flex flex-col gap-3 px-3 py-2" data-test="downtime-preview">
-    <OInnerLoading :showing="loading" size="sm" />
+    <OLoadingLine :active="loading" class="absolute inset-x-0 top-0" />
     <p v-if="error" class="text-input-error-text text-xs" data-test="downtime-preview-error">
       {{ t("alerts.downtimes.preview.failed") }}
     </p>
@@ -84,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       v-if="canExpand"
       class="self-start"
-      variant="ghost-primary"
-      size="xs"
+      variant="accent-ghost"
+      size="sm"
       data-test="downtime-preview-toggle-full"
       @click="full = !full"
     >
@@ -101,7 +101,7 @@ import type { PreviewMatch, PreviewResponse, TargetModule } from "@/services/dow
 import { MODULE_ICONS, MODULE_LABEL_KEYS, MODULE_ORDER } from "@/utils/downtimes/targetSummary";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 
 const SHORT_LIST = 5;
 

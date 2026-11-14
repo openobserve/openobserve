@@ -4,22 +4,17 @@
     :form="form"
     v-slot="{ isSubmitting }"
   >
-    <!-- Shared page header (same as JobFormPage) so the two eval forms read
-         identically: Back pill in the module-icon slot, title, and the close
-         button in #actions. The scorer type is NOT badged here — the title
-         already says it ("New LLM Judge Scorer"); the badge only earns its
-         place in ScorerList, where rows have no title to carry it. -->
+    <!-- No scorer type badge: the title already says it ("New LLM Judge Scorer"). -->
     <OPageLayout
       :back="{
-        label: t('onlineEvals.scorer.backTo'),
+        label: t('aiObservability.nav.scorers'),
         onClick: cancel,
         dataTest: 'scorer-form-back-btn',
       }"
+      :title="titleText"
+      title-data-test="scorer-form-title"
       bleed
     >
-      <template #title>
-        <span data-test="scorer-form-title">{{ titleText }}</span>
-      </template>
       <div
         class="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] gap-0 overflow-hidden max-[68.75rem]:grid-cols-1"
       >
@@ -48,7 +43,6 @@
                   :placeholder="
                     raw(formValues.scorerType === 'code' ? 'json_is_valid' : 'faithfulness_judge')
                   "
-                  size="sm"
                   required
                   :disabled="mode === 'edit'"
                   data-test="scorer-form-name-input"
@@ -60,7 +54,6 @@
                   name="description"
                   :label="t('onlineEvals.scorer.descriptionLabel')"
                   :placeholder="t('onlineEvals.scorer.descriptionPlaceholder')"
-                  size="sm"
                   :rows="3"
                   data-test="scorer-form-description-input"
                 />
@@ -72,7 +65,6 @@
                   :label="t('onlineEvals.scorer.producesScoreConfigLabel')"
                   :options="scoreConfigOptions"
                   :placeholder="t('onlineEvals.scorer.producesScoreConfigNone')"
-                  size="md"
                   :disabled="mode === 'edit'"
                   data-test="scorer-form-score-config-select"
                   @update:modelValue="handleScoreConfigSelection"
@@ -129,15 +121,14 @@
                     :label="t('onlineEvals.scorer.providerLabel')"
                     :options="providerOptions"
                     :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
-                    size="md"
                     required
                     class="min-w-0 flex-1"
                     data-test="scorer-form-provider-select"
                   />
                   <OButton
+                    icon-only
                     variant="ghost"
-                    size="icon-md"
-                    icon-left="refresh"
+                    icon="refresh"
                     :loading="isRefreshingProviders"
                     :title="t('onlineEvals.scorer.refreshProviders')"
                     data-test="scorer-form-provider-refresh-btn"
@@ -186,7 +177,6 @@
                   name="model"
                   :label="t('onlineEvals.scorer.modelLabel')"
                   :placeholder="t('onlineEvals.scorer.modelPlaceholder')"
-                  size="sm"
                   data-test="scorer-form-model-input"
                 />
                 <OFormInput
@@ -195,7 +185,6 @@
                   :placeholder="t('onlineEvals.scorer.temperaturePlaceholder')"
                   :help-text="t('onlineEvals.scorer.temperatureHelp')"
                   type="number"
-                  size="sm"
                   :min="0"
                   :max="2"
                   step="0.1"
@@ -207,7 +196,6 @@
                 <OFormTextarea
                   name="template"
                   :label="t('onlineEvals.scorer.promptLabel')"
-                  size="sm"
                   required
                   :rows="8"
                   data-test="scorer-form-prompt-input"
@@ -270,7 +258,6 @@
                   >
                     <OFormInput
                       :name="`extraMetadataFields[${idx}].name`"
-                      size="sm"
                       :placeholder="t('onlineEvals.scorer.extraFields.namePlaceholder')"
                       :class="{
                         'has-error': field.name && extraFieldNameDuplicates.has(field.name),
@@ -279,20 +266,18 @@
                     />
                     <OFormSelect
                       :name="`extraMetadataFields[${idx}].type`"
-                      size="md"
                       :options="extraFieldTypeOptions"
                       :data-test="`scorer-form-extra-field-type-${idx}`"
                     />
                     <OFormInput
                       :name="`extraMetadataFields[${idx}].description`"
-                      size="sm"
                       :placeholder="t('onlineEvals.scorer.extraFields.descriptionPlaceholder')"
                       :data-test="`scorer-form-extra-field-description-${idx}`"
                     />
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon-xs"
-                      icon-left="close"
+                      icon="close"
                       :aria-label="t('onlineEvals.buttons.remove')"
                       :data-test="`scorer-form-extra-field-remove-${idx}`"
                       @click="removeExtraField(idx)"
@@ -303,8 +288,8 @@
                 <div class="flex justify-between gap-3">
                   <OButton
                     v-if="!decisionProvider"
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     :disabled="formValues.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
                     data-test="scorer-form-extra-field-add"
                     @click="addExtraField"
@@ -317,8 +302,8 @@
 
                   <OButton
                     class="scorer-extras__preview"
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     data-test="scorer-form-preview-schema"
                     @click="previewOutputSchema"
                   >
@@ -347,7 +332,6 @@
                   :label="t('codeScorer.startFromLabel')"
                   :options="starterOptions"
                   :placeholder="t('codeScorer.startFromPlaceholder')"
-                  size="md"
                   data-test="scorer-form-code-starter"
                   @update:model-value="applyStarter"
                 />
@@ -432,7 +416,6 @@
                 <div class="scorer-url-bar grid grid-cols-[6.5rem_minmax(0,1fr)] gap-0">
                   <OFormSelect
                     name="httpMethod"
-                    size="md"
                     :options="httpMethodOptions"
                     :searchable="false"
                     data-test="scorer-form-remote-method-select"
@@ -440,7 +423,6 @@
                   <OFormInput
                     name="remoteEndpoint"
                     :placeholder="t('onlineEvals.scorer.remoteEndpointPlaceholder')"
-                    size="sm"
                     data-test="scorer-form-remote-endpoint-input"
                   />
                 </div>
@@ -452,7 +434,6 @@
                     name="timeoutMs"
                     :label="t('onlineEvals.scorer.remoteTimeoutLabel')"
                     type="number"
-                    size="sm"
                     :min="0"
                     data-test="scorer-form-remote-timeout"
                   />
@@ -462,7 +443,6 @@
                     name="maxRetries"
                     :label="t('onlineEvals.scorer.remoteRetriesLabel')"
                     type="number"
-                    size="sm"
                     :min="0"
                     data-test="scorer-form-remote-retries"
                   />
@@ -471,7 +451,6 @@
                   <OFormSelect
                     name="backoffStrategy"
                     :label="t('onlineEvals.scorer.remoteBackoffLabel')"
-                    size="md"
                     :options="backoffOptions"
                     :searchable="false"
                     data-test="scorer-form-remote-backoff"
@@ -504,7 +483,6 @@
                 <OFormSelect
                   name="authType"
                   :label="t('onlineEvals.scorer.remoteAuthLabel')"
-                  size="md"
                   :options="authTypeOptions"
                   :searchable="false"
                   :clearable="true"
@@ -518,7 +496,6 @@
                   name="authBearerToken"
                   :label="t('onlineEvals.scorer.remoteAuth.tokenLabel')"
                   :placeholder="t('onlineEvals.scorer.remoteAuth.bearerTokenPlaceholder')"
-                  size="sm"
                   required
                   type="password"
                   :help-text="t('onlineEvals.scorer.remoteAuth.encryptedHint')"
@@ -535,7 +512,6 @@
                     name="authBasicUsername"
                     :label="t('onlineEvals.scorer.remoteAuth.usernameLabel')"
                     :placeholder="t('onlineEvals.scorer.remoteAuth.basicUsernamePlaceholder')"
-                    size="sm"
                     required
                     data-test="scorer-form-remote-auth-basic-username"
                   />
@@ -545,7 +521,6 @@
                     name="authBasicPassword"
                     :label="t('onlineEvals.scorer.remoteAuth.passwordLabel')"
                     :placeholder="t('onlineEvals.scorer.remoteAuth.basicPasswordPlaceholder')"
-                    size="sm"
                     required
                     type="password"
                     :help-text="t('onlineEvals.scorer.remoteAuth.encryptedHint')"
@@ -563,7 +538,6 @@
                     name="authApiKeyHeaderName"
                     :label="t('onlineEvals.scorer.remoteAuth.headerNameLabel')"
                     :placeholder="t('onlineEvals.scorer.remoteAuth.apiKeyHeaderPlaceholder')"
-                    size="sm"
                     required
                     data-test="scorer-form-remote-auth-apikey-header"
                   />
@@ -573,7 +547,6 @@
                     name="authApiKeyToken"
                     :label="t('onlineEvals.scorer.remoteAuth.tokenLabel')"
                     :placeholder="t('onlineEvals.scorer.remoteAuth.apiKeyTokenPlaceholder')"
-                    size="sm"
                     required
                     type="password"
                     :help-text="t('onlineEvals.scorer.remoteAuth.encryptedHint')"
@@ -620,20 +593,18 @@
                   >
                     <OFormInput
                       :name="`customHeaders[${idx}].key`"
-                      size="sm"
                       :placeholder="t('onlineEvals.scorer.remoteHeaders.keyPlaceholder')"
                       :data-test="`scorer-form-remote-header-key-${idx}`"
                     />
                     <OFormInput
                       :name="`customHeaders[${idx}].value`"
-                      size="sm"
                       :placeholder="t('onlineEvals.scorer.remoteHeaders.valuePlaceholder')"
                       :data-test="`scorer-form-remote-header-value-${idx}`"
                     />
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon-xs"
-                      icon-left="close"
+                      icon="close"
                       :aria-label="t('onlineEvals.buttons.remove')"
                       :data-test="`scorer-form-remote-header-remove-${idx}`"
                       @click="removeCustomHeader(idx)"
@@ -643,8 +614,8 @@
 
                 <div class="flex justify-between gap-3">
                   <OButton
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     data-test="scorer-form-remote-header-add"
                     @click="addCustomHeader"
                   >
@@ -672,7 +643,6 @@
                 <OFormTextarea
                   name="template"
                   :label="t('onlineEvals.scorer.requestBodyLabel')"
-                  size="sm"
                   required
                   :rows="10"
                   data-test="scorer-form-request-body-input"
@@ -712,8 +682,7 @@
         <OButton
           data-test="scorer-form-cancel-btn"
           type="button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="isSubmitting"
           @click="cancel"
         >
@@ -723,7 +692,6 @@
           data-test="scorer-form-save-btn"
           type="submit"
           variant="primary"
-          size="sm-action"
           :loading="isSubmitting"
         >
           {{ t("onlineEvals.buttons.save") }}
@@ -751,9 +719,8 @@
           <div class="flex w-full items-center justify-between gap-2">
             <OButton
               data-test="scorer-form-schema-copy-btn"
-              variant="outline"
-              size="sm-action"
-              :icon-left="schemaJustCopied ? 'check' : 'content-copy'"
+              variant="secondary"
+              :icon="schemaJustCopied ? 'check' : 'content-copy'"
               :disabled="!schemaPreview || isLoadingSchemaPreview"
               @click="copySchemaToClipboard"
             >
@@ -762,7 +729,6 @@
             <OButton
               data-test="scorer-form-schema-close-btn"
               variant="primary"
-              size="sm-action"
               @click="schemaPreviewOpen = false"
             >
               {{ t("onlineEvals.buttons.close") }}

@@ -27,17 +27,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OButton
+      icon-only
       :aria-label="t('dashboard.selectDashboardDropdown.newDashboard')"
       data-test="dashboard-dashboard-new-add"
-      variant="outline"
-      size="icon-xs-sq"
-      class="h-8! w-8!"
+      variant="secondary"
+      size="sm"
       @click="
         () => {
           showAddDashboardDialog = true;
         }
       "
-      icon-left="add"
+      icon="add"
     >
     </OButton>
   </div>
@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="showAddDashboardDialog"
     size="sm"
     :title="t('dashboard.selectDashboardDropdown.newDashboard')"
-    :secondary-button-label="t('dashboard.cancel')"
-    :primary-button-label="t('dashboard.save')"
+    :secondary="{ label: t('dashboard.cancel') }"
+    :primary="{ label: t('dashboard.save') }"
     form-id="add-dashboard-form"
     data-test="dashboard-dashboard-add-dialog"
     @update:open="showAddDashboardDialog = $event"

@@ -35,8 +35,6 @@
     :total-count="totalCount"
     :loading="loading"
     :loading-reset-key="alertId"
-    :frame="false"
-    :show-global-filter="false"
     :persist-columns="true"
     table-id="alert-evaluation-history"
     :enable-column-resize="true"
@@ -50,12 +48,7 @@
         data-test="alerts-alertevaluationhistory-range"
         @update:model-value="onRangeChange"
       >
-        <OToggleGroupItem
-          v-for="option in rangeOptions"
-          :key="option.value"
-          :value="option.value"
-          size="sm"
-        >
+        <OToggleGroupItem v-for="option in rangeOptions" :key="option.value" :value="option.value">
           {{ option.label }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -63,8 +56,6 @@
 
     <template #toolbar-trailing>
       <ORefreshButton
-        layout="inline"
-        variant="outline"
         :last-run-at="lastUpdatedAt"
         :loading="loading"
         data-test="alerts-alertevaluationhistory-refresh"
@@ -144,9 +135,8 @@
     <template #empty>
       <OEmptyState
         v-if="!loading"
-        size="hero"
         :title="t('alerts.groups.noEvaluationsTitle')"
-        :description="t('alerts.groups.noEvaluationsDescription')"
+        :text="t('alerts.groups.noEvaluationsDescription')"
         data-test="alerts-alertevaluationhistory-empty"
       />
     </template>

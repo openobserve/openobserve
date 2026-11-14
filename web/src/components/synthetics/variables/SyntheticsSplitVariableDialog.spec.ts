@@ -67,7 +67,7 @@ async function mountDialog(over: Partial<SyntheticsVariable> = {}) {
       provide: { store: { state: { selectedOrganization: { identifier: "acme" } } } },
       stubs: {
         ODialog: { template: "<div><slot /><slot name='footer' /></div>" },
-        OBanner: { template: "<div><slot /></div>" },
+        OInlineNotice: { template: "<div><slot /></div>" },
       },
     },
   }) as VueWrapper;

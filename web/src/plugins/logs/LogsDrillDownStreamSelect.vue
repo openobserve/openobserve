@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="w-64 shrink-0" data-recent-searches-avoid>
     <span aria-live="polite" class="sr-only">{{ announcement }}</span>
     <OSelect
+      searchable
       ref="selectRef"
       data-test="logs-drilldown-stream-select"
       :aria-label="t('search.selectStream')"
       :model-value="modelValue"
       :options="selectOptions"
       :placeholder="t('search.selectStream')"
-      size="sm"
       pin-selected-in-groups
       :search-debounce="150"
       class="w-full"

@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPopover
+    size="md"
     :open="open"
     modal
     align="end"
@@ -25,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #trigger>
       <span class="pointer-events-none block size-0" aria-hidden="true" />
     </template>
-    <div class="flex w-80 flex-col gap-2 px-3 py-2.5 text-xs" data-test="log-line-link-popover">
+    <div class="flex flex-col gap-2 px-3 py-2.5 text-xs" data-test="log-line-link-popover">
       <span class="text-text-heading text-sm font-semibold">{{
         t("search.linePermalink.popoverTitle")
       }}</span>
@@ -33,19 +34,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput :model-value="url" readonly class="font-mono" data-test="log-line-link-popover-url" />
       <div class="flex justify-end gap-2">
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="log-line-link-popover-close"
           @click="closeLineLinkPopover"
         >
           {{ t("common.close") }}
         </OButton>
-        <OButton
-          variant="primary"
-          size="sm"
-          data-test="log-line-link-popover-copy"
-          @click="copyUrl"
-        >
+        <OButton variant="primary" data-test="log-line-link-popover-copy" @click="copyUrl">
           {{ t("common.copy") }}
         </OButton>
       </div>

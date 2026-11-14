@@ -40,10 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="col-auto ms-2">
         <OButton
+          icon-only
           :aria-label="t('common.close')"
           variant="ghost"
-          size="icon-sm"
-          icon-left="close"
+          icon="close"
           @click="dismissWarning"
         />
       </div>

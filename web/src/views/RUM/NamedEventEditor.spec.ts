@@ -94,6 +94,7 @@ describe("NamedEventEditor (AC-44)", () => {
     name: string,
     params: Record<string, string> = {},
     state?: Record<string, unknown>,
+    from: string = PA_ROUTES.events,
   ) => {
     router = createRouter({
       history: createWebHistory(),
@@ -109,7 +110,7 @@ describe("NamedEventEditor (AC-44)", () => {
         },
       ],
     });
-    await router.push({ name: PA_ROUTES.events, query: SCOPE });
+    await router.push({ name: from, query: SCOPE });
     await router.push({ name, params, query: SCOPE, state });
     wrapper = mount(
       { template: "<router-view />" },
@@ -236,6 +237,7 @@ describe("NamedEventEditor (AC-44)", () => {
         pageHints: ["/web/a", "/web/b"],
         from: "overview",
       }),
+      PA_ROUTES.overview,
     );
     expect(input("rum-analytics-named-events-name")?.value).toBe("save-btn");
     expect(q("rum-analytics-named-events-rule-0")?.textContent).toContain("save-btn");
@@ -248,7 +250,7 @@ describe("NamedEventEditor (AC-44)", () => {
     await settle();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.overview);
     expect(router.currentRoute.value.query).toEqual(SCOPE);
-    router.back();
+    router.forward();
     await settle();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.eventNew);
     await submitForm();

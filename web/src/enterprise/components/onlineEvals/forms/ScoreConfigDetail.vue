@@ -3,10 +3,10 @@
     bleed
     :open="open"
     side="right"
-    size="lg"
+    size="md"
     :title="raw(row?.name)"
     title-data-test="score-config-detail-name-badge"
-    :sub-title="t('onlineEvals.scoreConfig.detail.eyebrow')"
+    :subtitle="t('onlineEvals.scoreConfig.detail.eyebrow')"
     data-test="score-config-detail"
     @update:open="handleOpenChange"
   >

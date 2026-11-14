@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col gap-2" data-test="autoobserve-settings-reach">
     <div v-if="settings.isPending.value" class="flex flex-col gap-2" aria-hidden="true">
-      <OSkeleton animation="none" class="h-4 w-3/4" />
-      <OSkeleton animation="none" class="h-4 w-1/2" />
+      <OSkeleton shape="block" class="h-4 w-3/4" />
+      <OSkeleton shape="block" class="h-4 w-1/2" />
     </div>
     <p
       v-else-if="failure"
@@ -58,9 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </p>
     <OButton
       v-if="failure !== 'denied' && failure !== 'failed'"
-      variant="ghost-primary"
-      size="xs"
-      icon-right="arrow-forward"
+      variant="accent-ghost"
+      size="sm"
+      icon-end="arrow-forward"
       class="-ms-2 self-start"
       data-test="autoobserve-settings-reach-open"
       @click="router.push({ name: 'slack', query: { org_identifier: org } })"
@@ -73,8 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
     <OButton
       v-if="failure === 'failed'"
-      variant="ghost-primary"
-      size="xs"
+      variant="accent-ghost"
+      size="sm"
       class="-ms-2 self-start"
       data-test="autoobserve-settings-reach-retry"
       @click="settings.refetch()"

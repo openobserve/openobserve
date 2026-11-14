@@ -246,11 +246,7 @@ const baseStubs = {
   },
   OCard: {
     template: "<div><slot /></div>",
-    props: ["class", "key"],
-  },
-  OCardSection: {
-    template: "<div><slot /></div>",
-    props: [],
+    props: ["flush"],
   },
   OSeparator: {
     template: "<hr />",
@@ -275,7 +271,7 @@ const baseStubs = {
   },
   OEmptyState: {
     template: '<div :data-test="$attrs[\'data-test\']"><slot name="actions" /></div>',
-    props: ["size", "illustration", "title", "description", "preset"],
+    props: ["size", "kind", "icon", "title", "text"],
     inheritAttrs: true,
   },
   EmptyStateActionCard: {
@@ -343,9 +339,9 @@ const baseStubs = {
     template: '<div data-test="chart-renderer" />',
     props: ["data", "height"],
   },
-  SkeletonBox: {
+  OSkeleton: {
     template: "<div />",
-    props: ["width", "height", "rounded", "customRadius"],
+    props: ["shape"],
   },
   Teleport: {
     template: "<div><slot /></div>",

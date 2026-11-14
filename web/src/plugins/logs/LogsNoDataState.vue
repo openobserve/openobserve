@@ -19,18 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Each card routes to a distinct, real ingestion path in OpenObserve.
 -->
 <template>
-  <OEmptyState v-bind="shell" :hide-action="true">
-    <template #title>
-      <span
-        v-if="alternativesOnly"
-        class="text-text-secondary text-sm font-normal"
-        data-test="logs-no-data-another-way"
-        >{{ t("ingestion.firstDataPanel.anotherWay") }}</span
-      >
-      <template v-else>{{ t("logs.noData.title", { product: raw("OpenObserve") }) }}</template>
-    </template>
-
-    <template v-if="!alternativesOnly" #description>
+  <OEmptyState v-bind="shell">
+    <template v-if="!alternativesOnly" #text>
       <span v-html="description" />
     </template>
 
@@ -169,11 +159,11 @@ const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization.identifier,
 }));
 
-// v-bind keeps the hero's own defaults untouched; the caption form drops the illustration and backdrop.
+// Under FirstDataPanel the caption names the alternatives instead of the first-run title.
 const shell = computed(() =>
   props.alternativesOnly
-    ? { size: "block" as const, backdrop: false }
-    : { size: "hero" as const, illustration: "connect" as const },
+    ? { size: "inline" as const, title: t("ingestion.firstDataPanel.anotherWay") }
+    : { icon: "link" as const, title: t("logs.noData.title", { product: raw("OpenObserve") }) },
 );
 
 // Uses v-html — fully i18n-controlled, no user input.

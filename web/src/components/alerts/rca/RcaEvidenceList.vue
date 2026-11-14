@@ -45,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="option.value"
           :value="option.value"
           :data-test="`rca-evidence-filter-${option.value}`"
-          size="sm"
         >
           {{ option.label }}
         </OToggleGroupItem>

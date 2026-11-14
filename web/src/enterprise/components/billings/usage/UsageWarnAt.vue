@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           :model-value="hasBudget ? percentLabel : undefined"
           type="number"
-          size="md"
           suffix="%"
           :disabled="!hasBudget"
           :aria-label="t('billing.usageV2.warnPercent')"
@@ -37,7 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           :model-value="hasBudget ? amount : undefined"
           type="number"
-          size="md"
           prefix="$"
           :disabled="!hasBudget"
           :aria-label="t('billing.usageV2.warnAmount')"

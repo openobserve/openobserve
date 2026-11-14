@@ -32,9 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="mono">{{ row.version }}</OText>
       </div>
       <OProgressBar
-        :value="row.count / max"
-        :variant="row.outdated === null ? 'default' : row.outdated ? 'warning' : 'success'"
-        size="sm"
+        :value="(row.count / max) * 100"
+        :tone="row.outdated === null ? 'accent' : row.outdated ? 'warn' : 'ok'"
       />
       <OText variant="meta" class="text-end tabular-nums">{{ row.count }}</OText>
     </div>

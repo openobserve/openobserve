@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import {
   APPLY_FIELDS,
@@ -97,9 +97,9 @@ export const KIND_LOOK: Record<LookKind, { icon: IconName; badge: string; accent
 export const TUNING_LOOK = KIND_LOOK.tuning;
 
 // A state tag carries no icon, so Undone never reads as the Undo button beside it.
-export const STATE_LOOK: Record<ChangeState, { variant: BadgeVariant; key: I18nKey }> = {
-  done: { variant: "blue-soft", key: "autoobserve.activityLive.status.inForce" },
-  undone: { variant: "default-soft", key: "autoobserve2.activityPage.status.undone" },
+export const STATE_LOOK: Record<ChangeState, { variant: ChipTone; key: I18nKey }> = {
+  done: { variant: "neutral", key: "autoobserve.activityLive.status.inForce" },
+  undone: { variant: "neutral", key: "autoobserve2.activityPage.status.undone" },
 };
 
 const isApplyField = (field: string): field is ApplyField => field in APPLY_FIELDS;

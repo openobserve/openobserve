@@ -20,20 +20,23 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
-const { mockRouter, mockToast, uuidState } = vi.hoisted(() => ({
+const { mockRouter, mockToast, uuidState, routeLeave } = vi.hoisted(() => ({
   mockRouter: {
     push: vi.fn(),
     currentRoute: { value: { query: {} as Record<string, any> } },
   },
   mockToast: vi.fn(),
   uuidState: { n: 0 },
+  routeLeave: { guard: null as null | ((to: { fullPath: string }) => boolean) },
 }));
 
 vi.mock("vue-router", () => ({
   useRouter: () => mockRouter,
   // The editor registers an unsaved-changes route-leave guard (T8); the mock must
   // provide the export or mounting throws before any assertion runs.
-  onBeforeRouteLeave: () => {},
+  onBeforeRouteLeave: (guard: (to: { fullPath: string }) => boolean) => {
+    routeLeave.guard = guard;
+  },
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -159,20 +162,24 @@ const ConfirmDialogStub = {
   template: '<div class="confirm-dialog" :data-title="title" :data-open="String(modelValue)" />',
 };
 
+const LeaveDialogStub = {
+  name: "EditorDraftLeaveDialog",
+  props: ["open", "entityLabel", "saving", "canKeepDraft", "saveLabel"],
+  emits: ["choose"],
+  template: '<div class="leave-dialog" :data-open="String(open)" />',
+};
+
 const globalStubs = {
   ConfirmDialog: ConfirmDialogStub,
+  EditorDraftLeaveDialog: LeaveDialogStub,
   OPageHeader: {
     name: "OPageHeader",
-    props: ["title", "subtitle", "back"],
-    // The name and mode/description now live in the #title and #subtitle slots
-    // (inline-edited), not in a `title` prop — render both so the OInlineEdit
-    // controls under test actually mount.
+    props: ["title", "about", "back"],
+    // The name, folder and description are inline-edited in the #title slot, so render it.
     template:
       '<div class="app-page-header" :data-title="title">' +
-      '<button class="header-back" @click="back && back.onClick()" />' +
       '<div class="header-title"><slot name="title" /></div>' +
-      '<div class="header-subtitle"><slot name="subtitle" /></div>' +
-      '<slot name="title-trail" /><slot name="actions-overflow" /><slot name="actions" /></div>',
+      '<slot name="status" /><slot name="actions-overflow" /><slot name="actions" /></div>',
   },
   OButton: {
     name: "OButton",
@@ -1687,16 +1694,62 @@ describe("WorkflowEditor", () => {
       expect(wf().nodes).toEqual([]);
     });
 
-    it("returns to the list from the header back chevron", async () => {
+    it("links the header back to the list", async () => {
       wrapper = mountEditor();
       await flushPromises();
 
-      await wrapper.find(".header-back").trigger("click");
-
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        name: "workflows",
-        query: { org_identifier: "default", folder: "default" },
+      expect(wrapper.findComponent({ name: "OPageHeader" }).props("back")).toMatchObject({
+        to: { name: "workflows", query: { org_identifier: "default", folder: "default" } },
       });
+    });
+
+    it("asks through the shared leave dialog before leaving with unsaved edits; Discard leaves", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+      workflowObj.dirtyFlag = true;
+
+      expect(routeLeave.guard!({ fullPath: "/workflows" })).toBe(false);
+      await nextTick();
+      const leave = wrapper.findComponent(LeaveDialogStub);
+      expect(leave.props("open")).toBe(true);
+      expect(leave.props("canKeepDraft")).toBe(false);
+      expect(leave.props("saveLabel")).toBe(t("workflow.saveDraft"));
+
+      leave.vm.$emit("choose", "discard");
+      await flushPromises();
+      expect(leave.props("open")).toBe(false);
+      expect(workflowObj.dirtyFlag).toBe(false);
+      expect(mockRouter.push).toHaveBeenCalledWith("/workflows");
+    });
+
+    it("stays on the canvas when the leave dialog is dismissed", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+      workflowObj.dirtyFlag = true;
+
+      routeLeave.guard!({ fullPath: "/workflows" });
+      await nextTick();
+      wrapper.findComponent(LeaveDialogStub).vm.$emit("choose", "stay");
+      await flushPromises();
+
+      expect(wrapper.findComponent(LeaveDialogStub).props("open")).toBe(false);
+      expect(workflowObj.dirtyFlag).toBe(true);
+      expect(mockRouter.push).not.toHaveBeenCalled();
+    });
+
+    it("saves a draft from the leave dialog, then leaves", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+      wf().name = "draft-to-keep";
+      workflowObj.dirtyFlag = true;
+
+      routeLeave.guard!({ fullPath: "/workflows" });
+      await nextTick();
+      wrapper.findComponent(LeaveDialogStub).vm.$emit("choose", "save");
+      await flushPromises();
+
+      expect(createWorkflow).toHaveBeenCalledWith(expect.objectContaining({ draft: true }));
+      expect(mockRouter.push).toHaveBeenCalledWith("/workflows");
     });
 
     it("resets the shared state on unmount", async () => {
@@ -2063,7 +2116,7 @@ describe("WorkflowEditor HTTP endpoint", () => {
     w
       .findAllComponents({ name: "OTag" })
       .find((c: any) => c.find('[data-test="workflow-editor-http-endpoint-chip"]').exists())
-      ?.props("variant");
+      ?.props("tone");
   const panel = (w: any) => w.findComponent({ name: "WorkflowHttpEndpointPanel" });
   const endpoint = (enabled = true) => ({
     configured: true,
@@ -2135,22 +2188,22 @@ describe("WorkflowEditor HTTP endpoint", () => {
 
   it("chip success when live, warning when draft or disabled, neutral Off when switched off", async () => {
     await openSaved();
-    expect(chipVariant(wrapper)).toBe("success-soft");
+    expect(chipVariant(wrapper)).toBe("ok");
     expect(httpEditorState.endpointOn).toBe(true);
     wrapper.unmount();
     queryClient.clear();
     await openSaved({ is_draft: true });
-    expect(chipVariant(wrapper)).toBe("warning-soft");
+    expect(chipVariant(wrapper)).toBe("warn");
     wrapper.unmount();
     queryClient.clear();
     await openSaved({ enabled: false });
-    expect(chipVariant(wrapper)).toBe("warning-soft");
+    expect(chipVariant(wrapper)).toBe("warn");
 
     wrapper.unmount();
     queryClient.clear();
     getHttpTrigger.mockResolvedValue(endpoint(false));
     await openSaved();
-    expect(chipVariant(wrapper)).toBe("default-soft");
+    expect(chipVariant(wrapper)).toBe("neutral");
     expect(chip(wrapper).text()).toBe(t("workflow.http.editorButtonOff"));
     expect(httpEditorState.endpointOn).toBe(false);
   });

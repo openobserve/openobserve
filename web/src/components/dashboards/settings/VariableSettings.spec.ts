@@ -99,8 +99,8 @@ vi.mock("../../ConfirmDialog.vue", () => ({
   default: {
     name: "ConfirmDialog",
     template:
-      '<div data-test="confirm-dialog-mock" v-if="modelValue" :data-keypath="messageKeypath" :data-variant="okVariant"><div>{{title}}</div><div>{{message}}</div><b data-test="confirm-dialog-mock-name">{{messageName}}</b></div>',
-    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
+      '<div data-test="confirm-dialog-mock" v-if="modelValue" :data-keypath="messageKeypath" :data-variant="kind"><div>{{title}}</div><div>{{message}}</div><b data-test="confirm-dialog-mock-name">{{messageName}}</b></div>',
+    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "kind"],
     emits: ["update:ok", "update:cancel"],
   },
 }));
@@ -197,8 +197,8 @@ describe("VariableSettings", () => {
             inheritAttrs: false,
             template:
               '<div v-if="open" data-test="o-dialog-stub" class="o-dialog"><div data-test="o-dialog-title">{{ title }}</div><slot /></div>',
-            props: ["open", "width", "title", "subTitle", "persistent", "size", "showClose"],
-            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+            props: ["open", "width", "title", "subtitle", "persistent", "size", "showClose"],
+            emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
           },
         },
       },

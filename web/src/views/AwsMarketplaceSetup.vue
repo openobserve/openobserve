@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="text-text-secondary">
           {{ t("awsMarketplace.noTokenDescription") }}
         </p>
-        <OButton variant="primary" size="sm-action" class="mt-4" @click="goToDashboard">{{
+        <OButton variant="primary" class="mt-4" @click="goToDashboard">{{
           t("awsMarketplace.goToDashboard")
         }}</OButton>
       </div>
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'error'" class="text-center">
         <OIcon name="error" style="width: 5rem; height: 5rem" />
         <h5 class="mt-3">{{ errorMessage }}</h5>
-        <OButton variant="primary" size="sm-action" class="mt-4" @click="resetAndRetry">{{
+        <OButton variant="primary" class="mt-4" @click="resetAndRetry">{{
           t("awsMarketplace.tryAgain")
         }}</OButton>
       </div>
@@ -62,83 +62,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mx-auto max-w-100">
           <!-- Create New Org -->
-          <OCard class="rounded-default mb-4 transition-all duration-200 hover:shadow-md">
-            <OCardSection role="body">
-              <div class="text-xl font-semibold">{{ t("awsMarketplace.createNewOrg") }}</div>
-              <p class="text-text-secondary">
-                {{ t("awsMarketplace.createNewOrgDescription") }}
-              </p>
-              <OForm
-                id="aws-create-org-form"
-                :schema="awsCreateOrgSchema"
-                :default-values="awsCreateOrgDefaults()"
-                @submit="createNewOrgWithAws"
-                v-slot="{ isSubmitting }"
+          <OCard class="mb-3" :title="t('awsMarketplace.createNewOrg')">
+            <p class="text-text-secondary">
+              {{ t("awsMarketplace.createNewOrgDescription") }}
+            </p>
+            <OForm
+              id="aws-create-org-form"
+              :schema="awsCreateOrgSchema"
+              :default-values="awsCreateOrgDefaults()"
+              @submit="createNewOrgWithAws"
+              v-slot="{ isSubmitting }"
+            >
+              <OFormInput
+                name="newOrgName"
+                data-test="aws-marketplace-org-name"
+                :label="t('awsMarketplace.orgName')"
+                required
+                class="mb-3"
+              />
+              <OButton
+                data-test="aws-marketplace-create-link-btn"
+                type="submit"
+                variant="primary"
+                block
+                :loading="isSubmitting"
+                >{{ t("awsMarketplace.createAndLink") }}</OButton
               >
-                <OFormInput
-                  name="newOrgName"
-                  data-test="aws-marketplace-org-name"
-                  :label="t('awsMarketplace.orgName')"
-                  required
-                  class="mb-3"
-                />
-                <OButton
-                  data-test="aws-marketplace-create-link-btn"
-                  type="submit"
-                  variant="primary"
-                  size="sm-action"
-                  block
-                  :loading="isSubmitting"
-                  >{{ t("awsMarketplace.createAndLink") }}</OButton
-                >
-              </OForm>
-            </OCardSection>
+            </OForm>
           </OCard>
 
           <!-- Link to Existing Org (only show orgs without billing) -->
           <OCard
             v-if="eligibleOrganizations.length > 0"
-            class="rounded-default transition-all duration-200 hover:shadow-md"
+            :title="t('awsMarketplace.linkToExisting')"
           >
-            <OCardSection role="body">
-              <div class="text-xl font-semibold">{{ t("awsMarketplace.linkToExisting") }}</div>
-              <p class="text-text-secondary">
-                {{ t("awsMarketplace.linkBillingDescription") }}
-              </p>
-              <OForm
-                id="aws-link-org-form"
-                :schema="awsLinkOrgSchema"
-                :default-values="awsLinkOrgDefaults()"
-                @submit="linkToExistingOrg"
-                v-slot="{ isSubmitting }"
-              >
-                <!-- label-key/value-key map the fields; SelectOptionInput's required `label` doesn't apply -->
-                <OFormSelect
-                  name="selectedOrg"
-                  :options="eligibleOrganizations as any[]"
-                  label-key="name"
-                  value-key="identifier"
-                  :label="t('awsMarketplace.selectOrganization')"
-                  required
-                  class="mb-3"
-                />
-                <OButton
-                  type="submit"
-                  variant="primary"
-                  size="sm-action"
-                  block
-                  :loading="isSubmitting"
-                  >{{ t("awsMarketplace.linkAwsBilling") }}</OButton
-                >
-              </OForm>
-            </OCardSection>
+            <p class="text-text-secondary">
+              {{ t("awsMarketplace.linkBillingDescription") }}
+            </p>
+            <OForm
+              id="aws-link-org-form"
+              :schema="awsLinkOrgSchema"
+              :default-values="awsLinkOrgDefaults()"
+              @submit="linkToExistingOrg"
+              v-slot="{ isSubmitting }"
+            >
+              <!-- label-key/value-key map the fields; SelectOptionInput's required `label` doesn't apply -->
+              <OFormSelect
+                name="selectedOrg"
+                :options="eligibleOrganizations as any[]"
+                label-key="name"
+                value-key="identifier"
+                :label="t('awsMarketplace.selectOrganization')"
+                required
+                class="mb-3"
+              />
+              <OButton type="submit" variant="primary" block :loading="isSubmitting">{{
+                t("awsMarketplace.linkAwsBilling")
+              }}</OButton>
+            </OForm>
           </OCard>
         </div>
       </div>
 
       <!-- Processing State -->
       <div v-else-if="state === 'processing'" class="text-center">
-        <OSpinner variant="dots" size="xl" />
+        <OSpinner size="lg" />
         <h5 class="mt-3">{{ t("awsMarketplace.settingUp") }}</h5>
         <p class="text-text-secondary">{{ t("awsMarketplace.pleaseWait") }}</p>
       </div>
@@ -147,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'pending_activation'" class="text-center">
         <h5 class="mb-4">{{ t("awsMarketplace.waitingConfirmation") }}</h5>
         <div class="flex justify-center">
-          <OSpinner size="xl" />
+          <OSpinner size="lg" />
         </div>
         <p class="text-text-secondary mt-4">
           {{ t("awsMarketplace.pendingActivationDescription") }}
@@ -161,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="text-text-secondary">
           {{ t("awsMarketplace.activatedDescription", { product: raw("AWS Marketplace") }) }}
         </p>
-        <OButton variant="primary" size="sm-action" class="mt-4" @click="goToDashboard">{{
+        <OButton variant="primary" class="mt-4" @click="goToDashboard">{{
           t("awsMarketplace.goToDashboard")
         }}</OButton>
       </div>
@@ -173,14 +161,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="text-text-secondary">
           {{ t("awsMarketplace.paymentFailedDescription", { product: raw("AWS Marketplace") }) }}
         </p>
-        <OButton
-          as="a"
-          href="mailto:support@openobserve.ai"
-          variant="primary"
-          size="sm-action"
-          class="mt-4"
-          >{{ t("awsMarketplace.contactSupport") }}</OButton
-        >
+        <OButton href="mailto:support@openobserve.ai" variant="primary" class="mt-4">{{
+          t("awsMarketplace.contactSupport")
+        }}</OButton>
       </div>
     </div>
   </div>
@@ -189,7 +172,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onMounted, onUnmounted } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -226,7 +208,7 @@ type SetupState =
 
 export default defineComponent({
   name: "AwsMarketplaceSetup",
-  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect, OIcon, OCard, OCardSection },
+  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect, OIcon, OCard },
   setup() {
     const store = useStore();
     const { isDark } = useTheme();

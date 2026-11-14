@@ -189,12 +189,11 @@ describe("ListOrganizations", () => {
 
     it("should setup columns correctly for non-cloud mode", () => {
       const columns = wrapper.vm.columns;
-      // The row index is rendered by OTable's `show-index` prop, so there is no
-      // "#" column in the definition. Non-cloud columns are:
-      // name, identifier, type, actions = 4
-      expect(columns.map((c) => c.id)).toEqual(["name", "identifier", "type", "actions"]);
+      // OTable appends the actions column itself for rowActions / rowMenu.
+      expect(columns.map((c) => c.id)).toEqual(["name", "identifier", "type"]);
       expect(columns.map((c) => c.id)).not.toContain("plan");
-      expect(columns[columns.length - 1].isAction).toBe(true);
+      expect(wrapper.vm.rowActions.map((a) => a.id)).toEqual(["switch", "rename"]);
+      expect(wrapper.vm.rowMenu.map((a) => [a.id, a.destructive])).toEqual([["delete", true]]);
     });
 
     it("should add plan column when isCloud is true", async () => {
@@ -221,14 +220,12 @@ describe("ListOrganizations", () => {
       });
 
       await flushPromises();
-      // When isCloud is true a "plan" column is inserted before "actions":
-      // name, identifier, type, plan, actions = 5
+      // When isCloud is true a "plan" column is added after "type".
       expect(wrapperWithCloud.vm.columns.map((c) => c.id)).toEqual([
         "name",
         "identifier",
         "type",
         "plan",
-        "actions",
       ]);
       wrapperWithCloud.unmount();
 
@@ -624,7 +621,7 @@ describe("ListOrganizations", () => {
       expect(currentDialog.value).toMatchObject({
         messageKeypath: "iam.listOrganizations.deleteConfirm",
         messageName: "Acme",
-        confirmVariant: "destructive",
+        kind: "destructive",
       });
       handleCancel();
       await pending;

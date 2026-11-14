@@ -112,10 +112,10 @@ const hasEvidence = computed(() => {
   return e.consoleErrors > 0 || e.pageErrors > 0 || e.requestsFailed > 0 || e.responsesNon2xx > 0;
 });
 
-function outcomeVariant(outcome: string): "success" | "error" | "default" {
-  if (outcome === "matched") return "success";
-  if (outcome === "not_found") return "error";
-  return "default";
+function outcomeVariant(outcome: string): "ok" | "err" | "neutral" {
+  if (outcome === "matched") return "ok";
+  if (outcome === "not_found") return "err";
+  return "neutral";
 }
 
 /**
@@ -213,7 +213,7 @@ const noFallback = computed(() => candidates.value.length === 1);
             :class="c.outcome === 'not_tried' ? 'opacity-50' : ''"
             data-test="synthetics-run-detail-locator-candidate"
           >
-            <OBadge :variant="outcomeVariant(c.outcome)" size="sm">{{
+            <OBadge :tone="outcomeVariant(c.outcome)" size="sm">{{
               outcomeLabel(c.outcome)
             }}</OBadge>
             <span class="text-text-secondary shrink-0">{{ c.kind }}</span>
@@ -254,7 +254,7 @@ const noFallback = computed(() => candidates.value.length === 1);
             :key="`${s.signal}-${i}`"
             class="flex items-center gap-2 text-xs"
           >
-            <OBadge :variant="s.status === 'fired' ? 'success' : 'error'" size="sm">
+            <OBadge :tone="s.status === 'fired' ? 'ok' : 'err'" size="sm">
               {{ s.status }}
             </OBadge>
             <OTruncatedText class="text-text-body flex-1 font-mono">{{ s.signal }}</OTruncatedText>
@@ -292,7 +292,7 @@ const noFallback = computed(() => candidates.value.length === 1);
             :key="`${r.method}-${r.url}-${i}`"
             class="flex items-center gap-2 text-xs"
           >
-            <OBadge variant="error" size="sm">{{ r.status }}</OBadge>
+            <OBadge tone="err" size="sm">{{ r.status }}</OBadge>
             <span class="text-text-secondary shrink-0">{{ r.method }}</span>
             <OTruncatedText class="text-text-body flex-1 font-mono">{{ r.url }}</OTruncatedText>
             <span v-if="r.count > 1" class="text-text-secondary shrink-0">x{{ r.count }}</span>

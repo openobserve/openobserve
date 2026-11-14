@@ -23,7 +23,7 @@ import RcaGuidanceDialog from "./RcaGuidanceDialog.vue";
 // ODialog portals its content; the stub keeps the body and the button props in place.
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "title", "primaryButtonLabel", "primaryButtonDisabled"],
+  props: ["open", "title", "primary", "primary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `<div v-if="open" data-test="dialog-stub"><h2>{{ title }}</h2><slot /></div>`,
 };
@@ -42,7 +42,7 @@ describe("RcaGuidanceDialog (04 §3 frame I, SG33, SG40)", () => {
     const wrapper = mountDialog();
 
     expect(dialog(wrapper).props("title")).toBe("Re-analyze");
-    expect(dialog(wrapper).props("primaryButtonLabel")).toBe("Start re-analysis");
+    expect(dialog(wrapper).props("primary")?.label).toBe("Start re-analysis");
     expect(wrapper.text()).toContain("Fresh analysis");
     expect(wrapper.text()).toContain("Start from scratch, ignoring this report");
     expect(wrapper.text()).toContain("Build on previous");
@@ -74,11 +74,11 @@ describe("RcaGuidanceDialog (04 §3 frame I, SG33, SG40)", () => {
 
   it("Start is enabled with or without guidance, and disabled while a start is in flight", async () => {
     const wrapper = mountDialog();
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
     await guidanceBox(wrapper).setValue("Check the pool");
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
     await wrapper.setProps({ triggering: true });
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(dialog(wrapper).props("primary")?.disabled).toBe(true);
   });
 
   it.each([

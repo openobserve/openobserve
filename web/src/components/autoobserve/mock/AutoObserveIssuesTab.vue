@@ -18,12 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OTable
     :data="rows"
     :columns="columns"
-    :frame="false"
     :fill-height="false"
     row-key="id"
     pagination="client"
     :page-size="20"
-    :show-global-filter="false"
     :row-section="(row: Issue) => row.day"
     class="min-h-0 w-full"
     data-test="autoobserve-issues-table"
@@ -34,25 +32,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <div class="flex min-w-[12rem] flex-1 items-center sm:max-w-[22rem]">
           <label :for="SEARCH_ID" class="sr-only">{{ t("autoobserve.issues.searchLabel") }}</label>
-          <OInput
+          <OSearchInput
             :id="SEARCH_ID"
             v-model="query"
-            size="sm"
-            clearable
             class="w-full"
             :placeholder="t('autoobserve.issues.searchPlaceholder')"
             data-test="autoobserve-issues-search"
             @keydown.esc="clearSearch"
           >
-            <template #icon-left>
-              <OIcon name="search" size="sm" class="text-text-secondary" />
-            </template>
-          </OInput>
+          </OSearchInput>
           <span class="sr-only" role="status" data-test="autoobserve-issues-search-status">{{
             announcement
           }}</span>
         </div>
         <OToggleGroup
+          size="sm"
           :model-value="priority"
           :aria-label="t('autoobserve2.recent.priorityLabel')"
           data-test="autoobserve-issues-priority"
@@ -62,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="option in PRIORITY_FILTERS"
             :key="option"
             :value="option"
-            size="xs"
             :disabled="!counts[option] && option !== priority"
             :data-test="`autoobserve-issues-priority-${option}`"
           >
@@ -77,15 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="autoobserve-issues-filter"
           @update:model-value="(v) => (filter = v as typeof filter)"
         >
-          <OToggleGroupItem value="open" size="sm">{{
-            t("autoobserve.issues.open")
-          }}</OToggleGroupItem>
-          <OToggleGroupItem value="resolved" size="sm">{{
-            t("autoobserve.issues.recent")
-          }}</OToggleGroupItem>
-          <OToggleGroupItem value="all" size="sm">{{
-            t("autoobserve.issues.all")
-          }}</OToggleGroupItem>
+          <OToggleGroupItem value="open">{{ t("autoobserve.issues.open") }}</OToggleGroupItem>
+          <OToggleGroupItem value="resolved">{{ t("autoobserve.issues.recent") }}</OToggleGroupItem>
+          <OToggleGroupItem value="all">{{ t("autoobserve.issues.all") }}</OToggleGroupItem>
         </OToggleGroup>
       </div>
     </template>
@@ -145,20 +132,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #cell-services="{ row }">
       <div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
-        <OTag
-          v-for="svc in row.services"
-          :key="svc"
-          variant="default-soft"
-          shape="rounded"
-          size="xs"
-          :label="raw(svc)"
-        />
+        <OTag v-for="svc in row.services" :key="svc" tone="neutral" size="sm" :label="raw(svc)" />
       </div>
     </template>
     <template #cell-status="{ row }">
       <OTag
         v-if="row.deferred"
-        variant="default-soft"
+        tone="neutral"
         size="sm"
         icon="schedule"
         :label="t('autoobserve.issues.heldForDigest')"
@@ -191,8 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #empty>
       <OEmptyState
         v-if="term"
-        size="block"
-        illustration="no-results"
+        icon="search-off"
         :title="t('autoobserve.issues.noMatch', { query: raw(term) })"
         :action-label="t('autoobserve.issues.clearSearch')"
         data-test="autoobserve-issues-no-match"
@@ -200,10 +179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-else
-        size="block"
-        illustration="check"
+        icon="task-alt"
         :title="t('autoobserve.issues.emptyTitle')"
-        :description="t('autoobserve.issues.emptyDescription')"
+        :text="t('autoobserve.issues.emptyDescription')"
       />
     </template>
   </OTable>
@@ -219,7 +197,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   CONFIDENCE_LABEL,

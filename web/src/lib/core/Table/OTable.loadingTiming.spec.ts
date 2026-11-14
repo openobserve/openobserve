@@ -18,7 +18,7 @@ import { mount, type VueWrapper } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import type { OTableColumnDef } from "./OTable.types";
 import { LOADER_REVEAL } from "@/lib/styles/motion";
 
@@ -151,28 +151,11 @@ describe("loading per the rulings", () => {
     });
   });
 
-  describe("OInnerLoading", () => {
-    it("waits 300 ms before it shows, and never blocks a click meanwhile", async () => {
-      wrapper = mount(OInnerLoading, { props: { showing: true } });
-      const overlay = () => wrapper!.find('[role="status"]');
-      const layer = () => wrapper!.find('[role="status"] > div');
-      expect(overlay().classes()).toContain("pointer-events-none");
-      expect(layer().classes()).toContain("opacity-0");
-      await advance(SHOW_AFTER_MS - 1);
-      expect(layer().classes()).toContain("opacity-0");
-      await advance(1);
-      expect(layer().classes()).not.toContain("opacity-0");
-      expect(overlay().classes()).not.toContain("pointer-events-none");
-    });
-
-    it("starts the wait again on the next show", async () => {
-      wrapper = mount(OInnerLoading, { props: { showing: true } });
-      await advance(SHOW_AFTER_MS);
-      await wrapper.setProps({ showing: false });
-      await advance(500);
-      await wrapper.setProps({ showing: true });
-      await nextTick();
-      expect(wrapper.find('[role="status"] > div').classes()).toContain("opacity-0");
+  describe("OLoadingLine", () => {
+    it("waits 300 ms in CSS before the refresh line shows", () => {
+      wrapper = mount(OLoadingLine, { props: { active: true } });
+      const reveal = wrapper.find('[data-test="o-loading-line-reveal"]').classes();
+      expect(reveal).toEqual(expect.arrayContaining(LOADER_REVEAL.split(" ")));
     });
   });
 });

@@ -38,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OButton
         data-test="add-cipher-key-akeyless-access-id-input-cancel"
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         class="mt-2"
         v-if="isUpdate && accessId != ''"
         @click="isUpdateAccessID = false"
@@ -56,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         data-test="add-cipher-key-akeyless-access-id-input-update"
         variant="primary"
-        size="sm-action"
         @click="isUpdateAccessID = true"
         >{{ t("common.update") }}</OButton
       >
@@ -90,8 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             data-test="add-cipher-key-akeyless-access-key-input-cancel"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             class="mt-2"
             v-if="isUpdate && accessKey != ''"
             @click="isUpdateAccessKey = false"
@@ -108,7 +105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="add-cipher-key-akeyless-access-key-input-update"
             variant="primary"
-            size="sm-action"
             @click="isUpdateAccessKey = true"
             >{{ t("common.update") }}</OButton
           >
@@ -125,8 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             data-test="add-cipher-key-akeyless-ldap-username-input-cancel"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             class="mt-2"
             v-if="isUpdate && ldapUsername != ''"
             @click="isUpdateLDAPUsername = false"
@@ -143,7 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="add-cipher-key-akeyless-ldap-username-input-update"
             variant="primary"
-            size="sm-action"
             @click="isUpdateLDAPUsername = true"
             >{{ t("common.update") }}</OButton
           >
@@ -160,8 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             data-test="add-cipher-key-akeyless-ldap-password-input-cancel"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             class="mt-2"
             v-if="isUpdate && ldapPassword != ''"
             @click="isUpdateLDAPPass = false"
@@ -178,7 +171,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="add-cipher-key-akeyless-ldap-password-input-update"
             variant="primary"
-            size="sm-action"
             @click="isUpdateLDAPPass = true"
             >{{ t("common.update") }}</OButton
           >

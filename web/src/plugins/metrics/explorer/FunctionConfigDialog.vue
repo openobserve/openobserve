@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="modelValue"
     :title="raw(card.name)"
-    size="xl"
+    size="lg"
     data-test="metrics-fn-config"
     @update:open="$emit('update:modelValue', $event)"
   >
@@ -92,7 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="select(variant.id)"
       >
         <ORadio
-          size="xs"
           :value="variant.id"
           :label="variantLabel(variant)"
           :data-test="`metrics-fn-radio-${variant.id}`"
@@ -116,8 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="error" size="sm" class="text-error-600" />
             <span>{{ t("metrics.explorer.queryFailed") }}</span>
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :data-test="`metrics-fn-retry-${variant.id}`"
               @click.stop="load(variant)"
             >
@@ -160,8 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OSkeleton
             v-else
+            shape="block"
             class="h-full"
-            animation="wave"
             :data-test="`metrics-fn-loading-${variant.id}`"
           />
         </div>
@@ -177,7 +176,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckbox
             v-for="p in variant.availablePercentiles || []"
             :key="p"
-            size="xs"
             :model-value="isChecked(variant, p)"
             :label="raw(`p${p}`)"
             :disabled="isOnlyChecked(variant, p)"
@@ -190,22 +188,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #footer>
       <div class="flex items-center justify-between gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          data-test="metrics-fn-restore"
-          @click="onRestore"
-        >
+        <OButton variant="secondary" data-test="metrics-fn-restore" @click="onRestore">
           {{ t("metrics.explorer.fn.resetToDefault") }}
         </OButton>
 
         <div class="flex items-center gap-2">
-          <OButton variant="outline" size="sm-action" data-test="metrics-fn-cancel" @click="close">
+          <OButton variant="secondary" data-test="metrics-fn-cancel" @click="close">
             {{ t("metrics.explorer.fn.cancel") }}
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :disabled="!isDirty"
             data-test="metrics-fn-apply"
             @click="onApply"

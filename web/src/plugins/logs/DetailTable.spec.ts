@@ -219,9 +219,6 @@ describe("DetailTable Component", () => {
       },
       OSpinner: true,
       OSeparator: true,
-      OCardSection: {
-        template: "<div><slot /></div>",
-      },
       OLogsHighLighting: true,
       OChunkedContent: true,
       OTelemetryCorrelationDashboard: true,
@@ -858,7 +855,7 @@ describe("DetailTable Component", () => {
 
         const button = traceWrapper.find(BUTTON);
         expect(button.attributes("disabled")).toBeDefined();
-        expect(button.attributes("icon-left")).toBe("lock");
+        expect(button.attributes("icon")).toBe("lock");
         expect(traceWrapper.find(SELECT).exists()).toBe(false);
         await button.trigger("click");
         expect(traceWrapper.emitted()["view-trace"]).toBeUndefined();
@@ -983,7 +980,9 @@ describe("DetailTable Component", () => {
       const badge = sevWrapper.find(BADGE);
       (badge.element as HTMLElement).focus();
       expect(document.activeElement).toBe(badge.element);
-      await badge.trigger("keydown", { key: "Enter" });
+      expect(badge.element.tagName).toBe("BUTTON");
+      // A native button turns Enter into a click; jsdom does not, so the click stands in for it.
+      await badge.trigger("click");
       await flushPromises();
       const popover = document.body.querySelector(POPOVER);
       expect(popover).not.toBeNull();

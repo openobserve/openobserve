@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             v-model="searchQuery"
             :placeholder="t('regex_patterns.search')"
-            clearable
             class="w-full"
             data-test="built-in-pattern-search"
           />
@@ -40,8 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col-md-2 w-full">
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastUpdatedAt"
             :loading="fetching"
             data-test="built-in-pattern-refresh-btn"
@@ -62,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="error" style="width: 3.125rem; height: 3.125rem" />
       <div class="text-status-error-text mt-3">{{ error }}</div>
       <span class="mt-2">
-        <OButton variant="ghost-primary" size="sm" @click="() => fetchPatterns()">
+        <OButton variant="accent-ghost" @click="() => fetchPatterns()">
           {{ t("regex_patterns.try_again") }}
         </OButton>
       </span>
@@ -122,8 +119,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div class="ms-auto flex shrink-0 items-center">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon"
+                size="xs"
                 @click="previewPattern(pattern)"
                 :data-test="`pattern-preview-${index}`"
               >
@@ -153,8 +151,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="md"
       :title="raw(previewedPattern?.name)"
       data-test="pattern-preview-dialog"
-      :secondary-button-label="t('regex_patterns.close')"
-      :primary-button-label="t('regex_patterns.import_this_pattern')"
+      :secondary="{ label: t('regex_patterns.close') }"
+      :primary="{ label: t('regex_patterns.import_this_pattern') }"
       @click:secondary="showPreview = false"
       @click:primary="importSinglePattern"
     >

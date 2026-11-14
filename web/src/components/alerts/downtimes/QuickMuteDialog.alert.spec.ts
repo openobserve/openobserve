@@ -233,7 +233,7 @@ describe("Quick Mute from an alert screen (MK-4)", () => {
     await mountDialog(single);
     await click("o-dialog-primary-btn");
     expect(toast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error", message: "On call: Kim" }),
+      expect.objectContaining({ variant: "error", message: "You can't mute this. On call: Kim" }),
     );
     expect(wrapper.emitted("muted")).toBeUndefined();
   });

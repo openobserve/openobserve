@@ -121,7 +121,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -143,7 +143,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -180,7 +180,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -223,7 +223,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -258,7 +258,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -286,7 +286,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -331,7 +331,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -382,7 +382,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -411,7 +411,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -458,7 +458,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -516,7 +516,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": queryEditorStub,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -568,7 +568,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -623,7 +623,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -644,7 +644,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -665,7 +665,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -685,7 +685,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -705,7 +705,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -728,7 +728,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -748,7 +748,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -772,7 +772,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -792,7 +792,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -816,7 +816,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -845,7 +845,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },
@@ -867,7 +867,7 @@ describe("TestFunction.vue Branch Coverage", () => {
           provide: { store: mockStore },
           stubs: {
             "query-editor": true,
-            DateTime: true,
+            ODateTimeRange: true,
             FullViewContainer: true,
             O2AIContextAddBtn: true,
           },

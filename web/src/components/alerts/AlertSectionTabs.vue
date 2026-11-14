@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <FeatureLockExempt class="contents">
     <OTabs
       :model-value="activeSectionKey"
-      align="left"
       reorderable
       data-test="alert-section-tabs"
       @change="navigateToSection"
@@ -39,18 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="section.key"
         :name="section.key"
         :data-test="`alert-section-tab-${section.key}`"
+        :count="section.key === 'alertFiring' ? firingCount : undefined"
+        :count-tone="firingCount ? 'error' : 'default'"
       >
         <OIcon :name="section.icon" size="sm" class="shrink-0" />
         <span :class="section.key === activeSectionKey ? '' : 'max-md:hidden'">{{
           section.label
         }}</span>
-        <OTag
-          v-if="section.key === 'alertFiring' && firingCount !== null"
-          :variant="firingCount > 0 ? 'error-soft' : 'default-soft'"
-          size="sm"
-          data-test="alert-section-tab-alertFiring-badge"
-          :label="raw(String(firingCount))"
-        />
         <OIcon
           v-if="section.licenseLocked"
           name="lock"
@@ -71,13 +65,12 @@ import { useRouter, type RouteLocationRaw } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import { firingAlertsQuery } from "@/services/alerts.queries";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { countStates } from "@/utils/alerts/firingAlerts";
 import { featureState } from "@/utils/featureGate";
 

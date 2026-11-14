@@ -21,7 +21,6 @@ import i18n from "@/locales";
 
 const stubs = {
   OCard: { name: "OCard", template: "<div><slot /></div>" },
-  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
 };
 
 function render() {

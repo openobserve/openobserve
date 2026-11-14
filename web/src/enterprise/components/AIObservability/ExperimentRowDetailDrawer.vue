@@ -4,10 +4,10 @@
   <ODrawer
     :open="open"
     side="right"
-    size="xl"
+    size="lg"
     bleed
     :title="raw(detail?.logicalId) || t('aiObservability.experiments.rowDetail.fallbackTitle')"
-    :sub-title="snapshotLabel"
+    :subtitle="snapshotLabel"
     data-test="ai-experiment-row-detail"
     @update:open="$emit('update:open', $event)"
   >
@@ -22,8 +22,7 @@
             </h4>
             <OButton
               :aria-label="t('aiObservability.experiments.rowDetail.copyInput')"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :disabled="!hasContent(detail.input)"
               data-test="ai-experiment-row-copy-input"
               @click="copyContent(detail.input, 'input')"
@@ -60,8 +59,7 @@
             </h4>
             <OButton
               :aria-label="t('aiObservability.experiments.rowDetail.copyExpected')"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :disabled="!hasContent(detail.expectedOutput)"
               data-test="ai-experiment-row-copy-expected"
               @click="copyContent(detail.expectedOutput, 'output')"
@@ -119,7 +117,7 @@
             class="border-border-default rounded-default mt-3 space-y-3 border p-3"
           >
             <div class="flex items-center justify-between gap-2">
-              <OTag size="sm" :variant="statusVariant(activeTrial.taskStatus, 'eval').variant">
+              <OTag size="sm" :tone="statusVariant(activeTrial.taskStatus, 'eval').variant">
                 {{ statusVariant(activeTrial.taskStatus, "eval").label }}
               </OTag>
               <div class="flex items-center gap-2">
@@ -128,13 +126,8 @@
                   :content="tracesLock.lockedReason.value"
                 >
                   <span class="inline-flex">
-                    <OButton
-                      size="sm"
-                      variant="outline"
-                      disabled
-                      data-test="ai-experiment-row-trace"
-                    >
-                      <template #icon-left>
+                    <OButton variant="secondary" disabled data-test="ai-experiment-row-trace">
+                      <template #icon>
                         <OIcon
                           name="lock"
                           class="text-icon-locked"
@@ -148,8 +141,7 @@
                 </OTooltip>
                 <OButton
                   v-else-if="activeTrial.execution?.traceId"
-                  size="sm"
-                  variant="outline"
+                  variant="secondary"
                   data-test="ai-experiment-row-trace"
                   @click="$emit('trace', activeTrial.execution)"
                 >
@@ -157,8 +149,7 @@
                 </OButton>
                 <OButton
                   v-if="activeTrial.taskStatus === 'error'"
-                  size="sm"
-                  variant="outline"
+                  variant="secondary"
                   :disabled="retrying"
                   data-test="ai-experiment-row-retry"
                   @click="$emit('retry', activeTrial)"
@@ -175,8 +166,7 @@
                 </h4>
                 <OButton
                   :aria-label="t('aiObservability.experiments.rowDetail.copyOutput')"
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   :disabled="!hasContent(activeTrial.execution.output)"
                   data-test="ai-experiment-row-copy-output"
                   @click="copyContent(activeTrial.execution.output, 'output')"
@@ -244,12 +234,9 @@
             :data="scoreRows"
             :columns="scoreColumns"
             row-key="key"
-            :show-global-filter="false"
             :fill-height="false"
-            :frame="false"
             pagination="none"
             :default-columns="false"
-            width="100%"
             class="w-full"
             data-test="ai-experiment-row-score-matrix"
           />
@@ -280,12 +267,11 @@
                   >
                     <span class="inline-flex">
                       <OButton
-                        size="sm"
-                        variant="outline"
+                        variant="secondary"
                         disabled
                         :data-test="`ai-experiment-row-score-trace-${score.key}`"
                       >
-                        <template #icon-left>
+                        <template #icon>
                           <OIcon
                             name="lock"
                             class="text-icon-locked"
@@ -299,8 +285,7 @@
                   </OTooltip>
                   <OButton
                     v-else-if="score.trace"
-                    size="sm"
-                    variant="outline"
+                    variant="secondary"
                     :data-test="`ai-experiment-row-score-trace-${score.key}`"
                     @click="$emit('score-trace', score.trace)"
                   >

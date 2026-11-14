@@ -106,7 +106,6 @@ describe("IacRegistryLinks", () => {
     expect(tf.exists()).toBe(true);
     expect(tf.element.tagName).toBe("A");
     expect(tf.classes().join(" ")).toContain("border-button-outline-border");
-    expect(tf.classes().join(" ")).not.toContain("bg-button-secondary");
   });
 
   it("derives each link's data-test from dataTest", () => {

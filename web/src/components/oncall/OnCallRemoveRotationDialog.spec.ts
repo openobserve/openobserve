@@ -22,7 +22,7 @@ import i18n from "@/locales";
 const stubs = {
   ODialog: {
     name: "ODialog",
-    props: ["open", "title", "primaryButtonLabel", "primaryButtonDisabled", "primaryButtonVariant"],
+    props: ["open", "title", "primary", "primary", "primary"],
     emits: ["click:primary", "click:secondary", "update:open"],
     template: "<div v-if='open'>{{ title }} <slot /></div>",
   },
@@ -74,7 +74,7 @@ describe("OnCallRemoveRotationDialog", () => {
     const wrapper = render(null);
 
     expect(dialog(wrapper).props("title")).toBe("Delete the Secondary rotation?");
-    expect(dialog(wrapper).props("primaryButtonLabel")).toBe("Delete rotation");
+    expect(dialog(wrapper).props("primary")?.label).toBe("Delete rotation");
     expect(wrapper.find('[data-test="oncall-remove-rotation-body"]').text()).toBe(
       "Riya Root is on call in Secondary now. Once it's deleted, nobody takes over its shifts; Primary (Carol Nguyen) keeps its own.",
     );
@@ -104,9 +104,9 @@ describe("OnCallRemoveRotationDialog", () => {
     expect(wrapper.find('[data-test="oncall-remove-rotation-body"]').text()).toBe(
       "Riya Root is on call in Secondary now. The escalation policy is rebuilt around Primary.",
     );
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
     // Removing a rotation is destructive, so its button is red like every other delete.
-    expect(dialog(wrapper).props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog(wrapper).props("primary")?.variant).toBe("danger");
     dialog(wrapper).vm.$emit("click:primary");
     expect(wrapper.emitted("confirm")).toHaveLength(1);
   });
@@ -126,7 +126,7 @@ describe("OnCallRemoveRotationDialog", () => {
     expect(bodyOf(wrapper)).toBe(
       "Carol Nguyen is on call in Primary now. The escalation policy is rebuilt around Backup.",
     );
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
   });
 
   it("deleting the middle of three rebuilds around the other two, skipping one with nobody in it", () => {
@@ -151,7 +151,7 @@ describe("OnCallRemoveRotationDialog", () => {
     expect(bodyOf(wrapper)).toBe(
       "Nobody is on call in Secondary now. The escalation policy then pages the whole team.",
     );
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
   });
 
   it("refuses while a hand-edited policy pages the rotation, and links to it", async () => {
@@ -160,7 +160,7 @@ describe("OnCallRemoveRotationDialog", () => {
     expect(wrapper.find('[data-test="oncall-remove-rotation-blocked"]').text()).toBe(
       "P1 step 2 of the escalation policy pages Secondary. Edit the policy first.",
     );
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(dialog(wrapper).props("primary")?.disabled).toBe(true);
     await wrapper.find('[data-test="oncall-remove-rotation-open-policy"]').trigger("click");
     expect(wrapper.emitted("open-policy")).toHaveLength(1);
   });
@@ -172,7 +172,7 @@ describe("OnCallRemoveRotationDialog", () => {
     expect(wrapper.find('[data-test="oncall-remove-rotation-may-refuse"]').text()).toBe(
       "P1 step 2 of the escalation policy pages Secondary. If the policy was edited by hand, the delete is refused until it stops paging Secondary.",
     );
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
     await wrapper.find('[data-test="oncall-remove-rotation-open-policy"]').trigger("click");
     expect(wrapper.emitted("open-policy")).toHaveLength(1);
   });
@@ -185,7 +185,7 @@ describe("OnCallRemoveRotationDialog", () => {
     ]) {
       expect(wrapper.find('[data-test="oncall-remove-rotation-blocked"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-remove-rotation-may-refuse"]').exists()).toBe(false);
-      expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+      expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
       expect(wrapper.find('[data-test="oncall-remove-rotation-body"]').exists()).toBe(true);
     }
   });

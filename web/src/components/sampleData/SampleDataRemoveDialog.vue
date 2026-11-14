@@ -55,10 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <OProgressBar
-          :value="phase === 'done' ? 1 : session.removeFraction.value"
-          :variant="barVariant"
-          size="xs"
-          :aria-label="label"
+          :value="(phase === 'done' ? 1 : session.removeFraction.value) * 100"
+          :tone="barVariant"
+          :label="label"
         />
       </div>
 
@@ -103,8 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-wrap items-center justify-end gap-2">
         <OButton
           v-if="phase === 'removing'"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="sample-remove-background"
           @click="session.closeRemoveDialog()"
         >
@@ -113,7 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else-if="phase === 'done'"
           variant="primary"
-          size="sm"
           data-test="sample-remove-done"
           @click="session.closeRemoveDialog()"
         >
@@ -121,8 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <template v-else>
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             data-test="sample-remove-close"
             @click="session.closeRemoveDialog()"
           >
@@ -130,7 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             variant="primary"
-            size="sm"
             data-test="sample-remove-retry"
             @click="session.removeInDialog(session.removeOrg.value)"
           >
@@ -148,6 +143,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -171,8 +167,8 @@ const label = computed(() => t(`sampleData.removeDialog.${phase.value}.label`));
 const percent = computed(() =>
   raw(`${phase.value === "done" ? 100 : Math.round(session.removeFraction.value * 100)}%`),
 );
-const barVariant = computed(() =>
-  phase.value === "done" ? "success" : phase.value === "failed" ? "danger" : "default",
+const barVariant = computed<ProgressBarTone>(() =>
+  phase.value === "done" ? "ok" : phase.value === "failed" ? "err" : "accent",
 );
 
 const headerIcon = computed<IconName>(() => {

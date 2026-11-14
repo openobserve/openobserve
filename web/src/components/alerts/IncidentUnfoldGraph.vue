@@ -23,9 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OEmptyState
       v-if="!unfold.alertCount"
-      size="hero"
       :title="t('alerts.incidents.unfold.emptyTitle')"
-      :description="t('alerts.incidents.unfold.emptyText')"
+      :text="t('alerts.incidents.unfold.emptyText')"
       data-test="incident-unfold-empty"
     />
     <AutoObserveUnfoldGraph

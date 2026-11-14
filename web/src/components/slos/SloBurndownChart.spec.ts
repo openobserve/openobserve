@@ -110,7 +110,7 @@ describe("SloBurndownChart", () => {
       expect(wrapper.text()).toContain("Burn rate");
     });
 
-    it("titles them with the shared PanelBar, so they carry the header tint", async () => {
+    it("titles them with the shared 40 px PanelBar", async () => {
       // Regression guard: these bars were hand-copied class strings and silently
       // missed the header tint when it was introduced.
       respond(clean(5));
@@ -118,7 +118,7 @@ describe("SloBurndownChart", () => {
 
       const bars = wrapper.findAllComponents({ name: "PanelBar" });
       expect(bars).toHaveLength(2);
-      expect(bars[0].classes()).toContain("bg-panel-bar-bg");
+      expect(bars[0].classes()).toContain("min-h-10");
     });
   });
 

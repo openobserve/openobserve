@@ -24,13 +24,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OEmptyState
     v-if="error === 'forbidden'"
     :size="size"
-    preset="no-access"
+    kind="denied"
+    :title="t('emptyState.noAccess.title')"
+    :text="t('emptyState.noAccess.description')"
     :data-test="`${dataTest}-agents-forbidden`"
   />
   <OEmptyState
     v-else
     :size="size"
-    preset="load-error"
+    kind="error"
+    :title="t('emptyState.loadError.title')"
+    :text="t('emptyState.loadError.description')"
     :data-test="`${dataTest}-agents-error`"
     @action="$emit('retry')"
   />
@@ -38,6 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { EmptyStateSize } from "@/lib/core/EmptyState/OEmptyState.types";
+import { useI18nTyped } from "@/types/i18n";
 import type { AgentsLoadError } from "@/enterprise/composables/useAgentScope";
 
 withDefaults(
@@ -45,12 +51,14 @@ withDefaults(
     error: AgentsLoadError;
     /** data-test prefix; each page passes its own. */
     dataTest: string;
-    size?: "hero" | "block";
+    size?: EmptyStateSize;
   }>(),
-  { size: "hero" },
+  { size: "page" },
 );
 
 defineEmits<{
   (e: "retry"): void;
 }>();
+
+const { t } = useI18nTyped();
 </script>

@@ -38,7 +38,7 @@ vi.mock("@/services/oncall", () => ({
 const stubs = {
   ODialog: {
     name: "ODialog",
-    props: ["open", "title", "primaryButtonDisabled", "primaryButtonLoading"],
+    props: ["open", "title", "primary", "primary"],
     emits: ["update:open", "click:primary", "click:secondary"],
     template: "<div><slot /><slot name='footer-left' /></div>",
   },
@@ -143,14 +143,14 @@ describe("OnCallRuleEditor", () => {
     expect(wrapper.findAll('[data-test^="oncall-rule-editor-row-"]')).toHaveLength(1);
     expect(select(wrapper, "oncall-rule-editor-field-0").props("modelValue")).toBe("service");
     expect(wrapper.find('[data-test="oncall-rule-editor-value-0"]').exists()).toBe(true);
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(dialog(wrapper).props("primary")?.disabled).toBe(true);
   });
 
   it("picking a value is adding the condition", async () => {
     const wrapper = render();
     select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "risk-api");
     await flushPromises();
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
     dialog(wrapper).vm.$emit("click:primary");
     expect(wrapper.emitted("save")?.[0]).toEqual([
       { dimensions: { service: "risk-api" }, team_id: "team_1" },
@@ -185,14 +185,14 @@ describe("OnCallRuleEditor", () => {
     select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "risk-api");
     await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
     await flushPromises();
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
 
     select(wrapper, "oncall-rule-editor-field-1").vm.$emit("update:modelValue", "k8s-namespace");
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-1"]').text()).toBe(
       "Pick a value",
     );
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(dialog(wrapper).props("primary")?.disabled).toBe(true);
     expect(wrapper.find('[data-test="oncall-rule-editor-save-problem"]').text()).toBe(
       "Pick a value",
     );
@@ -201,7 +201,7 @@ describe("OnCallRuleEditor", () => {
 
     await wrapper.find('[data-test="oncall-rule-editor-remove-1"]').trigger("click");
     await flushPromises();
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
     dialog(wrapper).vm.$emit("click:primary");
     expect(wrapper.emitted("save")?.[0]).toEqual([
       { dimensions: { service: "risk-api" }, team_id: "team_1" },
@@ -219,18 +219,18 @@ describe("OnCallRuleEditor", () => {
     select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", null);
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-0"]').exists()).toBe(true);
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(dialog(wrapper).props("primary")?.disabled).toBe(true);
 
     select(wrapper, "oncall-rule-editor-value-0").vm.$emit("update:modelValue", "prod");
     await flushPromises();
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
 
     select(wrapper, "oncall-rule-editor-field-0").vm.$emit("update:modelValue", "environment");
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-rule-editor-pick-value-0"]').text()).toBe(
       "Pick a value",
     );
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(dialog(wrapper).props("primary")?.disabled).toBe(true);
     dialog(wrapper).vm.$emit("click:primary");
     expect(wrapper.emitted("save")).toBeUndefined();
   });
@@ -419,7 +419,7 @@ describe("OnCallRuleEditor", () => {
     });
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(text);
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(dialog(wrapper).props("primary")?.disabled).toBe(true);
     dialog(wrapper).vm.$emit("click:primary");
     expect(wrapper.emitted("save")).toBeUndefined();
   });
@@ -436,7 +436,7 @@ describe("OnCallRuleEditor", () => {
     });
     select(wrapper, "oncall-rule-editor-team").vm.$emit("update:modelValue", "team_2");
     await flushPromises();
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
   });
 
   /// A broader or narrower holder is a legitimate overlap: the rules split the alerts by specificity.
@@ -466,7 +466,7 @@ describe("OnCallRuleEditor", () => {
     });
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-rule-editor-outcome"]').text()).toBe(text);
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
   });
 
   it("shows who is on call now for the picked team", async () => {

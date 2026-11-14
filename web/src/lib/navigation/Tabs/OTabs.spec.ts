@@ -26,10 +26,10 @@ function mountTabs(
   options: {
     modelValue?: string | number;
     orientation?: "horizontal" | "vertical";
-    align?: "left" | "center" | "right" | "justify";
-    dense?: boolean;
+    size?: "page" | "compact";
     bordered?: boolean;
-    tabs?: Array<{ name: string; label?: string; disable?: boolean }>;
+    reorderable?: boolean;
+    tabs?: Array<{ name: string; label?: string; disabled?: boolean; count?: number }>;
   } = {},
 ) {
   const tabs = options.tabs ?? [
@@ -41,15 +41,15 @@ function mountTabs(
     props: {
       modelValue: options.modelValue ?? "tab1",
       orientation: options.orientation,
-      align: options.align,
-      dense: options.dense,
+      size: options.size,
       bordered: options.bordered,
+      reorderable: options.reorderable,
     },
     slots: {
       default: tabs
         .map(
           (t) =>
-            `<OTab name="${t.name}" label="${t.label ?? t.name}" ${t.disable ? "disable" : ""} />`,
+            `<OTab name="${t.name}" label="${t.label ?? t.name}" data-test="tab-${t.name}" ${t.disabled ? "disabled" : ""} ${t.count !== undefined ? `:count="${t.count}"` : ""} />`,
         )
         .join(""),
     },
@@ -252,26 +252,61 @@ describe("OTabs", () => {
     }
   });
 
-  // --- Align classes ---
+  // --- Alignment, size ---
 
-  it("applies left alignment class by default", () => {
+  it("always starts the tabs at the content edge", () => {
     const wrapper = mountTabs();
     expect(wrapper.find(".o-tabs").classes()).toContain("justify-start");
   });
 
-  it("applies center alignment class when align=center", () => {
-    const wrapper = mountTabs({ align: "center" });
-    expect(wrapper.find(".o-tabs").classes()).toContain("justify-center");
+  it("renders page tabs 40 high by default and compact tabs 32 high", () => {
+    const page = mountTabs();
+    expect(page.find('[role="tab"]').classes()).toContain("h-tabs-height");
+    const compact = mountTabs({ size: "compact" });
+    expect(compact.find('[role="tab"]').classes()).toContain("h-control-md");
   });
 
-  it("applies right alignment class when align=right", () => {
-    const wrapper = mountTabs({ align: "right" });
-    expect(wrapper.find(".o-tabs").classes()).toContain("justify-end");
+  // --- More ▾ ---
+
+  const nine = Array.from({ length: 9 }, (_, i) => ({ name: `t${i + 1}`, label: `Tab ${i + 1}` }));
+
+  it("shows six tabs and folds the rest into More", () => {
+    const wrapper = mountTabs({ tabs: nine });
+    const inline = wrapper.findAll("[data-otab-name]");
+    expect(inline.map((t) => t.attributes("data-otab-name"))).toEqual([
+      "t1",
+      "t2",
+      "t3",
+      "t4",
+      "t5",
+      "t6",
+    ]);
+    expect(wrapper.find('[data-test="o-tabs-more"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="o-tabs-more"]').text()).toContain("More");
   });
 
-  it("applies justify alignment class when align=justify", () => {
-    const wrapper = mountTabs({ align: "justify" });
-    expect(wrapper.find(".o-tabs").classes()).toContain("justify-stretch");
+  it("keeps every tab inline at six or fewer", () => {
+    const wrapper = mountTabs({ tabs: nine.slice(0, 6) });
+    expect(wrapper.findAll("[data-otab-name]")).toHaveLength(6);
+    expect(wrapper.find('[data-test="o-tabs-more"]').exists()).toBe(false);
+  });
+
+  it("marks More as the selected tab and names the folded tab when it is active", () => {
+    const wrapper = mountTabs({ tabs: nine, modelValue: "t8" });
+    const more = wrapper.get('[data-test="o-tabs-more"]');
+    expect(more.attributes("aria-selected")).toBe("true");
+    expect(more.text()).toContain("Tab 8");
+  });
+
+  it("keeps every tab inline on a reorderable strip", () => {
+    const wrapper = mountTabs({ tabs: nine, reorderable: true });
+    expect(wrapper.findAll("[data-otab-name]")).toHaveLength(9);
+    expect(wrapper.find('[data-test="o-tabs-more"]').exists()).toBe(false);
+  });
+
+  it("never folds a vertical list", () => {
+    const wrapper = mountTabs({ tabs: nine, orientation: "vertical" });
+    expect(wrapper.findAll("[data-otab-name]")).toHaveLength(9);
   });
 
   // --- Inner padding for focus-ring spacing (horizontal) ---

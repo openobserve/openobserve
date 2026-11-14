@@ -15,37 +15,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard
-    class="border-border rounded-default flex h-full flex-col border transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg"
-  >
-    <OCardSection class="flex-1 p-4 pb-2">
-      <div class="mb-2 flex items-start justify-between">
-        <div class="text-text-heading text-base leading-snug font-semibold">
-          {{ integration.displayName }}
-        </div>
-        <OButton
-          v-if="integration.documentationUrl"
-          variant="ghost"
-          size="icon-circle-sm"
-          @click="handleDocumentation()"
-          class="docs-btn opacity-70 transition-opacity duration-200 ease-in-out hover:opacity-100"
-          :data-test="`aws-${integration.id}-docs-btn`"
-        >
-          <OIcon name="description" size="sm" />
-          <OTooltip :content="t('ingestion.awsSetup.viewDocumentation')" />
-        </OButton>
-      </div>
-      <div class="text-text-secondary mb-3 min-h-[3em] text-sm leading-normal">
-        {{ t(integration.descriptionKey) }}
-      </div>
-    </OCardSection>
+  <OCard :title="raw(integration.displayName)" class="h-full">
+    <template #actions>
+      <OButton
+        v-if="integration.documentationUrl"
+        icon-only
+        variant="ghost"
+        size="sm"
+        @click="handleDocumentation()"
+        class="docs-btn opacity-70 transition-opacity duration-200 ease-in-out hover:opacity-100"
+        :data-test="`aws-${integration.id}-docs-btn`"
+      >
+        <OIcon name="description" size="sm" />
+        <OTooltip :content="t('ingestion.awsSetup.viewDocumentation')" />
+      </OButton>
+    </template>
+    <div class="text-text-secondary min-h-[3em] text-sm leading-normal">
+      {{ t(integration.descriptionKey) }}
+    </div>
 
-    <OCardActions align="left" class="px-4 pb-4">
+    <template #footer>
       <!-- Add Source Button -->
       <OButton
         v-if="hasCloudFormation"
         variant="primary"
-        size="sm"
         @click="handleAddSource()"
         class="flex-1"
         :data-test="`aws-${integration.id}-add-source-btn`"
@@ -55,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="integration.documentationUrl"
         variant="primary"
-        size="sm"
         @click="handleDocumentation()"
         class="flex-1"
         :data-test="`aws-${integration.id}-documentation-btn`"
@@ -65,9 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip v-if="dashboardsLocked" :content="dashboardsLockedReason">
         <span class="inline-flex flex-1">
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="lock"
+            variant="secondary"
+            icon="lock"
             disabled
             class="flex-1"
             :data-test="`aws-${integration.id}-add-dashboard-btn`"
@@ -77,15 +68,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTooltip>
       <OButton
         v-else
-        variant="outline"
-        size="sm"
+        variant="secondary"
         @click="handleAddDashboard"
         :disabled="!integration.hasDashboard || !integration.dashboardGithubUrl"
         class="flex-1"
         :data-test="`aws-${integration.id}-add-dashboard-btn`"
         >{{ t("ingestion.awsSetup.addDashboard") }}</OButton
       >
-    </OCardActions>
+    </template>
 
     <!-- Unified Integration Method Selection Dialog -->
     <ODialog
@@ -93,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showTemplateDialog"
       size="sm"
       :title="t('ingestion.awsSetup.chooseMethod')"
-      :secondary-button-label="t('common.cancel')"
+      :secondary="{ label: t('common.cancel') }"
       @click:secondary="showTemplateDialog = false"
     >
       <div class="mb-3 text-sm font-medium">
@@ -148,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       data-test="aws-integration-tile-content-dialog"
       v-model:open="showComponentContent"
-      size="xl"
+      size="lg"
       :title="raw(selectedComponentTitle)"
     >
       <component
@@ -168,8 +158,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OCardActions from "@/lib/core/Card/OCardActions.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import type {
@@ -195,7 +183,7 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
-  components: { OButton, ODialog, OIcon, OTooltip, OCard, OCardSection, OCardActions },
+  components: { OButton, ODialog, OIcon, OTooltip, OCard },
   props: {
     integration: {
       type: Object as PropType<AWSIntegration>,
@@ -495,7 +483,7 @@ export default defineComponent({
             messageKeypath: "ingestion.awsSetup.dashboardExistsMessage",
             messageName: props.integration.displayName,
             confirmLabel: t("common.replace"),
-            confirmVariant: "destructive",
+            kind: "destructive",
           });
           if (!ok) return;
 

@@ -199,7 +199,7 @@ describe("rowIsBad", () => {
   it("flags a running pod that carries an error waiting reason", () => {
     const crash = {
       ...pod("prod", "a", "Running"),
-      status: { text: "CrashLoopBackOff", variant: "error-soft" },
+      status: { text: "CrashLoopBackOff", variant: "err" },
       containers: [{ name: "app", waitingReason: "CrashLoopBackOff" }],
     };
     expect(rowIsBad(crash as any)).toBe(true);

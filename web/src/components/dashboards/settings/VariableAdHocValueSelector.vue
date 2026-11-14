@@ -28,20 +28,20 @@
         @update:model-value="emitValue()"
       />
       <OButton
+        icon-only
         :aria-label="t('common.remove')"
         variant="ghost"
-        size="icon"
+        size="xs"
         class="ms-1"
         @click="removeField(index)"
         :data-test="`dashboard-variable-adhoc-close-${index}`"
-        icon-left="close"
+        icon="close"
       >
       </OButton>
       <!-- <div v-if="index != adhocVariables.length - 1" class="ms-2 and-border" class="bg-surface-subtle-hover">AND</div> -->
     </div>
     <OButton
       variant="ghost"
-      size="sm"
       class="hideOnPrintMode ms-1 mb-2"
       @click="addFields"
       data-test="dashboard-variable-adhoc-add-selector"

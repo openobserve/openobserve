@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="sm"
     :title="beingUpdated ? t('serviceAccounts.update') : t('serviceAccounts.add')"
-    :primaryButtonLabel="t('user.save')"
-    :secondaryButtonLabel="t('user.cancel')"
+    :primary="{ label: t('user.save') }"
+    :secondary="{ label: t('user.cancel') }"
     form-id="add-service-account-form"
     @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
@@ -91,23 +91,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="iam-add-service-account-roles-select"
                 class="showLabelOnTop mt-2"
               >
-                <template v-if="rbacLocked" #icon-left>
+                <template v-if="rbacLocked" #icon>
                   <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OFormSelect>
               <div class="mt-1 flex justify-end">
                 <OButton
                   variant="ghost"
-                  size="sm"
                   type="button"
                   :disabled="rbacLocked"
                   data-test="iam-add-service-account-create-role-btn"
                   @click="!rbacAccess.allowed ? undefined : (showAddRoleDialog = true)"
                 >
-                  <template v-if="!rbacAccess.allowed || rbacLocked" #icon-left>
+                  <template v-if="!rbacAccess.allowed || rbacLocked" #icon>
                     <OIcon name="lock" size="sm" class="lock-chip" />
                   </template>
-                  <template v-else #icon-left><OIcon name="add" size="sm" /></template>
+                  <template v-else #icon><OIcon name="add" size="sm" /></template>
                   {{ t("serviceAccounts.form.roles.create") }}
                 </OButton>
               </div>
@@ -120,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="iam-add-service-account-groups-select"
                 class="showLabelOnTop mt-2"
               >
-                <template v-if="rbacLocked" #icon-left>
+                <template v-if="rbacLocked" #icon>
                   <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OFormSelect>

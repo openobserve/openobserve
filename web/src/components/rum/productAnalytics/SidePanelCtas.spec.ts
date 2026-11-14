@@ -63,9 +63,9 @@ describe("Top paths sessions count opens the branch side panel", () => {
   it("the count cell is a ghost-primary count with a chevron that says what it opens", async () => {
     const w = await mountTop();
     const btn = button(w, "rum-analytics-paths-top-row-0-sessions-btn");
-    expect(btn.props("variant")).toBe("ghost-primary");
-    expect(btn.props("size")).toBe("xs");
-    expect(btn.props("iconRight")).toBe("chevron-right");
+    expect(btn.props("variant")).toBe("accent-ghost");
+    expect(btn.props("size")).toBe("sm");
+    expect(btn.props("iconEnd")).toBe("chevron-right");
     expect(btn.findAllComponents(OIcon).map((i) => i.props("name"))).toContain("chevron-right");
     expect(btn.attributes("aria-haspopup")).toBe("dialog");
     expect(btn.attributes("aria-label")).toBe(

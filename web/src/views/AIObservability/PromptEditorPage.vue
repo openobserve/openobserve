@@ -5,7 +5,7 @@
     <OPageLayout
       :back="{
         label: t('aiObservability.nav.prompts'),
-        onClick: goBack,
+        to: promptsListRoute,
         dataTest: 'prompt-editor-back-btn',
       }"
       :title="
@@ -236,13 +236,9 @@
               <dt>{{ t("aiObservability.promptManagement.form.variables") }}</dt>
               <dd>
                 <div v-if="variables.length" class="flex flex-wrap gap-1">
-                  <OTag
-                    v-for="variable in variables"
-                    :key="variable"
-                    variant="default-soft"
-                    shape="rounded"
-                    >{{ variable }}</OTag
-                  >
+                  <OTag v-for="variable in variables" :key="variable" tone="neutral">{{
+                    variable
+                  }}</OTag>
                 </div>
                 <template v-else>{{ t("aiObservability.promptManagement.form.notSet") }}</template>
               </dd>
@@ -260,8 +256,7 @@
         <OButton
           v-if="playgroundAvailable"
           type="button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="Boolean(testDisabledReason)"
           data-test="prompt-editor-test-btn"
           @click="openPlayground"
@@ -271,8 +266,7 @@
         </OButton>
         <OButton
           type="button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="saving"
           data-test="prompt-editor-cancel-btn"
           @click="goBack"
@@ -282,7 +276,6 @@
         <OButton
           type="submit"
           variant="primary"
-          size="sm-action"
           :loading="saving"
           data-test="prompt-editor-submit-btn"
         >
@@ -555,13 +548,15 @@ function reset() {
   confirmedMatchFingerprint.value = "";
 }
 
+const promptsListRoute = computed(() =>
+  aiPromptsRoute(orgId.value, {
+    entityId: prompt.value?.entityId,
+    query: { folder: folderId.value },
+  }),
+);
+
 function goBack() {
-  router.push(
-    aiPromptsRoute(orgId.value, {
-      entityId: prompt.value?.entityId,
-      query: { folder: folderId.value },
-    }),
-  );
+  router.push(promptsListRoute.value);
 }
 
 async function openPlayground() {

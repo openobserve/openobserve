@@ -4,15 +4,12 @@
   <OPageLayout
     data-test="ai-experiments-page"
     :title="header?.title ?? t('aiObservability.nav.experiments')"
-    :subtitle="header?.subtitle ?? t('aiObservability.subtitle.experiments')"
-    :icon="header?.icon ?? 'science'"
+    :about="header?.about ?? t('aiObservability.subtitle.experiments')"
     bleed
-    :tabs-below="hasTabs"
   >
     <template v-if="hasTabs" #header-tabs><AiSectionTabs /></template>
     <template #actions>
       <OButton
-        size="sm"
         variant="primary"
         data-test="ai-experiments-new-btn"
         :aria-label="
@@ -36,9 +33,11 @@
       <section class="min-h-0 min-w-0 flex-1 space-y-3 overflow-auto">
         <OEmptyState
           v-if="!loading && !experiments.length"
-          size="hero"
-          preset="no-experiments"
+          :title="t('emptyState.noExperiments.title')"
+          :text="t('emptyState.noExperiments.description')"
+          icon="query-stats"
           data-test="ai-experiments-empty"
+          :action-label="t('emptyState.noExperiments.action')"
           @action="openCreate('')"
         />
         <ExperimentBrowser

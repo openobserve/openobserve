@@ -37,10 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Every real section carries a title + count chip + View all -->
     <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
       <div class="flex items-center gap-2">
-        <OSkeleton class="h-4 w-28" />
-        <OSkeleton class="h-4 w-6" />
+        <OSkeleton shape="block" class="h-4 w-28" />
+        <OSkeleton shape="block" class="h-4 w-6" />
       </div>
-      <OSkeleton class="h-3 w-14" />
+      <OSkeleton shape="block" class="h-3 w-14" />
     </div>
 
     <!-- INCIDENTS: joined rows inside one bordered container -->
@@ -53,24 +53,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="i"
         class="bg-surface-panel border-b-border-default flex items-center gap-3 border-b-[0.0625em] px-3 py-2 last:border-b-0"
       >
-        <OSkeleton type="circle" class="w-4 shrink-0" />
-        <OSkeleton class="h-4 w-8 shrink-0" />
-        <OSkeleton class="h-4 max-w-[20em]" />
-        <OSkeleton class="h-3 w-12 shrink-0" />
+        <OSkeleton shape="circle" class="w-4 shrink-0" />
+        <OSkeleton shape="block" class="h-4 w-8 shrink-0" />
+        <OSkeleton shape="block" class="h-4 max-w-[20em]" />
+        <OSkeleton shape="block" class="h-3 w-12 shrink-0" />
       </div>
     </div>
 
     <!-- SERVICES: scroll chevron + fixed-width cards -->
     <div v-else-if="section === 'services'" class="flex items-stretch gap-2">
-      <OSkeleton class="rounded-default w-6 shrink-0" />
+      <OSkeleton shape="block" class="w-6 shrink-0" />
       <div class="flex flex-1 flex-row gap-2 overflow-hidden">
         <div
           v-for="i in 4"
           :key="i"
           class="rounded-default border-border-default bg-surface-panel flex max-w-40 min-w-40 shrink-0 grow-0 basis-40 flex-col gap-2 border border-[0.0625em] px-3.5 py-3"
         >
-          <OSkeleton class="h-4 max-w-[7em]" />
-          <OSkeleton class="h-3 max-w-[4.5em]" />
+          <OSkeleton shape="block" class="h-4 max-w-[7em]" />
+          <OSkeleton shape="block" class="h-3 max-w-[4.5em]" />
         </div>
       </div>
     </div>
@@ -84,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="i"
         class="border-b-border-default flex items-center gap-3 border-b-[0.0625em] px-3 py-2 last:border-b-0"
       >
-        <OSkeleton type="circle" class="w-4 shrink-0" />
-        <OSkeleton class="h-4 max-w-[24em]" />
+        <OSkeleton shape="circle" class="w-4 shrink-0" />
+        <OSkeleton shape="block" class="h-4 max-w-[24em]" />
       </div>
     </div>
 
@@ -99,10 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="i"
         class="border-b-border-default flex items-center gap-3 border-b border-b-[0.0625em] px-3 py-2 last:border-b-0"
       >
-        <OSkeleton class="h-4 w-12 shrink-0" />
-        <OSkeleton class="h-3 w-[7.5em] shrink-0" />
-        <OSkeleton class="h-3 flex-1" />
-        <OSkeleton class="h-3 w-8 shrink-0" />
+        <OSkeleton shape="block" class="h-4 w-12 shrink-0" />
+        <OSkeleton shape="block" class="h-3 w-[7.5em] shrink-0" />
+        <OSkeleton shape="block" class="h-3 flex-1" />
+        <OSkeleton shape="block" class="h-3 w-8 shrink-0" />
       </div>
     </div>
   </section>

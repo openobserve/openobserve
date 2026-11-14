@@ -170,7 +170,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
             labelKey: "ingestion.setupCard.portLabel",
             default: "3306",
             placeholder: raw("3306"),
-            width: "sm",
+            width: "s",
           },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),

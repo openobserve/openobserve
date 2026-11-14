@@ -19,42 +19,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- With a config open the page header is the detail header, as on the other detail pages. -->
     <OPageHeader
       :title="!configId && sectionHeader ? sectionHeader.title : header.title"
-      :subtitle="!configId && sectionHeader ? sectionHeader.subtitle : header.subtitle"
-      :icon="configId ? undefined : (sectionHeader?.icon ?? 'star-rate')"
+      :about="!configId && sectionHeader ? sectionHeader.about : header.about"
       :back="
         configId
           ? {
-              label: t('onlineEvals.quality.detail.back'),
+              label: sectionHeader?.title ?? t('aiObservability.nav.quality'),
               onClick: closeConfig,
               dataTest: 'quality-detail-back',
             }
           : undefined
       "
       title-data-test="quality-page-title"
-      :tabs-below="hasTabs && !configId"
-      overflow-first
     >
-      <!-- The config list's peer tabs; a config's detail has its back button instead. -->
+      <!-- The config list's peer tabs; a config's detail has its back link instead. -->
       <template v-if="hasTabs && !configId" #tabs><AiSectionTabs /></template>
-      <template v-if="configId" #title-trail>
+      <template v-if="configId" #status>
         <div class="flex shrink-0 items-center gap-1.5" data-test="quality-detail-tags">
           <OTag v-if="header.dataType" type="evalDataType" :value="header.dataType" />
-          <OTag
-            v-if="header.version != null"
-            variant="default-soft"
-            shape="rounded"
-            :label="raw(`v${header.version}`)"
-          />
+          <OTag v-if="header.version != null" tone="neutral" :label="raw(`v${header.version}`)" />
         </div>
       </template>
       <!-- One-click stays reachable once configs exist; the empty state offers it too. -->
       <template v-if="showOneClick" #actions-overflow>
-        <OButton
-          variant="outline"
-          size="sm-toolbar"
-          data-test="quality-one-click-btn"
-          @click="oneClickOpen = true"
-        >
+        <OButton variant="secondary" data-test="quality-one-click-btn" @click="oneClickOpen = true">
           {{
             agent ? t("oneClickEval.headerActionAgent", { agent }) : t("oneClickEval.headerAction")
           }}
@@ -63,8 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <OButton
           v-if="configId"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="quality-detail-edit-config"
           @click="openEditConfig"
         >
@@ -108,7 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="option in scopeOptions"
               :key="option.value"
               :value="option.value"
-              size="sm"
               :data-test="`quality-detail-scope-${option.value}`"
             >
               {{ option.label }}
@@ -166,6 +151,7 @@ import { computed, ref, toRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import AiSectionTabs from "@/enterprise/components/AIObservability/AiSectionTabs.vue";
 import { useAiSectionTabs } from "@/enterprise/components/AIObservability/aiSectionTabs";
@@ -288,16 +274,17 @@ const header = computed(() => {
   if (!configId.value) {
     return {
       title: t("aiObservability.nav.quality"),
-      subtitle: t("aiObservability.subtitle.quality"),
+      about: t("aiObservability.subtitle.quality"),
       dataType: null,
       version: null,
     };
   }
   const row = selectedRow.value;
   const config = selectedConfig.value;
+  const description = row?.description || config?.description;
   return {
     title: raw(row?.name ?? config?.name ?? configId.value),
-    subtitle: raw(row?.description || config?.description || ""),
+    about: description ? raw(description) : undefined,
     dataType: row?.dataType ?? (config ? dataTypeOf(config) : null),
     version: row?.version ?? config?.version ?? null,
   };
@@ -399,9 +386,14 @@ function previousIsList() {
   );
 }
 
+const { goBack: backToList } = useSmartBack(() => ({
+  name: route.name as string,
+  query: { tab: route.query.tab },
+}));
+
 function closeConfig() {
   if (previousIsList()) {
-    router.back();
+    backToList();
     return;
   }
   updateQuery({

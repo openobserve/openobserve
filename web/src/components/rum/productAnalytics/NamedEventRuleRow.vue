@@ -21,25 +21,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex items-center gap-2">
       <OFormToggleGroup
+        size="sm"
         :name="`rules[${index}].t`"
         type="single"
         :data-test="`rum-analytics-named-events-rule-${index}-kind`"
       >
-        <OToggleGroupItem value="view" size="xs">{{
-          t("rum.analytics.kind.page")
-        }}</OToggleGroupItem>
-        <OToggleGroupItem value="action" size="xs">{{
-          t("rum.analytics.kind.click")
-        }}</OToggleGroupItem>
-        <OToggleGroupItem value="error" size="xs">{{
-          t("rum.analytics.kind.error")
-        }}</OToggleGroupItem>
+        <OToggleGroupItem value="view">{{ t("rum.analytics.kind.page") }}</OToggleGroupItem>
+        <OToggleGroupItem value="action">{{ t("rum.analytics.kind.click") }}</OToggleGroupItem>
+        <OToggleGroupItem value="error">{{ t("rum.analytics.kind.error") }}</OToggleGroupItem>
       </OFormToggleGroup>
       <OButton
         v-if="removable"
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="close"
+        icon="close"
         class="ms-auto"
         :aria-label="t('rum.analytics.events.removeRule')"
         :data-test="`rum-analytics-named-events-rule-${index}-remove`"
@@ -50,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OFormSelect
       :name="`rules[${index}].op`"
       :options="opOptions"
-      size="sm"
       :data-test="`rum-analytics-named-events-rule-${index}-op`"
     />
     <OFormCombobox
@@ -58,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :name="`rules[${index}].value`"
       :items="pageItems"
       :placeholder="t('rum.analytics.events.pagePlaceholder')"
-      size="sm"
       :data-test="`rum-analytics-named-events-rule-${index}-value`"
     />
     <OFormSelect
@@ -69,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       multiple
       searchable
       creatable
-      size="sm"
       :data-test="`rum-analytics-named-events-rule-${index}-targets`"
     />
     <template v-else>
@@ -77,13 +69,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="op === 'param'"
         :name="`rules[${index}].name`"
         :placeholder="t('rum.analytics.events.paramNamePlaceholder')"
-        size="sm"
         :data-test="`rum-analytics-named-events-rule-${index}-param-name`"
       />
       <OFormInput
         :name="`rules[${index}].value`"
         :placeholder="valuePlaceholder"
-        size="sm"
         :data-test="`rum-analytics-named-events-rule-${index}-value`"
       />
     </template>
@@ -92,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :name="`rules[${index}].onPage`"
       :options="onPageItems"
       :label="t('rum.analytics.events.onPage')"
-      size="sm"
       :data-test="`rum-analytics-named-events-rule-${index}-on-page`"
     />
   </div>

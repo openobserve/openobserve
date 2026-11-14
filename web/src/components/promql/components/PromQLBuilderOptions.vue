@@ -54,7 +54,7 @@
                 data-test="promql-builder-options-field-info-icon"
                 class="pointer-events-auto absolute top-1/2 right-2 z-10 -translate-y-1/2 cursor-pointer opacity-60 hover:opacity-100"
               >
-                <OTooltip side="top" max-width="15.625rem">
+                <OTooltip side="top">
                   <template #content>
                     ({{ t("dashboard.optional") }})
                     <b>{{ t("metrics.promQLBuilderOptions.legend") }}</b>
@@ -89,9 +89,9 @@
               data-test="dashboard-promql-builder-step-value"
               style="width: 8.75rem"
             >
-              <template v-slot:icon-right>
+              <template v-slot:icon-end>
                 <OIcon name="info" size="sm" class="cursor-pointer">
-                  <OTooltip side="top" max-width="15.625rem">
+                  <OTooltip side="top">
                     <template #content>
                       ({{ t("dashboard.optional") }})
                       <b>{{ t("metrics.promQLBuilderOptions.step") }}</b>
@@ -136,7 +136,7 @@
               data-test="promql-builder-options-field-info-icon"
               class="cursor-pointer"
             >
-              <OTooltip side="top" max-width="15.625rem">
+              <OTooltip side="top">
                 <template #content>
                   <b>{{ t("metrics.promQLBuilderOptions.queryType") }}</b
                   ><br />

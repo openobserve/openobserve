@@ -46,32 +46,32 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -139,11 +139,9 @@ describe("AddAnnotation", () => {
     expect(dialog.props("title")).toBe("Add Annotation");
   });
 
-  it("forwards persistent and size='lg' to the outer ODialog", () => {
+  it("forwards size='lg' to the outer ODialog, which asks before discarding edits instead of blocking Escape", () => {
     const dialog = wrapper.findAllComponents(ODialogStub)[0];
-    // `persistent` is used as a boolean-shorthand attribute in the template,
-    // so it's forwarded as an empty string by Vue.
-    expect(dialog.props("persistent")).toBe("");
+    expect(dialog.props("persistent")).toBeUndefined();
     expect(dialog.props("size")).toBe("lg");
   });
 
@@ -163,14 +161,14 @@ describe("AddAnnotation", () => {
 
   it("renders save/update and cancel buttons", () => {
     const dialog = wrapper.findAllComponents(ODialogStub)[0];
-    expect(dialog.props("primaryButtonLabel")).toBeTruthy();
-    expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+    expect(dialog.props("primary")?.label).toBeTruthy();
+    expect(dialog.props("secondary")?.label).toBe("Cancel");
   });
 
   it("renders a Save button (not Update) when not in edit mode", () => {
     const dialog = wrapper.findAllComponents(ODialogStub)[0];
-    expect(dialog.props("primaryButtonLabel")).toBe("Save");
-    expect(dialog.props("neutralButtonLabel")).toBeFalsy();
+    expect(dialog.props("primary")?.label).toBe("Save");
+    expect(dialog.props("extra")?.label).toBeFalsy();
   });
 
   it("calls create_timed_annotations when submitting a valid new annotation", async () => {
@@ -259,7 +257,7 @@ describe("AddAnnotation", () => {
     await flushPromises();
 
     const dialog = wrapper.findAllComponents(ODialogStub)[0];
-    expect(dialog.props("neutralButtonLabel")).toBe("Delete");
+    expect(dialog.props("extra")?.label).toBe("Delete");
   });
 
   it("opens the nested delete-confirm ODialog when Delete is clicked", async () => {
@@ -272,13 +270,13 @@ describe("AddAnnotation", () => {
     const innerDialogBefore = dialogs[1];
     expect(innerDialogBefore.props("open")).toBe(false);
     expect(innerDialogBefore.props("title")).toBe("Confirm Delete");
-    expect(innerDialogBefore.props("primaryButtonLabel")).toBe("Delete");
-    expect(innerDialogBefore.props("secondaryButtonLabel")).toBe("Cancel");
-    expect(innerDialogBefore.props("primaryButtonVariant")).toBe("destructive");
-    expect(innerDialogBefore.props("size")).toBe("xs");
+    expect(innerDialogBefore.props("primary")?.label).toBe("Delete");
+    expect(innerDialogBefore.props("secondary")?.label).toBe("Cancel");
+    expect(innerDialogBefore.props("primary")?.variant).toBe("danger");
+    expect(innerDialogBefore.props("size")).toBe("sm");
 
-    // Delete is now the ODialog built-in neutral button → emits click:neutral.
-    await wrapper.findAllComponents(ODialogStub)[0].vm.$emit("click:neutral");
+    // Delete is now the ODialog built-in neutral button → emits click:extra.
+    await wrapper.findAllComponents(ODialogStub)[0].vm.$emit("click:extra");
     await flushPromises();
 
     dialogs = wrapper.findAllComponents(ODialogStub);
@@ -304,8 +302,8 @@ describe("AddAnnotation", () => {
     await flushPromises();
 
     // Open the confirm dialog first.
-    // Delete is now the ODialog built-in neutral button → emits click:neutral.
-    await wrapper.findAllComponents(ODialogStub)[0].vm.$emit("click:neutral");
+    // Delete is now the ODialog built-in neutral button → emits click:extra.
+    await wrapper.findAllComponents(ODialogStub)[0].vm.$emit("click:extra");
     await flushPromises();
 
     const innerDialog = wrapper.findAllComponents(ODialogStub)[1];
@@ -326,8 +324,8 @@ describe("AddAnnotation", () => {
     (annotationService.delete_timed_annotations as any).mockResolvedValueOnce({});
 
     // Open the confirm dialog.
-    // Delete is now the ODialog built-in neutral button → emits click:neutral.
-    await wrapper.findAllComponents(ODialogStub)[0].vm.$emit("click:neutral");
+    // Delete is now the ODialog built-in neutral button → emits click:extra.
+    await wrapper.findAllComponents(ODialogStub)[0].vm.$emit("click:extra");
     await flushPromises();
 
     const innerDialog = wrapper.findAllComponents(ODialogStub)[1];
@@ -364,8 +362,8 @@ describe("AddAnnotation", () => {
   // not by disabling the button. (Replaces the old `:disabled="!title"` tests.)
   it("keeps the Save button enabled even when the title is empty", () => {
     const dialog = wrapper.findAllComponents(ODialogStub)[0];
-    expect(dialog.props("primaryButtonLabel")).toBeTruthy();
-    expect(dialog.props("primaryButtonDisabled")).toBeFalsy();
+    expect(dialog.props("primary")?.label).toBeTruthy();
+    expect(dialog.props("primary")?.disabled).toBeFalsy();
   });
 
   it("keeps the Save button enabled after the title is filled in", async () => {
@@ -374,7 +372,7 @@ describe("AddAnnotation", () => {
     await flushPromises();
 
     const dialog = wrapper.findAllComponents(ODialogStub)[0];
-    expect(dialog.props("primaryButtonDisabled")).toBeFalsy();
+    expect(dialog.props("primary")?.disabled).toBeFalsy();
   });
 
   it("shows an error notification and does not close when update_timed_annotations rejects", async () => {

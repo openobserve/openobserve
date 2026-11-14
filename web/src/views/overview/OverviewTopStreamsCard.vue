@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #empty>
       <OEmptyState
-        size="slim"
+        size="inline"
         :title="t('overview.streams.emptyTitle')"
-        :description="t('overview.streams.emptyDesc')"
+        :text="t('overview.streams.emptyDesc')"
         data-test="overview-streams-empty"
       />
     </template>

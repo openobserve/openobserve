@@ -246,8 +246,8 @@ describe("ViewDashboard time range gate", () => {
 
       await pick(relative("1h"));
 
-      expect(refreshButton().props("variant")).toBe("pending");
-      expect(refreshOptions().props("variant")).toBe("pending");
+      expect(refreshButton().props("variant")).toBe("primary");
+      expect(refreshOptions().props("variant")).toBe("primary");
       expect(refreshTooltip()).toBe("Refresh to apply the time range");
     });
 
@@ -326,13 +326,13 @@ describe("ViewDashboard time range gate", () => {
     expect(wrapper.vm.isEditingLayout).toBe(true);
 
     await pick(relative("1h"));
-    expect(refreshButton().props("variant")).toBe("pending");
+    expect(refreshButton().props("variant")).toBe("primary");
 
     refreshButton().vm.$emit("click");
     await flushPromises();
 
     expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
-    expect(refreshButton().props("variant")).toBe("outline");
+    expect(refreshButton().props("variant")).toBe("secondary");
     expect(wrapper.vm.isEditingLayout).toBe(true);
   });
 
@@ -343,7 +343,7 @@ describe("ViewDashboard time range gate", () => {
 
     await pick(relative("1h"));
 
-    expect(refreshButton().props("variant")).toBe("pending");
+    expect(refreshButton().props("variant")).toBe("primary");
     expect(refreshTooltip()).toBe("Refresh to apply the time range and variable changes");
   });
 
@@ -441,12 +441,12 @@ describe("ViewDashboard time range gate", () => {
       await flushPromises();
 
       const cancel = wrapper.findComponent('[data-test="dashboard-cancel-btn"]');
-      expect(cancel.props("variant")).toBe("cancel-query");
+      expect(cancel.props("variant")).toBe("secondary");
       expect(cancel.text()).toContain("Cancel");
-      expect(refreshOptions().props("variant")).toBe("cancel-query");
+      expect(refreshOptions().props("variant")).toBe("secondary");
       expect(wrapper.find('[data-test="dashboard-refresh-btn"]').exists()).toBe(false);
       // No X icon on wide screens; a hidden Refresh label keeps the button width.
-      expect(cancel.props("iconLeft")).toBeUndefined();
+      expect(cancel.props("icon")).toBeUndefined();
       expect(cancel.find('[aria-hidden="true"]').text()).toContain("Refresh");
     } finally {
       config.isEnterprise = wasEnterprise;
@@ -457,7 +457,7 @@ describe("ViewDashboard time range gate", () => {
     await mountDashboard();
 
     expect(refreshButton().props("variant")).toBe("primary");
-    expect(refreshButton().props("iconLeft")).toBe("refresh");
+    expect(refreshButton().props("icon")).toBe("refresh");
     expect(refreshButton().text()).toContain("Refresh");
   });
 
@@ -469,7 +469,7 @@ describe("ViewDashboard time range gate", () => {
 
       expect(refreshButton().props("variant")).toBe("primary");
       expect(refreshOptions().props("variant")).toBe("primary");
-      expect(refreshButton().props("iconLeft")).toBe("autorenew");
+      expect(refreshButton().props("icon")).toBe("autorenew");
       expect(refreshButton().text()).toContain("Refresh");
     });
 
@@ -538,6 +538,6 @@ describe("ViewDashboard time range gate", () => {
     await flushPromises();
 
     expect(pickerCalls.setSavedDate).not.toHaveBeenCalled();
-    expect(refreshButton().props("variant")).toBe("pending");
+    expect(refreshButton().props("variant")).toBe("primary");
   });
 });

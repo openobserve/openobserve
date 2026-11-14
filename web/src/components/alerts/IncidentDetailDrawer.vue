@@ -19,12 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       :back="{
         onClick: close,
-        label: t('alerts.incidents.goBack'),
+        label: t('alerts.incidents.title'),
         dataTest: 'incident-detail-back-btn',
       }"
-      :subtitle="t('alerts.incidents.incident')"
-      title-overflow="visible"
-      tabs-below
       bleed
     >
       <!-- Incident name — click the title to rename, Enter or blur saves,
@@ -44,9 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
-      <!-- Status, Severity, Alerts badges — trail immediately after the title
-           (soft dot-badge variant used in the Incident list). -->
-      <template #title-trail>
+      <template #status>
         <template v-if="incidentDetails && !isEditingTitle">
           <span class="inline-flex cursor-default">
             <OTag type="incidentStatus" :value="incidentDetails.status" />
@@ -79,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</OTag>
 
           <span v-if="externalSources.length" class="inline-flex cursor-default">
-            <OTag variant="default-outline" data-test="incident-external-source-badge">
+            <OTag tone="outline" data-test="incident-external-source-badge">
               <OIcon name="webhook" size="xs" />
               {{ externalSources.join(", ") }}
             </OTag>
@@ -93,8 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Last in the row, so its skeleton growing into the chip moves nothing after it. -->
           <OSkeleton
             v-if="liveChip === 'loading'"
-            animation="none"
-            class="h-5 w-36 rounded-full"
+            shape="block"
+            class="h-5 w-36"
             :aria-label="t('common.loading')"
           />
           <span
@@ -103,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="incident-detail-live-chip"
           >
             <OTag
-              :variant="liveChip.firing ? 'warning-soft' : 'default-soft'"
+              :tone="liveChip.firing ? 'warn' : 'neutral'"
               :dot="liveChip.firing"
               size="sm"
               :label="liveChip.label"
@@ -117,53 +112,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="incidentDetails">
           <OButton
             v-if="incidentDetails.status === 'open'"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :loading="updating"
             :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
             @click="acknowledgeIncident"
             ><OIcon name="check-circle" size="sm" aria-hidden="true" />{{
               t("alerts.incidents.acknowledge")
-            }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')"
+            }}<OTooltip :content="t('alerts.incidents.markAsAcknowledgedTooltip')"
           /></OButton>
           <OButton
             v-if="incidentDetails.status !== 'resolved'"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :loading="updating"
             @click="resolveIncident"
             ><OIcon name="task-alt" size="sm" />{{ t("alerts.incidents.resolve")
-            }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsResolvedTooltip')"
+            }}<OTooltip :content="t('alerts.incidents.markAsResolvedTooltip')"
           /></OButton>
           <OButton
             v-if="incidentDetails.status === 'resolved'"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :loading="updating"
             @click="reopenIncident"
             ><OIcon name="refresh" size="sm" />{{ t("alerts.incidents.reopen")
-            }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')"
+            }}<OTooltip :content="t('alerts.incidents.reopenIncidentTooltip')"
           /></OButton>
         </template>
       </template>
 
       <template #header-tabs>
-        <OTabs
-          v-model="activeTab"
-          align="left"
-          class="flex-1"
-          mobile-arrows
-          :breakpoint="0"
-          reorderable
-          @reorder="onTabReorder"
-        >
+        <OTabs v-model="activeTab" class="flex-1" reorderable @reorder="onTabReorder">
           <OTab
             v-for="tab in shownTabs"
             :key="tab"
             :name="tab"
             :label="tab === 'alertTriggers' ? undefined : tabLabels[tab]"
             :data-test="TAB_TEST_IDS[tab]"
-            :suffix-icon="isCorrelationTab(tab) && correlationLocked ? 'lock' : undefined"
+            :locked="isCorrelationTab(tab) && correlationLocked"
             :tooltip="
               isCorrelationTab(tab) && correlationLocked ? correlationLockedReason : undefined
             "
@@ -190,10 +174,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <div v-if="incidentDetails.muted_by_downtime_id" class="shrink-0 px-3 pt-2">
-          <OBanner
-            variant="warning"
-            dense
-            inline-actions
+          <OInlineNotice
+            tone="warn"
             icon="notifications-paused"
             data-test="incident-detail-muted-banner"
           >
@@ -201,14 +183,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #actions>
               <OButton
                 variant="ghost"
-                size="sm"
                 data-test="incident-detail-muted-view"
                 @click="openMutingDowntime"
               >
                 {{ t("toastMessages.downtimes.viewDowntime") }}
               </OButton>
             </template>
-          </OBanner>
+          </OInlineNotice>
         </div>
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
@@ -498,8 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Show Full Activity Button -->
                         <div class="border-border-default flex justify-end border-t p-2">
                           <OButton
-                            variant="ghost-primary"
-                            size="sm"
+                            variant="accent-ghost"
                             @click="activeTab = 'activity'"
                             data-test="incident-timeline-show-full-activity"
                             ><span class="text-xs">{{
@@ -1248,7 +1228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex flex-1 items-center justify-center p-4"
                   data-test="incident-finding-logs-loading"
                 >
-                  <OSpinner />
+                  <OSpinner size="lg" />
                 </div>
                 <IssueLogsLink
                   v-else
@@ -1311,8 +1291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OButton
                     v-if="correlationError && !correlationError.includes('disambiguation fields')"
-                    variant="outline"
-                    size="md"
+                    variant="secondary"
                     @click="refreshCorrelation"
                     class="mt-3"
                     ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
@@ -1395,8 +1374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OButton
                     v-if="correlationError && !correlationError.includes('disambiguation fields')"
-                    variant="outline"
-                    size="md"
+                    variant="secondary"
                     @click="refreshCorrelation"
                     class="mt-3"
                     ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
@@ -1443,8 +1421,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span class="text-xs">{{ t("alerts.incidents.showingCorrelatedTraces") }}</span>
                   <OButton
+                    icon-only
                     variant="ghost"
-                    size="icon-sm"
                     :disabled="correlationLoading"
                     @click="refreshCorrelation"
                     ><OIcon name="refresh" size="sm" /><OTooltip
@@ -1498,8 +1476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OButton
                     v-if="correlationError && !correlationError.includes('disambiguation fields')"
-                    variant="outline"
-                    size="md"
+                    variant="secondary"
                     @click="refreshCorrelation"
                     class="mt-3"
                     ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
@@ -1534,7 +1511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Loading state -->
       <div v-if="loading" class="flex flex-1 items-center justify-center">
-        <OSpinner size="md" />
+        <OSpinner size="lg" />
       </div>
       <LicenseDeniedState
         v-else-if="licenseDenied"
@@ -1548,7 +1525,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { formatWindowTime } from "@/utils/downtimes/schedule";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import {
@@ -1564,6 +1541,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
@@ -1736,7 +1714,7 @@ export default defineComponent({
     OSkeleton,
     OTruncatedText,
     OInlineEdit,
-    OBanner,
+    OInlineNotice,
     LicenseDeniedState,
   },
   emits: ["close", "status-updated", "sendToAiChat"],
@@ -2915,6 +2893,14 @@ export default defineComponent({
       contextRegistry.unregister("incidents");
     });
 
+    // A deep link has no list to pop back to, so it lands on the list with this route's query.
+    const { goBack: goBackToList } = useSmartBack(() => ({
+      name: "incidentList",
+      query: {
+        ...route.query,
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    }));
     const close = () => {
       // Clear correlation data when closing
       correlationData.value = null;
@@ -2924,15 +2910,7 @@ export default defineComponent({
       contextRegistry.setActive("");
       contextRegistry.unregister("incidents");
 
-      // Navigate back to incident list, carrying over this route's own query (e.g. page)
-      // instead of dropping it. `tab` never reaches here: the load consumes it.
-      router.push({
-        name: "incidentList",
-        query: {
-          ...route.query,
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
+      goBackToList();
     };
 
     // Esc leaves the page only when nothing else on it owns the key: no
@@ -3083,7 +3061,6 @@ export default defineComponent({
         message: t("alerts.incidents.acknowledgeConfirmMessage"),
         confirmLabel: t("alerts.incidents.acknowledgeConfirmLabel"),
         cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
-        persistent: false,
       });
       if (!ok) return;
       // The caller's promise must cover the update, not just the confirm dialog.
@@ -3096,7 +3073,6 @@ export default defineComponent({
         message: t("alerts.incidents.resolveConfirmMessage"),
         confirmLabel: t("alerts.incidents.resolve"),
         cancelLabel: t("common.cancel"),
-        persistent: false,
       });
       if (!ok) return;
       return updateStatus("resolved");
@@ -3107,7 +3083,6 @@ export default defineComponent({
         message: t("alerts.incidents.reopenConfirmMessage"),
         confirmLabel: t("alerts.incidents.reopen"),
         cancelLabel: t("common.cancel"),
-        persistent: false,
       });
       if (!ok) return;
       return updateStatus("open");
@@ -3338,7 +3313,6 @@ export default defineComponent({
                 : t("alerts.incidents.rerunAnalysisMessage"),
               confirmLabel: t("alerts.incidents.rerunAnalysisConfirmLabel"),
               cancelLabel: t("alerts.incidents.rerunAnalysisCancelLabel"),
-              persistent: false,
             });
             if (ok) {
               await triggerRca();

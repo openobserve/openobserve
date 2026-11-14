@@ -74,10 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
             <span class="flex shrink-0 items-center gap-1">
-              <OBadge v-if="isTestRun(run)" variant="default-soft" size="xs">
+              <OBadge v-if="isTestRun(run)" tone="neutral" size="sm">
                 {{ t("workflow.history.testRun") }}
               </OBadge>
-              <OTag type="hookRunStatus" :value="run.status" size="xs" />
+              <OTag type="hookRunStatus" :value="run.status" size="sm" />
             </span>
           </div>
           <!-- Hover a failed run to read WHY it failed without leaving the menu. -->
@@ -85,7 +85,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="run.status === 'failed' && run.error"
             :content="raw(String(run.error))"
             side="left"
-            max-width="22rem"
           />
         </ODropdownItem>
         <div
@@ -101,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="testRunCount > 0" class="border-border-default border-t px-2 py-1.5">
         <OButton
           variant="ghost"
-          size="sm"
           class="w-full"
           data-test="workflow-run-switcher-show-test"
           @click="showTestRuns = !showTestRuns"

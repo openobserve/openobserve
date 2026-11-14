@@ -24,9 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="state.label ?? ''"
         :options="labels"
         :label="t('profiles.compareLabel')"
-        label-position="inside"
-        size="sm"
-        width="sm"
+        variant="filter"
+        width="s"
         data-test="profiles-compare-label"
         @update:model-value="setLabel"
       />
@@ -35,16 +34,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="baselineOptions"
         :loading="valuesLoading"
         :label="t('profiles.compareFrom')"
-        label-position="inside"
-        size="sm"
-        width="sm"
+        variant="filter"
+        width="s"
         data-test="profiles-compare-baseline"
         @update:model-value="(value) => setSide('baseline', value)"
       />
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-toolbar"
-        icon-left="swap-horiz"
+        icon="swap-horiz"
         :aria-label="t('profiles.compareSwap')"
         :disabled="!state.baseline || !state.comparison"
         data-test="profiles-compare-swap"
@@ -57,9 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="comparisonOptions"
         :loading="valuesLoading"
         :label="t('profiles.compareTo')"
-        label-position="inside"
-        size="sm"
-        width="sm"
+        variant="filter"
+        width="s"
         data-test="profiles-compare-comparison"
         @update:model-value="(value) => setSide('comparison', value)"
       />
@@ -70,13 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="profiles-compare-display"
           @update:model-value="setDisplay"
         >
-          <OToggleGroupItem value="flame" size="sm" data-test="profiles-compare-display-flame">
+          <OToggleGroupItem value="flame" data-test="profiles-compare-display-flame">
             {{ t("profiles.diffFlameGraph") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="sides" size="sm" data-test="profiles-compare-display-sides">
+          <OToggleGroupItem value="sides" data-test="profiles-compare-display-sides">
             {{ t("profiles.compareSideBySide") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="table" size="sm" data-test="profiles-compare-display-table">
+          <OToggleGroupItem value="table" data-test="profiles-compare-display-table">
             {{ t("profiles.diffTable") }}
           </OToggleGroupItem>
         </OToggleGroup>
@@ -114,8 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton
         v-for="width in SKELETON_WIDTHS"
         :key="width"
-        type="rect"
-        class="rounded-default h-6"
+        shape="block"
+        class="h-6"
         :class="width"
       />
     </div>
@@ -177,11 +174,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       pagination="none"
       virtual-scroll
-      :show-global-filter="false"
-      :frame="false"
       :fill-height="!isMobile"
       class="md:min-h-0 md:flex-1"
-      :row-height="28"
+      density="compact"
       :enable-column-resize="true"
       data-test="profiles-compare-table"
     >

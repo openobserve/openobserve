@@ -37,7 +37,7 @@ vi.mock("@/services/synthetics", () => ({
 
 const STUBS = {
   ODrawer: {
-    props: ["open", "title", "subTitle", "size", "bleed"],
+    props: ["open", "title", "subtitle", "size", "bleed"],
     template: '<div v-if="open" class="odrawer-stub"><slot name="header-right" /><slot /></div>',
   },
   OBadge: {

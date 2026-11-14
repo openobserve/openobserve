@@ -214,14 +214,11 @@ export function resourceOptions(t: TranslateFn, record: DigestRecord): ResourceO
 }
 
 /** High is orange, as Incidents shows a High priority; red stays for failures and denials. */
-export const SEVERITY_BADGE: Record<
-  Severity,
-  "orange-soft" | "warning-soft" | "primary-soft" | "default-soft"
-> = {
-  High: "orange-soft",
-  Medium: "warning-soft",
-  Low: "primary-soft",
-  Info: "default-soft",
+export const SEVERITY_BADGE: Record<Severity, "warn" | "warn" | "accent" | "neutral"> = {
+  High: "warn",
+  Medium: "warn",
+  Low: "accent",
+  Info: "neutral",
 };
 
 /** The rule icon's tile takes the severity badge's tone, so the two read as one signal. */
@@ -375,7 +372,7 @@ export const notCheckedCopy = (t: TranslateFn, cause: NotCheckedCause) => ({
   next: t(NOT_CHECKED_COPY[cause].next),
 });
 
-type CoverageVariant = "success-soft" | "warning-soft" | "error-soft" | "default-soft";
+type CoverageVariant = "ok" | "warn" | "err" | "neutral";
 type CoverageTone = "success" | "warning" | "error" | "neutral";
 
 export const COVERAGE_BADGE: Record<
@@ -391,19 +388,19 @@ export const COVERAGE_BADGE: Record<
   full: {
     labelKey: "alertCalibration.coverage.full",
     shortKey: "alertCalibration.coverage.fullShort",
-    variant: "success-soft",
+    variant: "ok",
     tone: "success",
   },
   gap: {
     labelKey: "alertCalibration.coverage.gap",
     shortKey: "alertCalibration.coverage.gapShort",
-    variant: "warning-soft",
+    variant: "warn",
     tone: "warning",
   },
   none: {
     labelKey: "alertCalibration.coverage.none",
     shortKey: "alertCalibration.coverage.noneShort",
-    variant: "error-soft",
+    variant: "err",
     tone: "error",
   },
 };
@@ -422,6 +419,6 @@ export const coverageBadge = (
   const verdict = coverageVerdict(run as RunRow, uncheckedSkips);
   const badge = COVERAGE_BADGE[verdict];
   return verdict === "full" && run.alerts_in_scope === 0
-    ? { ...badge, variant: "default-soft" as const, tone: "neutral" as const }
+    ? { ...badge, variant: "neutral" as const, tone: "neutral" as const }
     : badge;
 };

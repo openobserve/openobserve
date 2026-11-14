@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <LLMPanelCard :title="title">
-    <OSkeleton v-if="loading" variant="button" class="h-55 w-full p-3" />
+    <OSkeleton v-if="loading" shape="block" class="h-55 w-full p-3" />
     <div v-else-if="!hasSeries" class="text-text-muted flex h-55 items-center justify-center">
       {{ emptyLabel }}
     </div>

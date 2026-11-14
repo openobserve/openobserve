@@ -749,9 +749,9 @@ function resetZoom() {
       data-test="k8s2-map-zoom"
     >
       <OButton
+        icon-only
         class="max-md:hidden"
         variant="ghost"
-        size="icon-sm"
         :aria-label="t('infra.k8s2.mapZoomIn')"
         :disabled="atMax"
         data-test="k8s2-map-zoom-in"
@@ -760,9 +760,9 @@ function resetZoom() {
         <OIcon name="add" size="sm" />
       </OButton>
       <OButton
+        icon-only
         class="max-md:hidden"
         variant="ghost"
-        size="icon-sm"
         :aria-label="t('infra.k8s2.mapZoomOut')"
         :disabled="atFit"
         data-test="k8s2-map-zoom-out"
@@ -771,8 +771,8 @@ function resetZoom() {
         <OIcon name="remove" size="sm" />
       </OButton>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
         :aria-label="t('infra.k8s2.mapFit')"
         data-test="k8s2-map-fit"
         @click="resetZoom"

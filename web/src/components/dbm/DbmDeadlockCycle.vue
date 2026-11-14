@@ -181,8 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            "Copy" and its tooltip carries the scope: the whole incident. -->
       <OButton
         variant="primary"
-        size="sm"
-        icon-left="content-copy"
+        icon="content-copy"
         class="shrink-0"
         :data-test="`${dataTest}-copy-slack`"
         @click="emit('copy-summary')"

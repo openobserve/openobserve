@@ -20,25 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="listStatus === 'forbidden' || permission === 'read' || invalidCount > 0"
       class="px-page-edge flex shrink-0 flex-col gap-2 pt-2"
     >
-      <OBanner
+      <OInlineNotice
         v-if="listStatus === 'forbidden'"
-        variant="warning"
-        dense
-        :content="t('rum.analytics.saved.noAccess')"
+        tone="warn"
+        :message="t('rum.analytics.saved.noAccess')"
         data-test="rum-analytics-funnel-saved-no-access"
       />
-      <OBanner
+      <OInlineNotice
         v-if="permission === 'read'"
-        variant="warning"
-        dense
-        :content="t('rum.analytics.saved.readOnly')"
+        tone="warn"
+        :message="t('rum.analytics.saved.readOnly')"
         data-test="rum-analytics-saved-funnels-read-only"
       />
-      <OBanner
+      <OInlineNotice
         v-if="invalidCount > 0"
-        variant="warning"
-        dense
-        :content="t('rum.analytics.saved.unreadable', { count: invalidCount }, invalidCount)"
+        tone="warn"
+        :message="t('rum.analytics.saved.unreadable', { count: invalidCount }, invalidCount)"
         data-test="rum-analytics-funnel-saved-unreadable"
       />
     </div>
@@ -66,28 +63,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:sort-by="sortBy = $event"
         @update:sort-order="sortOrder = $event"
         :default-columns="false"
-        :show-global-filter="false"
-        :frame="false"
         table-id="rum-analytics-saved-funnels"
         :persist-columns="true"
         data-test="rum-analytics-saved-funnels-table"
         @row-click="(row) => draft.openSaved(row)"
       >
         <template #toolbar>
-          <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+          <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
             <OSearchInput
               v-model="filter"
               class="min-w-0 flex-1 max-md:min-w-40"
               :placeholder="t('rum.analytics.saved.search')"
-              clearable
               data-test="rum-analytics-saved-funnels-search"
             />
           </div>
         </template>
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastUpdatedAt"
             :loading="refreshing"
             data-test="rum-analytics-saved-funnels-refresh"
@@ -96,10 +88,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #empty>
           <OEmptyState
-            size="hero"
-            preset="no-saved-funnels"
-            :filtered="!!filter"
-            @action="(id) => (id === 'clear-filters' ? (filter = '') : draft.startNew())"
+            :kind="filter ? 'filtered' : 'first-run'"
+            :title="
+              filter
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.savedFunnels') })
+                : t('emptyState.noSavedFunnels.title')
+            "
+            :text="
+              filter
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.savedFunnels') })
+                : t('emptyState.noSavedFunnels.description')
+            "
+            :icon="filter ? undefined : 'dashboard'"
+            :action-label="filter ? undefined : t('emptyState.noSavedFunnels.action')"
+            @action="filter ? (filter = '') : draft.startNew()"
           >
             <template v-if="!filter" #extra>
               <FunnelQuickStarts
@@ -116,22 +118,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OEmptyState>
         </template>
         <template #error="{ message }">
-          <OBanner
-            variant="error"
-            dense
-            :content="raw(message)"
+          <OInlineNotice
+            tone="err"
+            :message="raw(message)"
             data-test="rum-analytics-saved-funnels-error"
           >
             <template #actions>
               <OButton
                 variant="ghost"
-                size="sm"
                 data-test="rum-analytics-saved-funnels-retry-btn"
                 @click="refresh"
                 >{{ t("common.retry") }}</OButton
               >
             </template>
-          </OBanner>
+          </OInlineNotice>
         </template>
         <template #cell-name="{ row, index }">
           <span class="flex min-w-0 items-center gap-1.5">
@@ -143,8 +143,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               v-if="row.id === openedId"
               :label="t('rum.analytics.saved.current')"
-              variant="primary-soft"
-              size="xs"
+              tone="accent"
+              size="sm"
               :data-test="`rum-analytics-saved-funnel-row-${index}-current`"
             />
           </span>
@@ -168,9 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex items-center justify-end gap-0.5" @click.stop>
             <span class="max-md:hidden">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="edit"
+                icon="edit"
                 :disabled="!canWrite"
                 :aria-label="canWrite ? t('rum.analytics.saved.rename') : readOnlyTip"
                 :data-test="`rum-analytics-saved-funnel-row-${index}-rename`"
@@ -180,9 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span class="max-md:hidden">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="content-copy"
+                icon="content-copy"
                 :disabled="!!duplicateBlocked(row)"
                 :aria-label="duplicateBlocked(row) ?? t('rum.analytics.saved.duplicate')"
                 :data-test="`rum-analytics-saved-funnel-row-${index}-duplicate`"
@@ -192,9 +192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span class="max-md:hidden">
               <OButton
-                variant="ghost-destructive"
-                size="icon-sm"
-                icon-left="delete"
+                icon-only
+                variant="danger-ghost"
+                icon="delete"
                 :disabled="!canWrite"
                 :aria-label="canWrite ? t('rum.analytics.saved.delete') : readOnlyTip"
                 :data-test="`rum-analytics-saved-funnel-row-${index}-delete`"
@@ -205,16 +205,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-sm"
-                  icon-left="more-vert"
+                  icon="more-vert"
                   class="md:hidden"
                   :aria-label="t('rum.analytics.saved.more')"
                   :data-test="`rum-analytics-saved-funnel-row-${index}-menu`"
                 />
               </template>
               <ODropdownItem
-                icon-left="edit"
+                icon="edit"
                 class="md:hidden"
                 :disabled="!canWrite"
                 :data-test="`rum-analytics-saved-funnel-row-${index}-rename-menu`"
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("rum.analytics.saved.rename") }}</ODropdownItem
               >
               <ODropdownItem
-                icon-left="content-copy"
+                icon="content-copy"
                 class="md:hidden"
                 :disabled="!!duplicateBlocked(row)"
                 :data-test="`rum-analytics-saved-funnel-row-${index}-duplicate-menu`"
@@ -230,8 +230,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("rum.analytics.saved.duplicate") }}</ODropdownItem
               >
               <ODropdownItem
-                variant="destructive"
-                icon-left="delete"
+                tone="danger"
+                icon="delete"
                 class="md:hidden"
                 :disabled="!canWrite"
                 :data-test="`rum-analytics-saved-funnel-row-${index}-delete-menu`"
@@ -243,9 +243,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #selection-actions>
           <OButton
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
+            variant="danger-ghost"
+            icon="delete"
             data-test="rum-analytics-saved-funnels-bulk-delete-btn"
             @click="removeSelected"
             >{{ t("rum.analytics.saved.delete") }}</OButton
@@ -272,7 +271,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";

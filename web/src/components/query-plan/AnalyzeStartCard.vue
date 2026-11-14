@@ -19,13 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-surface-base border-border-default rounded-surface flex w-full max-w-140 flex-col gap-3.5 border p-6 shadow-sm max-md:p-4"
     data-test="query-plan-analyze-start"
   >
-    <OBanner
+    <OInlineNotice
+      class="wrap-anywhere whitespace-pre-line"
       v-if="notice"
-      :variant="notice.variant"
-      :icon="notice.variant === 'error' ? 'error-outline' : 'info-outline'"
-      :content="notice.text"
-      dense
-      preserve-whitespace
+      :tone="notice.tone"
+      :message="notice.text"
       data-test="query-plan-analyze-notice"
     />
     <h3 class="text-text-heading m-0 flex items-center gap-2.5 text-lg font-semibold">
@@ -48,8 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-wrap items-center gap-3">
       <OButton
         variant="primary"
-        size="sm"
-        icon-left="play-arrow"
+        icon="play-arrow"
         data-test="query-plan-analyze-run"
         @click="emit('run')"
         >{{
@@ -66,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ProfileStatTile from "./ProfileStatTile.vue";
 import type { AnalyzeFact, AnalyzeNotice } from "./profileStyles";

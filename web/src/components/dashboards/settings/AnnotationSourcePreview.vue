@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -110,12 +110,11 @@ const flags = computed<I18nText[]>(() => {
 
 <template>
   <div class="flex flex-col gap-2 py-2" data-test="dashboard-annotation-source-preview">
-    <OBanner
+    <OInlineNotice
+      class="wrap-anywhere whitespace-pre-line"
       v-if="error"
-      variant="error-soft"
-      dense
-      preserve-whitespace
-      :content="raw(error)"
+      tone="err"
+      :message="raw(error)"
       data-test="dashboard-annotation-source-preview-error"
     />
     <template v-else-if="summary">
@@ -128,7 +127,6 @@ const flags = computed<I18nText[]>(() => {
         sorting="none"
         selection="none"
         :default-columns="false"
-        :show-global-filter="false"
         data-test="dashboard-annotation-source-preview-table"
       />
       <p

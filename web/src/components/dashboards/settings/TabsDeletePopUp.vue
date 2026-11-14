@@ -22,9 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="open"
     size="md"
     :title="t('dashboard.tabsDeletePopUp.deleteTitle', { name: tabName })"
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('confirmDialog.ok')"
-    primary-button-variant="destructive"
+    :secondary="{ label: t('confirmDialog.cancel') }"
+    :primary="{ label: t('confirmDialog.ok'), variant: 'danger' }"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
@@ -54,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ORadioGroup v-model="action" orientation="vertical" class="gap-4">
             <div class="flex flex-row">
               <ORadio
-                val="move"
+                value="move"
                 :disabled="moveTabOptions.length === 0"
                 data-test="dashboard-tab-delete-tab-panels-move"
                 :label="t('dashboard.tabsDeletePopUp.movePanels')"
@@ -68,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <ORadio
-              val="delete"
+              value="delete"
               data-test="dashboard-tab-delete-tab-panels-delete"
               :label="t('dashboard.tabsDeletePopUp.deleteAllPanels')"
             />

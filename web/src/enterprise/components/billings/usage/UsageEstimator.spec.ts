@@ -119,7 +119,7 @@ describe("UsageEstimator My Current Usage", () => {
   it("says it is reading history instead of showing defaults as current usage", async () => {
     const wrapper = mountEstimator();
     await flushPromises();
-    const loading = () => wrapper.findComponent({ name: "OInnerLoading" }).props("showing");
+    const loading = () => wrapper.findComponent({ name: "OLoadingLine" }).props("active");
     expect(loading()).toBe(true);
 
     releaseHistory();

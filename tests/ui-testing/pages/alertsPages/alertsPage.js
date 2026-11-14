@@ -1655,7 +1655,7 @@ export class AlertsPage {
         await nextPageBtn.click();
     }
 
-    // Read the pagination info text ("Showing X - Y of Z"), whitespace-normalised.
+    // Read the pagination info text ("X–Y of Z"), whitespace-normalised.
     async getPaginationInfoText() {
         const text = await this.page.locator('[data-test="o2-table-pagination-info"]').textContent().catch(() => null);
         return (text || '').replace(/\s+/g, ' ').trim();
@@ -1784,13 +1784,13 @@ export class AlertsPage {
     }
 
     async verifySearchResults(expectedCount) {
-        const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
-        await expect(this.page.getByText(resultText)).toBeVisible();
+        const resultText = expectedCount === 1 ? /^\s*1–1 of/ : /^\s*1–2 of/;
+        await expect(this.page.locator('[data-test="o2-table-pagination-info"]').filter({ hasText: resultText })).toBeVisible();
     }
 
     async verifySearchResultsUIValidation(expectedCount) {
-        const resultText = expectedCount === 1 ? 'Showing 1 - 1 of' : 'Showing 1 - 2 of';
-        await expect(this.page.getByText(resultText)).toBeVisible({ timeout: 10000 });
+        const resultText = expectedCount === 1 ? /^\s*1–1 of/ : /^\s*1–2 of/;
+        await expect(this.page.locator('[data-test="o2-table-pagination-info"]').filter({ hasText: resultText })).toBeVisible({ timeout: 10000 });
     }
 
     async verifyAlertCellVisible(alertName, timeout = 10000) {
@@ -2003,10 +2003,11 @@ export class AlertsPage {
     async verifyTabContents() {
         await this.page.locator('[data-test="alert-list-tab-scheduled"]').click();
         await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
+        const singleRowRange = this.page.locator('[data-test="o2-table-pagination-info"]').filter({ hasText: /^\s*1–1 of/ });
         await this.page.locator('[data-test="alert-list-tab-realTime"]').click();
-        await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
+        await expect(singleRowRange).toBeVisible();
         await this.page.locator('[data-test="alert-list-tab-all"]').click();
-        await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
+        await expect(singleRowRange).toBeVisible();
     }
 
     async verifyFolderSearch(folderName) {

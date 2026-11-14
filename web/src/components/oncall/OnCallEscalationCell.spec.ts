@@ -32,7 +32,7 @@ vi.mock("@/services/users", () => ({
 
 const stubs = {
   OIcon: { name: "OIcon", template: "<span />" },
-  OProgressBar: { name: "OProgressBar", props: ["value", "variant"], template: "<div />" },
+  OProgressBar: { name: "OProgressBar", props: ["value", "tone"], template: "<div />" },
 };
 
 const NOW = () => Date.now() * 1000;

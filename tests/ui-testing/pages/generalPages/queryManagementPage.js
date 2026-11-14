@@ -194,11 +194,14 @@ export class QueryManagementPage {
     await expect(this.confirmDialog).toBeHidden({ timeout: 10000 });
   }
 
-  // All Queries tab: cancel the row whose org_id cell matches `orgId`.
+  // All Queries tab: cancel the row whose org_id cell matches `orgId`. Cancel sits in the
+  // row's ⋯ menu, which renders in a portal outside the row.
   async cancelAllQueriesRow(orgId) {
     const row = this.allQueriesList.locator('tr', { hasText: orgId }).first();
     await expect(row).toBeVisible({ timeout: 15000 });
-    await row.locator('[data-test="cancelQuery-btn"]').first().click();
+    await row.hover();
+    await row.locator('[data-test="running-queries-row-more-actions"]').click();
+    await this.page.locator('[role="menu"] [data-test="cancelQuery-btn"]').click();
   }
 
   // Summary tab: cancel the summary row whose user_id cell matches `email`.

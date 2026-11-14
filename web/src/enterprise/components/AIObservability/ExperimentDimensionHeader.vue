@@ -19,7 +19,7 @@
       :data-test="`ai-experiment-dim-none-${key}`"
     >
       {{ absent.label }}
-      <OTooltip :content="absent.hint" side="bottom" max-width="20rem" />
+      <OTooltip :content="absent.hint" side="bottom" />
     </span>
     <div v-else class="flex shrink-0 items-center gap-2.5">
       <span

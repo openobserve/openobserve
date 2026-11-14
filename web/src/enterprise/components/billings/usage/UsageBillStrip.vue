@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="billings-usagebillstrip-bar"
       @keydown="onKeydown"
     >
-      <OTooltip v-for="row in segments" :key="row.key" side="bottom" :delay="150" max-width="18rem">
+      <OTooltip v-for="row in segments" :key="row.key" side="bottom">
         <div
           role="tab"
           :aria-selected="row.key === selected"

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 import { computed, ref, watch } from "vue";
 
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCountBadge from "@/lib/core/Badge/OCountBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
@@ -84,31 +84,32 @@ function run(kind: JourneySuggestionActionKind) {
 
 <template>
   <OPopover
+    size="lg"
     v-if="count > 0"
     v-model:open="open"
     side="bottom"
     align="end"
-    content-class="w-104 max-w-[calc(100vw-2rem)] p-3"
+    content-class="p-3"
     :aria-label="label"
   >
     <template #trigger>
       <OButton
-        variant="outline"
-        size="icon-xs-sq"
+        icon-only
+        variant="secondary"
+        size="sm"
         :aria-label="label"
         data-test="synthetics-journey-suggestions-chip"
       >
         <!-- First child so it anchors to the whole button; suppressed while the panel is open. -->
         <OTooltip :content="label" :disabled="open" side="bottom" />
         <OIcon name="lightbulb" size="sm" class="text-status-warning-text" aria-hidden="true" />
-        <OBadge
-          variant="warning"
-          size="xs"
+        <OCountBadge
+          :count="count"
+          tone="accent"
           class="pointer-events-none absolute -end-1.5 -top-1.5"
           aria-hidden="true"
           data-test="synthetics-journey-suggestions-count"
-          >{{ count }}</OBadge
-        >
+        />
       </OButton>
     </template>
 
@@ -138,7 +139,6 @@ function run(kind: JourneySuggestionActionKind) {
           <div v-if="suggestion.action" class="pt-1">
             <OButton
               variant="primary"
-              size="sm"
               :data-test="`synthetics-journey-suggestion-action-${suggestion.id}`"
               @click="suggestion.action && run(suggestion.action.kind)"
             >

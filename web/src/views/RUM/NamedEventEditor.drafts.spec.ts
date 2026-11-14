@@ -234,9 +234,8 @@ describe("NamedEventEditor drafts", () => {
     click("rum-analytics-event-editor-cancel-btn");
     await flushPromises();
     clickLeave("o-dialog-secondary-btn");
-    await flushPromises();
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe(PA_ROUTES.events));
 
-    expect(router.currentRoute.value.name).toBe(PA_ROUTES.events);
     expect(readEditorDraft<EventDraft>(newScope())?.data.name).toBe("Half done");
   });
 
@@ -250,9 +249,8 @@ describe("NamedEventEditor drafts", () => {
     await flushPromises();
     expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
     clickLeave("o-dialog-neutral-btn");
-    await flushPromises();
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe(PA_ROUTES.events));
 
-    expect(router.currentRoute.value.name).toBe(PA_ROUTES.events);
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(readEditorDraft(newScope())).toBeNull();
   });

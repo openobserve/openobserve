@@ -109,7 +109,7 @@ describe("OTable Performance Benchmarks", () => {
             data: rows,
             columns: makeColumns(),
             virtualScroll: true,
-            rowHeight: 28,
+            density: "compact",
             maxHeight: 600,
           },
         });
@@ -189,7 +189,7 @@ describe("OTable Performance Benchmarks", () => {
             data: rows,
             columns: makeColumns(),
             virtualScroll: true,
-            rowHeight: 28,
+            density: "compact",
             maxHeight: 600,
             globalFilter: "User 500",
             filterMode: "client",
@@ -230,7 +230,7 @@ describe("OTable Performance Benchmarks", () => {
           data: rows,
           columns: makeColumns(),
           virtualScroll: true,
-          rowHeight: 28,
+          density: "compact",
           maxHeight: 600,
         },
       });
@@ -260,7 +260,7 @@ describe("OTable Performance Benchmarks", () => {
             data: rows,
             columns: makeColumns(),
             virtualScroll: true,
-            rowHeight: 28,
+            density: "compact",
             maxHeight: 600,
           },
         });
@@ -275,7 +275,7 @@ describe("OTable Performance Benchmarks", () => {
           data: rows,
           columns: makeColumns(),
           virtualScroll: true,
-          rowHeight: 28,
+          density: "compact",
           maxHeight: 600,
         },
       });

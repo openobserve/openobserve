@@ -22,6 +22,7 @@ import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { HttpCheckConfig, ProtocolCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -103,14 +104,14 @@ function removeHeader(index: number) {
           v-model="method"
           :label="t('synthetics.protocolConfig.http.method')"
           :options="methodOptions"
-          width="xs"
+          width="s"
           data-test="synthetics-check-http-method-select"
         />
         <OInput
           v-model.number="timeoutMs"
           type="number"
           :label="t('synthetics.protocolConfig.timeoutMs')"
-          width="sm"
+          width="s"
           data-test="synthetics-check-http-timeout-input"
         />
       </div>
@@ -152,31 +153,29 @@ function removeHeader(index: number) {
             />
           </div>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
             :aria-label="t('common.delete')"
             :data-test="`synthetics-check-http-header-remove-${i}`"
             @click="removeHeader(i)"
           >
-            <template #icon-left><OIcon name="close" size="xs" /></template>
+            <template #icon><OIcon name="close" size="xs" /></template>
           </OButton>
         </div>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="synthetics-check-http-add-header-btn"
           @click="addHeader"
         >
-          <template #icon-left><OIcon name="add" size="xs" /></template>
+          <template #icon><OIcon name="add" size="xs" /></template>
           {{ t("synthetics.protocolConfig.http.addHeader") }}
         </OButton>
       </div>
 
       <!-- Body -->
-      <OInput
+      <OTextarea
         v-if="showBody"
         v-model="body"
-        type="textarea"
         :rows="4"
         :label="t('synthetics.protocolConfig.http.body')"
         :placeholder="t('synthetics.protocolConfig.http.bodyPlaceholder')"

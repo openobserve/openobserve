@@ -578,8 +578,8 @@ export class RolesPage {
 
     async setPageSize(size) {
         await this.panePageSize.click();
-        // OSelect renders its options in a portal, so match on the visible option text.
-        await this.page.getByRole('option', { name: String(size), exact: true }).click();
+        // OSelect renders its options in a portal, so match on the visible option text ("50 per page").
+        await this.page.getByRole('option', { name: `${size} per page`, exact: true }).click();
         await expect.poll(async () => await this.pageSize(), { timeout: 10000 }).toBe(size);
     }
 

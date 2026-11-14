@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="lg"
+    size="md"
     :title="title"
     data-test="rum-analytics-paths-branch-drawer"
     @update:open="(v) => emit('update:open', v)"
@@ -26,28 +26,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="sampled > 1"
         :label="t('rum.analytics.sampled', { ratio: sampled })"
-        variant="info-outline"
+        tone="outline"
         icon="filter-alt"
         size="sm"
         class="self-start"
       />
-      <OBanner
+      <OInlineNotice
         v-if="incomplete"
-        variant="warning"
-        dense
-        :content="t('rum.analytics.dropoff.incomplete')"
+        tone="warn"
+        :message="t('rum.analytics.dropoff.incomplete')"
         data-test="rum-analytics-paths-branch-incomplete"
       >
         <template #actions>
           <OButton
             variant="ghost"
-            size="sm"
             data-test="rum-analytics-paths-branch-incomplete-retry-btn"
             @click="load(true)"
             >{{ t("common.retry") }}</OButton
           >
         </template>
-      </OBanner>
+      </OInlineNotice>
       <AnalyticsPanelState
         :state="panel"
         data-test="rum-analytics-paths-branch"
@@ -70,10 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #footer>
       <div class="flex w-full items-center justify-between gap-2">
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="filter-alt"
-          icon-right="arrow-forward"
+          variant="secondary"
+          icon="filter-alt"
+          icon-end="arrow-forward"
           :disabled="!funnelSteps.length"
           data-test="rum-analytics-paths-branch-funnel-btn"
           @click="emit('build-funnel', funnelSteps)"
@@ -81,7 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OButton
           variant="ghost"
-          size="sm-action"
           data-test="rum-analytics-paths-branch-close-btn"
           @click="emit('update:open', false)"
           >{{ t("rum.analytics.dropoff.close") }}</OButton
@@ -97,7 +93,7 @@ import { useRouter } from "vue-router";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import AnalyticsSessionsTable, {
   type SessionRow,

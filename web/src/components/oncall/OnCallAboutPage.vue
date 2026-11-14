@@ -24,167 +24,165 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   grows its own detail page.
 -->
 <template>
-  <OCard variant="glass" data-test="oncall-about-page">
-    <OCardSection role="header" dense>
-      <OText variant="card-title">{{ t("oncall.routingDetails") }}</OText>
-    </OCardSection>
-
-    <OCardSection role="body" dense>
-      <ODescriptionList dense label-width="narrow">
-        <!-- The engine records why it picked this team. It was only ever
+  <OCard :title="t('oncall.routingDetails')" data-test="oncall-about-page">
+    <ODescriptionList>
+      <!-- The engine records why it picked this team. It was only ever
              readable by scrolling the timeline, which is not where somebody
              asks "why me". The winning rule draws as the same key|value chips
              the routing tab draws it with, not a hand-built equation, so a
              dimension reads the same wherever it appears. -->
-        <ODescriptionItem v-if="showRoutingReason" :label="t('oncall.routedBy')">
-          <span class="flex min-w-0 flex-col items-start gap-1">
-            <span class="max-w-full wrap-anywhere" data-test="oncall-about-routing-reason">
-              <!-- Unrecognised wording: show the record's team, not the server's prose. -->
-              <OTag
-                v-if="fallbackRouted && teamDeleted"
-                variant="default-soft"
-                size="sm"
-                data-test="oncall-about-routing-team-deleted"
-              >
-                {{ t("oncall.deletedTeam") }}
-              </OTag>
-              <router-link
-                v-else-if="fallbackRouted && teamId"
-                class="text-accent font-medium"
-                :to="{
-                  name: 'onCallTeamDetail',
-                  params: { teamId, tab: 'overview' },
-                  query: { org_identifier: orgId },
-                }"
-                data-test="oncall-about-routing-id-link"
-              >
-                {{ raw(teamName) }}
-              </router-link>
-              <span
-                v-else-if="routingDimensions.length"
-                class="flex flex-wrap items-center gap-1.5"
-                data-test="oncall-about-routing-dimensions"
-              >
-                <ODimensionChip
-                  v-for="dimension in routingDimensions"
-                  :key="dimension.name"
-                  :dim-key="dimension.name"
-                  :value="dimension.value"
-                  tooltip
-                />
-              </span>
-              <span v-else>{{ routedByPrimary }}</span>
+      <ODescriptionItem v-if="showRoutingReason" :label="t('oncall.routedBy')">
+        <span class="flex min-w-0 flex-col items-start gap-1">
+          <span class="max-w-full wrap-anywhere" data-test="oncall-about-routing-reason">
+            <!-- Unrecognised wording: show the record's team, not the server's prose. -->
+            <OTag
+              v-if="fallbackRouted && teamDeleted"
+              tone="neutral"
+              size="sm"
+              data-test="oncall-about-routing-team-deleted"
+            >
+              {{ t("oncall.deletedTeam") }}
+            </OTag>
+            <router-link
+              v-else-if="fallbackRouted && teamId"
+              class="text-accent font-medium"
+              :to="{
+                name: 'onCallTeamDetail',
+                params: { teamId, tab: 'overview' },
+                query: { org_identifier: orgId },
+              }"
+              data-test="oncall-about-routing-id-link"
+            >
+              {{ raw(teamName) }}
+            </router-link>
+            <span
+              v-else-if="routingDimensions.length"
+              class="flex flex-wrap items-center gap-1.5"
+              data-test="oncall-about-routing-dimensions"
+            >
+              <ODimensionChip
+                v-for="dimension in routingDimensions"
+                :key="dimension.name"
+                :dim-key="dimension.name"
+                :value="dimension.value"
+                tooltip
+              />
             </span>
+            <span v-else>{{ routedByPrimary }}</span>
+          </span>
 
-            <!-- What routing considered and passed over on the way. Absent from
+          <!-- What routing considered and passed over on the way. Absent from
                  the card until now, and it is the half that answers "why NOT
                  the team I expected". -->
-            <span
-              v-for="(note, index) in routingNotes"
-              :key="index"
-              class="text-text-secondary max-w-full text-xs wrap-anywhere"
-              :data-test="`oncall-about-routing-note-${index}`"
-            >
-              {{ raw(note) }}
-            </span>
+          <span
+            v-for="(note, index) in routingNotes"
+            :key="index"
+            class="text-text-secondary max-w-full text-xs wrap-anywhere"
+            :data-test="`oncall-about-routing-note-${index}`"
+          >
+            {{ raw(note) }}
           </span>
-        </ODescriptionItem>
+        </span>
+      </ODescriptionItem>
 
-        <ODescriptionItem :label="t('oncall.team')">
-          <span v-if="!teamId" class="text-status-error-text" data-test="oncall-about-team-none">{{
-            t("oncall.statUnrouted")
-          }}</span>
-          <OTag
-            v-else-if="teamDeleted"
-            variant="default-soft"
-            size="sm"
-            data-test="oncall-about-team-deleted"
-          >
-            {{ t("oncall.deletedTeam") }}
-          </OTag>
-          <OSkeleton v-else-if="!teamName" class="h-4 w-24" data-test="oncall-about-team-pending" />
-          <router-link
-            v-else
-            class="text-accent"
-            :to="{
-              name: 'onCallTeamDetail',
-              params: { teamId, tab: 'overview' },
-              query: { org_identifier: orgId },
-            }"
-            data-test="oncall-about-team-link"
-          >
-            {{ raw(teamName) }}
-          </router-link>
-        </ODescriptionItem>
+      <ODescriptionItem :label="t('oncall.team')">
+        <span v-if="!teamId" class="text-status-error-text" data-test="oncall-about-team-none">{{
+          t("oncall.statUnrouted")
+        }}</span>
+        <OTag
+          v-else-if="teamDeleted"
+          tone="neutral"
+          size="sm"
+          data-test="oncall-about-team-deleted"
+        >
+          {{ t("oncall.deletedTeam") }}
+        </OTag>
+        <OSkeleton
+          v-else-if="!teamName"
+          shape="block"
+          class="h-4 w-24"
+          data-test="oncall-about-team-pending"
+        />
+        <router-link
+          v-else
+          class="text-accent"
+          :to="{
+            name: 'onCallTeamDetail',
+            params: { teamId, tab: 'overview' },
+            query: { org_identifier: orgId },
+          }"
+          data-test="oncall-about-team-link"
+        >
+          {{ raw(teamName) }}
+        </router-link>
+      </ODescriptionItem>
 
-        <ODescriptionItem v-if="subjectStream" :label="t('oncall.subjectStream')">
-          <OTruncatedText class="block" data-test="oncall-about-subject-stream">{{
-            raw(subjectStream)
-          }}</OTruncatedText>
-        </ODescriptionItem>
+      <ODescriptionItem v-if="subjectStream" :label="t('oncall.subjectStream')">
+        <OTruncatedText class="block" data-test="oncall-about-subject-stream">{{
+          raw(subjectStream)
+        }}</OTruncatedText>
+      </ODescriptionItem>
 
-        <ODescriptionItem v-if="cause" :label="t('oncall.resolveCause')">
-          <span data-test="oncall-about-cause">
-            {{ t(`oncall.cause_${cause}`) }}
-            <span v-if="causeNote" class="text-text-secondary">{{ raw(causeNote) }}</span>
-          </span>
-        </ODescriptionItem>
+      <ODescriptionItem v-if="cause" :label="t('oncall.resolveCause')">
+        <span data-test="oncall-about-cause">
+          {{ t(`oncall.cause_${cause}`) }}
+          <span v-if="causeNote" class="text-text-secondary">{{ raw(causeNote) }}</span>
+        </span>
+      </ODescriptionItem>
 
-        <ODescriptionItem v-if="incidentId" :label="t('oncall.incident')">
-          <OSkeleton
-            v-if="incidentLoading"
-            class="h-4 w-40"
-            data-test="oncall-about-incident-pending"
-          />
-          <router-link
-            v-else
-            class="text-accent min-w-0"
-            :to="{
-              name: 'incidentDetail',
-              params: { id: incidentId },
-              query: { org_identifier: orgId },
-            }"
-            data-test="oncall-about-incident-link"
-          >
-            <OTruncatedText class="block">{{ raw(incidentTitle || incidentId) }}</OTruncatedText>
-          </router-link>
-        </ODescriptionItem>
+      <ODescriptionItem v-if="incidentId" :label="t('oncall.incident')">
+        <OSkeleton
+          v-if="incidentLoading"
+          shape="block"
+          class="h-4 w-40"
+          data-test="oncall-about-incident-pending"
+        />
+        <router-link
+          v-else
+          class="text-accent min-w-0"
+          :to="{
+            name: 'incidentDetail',
+            params: { id: incidentId },
+            query: { org_identifier: orgId },
+          }"
+          data-test="oncall-about-incident-link"
+        >
+          <OTruncatedText class="block">{{ raw(incidentTitle || incidentId) }}</OTruncatedText>
+        </router-link>
+      </ODescriptionItem>
 
-        <!-- When the subject IS the incident, this row would repeat the
+      <!-- When the subject IS the incident, this row would repeat the
              Incident row above under the misleading "Alert" label instead of
              adding information, so it only ever applies to an alert subject. -->
-        <ODescriptionItem v-if="subjectType === 'alert'" :label="subjectLabel">
-          <span
-            class="rounded-default border-border-default bg-surface-panel flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
-            data-test="oncall-about-subject-id"
-          >
-            <!-- The id a responder reads here is the rule they then go and
+      <ODescriptionItem v-if="subjectType === 'alert'" :label="subjectLabel">
+        <span
+          class="rounded-default border-border-default bg-surface-panel flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
+          data-test="oncall-about-subject-id"
+        >
+          <!-- The id a responder reads here is the rule they then go and
                  change — the threshold that woke them at 3am. It links
                  straight to the editor rather than a paste into the alert
                  list's search box. -->
-            <router-link
-              v-if="alertEditRoute"
-              class="text-accent min-w-0 flex-1 font-mono"
-              :to="alertEditRoute"
-              data-test="oncall-about-subject-link"
-            >
-              <OTruncatedText class="block">{{ raw(sourceId) }}</OTruncatedText>
-            </router-link>
-            <span v-else class="text-text-body min-w-0 flex-1 truncate font-mono">
-              {{ raw(sourceId) }}
-            </span>
-            <OButton
-              variant="ghost"
-              size="icon-xs"
-              icon-left="content-copy"
-              :aria-label="t('common.copyToClipboard')"
-              data-test="oncall-about-copy-subject"
-              @click="copySubjectId"
-            />
+          <router-link
+            v-if="alertEditRoute"
+            class="text-accent min-w-0 flex-1 font-mono"
+            :to="alertEditRoute"
+            data-test="oncall-about-subject-link"
+          >
+            <OTruncatedText class="block">{{ raw(sourceId) }}</OTruncatedText>
+          </router-link>
+          <span v-else class="text-text-body min-w-0 flex-1 truncate font-mono">
+            {{ raw(sourceId) }}
           </span>
-        </ODescriptionItem>
-      </ODescriptionList>
-    </OCardSection>
+          <OCopyButton
+            data-test="oncall-about-copy-subject"
+            size="md"
+            :label="t('common.copyToClipboard')"
+            :value="sourceId"
+          />
+        </span>
+      </ODescriptionItem>
+    </ODescriptionList>
   </OCard>
 </template>
 
@@ -194,10 +192,8 @@ import type { RouteLocationRaw } from "vue-router";
 
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
@@ -206,7 +202,6 @@ import type { ResolutionCause, SubjectType } from "@/ts/interfaces/oncall";
 import type { RoutingMechanism } from "@/utils/oncall";
 import { parseRoutingReason } from "@/utils/oncall";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
-import { copyToClipboard } from "@/utils/clipboard";
 
 const props = withDefaults(
   defineProps<{
@@ -314,8 +309,4 @@ const alertEditRoute = computed<RouteLocationRaw | null>(() =>
       }
     : null,
 );
-
-async function copySubjectId() {
-  await copyToClipboard(props.sourceId, t);
-}
 </script>

@@ -207,8 +207,10 @@ export class LogsPage {
         // OSelect-based records-per-page dropdown (logs SearchResult.vue:138)
         this.recordsPerPageDropdown = '[data-test="logs-search-result-records-per-page"]';
         this.recordsPerPageOption = value => `[data-test="logs-search-result-records-per-page-option"][data-test-value="${value}"]`;
-        // OPagination per-page buttons forward parentDataTest as `${parent}-page-{n}` (OPagination.vue:98)
-        this.resultPaginationPageBtn = pageNumber => `[data-test="logs-search-result-pagination-page-${pageNumber}"]`;
+        // OPagination has no numbered buttons: it steps with `${parent}-prev|next` and carries
+        // the page state as data-test-page / data-test-page-count on its root.
+        this.resultPaginationPrevBtn = '[data-test="logs-search-result-pagination-prev"]';
+        this.resultPaginationNextBtn = '[data-test="logs-search-result-pagination-next"]';
         this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
         this.logsSearchBarFunctionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
         this.logsSearchBarFunctionDropdownSave = '[data-test="logs-search-bar-function-dropdown"] button';
@@ -2160,9 +2162,7 @@ export class LogsPage {
         // Pagination buttons can be slow to respond on cloud — retry
         // the click up to 3 times if the expected text doesn't appear.
         for (let attempt = 1; attempt <= 3; attempt++) {
-            // OPagination forwards the parent data-test as `${parent}-page-{n}` for each page button.
-            const pageBtn = this.page.locator(this.resultPaginationPageBtn(resultsPerPage));
-            await pageBtn.click({ force: true }).catch(() => {});
+            await this.goToResultPage(Number(resultsPerPage)).catch(() => {});
             await this.page.waitForTimeout(3000);
 
             try {
@@ -4937,17 +4937,31 @@ export class LogsPage {
     }
 
     async clickPaginationPage(pageNumber) {
-        return await this.page.locator(this.resultPaginationPageBtn(pageNumber)).first().click();
+        return await this.goToResultPage(Number(pageNumber));
+    }
+
+    /** Steps the result pager with prev/next until its root reports `pageNumber`. */
+    async goToResultPage(pageNumber) {
+        const pager = this.page.locator(this.resultPagination).first();
+        for (let guard = 0; guard < 50; guard++) {
+            const current = Number(await pager.getAttribute('data-test-page'));
+            if (current === pageNumber) return;
+            const step = current < pageNumber ? this.resultPaginationNextBtn : this.resultPaginationPrevBtn;
+            await this.page.locator(step).first().click();
+            await expect(pager).not.toHaveAttribute('data-test-page', String(current), { timeout: 30000 });
+        }
+        await expect(pager).toHaveAttribute('data-test-page', String(pageNumber));
     }
 
     async getPaginationPageCount() {
-        const pageButtons = this.page.locator(`[data-test^="logs-search-result-pagination-page-"]`);
-        return await pageButtons.count();
+        const count = await this.page.locator(this.resultPagination).first().getAttribute('data-test-page-count');
+        return Number(count) || 0;
     }
 
+    /** 'true' when `pageNumber` is the pager's current page, as the old page buttons' data-test-active read. */
     async getPaginationPageClasses(pageNumber) {
-        const pageButton = this.page.locator(this.resultPaginationPageBtn(pageNumber)).first();
-        return await pageButton.getAttribute('data-test-active');
+        const current = await this.page.locator(this.resultPagination).first().getAttribute('data-test-page');
+        return current === String(pageNumber) ? 'true' : 'false';
     }
 
     async isPaginationPageActive(pageNumber) {
@@ -4956,7 +4970,7 @@ export class LogsPage {
     }
 
     async getActivePaginationPageText() {
-        return await this.page.locator(`${this.resultPagination} button[aria-current='true'], ${this.resultPagination} button[aria-pressed='true'], ${this.resultPagination} button[data-state='active']`).first().textContent({ timeout: 5000 }).catch(() => 'unknown');
+        return await this.page.locator(this.resultPagination).first().getAttribute('data-test-page', { timeout: 5000 }).catch(() => 'unknown');
     }
 
     async expectSQLPaginationNotVisible() {
@@ -6222,7 +6236,9 @@ export class LogsPage {
 
     // J on a page's last row crosses only once the page-count query has given the pager its next page.
     async expectResultPageCountAtLeast(pageNumber, timeout = 60000) {
-        await expect(this.page.locator(this.resultPaginationPageBtn(pageNumber)).first()).toBeVisible({ timeout });
+        await expect
+            .poll(async () => await this.getPaginationPageCount(), { timeout })
+            .toBeGreaterThanOrEqual(pageNumber);
     }
 
     async setupAPICallTracking() {
@@ -12139,8 +12155,7 @@ export class LogsPage {
      * @param {string|number} pageNum - The page number to click (e.g., '1', '2')
      */
     async clickPageNumber(pageNum) {
-        const pageBtn = this.page.locator(this.resultPaginationPageBtn(pageNum));
-        await pageBtn.click({ force: true });
+        await this.goToResultPage(Number(pageNum));
         await this.waitForResultsLoaded();
     }
 
@@ -12323,12 +12338,7 @@ export class LogsPage {
     async getCurrentPageNumber() {
         return await this.page.evaluate(() => {
             const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
-            if (!pagination) return '';
-            const btn = pagination.querySelector('button[aria-current="page"]');
-            if (!btn) return '';
-            const label = btn.getAttribute('aria-label') || '';
-            const match = label.match(/\d+/);
-            return match ? match[0] : '';
+            return pagination?.getAttribute('data-test-page') ?? '';
         });
     }
 

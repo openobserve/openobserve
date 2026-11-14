@@ -64,11 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       :open="environmentToDelete !== null"
       size="sm"
-      persistent
       :title="t('synthetics.environments.deleteTitle')"
-      :primary-button-label="t('common.ok')"
-      primary-button-variant="destructive"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{ label: t('common.ok'), variant: 'danger' }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="synthetics-environment-delete-dialog"
       @update:open="(open: boolean) => !open && (environmentToDelete = null)"
       @click:primary="confirmRemoveEnvironment"

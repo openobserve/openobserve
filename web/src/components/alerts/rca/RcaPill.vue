@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         : 'h-5.5 shrink-0 rounded-full leading-none whitespace-nowrap',
     ]"
   >
-    <OSpinner v-if="spinner" size="xs" />
+    <OSpinner v-if="spinner" />
     <OIcon v-else-if="icon" :name="icon" size="xs" />
     <slot />
   </span>

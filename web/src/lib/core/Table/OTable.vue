@@ -31,11 +31,14 @@ import { isElementTruncated, readElementText } from "@/lib/overlay/Tooltip/useIs
 import {
   TABLE_CHECKBOX_COL_SIZE,
   TABLE_CELL_CLIP_ATTR,
+  TABLE_ROW_HEIGHT_PX,
+  ROW_ACTIONS_COLUMN_ID,
   OTableCellActionsKey,
+  OTableNumericColumnsKey,
   OTableOverflowTooltipKey,
+  OTableRowActionsKey,
   OTableStaleKey,
   ROW_RAIL_TONE_CLASS,
-  ROW_TONE_CLASS,
   type OTableProps,
   type OTableEmits,
   type OTableSlots,
@@ -64,8 +67,7 @@ import { useTableRowShortcuts } from "./composables/useTableRowShortcuts";
 import OTableHeader from "./sub-components/OTableHeader.vue";
 import OTableBody from "./sub-components/OTableBody.vue";
 import OTablePagination from "./sub-components/OTablePagination.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTableEmpty from "./sub-components/OTableEmpty.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { TABLE_FORBIDDEN_STATE_KEY } from "./tableForbiddenState";
@@ -78,13 +80,14 @@ import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { injectContextMenuRootContext } from "reka-ui";
 import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
 import { LOADER_DELAY_MS, MIN_SKELETON_MS, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
+import { PAGINATION_DEFAULT_PAGE_SIZES } from "@/lib/navigation/Pagination/OPagination.types";
 
 const { t } = useI18nTyped();
 const { featureNames } = useFeatureNames();
 const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pagination: "client",
   pageSize: 20,
-  pageSizeOptions: () => [20, 50, 100, 250, 500],
+  pageSizeOptions: () => [...PAGINATION_DEFAULT_PAGE_SIZES],
   sorting: "client",
   sortClearable: true,
   sortDisabled: false,
@@ -92,7 +95,6 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   showSelectAll: true,
   expansion: "none",
   virtualScroll: false,
-  virtualScrollItemSize: 48,
   enableColumnResize: false,
   enableColumnReorder: false,
   enableColumnPin: false,
@@ -103,24 +105,12 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   progressLine: true,
   streaming: false,
   error: null,
-  dense: true,
-  compact: false,
-  bordered: true,
-  // No outer box border on tables (design system): the app chrome already frames
-  // content, and CRUD listing tables sit flush to the edges. Row dividers (the
-  // `bordered` row-bottom hairlines) stay; only the surrounding border is gone.
-  frame: false,
-  toolbarBordered: true,
-  paginationBordered: true,
+  density: "default",
   striped: false,
   stickyHeader: true,
   wrap: false,
   cellOverflowTooltip: true,
   rowKey: "id",
-  rowHeight: undefined,
-  showGlobalFilter: true,
-  // no default here: a literal would ship untranslated. Resolved at render below.
-  globalFilterPlaceholder: undefined,
   filterMode: "client",
   defaultColumns: true,
   totalCountExact: true,
@@ -131,25 +121,63 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
 
-/**
- * `rowRailTone` / `rowTone` / `rowClass` folded into the ONE class function the
- * body already threads to every render path (plain, virtual, grouped). Both new
- * props resolve to token-backed utilities, so a call site never injects a colour
- * or reaches for `!important` to win against a row-state class.
- */
+// `rowState` is resolved per row in OTableBodyRow, where it can yield to selection.
 const resolvedRowClass = computed(() => {
-  const { rowRailTone, rowTone, rowClass } = props;
-  if (!rowRailTone && !rowTone) return rowClass;
+  const { rowRailTone, rowClass } = props;
+  if (!rowRailTone) return rowClass;
   return (row: TData): string => {
     const parts: string[] = [];
-    const rail = rowRailTone?.(row);
+    const rail = rowRailTone(row);
     if (rail) parts.push(ROW_RAIL_TONE_CLASS[rail]);
-    const tone = rowTone?.(row);
-    if (tone) parts.push(ROW_TONE_CLASS[tone]);
     const base = typeof rowClass === "function" ? rowClass(row) : rowClass;
     if (base) parts.push(base);
     return parts.join(" ");
   };
+});
+
+// A page that draws its own rail keeps it; the row state then adds only its fill.
+const hasOwnRail = computed(
+  () => !!props.rowRailTone || !!props.getRowStyle || !!props.getRowStatusColor,
+);
+
+// ── Row actions (B7) ────────────────────────────────────────────
+const rowActionList = computed(() => (props.rowActions ?? []).slice(0, 2));
+const rowMenuList = computed(() => props.rowMenu ?? []);
+if (import.meta.env.DEV) {
+  watch(
+    () => props.rowActions?.length ?? 0,
+    (n) => {
+      if (n > 2) {
+        console.warn("[OTable] rowActions shows two inline actions; move the rest to rowMenu.");
+      }
+    },
+    { immediate: true },
+  );
+}
+provide(OTableRowActionsKey, {
+  actions: rowActionList,
+  menu: rowMenuList,
+  menuDataTest: computed(() => props.rowMenuDataTest),
+});
+const hasRowActionsColumn = computed(
+  () => rowActionList.value.length > 0 || rowMenuList.value.length > 0,
+);
+
+/** The caller's columns, plus the actions column when `rowActions` / `rowMenu` are set. */
+const tableColumns = computed<OTableColumnDef<TData>[]>(() => {
+  const actionCount = rowActionList.value.length + (rowMenuList.value.length ? 1 : 0);
+  if (!actionCount) return props.columns;
+  return [
+    ...props.columns,
+    {
+      id: ROW_ACTIONS_COLUMN_ID,
+      header: t("components.table.rowActions"),
+      isAction: true,
+      sortable: false,
+      hideable: false,
+      meta: { align: "right", actionCount },
+    },
+  ];
 });
 
 // < md columns scroll within the table rather than being crushed down to the name column.
@@ -161,6 +189,13 @@ const showColumnToggle = computed(
     !!props.persistColumns &&
     !!props.tableId &&
     props.columns.some((c) => c.hideable && !c.isAction),
+);
+
+// ── Density (L7) ────────────────────────────────────────────────
+const densityRowHeight = computed(() =>
+  props.density === "compact"
+    ? "var(--table-row-height-compact, 1.75rem)"
+    : "var(--table-row-height-default, 2.25rem)",
 );
 
 // A row only gets the pointer cursor when it's actually interactive — i.e. the
@@ -180,12 +215,8 @@ const isRowClickable = computed(() => {
 // and renders the (empty) slot instead of falling through to the plain-text {{ displayValue }}.
 const cellSlotColumns = computed(() => props.columns.filter((col) => slots[`cell-${col.id}`]));
 
-// A page's own cell slot wins over `rowActions` and `meta.link`, so a table can move one column at a time.
-const rowActionsColumnId = computed<string | undefined>(() => {
-  if (!props.rowActions) return undefined;
-  const col = props.columns.find((c) => c.isAction === true || c.id === "actions");
-  return col && !slots[`cell-${col.id}`] ? col.id : undefined;
-});
+const rowActionsSlotOn = computed(() => hasRowActionsColumn.value && !!slots["row-actions"]);
+// A page's own cell slot wins over `meta.link`, so a table can move one column at a time.
 const linkColumns = computed(() =>
   props.columns.filter((col) => col.meta?.link && !slots[`cell-${col.id}`]),
 );
@@ -197,7 +228,7 @@ function linkCellText(col: OTableColumnDef<TData>, value: unknown, row: TData): 
 
 // ── Refs for virtual scroll & keyboard ──────────────────────────
 const scrollContainerRef = ref<HTMLElement | null>(null);
-const columnIds = computed(() => props.columns.map((c) => c.id));
+const columnIds = computed(() => tableColumns.value.map((c) => c.id));
 
 // ── Skeleton row count strategy ─────────────────────────────────
 // Easy to switch between strategies — change the `SKELETON_ROW_STRATEGY`
@@ -320,22 +351,8 @@ watch(staleDimmed, (dimmed) => {
   if (dimmed && rowContextMenu?.open.value) rowContextMenu.onOpenChange(false);
 });
 
-// ── Internal global filter state (uncontrolled when no parent binds :global-filter) ──
-const globalFilterLocal = ref(props.globalFilter ?? "");
-watch(
-  () => props.globalFilter,
-  (val) => {
-    globalFilterLocal.value = val ?? "";
-  },
-);
-
-function handleGlobalFilterChange(value: string) {
-  globalFilterLocal.value = value;
-  emit("update:globalFilter", value);
-  if (props.filterMode === "server") {
-    emit("filter-change", { global: value });
-  }
-}
+// ── Global filter: the text a #toolbar search sets ──────────────
+const globalFilterLocal = computed(() => props.globalFilter ?? "");
 
 // ── Column persistence ──────────────────────────────────────────
 const persistence = useTableColumnPersistence({
@@ -600,7 +617,7 @@ const {
       return windowedTableData.value;
     },
     get columns() {
-      return props.columns;
+      return tableColumns.value;
     },
     get pageSize() {
       return props.pageSize;
@@ -608,7 +625,6 @@ const {
     get currentPage() {
       return props.currentPage;
     },
-    showIndex: props.showIndex,
     get sortBy() {
       return props.sortBy;
     },
@@ -637,16 +653,12 @@ const {
     getSubRows: props.getSubRows,
     pagination: props.pagination,
     sorting: props.sorting,
-    rowHeight: props.rowHeight,
     filterMode: props.filterMode,
     get horizontalScroll() {
       return props.horizontalScroll;
     },
     get keepPageOnDataChange() {
       return props.keepPageOnDataChange;
-    },
-    get rowActions() {
-      return props.rowActions;
     },
   },
   emit,
@@ -969,6 +981,17 @@ const useDynamicRowHeight = computed(
   () => !!props.virtualScroll && (!!props.wrap || measuresExpandedRows.value),
 );
 
+// The estimate starts at the density's row height and is then read off a rendered row,
+// so a row a page styles taller or shorter still scrolls without drift.
+const measuredRowHeight = ref<number | null>(null);
+const rowHeightEstimate = computed(
+  () => measuredRowHeight.value ?? TABLE_ROW_HEIGHT_PX[props.density ?? "default"],
+);
+watch(
+  () => props.density,
+  () => (measuredRowHeight.value = null),
+);
+
 const {
   virtualRows,
   totalSize,
@@ -982,9 +1005,7 @@ const {
   // rebind once either resolves after mount.
   scrollEl: () => props.scrollEl ?? scrollContainerRef.value ?? null,
   scrollMargin: props.scrollMargin ?? 0,
-  // Keep this in sync with the --table-row-height-* tokens (dense = 38px) so the
-  // virtualizer's measured height matches the actual rendered row height.
-  rowHeight: props.rowHeight ?? (props.compact ? 25 : props.dense ? 38 : 54),
+  rowHeight: () => rowHeightEstimate.value,
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
   includeExpansionRow: () => measuresExpandedRows.value,
@@ -1024,6 +1045,45 @@ watch(
 );
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
+
+function calibrateRowHeight(): void {
+  if (!isVirtual.value || useDynamicRowHeight.value) return;
+  const row = scrollContainerRef.value?.querySelector<HTMLElement>(
+    'tbody[data-test="o2-table-body"] > tr[data-test^="o2-table-row-"]',
+  );
+  const height = row?.getBoundingClientRect().height ?? 0;
+  if (height <= 0 || Math.abs(height - rowHeightEstimate.value) < 0.5) return;
+  measuredRowHeight.value = height;
+  virtualMeasure();
+}
+watch(virtualRows, () => nextTick(calibrateRowHeight), { flush: "post" });
+
+// ── Auto-aligned numeric columns (D3) ───────────────────────────
+// Sampled, so a long list costs no more than its first rows; only default-rendered cells qualify.
+const NUMERIC_SAMPLE_ROWS = 20;
+const numericColumnIds = computed<ReadonlySet<string>>(() => {
+  const ids = new Set<string>();
+  const sample = tableData.value.slice(0, NUMERIC_SAMPLE_ROWS);
+  if (!sample.length) return ids;
+  for (const col of props.columns) {
+    if (col.meta?.align || col.cell || col.isAction || slots[`cell-${col.id}`]) continue;
+    const key = (col.accessorKey ?? col.id) as string;
+    let seen = false;
+    let numeric = true;
+    for (const row of sample) {
+      const value = col.accessorFn ? col.accessorFn(row) : (row as Record<string, unknown>)[key];
+      if (value === null || value === undefined || value === "") continue;
+      seen = true;
+      if (typeof value !== "number") {
+        numeric = false;
+        break;
+      }
+    }
+    if (seen && numeric) ids.add(col.id);
+  }
+  return ids;
+});
+provide(OTableNumericColumnsKey, numericColumnIds);
 
 // ── Delegated scroll ────────────────────────────────────────────
 // With an external `scrollEl` the table must not create its own scroll container,
@@ -1170,10 +1230,10 @@ const allowHorizontalScroll = computed(() => {
     if (frozen.value) return realSum() > containerWidth.value + 1;
     // Fill → scroll once the columns can't fit even at their min widths
     // (table-fixed otherwise grows past 100% and the overflow is clipped).
-    return measuredFillOverflow.value || fillFloorSum() > containerWidth.value + 1;
+    return measuredFillOverflow.value || fillMinSum() > containerWidth.value + 1;
   }
   // Past the columns' min widths the table grows anyway, clipping trailing columns out of reach.
-  return fillFloorSum() > containerWidth.value + 1;
+  return fillMinSum() > containerWidth.value + 1;
 });
 
 const SPACER_ID = "__spacer__";
@@ -1185,6 +1245,15 @@ function sizeVarKeys(id: string): [string, string] {
 
 function colMinSize(id: string): number {
   return table.getColumn(id)?.columnDef.minSize ?? 48;
+}
+
+// table-fixed hands an autoWidth column only the leftover; the built def's minSize is the
+// 48 resize floor, so the page's own minSize, else its size, is what keeps a name readable.
+const declaredMinSizes = computed(
+  () => new Map(effectiveColumns.value.map((c) => [c.id, c.minSize] as const)),
+);
+function autoWidthFloor(col: { id: string; getSize: () => number }): number {
+  return declaredMinSizes.value.get(col.id) ?? col.getSize();
 }
 
 // ── Fill ⇄ frozen state ─────────────────────────────────────────
@@ -1204,8 +1273,7 @@ watch(
     displayRows,
     effectiveColumns,
     () => props.loading,
-    () => props.dense,
-    () => props.compact,
+    () => props.density,
     () => frozen.value,
     () => measuredColumnSizeVars.value,
     () => containerWidth.value,
@@ -1255,17 +1323,13 @@ function realSum(): number {
 // can no longer absorb the overflow (table-fixed grows the table past 100%), so
 // the table must scroll horizontally instead of clipping the trailing columns.
 function fillMinSum(): number {
-  return nonFlexFixedSum() + flexColIds.value.reduce((a, id) => a + colMinSize(id), 0);
-}
-
-// With row actions an elastic filler counts at its floor: past it the table scrolls instead of crushing it.
-function fillFloorSum(): number {
-  if (!props.rowActions) return fillMinSum();
-  const elastic = table
+  const autoWidthSum = table
     .getVisibleLeafColumns()
-    .filter((c) => (c.columnDef.meta as any)?.autoWidth)
-    .reduce((a, c) => a + colMinSize(c.id), 0);
-  return fillMinSum() + elastic;
+    .filter((c) => (c.columnDef.meta as any)?.autoWidth && !(c.columnDef.meta as any)?.flex)
+    .reduce((a, c) => a + autoWidthFloor(c), 0);
+  return (
+    nonFlexFixedSum() + autoWidthSum + flexColIds.value.reduce((a, id) => a + colMinSize(id), 0)
+  );
 }
 
 // CSS size-var overrides:
@@ -1379,11 +1443,13 @@ const minTableWidth = computed<string | undefined>(() => {
     return sum > 0 ? `${sum}px` : undefined;
   }
   if (useComputedWidth.value || containerWidth.value <= 0) return undefined;
-  if (fillFloorSum() <= containerWidth.value + 1) return undefined;
+  if (fillMinSum() <= containerWidth.value + 1) return undefined;
   // table-fixed hands a filler column 0px once the fixed columns alone overflow.
-  const fillers = cols
-    .filter((c) => (c.columnDef.meta as any)?.flex || (c.columnDef.meta as any)?.autoWidth)
-    .reduce((a, c) => a + c.getSize(), 0);
+  const fillers = cols.reduce((a, c) => {
+    const meta = c.columnDef.meta as any;
+    if (meta?.flex) return a + c.getSize();
+    return meta?.autoWidth ? a + autoWidthFloor(c) : a;
+  }, 0);
   return `${nonFlexFixedSum() + fillers}px`;
 });
 
@@ -1441,6 +1507,13 @@ const showEmpty = computed(
     (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
+/** No pager under an empty table (D5); a selection still gets its bar (D6). */
+const showFooter = computed(() => {
+  if (selection.selectedCount.value > 0 && selection.isMultiple.value) return true;
+  if (!pagination.isEnabled.value) return false;
+  const nothingShown = showEmpty.value || showForbidden.value || showError.value;
+  return !(nothingShown && pagerView.value.totalCount === 0);
+});
 const showSkeleton = computed(() => coldLoading.value && skeletonDue.value);
 /** Streaming: data is arriving incrementally. Show pulsing indicator while stream is active and data exists. */
 const showStreaming = computed(() => props.streaming && displayRows.value.length > 0);
@@ -1564,18 +1637,12 @@ defineExpose({
     <!-- ── Top slot (search bar, title, actions) ─────────────── -->
     <slot name="top" />
 
-    <!-- ── Bordered wrapper: search + loading + top pagination + table area ── -->
-    <div
-      class="flex min-h-0 flex-1 flex-col"
-      :class="props.frame ? 'border-border-default border' : ''"
-    >
-      <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
+    <!-- ── Table region: toolbar + subheader + table area + footer ── -->
+    <div class="flex min-h-0 flex-1 flex-col">
+      <!-- ── Custom toolbar slot (above the table) ── -->
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
-        :class="[
-          'px-page-edge flex flex-wrap items-center gap-2 py-2',
-          props.toolbarBordered ? 'border-table-row-divider border-b' : '',
-        ]"
+        class="px-page-edge border-table-row-divider flex flex-wrap items-center gap-2 border-b py-2"
         data-test="o2-table-toolbar"
       >
         <!-- One wrapping row: a chip strip that does not fit takes a full-width line under everything. -->
@@ -1604,54 +1671,14 @@ defineExpose({
       <!-- ── Sub-header slot: custom full-width content between the toolbar and
          the table body (e.g. a summary-stat strip). ── -->
       <slot name="subheader" />
-      <!-- ── Built-in global search ─────────────────────────── -->
-      <div
-        v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"
-        class="px-page-edge border-table-row-divider bg-table-header-bg flex items-center gap-2 border-b py-2"
-        data-test="o2-table-global-filter"
-      >
-        <div class="relative max-w-xs flex-1">
-          <OIcon
-            name="search"
-            size="sm"
-            class="text-secondary absolute top-1/2 left-2 -translate-y-1/2"
-          />
-          <input
-            :value="globalFilterLocal"
-            type="text"
-            :placeholder="props.globalFilterPlaceholder ?? t('common.searchEllipsis')"
-            class="text-primary placeholder:text-input-placeholder w-full border-none bg-transparent py-1 ps-7 pe-2 text-sm outline-none"
-            data-test="o2-table-global-filter-input"
-            @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
-          />
-        </div>
-
-        <!-- Column visibility toggle — inline with search bar -->
-        <OTableColumnToggle
-          v-if="
-            props.persistColumns &&
-            props.tableId &&
-            props.columns.some((c) => c.hideable && !c.isAction)
-          "
-          :columns="props.columns"
-          :column-visibility="internalColumnVisibility"
-          :default-column-visibility="props.columnVisibility"
-          :has-resized-columns="props.enableColumnResize && hasResizedColumns"
-          data-test="o2-table-column-toggle"
-          @update:column-visibility="handleColumnVisibilityChange"
-          @reset:column-sizes="handleResetColumnSizes"
-        />
-      </div>
-
       <slot
         v-if="props.streaming && displayRows.length > 0 && slots['loading-banner']"
         name="loading-banner"
       />
-      <OBanner
+      <OInlineNotice
         v-else-if="props.streaming && displayRows.length > 0"
-        variant="info"
-        :content="t('common.loading')"
-        dense
+        tone="info"
+        :message="t('common.loading')"
         data-test="o2-table-loading-banner"
       />
 
@@ -1714,8 +1741,7 @@ defineExpose({
             props.horizontalScroll || props.defaultColumns ? 'table-auto' : 'table-fixed',
             // Sticky cells need border-separate so their borders and shadows travel
             // with them; border-collapse renders those inconsistently.
-            props.bordered &&
-            !props.columns.some((c) => c.pinned || c.isAction) &&
+            !tableColumns.some((c) => c.pinned || c.isAction) &&
             !(props.pivotHeaderLevels && props.pivotHeaderLevels.length) &&
             !props.stickyColTotals &&
             !(props.stickyRowTotals && stickyTotalRows.length)
@@ -1740,14 +1766,7 @@ defineExpose({
             ...dynamicSizeVars,
             ...(computedTableWidth ? { width: computedTableWidth } : {}),
             ...(minTableWidth ? { minWidth: minTableWidth } : {}),
-            '--table-row-height':
-              props.rowHeight != null
-                ? `${props.rowHeight}px`
-                : props.compact
-                  ? 'var(--table-row-height-compact, 1.5625rem)'
-                  : props.dense
-                    ? 'var(--table-row-height-dense, 2.25rem)'
-                    : 'var(--table-row-height-normal, 2.75rem)',
+            '--table-row-height': densityRowHeight,
           }"
           data-test="o2-table"
           :data-test-loading="heldLoading ? 'true' : 'false'"
@@ -1780,9 +1799,7 @@ defineExpose({
             :sort-disabled="props.sortDisabled"
             :sort-disabled-reason="props.sortDisabledReason"
             :sticky-header="props.stickyHeader"
-            :bordered="props.bordered"
-            :dense="props.dense"
-            :compact="props.compact"
+            :density="props.density"
             :pivot-header-levels="props.pivotHeaderLevels"
             :pivot-row-columns="props.pivotRowColumns"
             :sticky-col-totals="props.stickyColTotals"
@@ -1810,7 +1827,6 @@ defineExpose({
             :selection-enabled="selection.isEnabled.value"
             :expansion-enabled="expansion.isEnabled.value"
             :enable-row-reorder="props.enableRowReorder"
-            :bordered="props.bordered"
           />
 
           <!-- ── Body ─────────────────────────────────────────── -->
@@ -1833,11 +1849,10 @@ defineExpose({
             :should-highlight-column="highlighting.shouldHighlightColumn"
             :get-highlighted-html="highlighting.getHighlightedHtml"
             :wrap="props.wrap"
-            :dense="props.dense"
-            :compact="props.compact"
-            :bordered="props.bordered"
             :striped="props.striped"
             :row-class="resolvedRowClass as any"
+            :row-state="props.rowState as any"
+            :has-own-rail="hasOwnRail"
             :active-row-index="props.activeRowIndex"
             :row-style-fn="props.getRowStyle"
             :get-status-bar-color="props.getRowStatusColor"
@@ -1892,20 +1907,14 @@ defineExpose({
                 :index="slotProps.index"
               />
             </template>
-            <template v-if="rowActionsColumnId" #[`cell-${rowActionsColumnId}`]="slotProps">
+            <template v-if="rowActionsSlotOn" #[`cell-${ROW_ACTIONS_COLUMN_ID}`]="slotProps">
               <slot
-                v-if="slots['row-actions'] && (props.rowActionsSlot?.(slotProps.row) ?? true)"
+                v-if="props.rowActionsSlot?.(slotProps.row) ?? true"
                 name="row-actions"
                 :row="slotProps.row"
                 :index="slotProps.index"
               />
-              <OTableRowActions
-                v-else
-                :actions="props.rowActions ?? []"
-                :row="slotProps.row"
-                :index="slotProps.index"
-                :more-data-test="props.rowActionsMoreDataTest"
-              />
+              <OTableRowActions v-else :row="slotProps.row" :index="slotProps.index" />
             </template>
             <template
               v-for="col in linkColumns"
@@ -2055,10 +2064,9 @@ defineExpose({
         <OTableEmpty v-if="showForbidden" :floor="!props.fillHeight" data-test="o2-table-forbidden">
           <OEmptyState
             v-if="Array.isArray(props.forbidden)"
-            size="hero"
-            preset="no-access"
+            kind="denied"
             :title="t('featureLock.toastTitle')"
-            :description="
+            :text="
               props.forbidden.length
                 ? t('featureLock.toastMessage', {
                     features: raw(featureNames(props.forbidden)),
@@ -2072,7 +2080,12 @@ defineExpose({
             v-else-if="forbiddenState"
             :resource="props.forbiddenResource"
           />
-          <OEmptyState v-else size="hero" preset="no-access" />
+          <OEmptyState
+            v-else
+            kind="denied"
+            :title="t('emptyState.noAccess.title')"
+            :text="t('emptyState.noAccess.description')"
+          />
         </OTableEmpty>
 
         <!-- ── Empty State ───────────────────────────────────── -->
@@ -2124,33 +2137,27 @@ defineExpose({
           :prev-page="pagination.prevPage"
           :next-page="pagination.nextPage"
           :last-page="pagination.lastPage"
+          :go-to-page="pagination.goToPage"
         />
       </div>
 
       <OTablePagination
-        v-else-if="pagination.isEnabled.value"
-        position="bottom"
+        v-else-if="showFooter"
         :current-page="pagerView.currentPage"
         :total-pages="pagerView.totalPages"
         :total-count="pagerView.totalCount"
         :total-count-exact="props.totalCountExact"
         :page-size="pagerView.pageSize"
         :page-size-options="pagination.pageSizeOptions.value"
-        :showing-from="pagerView.showingFrom"
-        :showing-to="pagerView.showingTo"
-        :is-first-page="pagerView.isFirstPage"
-        :is-last-page="pagerView.isLastPage"
+        :paged="pagination.isEnabled.value"
         :loading="coldLoading"
         :pending="heldLoading"
         :stale="staleDimmed"
-        :selected-count="selection.selectedCount.value"
-        :bordered="props.paginationBordered"
+        :selected-count="selection.isMultiple.value ? selection.selectedCount.value : 0"
         :range-hidden="showError"
         @update:page-size="pagination.setPageSize"
-        @first-page="pagination.firstPage"
-        @prev-page="pagination.prevPage"
-        @next-page="pagination.nextPage"
-        @last-page="pagination.lastPage"
+        @go-to-page="pagination.goToPage"
+        @clear-selection="selection.clearSelection()"
       >
         <template v-if="slots['selection-actions']" #selection-actions>
           <slot name="selection-actions" />
@@ -2160,7 +2167,7 @@ defineExpose({
         </template>
       </OTablePagination>
     </div>
-    <!-- /bordered wrapper -->
+    <!-- /table region -->
     <OTableOverflowTooltip v-if="cellOverflowTooltip" :state="overflowTooltip" />
   </div>
 </template>

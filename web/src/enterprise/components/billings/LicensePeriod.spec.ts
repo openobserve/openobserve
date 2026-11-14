@@ -296,9 +296,8 @@ describe("LicensePeriod.vue", () => {
 
     it("is a warning banner on the kept container id", async () => {
       await mountExpired();
-      const banner = wrapper.findComponent({ name: "OBanner" });
-      expect(banner.props("variant")).toBe("warning");
-      expect(banner.props("icon")).toBe("warning");
+      const banner = wrapper.findComponent({ name: "OInlineNotice" });
+      expect(banner.props("tone")).toBe("warn");
       expect(wrapper.find('[data-test="license-period-container"]').attributes("role")).toBe(
         "alert",
       );
@@ -354,7 +353,7 @@ describe("LicensePeriod.vue", () => {
       wrapper = createWrapper(makeStore(nowPlusDays(12)));
       await flushPromises();
       expect(message()).toBe("12 days remaining until your license expires");
-      expect(wrapper.findComponent({ name: "OBanner" }).props("variant")).toBe("warning");
+      expect(wrapper.findComponent({ name: "OInlineNotice" }).props("tone")).toBe("warn");
       expect(renew().exists()).toBe(true);
     });
 

@@ -18,19 +18,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex flex-col gap-2"
     :data-test="`overview-${section}-loading`"
   >
-    <OSkeleton v-for="i in 3" :key="i" class="h-4 w-full" />
+    <OSkeleton v-for="i in 3" :key="i" shape="block" class="h-4 w-full" />
   </div>
   <OEmptyState
     v-else-if="view === 'error'"
     size="inline"
-    preset="load-error"
+    kind="error"
+    :title="t('emptyState.loadError.title')"
+    :text="t('emptyState.loadError.description')"
     :data-test="`overview-${section}-error`"
   >
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="refresh"
+        variant="secondary"
+        icon="refresh"
         :data-test="`overview-${section}-retry-btn`"
         @click="emit('retry')"
       >
@@ -41,8 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OEmptyState
     v-else-if="view === 'forbidden'"
     size="inline"
-    preset="no-access"
-    :description="t('overview.state.sectionForbidden')"
+    kind="denied"
+    :title="t('emptyState.noAccess.title')"
+    :text="t('overview.state.sectionForbidden')"
     :data-test="`overview-${section}-forbidden`"
   />
   <OEmptyState
@@ -54,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
   <OButton
     v-else-if="view === 'locked'"
-    variant="locked-body"
+    variant="secondary"
     block
-    icon-left="lock"
+    icon="lock"
     :data-test="`overview-${section}-locked`"
     @click="emit('unlock')"
   >

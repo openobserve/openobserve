@@ -276,7 +276,7 @@ function createWrapper(props = {}) {
 }
 
 describe("BuildQueryPage parser recovery", () => {
-  it("renders a soft error with a readable outline Retry action", async () => {
+  it("renders a soft error with a readable secondary Retry action", async () => {
     const parser = vi
       .spyOn(await import("@/utils/query/sqlUtils"), "parseWhereClauseToFilterChecked")
       .mockRejectedValueOnce(new Error("parser unavailable"));
@@ -287,7 +287,7 @@ describe("BuildQueryPage parser recovery", () => {
     expect(banner.classes()).toContain("bg-banner-error-soft-bg");
     expect(banner.classes()).toContain("text-banner-error-soft-text");
     expect(banner.get('[data-test="logs-build-parser-retry"]').attributes("data-o2-variant")).toBe(
-      "outline",
+      "secondary",
     );
     expect(parser).toHaveBeenCalled();
     wrapper.unmount();

@@ -169,7 +169,7 @@ document.body.appendChild(node);
 // fallthroughs to the stub's root element.
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "size", "showClose", "title", "subTitle", "width", "persistent"],
+  props: ["open", "size", "showClose", "title", "subtitle", "width", "persistent"],
   emits: ["update:open", "close"],
   inheritAttrs: false,
   template: `
@@ -443,7 +443,7 @@ describe("ReportList", () => {
         .findAllComponents({ name: "ConfirmDialog" })
         .find((c: any) => c.props("messageKeypath") === "reports.deleteReportNamedMessage");
       expect(dialog!.props("messageName")).toBe(REPORT_SCHEDULED.name);
-      expect(dialog!.props("okVariant")).toBe("destructive");
+      expect(dialog!.props("kind")).toBe("destructive");
       expect(wrapper.vm.deleteDialog.data).toEqual({
         report_id: REPORT_SCHEDULED.report_id,
         name: REPORT_SCHEDULED.name,
@@ -507,7 +507,7 @@ describe("ReportList", () => {
       const dialog = wrapper
         .findAllComponents({ name: "ConfirmDialog" })
         .find((c: any) => c.props("title") === i18n.global.t("reports.deleteReportsTitle"));
-      expect(dialog!.props("okVariant")).toBe("destructive");
+      expect(dialog!.props("kind")).toBe("destructive");
     });
   });
 

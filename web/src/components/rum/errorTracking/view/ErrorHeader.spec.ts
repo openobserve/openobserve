@@ -26,14 +26,19 @@ node.setAttribute("id", "app");
 document.body.appendChild(node);
 
 // Hoist mock helpers so vi.mock factories can reference them
-const { mockRouterBack, mockCopyToClipboard } = vi.hoisted(() => ({
+const { mockRouterBack, mockRouterPush, mockCopyToClipboard } = vi.hoisted(() => ({
   mockRouterBack: vi.fn(),
+  mockRouterPush: vi.fn(),
   mockCopyToClipboard: vi.fn(),
 }));
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ fullPath: "/rum/errors/view/error-abc123?timestamp=1700000000" }),
-  useRouter: () => ({ back: mockRouterBack, resolve: (to: string) => ({ href: to }) }),
+  useRouter: () => ({
+    back: mockRouterBack,
+    push: mockRouterPush,
+    resolve: (to: unknown) => ({ href: typeof to === "string" ? to : "/rum/errors" }),
+  }),
 }));
 
 vi.mock("@/utils/clipboard", () => ({
@@ -254,13 +259,29 @@ describe("ErrorHeader", () => {
       expect(wrapper.find('[data-test="back-button"]').exists()).toBe(true);
     });
 
-    it("calls router.back() when the back button is clicked", async () => {
+    it("goes back through history when there is one", async () => {
+      const state = vi
+        .spyOn(window.history, "state", "get")
+        .mockReturnValue({ back: "/rum/errors" });
       wrapper = mountComponent();
       await flushPromises();
 
       await wrapper.find('[data-test="back-button"]').trigger("click");
 
       expect(mockRouterBack).toHaveBeenCalledTimes(1);
+      state.mockRestore();
+    });
+
+    it("opens the error list when there is no history", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+
+      await wrapper.find('[data-test="back-button"]').trigger("click");
+
+      expect(mockRouterBack).not.toHaveBeenCalled();
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "ErrorTracking" }),
+      );
     });
   });
 

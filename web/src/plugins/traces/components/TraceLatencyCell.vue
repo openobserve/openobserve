@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="h-full min-w-0.5"
       :style="segmentStyle(service, svc as any)"
     >
-      <OTooltip side="left" align="center">
+      <OTooltip side="left">
         <template #content>
           <div class="mb-[0.35rem] text-xs font-semibold tracking-[0.03rem] opacity-100">
             {{

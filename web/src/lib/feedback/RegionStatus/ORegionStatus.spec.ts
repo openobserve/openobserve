@@ -17,20 +17,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, nextTick, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import ORegionStatus from "./ORegionStatus.vue";
-import OPartialTag from "./OPartialTag.vue";
 import { clearAnnouncements } from "./announcer";
 import { useRegionLoading } from "./useRegionLoading";
-
-const bubble = () =>
-  document.body.querySelector('[data-test="o-tooltip-content"]')?.textContent?.trim() ?? null;
-
-async function open(el: HTMLElement, how: "focus" | "hover") {
-  if (how === "focus") el.focus();
-  else el.dispatchEvent(new MouseEvent("mouseenter"));
-  vi.advanceTimersByTime(1000);
-  await nextTick();
-  await nextTick();
-}
 
 const speaking = () =>
   [
@@ -125,48 +113,5 @@ describe("ORegionStatus with useRegionLoading", () => {
     expect(live).toHaveLength(1);
     expect(live[0].getAttribute("data-test")).toBe("region-announcer");
     wrapper.unmount();
-  });
-});
-
-describe("OPartialTag", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => {
-    vi.useRealTimers();
-    document.body.innerHTML = "";
-  });
-
-  const tooltip =
-    "The search stopped after 10 of 12 partitions, so the count and rows cover only those. Narrow the time range to search everything.";
-
-  it("flags a partial result in amber", () => {
-    const wrapper = mount(OPartialTag, {
-      props: { partitions: { done: 10, total: 12 }, dataTest: "traces-count-partial" },
-    });
-    const tag = wrapper.find('[data-test="traces-count-partial"]');
-    expect(tag.text()).toContain("10 of 12 partitions");
-    expect(tag.find('[class*="warning"]').exists()).toBe(true);
-    expect(tag.attributes("tabindex")).toBe("0");
-    expect(tag.classes()).toEqual(
-      expect.arrayContaining(["rounded-full", "outline-none", "focus-visible:outline-offset-2"]),
-    );
-  });
-
-  it.each(["focus", "hover"] as const)(
-    "opens the reason on %s with the real tooltip",
-    async (how) => {
-      const wrapper = mount(OPartialTag, {
-        props: { partitions: { done: 10, total: 12 } },
-        attachTo: document.body,
-      });
-      expect(bubble()).toBeNull();
-      await open(wrapper.find<HTMLElement>('[data-test="partial-result"]').element, how);
-      expect(bubble()).toContain(tooltip);
-      wrapper.unmount();
-    },
-  );
-
-  it("renders nothing when every partition was searched", () => {
-    const wrapper = mount(OPartialTag, { props: { partitions: { done: 12, total: 12 } } });
-    expect(wrapper.find('[data-test="partial-result"]').exists()).toBe(false);
   });
 });

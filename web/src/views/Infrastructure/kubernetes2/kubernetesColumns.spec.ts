@@ -58,10 +58,10 @@ describe("kubernetesColumns", () => {
     );
     const derived = { kind: "deployment", conditionsDerived: true, conditions: [] as unknown[] };
     derived.conditions = [
-      { key: "infra.k8s2.conditionAvailable", text: "Available", variant: "success-soft" },
+      { key: "infra.k8s2.conditionAvailable", text: "Available", variant: "ok" },
     ];
     expect(words("deployments", derived)).toEqual(["infra.k8s2.conditionAvailable"]);
-    const observed = { ...derived, conditions: [{ text: "Progressing", variant: "default-soft" }] };
+    const observed = { ...derived, conditions: [{ text: "Progressing", variant: "neutral" }] };
     expect(words("deployments", observed)).toEqual(["Progressing"]);
   });
 

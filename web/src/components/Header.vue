@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
       <OButton
         v-if="!focusMode"
+        icon-only
         variant="ghost"
-        size="icon-toolbar"
         class="md:hidden"
         data-test="header-mobile-nav-toggle"
         :aria-label="t('components.navbar.mainNavigation')"
@@ -171,12 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.organizationData.quotaThresholdMsg
           }}
         </div>
-        <OButton
-          variant="secondary"
-          size="sm"
-          class="m-1"
-          @click="router.replace('/billings/plans')"
-        >
+        <OButton variant="secondary" class="m-1" @click="router.replace('/billings/plans')">
           {{ t("menu.upgradeToProPlan") }}
         </OButton>
       </div>
@@ -186,8 +181,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ingestion_quota_used >= 85"
+          icon-only
           variant="ghost"
-          size="icon-toolbar"
           data-test="ingestion-quota-warning-icon"
         >
           <OIcon
@@ -198,7 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OTooltip
             side="top"
-            align="center"
             :content="t('common.warningIngestionQuota', { percent: ingestionQuotaPercentage })"
           />
         </OButton>
@@ -209,16 +203,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Open Source: primary CTA to drive upgrades -->
         <OButton
           :variant="
-            config.isEnterprise === 'true' || config.isCloud === 'true'
-              ? 'outline-primary'
-              : 'primary'
+            config.isEnterprise === 'true' || config.isCloud === 'true' ? 'secondary' : 'primary'
           "
-          size="xs"
+          size="sm"
           class="max-md:hidden md:max-xl:min-w-0"
           data-test="upgrade-to-enterprise-btn"
           @click="openEnterpriseDialog"
         >
-          <template #icon-left>
+          <template #icon>
             <OIcon
               :name="
                 config.isEnterprise === 'true' || config.isCloud === 'true'
@@ -246,8 +238,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Shown locked (not hidden) in builds that don't unlock it. -->
           <template v-if="aiButtonVisible || aiLicenseLocked">
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-toolbar"
               @click="aiLicenseLocked ? openLockedAiAssistant() : toggleAIChat()"
               :data-test="aiLicenseLocked ? 'menu-link-ai-locked' : 'menu-link-ai-item'"
               :aria-label="aiButtonLabel"
@@ -264,9 +256,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
               <OTooltip
                 side="bottom"
-                align="center"
                 :content="aiButtonLabel"
-                :shortcut-id="aiAccess.allowed && !aiLicenseLocked ? 'aiChatToggle' : undefined"
+                :shortcut="aiAccess.allowed && !aiLicenseLocked ? 'aiChatToggle' : undefined"
               />
             </OButton>
           </template>
@@ -282,29 +273,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- SLACK COMMUNITY LINK -->
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-toolbar"
             class="max-md:hidden"
             data-test="menu-link-slack-item"
             :aria-label="raw('Slack')"
             @click="openSlack"
           >
             <component :is="slackIcon" class="size-5 shrink-0" />
-            <OTooltip side="top" align="center" :content="raw('Slack')" />
+            <OTooltip side="top" :content="raw('Slack')" />
           </OButton>
 
           <!-- HELP MENU: Contains links to docs, API, and about page -->
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-toolbar"
                 class="max-md:hidden"
                 data-test="menu-link-help-item"
                 :aria-label="t('menu.help')"
               >
                 <OIcon name="help-outline" size="sm" class="size-5!" />
-                <OTooltip side="top" align="center" :content="t('menu.help')" />
+                <OTooltip side="top" :content="t('menu.help')" />
               </OButton>
             </template>
             <div class="header-menu-bar min-w-62.5">
@@ -333,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Keyboard shortcuts -->
               <ODropdownItem
                 data-test="menu-link-shortcuts-item"
-                shortcut-id="openCheatsheet"
+                shortcut="openCheatsheet"
                 @select="openShortcuts"
               >
                 {{ t("menu.keyboardShortcuts") }}
@@ -359,8 +350,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #trigger>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-toolbar"
                 data-test="header-my-account-profile-icon"
                 :aria-label="
                   user.given_name ? user.given_name + ' ' + user.family_name : user.email
@@ -369,7 +360,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon :name="user.picture ? user.picture : 'person'" size="sm" class="size-5!" />
                 <OTooltip
                   side="top"
-                  align="center"
                   :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email"
                 />
               </OButton>
@@ -394,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="onLanguageRowSelect"
                   @keydown="onLanguageRowKeydown"
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon size="xs" name="language" class="padding-none" />
                   </template>
                   <span class="flex-1 whitespace-nowrap">{{ t("menu.language") }}</span>
@@ -454,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="menu-link-predefined-themes-item"
                 @select="openPredefinedThemes"
               >
-                <template #icon-left>
+                <template #icon>
                   <OIcon size="xs" name="color-lens" class="padding-none" />
                 </template>
                 {{ t("common.manageTheme") }}
@@ -466,7 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="menu-link-linked-accounts-item"
                   @select="showLinkedAccounts = true"
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon size="xs" name="link" class="padding-none" />
                   </template>
                   {{ t("menu.linkedAccounts") }}
@@ -475,12 +465,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <!-- Logout -->
-              <ODropdownItem
-                data-test="menu-link-logout-item"
-                variant="destructive"
-                @select="signout"
-              >
-                <template #icon-left>
+              <ODropdownItem data-test="menu-link-logout-item" tone="danger" @select="signout">
+                <template #icon>
                   <OIcon size="xs" name="exit-to-app" class="padding-none" />
                 </template>
                 {{ t("menu.signOut") }}

@@ -213,8 +213,8 @@ describe("backend-shaped error counts", () => {
 });
 describe("sample floors and early colours", () => {
   const tagStub = {
-    props: ["variant", "label"],
-    template: '<span :data-variant="variant">{{ label }}</span>',
+    props: ["tone", "label"],
+    template: '<span :data-variant="tone">{{ label }}</span>',
   };
   function judged() {
     const result = data();
@@ -229,9 +229,9 @@ describe("sample floors and early colours", () => {
     const wrapper = tags(judged());
     expect(
       wrapper.find('[data-test="svcver-error-introduced-new"]').attributes("data-variant"),
-    ).toBe("error-soft");
+    ).toBe("err");
     expect(wrapper.find('[data-test="svcver-error-fixed-gone"]').attributes("data-variant")).toBe(
-      "success-soft",
+      "ok",
     );
   });
   it("keeps RUM rows neutral below 100 views per arm", () => {
@@ -239,11 +239,11 @@ describe("sample floors and early colours", () => {
     result.rum!.views = { a: 60, b: 5000 };
     const wrapper = tags(result);
     expect(wrapper.find('[data-test="svcver-error-fixed-gone"]').attributes("data-variant")).toBe(
-      "default-outline",
+      "outline",
     );
     expect(
       wrapper.find('[data-test="svcver-error-introduced-new"]').attributes("data-variant"),
-    ).toBe("default-outline");
+    ).toBe("outline");
   });
   const significant = (a: number, b: number) => ({
     a,
@@ -402,13 +402,13 @@ describe("endpoints on one side only", () => {
     const wrapper = mount(Changed, {
       props: { org: "org", result: judged([promo()]) },
       global: {
-        stubs: { OTag: { props: ["variant"], template: '<span :data-variant="variant" />' } },
+        stubs: { OTag: { props: ["tone"], template: '<span :data-variant="tone" />' } },
       },
     });
     const chip = wrapper.get(
       '[data-test="svcver-endpoint-introduced-default-POST /api/checkout/promo"]',
     );
-    expect(chip.attributes("data-variant")).toBe("error-soft");
+    expect(chip.attributes("data-variant")).toBe("err");
     expect(
       wrapper
         .get('[data-test="svcver-error-introduced-default-POST /api/checkout/promo"]')
@@ -452,7 +452,7 @@ describe("endpoints on one side only", () => {
     const wrapper = mount(Changed, {
       props: { org: "org", result: judged([promo()]) },
       global: {
-        stubs: { OTag: { props: ["variant"], template: '<span :data-variant="variant" />' } },
+        stubs: { OTag: { props: ["tone"], template: '<span :data-variant="tone" />' } },
       },
     });
     expect(wrapper.find('[data-test="svcver-too-early"]').exists()).toBe(false);
@@ -460,7 +460,7 @@ describe("endpoints on one side only", () => {
       wrapper
         .find('[data-test="svcver-error-introduced-default-POST /api/checkout/promo"]')
         .attributes("data-variant"),
-    ).toBe("error-soft");
+    ).toBe("err");
   });
   it("never prints a delta for an insufficient metric", () => {
     const shared = {
@@ -522,7 +522,7 @@ describe("endpoint and error rows", () => {
   }
   const tagStub = {
     global: {
-      stubs: { OTag: { props: ["variant"], template: '<span :data-variant="variant" />' } },
+      stubs: { OTag: { props: ["tone"], template: '<span :data-variant="tone" />' } },
     },
   };
   it("states an error-rate change in pts, rounded like a percent change", () => {
@@ -559,7 +559,7 @@ describe("endpoint and error rows", () => {
     };
     const wrapper = mount(Changed, { props: { org: "org", result: judged([gone]) }, ...tagStub });
     const chip = wrapper.get('[data-test="svcver-endpoint-fixed-default-GET /legacy"]');
-    expect(chip.attributes("data-variant")).toBe("success-soft");
+    expect(chip.attributes("data-variant")).toBe("ok");
     expect(wrapper.get('[data-test="svcver-endpoint-errors-default-GET /legacy"]').text()).toBe("");
   });
   it("offers Slow traces on a new endpoint, against the service's p95", () => {
@@ -576,9 +576,7 @@ describe("endpoint and error rows", () => {
   });
   it("drops the too-early chip once a verdict exists and uses a neutral chip before", () => {
     const early = mount(Changed, { props: { org: "org", result: data() }, ...tagStub });
-    expect(early.get('[data-test="svcver-too-early"]').attributes("data-variant")).toBe(
-      "default-soft",
-    );
+    expect(early.get('[data-test="svcver-too-early"]').attributes("data-variant")).toBe("neutral");
     const result = data();
     result.live_verdict = structuredClone(producer.regressed.live_verdict) as never;
     const decided = mount(Changed, { props: { org: "org", result }, ...tagStub });
@@ -586,7 +584,7 @@ describe("endpoint and error rows", () => {
     expect(decided.text()).not.toContain("newErrorsEarly");
     expect(
       decided.get('[data-test="svcver-error-introduced-new"]').attributes("data-variant"),
-    ).toBe("error-soft");
+    ).toBe("err");
   });
 });
 describe("detail gap span", () => {

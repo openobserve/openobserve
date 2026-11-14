@@ -17,91 +17,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="qp-2"
+    :title="sessionDetails.id ? raw(sessionDetails.id) : t('rum.sessionReplay')"
     :back="{
-      label: t('rum.sessionReplay'),
-      onClick: () => router.back(),
+      label: t('rum.sessions'),
+      to: sessionsRoute,
       dataTest: 'session-viewer-back-btn',
     }"
     bleed
   >
-    <template #title>
-      <span class="inline-flex max-w-full min-w-0 items-center gap-2">
-        <OTruncatedText>{{
-          sessionDetails.id ? raw(sessionDetails.id) : t("rum.sessionReplay")
-        }}</OTruncatedText>
-        <OBadge
-          v-if="isLive && loadState !== 'error'"
-          variant="success"
-          size="sm"
-          dot
-          class="shrink-0"
-          data-test="session-viewer-live-badge"
-          >{{ t("rum.sessionReplayLiveBadge") }}</OBadge
-        >
-      </span>
-    </template>
-    <template v-if="!sessionNotFound" #subtitle>
-      <div
-        class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
-        data-test="session-viewer-subtitle"
+    <template #status>
+      <OBadge
+        v-if="isLive && loadState !== 'error'"
+        tone="ok"
+        size="sm"
+        dot
+        data-test="session-viewer-live-badge"
+        >{{ t("rum.sessionReplayLiveBadge") }}</OBadge
       >
-        <div class="flex min-w-0 items-center gap-1.5 text-xs">
-          <OIcon name="language" size="sm" />
-          <OTruncatedText>{{ sessionDetails.ip }}</OTruncatedText>
-        </div>
-        <div class="flex min-w-0 items-center gap-1.5 text-xs">
-          <OIcon name="calendar-month" size="sm" />
-          <OTruncatedText>{{ sessionDetails.date }}</OTruncatedText>
-        </div>
-        <div
-          v-if="sessionDetails.duration"
-          class="flex min-w-0 items-center gap-1.5 text-xs"
-          data-test="session-viewer-duration"
-        >
-          <OIcon name="access-time" size="sm" />
-          <OTruncatedText>{{ sessionDetails.duration }}</OTruncatedText>
-        </div>
-        <div class="flex min-w-0 items-center gap-1.5 text-xs">
-          <OIcon name="person" size="sm" />
-          <OTruncatedText>{{
-            sessionDetails.user_email || t("common.unknownUser")
-          }}</OTruncatedText>
-        </div>
-        <div class="flex min-w-0 items-center gap-1.5 text-xs">
-          <OIcon name="location-on" size="sm" />
-          <OTruncatedText>{{ sessionDetails.city }}, {{ sessionDetails.country }}</OTruncatedText>
-        </div>
-        <div class="flex min-w-0 items-center gap-1.5 text-xs">
-          <OIcon name="settings" size="sm" />
-          <OTruncatedText>{{ sessionDetails.browser }}, {{ sessionDetails.os }}</OTruncatedText>
-        </div>
-        <div
-          v-if="frustrationCount > 0"
-          class="flex items-center truncate text-xs"
-          :title="
+      <OBadge
+        v-if="frustrationCount > 0 && !sessionNotFound"
+        tone="warn"
+        size="sm"
+        icon="sentiment-very-dissatisfied"
+        data-test="session-viewer-frustration-summary"
+      >
+        {{ t("rum.frustration", { count: frustrationCount }, frustrationCount) }}
+        <OTooltip
+          :content="
             t('rum.frustrationSignalsDetected', { count: frustrationCount }, frustrationCount)
           "
-          data-test="session-viewer-frustration-summary"
-        >
-          <OIcon
-            name="sentiment-very-dissatisfied"
-            size="sm"
-            class="text-severity-warning-color pe-1"
-            data-test="frustration-summary-icon"
-          />
-          <span
-            class="text-severity-warning-color font-semibold"
-            data-test="frustration-summary-text"
-            >{{ t("rum.frustration", { count: frustrationCount }, frustrationCount) }}</span
-          >
-        </div>
-      </div>
+        />
+      </OBadge>
     </template>
     <template v-if="!sessionNotFound" #actions>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="grid-on"
+        variant="secondary"
+        icon="grid-on"
         :disabled="heatmapOpening"
         data-test="session-viewer-view-heatmap-btn"
         @click="openSessionHeatmap(String(getSessionId), viewerStartUs)"
@@ -109,45 +60,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("rum.heatmap.viewHeatmap") }}
         <OTooltip :content="t('rum.heatmap.viewHeatmapTip')" side="bottom" />
       </OButton>
-      <ShareButton
-        data-test="session-viewer-share-link-btn"
-        :url="shareUrl"
-        variant="outline"
-        size="icon-toolbar"
-      />
+      <ShareButton data-test="session-viewer-share-link-btn" :url="shareUrl" variant="secondary" />
     </template>
-    <OBanner
-      v-if="analyticsContext && !sessionNotFound"
-      variant="info"
-      dense
-      class="mx-page-edge my-1"
-      :content="
-        analyticsContext.step
-          ? t('rum.analytics.viewer.droppedAfter', {
-              step: analyticsContext.step,
-              label: raw(analyticsContext.label),
-            })
-          : t('rum.analytics.viewer.fromAnalytics', { label: raw(analyticsContext.label) })
-      "
-      data-test="session-viewer-analytics-context"
-    >
-      <template #actions>
-        <OButton
-          variant="ghost"
-          size="sm"
-          icon-left="arrow-back"
-          data-test="session-viewer-analytics-back-btn"
-          @click="router.back()"
-          >{{ t("rum.analytics.viewer.back") }}</OButton
-        >
-      </template>
-    </OBanner>
+    <template #banner>
+      <OBanner
+        v-if="analyticsContext && !sessionNotFound"
+        tone="info"
+        :message="
+          analyticsContext.step
+            ? t('rum.analytics.viewer.droppedAfter', {
+                step: analyticsContext.step,
+                label: raw(analyticsContext.label),
+              })
+            : t('rum.analytics.viewer.fromAnalytics', { label: raw(analyticsContext.label) })
+        "
+        data-test="session-viewer-analytics-context"
+      >
+        <template #actions>
+          <OButton
+            variant="ghost"
+            icon="arrow-back"
+            data-test="session-viewer-analytics-back-btn"
+            @click="backToAnalytics"
+            >{{ t("rum.analytics.viewer.back") }}</OButton
+          >
+        </template>
+      </OBanner>
+    </template>
     <OEmptyState
       v-if="sessionNotFound"
-      size="hero"
-      illustration="no-results"
+      icon="search-off"
       :title="t('rum.noReplayRecordedTitle')"
-      :description="t('rum.noReplayRecordedMessage', { id: sessionId })"
+      :text="t('rum.noReplayRecordedMessage', { id: sessionId })"
       data-test="session-viewer-no-replay"
     />
     <div
@@ -155,12 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="bg-card-glass-bg flex min-h-0 w-full flex-1 flex-col overflow-hidden"
       data-test="session-viewer-events-only"
     >
-      <OBanner
-        variant="warning"
-        dense
-        class="mx-page-edge my-1"
-        :content="t('rum.analytics.viewer.eventsOnly')"
-      />
+      <OBanner tone="warn" :message="t('rum.analytics.viewer.eventsOnly')" />
       <PlayerEventsSidebar
         :events="segmentEvents"
         :sessionDetails="sessionDetails"
@@ -202,8 +141,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span class="min-w-0 flex-1">{{ t("rum.sessionReplayLateRows") }}</span>
               <OButton
-                variant="outline"
-                size="xs"
+                variant="secondary"
+                size="sm"
                 data-test="session-viewer-late-rows-reload"
                 @click="reloadPage"
                 >{{ t("rum.sessionReplayReload") }}</OButton
@@ -308,13 +247,11 @@ import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useStreams from "@/composables/useStreams";
@@ -323,6 +260,8 @@ import { MAX_KEY_LENGTH } from "@/utils/rum/productAnalyticsModel";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
 import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
+import useSmartBack from "@/composables/useSmartBack";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import analytics from "@/services/product_analytics";
 
 import { formatDate } from "@/utils/date";
@@ -605,6 +544,15 @@ const markedTimestamps = computed<number[]>(() => {
 });
 
 const getSessionId = computed(() => router.currentRoute.value.params.id);
+
+const sessionsRoute = computed(() => ({
+  name: "Sessions",
+  query: { org_identifier: store.state.selectedOrganization.identifier },
+}));
+const { goBack: backToAnalytics } = useSmartBack(() => ({
+  name: analyticsContext.value?.step ? PA_ROUTES.funnels : PA_ROUTES.paths,
+  query: { org_identifier: store.state.selectedOrganization.identifier },
+}));
 const { openSessionHeatmap, opening: heatmapOpening } = useSessionHeatmap();
 
 // Read event_time query parameter

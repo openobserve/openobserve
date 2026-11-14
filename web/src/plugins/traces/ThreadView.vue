@@ -31,8 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="thread-summary bg-surface-base border-border-default flex flex-wrap items-center gap-[0.4rem] border-b px-4 py-2"
     >
       <OTag
+        tone="outline"
         type="metricChip"
-        class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! border-s-thread-rail-warning! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--steps"
         :title="t('traces.threadView.llmStep', { n: summary.turnCount })"
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
@@ -45,10 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </OTag>
 
-      <OTag
-        type="metricChip"
-        class="thread-chip thread-chip--tools bg-surface-base! border-border-default rounded-default! text-text-body! border-s-thread-rail-info! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
-      >
+      <OTag tone="outline" type="metricChip" class="thread-chip thread-chip--tools">
         <template #icon><OIcon name="build" size="xs" /></template>
         <span
           class="thread-chip__label text-text-secondary text-2xs me-[0.3125rem] font-medium tracking-normal"
@@ -59,10 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </OTag>
 
-      <OTag
-        type="metricChip"
-        class="thread-chip thread-chip--duration bg-surface-base! border-border-default rounded-default! text-text-body! border-s-thread-rail-neutral! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
-      >
+      <OTag tone="outline" type="metricChip" class="thread-chip thread-chip--duration">
         <template #icon><OIcon name="schedule" size="xs" /></template>
         <span
           class="thread-chip__label text-text-secondary text-2xs me-[0.3125rem] font-medium tracking-normal"
@@ -73,10 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTag>
 
-      <OTag
-        type="metricChip"
-        class="thread-chip thread-chip--cost bg-surface-base! border-border-default rounded-default! text-text-body! border-s-success-600! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
-      >
+      <OTag tone="outline" type="metricChip" class="thread-chip thread-chip--cost">
         <template #icon><OIcon name="payments" size="xs" /></template>
         <span
           class="thread-chip__label text-text-secondary text-2xs me-[0.3125rem] font-medium tracking-normal"
@@ -88,9 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTag>
 
       <OTag
+        tone="outline"
         v-if="summary.dominantModel"
         type="metricChip"
-        class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-s-ai-accent! dark:border-s-thread-accent-strong! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--model dark:border-s-thread-accent-strong!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
@@ -104,9 +97,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTag>
 
       <OTag
+        tone="outline"
         v-if="summary.errorCount > 0"
         type="metricChip"
-        class="thread-chip thread-chip--error bg-surface-base! border-border-default rounded-default! text-text-body! border-s-error-600! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--error"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
         <span
@@ -203,13 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="group.userId || t('traces.threadView.user')"
           >
             <OIcon name="person" size="sm" />
-            <OTooltip
-              v-if="group.userId"
-              :content="raw(group.userId)"
-              side="bottom"
-              align="center"
-              :side-offset="6"
-            />
+            <OTooltip v-if="group.userId" :content="raw(group.userId)" side="bottom" />
           </div>
           <div class="thread-user-row__text min-w-0 flex-1 self-center">{{ group.userQuery }}</div>
         </div>

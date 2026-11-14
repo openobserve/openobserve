@@ -55,8 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex min-w-0 flex-1 flex-col pb-4 group-last/rail:pb-0">
           <OButton
-            variant="ghost-muted"
-            size="sm"
+            variant="ghost"
             class="-ms-2 justify-start text-start"
             :aria-current="s.active ? 'step' : undefined"
             :data-test="`onboarding-guide-rail-${s.id}-link`"

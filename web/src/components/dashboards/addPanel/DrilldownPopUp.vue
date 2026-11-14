@@ -18,8 +18,8 @@
   <ODialog
     :open="open"
     :title="isEditMode ? t('dashboard.editDrilldown') : t('dashboard.createDrilldown')"
-    :primary-button-label="isEditMode ? t('dashboard.update') : t('common.add')"
-    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary="{ label: isEditMode ? t('dashboard.update') : t('common.add') }"
+    :secondary="{ label: t('confirmDialog.cancel') }"
     size="md"
     form-id="drilldown-popup-form"
     data-test="dashboard-drilldown-popup"
@@ -44,7 +44,6 @@
         <OFormToggleGroup name="type" :label="t('dashboard.goTo')">
           <OToggleGroupItem
             value="byDashboard"
-            size="sm"
             icon-left="dashboard"
             data-test="dashboard-drilldown-by-dashboard-btn"
           >
@@ -52,7 +51,6 @@
           </OToggleGroupItem>
           <OToggleGroupItem
             value="byUrl"
-            size="sm"
             icon-left="link"
             data-test="dashboard-drilldown-by-url-btn"
           >
@@ -60,7 +58,6 @@
           </OToggleGroupItem>
           <OToggleGroupItem
             value="logs"
-            size="sm"
             icon-left="search"
             data-test="dashboard-drilldown-by-logs-btn"
           >
@@ -72,8 +69,8 @@
       <div class="mt-2.5" v-if="drilldownData.type === 'logs'">
         <div>
           <OFormToggleGroup name="data.logsMode" :label="t('dashboard.selectLogsMode')">
-            <OToggleGroupItem value="auto" size="sm">{{ t("common.auto") }}</OToggleGroupItem>
-            <OToggleGroupItem value="custom" size="sm">{{ t("common.custom") }}</OToggleGroupItem>
+            <OToggleGroupItem value="auto">{{ t("common.auto") }}</OToggleGroupItem>
+            <OToggleGroupItem value="custom">{{ t("common.custom") }}</OToggleGroupItem>
           </OFormToggleGroup>
         </div>
         <component
@@ -136,7 +133,7 @@
               :disabled="getFoldersListLoading.isLoading.value"
               data-test="dashboard-drilldown-folder-select"
             >
-              <template v-if="drilldownData.data.folder" #icon-left>
+              <template v-if="drilldownData.data.folder" #icon>
                 <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
               </template>
             </OFormSelect>
@@ -173,10 +170,9 @@
               >
               <OButton
                 variant="primary"
-                size="sm"
                 @click="addVariableRow"
                 data-test="dashboard-drilldown-add-variable"
-                icon-left="add"
+                icon="add"
               >
                 {{ t("common.add") }}
               </OButton>
@@ -215,9 +211,8 @@
           <OFormSwitch
             name="data.passAllVariables"
             :label="t('dashboard.passAllCurrentVariables')"
-            labelPosition="left"
+            labelPosition="start"
             data-test="dashboard-drilldown-pass-all-variables"
-            size="lg"
           />
         </div>
       </div>
@@ -227,9 +222,8 @@
         <OFormSwitch
           name="targetBlank"
           :label="t('dashboard.openInNewTab')"
-          labelPosition="left"
+          labelPosition="start"
           data-test="dashboard-drilldown-open-in-new-tab"
-          size="lg"
         />
       </div>
     </OForm>

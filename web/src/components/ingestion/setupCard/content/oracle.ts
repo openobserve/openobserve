@@ -98,7 +98,7 @@ export default function oracleCard(subs: CardSubstitutions, t: TranslateFn): Ric
             labelKey: "ingestion.setupCard.portLabel",
             default: "1521",
             placeholder: raw("1521"),
-            width: "sm",
+            width: "s",
           },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),

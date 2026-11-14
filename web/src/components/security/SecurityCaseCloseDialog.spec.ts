@@ -19,8 +19,8 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 vi.mock("@/lib/overlay/Dialog/ODialog.vue", () => ({
   default: {
     name: "ODialog",
-    props: ["open", "title", "primaryButtonLabel", "primaryButtonDisabled"],
-    template: `<div v-if="open" class="o-dialog-stub"><h2>{{ title }}</h2><span data-test="primary" :data-disabled="String(!!primaryButtonDisabled)">{{ primaryButtonLabel }}</span><slot /></div>`,
+    props: ["open", "title", "primary", "primary"],
+    template: `<div v-if="open" class="o-dialog-stub"><h2>{{ title }}</h2><span data-test="primary" :data-disabled="String(!!primary?.disabled)">{{ primary?.label }}</span><slot /></div>`,
   },
 }));
 

@@ -94,24 +94,16 @@ import config from "@/aws-exports";
 // ODialog — the logout confirm — is also covered by this stub.)
 const ODialogStub = {
   name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "formId",
-    "persistent",
-  ],
+  props: ["open", "size", "title", "primary", "secondary", "formId", "persistent"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-form-id="formId">
       <slot />
       <button
-        v-if="secondaryButtonLabel"
+        v-if="secondary?.label"
         data-test="o-dialog-secondary-btn"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
   inheritAttrs: false,

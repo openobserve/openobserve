@@ -73,7 +73,7 @@ export default function zookeeperCard(subs: CardSubstitutions, t: TranslateFn): 
             labelKey: "ingestion.setupCard.portLabel",
             default: "2181",
             placeholder: raw("2181"),
-            width: "sm",
+            width: "s",
           },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),

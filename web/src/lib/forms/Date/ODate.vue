@@ -43,7 +43,6 @@ const wrapperAttrs = computed(() => {
 
 const props = withDefaults(defineProps<DateProps>(), {
   size: "md",
-  labelPosition: "outside",
   disabled: false,
   readonly: false,
   clearable: false,
@@ -58,7 +57,6 @@ const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
 
 // Inside-label mode: the label floats inside the field border, like OInput's
-const isInsideLabel = computed(() => props.labelPosition === "inside" && !!props.label);
 
 const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
@@ -129,8 +127,8 @@ function onFocusOut(e: FocusEvent) {
 }
 
 const heightClasses: Record<NonNullable<DateProps["size"]>, string> = {
-  sm: "h-6 text-sm",
-  md: "h-8.5 text-sm",
+  sm: "h-control-sm text-compact",
+  md: "h-control-md text-compact",
 };
 
 const wrapperClasses = computed(() => [
@@ -144,14 +142,13 @@ const wrapperClasses = computed(() => [
   "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   isDisabled.value ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
-  isInsideLabel.value ? "relative" : "",
 ]);
 </script>
 
 <template>
   <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <label
-      v-if="($slots.label || label || $slots.tooltip) && !isInsideLabel"
+      v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
@@ -190,15 +187,12 @@ const wrapperClasses = computed(() => [
         @focusin="onFocusIn"
         @focusout="onFocusOut"
       >
-        <!-- Inside label: floating mini-label at the top of the border, above the date text -->
-        <label
-          v-if="isInsideLabel"
-          :for="inputId"
-          class="text-2xs text-text-secondary pointer-events-none absolute start-9 end-3 top-1 overflow-hidden leading-none font-medium text-ellipsis whitespace-nowrap select-none"
-          >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></label
+        <span
+          v-if="prefix"
+          class="text-input-addon-text shrink-0 ps-3 whitespace-nowrap select-none"
+          :data-test="parentDataTest ? `${parentDataTest}-prefix` : undefined"
+          >{{ prefix }}</span
         >
-
-        <!-- Calendar trigger (calendar icon) -->
         <DatePickerTrigger
           class="text-datepicker-icon flex shrink-0 cursor-pointer items-center ps-3 outline-none disabled:cursor-not-allowed"
           :aria-label="t('components.date.openCalendar')"
@@ -214,7 +208,7 @@ const wrapperClasses = computed(() => [
             'flex min-w-0 flex-1 items-center gap-px ps-2 outline-none',
             clearable ? 'pe-2' : 'pe-3',
             // Inside-label: push the date down to leave room for the floating mini-label
-            isInsideLabel ? 'h-8.5 pt-3 pb-0.5 text-xs font-semibold' : heightClasses[size ?? 'md'],
+            'h-full',
           ]"
         >
           <template #default="{ segments }">
@@ -282,7 +276,7 @@ const wrapperClasses = computed(() => [
               </svg>
             </DatePickerPrev>
 
-            <DatePickerHeading class="text-datepicker-heading-text text-sm font-medium" />
+            <DatePickerHeading class="text-datepicker-heading-text text-compact font-medium" />
 
             <DatePickerNext
               class="rounded-default ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-datepicker-focus-ring flex size-7 items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2"

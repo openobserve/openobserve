@@ -428,7 +428,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.overview.stat.critical"),
     value: toneCounts.value.critical,
     icon: "emergency",
-    tone: "error",
+    tone: "crit",
     dataTest: "security-overview-stat-critical",
   },
   {
@@ -436,15 +436,15 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.overview.stat.high"),
     value: toneCounts.value.high,
     icon: "warning",
-    tone: "orange",
+    tone: "err",
     dataTest: "security-overview-stat-high",
   },
   {
     key: "cases",
     label: t("siem.overview.stat.openCases"),
-    value: casesUnsupported.value || casesDenials.value.length ? "—" : openCasesTotal.value,
+    value: casesUnsupported.value || casesDenials.value.length ? null : openCasesTotal.value,
     icon: "assignment",
-    tone: "warning",
+    tone: "warn",
     dataTest: "security-overview-stat-cases",
   },
   {
@@ -452,7 +452,6 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.overview.stat.firingDetections"),
     value: firingDetections.value,
     icon: "notifications-active",
-    tone: "primary",
     dataTest: "security-overview-stat-firing",
   },
   {
@@ -460,7 +459,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.overview.stat.quietSources"),
     value: quietSources.value,
     icon: "sync-problem",
-    tone: "warning",
+    tone: "warn",
     dataTest: "security-overview-stat-quiet",
   },
   {
@@ -468,7 +467,7 @@ const stats = computed<StatItem[]>(() => [
     label: t("siem.overview.stat.activeRules"),
     value: siemRows.value.length ? `${enabledRules.value} / ${siemRows.value.length}` : 0,
     icon: "verified-user",
-    tone: "success",
+    tone: "ok",
     dataTest: "security-overview-stat-rules",
   },
 ]);
@@ -486,7 +485,8 @@ function openAlerts(extra: Record<string, string> = {}) {
   nav("/security/alerts", { period: range.value, ...extra });
 }
 
-function onStat(key: string) {
+function onStat(key: string | null) {
+  if (!key) return;
   if (key === "critical" || key === "high") return openAlerts({ facet: key });
   if (key === "firing") return openAlerts();
   if (key === "quiet") {
@@ -568,9 +568,8 @@ function nav(path: string, query: Record<string, string> = {}) {
 
 <template>
   <OPageLayout
-    :title="t('siem.overview.title')"
-    :subtitle="t('siem.overview.subtitle')"
-    icon="security"
+    :title="t('siem.nav.overview')"
+    :about="t('siem.overview.subtitle')"
     scroll
     pad-y
     title-data-test="security-overview-title"
@@ -586,17 +585,16 @@ function nav(path: string, query: Record<string, string> = {}) {
             v-for="r in RANGES"
             :key="r.value"
             :value="r.value"
-            size="sm"
             :data-test="`security-overview-range-${r.value}`"
           >
             {{ t(`siem.range.${r.value}`) }}
           </OToggleGroupItem>
         </OToggleGroup>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          :icon-left="autoRefresh ? 'sync' : 'sync-disabled'"
-          :active="autoRefresh"
+          :icon="autoRefresh ? 'sync' : 'sync-disabled'"
+          :pressed="autoRefresh"
           data-test="security-overview-auto-refresh"
           @click="toggleAutoRefresh"
         >
@@ -625,10 +623,10 @@ function nav(path: string, query: Record<string, string> = {}) {
 
       <OStatStrip
         compact-values
+        size="lg"
         :items="stats"
         :loading="!summaryLanded"
         selectable
-        :row="false"
         :selected-key="null"
         data-test="security-overview-stats"
         @select="onStat"
@@ -649,10 +647,10 @@ function nav(path: string, query: Record<string, string> = {}) {
               type="severity"
               :value="tone"
               :label="t(toneLabelKey(tone))"
-              :count="toneCounts[tone]"
-              hide-zero-count
-              size="xs"
-            />
+              size="sm"
+            >
+              <template v-if="toneCounts[tone]" #trailing>{{ toneCounts[tone] }}</template>
+            </OTag>
           </template>
           <div class="min-h-0 flex-1 px-2 pb-2">
             <SecuritySeverityChart
@@ -669,7 +667,7 @@ function nav(path: string, query: Record<string, string> = {}) {
               size="inline"
               icon="task-alt"
               :title="t('siem.overview.quiet')"
-              :description="t('siem.overview.quietHint')"
+              :text="t('siem.overview.quietHint')"
             />
           </div>
         </SecurityPanel>
@@ -685,8 +683,7 @@ function nav(path: string, query: Record<string, string> = {}) {
           <template #actions>
             <OButton
               variant="ghost"
-              size="sm"
-              icon-right="arrow-forward"
+              icon-end="arrow-forward"
               data-test="security-overview-cases-view-all"
               @click="nav('/security/cases')"
             >
@@ -694,7 +691,7 @@ function nav(path: string, query: Record<string, string> = {}) {
             </OButton>
           </template>
           <div v-if="casesLoading && !incidents.length" class="flex flex-col gap-2 p-4">
-            <OSkeleton v-for="n in 4" :key="n" type="text" class="h-8" />
+            <OSkeleton v-for="n in 4" :key="n" class="h-8" />
           </div>
           <SecurityAccessLock
             v-else-if="casesDenials.length"
@@ -725,7 +722,7 @@ function nav(path: string, query: Record<string, string> = {}) {
               @keydown.enter="nav('/security/cases')"
               @keydown.space.prevent="nav('/security/cases')"
             >
-              <OTag type="severity" :value="c.severity.toLowerCase()" size="xs" />
+              <OTag type="severity" :value="c.severity.toLowerCase()" size="sm" />
               <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-text-heading truncate text-sm font-medium">
                   {{ c.title || t("siem.overview.untitledCase") }}
@@ -754,8 +751,7 @@ function nav(path: string, query: Record<string, string> = {}) {
           <template #actions>
             <OButton
               variant="ghost"
-              size="sm"
-              icon-right="arrow-forward"
+              icon-end="arrow-forward"
               data-test="security-overview-full-queue"
               @click="openAlerts()"
             >
@@ -769,7 +765,6 @@ function nav(path: string, query: Record<string, string> = {}) {
             :loading="triageLoading && !firings.length"
             pagination="none"
             sorting="none"
-            :show-global-filter="false"
             :get-row-status-color="(row: TriageRow) => severityRailColor(row.tone)"
             class="min-h-0 flex-1"
             data-test="security-overview-triage-table"
@@ -780,7 +775,7 @@ function nav(path: string, query: Record<string, string> = {}) {
                 type="severity"
                 :value="severityTagValue(row.tone)"
                 :label="t(toneLabelKey(row.tone))"
-                size="xs"
+                size="sm"
               />
             </template>
             <template #cell-name="{ row }">
@@ -801,9 +796,8 @@ function nav(path: string, query: Record<string, string> = {}) {
                 <OTag
                   v-for="tech in row.techniques.slice(0, 2)"
                   :key="tech"
-                  variant="purple-soft"
-                  shape="rounded"
-                  size="xs"
+                  tone="neutral"
+                  size="sm"
                   >{{ tech }}</OTag
                 >
                 <span v-if="row.techniques.length > 2" class="text-text-secondary text-xs">
@@ -825,7 +819,7 @@ function nav(path: string, query: Record<string, string> = {}) {
                 size="inline"
                 icon="task-alt"
                 :title="t('siem.overview.queueClear')"
-                :description="t('siem.overview.quietHint')"
+                :text="t('siem.overview.quietHint')"
               />
             </template>
           </OTable>
@@ -862,7 +856,7 @@ function nav(path: string, query: Record<string, string> = {}) {
                   type="severity"
                   :value="severityTagValue(d.tone)"
                   :label="t(toneLabelKey(d.tone))"
-                  size="xs"
+                  size="sm"
                 />
                 <span class="text-text-heading min-w-0 flex-1 truncate text-sm">{{ d.name }}</span>
                 <span class="text-text-heading text-sm font-semibold tabular-nums">{{
@@ -870,11 +864,8 @@ function nav(path: string, query: Record<string, string> = {}) {
                 }}</span>
               </div>
               <OProgressBar
-                :value="topMax ? d.count / topMax : 0"
-                :variant="
-                  d.tone === 'critical' ? 'danger' : d.tone === 'high' ? 'warning' : 'default'
-                "
-                size="xs"
+                :value="topMax ? (d.count / topMax) * 100 : 0"
+                :tone="d.tone === 'critical' ? 'err' : d.tone === 'high' ? 'warn' : 'accent'"
               />
             </li>
           </ul>
@@ -937,8 +928,7 @@ function nav(path: string, query: Record<string, string> = {}) {
           <template #actions>
             <OButton
               variant="ghost"
-              size="sm"
-              icon-right="arrow-forward"
+              icon-end="arrow-forward"
               data-test="security-overview-explore-events"
               @click="nav('/security/events')"
             >
@@ -949,14 +939,14 @@ function nav(path: string, query: Record<string, string> = {}) {
             v-if="securitySources.loading.value && !securitySources.rows.value.length"
             class="flex flex-col gap-2 p-4"
           >
-            <OSkeleton v-for="n in 4" :key="n" type="text" class="h-6" />
+            <OSkeleton v-for="n in 4" :key="n" class="h-6" />
           </div>
           <OEmptyState
             v-else-if="!sources.length"
             size="inline"
             icon="cloud-upload"
             :title="t('siem.overview.noSources')"
-            :description="t('siem.overview.noSourcesHint')"
+            :text="t('siem.overview.noSourcesHint')"
           />
           <ul v-else class="min-h-0 flex-1 overflow-y-auto">
             <li

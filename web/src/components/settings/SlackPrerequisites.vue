@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCode from "@/lib/core/Code/OCode.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -62,11 +62,9 @@ const showsHelmHint = (row: SlackPrerequisiteCheck): boolean =>
       :columns="columns"
       row-key="id"
       pagination="none"
-      :show-global-filter="false"
       :loading="loading"
       :cell-overflow-tooltip="false"
       wrap
-      dense
     >
       <template #cell-setting="{ row }">
         <span class="flex items-center gap-2">
@@ -90,14 +88,12 @@ const showsHelmHint = (row: SlackPrerequisiteCheck): boolean =>
           :class="row.status === 'fail' ? 'text-status-error-text' : undefined"
         >
           <span>{{ raw(row.detail) }}</span>
-          <OCode
+          <OCodeBlock
             v-if="row.fix && row.status !== 'pass'"
-            block
-            copyable
-            class="[&>code]:pe-9 [&>code]:wrap-anywhere [&>code]:whitespace-pre-wrap"
+            :code="row.fix"
+            wrap
             data-test="slack-prereq-fix"
-            >{{ raw(row.fix) }}</OCode
-          >
+          />
           <span
             v-if="showsHelmHint(row)"
             class="text-text-secondary text-xs"
@@ -146,13 +142,12 @@ const showsHelmHint = (row: SlackPrerequisiteCheck): boolean =>
           :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-body'"
         >
           <span>{{ raw(row.detail) }}</span>
-          <OCode
+          <OCodeBlock
             v-if="row.fix && row.status !== 'pass'"
-            block
-            copyable
+            :code="row.fix"
+            wrap
             data-test="slack-prereq-fix"
-            >{{ raw(row.fix) }}</OCode
-          >
+          />
           <span
             v-if="showsHelmHint(row)"
             class="text-text-secondary text-xs"
@@ -192,9 +187,8 @@ const showsHelmHint = (row: SlackPrerequisiteCheck): boolean =>
         <span v-else class="text-text-secondary">{{ t("slackApp.prereq.allPassed") }}</span>
       </span>
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="refresh"
+        variant="secondary"
+        icon="refresh"
         :loading="loading"
         data-test="slack-prereq-recheck"
         @click="emit('recheck')"

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { formatDistanceToNowStrict } from "date-fns";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -67,14 +67,9 @@ const openLocked = computed(() => isLocked(openFeature.value));
 </script>
 
 <template>
-  <OBanner variant="success" inline-actions dense data-test="first-data-notice">
+  <OInlineNotice tone="ok" data-test="first-data-notice">
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
-      <OTag
-        :label="t('ingestion.firstDataNotice.pill')"
-        variant="success"
-        icon="check-circle"
-        size="sm"
-      />
+      <OTag :label="t('ingestion.firstDataNotice.pill')" tone="ok" icon="check-circle" size="sm" />
       <i18n-t
         keypath="ingestion.firstDataNotice.text"
         tag="span"
@@ -91,20 +86,14 @@ const openLocked = computed(() => isLocked(openFeature.value));
     </div>
     <template #actions>
       <div class="flex items-center gap-2">
-        <OButton
-          variant="ghost"
-          size="sm-action"
-          data-test="first-data-notice-dismiss-btn"
-          @click="emit('dismiss')"
-        >
+        <OButton variant="ghost" data-test="first-data-notice-dismiss-btn" @click="emit('dismiss')">
           {{ t("ingestion.firstDataNotice.dismiss") }}
         </OButton>
         <OTooltip :content="lockedReason(openFeature ?? '')" :disabled="!openLocked">
           <span class="inline-flex">
             <OButton
               variant="primary"
-              size="sm-action"
-              :icon-left="openLocked ? 'lock' : 'open-in-new'"
+              :icon="openLocked ? 'lock' : 'open-in-new'"
               :disabled="openLocked"
               data-test="first-data-notice-open-btn"
               @click="emit('open')"
@@ -115,5 +104,5 @@ const openLocked = computed(() => isLocked(openFeature.value));
         </OTooltip>
       </div>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>

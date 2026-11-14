@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- The trigger paints no per-option icon of its own, so the selected
            folder's icon comes in through #icon-left. Omitted entirely while
            nothing is selected — an empty field has no folder to stand for. -->
-      <template v-if="selectedFolder" #icon-left>
+      <template v-if="selectedFolder" #icon>
         <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
       </template>
       <template #empty>{{ t("search.noResult") }}</template>
@@ -41,9 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div :style="computedStyle">
       <OButton
-        variant="outline"
-        size="icon-xs-sq"
-        class="h-8! w-8!"
+        icon-only
+        variant="secondary"
+        size="sm"
         :data-test="`${type}-folder-move-new-add`"
         :title="t(folderKey(type, 'common.addFolder'))"
         :disabled="disableDropdown"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             showAddFolderDialog = true;
           }
         "
-        icon-left="add"
+        icon="add"
       />
     </div>
   </div>

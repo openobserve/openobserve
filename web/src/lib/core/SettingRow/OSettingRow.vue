@@ -58,9 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OSkeleton
         v-if="loading"
-        animation="none"
+        shape="block"
         aria-hidden="true"
-        class="h-8.5"
+        class="h-control-md"
         :class="atEnd ? 'w-full' : 'w-40'"
       />
       <ControlSlot v-else :render="$slots.default" :described-by="describedBy" />

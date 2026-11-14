@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </h2>
           <OBadge
             v-if="!hideVerdict && verdict.assessed > 0"
-            :variant="verdict.pass ? 'success-soft' : 'warning-soft'"
+            :tone="verdict.pass ? 'ok' : 'warn'"
             data-test="rum-overview-verdict-chip"
           >
             {{
@@ -54,7 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="p in PERCENTILES"
           :key="p"
           :value="p"
-          size="sm"
           :data-test="`rum-overview-percentile-${p}`"
         >
           {{ p }}
@@ -64,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ul class="mt-4 grid list-none grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-4 p-0">
       <li v-for="card in cards" :key="card.key" :data-test="`rum-overview-vital-${card.key}`">
-        <OCard variant="outlined" class="p-4">
+        <OCard>
           <router-link
             :to="sessionsLink(card.filter)"
             class="text-text-heading block no-underline hover:underline focus-visible:underline"
@@ -75,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-sm">
                 <b class="text-text-heading">{{ card.code }}</b> {{ percentile }} · {{ card.name }}
               </span>
-              <OBadge v-if="card.band" :variant="BAND_BADGE[card.band]" size="sm">
+              <OBadge v-if="card.band" :tone="BAND_BADGE[card.band]" size="sm">
                 {{ card.bandText }}
               </OBadge>
             </div>
@@ -145,10 +144,10 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: "update:percentile", value: Percentile): void }>();
 const { t } = useI18nTyped();
 
-const BAND_BADGE: Record<Band, "success-soft" | "warning-soft" | "error-soft"> = {
-  good: "success-soft",
-  needs: "warning-soft",
-  poor: "error-soft",
+const BAND_BADGE: Record<Band, "ok" | "warn" | "err"> = {
+  good: "ok",
+  needs: "warn",
+  poor: "err",
 };
 
 const NAMES: Record<VitalKey, I18nKey> = {

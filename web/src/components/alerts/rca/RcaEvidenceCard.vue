@@ -94,8 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OTooltip v-if="link && linkLocked" :content="lockedReason(link.page)">
         <span class="inline-flex">
-          <OButton data-test="rca-evidence-open" variant="ghost-primary" size="sm" disabled>
-            <template #icon-left>
+          <OButton data-test="rca-evidence-open" variant="accent-ghost" disabled>
+            <template #icon>
               <OIcon
                 name="lock"
                 class="text-icon-locked"
@@ -110,9 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="link"
         data-test="rca-evidence-open"
-        variant="ghost-primary"
-        size="sm"
-        icon-left="open-in-new"
+        variant="accent-ghost"
+        icon="open-in-new"
         @click="router.push(link.route)"
       >
         {{ openLabel }}
@@ -120,9 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="query"
         data-test="rca-evidence-copy"
-        variant="ghost-muted"
-        size="sm"
-        icon-left="content-copy"
+        variant="ghost"
+        icon="content-copy"
         @click="copyQuery"
       >
         {{ t("alerts.incidents.rcaSummary.copyQuery") }}

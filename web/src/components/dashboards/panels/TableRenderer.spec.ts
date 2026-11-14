@@ -912,9 +912,9 @@ describe("TableRenderer", () => {
       expect(paginationDiv.exists()).toBe(true);
     });
 
-    it("should render TablePaginationControls in the bottom slot", () => {
+    it("should render the one pager (OPagination) in the bottom slot", () => {
       wrapper = createWrapper({ showPagination: true });
-      const controls = wrapper.findComponent({ name: "TablePaginationControls" });
+      const controls = wrapper.findComponent({ name: "OPagination" });
       expect(controls.exists()).toBe(true);
     });
 
@@ -922,7 +922,7 @@ describe("TableRenderer", () => {
       wrapper = createWrapper({ showPagination: false });
       const paginationDiv = wrapper.find('[data-test="dashboard-table-pagination"]');
       expect(paginationDiv.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-table-row-count"]').text()).toBe("1-3 of 3");
+      expect(wrapper.find('[data-test="dashboard-table-row-count"]').text()).toBe("1–3 of 3");
     });
 
     it("should drop the pagination bar chrome when showPagination is false", () => {
@@ -957,7 +957,7 @@ describe("TableRenderer", () => {
       const table = wrapper.findComponent({ name: "OTable" }).vm.table;
       expect(table.getRowModel().rows.length).toBe(5);
 
-      wrapper.findComponent({ name: "TablePaginationControls" }).vm.$emit("update:rowsPerPage", 10);
+      wrapper.findComponent({ name: "OPagination" }).vm.$emit("update:pageSize", 10);
       await flushPromises();
 
       expect(table.getRowModel().rows.length).toBe(10);

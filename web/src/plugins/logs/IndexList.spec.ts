@@ -1702,9 +1702,16 @@ describe("Stream picker — internal streams", () => {
     expect(announcement.attributes("data-o-tooltip-trigger")).toBeUndefined();
   });
 
-  it("pins selected streams within their group in multi-select", () => {
+  it("picks several streams in multi-select, pinned in their group, with row-click single select", () => {
     expect(select().props("multiple")).toBe(true);
     expect(select().props("pinSelectedInGroups")).toBe(true);
+    expect(select().props("rowClickSingleSelect")).toBe(true);
+  });
+
+  it("drops row-click single select once the picker is single-select", async () => {
+    await wrapper.setProps({ selectionMode: "single" });
+    expect(select().props("multiple")).toBe(false);
+    expect(select().props("rowClickSingleSelect")).toBe(false);
   });
 
   it("collapses the group when the header's Hide action fires, and expands it on Show", async () => {

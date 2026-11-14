@@ -564,15 +564,6 @@ async function mountEditRole(customStubs = {}) {
     global: {
       plugins: [i18n, store, router],
       stubs: {
-        AppTabs: {
-          props: ["tabs", "activeTab"],
-          emits: ["update:active-tab"],
-          template: `<div data-test="app-tabs-stub">
-            <button class="tab-permissions" @click="$emit('update:active-tab','permissions')">Permissions</button>
-            <button class="tab-users" @click="$emit('update:active-tab','users')">Users</button>
-            <button class="tab-serviceAccounts" @click="$emit('update:active-tab','serviceAccounts')">Service Accounts</button>
-          </div>`,
-        },
         ModuleRail: {
           props: ["modules", "modelValue"],
           emits: ["update:modelValue"],
@@ -655,13 +646,13 @@ afterEach(() => {
 describe("EditRole - tabs behavior", () => {
   it("switches to users tab", async () => {
     const wrapper = await mountEditRole();
-    await wrapper.find(".tab-users").trigger("click");
+    await wrapper.get('[data-test="tab-users"]').trigger("mousedown", { button: 0 });
     expect(wrapper.vm.activeTab).toBe("users");
   });
 
   it("switches to service accounts when available", async () => {
     const wrapper = await mountEditRole();
-    await wrapper.find(".tab-serviceAccounts").trigger("click");
+    await wrapper.get('[data-test="tab-serviceAccounts"]').trigger("mousedown", { button: 0 });
     expect(wrapper.vm.activeTab).toBe("serviceAccounts");
   });
 

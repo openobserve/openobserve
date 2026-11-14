@@ -47,12 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
-        :frame="false"
-        :toolbar-bordered="false"
         :error="error"
         :forbidden="forbidden"
         sorting="client"
-        :show-global-filter="false"
         table-id="dbm-activity"
         persist-columns
         :column-visibility="defaultColumnVisibility"
@@ -62,8 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #error="{ message }">
           <OEmptyState
-            preset="load-error"
-            :description="raw(message)"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="raw(message)"
             data-test="dbm-activity-error"
             @action="onRefresh()"
           />
@@ -93,19 +91,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
-            <DateTime
+            <ODateTimeRange
               auto-apply
               menu-align="end"
               :default-type="range.type"
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-activity-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
+              class="max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :loading="loading"
               :last-run-at="lastRunAt"
               data-test="dbm-activity-refresh"
@@ -117,12 +113,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- Always rendered — `:loading` draws the skeleton — so arriving
                data never shifts the rows below it. -->
-          <OStatStrip
-            :items="summaryStats"
-            :loading="loading"
-            row
+          <div
+            class="px-page-edge border-table-row-divider border-b py-1.5"
             data-test="dbm-activity-summary"
-          />
+          >
+            <OStatStrip :items="summaryStats" :loading="loading" />
+          </div>
 
           <!-- The wait-event breakdown, grouped by the ENGINE'S OWN vocabulary.
                A unified cross-engine taxonomy was considered and withdrawn:
@@ -269,7 +265,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                own filter. -->
           <OEmptyState
             v-if="!loading && searchHidEverything"
-            preset="no-search-results"
+            kind="filtered"
+            :title="t('emptyState.noSearchResults.title')"
+            :text="t('emptyState.noSearchResults.description')"
             data-test="dbm-activity-no-matches"
             @action="search = ''"
           />
@@ -320,7 +318,7 @@ import { useRoute, useRouter } from "vue-router";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
@@ -656,35 +654,32 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("dbm.activity.summary.sessions"),
       // No `??` fallback to the row count: that would silently swap a capped
       // sample in under an aggregate label, next to aggregate-grain tiles.
-      value: sampleTotal.value ?? raw("—"),
+      value: sampleTotal.value,
       icon: "database",
-      tone: "neutral",
       dataTest: "dbm-activity-summary-sessions",
     },
     {
       key: "onCpu",
       label: t("dbm.activity.summary.onCpu"),
-      value: sampledWaits ? waits.onCpu : raw("—"),
+      value: sampledWaits ? waits.onCpu : null,
       icon: "speed",
-      tone: "neutral",
       dataTest: "dbm-activity-summary-on-cpu",
     },
     {
       key: "waiting",
       label: t("dbm.activity.summary.waiting"),
-      value: sampledWaits ? waits.waiting : raw("—"),
+      value: sampledWaits ? waits.waiting : null,
       icon: "timer",
-      tone: "neutral",
       dataTest: "dbm-activity-summary-waiting",
     },
     {
       key: "idleInTransaction",
       label: t("dbm.activity.summary.idleInTransaction"),
-      value: sampledStates ? idleInTransaction : raw("—"),
+      value: sampledStates ? idleInTransaction : null,
       icon: "lock",
       // Tone follows the MEASUREMENT, so an unsampled window cannot go amber:
       // a warning colour is itself a claim that something was found.
-      tone: sampledStates && idleInTransaction > 0 ? "warning" : "neutral",
+      tone: sampledStates && idleInTransaction > 0 ? "warn" : "neutral",
       dataTest: "dbm-activity-summary-idle-in-transaction",
     },
   ];

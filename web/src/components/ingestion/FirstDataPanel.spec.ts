@@ -307,7 +307,7 @@ describe("FirstDataPanel — full panel on Logs, Traces and Metrics", () => {
     expect(code.text()).toContain(`/api/${ORG}/default/_json`);
     expect(code.text()).not.toContain(" -k ");
     expect(code.text()).not.toContain(PASSCODE);
-    expect(q("first-data-panel-code-block-pre").attributes("style")).toContain("padding: 0.75rem");
+    expect(q("first-data-panel-code-block-pre").classes()).toContain("p-3");
   });
 
   it("restarts the fast cadence and records the copy when the block is copied", async () => {

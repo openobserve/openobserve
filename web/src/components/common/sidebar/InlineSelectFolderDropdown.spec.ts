@@ -69,32 +69,32 @@ const ODrawerStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-drawer-stub"
       :data-open="String(open)"
       :data-width="width"
       :data-show-close="String(showClose)"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <slot name="header" />
       <slot />
@@ -102,11 +102,11 @@ const ODrawerStub = {
       <button
         data-test="o-drawer-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-drawer-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -143,8 +143,8 @@ const globalConfig = {
     OSelect: {
       template: `
         <div class="o-select-stub" :data-disable="String(disabled)">
-          <span v-if="$slots['icon-left']" data-test="stub-icon-left">
-            <slot name="icon-left" />
+          <span v-if="$slots.icon" data-test="stub-icon-left">
+            <slot name="icon" />
           </span>
           <select
             :value="modelValue"

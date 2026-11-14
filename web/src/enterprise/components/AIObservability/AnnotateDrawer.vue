@@ -25,12 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="open"
     side="right"
-    size="lg"
+    size="md"
     :title="t('aiObservability.annotate.title', { scope: scopeLabel })"
-    :primary-button-label="t('aiObservability.annotate.save')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-disabled="!filledCount"
-    :primary-button-loading="saving"
+    :primary="{
+      label: t('aiObservability.annotate.save'),
+      disabled: !filledCount,
+      loading: saving,
+    }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="annotate-drawer"
     @update:open="(value: boolean) => emit('update:open', value)"
     @click:primary="save"
@@ -41,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTruncatedText class="text-text-heading text-sm font-semibold">
           {{ targetLabel }}
         </OTruncatedText>
-        <OTag variant="default-soft" shape="rounded" class="ms-auto shrink-0">
+        <OTag tone="neutral" class="ms-auto shrink-0">
           {{ t("aiObservability.annotate.viaAnnotation") }}
         </OTag>
       </div>
@@ -99,15 +101,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">
               {{ raw(dimension.name) }}
             </OTruncatedText>
-            <OTag variant="default-soft" shape="rounded" class="shrink-0">
+            <OTag tone="neutral" class="shrink-0">
               {{ raw(dimension.dataType) }}
             </OTag>
-            <OTag variant="default-outline" shape="rounded" class="shrink-0">
+            <OTag tone="outline" class="shrink-0">
               {{ t("aiObservability.annotate.version", { version: dimension.version }) }}
             </OTag>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
               class="ms-auto"
               :aria-label="t('common.remove')"
               :data-test="`annotate-drawer-remove-${dimension.id}`"

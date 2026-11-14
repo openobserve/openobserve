@@ -37,7 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="group in groups"
         :key="group.key"
         :variant="group.variant"
-        size="xs"
+        :pressed="group.pressed"
+        size="sm"
         :data-test="`oncall-ladder-priority-${group.key}`"
         @click="emit('update:selected', group.selects)"
       >
@@ -45,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="alertPriority"
           :value="group.selects.toLowerCase()"
           :label="group.label"
-          size="xs"
+          size="sm"
         />
         <span class="text-2xs ms-1.5" :class="group.summaryTone">{{ group.summary }}</span>
       </OButton>
@@ -76,29 +77,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="oncall-ladder-send-test-wrap"
           >
             <OButton
-              variant="outline"
-              size="sm"
+              :disabled-reason="t('oncall.ladderSendTestBlocked')"
+              variant="secondary"
               :disabled="!sendTestReady"
-              :focusable-unavailable="!sendTestReady"
               data-test="oncall-ladder-send-test"
               @click="emit('send-test')"
             >
-              <!-- First child, so it anchors to the whole button and opens on keyboard focus too. -->
-              <OTooltip
-                v-if="!sendTestReady"
-                side="bottom"
-                :content="t('oncall.ladderSendTestBlocked')"
-              />
               <OIcon name="play-arrow" size="sm" />{{ t("oncall.ladderSendTestPage") }}
-              <template v-if="!sendTestReady" #unavailable-reason>{{
-                t("oncall.ladderSendTestBlocked")
-              }}</template>
             </OButton>
           </span>
           <OButton
-            variant="outline-primary"
-            size="sm"
-            icon-left="edit"
+            variant="secondary"
+            icon="edit"
             data-test="oncall-policy-edit"
             @click="emit('edit')"
           >
@@ -107,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
 
-      <OInnerLoading v-if="loading" showing />
+      <OSkeleton v-if="loading" preset="tableRows" :rows="3" />
 
       <div v-else class="rounded-b-surface flex flex-col" data-test="oncall-ladder-body">
         <!-- Every level of every priority aimed at the whole team, on a team that HAS rotations, is a policy minted before it had members. -->
@@ -116,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-border-default flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b px-4 py-2"
           data-test="oncall-ladder-stale-default"
         >
-          <OTag variant="warning-soft" size="sm">{{ t("oncall.ladderStaleDefaultTag") }}</OTag>
+          <OTag tone="warn" size="sm">{{ t("oncall.ladderStaleDefaultTag") }}</OTag>
           <span class="text-text-secondary text-xs">{{ t("oncall.ladderStaleDefaultHint") }}</span>
         </span>
 
@@ -186,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :email="one.email"
                     :data-test="`oncall-ladder-person-name-${group.firstMicros}-${one.email}`"
                   />
-                  <OTag v-for="seat in one.seats" :key="seat" variant="default-outline" size="sm">
+                  <OTag v-for="seat in one.seats" :key="seat" tone="outline" size="sm">
                     {{ raw(seat) }}
                   </OTag>
                 </span>
@@ -194,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   v-for="seat in unheldSeats(group.rung)"
                   :key="`unheld-${seat}`"
-                  variant="default-outline"
+                  tone="outline"
                   size="sm"
                 >
                   {{ raw(seat) }}
@@ -203,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Only when something is wrong, as a badge; the server's sentence is one hover away. -->
               <OTag
                 v-if="problems[group.firstMicros]"
-                variant="error-soft"
+                tone="err"
                 size="sm"
                 :data-test="`oncall-ladder-rung-problem-${group.firstMicros}`"
               >
@@ -261,9 +251,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <OButton
                 v-if="canConfigure"
-                variant="outline"
-                size="sm"
-                icon-left="add"
+                variant="secondary"
+                icon="add"
                 data-test="oncall-ladder-add-rung"
                 @click="emit('edit')"
               >
@@ -299,7 +288,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OnCallChannelIcons from "./OnCallChannelIcons.vue";
 import OnCallPersonName from "./OnCallPersonName.vue";
 import { useOrgUserNames } from "@/composables/useOrgUserNames";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
   Channel,
@@ -395,6 +384,7 @@ interface PriorityGroup {
   label: I18nText;
   summary: I18nText;
   variant: ButtonVariant;
+  pressed: boolean;
   summaryTone: string;
   /** Which priority a click selects — the first of the run. */
   selects: string;
@@ -426,7 +416,8 @@ const groups = computed<PriorityGroup[]>(() => {
       key: (run.length > 1 ? `${first.priority}-${last.priority}` : first.priority).toLowerCase(),
       label: run.length > 1 ? raw(`${first.priority}–${last.priority}`) : raw(first.priority),
       summary: summaryFor(first, run.length),
-      variant: isSelected ? "outline-primary" : silent ? "outline-destructive" : "outline",
+      variant: silent && !isSelected ? "danger-ghost" : "secondary",
+      pressed: isSelected,
       summaryTone: silent && !isSelected ? "" : "text-text-secondary",
       selects: first.priority,
       priorities: run.map((entry) => entry.priority),

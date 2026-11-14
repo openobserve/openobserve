@@ -3,8 +3,8 @@
     :open="open && !dashboardsLocked"
     size="md"
     :title="t('dashboard.addDashboard')"
-    :secondary-button-label="t('metrics.addToDashboardPage.cancel')"
-    :primary-button-label="t('metrics.add')"
+    :secondary="{ label: t('metrics.addToDashboardPage.cancel') }"
+    :primary="{ label: t('metrics.add') }"
     form-id="add-to-dashboard-form"
     data-test="add-to-dashboard-dialog"
     @update:open="$emit('update:open', $event)"
@@ -17,11 +17,10 @@
       @submit="onSubmit"
     >
       <div class="add-dashboard-form-card-section flex flex-col gap-4">
-        <OBanner
+        <OInlineNotice
           v-if="notice"
-          variant="info"
-          dense
-          :content="notice"
+          tone="info"
+          :message="notice"
           data-test="add-to-dashboard-notice"
         />
         <!-- select folder or create new folder and select -->
@@ -88,7 +87,7 @@ import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { z } from "zod";
 import { useRouter } from "vue-router";
@@ -117,7 +116,7 @@ export default defineComponent({
     ODialog,
     OForm,
     OFormInput,
-    OBanner,
+    OInlineNotice,
     OTruncatedText,
   },
   props: {

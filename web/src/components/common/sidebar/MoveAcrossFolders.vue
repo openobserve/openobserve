@@ -24,10 +24,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type: type.charAt(0).toUpperCase() + type.slice(1),
       })
     "
-    :secondary-button-label="t('dashboard.cancel')"
-    :primary-button-label="t('common.move')"
-    :primary-button-loading="onSubmit.isLoading.value"
-    :primary-button-disabled="!selectedFolder.value || activeFolderId === selectedFolder.value"
+    :secondary="{ label: t('dashboard.cancel') }"
+    :primary="{
+      label: t('common.move'),
+      disabled: !selectedFolder.value || activeFolderId === selectedFolder.value,
+      loading: onSubmit.isLoading.value,
+    }"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
     @click:primary="onSubmit.execute()"

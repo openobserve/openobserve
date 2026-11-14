@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Dashboard time range apply + Auto Run (view mode): the picker has no Apply button;
-// a pick applies at once with Auto Run on, or defers to a yellow/ghost-warning Refresh off.
+// a pick applies at once with Auto Run on, or defers to a stale (data-o2-stale) Refresh off.
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const { namespaceTablePanel, deleteCreatedDashboards, trackDashboard } = require('../utils/dashboard-auto-run-fixtures.js');
@@ -135,7 +135,7 @@ test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', 
     await assertPanelTimeInURL(page, panelId, '6d');
     await pm.dashboardTimeRange.expectPanelRefreshNotPending();
 
-    // Auto Run off → defers; the panel refresh button turns ghost-warning and the URL is unchanged.
+    // Auto Run off → defers; the panel refresh button is marked stale and the URL is unchanged.
     await autoRun.toggleAutoRun();
     expect(await autoRun.getStoredAutoRun()).toBe('false');
     await pm.dashboardPanelTime.changePanelTimeInView(panelId, '1-w', false);

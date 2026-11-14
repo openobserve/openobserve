@@ -301,18 +301,17 @@ function onSetUp() {
           {{ t("infra.hosts.depsCaption", { window: windowText }) }}
         </OText>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="info"
+          icon="info"
           :aria-label="t('infra.hosts.depsCaptionMore')"
           data-test="hosts-deps-caption-more"
         >
-          <OTooltip :content="t('infra.hosts.depsCaptionMore')" max-width="24rem" />
+          <OTooltip :content="t('infra.hosts.depsCaptionMore')" />
         </OButton>
       </div>
       <OSwitch
         :model-value="lowTraffic"
-        size="sm"
         :label="t('infra.hosts.depsShowLowTraffic')"
         data-test="hosts-deps-show-low-traffic"
         @update:model-value="(show: unknown) => emit('update:lowTraffic', !!show)"
@@ -324,14 +323,21 @@ function onSetUp() {
         class="text-text-secondary ms-auto flex items-center gap-1.5 text-xs"
         data-test="hosts-deps-updated"
       >
-        <OSpinner v-if="loading" size="xs" />
+        <OSpinner v-if="loading" />
         {{ t("refreshButton.lastRefreshed", { time: updatedAt }) }}
       </OText>
     </div>
-    <OEmptyState v-if="forbidden" preset="no-access" data-test="hosts-deps-forbidden" />
+    <OEmptyState
+      v-if="forbidden"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
+      data-test="hosts-deps-forbidden"
+    />
     <OEmptyState
       v-else-if="loadError"
-      preset="load-error"
+      kind="error"
+      :text="t('emptyState.loadError.description')"
       :title="t('infra.hosts.depsLoadError')"
       data-test="hosts-deps-error"
       @action="emit('refresh')"
@@ -345,8 +351,7 @@ function onSetUp() {
     </div>
     <OEmptyState
       v-else-if="!edges.length && allEdges.length"
-      variant="no-results"
-      illustration="no-results"
+      kind="filtered"
       :title="t('infra.hosts.depsAllQuiet')"
       :action-label="t('infra.hosts.depsShowQuiet')"
       data-test="hosts-deps-all-quiet"
@@ -354,9 +359,8 @@ function onSetUp() {
     />
     <OEmptyState
       v-else-if="!edges.length"
-      preset="no-data"
       :title="t('infra.hosts.depsNoFlowsTitle')"
-      :description="
+      :text="
         wholeRange
           ? t('infra.hosts.depsNoFlowsDescriptionRange')
           : t('infra.hosts.depsNoFlowsDescription', { window: windowText })
@@ -388,8 +392,8 @@ function onSetUp() {
             <OButton
               v-for="edge in navEdges"
               :key="edge.id"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="hosts-deps-link"
               @click="showEdge(edge.id, $event)"
             >
@@ -417,8 +421,8 @@ function onSetUp() {
         >
           <div class="flex items-center gap-1">
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :disabled="selectedEdge.source.kind !== 'host'"
               data-test="hosts-deps-edge-source"
               @click="openEnd(selectedEdge.source)"
@@ -427,8 +431,8 @@ function onSetUp() {
             </OButton>
             <OText tag="span" class="text-text-secondary">{{ raw(arrowOf(selectedEdge)) }}</OText>
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :disabled="selectedEdge.target.kind !== 'host'"
               data-test="hosts-deps-edge-target"
               @click="openEnd(selectedEdge.target)"
@@ -436,10 +440,10 @@ function onSetUp() {
               {{ raw(endLabel(selectedEdge.target)) }}
             </OButton>
             <OButton
+              icon-only
               class="ms-auto"
               variant="ghost"
-              size="icon-sm"
-              icon-left="close"
+              icon="close"
               :aria-label="t('common.close')"
               data-test="hosts-deps-edge-close"
               @click="closeEdge"

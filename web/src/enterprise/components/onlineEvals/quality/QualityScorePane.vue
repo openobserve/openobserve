@@ -53,23 +53,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex min-w-0 flex-1 items-center gap-2"
           data-test="quality-score-pane-header-skeleton"
         >
-          <OSkeleton type="text" class="h-5 w-20" />
-          <OSkeleton type="text" class="h-3 w-32" />
+          <OSkeleton class="h-5 w-20" />
+          <OSkeleton class="h-3 w-32" />
         </div>
         <div class="flex shrink-0 items-center gap-1">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="chevron-left"
+            icon="chevron-left"
             :disabled="!canPrev"
             :title="t('onlineEvals.quality.pane.previous')"
             data-test="quality-score-pane-prev"
             @click="emit('prev')"
           />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="chevron-right"
+            icon="chevron-right"
             :disabled="!canNext"
             :title="t('onlineEvals.quality.pane.next')"
             data-test="quality-score-pane-next"
@@ -122,8 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("onlineEvals.quality.pane.fullTextUnavailable") }}
         </p>
         <OCollapsible
-          v-model="reasoningOpen"
-          variant="sidebar"
+          v-model:open="reasoningOpen"
           class="border-border-default rounded-default shrink-0 overflow-hidden border"
           data-test="quality-score-pane-reasoning"
         >
@@ -139,8 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex flex-col gap-2 px-3 pb-2"
             data-test="quality-score-pane-reasoning-skeleton"
           >
-            <OSkeleton type="text" class="h-3 w-full" />
-            <OSkeleton type="text" class="h-3 w-3/4" />
+            <OSkeleton class="h-3 w-full" />
+            <OSkeleton class="h-3 w-3/4" />
           </div>
           <p
             v-else-if="score?.reasoning"
@@ -164,8 +163,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="quality-score-pane-actions"
       >
         <template v-if="loading">
-          <OSkeleton type="text" class="h-6 w-24" />
-          <OSkeleton type="text" class="h-6 w-28" />
+          <OSkeleton class="h-6 w-24" />
+          <OSkeleton class="h-6 w-28" />
         </template>
         <OTooltip
           v-if="targetLocation && tracesLock.locked.value"
@@ -173,12 +172,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="inline-flex">
             <OButton
-              variant="outline"
-              size="xs"
+              variant="secondary"
+              size="sm"
               disabled
               data-test="quality-score-pane-open-target"
             >
-              <template #icon-left>
+              <template #icon>
                 <OIcon
                   name="lock"
                   class="text-icon-locked"
@@ -192,8 +191,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTooltip>
         <OButton
           v-else-if="targetLocation"
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           data-test="quality-score-pane-open-target"
           @click="openTarget"
         >
@@ -205,12 +204,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="inline-flex">
             <OButton
-              variant="outline"
-              size="xs"
+              variant="secondary"
+              size="sm"
               disabled
               data-test="quality-score-pane-open-evaluator"
             >
-              <template #icon-left>
+              <template #icon>
                 <OIcon
                   name="lock"
                   class="text-icon-locked"
@@ -224,8 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTooltip>
         <OButton
           v-else-if="evaluatorLocation"
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           data-test="quality-score-pane-open-evaluator"
           @click="openTraceDrawer('evaluator')"
         >
@@ -233,16 +232,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="score"
-          variant="outline"
-          size="xs"
+          :disabled-reason="datasetBlockedReason || undefined"
+          variant="secondary"
+          size="sm"
           :disabled="!datasetTarget"
-          focusable-unavailable
           data-test="quality-score-pane-add-to-dataset"
           @click="openDataset"
         >
-          <template #unavailable-reason>{{ datasetBlockedReason }}</template>
           {{ t("onlineEvals.quality.pane.addToDataset") }}
-          <OTooltip v-if="datasetBlockedReason" :content="datasetBlockedReason" />
         </OButton>
       </footer>
     </template>
@@ -256,9 +253,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #footer>
         <div class="flex w-full items-center justify-end gap-2">
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="chevron-left"
+            variant="secondary"
+            icon="chevron-left"
             :disabled="!canPrev"
             data-test="quality-trace-drawer-prev"
             @click="emit('prev')"
@@ -266,9 +262,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("aiTraceDrawer.previousScore") }}
           </OButton>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-right="chevron-right"
+            variant="secondary"
+            icon-end="chevron-right"
             :disabled="!canNext"
             data-test="quality-trace-drawer-next"
             @click="emit('next')"

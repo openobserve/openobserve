@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("ingestion.awsSetup.description") }}
       </div>
 
-      <OTabs v-model="activeTab" dense class="aws-tabs" align="left">
+      <OTabs v-model="activeTab" size="compact" class="aws-tabs">
         <OTab
           name="quick-setup"
           :label="t('ingestion.awsSetup.quickSetup')"

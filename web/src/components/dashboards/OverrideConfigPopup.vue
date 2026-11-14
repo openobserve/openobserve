@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODialog
+    size="lg"
     data-test="override-config-popup-dialog"
     :open="open"
     @update:open="
@@ -26,12 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="
       isChartMode ? t('dashboard.seriesFormattingTitle') : t('dashboard.columnFormattingTitle')
     "
-    :sub-title="
+    :subtitle="
       isChartMode
         ? t('dashboard.seriesFormattingSubtitle')
         : t('dashboard.columnFormattingSubtitle')
     "
-    :width="80"
   >
     <div
       data-test="override-config-accordion"
@@ -79,9 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ seriesRowLabel(draft) }}
               </OTruncatedText>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs"
-                icon-left="close"
+                icon="close"
                 :title="t('common.remove')"
                 :data-test="`series-override-remove-${idx}`"
                 class="absolute! top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
@@ -156,17 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="col-start-2 col-end-4 flex items-center justify-center p-6 max-[56.25rem]:col-end-3"
         >
           <OEmptyState
-            size="block"
             :title="t('dashboard.seriesFormattingEmptyTitle')"
-            :description="t('dashboard.seriesFormattingEmptyHint')"
+            :text="t('dashboard.seriesFormattingEmptyHint')"
+            icon="tune"
           >
-            <template #illustration>
-              <div
-                class="rounded-default text-text-secondary bg-border-strong/8 flex h-18 w-18 items-center justify-center"
-              >
-                <OIcon name="tune" size="xl" />
-              </div>
-            </template>
             <template #actions>
               <SeriesAddMenu
                 variant="primary"
@@ -184,11 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else>
         <!-- Left: add-field dropdown + list of added fields -->
         <div class="border-border-strong/18 flex min-w-0 flex-col gap-2.5 border-e p-3">
-          <ODropdown
-            v-model:open="addOpenLeft"
-            align="start"
-            content-class="min-w-(--reka-popper-anchor-width)!"
-          >
+          <ODropdown v-model:open="addOpenLeft" align="start">
             <template #trigger>
               <button
                 type="button"
@@ -248,9 +237,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
               </OTruncatedText>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs"
-                icon-left="close"
+                icon="close"
                 :title="t('common.remove')"
                 :data-test="`dashboard-addpanel-config-delete-column-${idx}`"
                 class="absolute! top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
@@ -309,27 +298,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="col-start-2 col-end-4 flex items-center justify-center p-6 max-[56.25rem]:col-end-3"
         >
           <OEmptyState
-            size="block"
             :title="t('dashboard.columnFormattingEmptyTitle')"
-            :description="t('dashboard.columnFormattingEmptyHint')"
+            :text="t('dashboard.columnFormattingEmptyHint')"
+            icon="tune"
           >
-            <template #illustration>
-              <div
-                class="rounded-default text-text-secondary bg-border-strong/8 flex h-18 w-18 items-center justify-center"
-              >
-                <OIcon name="tune" size="xl" />
-              </div>
-            </template>
             <template #actions>
-              <ODropdown
-                v-model:open="addOpenCenter"
-                align="start"
-                content-class="min-w-(--reka-popper-anchor-width)!"
-              >
+              <ODropdown v-model:open="addOpenCenter" align="start">
                 <template #trigger>
                   <OButton
                     variant="primary"
-                    icon-left="add"
+                    icon="add"
                     data-test="dashboard-addpanel-config-add-column-empty"
                   >
                     {{ t("dashboard.columnFormattingAddField") }}
@@ -370,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex w-full items-center justify-between">
         <span class="text-text-secondary text-xs">{{ footerSummary }}</span>
         <div class="flex gap-2">
-          <OButton variant="outline" data-test="override-config-popup-cancel" @click="closePopup">
+          <OButton variant="secondary" data-test="override-config-popup-cancel" @click="closePopup">
             {{ t("dashboard.cancel") }}
           </OButton>
           <OButton variant="primary" data-test="override-config-popup-save" @click="saveOverrides">

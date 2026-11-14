@@ -19,12 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="t('insight.decisions.mark.title', {}, alerts.length)"
-    :primary-button-label="t('insight.decisions.mark.button', { count: copy.count(chosen.length) })"
-    primary-button-data-test="decision-mark-submit"
-    :primary-button-disabled="!chosen.length || submitting || !current || previews.isFetching.value"
-    :primary-button-loading="submitting"
-    :secondary-button-label="t('common.cancel')"
-    secondary-button-variant="outline"
+    :primary="{
+      label: t('insight.decisions.mark.button', { count: copy.count(chosen.length) }),
+      disabled: !chosen.length || submitting || !current || previews.isFetching.value,
+      loading: submitting,
+      dataTest: 'decision-mark-submit',
+    }"
+    :secondary="{ label: t('common.cancel'), variant: 'secondary' }"
     data-test="decision-mark-dialog"
     @update:open="emit('update:open', $event)"
     @click:primary="submit"

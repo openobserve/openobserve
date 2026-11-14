@@ -42,14 +42,13 @@
         {{ t("alerts.groups.filteredBy") }}
       </span>
       <OTag
-        variant="primary-soft"
+        tone="accent"
         size="sm"
         :label="raw(groupFilter.group_labels || groupFilter.group_key)"
       />
       <OButton
         variant="ghost"
-        size="sm"
-        icon-left="close"
+        icon="close"
         data-test="alerts-alertgrouphistory-clear-filter"
         @click="emit('clear-filter')"
       >
@@ -62,10 +61,8 @@
       :columns="columns"
       row-key="rowKey"
       :loading="loading"
-      :frame="false"
       :page-size="25"
       :page-size-options="[25, 50, 100]"
-      :show-global-filter="false"
       :persist-columns="true"
       table-id="alert-group-history"
       :enable-column-resize="true"
@@ -74,9 +71,9 @@
     >
       <template #toolbar-trailing>
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          icon-only
+          variant="secondary"
+          icon="refresh"
           :loading="loading"
           data-test="alerts-alertgrouphistory-refresh"
           @click="emit('refresh')"
@@ -118,9 +115,8 @@
       <template #empty>
         <OEmptyState
           v-if="!loading"
-          size="hero"
           :title="t('alerts.groups.noHistoryTitle')"
-          :description="emptyDescription"
+          :text="emptyDescription"
           data-test="alerts-alertgrouphistory-empty"
         />
       </template>

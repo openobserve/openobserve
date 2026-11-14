@@ -16,12 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- What must exist before an alert can wake somebody, each step answered from live data. -->
 <template>
-  <OBanner
+  <OInlineNotice
     v-if="compact && !expanded && !dismissed"
-    variant="info"
+    tone="info"
     icon="rocket-launch"
-    inline-actions
-    dense
     data-test="oncall-setup-banner"
   >
     <OTruncatedText
@@ -35,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="flex shrink-0 items-center gap-2">
         <OButton
           v-if="canConfigure"
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           :data-test="`oncall-setup-bar-cta-${nextStep.key}`"
           @click="nextStep.act()"
         >
@@ -44,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           variant="ghost"
-          size="xs"
-          icon-right="expand-more"
+          size="sm"
+          icon-end="expand-more"
           data-test="oncall-setup-expand"
           @click="expanded = true"
         >
@@ -53,9 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="dismissible"
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="close"
+          icon="close"
           :aria-label="t('oncall.setupHideBanner')"
           data-test="oncall-setup-dismiss"
           @click="dismiss"
@@ -64,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </span>
     </template>
-  </OBanner>
+  </OInlineNotice>
 
   <div
     v-else-if="!compact || !dismissed"
@@ -118,9 +116,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="canConfigure">
           <OButton
             v-if="step.state === 'done'"
-            variant="outline"
-            size="xs"
-            icon-left="edit"
+            variant="secondary"
+            size="sm"
+            icon="edit"
             :data-test="`oncall-setup-change-${step.key}`"
             @click="step.review()"
           >
@@ -130,16 +128,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="step.markDone"
               variant="ghost"
-              size="sm"
-              icon-left="check"
+              icon="check"
               :data-test="`oncall-setup-mark-done-${step.key}`"
               @click="step.markDone()"
             >
               {{ t("oncall.setupStepMarkDone") }}
             </OButton>
             <OButton
-              :variant="step.state === 'active' ? 'primary' : 'outline'"
-              size="sm"
+              :variant="step.state === 'active' ? 'primary' : 'secondary'"
               :loading="step.key === 'test' && testing"
               :data-test="`oncall-setup-cta-${step.key}`"
               @click="step.act()"
@@ -154,8 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="compact" class="flex">
       <OButton
         variant="ghost"
-        size="sm-action"
-        icon-right="expand-less"
+        icon-end="expand-less"
         data-test="oncall-setup-collapse"
         @click="expanded = false"
       >
@@ -186,7 +181,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOnCallPolicyReviewed } from "@/composables/useOnCallPolicyReviewed";

@@ -81,7 +81,7 @@ describe("ColorPaletteDropDown", () => {
                 <slot name="option" v-for="opt in options" :key="opt.value" :opt="opt" />
               </div>
             `,
-            props: ["modelValue", "options", "label", "dropdownStyle"],
+            props: ["modelValue", "options", "label"],
             emits: ["update:model-value"],
             inheritAttrs: false,
           },

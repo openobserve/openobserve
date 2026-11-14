@@ -55,7 +55,7 @@ vi.mock("@/composables/security/useSecurityAccess", async () => {
 vi.mock("@/lib/overlay/Dialog/ODialog.vue", () => ({
   default: {
     name: "ODialog",
-    props: ["open", "primaryButtonDisabled"],
+    props: ["open", "primary"],
     template: `<div v-if="open" class="o-dialog-stub"><slot /></div>`,
   },
 }));
@@ -114,7 +114,7 @@ describe("SecurityNewDetectionDialog destinations", () => {
     const w = await mountDialog();
     const banner = w.findComponent('[data-test="security-detections-new-no-destination"]');
     expect(banner.exists()).toBe(true);
-    expect(banner.props("variant")).toBe("info");
+    expect(banner.props("tone")).toBe("info");
   });
 
   it("leaves the destination empty even when only one exists", async () => {
@@ -147,7 +147,7 @@ describe("SecurityNewDetectionDialog destinations", () => {
       source: "aws_cloudtrail",
     });
     const dialog = w.findComponent({ name: "ODialog" });
-    expect(dialog.props("primaryButtonDisabled")).toBe(false);
+    expect(dialog.props("primary")?.disabled).toBeFalsy();
     await submit(w);
     await flushPromises();
     const [, payload] = vi.mocked(alertsService.create_by_alert_id).mock.calls[0] as unknown as [
@@ -199,7 +199,7 @@ describe("SecurityNewDetectionDialog correlations", () => {
     const periodInput = period.find("input");
     expect((periodInput.element as HTMLInputElement).value).toBe("60");
     const dialog = w.findComponent({ name: "ODialog" });
-    expect(dialog.props("primaryButtonDisabled")).toBe(false);
+    expect(dialog.props("primary")?.disabled).toBeFalsy();
 
     await periodInput.setValue("30");
     await w.find("form").trigger("submit");

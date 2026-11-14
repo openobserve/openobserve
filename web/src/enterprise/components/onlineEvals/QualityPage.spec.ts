@@ -47,6 +47,7 @@ vi.mock("@/composables/useBreakpoint", async () => {
 });
 
 import QualityPage from "./QualityPage.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 
 const TableStub = defineComponent({
   name: "QualityConfigsTable",
@@ -203,7 +204,9 @@ describe("QualityPage", () => {
     const wrapper = mountPage(undefined, [TOX_CONFIG]);
     await flushPromises();
     expect(wrapper.find('[data-test="quality-page-title"]').text()).toBe("toxicity");
-    expect(wrapper.text()).toContain("Toxicity level of the response.");
+    expect(wrapper.findComponent(OPageHeader).props("about")).toBe(
+      "Toxicity level of the response.",
+    );
     const tags = wrapper.find('[data-test="quality-detail-tags"]');
     expect(tags.findAllComponents({ name: "OTag" }).map((tag) => tag.text())).toEqual([
       "Categorical",

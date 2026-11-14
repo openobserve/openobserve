@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="xl"
+    size="lg"
     :title="active ? raw(active.config) : t('fleet.fleets.rollouts')"
-    :sub-title="active ? changeText(active) : fleetName"
+    :subtitle="active ? changeText(active) : fleetName"
     data-test="fleet-rollouts-drawer"
     @update:open="emit('update:open', $event)"
   >
@@ -27,8 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <OButton
           variant="ghost"
-          size="sm"
-          icon-left="arrow-back"
+          icon="arrow-back"
           data-test="fleet-rollouts-back"
           @click="emit('update:rolloutId', null)"
         >
@@ -36,11 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <template v-if="active">
-        <OBanner
+        <OInlineNotice
           v-if="detail.error.value"
-          variant="error"
-          dense
-          :content="t('fleet.common.loadFailed')"
+          tone="err"
+          :message="t('fleet.common.loadFailed')"
           data-test="fleet-rollouts-detail-stale"
         />
         <div class="flex flex-wrap items-center gap-2">
@@ -91,36 +89,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <OEmptyState
         v-else-if="isForbidden(detail.error.value)"
-        size="block"
-        preset="no-access"
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('emptyState.noAccess.description')"
         data-test="fleet-rollouts-detail-forbidden"
       />
       <OEmptyState
         v-else-if="isNotFound(detail.error.value)"
-        size="block"
-        preset="no-data"
+        kind="error"
         :title="t('fleet.rollouts.notFound')"
-        :description="t('fleet.rollouts.notFoundDescription')"
+        :text="t('fleet.rollouts.notFoundDescription')"
         data-test="fleet-rollouts-detail-not-found"
       />
       <OEmptyState
         v-else-if="detail.error.value"
-        size="block"
-        preset="load-error"
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
         data-test="fleet-rollouts-detail-error"
         @action="detail.refetch()"
       />
       <div v-else class="flex justify-center py-6" data-test="fleet-rollouts-detail-loading">
-        <OSpinner />
+        <OSpinner size="lg" />
       </div>
     </div>
 
     <div v-else class="flex flex-col gap-3">
-      <OBanner
+      <OInlineNotice
         v-if="stale"
-        variant="error"
-        dense
-        :content="t('fleet.common.loadFailed')"
+        tone="err"
+        :message="t('fleet.common.loadFailed')"
         data-test="fleet-rollouts-stale"
       />
       <FleetRolloutTable
@@ -144,7 +142,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
@@ -309,8 +307,7 @@ async function confirmExit(r: RolloutRow, exit: FleetHaltExit): Promise<boolean>
     title: t("fleet.rollouts.confirmExitTitle", { exit: exitLabel(exit) }),
     message: messages[exit],
     confirmLabel: exitLabel(exit),
-    confirmVariant: exit === "rollback" ? "destructive" : "primary",
-    focusCancel: exit === "rollback" || exit === "skip",
+    kind: exit === "rollback" ? "destructive" : "confirm",
   });
 }
 

@@ -4,7 +4,7 @@
 import { onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { SLACK_OAUTH_MESSAGE_TYPE, type SlackOAuthCallbackMessage } from "@/utils/slackOAuth";
@@ -45,16 +45,11 @@ onMounted(() => {
     data-test="slack-oauth-callback-page"
   >
     <div class="flex min-h-48 items-center justify-center">
-      <OBanner
-        v-if="failed"
-        variant="error"
-        icon="error-outline"
-        data-test="slack-oauth-callback-error"
-      >
+      <OInlineNotice v-if="failed" tone="err" data-test="slack-oauth-callback-error">
         {{ t("alert_destinations.slackOAuth.callbackError") }}
-      </OBanner>
+      </OInlineNotice>
       <div v-else class="text-text-secondary flex items-center gap-3 text-sm">
-        <OSpinner size="sm" />
+        <OSpinner size="lg" />
         <span>{{
           t("alert_destinations.slackOAuth.callbackWorking", { product: raw("OpenObserve") })
         }}</span>

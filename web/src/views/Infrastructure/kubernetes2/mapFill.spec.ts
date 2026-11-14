@@ -51,7 +51,7 @@ const pod = (over: Partial<PodRow> = {}): PodRow =>
     object: null,
     phase: "Running",
     ready: "true",
-    status: { text: "Running", variant: "success-soft" },
+    status: { text: "Running", variant: "ok" },
     controller: null,
     workload: null,
     node: "n1",

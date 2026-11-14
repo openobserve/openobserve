@@ -15,70 +15,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="root" class="flex flex-col gap-4" data-test="fleet-collector-versions">
-    <OCard variant="outlined" data-test="fleet-collector-versions-distribution">
-      <OCardSection role="header">
-        <OText variant="panel-title">{{ t("fleet.upgrades.distribution") }}</OText>
-      </OCardSection>
-      <OSeparator />
-      <OCardSection role="body">
-        <div
-          v-if="summaryLoading"
-          class="flex justify-center py-4"
-          data-test="fleet-collector-versions-distribution-loading"
-        >
-          <OSpinner />
-        </div>
-        <div
-          v-else-if="summaryError && !summary"
-          data-test="fleet-collector-versions-distribution-error"
-        >
-          <OEmptyState
-            size="inline"
-            preset="load-error"
-            :action-label="t('emptyState.loadError.action')"
-            action-icon="refresh"
-            @action="refresh"
-          />
-        </div>
-        <OBanner
-          v-if="summaryError && summary"
-          class="mb-3"
-          variant="error"
-          dense
-          :content="t('fleet.common.loadFailed')"
-          data-test="fleet-collector-versions-distribution-stale"
+  <div ref="root" class="flex flex-col gap-3" data-test="fleet-collector-versions">
+    <OCard
+      :title="t('fleet.upgrades.distribution')"
+      data-test="fleet-collector-versions-distribution"
+    >
+      <div
+        v-if="summaryLoading"
+        class="flex justify-center py-4"
+        data-test="fleet-collector-versions-distribution-loading"
+      >
+        <OSpinner size="lg" />
+      </div>
+      <div
+        v-else-if="summaryError && !summary"
+        data-test="fleet-collector-versions-distribution-error"
+      >
+        <OEmptyState
+          size="inline"
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="t('emptyState.loadError.description')"
+          @action="refresh"
         />
-        <FleetVersionBars
-          v-if="summary"
-          :versions="summary?.versions ?? []"
-          :target="summary?.target_version ?? ''"
-          :outdated-versions="outdatedVersions"
-        />
-      </OCardSection>
+      </div>
+      <OInlineNotice
+        v-if="summaryError && summary"
+        class="mb-3"
+        tone="err"
+        :message="t('fleet.common.loadFailed')"
+        data-test="fleet-collector-versions-distribution-stale"
+      />
+      <FleetVersionBars
+        v-if="summary"
+        :versions="summary?.versions ?? []"
+        :target="summary?.target_version ?? ''"
+        :outdated-versions="outdatedVersions"
+      />
     </OCard>
 
     <OCard
       v-if="outdated.length || listLoading || listError || listForbidden"
       ref="outdatedCard"
-      variant="outlined"
+      flush
       data-test="fleet-collector-versions-outdated"
     >
-      <OCardSection role="header" class="justify-between">
-        <div class="flex items-center gap-2">
-          <OText variant="panel-title">{{ t("fleet.upgrades.outdatedTitle") }}</OText>
-          <OText variant="meta" data-test="fleet-collector-versions-outdated-count">{{
-            listForbidden ? DASH : outdated.length
-          }}</OText>
-        </div>
-      </OCardSection>
+      <template #header>
+        <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+          {{ t("fleet.upgrades.outdatedTitle") }}
+        </h3>
+        <span
+          class="text-text-muted shrink-0 text-xs"
+          data-test="fleet-collector-versions-outdated-count"
+          >{{ listForbidden ? DASH : outdated.length }}</span
+        >
+      </template>
       <OTable
         :data="outdated"
         :columns="columns"
         row-key="id"
         pagination="client"
         :page-size="10"
-        :frame="false"
         :loading="listLoading"
         :error="listError"
         :forbidden="listForbidden"
@@ -98,7 +95,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #error>
           <div data-test="fleet-collector-versions-outdated-error">
-            <OEmptyState size="block" preset="load-error" @action="refresh" />
+            <OEmptyState
+              kind="error"
+              :title="t('emptyState.loadError.title')"
+              :text="t('emptyState.loadError.description')"
+              @action="refresh"
+            />
           </div>
         </template>
       </OTable>
@@ -109,15 +111,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import FleetVersionBars from "./FleetVersionBars.vue";

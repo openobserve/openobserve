@@ -71,20 +71,16 @@ the Free Software Foundation, either version 3 of the License, or
       <OPageHeader
         v-if="hideTabBar && embeddedHeader && activeTab !== 'quality'"
         :title="sectionHeader?.title ?? raw(embeddedHeader.title)"
-        :subtitle="sectionHeader?.subtitle ?? raw(embeddedHeader.subtitle)"
-        :icon="sectionHeader?.icon ?? embeddedHeader.icon"
-        :tabs-below="hasTabs"
-        class="border-border-default shrink-0 border-b"
+        :about="sectionHeader?.about ?? raw(embeddedHeader.about)"
       >
         <template v-if="hasTabs" #tabs><AiSectionTabs /></template>
         <template v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'" #actions>
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 :data-test="`${activeTab}-import`"
-                icon-right="expand-more"
+                icon-end="expand-more"
               >
                 {{ t(`onlineEvals.${importI18nKey}.import.button`) }}
               </OButton>
@@ -120,7 +116,6 @@ the Free Software Foundation, either version 3 of the License, or
             v-if="addButtonLabel"
             :data-test="`${activeTab}-list-add-btn`"
             variant="primary"
-            size="sm"
             :aria-label="
               activeTab === 'scorers' && hasNewScorerDraft
                 ? t('common.editorDraft.newDot', { label: addButtonLabel })
@@ -142,7 +137,6 @@ the Free Software Foundation, either version 3 of the License, or
             v-if="addButtonLabel"
             data-test="eval-job-list-add-btn"
             variant="primary"
-            size="sm"
             :aria-label="
               jobDrafts.hasNew
                 ? t('common.editorDraft.newDot', { label: addButtonLabel })
@@ -194,8 +188,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <OButton
             variant="primary"
-            size="sm-toolbar"
-            icon-left="refresh"
+            icon="refresh"
             :disabled="qualityBusy"
             :loading="qualityBusy"
             data-test="quality-refresh-btn"
@@ -333,14 +326,14 @@ the Free Software Foundation, either version 3 of the License, or
         bleed
         v-model:open="showScoreConfigLibrary"
         side="right"
-        size="lg"
+        size="md"
         :title="t('onlineEvals.scoreConfig.import.libraryDrawerTitle')"
-        :secondary-button-label="t('onlineEvals.buttons.cancel')"
-        :primary-button-label="
-          t('onlineEvals.importCount', { count: scoreConfigLibrarySelectedCount })
-        "
-        :primary-button-disabled="scoreConfigLibrarySelectedCount === 0"
-        :primary-button-loading="scoreConfigLibraryImporting"
+        :secondary="{ label: t('onlineEvals.buttons.cancel') }"
+        :primary="{
+          label: t('onlineEvals.importCount', { count: scoreConfigLibrarySelectedCount }),
+          disabled: scoreConfigLibrarySelectedCount === 0,
+          loading: scoreConfigLibraryImporting,
+        }"
         data-test="score-config-library-drawer"
         @click:secondary="showScoreConfigLibrary = false"
         @click:primary="triggerScoreConfigLibraryImport"
@@ -357,12 +350,14 @@ the Free Software Foundation, either version 3 of the License, or
         bleed
         v-model:open="showScorerLibrary"
         side="right"
-        size="lg"
+        size="md"
         :title="t('onlineEvals.scorer.import.libraryDrawerTitle')"
-        :secondary-button-label="t('onlineEvals.buttons.cancel')"
-        :primary-button-label="t('onlineEvals.importCount', { count: scorerLibrarySelectedCount })"
-        :primary-button-disabled="scorerLibrarySelectedCount === 0"
-        :primary-button-loading="scorerLibraryImporting"
+        :secondary="{ label: t('onlineEvals.buttons.cancel') }"
+        :primary="{
+          label: t('onlineEvals.importCount', { count: scorerLibrarySelectedCount }),
+          disabled: scorerLibrarySelectedCount === 0,
+          loading: scorerLibraryImporting,
+        }"
         data-test="scorer-library-drawer"
         @click:secondary="showScorerLibrary = false"
         @click:primary="triggerScorerLibraryImport"
@@ -411,7 +406,7 @@ the Free Software Foundation, either version 3 of the License, or
         :message="deleteDialogMessage"
         :message-keypath="isBulkDelete ? undefined : 'onlineEvals.deleteConfirmMessage'"
         :message-name="pendingDeleteRow?.name ?? ''"
-        ok-variant="destructive"
+        kind="destructive"
         @update:ok="performDelete"
         @update:cancel="cancelDelete"
       />
@@ -476,7 +471,6 @@ import AiSectionTabs from "@/enterprise/components/AIObservability/AiSectionTabs
 import { useAiSectionTabs } from "@/enterprise/components/AIObservability/aiSectionTabs";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AiLastRefreshed from "@/enterprise/components/AIObservability/AiLastRefreshed.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -660,39 +654,21 @@ const tabs = computed<Array<{ value: ActiveTab; label: I18nText; badge?: string 
   { value: "scoreConfigs", label: t("onlineEvals.tabs.scoreConfigs") },
 ]);
 
-// Header chrome shown only when embedded in the AI Observability shell —
-// mirrors the LLM Insights / Sessions pages so every section in the rail
-// shares the same title strip. Title + icon track the active rail item.
-const EMBEDDED_HEADER_META: Record<
-  ActiveTab,
-  { i18nKey: I18nKey; subtitleKey: I18nKey; icon: IconName }
-> = {
-  quality: {
-    i18nKey: "aiObservability.nav.quality",
-    subtitleKey: "aiObservability.subtitle.quality",
-    icon: "star-rate",
-  },
-  jobs: {
-    i18nKey: "aiObservability.nav.evalJobs",
-    subtitleKey: "aiObservability.subtitle.evalJobs",
-    icon: "event",
-  },
-  scorers: {
-    i18nKey: "aiObservability.nav.scorers",
-    subtitleKey: "aiObservability.subtitle.scorers",
-    icon: "rule",
-  },
+// The header when embedded in the AI Observability shell; a tabbed rail item's own header wins.
+const EMBEDDED_HEADER_META: Record<ActiveTab, { i18nKey: I18nKey; aboutKey: I18nKey }> = {
+  quality: { i18nKey: "aiObservability.nav.quality", aboutKey: "aiObservability.subtitle.quality" },
+  jobs: { i18nKey: "aiObservability.nav.evalJobs", aboutKey: "aiObservability.subtitle.evalJobs" },
+  scorers: { i18nKey: "aiObservability.nav.scorers", aboutKey: "aiObservability.subtitle.scorers" },
   scoreConfigs: {
     i18nKey: "aiObservability.nav.scoreConfigs",
-    subtitleKey: "aiObservability.subtitle.scoreConfigs",
-    icon: "tune",
+    aboutKey: "aiObservability.subtitle.scoreConfigs",
   },
 };
 
-const embeddedHeader = computed<{ title: string; subtitle: string; icon: IconName } | null>(() => {
+const embeddedHeader = computed<{ title: string; about: string } | null>(() => {
   const meta = EMBEDDED_HEADER_META[activeTab.value];
   if (!meta) return null;
-  return { title: t(meta.i18nKey), subtitle: t(meta.subtitleKey), icon: meta.icon };
+  return { title: t(meta.i18nKey), about: t(meta.aboutKey) };
 });
 
 // Per-tab "create" button label for the embedded OPageHeader. Quality has

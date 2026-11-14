@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-stream-select"
                 >
                   <template #tooltip>
-                    <OTooltip max-width="15.625rem">
+                    <OTooltip>
                       <template #content>
                         {{ t("dashboard.streamSelectTooltip") }}
                       </template>
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-field-select"
                 >
                   <template #tooltip>
-                    <OTooltip max-width="15.625rem">
+                    <OTooltip>
                       <template #content>
                         {{ t("dashboard.fieldSelectTooltip") }}
                       </template>
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div data-test="dashboard-query-values-filter" class="text-base font-bold">
                     {{ t("dashboard.addSettingVariable.filters") }}
                   </div>
-                  <OTooltip max-width="15.625rem">
+                  <OTooltip>
                     <OIcon
                       size="sm"
                       name="info-outline"
@@ -296,25 +296,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div>
                 <OButton
+                  icon-only
                   :aria-label="t('common.remove')"
                   variant="ghost"
-                  size="icon"
+                  size="xs"
                   :disabled="variableData?.options?.length === 1"
                   @click="removeField(index)"
                   :data-test="`dashboard-custom-variable-${index}-remove`"
-                  icon-left="cancel"
+                  icon="cancel"
                 >
                 </OButton>
               </div>
             </div>
             <div class="flex flex-col">
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 class="mt-3 w-fit"
                 @click="addField()"
                 data-test="dashboard-add-option-btn"
-                icon-left="add"
+                icon="add"
               >
                 {{ t("dashboard.addOption") }}
               </OButton>
@@ -326,7 +326,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="multiSelect"
               :label="t('dashboard.multiSelect')"
               data-test="dashboard-query_values-show_multiple_values"
-              size="lg"
             />
           </div>
           <!-- default value for multi select variables -->
@@ -339,19 +338,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormToggleGroup name="selectAllValueForMultiSelect">
                 <OToggleGroupItem
                   value="first"
-                  size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-first-value"
                   >{{ t("dashboard.firstValue") }}</OToggleGroupItem
                 >
                 <OToggleGroupItem
                   value="all"
-                  size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-all-values"
                   >{{ t("dashboard.allValues") }}</OToggleGroupItem
                 >
                 <OToggleGroupItem
                   value="custom"
-                  size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-custom"
                   >{{ t("dashboard.customValue") }}</OToggleGroupItem
                 >
@@ -378,13 +374,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`dashboard-variable-custom-value-${index}`"
                   />
                   <OButton
-                    :aria-label="t('common.remove')"
                     v-if="variableData.multiSelect"
+                    icon-only
+                    :aria-label="t('common.remove')"
                     variant="ghost"
-                    size="icon"
+                    size="xs"
                     @click="removeCustomValue(index)"
                     :data-test="`dashboard-variable-custom-close-${index}`"
-                    icon-left="close"
+                    icon="close"
                   >
                   </OButton>
                 </div>
@@ -393,12 +390,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="variableData.multiSelect" class="flex w-1/2">
                 <OButton
                   :aria-label="t('common.add')"
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   class="mt-3"
                   @click="addCustomValue"
                   data-test="dashboard-add-custom-value-btn"
-                  icon-left="add"
+                  icon="add"
                 >
                 </OButton>
               </div>
@@ -410,7 +406,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="hideOnDashboard"
               :label="t('dashboard.hideOnDashboard')"
               data-test="dashboard-variable-hide_on_dashboard"
-              size="lg"
             />
           </div>
 
@@ -420,11 +415,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="escapeSingleQuotes"
               :label="t('dashboard.escapeSingleQuotes')"
               data-test="dashboard-variable-escape-single-quotes"
-              size="lg"
               disabled
             >
               <template #tooltip>
-                <OTooltip max-width="18.75rem">
+                <OTooltip>
                   <template #content>
                     {{ t("dashboard.escapeSingleQuotesTooltip") }}
                   </template>
@@ -438,8 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-t-border-default shadow-sticky-footer sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t px-4 py-3"
       >
         <OButton
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="isSavingVariable"
           @click="close"
           data-test="dashboard-variable-cancel-btn"
@@ -447,7 +440,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OButton
           variant="primary"
-          size="sm-action"
           type="submit"
           form="add-setting-variable-form"
           :loading="isSavingVariable"

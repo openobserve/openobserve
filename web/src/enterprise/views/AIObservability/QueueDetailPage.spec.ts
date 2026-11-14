@@ -57,7 +57,6 @@ vi.mock("@/lib/core/PageLayout/OPageLayout.vue", () => ({
     name: "OPageLayout",
     props: ["back"],
     template: `<div class="o-page-layout">
-      <button v-if="back" data-test="app-page-header-back" @click="back.onClick?.()" />
       <slot name="actions" /><slot name="subnav" /><slot />
     </div>`,
   },
@@ -70,6 +69,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
     emits: ["rowClick"],
     template: `<div class="o-table" :data-rows="(data || []).map(r => r.id).join(',')">
       <slot name="toolbar" />
+      <slot name="subheader" />
       <template v-for="row in data" :key="row.id"><slot name="cell-actions" :row="row" /></template>
     </div>`,
   },
@@ -121,16 +121,14 @@ beforeEach(() => {
 });
 
 describe("QueueDetailPage", () => {
-  it("uses real browser back when there's history to pop, instead of the bare Queues list", async () => {
-    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+  // The header's back link does the smart back; the page names the parent it falls back to.
+  it("links back to the Queues list of this org", async () => {
     const wrapper = await mountPage();
-    mockPush.mockClear();
 
-    await wrapper.get('[data-test="app-page-header-back"]').trigger("click");
-
-    expect(mockBack).toHaveBeenCalledTimes(1);
-    expect(mockPush).not.toHaveBeenCalled();
-    window.history.replaceState(null, "");
+    expect(wrapper.findComponent({ name: "OPageLayout" }).props("back")).toEqual({
+      label: "aiObservability.nav.queues",
+      to: { name: "aiQueues", query: { org_identifier: "test-org" } },
+    });
   });
 
   it("loads the queue and its items, and derives the status counts", async () => {

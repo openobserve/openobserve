@@ -134,7 +134,7 @@ describe("FleetSettings", () => {
       data: { restricted_components: [], target_collector_version: null },
     } as any);
     await mountSettings();
-    const fixed = wrapper.findAll(".w-field-width-md");
+    const fixed = wrapper.findAll(".w-field-width-m");
     expect(fixed).toHaveLength(2);
     for (const control of fixed) expect(control.classes()).toContain("max-md:w-full");
     expect(wrapper.find(sel("restricted-trigger")).text()).toContain(

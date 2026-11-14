@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="open"
-    size="xl"
+    size="lg"
     :title="t('fleet.addCollector')"
-    :sub-title="t('fleet.install.subtitle')"
-    :primary-button-label="t('fleet.common.done')"
+    :subtitle="t('fleet.install.subtitle')"
+    :primary="{ label: t('fleet.common.done') }"
     data-test="fleet-install-dialog"
     @update:open="emit('update:open', $event)"
     @click:primary="emit('update:open', false)"
@@ -31,30 +31,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex justify-center py-6"
         data-test="fleet-install-dialog-tokens-loading"
       >
-        <OSpinner />
+        <OSpinner size="lg" />
       </div>
       <div v-else-if="tokensForbidden" data-test="fleet-install-dialog-tokens-forbidden">
-        <OEmptyState size="block" preset="no-access" />
+        <OEmptyState
+          kind="denied"
+          :title="t('emptyState.noAccess.title')"
+          :text="t('emptyState.noAccess.description')"
+        />
       </div>
       <div v-else-if="tokensFailed" data-test="fleet-install-dialog-tokens-error">
-        <OEmptyState size="block" preset="load-error" @action="retryTokens" />
+        <OEmptyState
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="t('emptyState.loadError.description')"
+          @action="retryTokens"
+        />
       </div>
       <div
         v-else-if="pendingTokenId && !selectedId"
         class="flex justify-center py-6"
         data-test="fleet-install-dialog-token-pending"
       >
-        <OSpinner />
+        <OSpinner size="lg" />
       </div>
       <div
         v-else-if="!activeTokens.length"
         class="flex flex-col gap-4"
         data-test="fleet-install-dialog-no-token"
       >
-        <OBanner variant="info" dense>
+        <OInlineNotice tone="info">
           <span class="font-medium">{{ t("fleet.install.noTokenTitle") }}</span>
           {{ t("fleet.install.noTokenBody") }}
-        </OBanner>
+        </OInlineNotice>
         <OText variant="meta" data-test="fleet-install-dialog-security-note"
           >{{ t("fleet.enrollment.securityNote") }}
           {{ t("fleet.install.envRefNote", { ref: ENV_REF }) }}</OText
@@ -71,18 +80,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText v-if="joinsText" variant="meta" data-test="fleet-install-dialog-fleet">{{
           joinsText
         }}</OText>
-        <OBanner
+        <OInlineNotice
           v-if="createdHere"
-          variant="warning"
-          dense
-          :content="t('fleet.enrollment.copyOnce')"
+          tone="warn"
+          :message="t('fleet.enrollment.copyOnce')"
           data-test="fleet-install-dialog-copy-once"
         />
-        <OBanner
+        <OInlineNotice
           v-if="!secret"
-          variant="warning"
-          dense
-          :content="
+          tone="warn"
+          :message="
             t('fleet.install.placeholderHint', {
               name: raw(selectedTokenName),
               placeholder: TOKEN_PLACEHOLDER,
@@ -92,15 +99,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #actions>
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               data-test="fleet-install-dialog-new-token"
               @click="creatingHere = !creatingHere"
             >
               {{ t("fleet.enrollment.newToken") }}
             </OButton>
           </template>
-        </OBanner>
+        </OInlineNotice>
         <FleetTokenForm
           v-if="!secret && creatingHere"
           :fleet-id="fleetId"
@@ -116,45 +122,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState
             v-if="collectorsForbidden"
             size="inline"
-            preset="no-access"
+            kind="denied"
+            :title="t('emptyState.noAccess.title')"
+            :text="t('emptyState.noAccess.description')"
             data-test="fleet-install-dialog-collectors-forbidden"
           />
           <OEmptyState
             v-else-if="collectors.error.value"
             size="inline"
-            preset="load-error"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('emptyState.loadError.description')"
             data-test="fleet-install-dialog-collectors-error"
             @action="retryCollectors"
           />
-          <OBanner
-            v-else-if="connected"
-            variant="success"
-            dense
-            data-test="fleet-install-dialog-connected"
-          >
+          <OInlineNotice v-else-if="connected" tone="ok" data-test="fleet-install-dialog-connected">
             {{ t("fleet.install.connected", { name: raw(connected.name) }) }}
             <template #actions>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 data-test="fleet-install-dialog-view-collectors"
                 @click="viewCollectors"
               >
                 {{ t("fleet.install.viewCollectors") }}
               </OButton>
             </template>
-          </OBanner>
-          <OBanner
-            v-else-if="baseline"
-            variant="info"
-            dense
-            data-test="fleet-install-dialog-waiting"
-          >
+          </OInlineNotice>
+          <OInlineNotice v-else-if="baseline" tone="info" data-test="fleet-install-dialog-waiting">
             <span class="inline-flex items-center gap-2">
-              <OSpinner size="xs" />
+              <OSpinner />
               {{ t("fleet.install.waiting") }}
             </span>
-          </OBanner>
+          </OInlineNotice>
         </div>
       </template>
     </div>
@@ -169,7 +168,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useOrgId } from "@/composables/query/useOrgId";

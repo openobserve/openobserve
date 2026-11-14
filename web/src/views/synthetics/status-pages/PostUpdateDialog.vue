@@ -25,19 +25,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="open"
-    persistent
     size="sm"
     :title="t('statusPages.postUpdate.title', { name: pageName })"
     :form-id="FORM_ID"
-    :primary-button-label="t('statusPages.postUpdate.post')"
-    :primary-button-disabled="mode === 'new' && components.length === 0"
-    :secondary-button-label="t('common.cancel')"
+    :primary="{
+      label: t('statusPages.postUpdate.post'),
+      disabled: mode === 'new' && components.length === 0,
+    }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="status-page-post-update-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
     <div v-if="loadingIncident" class="flex justify-center py-8">
-      <OSpinner />
+      <OSpinner size="lg" />
     </div>
 
     <template v-else>
@@ -49,13 +50,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="font-medium">{{ raw(activeIncident.title) }}</span>
         </div>
         <OToggleGroup v-model="mode" type="single" :label="t('statusPages.postUpdate.mode')">
-          <OToggleGroupItem
-            value="attach"
-            size="sm"
-            data-test="status-page-post-update-mode-attach"
-            >{{ t("statusPages.postUpdate.modeAttach") }}</OToggleGroupItem
-          >
-          <OToggleGroupItem value="new" size="sm" data-test="status-page-post-update-mode-new">{{
+          <OToggleGroupItem value="attach" data-test="status-page-post-update-mode-attach">{{
+            t("statusPages.postUpdate.modeAttach")
+          }}</OToggleGroupItem>
+          <OToggleGroupItem value="new" data-test="status-page-post-update-mode-new">{{
             t("statusPages.postUpdate.modeNew")
           }}</OToggleGroupItem>
         </OToggleGroup>
@@ -72,24 +70,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @submit="onSubmitAttach"
       >
         <OFormToggleGroup name="escalateTo" :label="t('statusPages.postUpdate.escalate')">
-          <OToggleGroupItem
-            value="none"
-            size="sm"
-            data-test="status-page-post-update-escalate-none"
-            >{{ t("statusPages.postUpdate.escalateNone") }}</OToggleGroupItem
-          >
+          <OToggleGroupItem value="none" data-test="status-page-post-update-escalate-none">{{
+            t("statusPages.postUpdate.escalateNone")
+          }}</OToggleGroupItem>
           <template v-for="opt in escalationOptions" :key="opt">
-            <OToggleGroupItem
-              :value="opt"
-              size="sm"
-              :data-test="`status-page-post-update-escalate-${opt}`"
-              >{{ t(impactLabelKey(opt)) }}</OToggleGroupItem
-            >
+            <OToggleGroupItem :value="opt" :data-test="`status-page-post-update-escalate-${opt}`">{{
+              t(impactLabelKey(opt))
+            }}</OToggleGroupItem>
           </template>
         </OFormToggleGroup>
-        <OFormInput
+        <OFormTextarea
           name="body"
-          type="textarea"
           :rows="4"
           :label="t('statusPages.postUpdate.message')"
           :placeholder="t('statusPages.postUpdate.messagePlaceholder')"
@@ -108,24 +99,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @submit="onSubmitNew"
       >
         <OFormToggleGroup name="impact" :label="t('statusPages.postUpdate.impact')">
-          <OToggleGroupItem
-            value="degraded"
-            size="sm"
-            data-test="status-page-post-update-impact-degraded"
-            >{{ t("statusPages.postUpdate.impactDegraded") }}</OToggleGroupItem
-          >
+          <OToggleGroupItem value="degraded" data-test="status-page-post-update-impact-degraded">{{
+            t("statusPages.postUpdate.impactDegraded")
+          }}</OToggleGroupItem>
           <OToggleGroupItem
             value="partial_outage"
-            size="sm"
             data-test="status-page-post-update-impact-partial"
             >{{ t("statusPages.postUpdate.impactPartial") }}</OToggleGroupItem
           >
-          <OToggleGroupItem
-            value="major_outage"
-            size="sm"
-            data-test="status-page-post-update-impact-major"
-            >{{ t("statusPages.postUpdate.impactMajor") }}</OToggleGroupItem
-          >
+          <OToggleGroupItem value="major_outage" data-test="status-page-post-update-impact-major">{{
+            t("statusPages.postUpdate.impactMajor")
+          }}</OToggleGroupItem>
         </OFormToggleGroup>
 
         <div class="flex flex-col gap-2">
@@ -153,9 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           required
           data-test="status-page-post-update-title-input"
         />
-        <OFormInput
+        <OFormTextarea
           name="body"
-          type="textarea"
           :rows="4"
           :label="t('statusPages.postUpdate.message')"
           :placeholder="t('statusPages.postUpdate.messagePlaceholder')"
@@ -174,6 +157,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";

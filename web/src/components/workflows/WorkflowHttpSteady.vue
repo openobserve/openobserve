@@ -23,7 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText as="span" class="text-text-secondary text-sm">{{
           t("workflow.http.authLabel")
         }}</OText>
-        <OPopover v-model:open="switchOpen" side="bottom" align="start" :aria-label="switchTitle">
+        <OPopover
+          size="md"
+          v-model:open="switchOpen"
+          side="bottom"
+          align="start"
+          :aria-label="switchTitle"
+        >
           <template #trigger>
             <span class="inline-flex">
               <span class="inline-flex" @click.stop>
@@ -33,30 +39,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="workflow-http-auth-mode"
                   @update:model-value="onModeChange"
                 >
-                  <OToggleGroupItem value="token" size="sm" data-test="workflow-http-auth-token">
+                  <OToggleGroupItem value="token" data-test="workflow-http-auth-token">
                     {{ t("workflow.http.authToken") }}
                   </OToggleGroupItem>
-                  <OToggleGroupItem
-                    value="signature"
-                    size="sm"
-                    data-test="workflow-http-auth-signed"
-                  >
+                  <OToggleGroupItem value="signature" data-test="workflow-http-auth-signed">
                     {{ t("workflow.http.authSigned") }}
                   </OToggleGroupItem>
                 </OToggleGroup>
               </span>
             </span>
           </template>
-          <div
-            data-test="workflow-http-auth-switch-popover"
-            class="flex w-80 max-w-[calc(100vw-1.5rem)] flex-col gap-2 p-3"
-          >
+          <div data-test="workflow-http-auth-switch-popover" class="flex flex-col gap-2 p-3">
             <OText variant="body-strong">{{ switchTitle }}</OText>
             <OText variant="meta" as="p">{{ switchBody }}</OText>
             <div class="flex justify-end gap-2">
               <OButton
-                variant="outline"
-                size="sm-action"
+                variant="secondary"
                 data-test="workflow-http-auth-switch-cancel"
                 @click="switchOpen = false"
               >
@@ -64,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="primary"
-                size="sm-action"
                 :loading="saving"
                 data-test="workflow-http-auth-switch-confirm"
                 @click="confirmSwitch"
@@ -74,11 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </OPopover>
-        <OPopover side="bottom" align="start" :aria-label="t('workflow.http.authAbout')">
+        <OPopover size="md" side="bottom" align="start" :aria-label="t('workflow.http.authAbout')">
           <template #trigger>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs-sq"
+              size="sm"
               :aria-label="t('workflow.http.authAbout')"
               data-test="workflow-http-auth-info"
             >
@@ -94,12 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <WorkflowHttpExample />
     </template>
 
-    <OBanner
+    <OInlineNotice
       v-if="actionError"
-      variant="error-soft"
-      dense
+      tone="err"
       data-test="workflow-http-steady-error"
-      :content="actionError"
+      :message="actionError"
     />
 
     <div class="flex flex-col gap-2">
@@ -116,9 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="workflow-http-run-test-tooltip"
           >
             <OButton
-              variant="outline"
-              size="sm-action"
-              icon-left="science"
+              variant="secondary"
+              icon="science"
               data-test="workflow-http-run-test"
               @click="emit('run-test')"
             >
@@ -155,12 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @copy="onCopy"
         @revoke="onRevoke"
       />
-      <OBanner
+      <OInlineNotice
         v-if="storageWarning"
-        variant="warning"
-        dense
+        tone="warn"
         data-test="workflow-http-secret-storage-warning"
-        :content="t('workflow.http.secretStorageWarning')"
+        :message="t('workflow.http.secretStorageWarning')"
       />
     </div>
 
@@ -186,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";

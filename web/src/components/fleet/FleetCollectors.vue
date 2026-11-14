@@ -23,11 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="columns"
       row-key="id"
       selection="multiple"
-      :frame="false"
       pagination="client"
       :page-size="20"
       :page-size-options="[20, 50, 100]"
-      :show-global-filter="false"
       :column-visibility="{ lastConnectedFrom: false, arch: false }"
       :persist-columns="true"
       table-id="fleet-collectors"
@@ -39,91 +37,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="fleet-collectors-table"
       @row-click="openCollector"
     >
+      <template #subheader>
+        <div class="px-page-edge border-table-row-divider border-b py-1.5">
+          <OStatStrip
+            :items="statusStats"
+            :loading="loading"
+            selectable
+            multiple
+            :selected-keys="statusFilters"
+            @update:selected-keys="statusFilters = $event"
+          />
+        </div>
+      </template>
+
       <template #toolbar>
-        <div class="contents">
+        <div
+          class="flex min-w-0 flex-1 items-center gap-2 max-md:contents"
+          data-drawer-anchor="fleet-collectors-toolbar"
+        >
           <OButton
-            variant="outline"
-            size="icon-toolbar"
-            icon-left="filter-list"
+            icon-only
+            variant="secondary"
+            icon="filter-list"
             class="lg:hidden"
-            data-drawer-anchor="fleet-collectors-toolbar"
             :aria-label="t('common.filters')"
             data-test="fleet-collectors-mobile-filters-btn"
             @click="mobileFiltersOpen = true"
           >
             <OTooltip :content="t('common.filters')" />
           </OButton>
-          <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
+          <div class="min-w-0 flex-1 max-md:min-w-40">
             <OSearchInput
               v-model="search"
               class="w-full"
-              size="sm"
-              clearable
               :placeholder="
                 allFleets ? t('fleet.collectors.searchAllFleets') : t('fleet.collectors.search')
               "
               data-test="fleet-collectors-search"
-            >
-              <template #icon-right>
-                <OToggleGroup
-                  :model-value="allFleets ? 'all' : 'this'"
-                  type="single"
-                  class="me-1 self-center"
-                  data-test="fleet-collectors-scope"
-                  @update:model-value="(v) => (allFleets = v === 'all')"
-                >
-                  <OToggleGroupItem
-                    value="this"
-                    size="xs"
-                    icon-left="folder-outline"
-                    data-test="fleet-collectors-scope-this"
-                    :title="t('fleet.collectors.searchThisFleetTitle')"
-                    ><span class="max-lg:hidden">{{
-                      t("fleet.collectors.searchThisFleet")
-                    }}</span></OToggleGroupItem
-                  >
-                  <OToggleGroupItem
-                    value="all"
-                    size="xs"
-                    icon-left="search"
-                    data-test="fleet-collectors-scope-all"
-                    :title="t('fleet.collectors.searchAllFleetsTitle')"
-                    ><span class="max-lg:hidden">{{
-                      t("fleet.collectors.allFleets")
-                    }}</span></OToggleGroupItem
-                  >
-                </OToggleGroup>
-              </template>
-            </OSearchInput>
+              :scope="allFleets ? 'all' : 'this'"
+              :scope-options="scopeOptions"
+              @update:scope="(v) => (allFleets = v === 'all')"
+            />
           </div>
           <OSelect
             v-model="osFilter"
             class="max-lg:hidden"
-            width="sm"
-            size="sm"
+            width="s"
             clearable
             :options="osOptions"
             :placeholder="t('fleet.collectors.allOs')"
             data-test="fleet-collectors-os-filter"
-          />
-          <OStatStrip
-            :items="statusStats"
-            compact
-            selectable
-            :row="false"
-            multiple
-            :selected-keys="statusFilters"
-            default-key="all"
-            class="max-md:order-last"
-            @update:selected-keys="statusFilters = $event"
           />
         </div>
       </template>
 
       <template #toolbar-trailing>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="lastUpdatedAt"
           :loading="fetching"
           data-test="fleet-collectors-refresh"
@@ -162,12 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="inline-flex items-center gap-1.5">
           <span v-if="row.version" class="font-mono text-xs">{{ row.version }}</span>
           <span v-else class="text-text-muted">{{ DASH }}</span>
-          <OTag
-            v-if="row.outdated"
-            variant="warning-soft"
-            size="xs"
-            :label="t('fleet.collectors.outdated')"
-          />
+          <OTag v-if="row.outdated" tone="warn" size="sm" :label="t('fleet.collectors.outdated')" />
         </span>
       </template>
 
@@ -203,8 +167,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="row.delivery"
             type="fleetDelivery"
             :value="row.delivery"
-            size="xs"
-            :variant="row.status === 'offline' ? 'default-outline' : undefined"
+            size="sm"
+            :tone="row.status === 'offline' ? 'outline' : undefined"
           />
           <span v-else class="text-text-muted">{{ DASH }}</span>
         </span>
@@ -225,9 +189,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdown align="end">
           <template #trigger>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="more-vert"
+              icon="more-vert"
               :aria-label="t('fleet.common.actions')"
               :data-test="`fleet-collectors-row-menu-${row.id}`"
               @click.stop
@@ -236,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <ODropdownItem
-            icon-left="restart-alt"
+            icon="restart-alt"
             :disabled="row.status === 'offline'"
             :description="row.status === 'offline' ? t('fleet.collectors.restartOffline') : null"
             :data-test="`fleet-collectors-row-restart-${row.id}`"
@@ -246,22 +210,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdownItem>
           <ODropdownItem
             v-if="row.config"
-            icon-left="sync"
+            icon="sync"
             :data-test="`fleet-collectors-row-redeliver-${row.id}`"
             @select="actions.redeliver(row)"
           >
             {{ t("fleet.collectors.redeliver") }}
           </ODropdownItem>
           <ODropdownItem
-            icon-left="edit"
+            icon="edit"
             :data-test="`fleet-collectors-row-rename-${row.id}`"
             @select="openRename(row)"
           >
             {{ t("fleet.collectors.rename") }}
           </ODropdownItem>
           <ODropdownItem
-            icon-left="delete"
-            variant="destructive"
+            icon="delete"
+            tone="danger"
             :data-test="`fleet-collectors-row-remove-${row.id}`"
             @select="removeRows([row])"
           >
@@ -273,9 +237,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #selection-actions>
         <OButton
           v-if="restartableRows.length"
-          variant="outline"
-          size="sm"
-          icon-left="restart-alt"
+          variant="secondary"
+          icon="restart-alt"
           :loading="actions.restarting.value"
           data-test="fleet-collectors-bulk-restart"
           @click="actions.restart(restartableRows)"
@@ -283,9 +246,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("fleet.collectors.restart") }}
         </OButton>
         <OButton
-          variant="outline-destructive"
-          size="sm"
-          icon-left="delete"
+          variant="danger-ghost"
+          icon="delete"
           :loading="actions.removing.value"
           data-test="fleet-collectors-bulk-remove"
           @click="removeRows(selectedRows)"
@@ -296,22 +258,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #empty>
         <div data-test="fleet-collectors-empty">
-          <OEmptyState size="hero" preset="no-data" :filtered="isFiltered" @action="clearFilters" />
+          <OEmptyState
+            :kind="isFiltered ? 'filtered' : 'first-run'"
+            :title="
+              isFiltered
+                ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+                : t('emptyState.noData.title')
+            "
+            :text="
+              isFiltered
+                ? t('emptyState.filtered.description', {
+                    noun: t('emptyState.filtered.fallbackNoun'),
+                  })
+                : t('emptyState.noData.description')
+            "
+            @action="clearFilters"
+          />
         </div>
       </template>
 
       <template #error>
         <div data-test="fleet-collectors-error">
-          <OEmptyState size="hero" preset="load-error" @action="refresh" />
+          <OEmptyState
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('emptyState.loadError.description')"
+            @action="refresh"
+          />
         </div>
       </template>
     </OTable>
 
     <ODrawer
+      size="xl"
       v-if="!isDesktop"
       v-model:open="mobileFiltersOpen"
       side="left"
-      :width="80"
       :title="t('common.filters')"
       anchor='[data-drawer-anchor="fleet-collectors-toolbar"]'
       data-test="fleet-collectors-mobile-filters-drawer"
@@ -319,7 +301,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-4">
         <OSelect
           v-model="osFilter"
-          size="sm"
           clearable
           :label="t('fleet.collectors.os')"
           :options="osOptions"
@@ -351,6 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import type { SearchScopeOption } from "@/lib/forms/SearchInput/OSearchInput.types";
 import { useRoute } from "vue-router";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef, RowRailTone } from "@/lib/core/Table/OTable.types";
@@ -359,8 +341,6 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -396,6 +376,22 @@ const props = defineProps<{
   forbidden: boolean;
 }>();
 const allFleets = defineModel<boolean>("allFleets", { default: false });
+const scopeOptions = computed<SearchScopeOption[]>(() => [
+  {
+    value: "this",
+    label: t("fleet.collectors.searchThisFleet"),
+    icon: "folder-outline",
+    tooltip: t("fleet.collectors.searchThisFleetTitle"),
+    dataTest: "fleet-collectors-scope-this",
+  },
+  {
+    value: "all",
+    label: t("fleet.collectors.allFleets"),
+    icon: "search",
+    tooltip: t("fleet.collectors.searchAllFleetsTitle"),
+    dataTest: "fleet-collectors-scope-all",
+  },
+]);
 
 const { t } = useI18nTyped();
 
@@ -503,49 +499,46 @@ const statusCounts = computed(() => {
 const statusStats = computed<StatItem[]>(() => {
   const counts = statusCounts.value;
   const n = (key: "offline" | "degraded" | "unknown" | "outdated" | "online") =>
-    counts?.[key] ?? DASH;
+    counts?.[key] ?? null;
   const items: StatItem[] = [
-    {
-      key: "all",
-      label: t("common.all"),
-      value: counts?.total ?? DASH,
-      icon: "dns",
-      tone: "neutral",
-    },
-    {
-      key: "online",
-      label: t("fleet.stats.online"),
-      value: n("online"),
-      icon: "check-circle",
-      tone: "success",
-    },
     {
       key: "offline",
       label: t("fleet.stats.offline"),
       value: n("offline"),
       icon: "cloud-off",
-      tone: "error",
+      tone: "err",
     },
     {
       key: "degraded",
       label: t("fleet.stats.degraded"),
       value: n("degraded"),
       icon: "warning",
-      tone: "warning",
+      tone: "warn",
     },
     {
       key: "unknown",
       label: t("fleet.stats.unknown"),
       value: n("unknown"),
       icon: "help-outline",
-      tone: "neutral",
     },
     {
       key: "outdated",
       label: t("fleet.stats.outdated"),
       value: n("outdated"),
       icon: "update",
-      tone: "neutral",
+    },
+    {
+      key: "online",
+      label: t("fleet.stats.online"),
+      value: n("online"),
+      icon: "check-circle",
+      tone: "ok",
+    },
+    {
+      key: "all",
+      label: t("common.all"),
+      value: counts?.total ?? null,
+      icon: "dns",
     },
   ];
   return items.map((item) => ({ ...item, dataTest: `fleet-collectors-stat-${item.key}` }));

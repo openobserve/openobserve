@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="marker.unavailable"
             variant="ghost"
-            size="chip"
+            size="xs"
             data-test="svcver-marker-unavailable-retry"
             @click="emit('retry')"
             >{{ t("serviceVersions.rum.markers.unavailable") }}</OButton
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-else
             variant="ghost"
-            size="chip"
+            size="xs"
             data-test="svcver-marker-compare-previous"
             :data-deploy-key="marker.deployKey"
             @click="emit('compare', marker)"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton
         v-for="index in 24"
         :key="index"
-        variant="button"
+        shape="block"
         class="flex-1"
         :style="{ height: `${20 + ((index * 13) % 70)}%` }"
       />

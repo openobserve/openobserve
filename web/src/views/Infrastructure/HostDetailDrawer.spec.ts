@@ -61,7 +61,7 @@ const curatedOverride = vi.hoisted(() => ({ current: null as null | ((real: any)
 // The house ODialog teleports via DialogPortal — the sibling suites' stub keeps it findable in-wrapper.
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "size", "title", "subTitle", "showClose", "persistent"],
+  props: ["open", "size", "title", "subtitle", "showClose", "persistent"],
   emits: ["update:open"],
   template: `<div :data-open="open" :data-title="title"><slot name="header" /><slot /><slot name="footer" /></div>`,
 };
@@ -99,11 +99,11 @@ const renderChartsStub = defineComponent({
 const dateTimeCapture: Record<string, any> = {};
 
 // What the picker would return NOW — a relative window recomputes per call
-// (DateTime.vue:855), which is the whole reason the drawer must not cache one.
+// (ODateTimeRange.getConsumableDateTime), which is the whole reason the drawer must not cache one.
 const pickerWindow = { startTime: 0, endTime: 0 };
 
 const dateTimeStub = defineComponent({
-  name: "DateTime",
+  name: "ODateTimeRange",
   inheritAttrs: false,
   created() {
     Object.assign(dateTimeCapture, (this as any).$attrs);
@@ -237,7 +237,7 @@ describe("HostDetailDrawer", () => {
         plugins: [store, router, i18n],
         stubs: {
           RenderDashboardCharts: renderStub,
-          DateTime: dateTimeStub,
+          ODateTimeRange: dateTimeStub,
           ODrawer: {
             props: ["title"],
             template: "<div><h1>{{ title }}</h1><slot /><slot name='footer' /></div>",
@@ -700,10 +700,10 @@ describe("HostDetailDrawer", () => {
 
     // ViewDashboard holds a template ref and calls getConsumableDateTime() at every
     // point of use rather than caching a range, because a RELATIVE window recomputes
-    // per call (DateTime.vue:855). A cached range silently freezes the window.
+    // per call (ODateTimeRange.getConsumableDateTime). A cached range silently freezes the window.
     it("a picker change queries the NEW window, not the one captured at open", async () => {
       wrapper = await mountDrawer();
-      const picker = wrapper.findComponent({ name: "DateTime" });
+      const picker = wrapper.findComponent({ name: "ODateTimeRange" });
 
       const moved = { startTime: RANGE.from + DAY_US, endTime: RANGE.to + DAY_US };
       pickerWindow.startTime = moved.startTime;
@@ -723,7 +723,7 @@ describe("HostDetailDrawer", () => {
       const slid = { startTime: RANGE.from + 5 * DAY_US, endTime: RANGE.to + 5 * DAY_US };
       pickerWindow.startTime = slid.startTime;
       pickerWindow.endTime = slid.endTime;
-      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      wrapper.findComponent({ name: "ODateTimeRange" }).vm.$emit("on:date-change", {
         startTime: RANGE.from,
         endTime: RANGE.to,
         userChangedValue: true,
@@ -749,7 +749,7 @@ describe("HostDetailDrawer", () => {
       const afterMount = refreshSpy.mock.calls.length;
 
       wrapper
-        .findComponent({ name: "DateTime" })
+        .findComponent({ name: "ODateTimeRange" })
         .vm.$emit("on:date-change", { ...pickerWindow, userChangedValue: false });
       await flushPromises();
 

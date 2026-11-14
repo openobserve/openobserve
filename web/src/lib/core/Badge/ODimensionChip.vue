@@ -3,35 +3,23 @@ import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
-// ODimensionChip — the standard key|value dimension chip (k8s-cluster=prod,
-// service=api, …). A two-segment OTag: a muted KEY segment + a bold VALUE
-// segment. Colour comes from `dimensionVariant()` (exact → SUBSTRING → stable
-// hash) so prefixed keys like "k8s-cluster"/"k8s-namespace" resolve to the same
-// colour as "cluster"/"namespace" — the same logic the incident list uses, so a
-// dimension is the same colour everywhere (incident, home overview, correlation).
-// NOTE: do NOT use `type="dimensionKey"` here — that only EXACT-matches, so
-// prefixed keys fall through to grey.
-//
-//   <ODimensionChip dim-key="service" value="openobserve" />
-//   <ODimensionChip dim-key="k8s-cluster" key-label="cluster" :value="v" />
-//   <ODimensionChip dim-key="service" :value="v" removable @remove="drop(i)" />
-//
-// Single source of truth — do NOT hand-roll the two-segment markup again.
+// ODimensionChip — the key/value tag (env: prod): a mono key on a subtle fill, then the
+// mono value in strong text. The key is secondary, the value is the fact.
 
-import OTag from "./OTag.vue";
+import { computed } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { dimensionVariant } from "./badgeGroups";
-import type { BadgeVariant } from "./OBadge.types";
+import { CHIP_TONE_CLASSES } from "./chipClasses";
+import type { ChipTone } from "./OBadge.types";
 
 const { t } = useI18nTyped();
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
-    /** Dimension key — drives the colour via the `dimensionKey` group. */
+    /** Dimension key, shown in the key segment unless `keyLabel` overrides it. */
     dimKey: string;
-    /** Dimension value (shown in the bold segment). */
+    /** Dimension value (shown in the strong segment). */
     value: string | number;
     /** Optional display override for the key segment (e.g. a shortened key). */
     keyLabel?: string;
@@ -39,18 +27,14 @@ withDefaults(
     tooltip?: boolean;
     /** Give a cut value its own tooltip; turn off when an enclosing element already shows the full value. */
     valueTooltip?: boolean;
-    /**
-     * Render a dismiss affordance inside the chip and emit `remove` on click.
-     * A dismissable condition is the chip itself, not a button parked beside
-     * it — the two read as one control and stay the same height.
-     */
+    /** Render a ✕ inside the chip that emits `remove`. */
     removable?: boolean;
     /** Accessible name for the dismiss affordance. */
     removeLabel?: I18nText;
     /** `data-test` for the dismiss affordance, so a page can target one chip's remove. */
     removeDataTest?: string;
-    /** Colour override for a condition that is not a user-picked dimension (an insight filter). */
-    variant?: BadgeVariant;
+    /** Tone for a condition that is not a user-picked dimension (an insight filter). */
+    tone?: ChipTone;
     /** Third segment naming how the value was derived; a removable chip shows its dismiss affordance instead. */
     qualifier?: I18nText;
     /** `data-test` for the qualifier segment. */
@@ -66,7 +50,7 @@ withDefaults(
     removable: false,
     removeLabel: undefined,
     removeDataTest: undefined,
-    variant: undefined,
+    tone: "neutral",
     qualifier: undefined,
     qualifierDataTest: undefined,
     muted: false,
@@ -75,50 +59,58 @@ withDefaults(
 );
 
 const emit = defineEmits<{ (e: "remove"): void }>();
+
+const isNeutral = computed(() => props.tone === "neutral");
+const rootTone = computed(() =>
+  isNeutral.value ? "border-border-default bg-surface-base" : CHIP_TONE_CLASSES[props.tone],
+);
+const segmentTone = computed(() =>
+  isNeutral.value
+    ? "border-border-default bg-surface-subtle text-text-secondary"
+    : "border-current/20 bg-current/8",
+);
+const valueText = computed(() => {
+  if (props.muted) return "text-text-secondary font-normal";
+  return isNeutral.value ? "text-text-heading font-medium" : "font-medium";
+});
 </script>
 
 <template>
-  <span class="inline-flex max-w-full min-w-0">
-    <OTag
-      :variant="variant ?? dimensionVariant(dimKey)"
-      shape="rounded"
-      class="min-w-0 overflow-hidden !p-0"
-    >
-      <span class="inline-flex min-w-0 items-stretch">
-        <span
-          v-if="!hideKey"
-          class="shrink-0 bg-current/8 py-1.5 ps-2.5 pe-1 whitespace-nowrap opacity-90"
-          :class="muted ? 'text-text-secondary' : undefined"
-          >{{ keyLabel ?? dimKey }}</span
-        >
-        <OTruncatedText
-          class="py-1.5"
-          :class="[
-            hideKey ? 'ps-2.5' : 'ps-1',
-            muted ? 'text-text-secondary font-medium' : 'font-semibold',
-            removable ? 'pe-1' : qualifier ? 'pe-1.5' : 'pe-2.5',
-          ]"
-          :tooltip="tooltip || !valueTooltip ? false : undefined"
-          >{{ value }}</OTruncatedText
-        >
-        <button
-          v-if="removable"
-          type="button"
-          :aria-label="removeLabel ?? t('common.remove')"
-          class="inline-flex shrink-0 cursor-pointer items-center ps-0.5 pe-1.5 hover:opacity-70"
-          :data-test="removeDataTest"
-          @click.stop="emit('remove')"
-        >
-          <OIcon name="close" size="xs" />
-        </button>
-        <span
-          v-else-if="qualifier"
-          class="shrink-0 border-s border-current/20 bg-current/8 py-1.5 ps-1.5 pe-2 font-medium whitespace-nowrap opacity-90"
-          :data-test="qualifierDataTest"
-          >{{ qualifier }}</span
-        >
-      </span>
-    </OTag>
+  <span
+    class="rounded-chip inline-flex h-5 max-w-full min-w-0 items-center overflow-hidden border font-mono text-xs leading-none"
+    :class="rootTone"
+    data-test="o-dimension-chip"
+  >
+    <!-- First child: with no element before it, the tooltip attaches to the chip root. -->
     <OTooltip v-if="tooltip" :content="raw(`${dimKey}=${value}`)" />
+    <span
+      v-if="!hideKey"
+      class="inline-flex shrink-0 items-center self-stretch border-e px-1.5 font-normal whitespace-nowrap"
+      :class="segmentTone"
+      >{{ keyLabel ?? dimKey }}</span
+    >
+    <OTruncatedText
+      class="px-1.5"
+      :class="[valueText, removable ? 'pe-0.5' : undefined]"
+      :tooltip="tooltip || !valueTooltip ? false : undefined"
+      >{{ value }}</OTruncatedText
+    >
+    <button
+      v-if="removable"
+      type="button"
+      :aria-label="removeLabel ?? t('common.remove')"
+      class="focus-visible:ring-badge-focus-ring inline-grid shrink-0 cursor-pointer place-items-center self-stretch pe-1 opacity-70 hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
+      :data-test="removeDataTest"
+      @click.stop="emit('remove')"
+    >
+      <OIcon name="close" size="xs" class="size-2.5!" />
+    </button>
+    <span
+      v-else-if="qualifier"
+      class="inline-flex shrink-0 items-center self-stretch border-s px-1.5 font-sans font-medium whitespace-nowrap"
+      :class="segmentTone"
+      :data-test="qualifierDataTest"
+      >{{ qualifier }}</span
+    >
   </span>
 </template>

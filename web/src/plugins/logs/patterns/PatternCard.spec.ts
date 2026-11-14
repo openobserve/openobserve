@@ -58,7 +58,7 @@ describe("PatternCard", () => {
   };
   const OButtonStub = {
     name: "OButton",
-    props: ["variant", "size", "iconLeft", "iconRight", "disabled", "title"],
+    props: ["variant", "size", "icon", "iconEnd", "disabled", "title"],
     // Do NOT declare "click" in emits — VTU then treats the parent's @click.stop
     // as a native DOM listener on the root element, which fires on trigger("click").
     emits: [],

@@ -45,7 +45,7 @@ describe("OFormSelect", () => {
   // Regression: OFormSelect re-declares `searchable` (a boolean prop). An OMITTED
   // `searchable` must NOT be cast to false and clobber OSelect's `searchable: true`
   // default — otherwise every migrated form select loses its search box.
-  it("stays searchable by default (matches OSelect) when not specified", () => {
+  it("keeps OSelect's auto search by default when not specified", () => {
     wrapper = mount(OForm, {
       props: { defaultValues: { kind: "" } },
       slots: {
@@ -53,7 +53,7 @@ describe("OFormSelect", () => {
       },
       global: { components: { OFormSelect } },
     });
-    expect(wrapper.findComponent(OSelect).props("searchable")).toBe(true);
+    expect(wrapper.findComponent(OSelect).props("searchable")).toBe("auto");
   });
 
   it('honors an explicit :searchable="false"', () => {
@@ -135,17 +135,17 @@ describe("OFormSelect", () => {
     expect(wrapper.text()).toContain("Column is required when using an aggregate function.");
   });
 
-  it("forwards other re-declared props (optionTooltip, labelPosition) through to OSelect", () => {
+  it("forwards other re-declared props (variant, maxChips) through to OSelect", () => {
     wrapper = mount(OForm, {
       props: { defaultValues: { kind: "" } },
       slots: {
         default:
-          '<OFormSelect name="kind" :option-tooltip="true" label-position="inside" :options="[{label:\'A\',value:\'a\'}]" />',
+          '<OFormSelect name="kind" variant="filter" :max-chips="3" :options="[{label:\'A\',value:\'a\'}]" />',
       },
       global: { components: { OFormSelect } },
     });
-    expect(wrapper.findComponent(OSelect).props("optionTooltip")).toBe(true);
-    expect(wrapper.findComponent(OSelect).props("labelPosition")).toBe("inside");
+    expect(wrapper.findComponent(OSelect).props("variant")).toBe("filter");
+    expect(wrapper.findComponent(OSelect).props("maxChips")).toBe(3);
   });
 
   it("forwards OSelect's header-action event to the consumer", () => {

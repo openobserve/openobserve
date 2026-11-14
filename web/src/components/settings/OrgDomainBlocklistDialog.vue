@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     data-test="settings-org-domain-blocklist-dialog"
     v-model:open="dialogOpen"
-    persistent
     size="md"
     :form-id="FORM_ID"
     :title="
@@ -26,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t('settings.orgDomainMapping.editBlockedUsers')
         : t('settings.orgDomainMapping.blockUsers')
     "
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="isEditing ? t('common.save') : t('settings.orgDomainMapping.block')"
+    :secondary="{ label: t('common.cancel') }"
+    :primary="{ label: isEditing ? t('common.save') : t('settings.orgDomainMapping.block') }"
     @click:secondary="dialogOpen = false"
   >
     <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">

@@ -26,7 +26,7 @@ const stubs = {
   ODropdownItem: {
     name: "ODropdownItem",
     emits: ["select"],
-    template: `<button v-bind="$attrs" @click="$emit('select')"><slot /><slot name="icon-right" /></button>`,
+    template: `<button v-bind="$attrs" @click="$emit('select')"><slot /><slot name="end" /></button>`,
   },
   OTag: true,
   PlaygroundVariablesMenu: true,

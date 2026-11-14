@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, nextTick, ref } from "vue";
 import ODialog from "./ODialog.vue";
@@ -96,11 +96,11 @@ describe("ODialog", () => {
     expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(false);
   });
 
-  it("shows the close button when persistent=true (persistent only blocks Escape/backdrop)", () => {
+  it("hides the close button when persistent=true, since a forced flow cannot be dismissed", () => {
     const wrapper = mount(ODialog, {
       props: { open: true, title: "Test", persistent: true },
     });
-    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(true);
+    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(false);
   });
 
   it("hides the close button when showClose=false even with persistent=true", () => {
@@ -219,7 +219,7 @@ describe("ODialog", () => {
   describe("body action button validation suppression", () => {
     it("AC-4: primary button emits click:primary so consumer can trigger validation", async () => {
       const wrapper = mount(ODialog, {
-        props: { open: true, primaryButtonLabel: "Save" },
+        props: { open: true, primary: { label: "Save" } },
       });
       await wrapper.find('[data-test="o-dialog-primary-btn"]').trigger("click");
       expect(wrapper.emitted("click:primary")).toBeTruthy();
@@ -297,7 +297,7 @@ describe("ODialog", () => {
     it("should stop a printable key pressed on a footer button from reaching document", () => {
       const wrapper = mount(ODialog, {
         attachTo: document.body,
-        props: { open: true, title: "Test", primaryButtonLabel: "OK" },
+        props: { open: true, title: "Test", primary: { label: "OK" } },
       });
       const btn = wrapper.find('[data-test="o-dialog-primary-btn"]');
       expect(btn.exists()).toBe(true);
@@ -310,7 +310,7 @@ describe("ODialog", () => {
       window.addEventListener("error", uncaught);
       const wrapper = mount(ODialog, {
         attachTo: document.body,
-        props: { open: true, title: "Test", primaryButtonLabel: "OK" },
+        props: { open: true, title: "Test", primary: { label: "OK" } },
       });
       const btn = wrapper.find('[data-test="o-dialog-primary-btn"]');
       btn.element.dispatchEvent(new Event("keydown", { bubbles: true, cancelable: true }));
@@ -335,7 +335,7 @@ describe("ODialog", () => {
     it("should let modifier combos and non-printable keys propagate", () => {
       const wrapper = mount(ODialog, {
         attachTo: document.body,
-        props: { open: true, title: "Test", primaryButtonLabel: "OK" },
+        props: { open: true, title: "Test", primary: { label: "OK" } },
       });
       const btn = wrapper.find('[data-test="o-dialog-primary-btn"]');
       expect(dispatchKeydown(btn.element, { key: "s", ctrlKey: true })).toBe(true);
@@ -350,8 +350,8 @@ describe("ODialog", () => {
         props: {
           open: true,
           title: "Discard?",
-          primaryButtonLabel: "Discard",
-          secondaryButtonLabel: "Keep",
+          primary: { label: "Discard" },
+          secondary: { label: "Keep" },
           ...props,
         },
         slots: { default: "<p>Body</p>" },
@@ -372,10 +372,9 @@ describe("ODialog", () => {
       wrapper.unmount();
     });
 
-    it("focuses the secondary button when initialFocus is secondary, so Enter does not run a destructive primary", async () => {
+    it("focuses the secondary button when the primary is destructive, so Enter cannot run it", async () => {
       const wrapper = await openConfirm({
-        initialFocus: "secondary",
-        primaryButtonVariant: "destructive",
+        primary: { label: "Discard", variant: "danger" },
       });
       await vi.waitFor(() =>
         expect(document.activeElement?.getAttribute("data-test")).toBe("o-dialog-secondary-btn"),
@@ -439,93 +438,161 @@ describe("ODialog", () => {
     });
   });
 
-  describe("pinned top", () => {
-    const height = { value: 300 };
-    const centredTop = (panelHeight: number) => `${(window.innerHeight - panelHeight) / 2}px`;
-
-    const openDialog = async () => {
-      height.value = 300;
-      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
-        () => ({ height: height.value }) as DOMRect,
-      );
-      const wrapper = mount(ODialog, {
-        props: { open: true },
-        slots: { default: "<p data-testid='body'>Body</p>" },
-      });
-      await flushPromises();
-      return wrapper;
-    };
+  describe("fixed top and sizes", () => {
     const panelOf = (w: ReturnType<typeof mount>) =>
       w.find("[data-o2-dialog]").element as HTMLElement;
-    const grow = async (w: ReturnType<typeof mount>) => {
-      height.value = 420;
-      await w.setProps({ title: "Grown" });
+
+    it("sits at a fixed 12vh top and never centres vertically (O5)", async () => {
+      const wrapper = mount(ODialog, { props: { open: true } });
       await flushPromises();
+      const classes = panelOf(wrapper).className;
+      expect(classes).toContain("top-[12vh]");
+      expect(classes).not.toContain("top-1/2");
+      expect(panelOf(wrapper).getAttribute("style") ?? "").not.toContain("top:");
+    });
+
+    it.each([
+      ["sm", "25rem"],
+      ["md", "35rem"],
+      ["lg", "45rem"],
+    ])("draws size %s at its fixed width", async (size, width) => {
+      const wrapper = mount(ODialog, { props: { open: true, size: size as "sm" } });
+      await flushPromises();
+      expect(panelOf(wrapper).className).toContain(width);
+      expect(panelOf(wrapper).getAttribute("data-o2-dialog-size")).toBe(size);
+    });
+
+    it("has no width or max-height escape hatch", () => {
+      expect(ODialog.props).not.toHaveProperty("width");
+      expect(ODialog.props).not.toHaveProperty("maxHeight");
+    });
+  });
+
+  describe("footer actions", () => {
+    it("puts the extra action on the left and Cancel before the primary on the right (O7)", async () => {
+      const wrapper = mount(ODialog, {
+        props: {
+          open: true,
+          primary: { label: "Save" },
+          secondary: { label: "Cancel" },
+          extra: { label: "Test" },
+        },
+      });
+      await flushPromises();
+      const order = wrapper
+        .findAll("[data-o2-btn]")
+        .map((b) => b.attributes("data-test"))
+        .filter((id) => id !== "o-dialog-close-btn");
+      expect(order).toEqual([
+        "o-dialog-neutral-btn",
+        "o-dialog-secondary-btn",
+        "o-dialog-primary-btn",
+      ]);
+    });
+
+    it("emits click:extra from the extra action", async () => {
+      const wrapper = mount(ODialog, { props: { open: true, extra: { label: "Delete" } } });
+      await wrapper.find('[data-test="o-dialog-neutral-btn"]').trigger("click");
+      expect(wrapper.emitted("click:extra")).toBeTruthy();
+    });
+
+    it("keeps a disabled action focusable with its reason", async () => {
+      const wrapper = mount(ODialog, {
+        props: {
+          open: true,
+          primary: { label: "Save", disabled: true, disabledReason: "Fix 2 errors" },
+        },
+      });
+      await flushPromises();
+      const btn = wrapper.find('[data-test="o-dialog-primary-btn"]');
+      expect(btn.attributes("aria-disabled")).toBe("true");
+      expect(btn.attributes("aria-describedby")).toBeTruthy();
+    });
+
+    it("uses the action's own data-test", () => {
+      const wrapper = mount(ODialog, {
+        props: { open: true, primary: { label: "Go", dataTest: "my-go" } },
+      });
+      expect(wrapper.find('[data-test="my-go"]').exists()).toBe(true);
+    });
+  });
+
+  describe("discard guard (V5, O8)", () => {
+    function findDialogPanel(wrapper: ReturnType<typeof mount>) {
+      return wrapper
+        .findAllComponents(DialogContent)
+        .find((c) => c.attributes("data-o2-dialog") !== undefined)!;
+    }
+    const escape = () => new KeyboardEvent("keydown", { key: "Escape" });
+
+    it("asks in its own footer instead of closing when dirty", async () => {
+      const wrapper = mount(ODialog, {
+        props: { open: true, dirty: true, primary: { label: "Save" } },
+      });
+      await findDialogPanel(wrapper).vm.$emit("escapeKeyDown", escape());
+      await flushPromises();
+      expect(wrapper.emitted("update:open")).toBeFalsy();
+      expect(wrapper.find('[data-test="o-dialog-discard-row"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-dialog-primary-btn"]').exists()).toBe(false);
+      expect(wrapper.findAll("[data-o2-dialog]").length).toBe(1);
+    });
+
+    it("keeps editing on Keep editing and closes with a discard event on Discard", async () => {
+      const wrapper = mount(ODialog, { props: { open: true, dirty: true } });
+      await wrapper.find('[data-test="o-dialog-close-btn"]').trigger("click");
+      await flushPromises();
+      await wrapper.find('[data-test="o-dialog-keep-editing-btn"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="o-dialog-discard-row"]').exists()).toBe(false);
+      expect(wrapper.emitted("update:open")).toBeFalsy();
+
+      await wrapper.find('[data-test="o-dialog-close-btn"]').trigger("click");
+      await flushPromises();
+      await wrapper.find('[data-test="o-dialog-discard-btn"]').trigger("click");
+      expect(wrapper.emitted("discard")).toBeTruthy();
+      expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+    });
+
+    it("closes at once when there are no edits", async () => {
+      const wrapper = mount(ODialog, { props: { open: true } });
+      await findDialogPanel(wrapper).vm.$emit("escapeKeyDown", escape());
+      expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+    });
+
+    it("cannot be dismissed while an action is busy", async () => {
+      const wrapper = mount(ODialog, {
+        props: { open: true, primary: { label: "Save", loading: true } },
+      });
+      await findDialogPanel(wrapper).vm.$emit("escapeKeyDown", escape());
+      expect(wrapper.emitted("update:open")).toBeFalsy();
+    });
+  });
+
+  describe("Enter in a form (V7)", () => {
+    const pressEnter = (input: Element) => {
+      const event = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+      input.dispatchEvent(event);
+      return event.defaultPrevented;
     };
 
-    afterEach(() => vi.restoreAllMocks());
-
-    it("stays centred while content changes before the user interacts", async () => {
-      const wrapper = await openDialog();
-      await grow(wrapper);
-      expect(panelOf(wrapper).style.top).toBe("");
+    it("lets Enter submit a single-field form", () => {
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: { open: true },
+        slots: { default: '<form><input data-testid="name" /></form>' },
+      });
+      expect(pressEnter(wrapper.find('[data-testid="name"]').element)).toBe(false);
+      wrapper.unmount();
     });
 
-    it("pins its top on the first pointerdown, so later growth extends downward", async () => {
-      const wrapper = await openDialog();
-      await wrapper.find('[data-testid="body"]').trigger("pointerdown");
-      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
-      expect(panelOf(wrapper).getAttribute("style")).toContain("translate: -50% 0");
-
-      await grow(wrapper);
-      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
-    });
-
-    it("pins its top on the first keydown inside the panel", async () => {
-      const wrapper = await openDialog();
-      await wrapper.find('[data-testid="body"]').trigger("keydown", { key: "Tab" });
-      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
-    });
-
-    it("centres again after it is closed and reopened", async () => {
-      const wrapper = await openDialog();
-      await wrapper.find('[data-testid="body"]').trigger("pointerdown");
-      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
-
-      await wrapper.setProps({ open: false });
-      await flushPromises();
-      await wrapper.setProps({ open: true });
-      await flushPromises();
-      expect(panelOf(wrapper).style.top).toBe("");
-    });
-
-    it("drops a resize repin that is still queued when the dialog closes", async () => {
-      const wrapper = await openDialog();
-      await wrapper.find('[data-testid="body"]').trigger("pointerdown");
-      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
-
-      window.dispatchEvent(new Event("resize"));
-      await wrapper.setProps({ open: false });
-      await flushPromises();
-      await wrapper.setProps({ open: true });
-      await flushPromises();
-      expect(panelOf(wrapper).style.top).toBe("");
-    });
-
-    it("clears the non-fullscreen pin when an open dialog becomes fullscreen", async () => {
-      const wrapper = await openDialog();
-      await wrapper.find('[data-testid="body"]').trigger("pointerdown");
-      expect(panelOf(wrapper).style.top).toBe(centredTop(300));
-
-      await wrapper.setProps({ size: "full" });
-      await flushPromises();
-      expect(panelOf(wrapper).style.top).toBe("");
-      expect(panelOf(wrapper).style.maxHeight).toBe("");
-      expect(panelOf(wrapper).getAttribute("style") ?? "").not.toContain("translate");
-
-      await wrapper.setProps({ size: "md" });
-      await flushPromises();
-      expect(panelOf(wrapper).style.top).toBe("");
+    it("never submits a multi-field form on Enter", () => {
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: { open: true },
+        slots: { default: '<form><input data-testid="name" /><textarea /></form>' },
+      });
+      expect(pressEnter(wrapper.find('[data-testid="name"]').element)).toBe(true);
+      wrapper.unmount();
     });
   });
 });

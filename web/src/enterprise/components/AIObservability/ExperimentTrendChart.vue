@@ -12,9 +12,8 @@
       <OSelect
         v-model="scoreKey"
         :label="t('experimentsAtScale.trendScore')"
-        label-position="inside"
-        size="sm"
-        width="md"
+        variant="filter"
+        width="m"
         :options="options"
         data-test="ai-experiment-trend-score"
       />

@@ -52,10 +52,10 @@ describe("httpButtonState", () => {
 
 describe("httpButtonChip and httpButtonTooltip", () => {
   const cases: [HttpButtonState, string | null, string | null, string | null][] = [
-    ["on", "success-soft", "On", null],
-    ["paused", "warning-soft", "On", "Requests get 403 while the workflow is paused"],
-    ["draft", "warning-soft", "On", "Requests get 403 until the workflow is published"],
-    ["off", "default-soft", "Off", "Let another system start this workflow with an HTTP request"],
+    ["on", "ok", "On", null],
+    ["paused", "warn", "On", "Requests get 403 while the workflow is paused"],
+    ["draft", "warn", "On", "Requests get 403 until the workflow is published"],
+    ["off", "neutral", "Off", "Let another system start this workflow with an HTTP request"],
     ["none", null, null, "Let another system start this workflow with an HTTP request"],
   ];
 
@@ -121,7 +121,7 @@ describe("useWorkflowHttpButton", () => {
     const button = await mountButton();
     expect(button.state.value).toBe("off");
     expect(button.endpointOn.value).toBe(false);
-    expect(button.chip.value?.variant).toBe("default-soft");
+    expect(button.chip.value?.variant).toBe("neutral");
   });
 
   it("no endpoint configured shows no chip", async () => {

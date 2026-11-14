@@ -75,7 +75,7 @@ describe("OSparkline", () => {
     );
   });
 
-  it("applies the tone class matching OCoverageMeter's vocabulary", () => {
+  it("applies the status text colour for its tone", () => {
     const wrapper = mount(OSparkline, { props: { points: [1, 2], tone: "danger" } });
     expect(wrapper.find("svg").classes()).toContain("text-status-error-text");
   });

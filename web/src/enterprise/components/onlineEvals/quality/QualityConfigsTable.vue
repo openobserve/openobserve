@@ -27,14 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="configId"
       :loading="loading"
       :forbidden="forbidden"
-      :show-global-filter="false"
       :default-columns="false"
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="quality-score-configs-v3"
       sort-by="health"
       sort-order="asc"
-      width="100%"
       @row-click="(row: QualityRow) => emit('open', row, 'all')"
     >
       <!-- In the toolbar so the column picker shares their row; hidden when the list is empty. -->
@@ -43,21 +41,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OStatStrip>
             <OTooltip :content="t('onlineEvals.quality.tiles.attentionTooltip')">
               <OStatCard
-                class="grow basis-52 max-lg:shrink-0 max-lg:basis-auto"
                 :label="t('onlineEvals.quality.tiles.attention')"
-                :value="loading ? '—' : tiles.attention"
+                :value="tiles.attention"
+                :loading="loading"
                 :max="tiles.total"
-                :tone="tiles.attention > 0 ? 'error' : 'neutral'"
+                :tone="tiles.attention > 0 ? 'err' : 'neutral'"
                 clickable
                 :selected="tileFilter === 'attention'"
                 data-test="quality-tile-attention"
                 @click="toggleTile('attention')"
               >
                 <template #value>
-                  <span data-test="quality-tile-attention-value">{{
-                    loading ? "—" : tiles.attention
-                  }}</span>
-                  <span v-if="!loading" class="text-text-secondary ms-1 text-sm font-normal">{{
+                  <span data-test="quality-tile-attention-value">{{ tiles.attention }}</span>
+                  <span class="text-text-secondary text-compact ms-1 font-medium">{{
                     t("onlineEvals.quality.tiles.ofTotal", { total: tiles.total })
                   }}</span>
                 </template>
@@ -72,11 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTooltip>
             <OTooltip :content="t('onlineEvals.quality.tiles.withoutResultTooltip')">
               <OStatCard
-                class="grow basis-52 max-lg:shrink-0 max-lg:basis-auto"
                 :label="t('onlineEvals.quality.tiles.withoutResult')"
-                :value="loading ? '—' : tiles.withoutResult"
+                :value="tiles.withoutResult"
+                :loading="loading"
                 :max="tiles.total"
-                :tone="tiles.withoutResult > 0 ? 'warning' : 'neutral'"
+                :tone="tiles.withoutResult > 0 ? 'warn' : 'neutral'"
                 clickable
                 :selected="tileFilter === 'withoutResult'"
                 data-test="quality-tile-without-result"
@@ -84,9 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #value>
                   <span data-test="quality-tile-without-result-value">{{
-                    loading ? "—" : tiles.withoutResult
+                    tiles.withoutResult
                   }}</span>
-                  <span v-if="!loading" class="text-text-secondary ms-1 text-sm font-normal">{{
+                  <span class="text-text-secondary text-compact ms-1 font-medium">{{
                     t("onlineEvals.quality.tiles.ofTotal", { total: tiles.total })
                   }}</span>
                 </template>
@@ -110,14 +106,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #empty>
         <div class="flex items-center justify-center py-8" data-test="quality-configs-empty">
-          <OEmptyState v-if="loadError" size="hero" preset="load-error" @action="emit('retry')" />
+          <OEmptyState
+            v-if="loadError"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('emptyState.loadError.description')"
+            @action="emit('retry')"
+          />
           <OEmptyState
             v-else
-            size="hero"
-            preset="no-score-configs"
-            :filtered="!!search.trim() || !!tileFilter"
-            :actions="search.trim() || tileFilter ? undefined : emptyActions"
-            @action="onEmptyAction"
+            :kind="!!search.trim() || !!tileFilter ? 'filtered' : 'first-run'"
+            :title="
+              !!search.trim() || !!tileFilter
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.scoreConfigs') })
+                : t('emptyState.noScoreConfigs.title')
+            "
+            :text="
+              !!search.trim() || !!tileFilter
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.scoreConfigs') })
+                : t('emptyState.noScoreConfigs.description')
+            "
+            :icon="!!search.trim() || !!tileFilter ? undefined : 'dashboard'"
+            :action-label="
+              search.trim() || tileFilter
+                ? undefined
+                : t('oneClickEval.evaluate', { agent: agent ?? t('oneClickEval.anAgent') })
+            "
+            :secondary-action-label="
+              search.trim() || tileFilter ? undefined : t('emptyState.noScoreConfigs.action')
+            "
+            @action="onEmptyAction(search.trim() || tileFilter ? 'clear-filters' : 'one-click')"
+            @secondary-action="onEmptyAction('create')"
           />
         </div>
       </template>
@@ -126,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex min-w-0 flex-col gap-0.5">
           <div class="flex min-w-0 items-center gap-1.5">
             <span class="text-text-heading truncate font-semibold">{{ row.name }}</span>
-            <OTag type="evalDataType" :value="row.dataType" size="xs" />
+            <OTag type="evalDataType" :value="row.dataType" size="sm" />
           </div>
           <span v-if="row.description" class="text-text-secondary truncate text-xs">{{
             row.description
@@ -154,16 +173,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-unhealthy="{ row }">
         <OButton
           v-if="unhealthyShare(row) != null"
-          variant="cell"
+          variant="link"
           :title="t('onlineEvals.quality.table.openUnhealthy')"
           :data-test="`quality-configs-unhealthy-${row.configId}`"
           @click.stop="emit('open', row, 'unhealthy')"
         >
           <!-- Decorative: the text beside it states the share, and the minimum sliver would announce a wrong value. -->
           <OProgressBar
-            :value="barShare(unhealthyShare(row))"
-            :variant="unhealthyTone(unhealthyShare(row)) ?? 'default'"
-            size="sm"
+            :value="barShare(unhealthyShare(row)) * 100"
+            :tone="unhealthyTone(unhealthyShare(row)) ?? 'accent'"
             aria-hidden="true"
           />
           <!-- Wraps rather than clips the percent when the counts run to six digits. -->
@@ -199,8 +217,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #cell-actions="{ row }">
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :data-test="`quality-configs-config-link-${row.configId}`"
           @click.stop="openConfig(row)"
         >
@@ -222,7 +240,6 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
@@ -368,22 +385,6 @@ function openConfig(row: QualityRow) {
     .push(scoreConfigLink(String(route.name), orgId.value, row.configId, "view"))
     .catch(() => {});
 }
-
-const emptyActions = computed<EmptyStateAction[]>(() => [
-  {
-    id: "one-click",
-    icon: "auto-awesome",
-    titleKey: "oneClickEval.evaluate",
-    titleParams: { agent: props.agent ?? t("oneClickEval.anAgent") },
-    descriptionKey: "oneClickEval.emptyActionDesc",
-  },
-  {
-    id: "create",
-    icon: "add",
-    titleKey: "emptyState.noScoreConfigs.action",
-    descriptionKey: "emptyState.noScoreConfigs.actionDesc",
-  },
-]);
 
 function onEmptyAction(id?: string) {
   if (id === "one-click") {

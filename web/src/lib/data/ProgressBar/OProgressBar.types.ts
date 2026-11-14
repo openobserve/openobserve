@@ -1,32 +1,22 @@
-/** Semantic color state derived from the data value; `neutral` is a calm, non-semantic fill (a comparison baseline) */
-export type ProgressBarVariant = "default" | "success" | "warning" | "danger" | "neutral";
+import type { I18nText } from "@/types/i18n";
 
-/** Height of the progress track */
-export type ProgressBarSize = "xs" | "sm" | "md" | "lg";
+/** Fill colour by meaning: accent for plain progress, ok / warn / err for a status reading. */
+export type ProgressBarTone = "accent" | "ok" | "warn" | "err";
+
+export const PROGRESS_BAR_TONES = [
+  "accent",
+  "ok",
+  "warn",
+  "err",
+] as const satisfies readonly ProgressBarTone[];
 
 export interface ProgressBarProps {
-  /** Progress value between 0 and 1 (inclusive) */
-  value: number;
-  /**
-   * Left edge of the fill, between 0 and 1. Default 0 — the fill starts at the
-   * track's start, which is ordinary progress.
-   *
-   * Set it to turn the bar into a *segment* of the track: the fill spans
-   * `[start, value]` rather than `[0, value]`, so a series of bars sharing one
-   * scale reads as a timeline. `start >= value` renders an empty fill rather
-   * than a negative width.
-   */
+  /** Percent done, 0-100; null is work with no known end and animates the fill. */
+  value: number | null;
+  /** Left edge of the fill, 0-100, so a row of bars on one scale reads as a timeline. Default: 0 */
   start?: number;
-  /** Semantic color state. Default: "default" */
-  variant?: ProgressBarVariant;
-  color?: string;
-  /** Track height. Default: "sm" */
-  size?: ProgressBarSize;
-  /** Work with no known end: a short fill slides along the track and `value` is ignored. */
-  indeterminate?: boolean;
-}
-
-export interface ProgressBarSlots {
-  /** Content rendered inside the filled bar (e.g. a percentage label) */
-  default?: () => unknown;
+  /** Fill colour. Default: "accent" */
+  tone?: ProgressBarTone;
+  /** Accessible name of the bar. */
+  label?: I18nText;
 }

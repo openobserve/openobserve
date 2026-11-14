@@ -141,7 +141,7 @@ export class DatabaseMonitoringPage {
     this.prevPageBtn = page.locator('[data-test="o2-table-prev-page-btn"]');
     this.firstPageBtn = page.locator('[data-test="o2-table-first-page-btn"]');
     this.paginationInfo = page.locator('[data-test="o2-table-pagination-info"]');
-    this.paginationBottom = page.locator('[data-test*="pagination"], .q-table__bottom');
+    this.paginationBottom = page.locator('[data-test="o2-table-pagination-bottom"]');
   }
 
   /**

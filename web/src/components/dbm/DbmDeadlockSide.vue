@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          DBA rather than thrown away. -->
     <p v-if="waitSentence" class="text-text-secondary text-2xs leading-relaxed">
       {{ waitSentence }}
-      <OTag v-if="rawLock" variant="default-soft" size="xs" shape="rounded" class="mt-1 font-mono">
+      <OTag v-if="rawLock" tone="neutral" mono size="sm" class="mt-1">
         {{ rawLock }}
       </OTag>
     </p>
@@ -98,9 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-for="action in actions"
         :key="action.id"
-        variant="outline"
-        :size="action.iconOnly ? 'icon-sm' : 'sm'"
-        :icon-left="action.icon"
+        :icon-only="action.iconOnly"
+        variant="secondary"
+        :icon="action.icon"
         :data-test="`${dataTest}-${action.id}`"
         @click="emit('action', action.id)"
       >

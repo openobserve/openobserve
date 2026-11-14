@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="(value: string) => setTextConfig(field.key, value)"
       >
         <template #tooltip>
-          <OTooltip :content="t('dashboard.htmlPanelFieldTooltip')" max-width="15.625rem" />
+          <OTooltip :content="t('dashboard.htmlPanelFieldTooltip')" />
         </template>
       </OCombobox>
     </template>
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-config-logs_order"
     >
       <template #tooltip>
-        <OTooltip :content="t('dashboard.logsOrderTooltip')" max-width="15.625rem" />
+        <OTooltip :content="t('dashboard.logsOrderTooltip')" />
       </template>
     </OSelect>
     <OSwitch
@@ -48,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="config.logs_show_time !== false"
       :label="t('dashboard.logsShowTime')"
       data-test="dashboard-config-logs_show_time"
-      size="lg"
       @update:model-value="(value: any) => setDefaultOnFlag('logs_show_time', value)"
     />
     <OSwitch
@@ -56,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="config.logs_wrap === true"
       :label="t('dashboard.logsWrap')"
       data-test="dashboard-config-logs_wrap"
-      size="lg"
       @update:model-value="(value: any) => setFlagConfig('logs_wrap', value)"
     />
     <OSwitch
@@ -64,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="config.logs_prettify_json !== false"
       :label="t('dashboard.logsPrettifyJson')"
       data-test="dashboard-config-logs_prettify_json"
-      size="lg"
       @update:model-value="(value: any) => setDefaultOnFlag('logs_prettify_json', value)"
     />
   </div>

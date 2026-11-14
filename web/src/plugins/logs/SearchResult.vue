@@ -25,8 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
-          variant="outline"
-          size="icon-chip"
+          icon-only
+          variant="secondary"
+          size="xs"
           class="ms-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
@@ -50,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('logs.searchResult.openFields')
             "
             side="bottom"
-            shortcut-id="logsToggleSidebar"
+            shortcut="logsToggleSidebar"
           />
         </OButton>
         <div
@@ -126,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="min-w-0 truncate">{{ patternSummaryText }}</span>
           </template>
           <span v-if="searchObj.loadingCounter" class="shrink-0">
-            <OSpinner size="xs" class="mx-auto block" />
+            <OSpinner class="mx-auto block" />
           </span>
           <div
             v-else-if="
@@ -137,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-warning shrink-0 cursor-pointer"
           >
             <OIcon name="info-outline" size="sm"> </OIcon>
-            <OTooltip :content="raw(searchObj.data.histogram.errorMsg)" side="top" align="center" />
+            <OTooltip :content="raw(searchObj.data.histogram.errorMsg)" side="top" />
           </div>
         </div>
 
@@ -145,32 +146,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
-              <OButton variant="outline" size="icon-chip" data-test="logs-result-actions-menu-btn">
+              <OButton
+                icon-only
+                variant="secondary"
+                size="xs"
+                data-test="logs-result-actions-menu-btn"
+              >
                 <OIcon name="more-horiz" size="sm" />
                 <OTooltip :content="t('search.moreActions')" />
               </OButton>
             </template>
-            <ODropdownItem data-test="logs-result-refresh-menu-item" @select="$emit('run-query')">
-              <template #icon-left><OIcon name="refresh" size="sm" /></template>
+            <ODropdownItem
+              icon="refresh"
+              data-test="logs-result-refresh-menu-item"
+              @select="$emit('run-query')"
+            >
               {{ t("common.refresh") }}
             </ODropdownItem>
             <ODropdownItem
+              icon="wrap-text"
               v-if="showWrapBtn"
               data-test="logs-result-wrap-menu-item"
               @select="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
             >
-              <template #icon-left><OIcon name="wrap-text" size="sm" /></template>
               {{ t("search.messageWrapContent") }}
-              <template v-if="searchObj.meta.toggleSourceWrap" #icon-right>
+              <template v-if="searchObj.meta.toggleSourceWrap" #end>
                 <OIcon name="check" size="sm" />
               </template>
             </ODropdownItem>
             <ODropdownItem
+              icon="troubleshoot"
               v-if="showInspectBtn"
               data-test="logs-inspect-button"
               @select="openSearchJobInspector"
             >
-              <template #icon-left><OIcon name="troubleshoot" size="sm" /></template>
               {{ t("volumeInsights.searchInspectionsLabel") }}
             </ODropdownItem>
           </ODropdown>
@@ -182,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-card-glass-border rounded-default inline-flex h-6 items-center border px-1"
             >
               <ORefreshButton
-                size="inset"
+                size="sm"
                 :last-run-at="searchObj.meta.lastRunAt"
                 :loading="searchObj.loading || histogramSettling"
                 :disabled="searchObj.loading || histogramSettling"
@@ -193,8 +202,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-0.5">
               <OButton
                 v-if="inspectAvailable"
-                variant="outline"
-                :size="showActionLabels ? 'chip' : 'icon-chip'"
+                :icon-only="!showActionLabels"
+                variant="secondary"
+                size="xs"
                 :disabled="!showInspectBtn"
                 @click="openSearchJobInspector"
                 data-test="logs-inspect-button"
@@ -210,9 +220,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="showWrapBtn"
-                variant="outline"
-                size="icon-chip"
-                :active="searchObj.meta.toggleSourceWrap"
+                icon-only
+                variant="secondary"
+                size="xs"
+                :pressed="searchObj.meta.toggleSourceWrap"
                 @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
                 data-test="logs-search-result-wrap-table-content-btn"
               >
@@ -240,7 +251,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.meta.resultGrid.rowsPerPage"
               :options="rowsPerPageOptions"
               class="select-pagination min-w-[4.5rem]"
-              size="sm"
               :searchable="false"
               :disabled="searchObj.loading || !!gridLockReason"
               @update:model-value="getPageData('recordsPerPage')"
@@ -261,23 +271,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabindex="gridLockReason ? 0 : undefined"
             :aria-disabled="gridLockReason ? true : undefined"
             :aria-describedby="gridLockReason ? 'logs-pagination-reason' : undefined"
-            class="inline-flex justify-end"
-            :class="paginationMaxPages === 5 ? 'min-w-54' : 'min-w-39'"
+            class="inline-flex min-w-31 justify-end"
           >
             <OPagination
               v-if="
                 searchObj.meta.resultGrid.showPagination &&
                 searchObj.meta.logsVisualizeToggle === 'logs'
               "
-              :disable="searchObj.loading || histogramSettling || !!gridLockReason"
+              :loading="searchObj.loading || histogramSettling || !!gridLockReason"
+              :disabled-reason="gridLockReason || undefined"
               :data-locked="gridLockReason ? 'true' : undefined"
-              v-model="pageNumberInput"
-              :max="summaryView.pageCount"
-              :max-pages="paginationMaxPages"
+              v-model:page="pageNumberInput"
+              :page-count="summaryView.pageCount"
               class="paginator-section"
-              @update:model-value="getPageData('pageChange')"
+              @update:page="getPageData('pageChange')"
               data-test="logs-search-result-pagination"
-            />
+            >
+              <!-- The results summary beside it already states the range. -->
+              <template #range />
+            </OPagination>
             <span v-if="gridLockReason" id="logs-pagination-reason" class="sr-only">{{
               gridLockReason
             }}</span>
@@ -394,7 +406,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="inline"
             icon="bar-chart"
             :title="t('logs.searchResult.noData')"
-            :backdrop="false"
             data-test="logs-search-no-data-histogram"
             class="histogram-empty !min-h-0 !p-2"
           />
@@ -424,7 +435,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("logs.searchResult.histogramFetchError") }}
             <OButton
               variant="secondary"
-              size="sm"
               @click="toggleErrorDetails"
               data-test="logs-page-histogram-error-details-btn"
               >{{ t("search.histogramErrorBtnLabel") }}</OButton
@@ -536,7 +546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :streaming="isResultsStreaming || showStaleRows"
                   :data-stale-rows="showStaleRows ? 'true' : undefined"
                   :row-key="logsRowKey"
-                  :row-height="20"
+                  density="compact"
                   virtual-scroll
                   skeleton-on-refetch
                   :fill-height="false"
@@ -544,8 +554,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :horizontal-scroll="true"
                   :scroll-margin="0"
                   :default-columns="false"
-                  :show-global-filter="false"
-                  :frame="false"
                   pagination="none"
                   sorting="none"
                   :enable-column-reorder="true"
@@ -646,7 +654,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <OButton
                         variant="ghost"
-                        size="sm"
                         data-test="logs-expanded-quick-mode-off"
                         @click="turnOffQuickMode"
                       >
@@ -683,7 +690,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OContextMenuSeparator />
 
               <OContextMenuItem
-                icon-left="content-copy"
+                icon="content-copy"
                 data-test="log-context-menu-copy-value"
                 @select="copyLogToClipboard(contextCell.value)"
               >
@@ -692,10 +699,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <OContextMenuItem
                 v-if="contextLineLink.kind !== 'hidden'"
-                icon-left="link"
+                icon="link"
                 :disabled="contextLineLink.kind === 'disabled'"
-                focusable-unavailable
-                :description="
+                :disabled-reason="
                   contextLineLink.kind === 'disabled' ? contextLineLink.reason : undefined
                 "
                 data-test="log-context-menu-copy-line-link"
@@ -725,7 +731,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- size="sm" matches the registry icons on the other items so
                     the labels line up; the glyph itself is inset because it
                     fills its viewBox edge-to-edge, unlike Material Symbols. -->
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon name="" size="sm">
                       <EqualIcon class="size-3" />
                     </OIcon>
@@ -743,7 +749,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )
                   "
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon name="" size="sm">
                       <NotEqualIcon class="size-3" />
                     </OIcon>
@@ -755,14 +761,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="aiEnabled">
                 <OContextMenuSeparator />
                 <OContextMenuItem
-                  icon-left="auto-awesome"
+                  icon="auto-awesome"
                   data-test="log-context-menu-ai-value"
                   @select="sendToAiChat(JSON.stringify(contextCell.value))"
                 >
                   {{ t("logs.cellActions.sendValueToAi") }}
                 </OContextMenuItem>
                 <OContextMenuItem
-                  icon-left="auto-awesome"
+                  icon="auto-awesome"
                   data-test="log-context-menu-ai-row"
                   @select="sendToAiChat(JSON.stringify(contextCell.row), true)"
                 >
@@ -803,13 +809,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end combined scroll area -->
 
       <ODrawer
+        size="xl"
         bleed
         lazy
         data-test="logs-search-result-detail-dialog"
         v-model:open="searchObj.meta.showDetailTab"
-        :width="85"
         :title="t('search.rowDetail')"
-        :sub-title="drawerSubTitle"
+        :subtitle="drawerSubTitle"
         :return-focus-to="detailReturnFocus"
         @update:open="(v) => !v && (reDrawChart(), endSharedDetail())"
         @after-close="onDetailDrawerAfterClose"
@@ -1281,7 +1287,6 @@ export default defineComponent({
     const containerWidth = ref(9999);
     let containerResizeObserver: ResizeObserver | null = null;
     // match shouldMoveActionsToMenu threshold: 3 pages when narrow, 5 when wide
-    const paginationMaxPages = computed(() => (containerWidth.value < 700 ? 3 : 5));
 
     // The histogram is sticky-left inside the shared scroll container. Sticky
     // alone would stretch it to the full scroll width and mis-size the ECharts
@@ -3187,7 +3192,6 @@ export default defineComponent({
       plotChart,
       searchObj,
       containerWidth,
-      paginationMaxPages,
       patternsState,
       updatedLocalLogFilterField,
       byString,

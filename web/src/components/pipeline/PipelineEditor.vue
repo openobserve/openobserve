@@ -22,26 +22,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            pipeline name for NEW pipelines (edit mode shows it in the breadcrumb). -->
       <Teleport defer to="#o2-page-actions">
         <OButton
-          variant="outline"
-          size="icon-sm"
+          icon-only
+          variant="secondary"
           class="hideOnPrintMode"
           data-test="pipeline-json-edit-btn"
           @click="openJsonEditor"
-          icon-left="code"
+          icon="code"
         >
           <OTooltip :content="t('pipeline.editPipelineJson')" side="top" />
         </OButton>
         <OButton
           data-test="add-pipeline-cancel-btn"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           @click="openCancelDialog"
           >{{ t("pipeline.cancel") }}</OButton
         >
         <OButton
           data-test="add-pipeline-save-btn"
           variant="primary"
-          size="sm-action"
           :loading="isPipelineSaving"
           :disabled="isPipelineSaving"
           @click="savePipeline()"
@@ -144,17 +142,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @close="closeStepPicker"
   />
   <ODrawer
+    size="xl"
     data-test="pipeline-editor-json-editor-drawer"
     bleed
     v-model:open="showJsonEditorDialog"
-    :width="70"
     :title="t('pipeline.editPipelineJSON')"
-    persistent
+    :dirty="jsonEditorDirty"
   >
     <template v-if="jsonEditorAiButtonVisible" #header-right>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-toolbar"
         @click="toggleJsonEditorAIChat"
         data-test="menu-link-ai-item"
         :aria-label="t('menu.aiAssistant')"
@@ -184,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :validation-errors="validationErrors"
       @close="showJsonEditorDialog = false"
       @saveJson="savePipelineJson"
+      @update:dirty="jsonEditorDirty = $event"
     />
   </ODrawer>
   <ConfirmDialog
@@ -475,6 +474,7 @@ const { getStreams } = useStreams(t);
 
 const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);
+const jsonEditorDirty = ref(false);
 const associatedFunctions: Ref<string[]> = ref([]);
 
 // Edition check via the registry (fixes a missing-Cloud bug the old raw

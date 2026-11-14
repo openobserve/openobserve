@@ -33,9 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="page"
       pagination="none"
       sorting="none"
-      :show-global-filter="false"
       :fill-height="false"
-      frame
       data-test="svcver-pages-table"
       ><template #cell-page="{ row }"
         ><span class="truncate font-mono text-xs" :data-test="`svcver-page-${slug(row.page)}`">{{
@@ -60,8 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ><template #cell-link="{ row }"
         ><OButton
           v-if="row.sessions"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :data-test="`svcver-page-replays-${slug(row.page)}`"
           @click="visit(row.sessions)"
           >{{ t("serviceVersions.compare.drill.pages.sessions") }}</OButton
@@ -91,9 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="key"
         pagination="none"
         sorting="none"
-        :show-global-filter="false"
         :fill-height="false"
-        frame
         data-test="svcver-inp-targets-table"
         ><template #cell-target="{ row }"
           ><span class="flex min-w-0 flex-col" :data-test="`svcver-inp-target-${row.rank}`"
@@ -113,8 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ><template #cell-link="{ row }"
           ><OButton
             v-if="row.sessions"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             :data-test="`svcver-inp-target-replay-${row.rank}`"
             @click="visit(row.sessions)"
             >{{ t("serviceVersions.compare.drill.inp.replay") }}</OButton
@@ -146,9 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="key"
         pagination="none"
         sorting="none"
-        :show-global-filter="false"
         :fill-height="false"
-        frame
         wrap
         data-test="svcver-breakdown-table"
         ><template #cell-value="{ row }"

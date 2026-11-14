@@ -88,7 +88,7 @@ const overlapStat = (
   return {
     key,
     label: raw(key),
-    value: tile.value ?? raw("—"),
+    value: tile.value,
     ...(tile.qualified ? { sub: raw(qualifier) } : {}),
     dataTest: `dbm-queries-summary-${key}`,
   };

@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFieldRow :data-test="row.testId">
             <OTag
               :label="kindLabel(row.step)"
-              :variant="kindVariant(row.step)"
-              size="xs"
+              :tone="kindVariant(row.step)"
+              size="sm"
               class="shrink-0"
             />
             <OTruncatedText class="text-text-body flex-1 font-mono text-xs">{{
@@ -73,8 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               v-if="row.custom"
               :label="t('rum.analytics.kind.event')"
-              variant="default-soft"
-              size="xs"
+              tone="neutral"
+              size="sm"
               class="shrink-0"
             />
             <span
@@ -89,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span data-test="rum-analytics-funnel-add-step-empty">{{ listEmpty }}</span>
             <OButton
               v-if="failed && !loading"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="rum-analytics-funnel-add-step-empty-retry"
               @click="load"
               >{{ t("common.retry") }}</OButton
@@ -102,8 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span data-test="rum-analytics-funnel-add-step-note">{{ note }}</span>
             <OButton
               v-if="failed && !loading"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="rum-analytics-funnel-add-step-retry"
               @click="load"
               >{{ t("common.retry") }}</OButton

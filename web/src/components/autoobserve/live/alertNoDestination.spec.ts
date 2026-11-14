@@ -83,7 +83,7 @@ describe("alert_no_destination suggestions (C7)", () => {
   it("words the All suggestions row with its own headline, next step and CTA, not Other", () => {
     const [row] = toSuggestionRows(gt, ZONE, [noDestination()], NOW_MS);
     expect(row.kind).toBe("Notifies no one");
-    expect(row.kindVariant).toBe("amber-soft");
+    expect(row.kindVariant).toBe("warn");
     expect(row.headline).toBe("checkout-errors fired and notifies no one");
     expect(String(row.note)).toContain("Choose who gets notified.");
     expect(row.insight.cta?.label).toBe("Review alert");
@@ -106,7 +106,7 @@ describe("alert_no_destination suggestions (C7)", () => {
 
   it("is amber, says how often it fired and what the button opens, on the card itself (T1-N5)", () => {
     const [request] = toRequests(gt, ZONE, [noDestination()], NOW_MS);
-    expect(request.insight.chip).toMatchObject({ variant: "amber-soft", tone: "gap" });
+    expect(request.insight.chip).toMatchObject({ variant: "warn", tone: "gap" });
     expect(request.insight.why).toBe(
       "It fired 4 times in the last calibration window, and no one was notified.",
     );
@@ -187,6 +187,6 @@ describe("calibration tiers say what they mean (T1-15)", () => {
       [finding("alert_not_working", { rule_id: "failure", pattern: "syntax" }, { tier })],
       NOW_MS,
     );
-    expect(row.insight.facts).toEqual([{ label, variant: "default-soft", hint }]);
+    expect(row.insight.facts).toEqual([{ label, variant: "neutral", hint }]);
   });
 });

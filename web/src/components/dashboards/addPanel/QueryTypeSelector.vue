@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="selectedButtonQueryType"
         @update:model-value="onUpdateQueryMode($event as string)"
       >
-        <OToggleGroupItem value="sql" size="sm" data-test="dashboard-sql-query-type">
+        <OToggleGroupItem value="sql" data-test="dashboard-sql-query-type">
           <template #icon-left><OIcon name="database" size="xs" class="shrink-0" /></template>
           {{ t("panel.SQL") }}
         </OToggleGroupItem>
@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               .stream_type == 'metrics' && !isCustomSqlPanel(dashboardPanelData.data.type)
           "
           value="promql"
-          size="sm"
           data-test="dashboard-promql-query-type"
         >
           <template #icon-left><OIcon name="show-chart" size="xs" class="shrink-0" /></template>
@@ -55,13 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
           value="builder"
-          size="sm"
           data-test="dashboard-builder-query-type"
         >
           <template #icon-left><OIcon name="build" size="xs" class="shrink-0" /></template>
           {{ t("panel.builder") }}
         </OToggleGroupItem>
-        <OToggleGroupItem value="custom" size="sm" data-test="dashboard-custom-query-type">
+        <OToggleGroupItem value="custom" data-test="dashboard-custom-query-type">
           <template #icon-left><OIcon name="code" size="xs" class="shrink-0" /></template>
           {{ t("panel.custom") }}
         </OToggleGroupItem>

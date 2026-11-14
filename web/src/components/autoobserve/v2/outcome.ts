@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nKey } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 
 export type ProblemOutcome =
   "active" | "fixing" | "fixed" | "contained" | "resolved" | "held" | "predicted";
@@ -22,48 +22,48 @@ export type ProblemOutcome =
 // One look per outcome, shared by the problem list and the problem drawer.
 export const OUTCOME: Record<
   ProblemOutcome,
-  { marker: string; ink: string; tag: BadgeVariant; key: I18nKey }
+  { marker: string; ink: string; tag: ChipTone; key: I18nKey }
 > = {
   active: {
     marker: "bg-status-error-text",
     ink: "text-status-error-text",
-    tag: "error-soft",
+    tag: "err",
     key: "autoobserve2.outcome.active",
   },
   fixing: {
     marker: "bg-accent",
     ink: "text-accent",
-    tag: "primary-soft",
+    tag: "accent",
     key: "autoobserve2.outcome.fixing",
   },
   fixed: {
     marker: "bg-accent",
     ink: "text-accent",
-    tag: "primary-soft",
+    tag: "accent",
     key: "autoobserve2.outcome.fixed",
   },
   contained: {
     marker: "bg-status-info-text",
     ink: "text-status-info-text",
-    tag: "blue-soft",
+    tag: "neutral",
     key: "autoobserve2.outcome.contained",
   },
   resolved: {
     marker: "bg-status-positive",
     ink: "text-status-positive",
-    tag: "success-soft",
+    tag: "ok",
     key: "autoobserve2.outcome.resolved",
   },
   held: {
     marker: "bg-border-strong",
     ink: "text-text-secondary",
-    tag: "default-soft",
+    tag: "neutral",
     key: "autoobserve2.outcome.held",
   },
   predicted: {
     marker: "bg-status-warning-text",
     ink: "text-status-warning-text",
-    tag: "warning-soft",
+    tag: "warn",
     key: "autoobserve2.outcome.predicted",
   },
 };

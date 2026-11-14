@@ -43,12 +43,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Section navigation stays live on a license-locked page; edition-gated tabs keep their own `disable`. -->
   <FeatureLockExempt class="contents">
-    <OTabs :model-value="activeTab" align="left" data-test="dbm-section-tabs" @change="navigate">
+    <OTabs :model-value="activeTab" data-test="dbm-section-tabs" @change="navigate">
       <OTab
         v-for="section in sections"
         :key="section.key"
         :name="section.key"
-        :disable="section.disabled"
+        :disabled="section.disabled"
         :data-test="`dbm-section-tab-${section.key}`"
       >
         <span>{{ section.label }}</span>

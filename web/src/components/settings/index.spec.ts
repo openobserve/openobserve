@@ -102,7 +102,7 @@ const createWrapper = (props = {}, options = {}) => {
           template: `<div data-test-stub="app-page-header">
             <slot name="title"></slot>
           </div>`,
-          props: ["title", "subtitle", "icon", "class"],
+          props: ["title", "titleDataTest", "about"],
         },
         ConstrainedPage: {
           template: `<div data-test-stub="constrained-page"><slot></slot></div>`,
@@ -385,7 +385,7 @@ describe("SettingsIndex", () => {
       expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
     });
 
-    it("gives the Slack section a page subtitle like its siblings", () => {
+    it("gives the Slack section About text like its siblings", () => {
       mockStore.state.zoConfig = { service_streams_enabled: true, slack_enabled: true };
       const wrapper = createWrapper();
       const items = (wrapper.vm.sectionGroups as SectionHubGroup[]).flatMap((g) => g.items);

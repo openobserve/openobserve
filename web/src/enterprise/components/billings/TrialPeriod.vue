@@ -16,14 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="visible" class="flex flex-col gap-2">
-    <OBanner
-      :variant="tone"
-      :icon="tone === 'warning' ? 'warning' : 'info-outline'"
-      inline-actions
-      dense
-      data-test="trial-period-container"
-      :data-tone="tone"
-    >
+    <OInlineNotice :tone="tone" data-test="trial-period-container" :data-tone="tone">
       <span class="font-semibold">{{ t("billing.trialStrip.title") }}</span>
       <span class="mx-1">·</span>
       <template v-if="expired">
@@ -43,22 +36,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <OButton
           v-if="currentPage !== 'billing'"
-          :variant="tone === 'warning' ? 'warning' : 'outline'"
-          size="xs"
+          :variant="tone === 'warn' ? 'primary' : 'secondary'"
+          size="sm"
           data-test="trial-period-compare-plans-btn"
           @click="redirectBilling"
           >{{ t("billing.trialStrip.comparePlans") }}</OButton
         >
         <OButton
           v-else
-          :variant="tone === 'warning' ? 'warning' : 'outline'"
-          size="xs"
+          :variant="tone === 'warn' ? 'primary' : 'secondary'"
+          size="sm"
           data-test="trial-period-contact-support-btn"
           @click="redirectContactSupport"
           >{{ t("billing.trialStrip.contactSupport") }}</OButton
         >
       </template>
-    </OBanner>
+    </OInlineNotice>
     <p
       v-if="currentPage === 'usage'"
       class="text-text-secondary m-0 text-xs"
@@ -77,7 +70,7 @@ import { useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
 import BillingService from "@/services/billings";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -110,7 +103,7 @@ const remainingMs = computed(() =>
 const daysLeft = computed(() => Math.max(0, Math.floor(remainingMs.value / DAY_MS)));
 // Ended only once the expiry has passed; the paywall keeps its own BASE boundary (isTrialExpired).
 const expired = computed(() => remainingMs.value <= 0);
-const tone = computed(() => (expired.value || daysLeft.value <= WARNING_DAYS ? "warning" : "info"));
+const tone = computed(() => (expired.value || daysLeft.value <= WARNING_DAYS ? "warn" : "info"));
 const endDate = computed(() =>
   expiryMicros.value === undefined
     ? ""

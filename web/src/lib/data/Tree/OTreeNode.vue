@@ -170,7 +170,6 @@ function onTickChange(newVal: CheckboxModelValue) {
       <OCheckbox
         :model-value="checkboxState"
         :disabled="isDisabled"
-        size="sm"
         class="cursor-pointer"
         @click.stop
         @update:model-value="onTickChange"

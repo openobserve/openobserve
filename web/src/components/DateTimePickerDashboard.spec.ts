@@ -17,7 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { defineComponent, ref } from "vue";
 import { mount, shallowMount, flushPromises } from "@vue/test-utils";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import { useDashboardTimeGate } from "@/composables/dashboard/useDashboardTimeGate";
 import { toPickerSavedDate } from "@/utils/dashboard/panelTimeUtils";
 import i18n from "@/locales";
@@ -34,7 +34,7 @@ describe("DateTimePickerDashboard", () => {
       valueType: "relative",
     },
     initialTimezone: "UTC",
-    disable: false,
+    disabled: false,
     autoApplyDashboard: false,
   };
 
@@ -56,7 +56,7 @@ describe("DateTimePickerDashboard", () => {
       },
       global: {
         stubs: {
-          DateTime: {
+          ODateTimeRange: {
             template: '<div data-test="datetime-component"></div>',
             props: {
               "auto-apply": Boolean,
@@ -64,7 +64,8 @@ describe("DateTimePickerDashboard", () => {
               "default-absolute-time": Object,
               "default-relative-time": String,
               initialTimezone: [String, null],
-              disable: Boolean,
+              disabled: Boolean,
+              size: String,
               calendarPresets: Boolean,
             },
             methods: {
@@ -105,7 +106,7 @@ describe("DateTimePickerDashboard", () => {
 
     it("should render DateTime component", () => {
       wrapper = createWrapper();
-      const dateTimeComponent = wrapper.findComponent(DateTime);
+      const dateTimeComponent = wrapper.findComponent(ODateTimeRange);
       expect(dateTimeComponent.exists()).toBe(true);
     });
   });
@@ -151,14 +152,16 @@ describe("DateTimePickerDashboard", () => {
       expect(wrapper.vm.initialTimezone).toBe("America/New_York");
     });
 
-    it("should pass disable prop correctly", () => {
+    it("should pass disabled and size to the picker", () => {
       wrapper = createWrapper({
-        disable: true,
+        disabled: true,
+        size: "sm",
       });
 
       const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
       expect(dateTimeComponent.exists()).toBe(true);
-      expect(wrapper.vm.disable).toBe(true);
+      expect(dateTimeComponent.props("disabled")).toBe(true);
+      expect(dateTimeComponent.props("size")).toBe("sm");
     });
 
     it("should pass autoApplyDashboard prop correctly", () => {
@@ -286,7 +289,7 @@ describe("DateTimePickerDashboard", () => {
     it("should handle DateTime component hide event", async () => {
       wrapper = createWrapper();
 
-      const dateTimeComponent = wrapper.findComponent(DateTime);
+      const dateTimeComponent = wrapper.findComponent(ODateTimeRange);
       await dateTimeComponent.vm.$emit("hide");
 
       expect(wrapper.emitted("hide")).toBeTruthy();
@@ -295,7 +298,7 @@ describe("DateTimePickerDashboard", () => {
     it("should handle DateTime component show event", async () => {
       wrapper = createWrapper();
 
-      const dateTimeComponent = wrapper.findComponent(DateTime);
+      const dateTimeComponent = wrapper.findComponent(ODateTimeRange);
       await dateTimeComponent.vm.$emit("show");
 
       expect(wrapper.emitted("show")).toBeTruthy();
@@ -311,7 +314,7 @@ describe("DateTimePickerDashboard", () => {
         valueType: "relative",
       };
 
-      const dateTimeComponent = wrapper.findComponent(DateTime);
+      const dateTimeComponent = wrapper.findComponent(ODateTimeRange);
       await dateTimeComponent.vm.$emit("on:date-change", mockDate);
 
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
@@ -458,7 +461,7 @@ describe("DateTimePickerDashboard", () => {
       wrapper = createWrapper({
         modelValue: {},
         initialTimezone: "",
-        disable: null,
+        disabled: null,
         autoApplyDashboard: null,
       });
 
@@ -505,7 +508,7 @@ describe("DateTimePickerDashboard", () => {
           valueType: "absolute",
         },
         initialTimezone: "Europe/London",
-        disable: true,
+        disabled: true,
         autoApplyDashboard: true,
       });
 
@@ -516,7 +519,7 @@ describe("DateTimePickerDashboard", () => {
       expect(wrapper.vm.modelValue.valueType).toBe("absolute");
       expect(wrapper.vm.modelValue.relativeTimePeriod).toBe("1d");
       expect(wrapper.vm.initialTimezone).toBe("Europe/London");
-      expect(wrapper.vm.disable).toBe(true);
+      expect(wrapper.vm.disabled).toBe(true);
       expect(wrapper.vm.autoApplyDashboard).toBe(true);
     });
 
@@ -564,7 +567,7 @@ describe("DateTimePickerDashboard", () => {
     });
 
     const openPicker = async (host: any) => {
-      host.findComponent(DateTime).vm.menuOpen = true;
+      host.findComponent(ODateTimeRange).vm.menuOpen = true;
       await flushPromises();
     };
     const inMenu = (dataTest: string) =>
@@ -600,18 +603,18 @@ describe("DateTimePickerDashboard", () => {
       });
       await flushPromises();
       const label = () => wrapper.find('[data-test="date-time-btn"]').text();
-      const realPicker = wrapper.findComponent(DateTime);
-      expect(label()).toContain("2026/10/13 10:00:00 - 2026/10/13 10:30:00");
+      const realPicker = wrapper.findComponent(ODateTimeRange);
+      expect(label()).toContain("Oct 13 10:00 – 10:30");
 
       realPicker.vm.onMenuOpenChange(true);
       realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
       await flushPromises();
-      expect(label()).toContain("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+      expect(label()).toContain("Oct 13 18:50 – 18:25");
 
       realPicker.vm.onMenuOpenChange(false);
       await flushPromises();
 
-      expect(label()).toContain("2026/10/13 10:00:00 - 2026/10/13 10:30:00");
+      expect(label()).toContain("Oct 13 10:00 – 10:30");
       expect((wrapper.vm as any).gate.needsRefresh.value).toBe(false);
     });
 

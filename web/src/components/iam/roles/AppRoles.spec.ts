@@ -76,14 +76,7 @@ async function mountAppRoles({ realConfirm = false } = {}) {
           ? false
           : {
               name: "ConfirmDialog",
-              props: [
-                "modelValue",
-                "title",
-                "message",
-                "messageKeypath",
-                "messageName",
-                "okVariant",
-              ],
+              props: ["modelValue", "title", "message", "messageKeypath", "messageName", "kind"],
               emits: ["update:ok", "update:cancel", "update:modelValue"],
               template: '<div data-test="confirm-dialog-stub"></div>',
             },
@@ -106,13 +99,6 @@ describe("AppRoles - rendering", () => {
     const wrapper = await mountAppRoles();
     // Title now lives in the standard OPageHeader (row 1).
     expect(wrapper.find(".app-page-header h1").text()).toContain("Roles");
-  });
-
-  it.skip("renders the search input", async () => {
-    // Search input is inside RoleTable child component, not directly in AppRoles.
-    // AppRoles binds v-model:global-filter to RoleTable; the input is rendered by RoleTable itself.
-    const wrapper = await mountAppRoles();
-    expect(wrapper.find('[data-test="o2-table-global-filter-input"]').exists()).toBe(true);
   });
 
   it("renders the roles table", async () => {
@@ -344,7 +330,7 @@ describe("AppRoles - showConfirmDialog", () => {
     const dialog = wrapper.findAllComponents({ name: "ConfirmDialog" })[0];
     expect(dialog.props("messageKeypath")).toBe("iam.appRoles.deleteConfirm");
     expect(dialog.props("messageName")).toBe("Viewer");
-    expect(dialog.props("okVariant")).toBe("destructive");
+    expect(dialog.props("kind")).toBe("destructive");
   });
 
   it("builds a blast-radius warning with the live user count", async () => {
@@ -425,7 +411,7 @@ describe("AppRoles - openBulkDeleteDialog", () => {
     const dialog = wrapper
       .findAllComponents({ name: "ConfirmDialog" })
       .find((c: any) => c.props("title") === i18n.global.t("iam.appRoles.bulkDeleteRoles"));
-    expect(dialog!.props("okVariant")).toBe("destructive");
+    expect(dialog!.props("kind")).toBe("destructive");
   });
 });
 
@@ -760,8 +746,14 @@ describe("AppRoles - editor drafts", () => {
     expect(wrapper.find('[data-test="iam-roles-Admin-draft-dot"]').exists()).toBe(false);
   });
 
+  // Delete is destructive, so it sits in the row's ⋯ menu (B7).
   const deleteFromRow = async (wrapper: VueWrapper, role: string) => {
-    await wrapper.get(`[data-test="iam-roles-delete-${role}-role-icon"]`).trigger("click");
+    const row = wrapper.findAll("tbody tr").find((tr) => tr.text().includes(role))!;
+    await row.get('[data-test="iam-roles-row-more-actions"]').trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    document
+      .querySelector<HTMLElement>(`[data-test="iam-roles-delete-${role}-role-icon"]`)!
+      .click();
     await flushPromises();
     clickIn("confirm-dialog", "o-dialog-primary-btn");
     await flushPromises();

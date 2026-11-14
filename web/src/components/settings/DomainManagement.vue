@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-slot="{ isSubmitting }"
             class="flex items-start gap-x-2"
           >
-            <div class="w-field-width-md max-w-full min-w-0">
+            <div class="w-field-width-m max-w-full min-w-0">
               <OFormInput
                 :id="NEW_DOMAIN_INPUT_ID"
                 data-test="domain-management-new-domain-input"
@@ -98,8 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OButton
               data-test="domain-management-add-domain-btn"
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               type="submit"
               :loading="isSubmitting"
               >{{ t("settings.domainManagement.addDomain") }}
@@ -131,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ domain.name }}
               </div>
-              <div class="w-field-width-md max-w-full">
+              <div class="w-field-width-m max-w-full">
                 <OSelect
                   v-model="domain.policy"
                   :options="policyOptions"
@@ -143,22 +142,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <OButton
-                icon-left="close"
-                variant="ghost-muted"
-                size="icon-xs-sq"
-                :aria-label="
-                  t('settings.domainManagement.removeDomain', { domain: raw(domain.name) })
-                "
+                icon-only
+                icon="close"
+                variant="ghost"
+                size="sm"
+                :label="t('settings.domainManagement.removeDomain', { domain: raw(domain.name) })"
                 :data-test="`domain-management-remove-domain-btn-${domain.name}`"
                 @click="removeDomain(index)"
-              >
-                <OTooltip
-                  :content="
-                    t('settings.domainManagement.removeDomain', { domain: raw(domain.name) })
-                  "
-                  side="top"
-                />
-              </OButton>
+              />
             </div>
 
             <p
@@ -190,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-slot="{ isSubmitting }"
                 class="flex items-start gap-x-2"
               >
-                <div class="w-field-width-md max-w-full min-w-0">
+                <div class="w-field-width-m max-w-full min-w-0">
                   <OFormInput
                     :id="emailInputId(domain)"
                     :data-test="`domain-management-${listKind(domain)}-email-input-${domain.name}`"
@@ -207,8 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'domain-management-block-email-btn'
                       : 'domain-management-add-email-btn'
                   "
-                  variant="outline"
-                  size="sm-action"
+                  variant="secondary"
                   type="submit"
                   :loading="isSubmitting"
                   >{{ t("common.add") }}</OButton
@@ -223,10 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span class="break-all">{{ email }}</span>
                   <OButton
-                    icon-left="close"
-                    variant="ghost-muted"
-                    size="icon-xs-sq"
-                    :aria-label="t('settings.domainManagement.removeEmail', { email: raw(email) })"
+                    icon-only
+                    icon="close"
+                    variant="ghost"
+                    size="sm"
+                    :label="t('settings.domainManagement.removeEmail', { email: raw(email) })"
                     @click="
                       domain.policy === 'block_specific'
                         ? removeBlockedEmail(domain, emailIndex)
@@ -264,9 +255,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODrawer
       v-model:open="showVrlInfo"
+      size="md"
       :title="t('settings.claimParserFunctionInfoTitle')"
       side="right"
-      :width="40"
     >
       <div class="text-sm">
         <div class="rounded-default bg-surface-subtle mb-4 p-4">
@@ -292,19 +283,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
             <div>
               <OButton
-                icon-left="refresh"
-                variant="ghost-muted"
-                size="icon-xs-sq"
-                @click="loadRecentErrors"
+                icon-only
+                icon="refresh"
+                variant="ghost"
+                size="sm"
+                :label="t('common.refresh')"
                 :loading="loadingErrors"
-              >
-                <OTooltip :content="t('common.refresh')" side="top" />
-              </OButton>
+                @click="loadRecentErrors"
+              />
             </div>
           </div>
 
           <div v-if="loadingErrors" class="py-4 text-center">
-            <OSpinner size="xs" />
+            <OSpinner />
           </div>
 
           <div v-else-if="recentErrors.length === 0" class="text-text-muted py-2 text-center">
@@ -334,10 +325,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="logsLock.lockedReason.value" :disabled="!logsLock.locked.value">
                 <span class="inline-flex">
                   <OButton
-                    :icon-left="logsLock.locked.value ? 'lock' : undefined"
-                    :icon-right="logsLock.locked.value ? undefined : 'open-in-new'"
-                    variant="ghost-primary"
-                    size="sm"
+                    :icon="logsLock.locked.value ? 'lock' : undefined"
+                    :icon-end="logsLock.locked.value ? undefined : 'open-in-new'"
+                    variant="accent-ghost"
                     :disabled="logsLock.locked.value"
                     data-test="domain-management-view-all-errors"
                     @click="viewAllErrors"
@@ -358,9 +348,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="confirmRemoveDomainOpen"
     size="sm"
     :title="t('common.confirm')"
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('confirmDialog.ok')"
-    primary-button-variant="destructive"
+    :secondary="{ label: t('confirmDialog.cancel') }"
+    :primary="{ label: t('confirmDialog.ok'), variant: 'danger' }"
     @click:secondary="confirmRemoveDomainOpen = false"
     @click:primary="doRemoveDomain"
   >
@@ -382,9 +371,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="confirmRemoveEmailOpen"
     size="sm"
     :title="t('common.confirm')"
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('confirmDialog.ok')"
-    :primary-button-variant="shownRemoveEmail.blocked ? 'primary' : 'destructive'"
+    :secondary="{ label: t('confirmDialog.cancel') }"
+    :primary="{
+      label: t('confirmDialog.ok'),
+      variant: shownRemoveEmail.blocked ? 'primary' : 'danger',
+    }"
     @click:secondary="cancelRemoveEmail"
     @click:primary="doRemoveEmail"
   >

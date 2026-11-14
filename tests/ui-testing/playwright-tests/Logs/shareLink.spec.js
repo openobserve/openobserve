@@ -1013,7 +1013,7 @@ test.describe('Line links (4c Part C)', () => {
     await expect(notice).toBeVisible({ timeout: 60000 });
     await expect(notice).toContainText('This link was on page 3.');
     await page.locator('[data-test="logs-shared-page-go-btn"]').click();
-    await expect(page.locator('[data-test="logs-search-result-pagination"] [aria-current="page"]')).toHaveText('3', {
+    await expect(page.locator('[data-test="logs-search-result-pagination"]')).toHaveAttribute('data-test-page', '3', {
       timeout: 60000,
     });
     await expect(notice).toHaveCount(0);

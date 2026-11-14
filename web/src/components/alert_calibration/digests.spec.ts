@@ -710,12 +710,12 @@ describe("a short-blips noise finding", () => {
 describe("the colours a run's words take", () => {
   it("never paints full coverage green when no alert was in scope", () => {
     expect(coverageBadge(run({ alerts_in_scope: 0 })).tone).toBe("neutral");
-    expect(coverageBadge(run({ alerts_in_scope: 0 })).variant).toBe("default-soft");
+    expect(coverageBadge(run({ alerts_in_scope: 0 })).variant).toBe("neutral");
     expect(coverageBadge(run({ alerts_in_scope: 4 })).tone).toBe("success");
   });
 
   it("shows High severity in the same orange Incidents uses for High", () => {
-    expect(SEVERITY_BADGE.High).toBe("orange-soft");
+    expect(SEVERITY_BADGE.High).toBe("warn");
   });
 });
 
@@ -745,7 +745,7 @@ describe("countTile", () => {
     expect(countTile(1000, "en-US")).toEqual({ value: "1K" });
     expect(countTile(12_345, "en-US")).toEqual({ value: "12.3K" });
     expect(countTile(1_234_567, "de-DE").value).toMatch(/^1,2\sMio\.$/);
-    expect(countTile(null, "en-US")).toEqual({ value: "—" });
-    expect(countTile(undefined, "en-US")).toEqual({ value: "—" });
+    expect(countTile(null, "en-US")).toEqual({ value: null });
+    expect(countTile(undefined, "en-US")).toEqual({ value: null });
   });
 });

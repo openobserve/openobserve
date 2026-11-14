@@ -45,7 +45,6 @@
           v-for="option in rangeOptions"
           :key="option.value"
           :value="option.value"
-          size="sm"
           :data-test="`alerts-anomalydetectionchart-range-${option.value}`"
         >
           {{ option.label }}
@@ -78,7 +77,7 @@
           class="flex h-full items-center justify-center"
           data-test="alerts-anomalydetectionchart-metric-loading"
         >
-          <OSpinner size="md" />
+          <OSpinner size="lg" />
         </div>
         <div
           v-else-if="!metricQuery || metricError"
@@ -107,7 +106,7 @@
     </div>
 
     <OCollapsible
-      :label="t('alerts.anomaly.detectorInternals')"
+      :title="t('alerts.anomaly.detectorInternals')"
       data-test="alerts-anomalydetectionchart-internals"
     >
       <div class="flex flex-col gap-3 pt-2">
@@ -127,7 +126,7 @@
               class="flex h-full items-center justify-center"
               :data-test="`alerts-anomalydetectionchart-${panel.key}-loading`"
             >
-              <OSpinner size="md" />
+              <OSpinner size="lg" />
             </div>
             <PanelSchemaRenderer
               v-else-if="panel.schema"

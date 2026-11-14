@@ -15,13 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OBanner
-    data-test="rca-blocked-banner"
-    variant="error-soft"
-    icon="block"
-    role="alert"
-    inline-actions
-  >
+  <OInlineNotice data-test="rca-blocked-banner" tone="err" icon="block">
     <p class="text-banner-error-soft-text m-0 text-sm font-semibold">
       {{ t("alerts.incidents.rcaBlocked") }}
     </p>
@@ -33,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="refusal.remedy === 'plans'"
         data-test="rca-plans-btn"
         variant="primary"
-        size="sm"
         @click="openPlans"
       >
         {{ t("billing.plansLabel") }}
@@ -42,15 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="refusal.remedy === 'contact'"
         data-test="rca-contact-btn"
         variant="primary"
-        size="sm"
         @click="contactSales"
       >
         {{ t("billing.contactLabel") }}
       </OButton>
       <OButton
         data-test="rca-blocked-retry-btn"
-        variant="outline"
-        size="sm"
+        variant="secondary"
         :loading="retrying"
         @click="$emit('retry')"
       >
@@ -58,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.incidents.rcaRetry") }}
       </OButton>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
@@ -66,7 +57,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { siteURL } from "@/constants/config";
 import { useI18nTyped } from "@/types/i18n";
 import type { RcaRefusal } from "@/composables/useIncidentRca";

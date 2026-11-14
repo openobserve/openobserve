@@ -66,7 +66,7 @@ const Host = defineComponent({
       @blur="(event) => $emit('blur', event)"
       @keydown="(event) => $emit('keydown', event)"
     >
-      <template #prefix><span data-test="link-icon">link</span></template>
+      <template #icon><span data-test="link-icon">link</span></template>
       <template #tooltip><span>Substituted at run time</span></template>
     </OTemplateInput>
   `,
@@ -194,7 +194,7 @@ describe("OTemplateInput", { timeout: 20_000 }, () => {
     expect(document.activeElement).toBe(field);
   });
 
-  it("renders the forwarded prefix and tooltip slots", () => {
+  it("renders the forwarded icon and tooltip slots", () => {
     mountHost();
     expect(wrapper.find('[data-test="link-icon"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="url-info"]').exists()).toBe(true);

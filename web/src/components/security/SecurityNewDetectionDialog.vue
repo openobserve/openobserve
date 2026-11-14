@@ -21,10 +21,10 @@ import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OCode from "@/lib/core/Code/OCode.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -684,17 +684,19 @@ const destinationOptions = computed(() =>
 <template>
   <ODialog
     :open="shown"
-    size="xl"
+    size="lg"
     :title="editing ? t('siem.detections.edit.title') : t('siem.detections.newTitle')"
-    :sub-title="
+    :subtitle="
       editing
         ? t('siem.detections.edit.subtitle', { name: edit?.name ?? '' })
         : t('siem.detections.newSubtitle')
     "
-    :primary-button-label="editing ? t('siem.detections.edit.save') : t('siem.detections.create')"
-    :secondary-button-label="t('siem.detections.cancel')"
+    :primary="{
+      label: editing ? t('siem.detections.edit.save') : t('siem.detections.create'),
+      disabled: !draftReady || !canAuthor,
+    }"
+    :secondary="{ label: t('siem.detections.cancel') }"
     :form-id="FORM_ID"
-    :primary-button-disabled="!draftReady || !canAuthor"
     data-test="security-detections-new-dialog"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:secondary="emit('update:open', false)"
@@ -708,7 +710,6 @@ const destinationOptions = computed(() =>
       >
         <OToggleGroupItem
           value="library"
-          size="sm"
           icon-left="menu-book"
           data-test="security-detections-new-mode-library"
         >
@@ -716,7 +717,6 @@ const destinationOptions = computed(() =>
         </OToggleGroupItem>
         <OToggleGroupItem
           value="custom"
-          size="sm"
           icon-left="code"
           data-test="security-detections-new-mode-custom"
         >
@@ -753,7 +753,7 @@ const destinationOptions = computed(() =>
                     type="severity"
                     :value="severityTagValue(toneOfSigmaLevel(rule.level))"
                     :label="t(toneLabelKey(toneOfSigmaLevel(rule.level)))"
-                    size="xs"
+                    size="sm"
                   />
                   <span class="text-text-heading truncate text-sm font-normal">{{
                     rule.title
@@ -766,7 +766,7 @@ const destinationOptions = computed(() =>
                     class="inline-flex shrink-0"
                     :data-test="`security-detections-new-not-runnable-${rule.key}`"
                   >
-                    <OTag variant="default-soft" icon="hourglass-empty" size="xs">{{
+                    <OTag tone="neutral" icon="hourglass-empty" size="sm">{{
                       t("siem.content.notRunnableYet")
                     }}</OTag>
                     <OTooltip :content="blockedReason(notRunnableYet(rule.key)!)" />
@@ -799,9 +799,9 @@ const destinationOptions = computed(() =>
             @update:query="(q: string) => (customYaml = q)"
           />
         </div>
-        <OBanner v-if="customError" variant="error-soft" icon="error-outline" dense>
+        <OInlineNotice v-if="customError" tone="err">
           {{ customError }}
-        </OBanner>
+        </OInlineNotice>
       </template>
 
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -825,19 +825,16 @@ const destinationOptions = computed(() =>
         />
       </div>
 
-      <OBanner
+      <OInlineNotice
         v-if="destinationsLoaded && !destinations.length"
-        variant="info"
-        icon="info"
-        dense
+        tone="info"
         data-test="security-detections-new-no-destination"
       >
         {{ t("siem.detections.noDestinations") }}
         <template #actions>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-right="open-in-new"
+            variant="secondary"
+            icon-end="open-in-new"
             :aria-label="t('siem.detections.createDestinationAria')"
             data-test="security-detections-new-create-destination"
             @click="createDestination"
@@ -845,14 +842,13 @@ const destinationOptions = computed(() =>
           >
           <OButton
             variant="ghost"
-            size="sm"
-            icon-left="refresh"
+            icon="refresh"
             data-test="security-detections-new-reload-destinations"
             @click="loadDestinations"
             >{{ t("siem.detections.reloadDestinations") }}</OButton
           >
         </template>
-      </OBanner>
+      </OInlineNotice>
 
       <OForm :id="FORM_ID" :form="form" class="grid grid-cols-1 gap-3 md:grid-cols-3">
         <OInput
@@ -903,38 +899,31 @@ const destinationOptions = computed(() =>
         />
       </OForm>
 
-      <OBanner
+      <OInlineNotice
         v-if="logsourceMismatch"
-        variant="warning"
-        icon="warning-amber"
-        dense
+        tone="warn"
         data-test="security-detections-new-logsource-mismatch"
       >
         {{ logsourceMismatch }}
-      </OBanner>
-      <OBanner
+      </OInlineNotice>
+      <OInlineNotice
         v-else-if="ocsfBridge && draftCompiled?.runnable"
-        variant="info"
-        icon="info-outline"
-        dense
+        tone="info"
         data-test="security-detections-new-ocsf-bridge"
       >
         {{ ocsfBridgeText }}
-      </OBanner>
-      <OBanner
+      </OInlineNotice>
+      <OInlineNotice
         v-if="unseenText"
-        variant="info"
-        icon="info-outline"
-        dense
+        tone="info"
         data-test="security-detections-new-unseen-fields"
       >
         {{ unseenText }}
-      </OBanner>
+      </OInlineNotice>
 
-      <OBanner
+      <OInlineNotice
         v-if="draftRule && pickedStream && draftCompiled"
-        :variant="draftCompiled.runnable ? 'success' : 'warning'"
-        :icon="draftCompiled.runnable ? 'check-circle-outline' : 'warning-amber'"
+        :tone="draftCompiled.runnable ? 'ok' : 'warn'"
         data-test="security-detections-new-compile"
       >
         <div class="flex flex-col gap-1">
@@ -954,14 +943,19 @@ const destinationOptions = computed(() =>
           <span v-if="!draftCompiled.runnable">{{ blockedReason(draftCompiled) }}</span>
           <span v-else-if="caveat(draftCompiled)">{{ caveat(draftCompiled) }}</span>
         </div>
-      </OBanner>
+      </OInlineNotice>
       <div
         v-if="draftRule && pickedStream && draftCompiled"
         class="min-w-0"
         data-test="security-detections-new-compiled-sql"
       >
-        <OCode v-if="draftCorrelation?.runnable" block>{{ draftCorrelation.sql }}</OCode>
-        <OCode v-else-if="draftCompiled.where" block>{{ draftCompiled.where }}</OCode>
+        <OCodeBlock
+          v-if="draftCorrelation?.runnable"
+          :code="draftCorrelation.sql"
+          lang="sql"
+          wrap
+        />
+        <OCodeBlock v-else-if="draftCompiled.where" :code="draftCompiled.where" lang="sql" wrap />
       </div>
 
       <div v-if="draftSql" class="flex flex-col gap-2" data-test="security-detections-new-preview">
@@ -975,16 +969,14 @@ const destinationOptions = computed(() =>
               v-for="range in PREVIEW_RANGES"
               :key="range"
               :value="range"
-              size="sm"
               :data-test="`security-detections-new-preview-range-${range}`"
             >
               {{ rangeLabel(range) }}
             </OToggleGroupItem>
           </OToggleGroup>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="play-arrow"
+            variant="secondary"
+            icon="play-arrow"
             :loading="preview.running.value"
             :disabled="!previewRequest"
             data-test="security-detections-new-preview-run"
@@ -997,20 +989,16 @@ const destinationOptions = computed(() =>
             >{{ previewSummary || t("siem.detections.preview.hint") }}</span
           >
         </div>
-        <OBanner
+        <OInlineNotice
           v-if="queryFailure || (previewCurrent && preview.error.value)"
-          variant="error-soft"
-          icon="error-outline"
-          dense
+          tone="err"
           data-test="security-detections-new-preview-error"
         >
           {{ t("siem.detections.preview.failed", { reason: queryFailure || preview.error.value }) }}
-        </OBanner>
-        <OBanner
+        </OInlineNotice>
+        <OInlineNotice
           v-if="previewResult?.windows_failed"
-          variant="warning"
-          icon="warning-amber"
-          dense
+          tone="warn"
           data-test="security-detections-new-preview-partial"
         >
           {{
@@ -1020,7 +1008,7 @@ const destinationOptions = computed(() =>
               previewResult.windows_failed,
             )
           }}
-        </OBanner>
+        </OInlineNotice>
         <span
           v-if="previewNarrowed"
           class="text-text-secondary text-xs"
@@ -1035,8 +1023,8 @@ const destinationOptions = computed(() =>
           <OTag
             v-for="w in previewResult.windows.slice(0, 12)"
             :key="w.start"
-            variant="orange-soft"
-            size="xs"
+            tone="warn"
+            size="sm"
             >{{
               t(
                 "siem.detections.preview.windowFired",
@@ -1058,8 +1046,6 @@ const destinationOptions = computed(() =>
             :columns="previewColumns"
             pagination="none"
             sorting="none"
-            :show-global-filter="false"
-            :frame="false"
             class="h-full"
             data-test="security-detections-new-preview-table"
           >
@@ -1070,26 +1056,18 @@ const destinationOptions = computed(() =>
         </div>
       </div>
 
-      <OBanner
-        v-if="saveFailure"
-        variant="error-soft"
-        icon="error-outline"
-        dense
-        data-test="security-detections-new-save-error"
-      >
+      <OInlineNotice v-if="saveFailure" tone="err" data-test="security-detections-new-save-error">
         {{ saveFailure }}
-      </OBanner>
+      </OInlineNotice>
       <component :is="form.Field" name="name">
         <template #default="{ field }">
-          <OBanner
+          <OInlineNotice
             v-if="field.state.meta.errors.length > 0"
-            variant="error-soft"
-            icon="error-outline"
-            dense
+            tone="err"
             data-test="security-detections-new-name-taken"
           >
             {{ firstFieldError(field.state.meta.errors) }}
-          </OBanner>
+          </OInlineNotice>
         </template>
       </component>
     </div>

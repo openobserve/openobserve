@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OToggleGroup
+    size="sm"
     :model-value="modelValue"
     :aria-label="t('panel.previewView')"
     :data-test="`${dataTestPrefix}-preview-view-toggle`"
@@ -23,14 +24,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OToggleGroupItem
       value="chart"
-      size="xs"
       icon-left="show-chart"
       :data-test="`${dataTestPrefix}-preview-view-chart`"
       >{{ t("panel.previewChart") }}</OToggleGroupItem
     >
     <OToggleGroupItem
       value="data"
-      size="xs"
       icon-left="table-chart"
       :data-test="`${dataTestPrefix}-preview-view-data`"
       >{{ t("panel.previewData") }}</OToggleGroupItem

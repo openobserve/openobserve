@@ -17,27 +17,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="xl"
+    size="lg"
     :title="t('fleet.fleets.settingsTitle')"
-    :sub-title="fleetName"
+    :subtitle="fleetName"
     :form-id="ready ? FORM_ID : undefined"
-    :primary-button-label="ready ? t('fleet.settings.save') : undefined"
-    :primary-button-loading="update.isPending.value"
-    :secondary-button-label="t('common.cancel')"
+    :primary="{
+      label: ready ? t('fleet.settings.save') : undefined,
+      loading: update.isPending.value,
+    }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="fleet-fleet-settings-drawer"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
     <OEmptyState
       v-if="forbidden"
-      size="block"
-      preset="no-access"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
       data-test="fleet-fleet-settings-forbidden"
     />
     <OEmptyState
       v-else-if="failed"
-      size="block"
-      preset="load-error"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="t('emptyState.loadError.description')"
       data-test="fleet-fleet-settings-error"
       @action="retry"
     />
@@ -46,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex justify-center py-6"
       data-test="fleet-fleet-settings-loading"
     >
-      <OSpinner />
+      <OSpinner size="lg" />
     </div>
     <div v-else class="flex flex-col gap-4">
       <OText variant="meta">{{ t("fleet.fleets.settingsHint") }}</OText>

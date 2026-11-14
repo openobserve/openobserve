@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open && !!run"
-    size="md"
+    size="sm"
     :title="title"
     title-data-test="reports-reportrundrawer-title"
     data-test="reports-reportrundrawer"
@@ -35,11 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
 
-      <OBanner
+      <OInlineNotice
+        class="wrap-anywhere whitespace-pre-line"
         v-if="run.error"
-        :variant="run.status === 'error' ? 'error' : 'warning'"
-        :content="raw(run.error)"
-        preserve-whitespace
+        :tone="run.status === 'error' ? 'err' : 'warn'"
+        :message="raw(run.error)"
         data-test="reports-reportrundrawer-error"
       />
 
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <h3 class="text-text-heading text-sm font-semibold">
           {{ t("reports.history.deliverySection") }}
         </h3>
-        <ODescriptionList dense>
+        <ODescriptionList>
           <ODescriptionItem :label="t('reports.history.colRecipients')">
             <template v-if="run.is_cached">{{ t("reports.history.noRecipients") }}</template>
             <template v-else-if="run.recipient_count != null">{{ run.recipient_count }}</template>
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}
             </template>
           </ODescriptionItem>
-          <ODescriptionItem :label="t('reports.history.outcome')" stacked>
+          <ODescriptionItem :label="t('reports.history.outcome')">
             <span data-test="reports-reportrundrawer-outcome">{{ outcome }}</span>
           </ODescriptionItem>
         </ODescriptionList>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <h3 class="text-text-heading text-sm font-semibold">
           {{ t("reports.history.timingSection") }}
         </h3>
-        <ODescriptionList dense>
+        <ODescriptionList>
           <ODescriptionItem
             v-if="run.trigger_source === 'manual'"
             :label="t('reports.history.triggeredBy')"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODescriptionItem :label="t('reports.history.colNode')">
             <template v-if="run.source_node">{{ run.source_node }}</template>
           </ODescriptionItem>
-          <ODescriptionItem :label="t('reports.history.colTraceId')" stacked>
+          <ODescriptionItem :label="t('reports.history.colTraceId')">
             <span v-if="run.scheduler_trace_id" class="text-compact font-mono break-all">{{
               run.scheduler_trace_id
             }}</span>
@@ -129,8 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ul class="flex flex-col gap-1">
           <li v-for="(d, i) in dashboards" :key="i">
             <OButton
-              variant="ghost-primary"
-              size="sm"
+              variant="accent-ghost"
               :data-test="`reports-reportrundrawer-dashboard-${i}`"
               @click="openDashboard(d)"
             >
@@ -147,9 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex w-full justify-end gap-2">
         <OButton
           v-if="canEdit && !run?.is_cached"
-          variant="outline"
-          size="sm-action"
-          icon-left="edit"
+          variant="secondary"
+          icon="edit"
           data-test="reports-reportrundrawer-edit-recipients"
           @click="emit('edit-recipients')"
         >
@@ -158,8 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="canTrigger"
           variant="primary"
-          size="sm-action"
-          icon-left="send"
+          icon="send"
           :loading="running"
           data-test="reports-reportrundrawer-run-now"
           @click="emit('run-now')"
@@ -176,7 +173,7 @@ import { computed } from "vue";
 import { useRouter } from "vue-router";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";

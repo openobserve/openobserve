@@ -130,7 +130,6 @@ function toggle(browserId: string, deviceId: string) {
         <div v-for="device in activeDevices" :key="device.id" class="w-20">
           <OCheckbox
             :model-value="isChecked(browser.id, device.id)"
-            size="md"
             :data-test="`synthetics-check-browser-devices-cell-${browser.id}-${device.id}`"
             @update:model-value="toggle(browser.id, device.id)"
           />

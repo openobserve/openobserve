@@ -299,7 +299,7 @@ function parseJsonRange(s: string): TimestampRangeResult | null {
   return null;
 }
 
-// Auto-detect epoch unit by digit length; mirrors DateTime.vue's defaultAbsoluteTime.
+// Auto-detect epoch unit by digit length; mirrors ODateTimeRange's defaultAbsoluteTime.
 function toMicros(digits: string): number {
   const n = Number(digits);
   if (digits.length <= 10) return n * 1_000_000; // seconds

@@ -260,6 +260,6 @@ describe("ackState", () => {
         verb,
         t,
       ),
-    ).toEqual({ variant: "error", title, message: "On call: bo@acme.io" });
+    ).toEqual({ variant: "error", message: `${title} On call: bo@acme.io` });
   });
 });

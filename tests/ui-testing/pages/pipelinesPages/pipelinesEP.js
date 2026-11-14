@@ -270,7 +270,10 @@ export class PipelinesEP {
         const trigger = field.nth(index).locator(`[data-test="${dataTest}-trigger"]`);
         await trigger.click();
         const search = this.page.locator(`[data-test="${dataTest}-search"]`);
-        await search.fill(value);
+        const popover = this.page.locator(`[data-test="${dataTest}-popover"]`);
+        // OSelect renders its search box only past eight options; a short list shows every row.
+        await popover.locator('[data-test-value]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        if (await search.count()) await search.fill(value);
         await this.page.locator(`[data-test="${dataTest}-option"][data-test-value="${value}"]`).click();
         await expect(search).toBeHidden();
         await expect(trigger).toHaveAttribute('data-test-selected-value', value);

@@ -14,27 +14,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  NoData — the app's shared "no data" placeholder. Now backed by the unified
-  OEmptyState system (object illustration + consistent copy) so every list/table
-  that renders <NoData /> gets the standardized empty state. Pass `title` to
-  override the default message; for a richer, scenario-specific empty state use
-  <OEmptyState preset="…" /> directly instead.
--->
 <template>
   <div data-test="no-data-message" class="w-full">
     <OEmptyState
       v-if="filtered"
-      size="block"
-      preset="no-search-results"
-      @action="emit('action', $event)"
+      kind="filtered"
+      :title="t('emptyState.noSearchResults.title')"
+      :text="t('emptyState.noSearchResults.description')"
+      @action="emit('action')"
     />
-    <OEmptyState
-      v-else
-      size="block"
-      illustration="box"
-      :title="title || t('ticket.noDataErrorMsg')"
-    />
+    <OEmptyState v-else :title="title || t('ticket.noDataErrorMsg')" />
   </div>
 </template>
 
@@ -51,7 +40,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  action: [id?: string];
+  action: [];
 }>();
 
 const { t } = useI18nTyped();

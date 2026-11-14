@@ -31,9 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</OText>
       </div>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="close"
+        icon="close"
         data-test="fleet-flow-details-close"
         @click="emit('close')"
       >
@@ -56,8 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-secondary text-xs">{{ issue.evidence }}</span>
         <OButton
           class="self-start"
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           :data-test="`fleet-flow-details-action-${issue.id}`"
           @click="emit('action', issue.action)"
         >
@@ -74,9 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OButton
         v-if="fleetId"
-        variant="outline"
-        size="xs"
-        icon-left="folder-open"
+        variant="secondary"
+        size="sm"
+        icon="folder-open"
         data-test="fleet-flow-details-open-fleet"
         @click="emit('open-fleet')"
       >
@@ -84,9 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-if="!hideConfig"
-        variant="outline"
-        size="xs"
-        icon-left="visibility"
+        variant="secondary"
+        size="sm"
+        icon="visibility"
         data-test="fleet-flow-details-open-config"
         @click="emit('open-config')"
       >

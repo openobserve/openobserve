@@ -61,8 +61,8 @@ const ColorBySeriesPopUpStub = defineComponent({
 // or its children render them directly inside this view).
 const ODialogStub = defineComponent({
   name: "ODialog",
-  props: ["open", "persistent", "size", "title", "subTitle", "showClose", "width"],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  props: ["open", "persistent", "size", "title", "subtitle", "showClose", "width"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   setup(_, { slots }) {
     return () => h("div", { "data-test": "o-dialog-stub" }, slots.default?.());
   },
@@ -70,8 +70,8 @@ const ODialogStub = defineComponent({
 
 const ODrawerStub = defineComponent({
   name: "ODrawer",
-  props: ["open", "persistent", "size", "title", "subTitle", "showClose", "width"],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  props: ["open", "persistent", "size", "title", "subtitle", "showClose", "width"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   setup(_, { slots }) {
     return () => h("div", { "data-test": "o-drawer-stub" }, slots.default?.());
   },

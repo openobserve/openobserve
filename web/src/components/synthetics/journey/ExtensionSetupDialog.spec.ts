@@ -28,7 +28,7 @@ import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
 // header-right, default, and footer slots inline — and only while open.
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "title", "subTitle", "size"],
+  props: ["open", "title", "subtitle", "size"],
   emits: ["update:open"],
   template: `
     <div v-if="open" class="dialog-stub">

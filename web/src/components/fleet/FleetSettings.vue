@@ -19,15 +19,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-4">
       <OFormSection :title="t('fleet.settings.governance')" data-test="fleet-settings-governance">
         <div v-if="forbidden" class="py-3" data-test="fleet-settings-no-access">
-          <OEmptyState size="inline" preset="no-access" :title="t('fleet.settings.noAccess')" />
+          <OEmptyState
+            size="inline"
+            kind="denied"
+            :text="t('emptyState.noAccess.description')"
+            :title="t('fleet.settings.noAccess')"
+          />
         </div>
         <div v-else-if="loadFailed" class="py-3" data-test="fleet-settings-load-failed">
           <OEmptyState
             size="inline"
-            preset="load-error"
+            kind="error"
+            :text="t('emptyState.loadError.description')"
             :title="t('fleet.settings.loadFailed')"
-            :action-label="t('emptyState.loadError.action')"
-            action-icon="refresh"
             @action="current.refetch"
           />
         </div>
@@ -36,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-center py-4"
           data-test="fleet-settings-loading"
         >
-          <OSpinner />
+          <OSpinner size="lg" />
         </div>
         <template v-else>
           <OSettingRow
@@ -45,9 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSelect
               v-model="restricted"
-              width="md"
+              width="m"
               class="max-md:w-full"
-              size="sm"
               :placeholder="t('fleet.settings.restrictedPlaceholder')"
               multiple
               creatable
@@ -63,9 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OInput
               v-model="target"
-              width="md"
+              width="m"
               class="max-md:w-full"
-              size="sm"
               :placeholder="t('fleet.settings.targetVersionPlaceholder')"
               :disabled="!editable"
               data-test="fleet-settings-target-version"
@@ -74,7 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="editable" class="pt-1">
             <OButton
               variant="primary"
-              size="sm-action"
               :disabled="!dirty"
               :loading="update.isPending.value"
               data-test="fleet-settings-save"
@@ -103,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @save="saveDefaults"
         />
         <div v-else-if="!forbidden && !loadFailed" class="flex justify-center py-4">
-          <OSpinner />
+          <OSpinner size="lg" />
         </div>
       </OFormSection>
 

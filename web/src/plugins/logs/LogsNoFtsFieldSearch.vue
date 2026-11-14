@@ -106,8 +106,7 @@ onMounted(async () => {
       <OText variant="panel-title">{{ t("search.noFtsRecovery.searchField") }}</OText>
       <OButton
         variant="ghost"
-        size="sm"
-        icon-left="close"
+        icon="close"
         :aria-label="t('search.noFtsRecovery.close')"
         @click="emit('cancel')"
       />
@@ -162,15 +161,11 @@ onMounted(async () => {
         t("search.noFtsRecovery.replacement", { term })
       }}</OText>
       <div class="flex flex-wrap justify-end gap-2">
-        <OButton variant="outline" size="sm-action" @click="emit('cancel')">{{
-          t("common.cancel")
-        }}</OButton>
+        <OButton variant="secondary" @click="emit('cancel')">{{ t("common.cancel") }}</OButton>
         <OButton
           type="submit"
           variant="primary"
-          size="sm-action"
           :disabled="!fields.length"
-          :tooltip="!fields.length ? t('search.noFtsRecovery.noFields') : undefined"
           data-test="logs-no-fts-run-field-btn"
           >{{ t("search.noFtsRecovery.run") }}</OButton
         >

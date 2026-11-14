@@ -41,19 +41,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dbm-metrics-toolbar"
       >
         <DbmScopeFilters class="min-w-0 flex-1" :filters="dimensionFilters" @clear="clearScope" />
-        <DateTime
+        <ODateTimeRange
           auto-apply
           menu-align="end"
           :default-type="range.type"
           :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
           :default-relative-time="range.relativeTimePeriod ?? undefined"
           data-test-name="dbm-metrics-date-time"
-          class="h-8 max-md:[&_.date-time-label]:hidden"
+          class="max-md:[&_.date-time-label]:hidden"
           @on:date-change="onDateChange"
         />
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :loading="loading"
           :last-run-at="lastRunAt"
           data-test="dbm-metrics-refresh"
@@ -82,19 +80,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               header-align="center"
             >
               <template #hint>
-                <!-- Reads as part of the heading — "Database load · By user ▾" —
-                 the way the folder picker reads inside a page description. -->
+                <!-- A group-by picker, not a filter: it always holds a dimension, so it has no Any and no clear. -->
                 <OSelect
                   v-model="loadBreakdown"
                   :options="breakdownOptions"
                   size="sm"
-                  appearance="inline"
+                  width="s"
                   :searchable="false"
                   class="shrink-0"
                   data-test="dbm-metrics-load-breakdown"
                 />
                 <!-- How to read the chart is reference, so it opens on demand instead of truncating beside the title. -->
                 <OPopover
+                  size="lg"
                   v-model:open="loadHintOpen"
                   side="bottom"
                   align="start"
@@ -103,26 +101,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <OButton
                       variant="ghost"
-                      size="xs"
-                      icon-left="info-outline"
+                      size="sm"
+                      icon="info-outline"
                       data-test="dbm-metrics-load-hint-trigger"
                     >
                       <span class="max-md:sr-only">{{ t("dbm.metrics.load.about") }}</span>
                     </OButton>
                   </template>
-                  <p
-                    class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
-                    data-test="dbm-metrics-load-hint"
-                  >
+                  <p class="p-3 leading-5" data-test="dbm-metrics-load-hint">
                     <OText variant="meta">{{ t("dbm.metrics.load.hint") }}</OText>
                   </p>
                 </OPopover>
               </template>
               <template #actions>
                 <OButton
-                  variant="outline"
-                  size="sm"
-                  icon-right="arrow-forward"
+                  variant="secondary"
+                  icon-end="arrow-forward"
                   data-test="dbm-metrics-view-activity"
                   @click="openActivity"
                 >
@@ -162,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="inline"
                     icon="database"
                     :title="t('dbm.metrics.serverStreamMissing.title')"
-                    :description="
+                    :text="
                       t('dbm.metrics.serverStreamMissing.description', {
                         stream: raw('_o2_dbm_server'),
                       })
@@ -237,12 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
                 data-test="dbm-metrics-skeleton"
               >
-                <OSkeleton
-                  v-for="n in 6"
-                  :key="n"
-                  type="rect"
-                  class="rounded-surface h-55 w-full"
-                />
+                <OSkeleton v-for="n in 6" :key="n" shape="block" class="h-55 w-full" />
               </div>
             </template>
 
@@ -251,7 +240,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              receivers for a fetch that never landed. -->
             <OEmptyState
               v-else-if="error"
-              preset="load-error"
+              kind="error"
+              :title="t('emptyState.loadError.title')"
+              :text="t('emptyState.loadError.description')"
               data-test="dbm-metrics-load-error"
               @action="onRefresh"
             />
@@ -266,7 +257,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :description="t('dbm.metrics.notCollecting.description')"
               :checklist-title="t('dbm.metrics.notCollecting.checklistTitle')"
               :checks="notCollectingChecks"
-              size="block"
               data-test="dbm-metrics-not-collecting"
             />
 
@@ -299,8 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="sections.groups.length" class="flex items-center justify-end">
                 <OInput
                   v-model="panelSearch"
-                  size="sm"
-                  icon-left="search"
+                  icon="search"
                   :placeholder="t('dbm.metrics.searchPlaceholder')"
                   class="w-60"
                   data-test="dbm-metrics-panel-search"
@@ -348,7 +337,7 @@ import { computed, defineAsyncComponent, onBeforeUnmount, ref, shallowRef } from
 import { useRoute, useRouter } from "vue-router";
 
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DbmMetricPanel from "@/components/dbm/DbmMetricPanel.vue";
 import DbmMetricsRail, { type DbmMetricsRailItem } from "@/components/dbm/DbmMetricsRail.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";

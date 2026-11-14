@@ -211,7 +211,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
       const tag = wrapper
         .findAllComponents({ name: "OTag" })
         .find((c) => String(c.props("label")) === "Partly watched");
-      expect(tag?.props("variant")).toBe("warning-outline");
+      expect(tag?.props("tone")).toBe("outline");
       const filters = wrapper.findAll('[data-test^="autoobserve-coverage-filter-"]');
       expect(filters.map((f) => f.attributes("data-test"))).toContain(
         "autoobserve-coverage-filter-partial",

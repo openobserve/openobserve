@@ -22,8 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     row-key="id"
     pagination="none"
     sorting="none"
-    :show-global-filter="false"
-    :frame="false"
     data-test="rum-analytics-paths-top-table"
   >
     <template #cell-path="{ row, index }">
@@ -33,9 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #cell-sessions="{ row, index }">
       <OButton
-        variant="ghost-primary"
-        size="xs"
-        icon-right="chevron-right"
+        variant="accent-ghost"
+        size="sm"
+        icon-end="chevron-right"
         aria-haspopup="dialog"
         class="tabular-nums"
         :aria-label="

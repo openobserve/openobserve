@@ -13,18 +13,19 @@ describe("OShortcut", () => {
   });
 
   describe("combo rendering (string)", () => {
-    it("should render a combo string as a single symbolised keycap", () => {
+    it("should render every key of a combo as its own symbolised cap", () => {
       wrapper = mount(OShortcut, { props: { keys: "ctrl+shift+a" } });
-      const caps = wrapper.findAll("kbd");
-      expect(caps).toHaveLength(1);
-      expect(caps[0].text()).toBe("⌘⇧A");
+      expect(wrapper.findAll("kbd").map((c) => c.text())).toEqual(["⌘", "⇧", "A"]);
     });
 
     it("should symbolise enter and ctrl in a two-key combo", () => {
       wrapper = mount(OShortcut, { props: { keys: "ctrl+enter" } });
-      const caps = wrapper.findAll("kbd");
-      expect(caps).toHaveLength(1);
-      expect(caps[0].text()).toBe("⌘↵");
+      expect(wrapper.findAll("kbd").map((c) => c.text())).toEqual(["⌘", "↵"]);
+    });
+
+    it("should treat a lone plus as a key", () => {
+      wrapper = mount(OShortcut, { props: { keys: "+" } });
+      expect(wrapper.find("kbd").text()).toBe("+");
     });
 
     it("should render a bare single key unchanged", () => {
@@ -53,7 +54,7 @@ describe("OShortcut", () => {
 
     it("should render a ctrl-combo id as a ⌘ keycap on Mac", () => {
       wrapper = mount(OShortcut, { props: { id: "logsRunQuery" } });
-      expect(wrapper.findAll("kbd").map((c) => c.text())).toEqual(["⌘↵"]);
+      expect(wrapper.findAll("kbd").map((c) => c.text())).toEqual(["⌘", "↵"]);
     });
 
     it("should resolve a display-only id (e.g. delete)", () => {
@@ -68,22 +69,16 @@ describe("OShortcut", () => {
 
     it("should render nothing for an unknown id", () => {
       wrapper = mount(OShortcut, { props: { id: "nopeNotAnId" } });
-      expect(wrapper.findAll("kbd")).toHaveLength(0);
+      expect(wrapper.find("[data-test='o-shortcut']").exists()).toBe(false);
     });
   });
 
-  describe("size", () => {
-    it("should apply small keycap sizing by default", () => {
-      wrapper = mount(OShortcut, { props: { keys: "?" } });
-      expect(wrapper.find("kbd").classes()).toContain("h-5");
-    });
-
-    it("should apply medium keycap sizing when size='md'", () => {
-      wrapper = mount(OShortcut, { props: { keys: "?", size: "md" } });
-      const cls = wrapper.find("kbd").classes();
-      expect(cls).toContain("h-6");
-      expect(cls).not.toContain("h-5");
-    });
+  it("should draw one 18 px mono cap with a 2 px bottom edge (one size)", () => {
+    wrapper = mount(OShortcut, { props: { keys: "?" } });
+    const cls = wrapper.find("kbd").classes();
+    expect(cls).toEqual(
+      expect.arrayContaining(["h-4.5", "font-mono", "text-2xs", "border-b-2", "rounded-chip"]),
+    );
   });
 
   it("should use the theme-aware keycap tokens (auto light/dark)", () => {

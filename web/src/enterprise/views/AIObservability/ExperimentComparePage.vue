@@ -4,13 +4,12 @@
   <OPageLayout
     data-test="ai-experiment-compare-page"
     :title="t('aiObservability.experiments.comparePage.title')"
-    icon="science"
     :back="backTarget"
     bleed
   >
-    <template #title-trail>
+    <template #subnav>
       <div
-        class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2"
+        class="px-page-edge flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 py-2"
         data-test="ai-experiment-compare-picker"
       >
         <div class="flex min-w-0 items-center gap-2">
@@ -22,8 +21,7 @@
             :options="baselineOptions"
             :loading="optionsLoading"
             :placeholder="t('aiObservability.experiments.comparePage.baselinePlaceholder')"
-            size="sm"
-            width="md"
+            width="m"
             searchable
             data-test="ai-experiment-compare-baseline-select"
             @update:model-value="selectSide('baseline', $event)"
@@ -31,8 +29,9 @@
         </div>
         <OTooltip :content="t('aiObservability.experiments.comparePage.swap')">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon"
+            size="xs"
             type="button"
             class="shrink-0"
             :disabled="!baselineId || !candidateId"
@@ -52,8 +51,7 @@
             :options="candidateOptions"
             :loading="optionsLoading"
             :placeholder="t('aiObservability.experiments.comparePage.candidatePlaceholder')"
-            size="sm"
-            width="md"
+            width="m"
             searchable
             data-test="ai-experiment-compare-candidate-select"
             @update:model-value="selectSide('candidate', $event)"
@@ -69,7 +67,7 @@
       <OTooltip v-if="datasetName" :content="datasetName" :disabled="!datasetNameTruncated">
         <OTag
           size="sm"
-          variant="default-soft"
+          tone="neutral"
           icon=""
           :label="datasetLabel"
           data-test="ai-experiment-compare-dataset"
@@ -122,7 +120,6 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import useSmartBack from "@/composables/useSmartBack";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -169,12 +166,9 @@ const candidateRow = ref<ExperimentRowDetail | null>(null);
 const experiments = ref<LlmExperiment[]>([]);
 const optionsLoading = ref(false);
 
-// Real browser back when there's history to pop — returns to the Experiment
-// Detail page the compare was launched from, not just the bare list.
-const { goBack: backToExperiments } = useSmartBack(() => aiExperimentsRoute(orgId.value));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
-  onClick: backToExperiments,
+  to: aiExperimentsRoute(orgId.value),
 }));
 
 /** The dataset both sides are pinned to — the server refuses to compare across datasets. */

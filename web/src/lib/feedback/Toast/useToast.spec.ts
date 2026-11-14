@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { toast, useToast, toastRecords } from "./useToast";
+import { toast, useToast, toastRecords, pauseTimer, resumeTimer } from "./useToast";
 
 // Reset module state between tests
 beforeEach(() => {
@@ -57,24 +57,44 @@ describe("toast()", () => {
     expect(toastRecords[0].message).toBe("Done!");
   });
 
-  it("applies default timeout for success variant", () => {
-    toast({ variant: "success", message: "OK" });
-    expect(toastRecords[0].timeout).toBe(5000);
+  it("stays 4 s for a result and 30 s for an error or warning", () => {
+    for (const variant of ["success", "error", "warning", "info", "default"] as const) {
+      toast({ variant, message: `msg ${variant}` });
+    }
+    expect(toastRecords.map((r) => r.timeout)).toEqual([4000, 30000, 30000, 4000, 4000]);
   });
 
-  it("applies default timeout for error variant", () => {
-    toast({ variant: "error", message: "Fail" });
+  it("keeps an error 30 s even when it offers an action", () => {
+    toast({
+      variant: "error",
+      message: "Save failed",
+      action: { label: "Retry", handler: vi.fn() },
+    });
     expect(toastRecords[0].timeout).toBe(30000);
   });
 
-  it("applies default timeout for warning variant", () => {
-    toast({ variant: "warning", message: "Warn" });
-    expect(toastRecords[0].timeout).toBe(30000);
+  it("stays 8 s when it offers an action such as Undo", () => {
+    const handler = vi.fn();
+    toast({ variant: "success", message: "Alert paused", action: { label: "Undo", handler } });
+    expect(toastRecords[0].timeout).toBe(8000);
+    vi.advanceTimersByTime(7999);
+    expect(toastRecords[0].open).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(toastRecords[0].open).toBe(false);
   });
 
-  it("applies default timeout for info variant", () => {
-    toast({ variant: "info", message: "FYI" });
-    expect(toastRecords[0].timeout).toBe(5000);
+  it("pauses its timer while hovered and resumes with the time left", () => {
+    toast({ message: "Dashboard saved" });
+    const id = toastRecords[0].id;
+    vi.advanceTimersByTime(3000);
+    pauseTimer(id);
+    vi.advanceTimersByTime(10000);
+    expect(toastRecords[0].open).toBe(true);
+    resumeTimer(id);
+    vi.advanceTimersByTime(999);
+    expect(toastRecords[0].open).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(toastRecords[0].open).toBe(false);
   });
 
   it("applies timeout: 0 for loading variant (persistent)", () => {
@@ -84,9 +104,9 @@ describe("toast()", () => {
     expect(toastRecords).toHaveLength(0);
   });
 
-  it("applies default timeout for default variant", () => {
+  it("applies the default timeout without a variant", () => {
     toast({ message: "Hello" });
-    expect(toastRecords[0].timeout).toBe(5000);
+    expect(toastRecords[0].timeout).toBe(4000);
   });
 
   it("respects explicit timeout: 0 (persistent)", () => {

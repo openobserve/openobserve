@@ -24,8 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :tab="curlTab"
         :rest-label="t('ingestion.logsLabel')"
       />
-      <ORouteTab v-else v-bind="curlTab" data-test="ingestion-logs-tab-curl" />
-      <ORouteTab
+      <OTab v-else v-bind="curlTab" data-test="ingestion-logs-tab-curl" />
+      <OTab
         name="filebeat"
         data-test="ingestion-logs-tab-filebeat"
         :to="{
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/filebeat.png')"
         :label="t('ingestion.filebeat')"
       />
-      <ORouteTab
+      <OTab
         name="fluentbit"
         data-test="ingestion-logs-tab-fluentbit"
         :to="{
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
         :label="t('ingestion.fluentbit')"
       />
-      <ORouteTab
+      <OTab
         name="fluentd"
         data-test="ingestion-logs-tab-fluentd"
         :to="{
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
         :label="t('ingestion.fluentd')"
       />
-      <ORouteTab
+      <OTab
         name="vector"
         :to="{
           name: 'vector',
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/vector.png')"
         :label="t('ingestion.vector')"
       />
-      <ORouteTab
+      <OTab
         name="kinesisfirehose"
         data-test="ingestion-logs-tab-kinesisfirehose"
         :to="{
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/kinesis_firehose.svg')"
         :label="t('ingestion.kinesisFirehose')"
       />
-      <ORouteTab
+      <OTab
         name="gcpLogs"
         data-test="ingestion-logs-tab-gcplogs"
         :to="{
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/gcp.svg')"
         :label="t('ingestion.gcpLogs')"
       />
-      <ORouteTab
+      <OTab
         name="ingestLogsFromOtel"
         :to="{
           name: 'ingestLogsFromOtel',
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
         :label="t('ingestion.otelCollector')"
       />
-      <ORouteTab
+      <OTab
         name="logstash"
         :to="{
           name: 'logstash',
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/logstash.svg')"
         :label="t('ingestion.logstash')"
       />
-      <ORouteTab
+      <OTab
         name="syslogNg"
         :to="{
           name: 'syslogNg',
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="plagiarism"
         :label="t('ingestion.syslogNg')"
       />
-      <ORouteTab
+      <OTab
         name="splunkHec"
         data-test="ingestion-logs-tab-splunkhec"
         :to="{
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="cloud-upload"
         :label="t('ingestion.splunkHecTab')"
       />
-      <ORouteTab
+      <OTab
         name="datadogAgentLogs"
         data-test="ingestion-logs-tab-datadogagent"
         :to="{
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/pipeline/datadog.png')"
         :label="t('ingestion.datadogAgentTab')"
       />
-      <ORouteTab
+      <OTab
         name="loongcollector"
         data-test="ingestion-logs-tab-loongcollector"
         :to="{
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 import FirstSourcePickGroup from "@/components/ingestion/FirstSourcePickGroup.vue";
 // @ts-ignore
@@ -198,7 +198,7 @@ import { firstSourcePickRoute } from "@/components/login/firstSourceOptions";
 
 export default defineComponent({
   name: "IngestLogs",
-  components: { ORouteTab, DataSourceSidebarLayout, FirstSourcePickGroup },
+  components: { OTab, DataSourceSidebarLayout, FirstSourcePickGroup },
   props: {
     currOrgIdentifier: {
       type: String,

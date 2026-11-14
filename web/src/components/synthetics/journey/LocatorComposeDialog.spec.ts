@@ -32,12 +32,12 @@ const i18n = createI18n({
 // builder is what is under test rather than the teleport.
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel", "primaryButtonDisabled"],
+  props: ["open", "title", "primary", "secondary", "primary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div v-if="open" class="dialog-stub">
       <slot />
-      <button data-test="stub-primary" :disabled="primaryButtonDisabled" @click="$emit('click:primary')" />
+      <button data-test="stub-primary" :disabled="primary?.disabled" @click="$emit('click:primary')" />
     </div>`,
 };
 

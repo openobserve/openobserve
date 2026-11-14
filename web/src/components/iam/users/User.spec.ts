@@ -97,24 +97,24 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       class="o-dialog-stub"
@@ -122,8 +122,8 @@ const ODialogStub = {
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <slot name="header" />
       <slot />
@@ -131,11 +131,11 @@ const ODialogStub = {
       <button
         class="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         class="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -326,8 +326,8 @@ describe("User Component", () => {
       const dialog = wrapper
         .findAllComponents(ODialogStub)
         .find((d: any) => d.props("title") === "Delete User")!;
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
-      const name = dialog.find('[data-test="user-delete-dialog-message"] span.font-semibold');
+      expect(dialog.props("primary")?.variant).toBe("danger");
+      const name = dialog.find('[data-test="confirm-dialog-name"]');
       expect(name.text()).toBe("to-delete@example.com");
     });
 
@@ -374,7 +374,7 @@ describe("User Component", () => {
       const dialog = wrapper
         .findAllComponents(ODialogStub)
         .find((d: any) => d.props("title") === "Revoke Invitation")!;
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("primary")?.variant).toBe("danger");
       const name = dialog.find('[data-test="user-revoke-dialog-message"] span.font-semibold');
       expect(name.text()).toBe("pending@example.com");
     });
@@ -423,9 +423,9 @@ describe("User Component", () => {
         .find((d: any) => d.props("title") === "Delete Users");
       expect(dialog).toBeTruthy();
       expect(dialog!.props("size")).toBe("sm");
-      expect(dialog!.props("primaryButtonLabel")).toBe("OK");
-      expect(dialog!.props("primaryButtonVariant")).toBe("destructive");
-      expect(dialog!.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog!.props("primary")?.label).toBe("OK");
+      expect(dialog!.props("primary")?.variant).toBe("danger");
+      expect(dialog!.props("secondary")?.label).toBe("Cancel");
       expect(dialog!.props("open")).toBe(true);
     });
 

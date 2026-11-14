@@ -56,9 +56,9 @@ function mountStrip(disableActive = false) {
     components: { OTabs, OTab },
     data: () => ({ disableActive }),
     template: `<OTabs model-value="a">
-      <OTab name="a" label="O2 Assistant" :disable="disableActive" />
+      <OTab name="a" label="O2 Assistant" :disabled="disableActive" />
       <OTab name="b" label="Overview" />
-      <OTab name="c" label="Usage" disable />
+      <OTab name="c" label="Usage" disabled />
       <OTab name="d"><span>Slot tab</span></OTab>
     </OTabs>`,
   });

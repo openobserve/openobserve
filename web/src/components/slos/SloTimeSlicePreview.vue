@@ -43,12 +43,7 @@
         data-test="slos-slotimeslicepreview-range"
         @update:model-value="onRangeChange"
       >
-        <OToggleGroupItem
-          v-for="option in rangeOptions"
-          :key="option.value"
-          :value="option.value"
-          size="sm"
-        >
+        <OToggleGroupItem v-for="option in rangeOptions" :key="option.value" :value="option.value">
           {{ option.label }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -84,7 +79,7 @@
           class="flex h-full items-center justify-center"
           data-test="slos-slotimeslicepreview-loading"
         >
-          <OSpinner size="sm" />
+          <OSpinner size="lg" />
         </div>
         <div
           v-else-if="error"

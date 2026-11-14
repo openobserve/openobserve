@@ -151,11 +151,10 @@ export class SanityPage {
         // ============================================================
         // Schema Pagination locators
         // ============================================================
-        this.schemaLastPageButton = page.locator('[data-test="logs-page-fields-list-pagination-lastpage-button"]');
-        this.schemaFirstPageButton = page.locator('[data-test="logs-page-fields-list-pagination-firstpage-button"]');
-        this.schemaPage2Button = page.locator('[data-test="logs-page-fields-list-pagination-page-2-button"]');
-        this.schemaPage3Button = page.locator('[data-test="logs-page-fields-list-pagination-page-3-button"]');
-        this.schemaPage4Button = page.locator('[data-test="logs-page-fields-list-pagination-page-4-button"]');
+        // OPagination: no numbered buttons; its root carries data-test-page / data-test-page-count.
+        this.schemaPagination = page.locator('[data-test="logs-page-fields-list-pagination"]');
+        this.schemaPrevPageButton = page.locator('[data-test="logs-page-fields-list-pagination-prev"]');
+        this.schemaNextPageButton = page.locator('[data-test="logs-page-fields-list-pagination-next"]');
         // OSelect (multiple) renders the wrapper div with the consumer-supplied
         // data-test and the clickable PopoverTrigger as `${parent}-trigger`.
         // Click the `-trigger` to actually open the popover.
@@ -819,48 +818,28 @@ export class SanityPage {
         await this.refreshButton.click({ timeout: 10000 });
         await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
 
-        // Wait for pagination to be visible (wait for the first page button as indicator)
+        // Wait for the field-list pager to be visible
         testLogger.debug('Waiting for schema pagination to be visible');
-        await this.page.waitHelpers.waitForElementVisible(this.schemaFirstPageButton, {
-            description: 'schema pagination first page button',
+        await this.page.waitHelpers.waitForElementVisible(this.schemaPagination, {
+            description: 'schema pagination',
             timeout: 30000
         });
-        testLogger.debug('Schema pagination is now visible');
+        await expect(this.schemaPagination).toHaveAttribute('data-test-page', '1');
+        const pageCount = Number(await this.schemaPagination.getAttribute('data-test-page-count'));
+        expect(pageCount, '70 ingested fields must span at least 4 schema pages').toBeGreaterThanOrEqual(4);
+        testLogger.info(`Schema pagination is visible with ${pageCount} pages`);
 
-        // Verify last page button is visible
-        testLogger.debug('Verifying schema last page button is visible');
-        await this.page.waitHelpers.waitForElementVisible(this.schemaLastPageButton, {
-            description: 'schema pagination last page button'
-        });
-        testLogger.info('Schema last page button verified as visible');
-
-        // Click page 2 button
-        testLogger.debug('Navigating to page 2 of schema fields');
-        await this.page.waitHelpers.waitForElementClickable(this.schemaPage2Button, {
-            description: 'schema pagination page 2 button'
-        });
-        await this.schemaPage2Button.click({ timeout: 10000 });
-
-        // Click page 3 button
-        testLogger.debug('Navigating to page 3 of schema fields');
-        await this.page.waitHelpers.waitForElementClickable(this.schemaPage3Button, {
-            description: 'schema pagination page 3 button'
-        });
-        await this.schemaPage3Button.click({ timeout: 10000 });
-
-        // Click page 4 button
-        testLogger.debug('Navigating to page 4 of schema fields');
-        await this.page.waitHelpers.waitForElementClickable(this.schemaPage4Button, {
-            description: 'schema pagination page 4 button'
-        });
-        await this.schemaPage4Button.click({ timeout: 10000 });
-
-        // Click first page button
-        testLogger.debug('Navigating back to first page of schema fields');
-        await this.page.waitHelpers.waitForElementClickable(this.schemaFirstPageButton, {
-            description: 'schema pagination first page button'
-        });
-        await this.schemaFirstPageButton.click({ timeout: 10000 });
+        // Step forward to page 4, then back to page 1
+        for (const pageNumber of [2, 3, 4]) {
+            testLogger.debug(`Navigating to page ${pageNumber} of schema fields`);
+            await this.schemaNextPageButton.click({ timeout: 10000 });
+            await expect(this.schemaPagination).toHaveAttribute('data-test-page', String(pageNumber));
+        }
+        for (const pageNumber of [3, 2, 1]) {
+            testLogger.debug(`Navigating back to page ${pageNumber} of schema fields`);
+            await this.schemaPrevPageButton.click({ timeout: 10000 });
+            await expect(this.schemaPagination).toHaveAttribute('data-test-page', String(pageNumber));
+        }
 
         testLogger.info('Schema pagination test completed successfully');
     }

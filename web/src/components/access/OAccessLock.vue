@@ -16,32 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OEmptyState
-    preset="no-access"
+    kind="denied"
     :size="size"
-    :title="named ? message.title : undefined"
-    :description="description"
+    :title="named ? message.title : t('emptyState.noAccess.title')"
+    :text="description ?? t('emptyState.noAccess.description')"
     :action-label="actionLabel ?? (named ? copyLabel : undefined)"
-    :action-icon="actionLabel ? actionIcon : 'content-copy'"
     :secondary-action-label="actionLabel && named ? copyLabel : undefined"
     @action="actionLabel ? emit('action') : copyDetails()"
     @secondary-action="copyDetails"
-  >
-    <template #illustration>
-      <span
-        class="bg-banner-error-soft-bg text-banner-error-soft-text inline-flex size-20 items-center justify-center rounded-full"
-        data-test="access-lock-icon"
-      >
-        <OIcon name="lock" size="xl" />
-      </span>
-    </template>
-  </OEmptyState>
+  />
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { EmptyStateSize } from "@/lib/core/EmptyState/OEmptyState.types";
 import { useAccessCopy } from "@/components/access/useAccessCopy";
 import { coverDenials } from "@/components/access/surfaceDenials";
 import {
@@ -58,18 +47,16 @@ const props = withDefaults(
     denials: AccessDenial[];
     /** Read when Copy details is pressed, since a page's denied requests keep arriving after it locks. */
     requests?: () => string[];
-    size?: "hero" | "block";
+    size?: EmptyStateSize;
     /** The view's own next step; Copy details then moves to the secondary button. */
     actionLabel?: I18nText;
-    actionIcon?: IconName;
     /** The access chip leaves these denials out while the lock shows, for a lock whose page would otherwise list them a second time. */
     covers?: boolean;
   }>(),
   {
-    size: "block",
+    size: "page",
     requests: undefined,
     actionLabel: undefined,
-    actionIcon: undefined,
     covers: false,
   },
 );

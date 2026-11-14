@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton
         v-for="index in 24"
         :key="index"
-        variant="button"
+        shape="block"
         class="flex-1"
         :style="{ height: `${20 + ((index * 13) % 70)}%` }"
       />

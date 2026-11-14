@@ -28,27 +28,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }}</OTruncatedText>
     </div>
     <div v-if="relatives.length" class="mt-2 flex flex-wrap gap-1.5">
-      <OBadge
+      <OButton
         v-for="r in relatives"
         :key="r.id"
-        clickable
-        size="sm"
-        shape="rounded"
-        variant="default-outline"
+        variant="secondary"
+        size="xs"
+        :icon="r.up ? 'arrow-upward' : 'arrow-downward'"
         :data-test="`query-profile-detail-link-${r.id}`"
         @click="emit('select', r.id)"
       >
-        <OIcon :name="r.up ? 'arrow-upward' : 'arrow-downward'" size="xs" />
         <span class="size-1.5 shrink-0 rounded-full" :class="r.swatch" />
         {{ r.label }}
-      </OBadge>
+      </OButton>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useI18nTyped } from "@/types/i18n";

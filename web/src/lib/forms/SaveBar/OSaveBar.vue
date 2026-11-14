@@ -124,7 +124,7 @@ function discard() {
           class="flex min-w-0 items-center gap-2"
           :data-test="`${dataTest}-status`"
         >
-          <OSkeleton v-if="!loaded" type="text" animation="none" class="w-40" />
+          <OSkeleton v-if="!loaded" class="w-40" />
           <template v-else-if="isCreate" />
           <template v-else-if="!changed">
             <OIcon name="check-circle" size="sm" class="shrink-0" aria-hidden="true" />
@@ -159,8 +159,7 @@ function discard() {
       <slot name="actions" />
       <OButton
         v-if="isCreate"
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         type="button"
         :disabled="isSaving"
         :data-test="cancelDataTest ?? `${dataTest}-cancel`"
@@ -170,8 +169,7 @@ function discard() {
       </OButton>
       <OButton
         v-else-if="changed"
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         type="button"
         :disabled="isSaving"
         :data-test="discardDataTest ?? `${dataTest}-discard`"
@@ -181,7 +179,6 @@ function discard() {
       </OButton>
       <OButton
         variant="primary"
-        size="sm-action"
         :type="submit ? 'submit' : 'button'"
         :form="formId"
         :loading="isSaving"

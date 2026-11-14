@@ -1,141 +1,77 @@
 /**
- * Button.types.ts — single source of truth for all OButton public types.
- * No types should be defined inline in Button.vue.
+ * OButton.types.ts — single source of truth for all OButton public types.
+ * No types should be defined inline in OButton.vue.
  */
 
-import type { PrimitiveProps } from "reka-ui";
+import type { InjectionKey, Ref } from "vue";
+import type { RouteLocationRaw } from "vue-router";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { I18nText } from "@/types/i18n";
 
-/** Visual style variant — design is baked in, no style override props */
+/** Seven variants chosen by job; `danger` (solid) belongs inside a confirmation only. */
 export type ButtonVariant =
-  | "primary"
-  | "secondary"
-  | "outline"
-  | "ghost"
-  | "ghost-primary"
-  | "ghost-muted"
-  | "ghost-subtle"
-  | "ghost-destructive"
-  // Flat + positive green text — play/resume (enable) actions, mirror of ghost-destructive
-  | "ghost-success"
-  | "ghost-warning"
-  | "ghost-neutral"
-  | "outline-destructive"
-  // Solid "stop this running operation" red — distinct from destructive
-  // (delete/danger): a query/task actively in flight that a click will abort
-  | "cancel-query"
-  | "sidebar-toggle"
-  // Dedicated variant for sidebar panel collapse/expand icon button
-  | "panel-collapse"
-  // Primary-colored tall-narrow vertical rectangle — for splitter collapse/expand buttons
-  | "sidebar-button"
-  | "destructive"
-  // Icon-only exclude-filter toggle (≠) — lighter red than destructive; glyph-on-fill, so 3:1 non-text contrast applies
-  | "filter-exclude"
-  // AI-themed gradient — purple→pink gradient background, white text (AI send/generate buttons)
-  | "ai-gradient"
-  // Use on dark gradient backgrounds — white background with primary text
-  | "on-dark-primary"
-  // Use on dark gradient backgrounds — transparent with white border/text
-  | "on-dark-ghost"
-  // Solid warning (yellow) background — use to draw attention to a required action
-  | "warning"
-  // Solid amber for a Run/Apply button whose result is behind unapplied edits; never the theme accent (light amber-400, dark amber-500)
-  | "pending"
-  // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
-  | "preview-slack"
-  | "preview-teams"
-  | "preview-email"
-  | "preview-opsgenie"
-  // Generic preview action button — for destination previews with no specific brand color
-  | "preview-action"
-  // Webinar banner dismiss — inline text-link style button for the top bar banner
-  | "webinar-dismiss"
-  // Banner action — inline text-link style button for actions inside an OBanner bar
-  | "banner-dismiss"
-  // Text link inside running copy (a description, a help line); keeps the surrounding font size
-  | "link"
-  // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
-  | "pricing-chip"
-  | "section-chip"
-  // Outline with primary color text + border — for "always highlighted" branded badges (e.g. edition indicator)
-  | "outline-primary"
-  // Dashed outline "add tile" — transparent bg, dashed muted border + muted icon.
-  // For the small "+" add-affordance buttons in the query builder (add join / filter / condition).
-  | "dashed"
-  // Soft categorical badge fill (bg + text) for colour-coded identity tiles, e.g. a cluster code in a hot bar
-  | "tint-teal"
-  | "tint-purple"
-  | "tint-blue"
-  | "tint-orange"
-  // Table-cell content that is itself the action: no chrome, full cell width, stacked lines.
-  | "cell"
-  // Borderless list row whose whole content is the action.
-  | "row"
-  // Outlined prompt whose message is the action, e.g. a locked section.
-  | "locked-body";
+  "primary" | "secondary" | "ghost" | "accent-ghost" | "danger" | "danger-ghost" | "link";
 
-/** Size controls height, padding, font-size, and border-radius */
-export type ButtonSize =
-  | "xs"
-  | "chip"
-  | "sm"
-  | "sm-action"
-  | "md"
-  | "cta"
-  | "lg"
-  | "icon"
-  | "icon-xs"
-  | "icon-xs-circle"
-  | "icon-xs-sq"
-  | "icon-chip"
-  | "icon-sm"
-  | "icon-md"
-  | "icon-lg"
-  | "icon-circle"
-  | "icon-circle-sm"
-  // 30×30px square — matches toolbar icon button height (share/hamburger/auto-refresh)
-  | "icon-toolbar"
-  // 26px rounded-default — compact modern icon button for panel header collapse/expand
-  | "icon-panel"
-  // Tall narrow vertical rectangle — 32×20px for splitter collapse/expand buttons
-  | "sidebar-button"
-  // 30px labeled button — matches toolbar icon height for labeled outline toolbar buttons
-  | "sm-toolbar"
-  | "xs-grouped"
-  // Chip with fixed 12px font — for dashboard query builder axis field chips
-  | "chip-12";
+/** Control heights: xs 24, sm 28, md 32 (default), lg 36 (sign-in and empty-state CTA). */
+export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
-export interface ButtonProps extends PrimitiveProps {
-  /** Visual style variant */
+export const BUTTON_VARIANTS = [
+  "primary",
+  "secondary",
+  "ghost",
+  "accent-ghost",
+  "danger",
+  "danger-ghost",
+  "link",
+] as const satisfies readonly ButtonVariant[];
+
+export const BUTTON_SIZES = ["xs", "sm", "md", "lg"] as const satisfies readonly ButtonSize[];
+
+export interface ButtonProps {
+  /** Visual job of the button. Defaults to `secondary`. */
   variant?: ButtonVariant;
-  /** Component size */
+  /** Height token; inherits the enclosing OButtonGroup's size, else `md`. */
   size?: ButtonSize;
-  /** Disables the button and all interaction */
-  disabled?: boolean;
-  /** Keeps an unavailable button focusable so its reason can be reached. */
-  focusableUnavailable?: boolean;
-  /** Associates the unavailable button with its reason. */
-  descriptionId?: string;
-  /** Shows loading state and disables interaction */
+  /** Leading glyph, only when it adds meaning the label lacks. */
+  icon?: IconName;
+  /** Trailing glyph: a menu chevron or an external-link arrow. */
+  iconEnd?: IconName;
+  /** Square button with no visible text; name it with `label` or `aria-label`. */
+  iconOnly?: boolean;
+  /** Visible text, or with `iconOnly` the aria-label and tooltip. */
+  label?: I18nText;
+  /** Count pill after the label. */
+  count?: number;
+  /** Toggle state; any boolean renders `aria-pressed` and the selected look. */
+  pressed?: boolean;
+  /** Keeps the width, shows a spinner and ignores clicks. */
   loading?: boolean;
-  /** `false` keeps the busy state but never spins, for a control whose region already shows one spinner. */
-  spinner?: boolean;
-  /** Applies active/selected state styling (overrides variant to primary appearance) */
-  active?: boolean;
-  /** Native button type attribute — only meaningful when as="button" */
+  /** Disables the button and all interaction. */
+  disabled?: boolean;
+  /** With `disabled`, keeps the button focusable and says why in a tooltip. */
+  disabledReason?: I18nText;
+  /** Marks the result as older than the inputs (a Run or Apply waiting to be pressed). */
+  stale?: boolean;
+  /** Renders an anchor. */
+  href?: string;
+  /** Renders a router link. */
+  to?: RouteLocationRaw;
+  /** Shortcut registry id; its keys appear in the built-in tooltip. */
+  shortcut?: string;
+  /** Native button type. */
   type?: "button" | "submit" | "reset";
-  /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */
-  block?: boolean; /**
-   * Renders an OIcon to the left of the label.
-   * If the #icon-left slot is also provided, the slot takes precedence.
-   */
-  iconLeft?: IconName;
-  /**
-   * Renders an OIcon to the right of the label.
-   * If the #icon-right slot is also provided, the slot takes precedence.
-   */
-  iconRight?: IconName;
+  /** Full-width block button. */
+  block?: boolean;
+  /** `div` hosts an embedded control (a switch) that cannot nest inside a native button. */
+  as?: "button" | "div";
+}
+
+/** Class strings for one variant in each interaction state. */
+export interface ButtonVariantLook {
+  base: string;
+  interactive: string;
+  pressed: string;
+  disabled: string;
 }
 
 export interface ButtonEmits {
@@ -145,10 +81,12 @@ export interface ButtonEmits {
 export interface ButtonSlots {
   /** Main label / content */
   default?: () => unknown;
-  /** Explains why the focusable button cannot perform its action. */
-  "unavailable-reason"?: () => unknown;
-  /** Icon placed before the label */
-  "icon-left"?: () => unknown;
-  /** Icon placed after the label */
-  "icon-right"?: () => unknown;
+  /** Replaces the `icon` glyph */
+  icon?: () => unknown;
+  /** Replaces the `iconEnd` glyph */
+  "icon-end"?: () => unknown;
 }
+
+/** Provided by OButtonGroup so its children share one height. */
+export const BUTTON_GROUP_SIZE: InjectionKey<Ref<ButtonSize | undefined>> =
+  Symbol("OButtonGroupSize");

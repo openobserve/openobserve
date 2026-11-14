@@ -29,14 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag v-if="v.live" type="fleetDelivery" value="running" />
           <OTag
             v-if="v.state === 'published'"
-            variant="default-soft"
+            tone="neutral"
             dot
             :label="t('fleet.history.published')"
             :data-test="`fleet-config-history-state-${v.version}`"
           />
           <OTag
             v-else-if="v.state === 'rolling_out'"
-            variant="primary-soft"
+            tone="accent"
             dot
             :label="t('fleet.history.rollingOut')"
             :data-test="`fleet-config-history-state-${v.version}`"
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OText variant="meta" class="flex-1" truncate>{{ v.author }}</OText>
           <OButton
             variant="ghost"
-            size="xs"
-            icon-left="compare"
+            size="sm"
+            icon="compare"
             :disabled="v.version === 1"
             :data-test="`fleet-config-history-compare-${v.version}`"
             @click="picked = { configId, version: v.version }"
@@ -60,9 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <template v-if="!v.live && v.state === 'published'">
             <OButton
-              variant="outline"
-              size="xs"
-              icon-left="rocket-launch"
+              variant="secondary"
+              size="sm"
+              icon="rocket-launch"
               :data-test="`fleet-config-history-start-${v.version}`"
               @click="openRollout(v.version)"
             >
@@ -76,13 +76,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OEmptyState
       v-if="comparable() && diffForbidden"
       size="inline"
-      preset="no-access"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
       data-test="fleet-config-history-diff-forbidden"
     />
     <OEmptyState
       v-else-if="comparable() && diffFailed"
       size="inline"
-      preset="load-error"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="t('emptyState.loadError.description')"
       data-test="fleet-config-history-diff-error"
       @action="retryDiff"
     />
@@ -91,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex justify-center py-4"
       data-test="fleet-config-history-diff-loading"
     >
-      <OSpinner />
+      <OSpinner size="lg" />
     </div>
     <div v-else-if="before && after" class="flex flex-col gap-2">
       <div class="flex items-center gap-2">

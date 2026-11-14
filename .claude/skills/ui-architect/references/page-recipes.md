@@ -24,25 +24,48 @@ feel like one product.
 
 ## Every page = OPageHeader + body
 
-Any routed view is: an `OPageHeader` (rule 1) on top, then the page body below
-it, all inside a **full-height flex column** so the header stays put and only the
-body scrolls.
+Any routed view is an `OPageLayout` (rule 1): the stacked `OPageHeader` on top,
+then the page body, all inside a **full-height flex column** so the header stays
+put and only the body scrolls. The header is [header-spec.md](header-spec.md):
 
-- **Primary page action** (New / Add / Create) goes in the header's
-  **`#actions`** slot; page-level secondary actions (Import, Export, an overflow
-  `ODropdown`) go in **`#actions-overflow`** — inline on desktop, behind one ⋮ on
-  phones (add `overflow-first` so they keep their place before the CTA). Never in the
-  table toolbar. See [responsive.md](responsive.md#page-shell-the-header-stays-on-one-row).
-- **The create CTA is label-only — no `icon-left="add"`.** Secondary header
-  actions keep their semantic icons (Import → `upload-file`), and in-section
-  adders inside the body keep their `+`; it is only the header's create button
-  that carries no icon. See
-  [house-rules § The header create CTA carries no icon](house-rules.md#the-header-create-cta-carries-no-icon).
-- The header owns its own chrome — don't wrap it in a bordered/padded div, but
-  **do** give it horizontal padding and a bottom divider so the header aligns with
-  the app frame while the table below runs flush (see the skeleton next).
-- The subtitle/description is the **`subtitle`** prop (there is **no**
-  `description` prop on `OPageHeader`).
+- **One 56 px band on every page** (H1): a 16 px context line over a 24 px title,
+  actions on the right. The band never wraps and nothing in it is sized by its
+  content, so the title sits at the same x and y on every page.
+- **The context line names the container** (H4), derived for you from the route
+  through the rail's nav model (`navGroups.ts` + MainLayout's links): the rail
+  group ("Reliability", "Data", "Infra", "Experience", "Settings", "Dashboards")
+  or the org on ungrouped pages. Override it with `:context` only where the
+  derivation is wrong (an `OPageHeader` inside a panel). Detail, editor and import
+  pages pass **`:back="{ label, to }"`**: the line becomes a real "‹ Parent" link,
+  and Back is smart (N3) — see the detail recipe below.
+- **The title is the page or object name** (`:title`) and never changes on a tab
+  click (H8). Long titles truncate with a tooltip. A `#title` slot is only for an
+  inline-edited name control; it owns its overflow.
+- **A status chip or count follows the title in `#status`** (H5): "3 firing",
+  "Paused", a Beta badge.
+- **Actions** (H3): the primary (New / Add / Create) and anything that must never
+  fold go in **`#actions`**; secondary page actions (Import, Export) go in
+  **`#actions-overflow`**, which renders *before* `#actions` and folds into ⋯ More
+  under 640 px (R2). Never in the table toolbar. See
+  [responsive.md](responsive.md#page-shell-the-header-stays-on-one-row).
+- **The create CTA is "New <object>", label only** (H6) — no `+`, here or on any
+  other text button (B4). A text button carries an icon only for ▾, ↗, download,
+  upload, copy or run. See
+  [house-rules § No `+` on a text button](house-rules.md#no--on-a-text-button-b4-h6).
+- **Peer tabs** go in `#header-tabs` (`#tabs` on a bare `OPageHeader`): always their
+  own 40 px row under the band, the first label at the content edge (H8, N2). Only
+  peer-page navigation belongs there, never a filter or a toggle (F6).
+- **No icon and no subtitle** (H2): `icon`, `subtitle` and `#subtitle` are gone. Help
+  that the title cannot say goes in **`:about`**, an ⓘ "About this page" popover
+  beside the title; filler is dropped.
+- **A lasting page condition** (quota, read-only, partial data) is one `OBanner` in
+  **`#banner`**, directly under the header and tabs (K3), never a notice inside a
+  padded body.
+- The header owns its own chrome: its divider and the one 16 px gutter (L3). Never
+  wrap it in a bordered or padded div and never put `px-*` or `border-b` on it.
+- `local/o2-page-header-api` (in `lint:ci`) rejects the removed props and slots,
+  a hand-built back button beside the header, `router.back()` in a page with a
+  header, and an `<h1>` in a view.
 
 ---
 
@@ -60,60 +83,39 @@ Settings sub-page / a hover-flyout child, and how to gate it with
 
 ## The listing-page skeleton (flush table, fixed height)
 
-Real listing pages do **not** use a padded `gap-6 p-6` page container. They use a
-full-height flex column where **the header carries the horizontal padding and the
-table wrapper carries none**, so table rows run **flush to the content edges**
-while the header aligns with the app frame:
+Real listing pages do **not** use a padded `gap-6 p-6` page container. They are an
+`OPageLayout` with **`bleed`**: the header carries the one gutter and the body
+carries none, so table rows run **flush to the content edges** while the header
+title and the table's first column share one grid line:
 
 ```vue
 <template>
-  <!-- page root: full height, NO page padding -->
-  <div class="flex flex-col h-full p-0">
-    <!-- header: shrink-0, its OWN horizontal padding + bottom divider -->
-    <OPageHeader
-      :title="t('channels.title')"
-      icon="notifications"
-      :subtitle="t('channels.subtitle')"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
-      <template #actions>
-        <OButton variant="primary" size="sm" data-test="channels-new" @click="create">
-          {{ t("channels.new") }}
-        </OButton>
-      </template>
-    </OPageHeader>
-
-    <!-- table wrapper: fills remaining height, scrolls internally, NO padding -->
-    <div class="card-container flex-1 min-h-0 overflow-hidden">
-      <OTable :frame="false" … />
-    </div>
-  </div>
+  <OPageLayout :title="t('channels.title')" bleed>
+    <template #actions>
+      <OButton variant="primary" data-test="channels-new" @click="create">
+        {{ t("channels.new") }}
+      </OButton>
+    </template>
+    <OTable … />
+  </OPageLayout>
 </template>
 ```
 
-Why each class matters — these are load-bearing, not decoration:
+Why it works:
 
-- **`h-full` + `flex flex-col`** on the root, **`shrink-0`** on the header, and
-  **`flex-1 min-h-0 overflow-hidden`** on the table wrapper form the fixed-height
-  chain: the header never scrolls, the table body does. `min-h-0` is what lets the
-  flex child shrink below its content so the inner scroll area works — omit it and
-  the whole page scrolls instead of the table.
-- **Header self-insets** (`OPageHeader` bakes in `px-page-edge`, the single
-  `--spacing-page-edge` grid line) **+ `border-b border-border-default`**, table
-  wrapper **no horizontal padding** → the table is **flush** (rows touch the
-  content-area edges) but its first-column inset (also `--spacing-page-edge`)
-  lands on the *same* grid line as the header title. **Never add a `px-*` to
-  `OPageHeader`** — it owns its inset; a consumer `px-4` would fight the baked
-  `px-page-edge` and knock the header 4px off the table. Don't add page padding and
-  don't wrap the table in a padded box — that inset breaks the flush alignment.
-- **`card-container`** is the existing app class that gives the table area its
-  surface background; reuse it, don't invent a `bg-*`/border box (that would
-  double-frame the borderless table).
-- **`:frame="false"`** on `OTable` keeps it borderless (its default) — the app
-  frame provides the single content card. If OPageLayout wraps the view instead,
-  its `#header` wrapper is just `shrink-0 border-b border-border-default` — the
-  `OPageHeader` inside still supplies the `px-page-edge` inset, so don't re-add
-  it via `header-class`.
+- `OPageLayout` is the fixed-height chain: a full-height column whose header never
+  scrolls and whose body is `flex-1 min-h-0`, so the table scrolls internally
+  instead of the page.
+- **One gutter, applied once (L3).** `--spacing-page-edge` is 16 px. The header
+  insets itself with it; a non-`bleed` body is inset by `OContent` with the same
+  token; an `OTable` insets its first and last column with
+  `--spacing-table-edge` (the gutter plus 2 px). So `bleed` is for a body that owns
+  its edge (a table, a chart, a canvas, a `router-view` shell), and an inset body
+  never adds its own `px-*` on top. **Never add a `px-*` or `border-b` to
+  `OPageHeader`**; it owns its inset and its divider.
+- `OTable` has one frame and no frame props (D8) — the app frame provides the
+  single content card. The `#header` escape hatch is for the rare page the props
+  cannot express; the `OPageHeader` inside still supplies the gutter and divider.
 
 > Reserve `p-6`/`gap-6` page containers for **form / detail** views (constrained
 > content), **not** for full-bleed listing tables.
@@ -133,10 +135,7 @@ for every list — don't ship a listing page without them.
   :columns="columns"
   row-key="id"
   :loading="loading"
-  :frame="false"
-  :page-size="20"
-  :page-size-options="[20, 50, 100]"
-  :show-global-filter="false"        <!-- filters + search live in #toolbar below -->
+  :global-filter="search"            <!-- the OSearchInput in #toolbar below sets it -->
   :column-visibility="defaultColumnVisibility"
   :persist-columns="true"
   table-id="channels-list"
@@ -154,16 +153,15 @@ for every list — don't ship a listing page without them.
         data-test="channels-type-filter"
         @update:model-value="filterByType"
       >
-        <OToggleGroupItem value="all" size="sm">{{ t("channels.all") }}</OToggleGroupItem>
-        <OToggleGroupItem value="prebuilt" size="sm">{{ t("channels.prebuilt") }}</OToggleGroupItem>
-        <OToggleGroupItem value="custom" size="sm">{{ t("channels.custom") }}</OToggleGroupItem>
+        <OToggleGroupItem value="all">{{ t("channels.all") }}</OToggleGroupItem>
+        <OToggleGroupItem value="prebuilt">{{ t("channels.prebuilt") }}</OToggleGroupItem>
+        <OToggleGroupItem value="custom">{{ t("channels.custom") }}</OToggleGroupItem>
       </OToggleGroup>
       <div class="min-w-0 flex-1 max-md:min-w-40">
         <OSearchInput
           v-model="search"
-          class="w-full"
+          width="list"
           :placeholder="t('channels.search')"
-          clearable
           data-test="channels-search"
         />
       </div>
@@ -172,25 +170,23 @@ for every list — don't ship a listing page without them.
 
   <!-- refresh on the RIGHT (the column-visibility toggle is auto-injected between them) -->
   <template #toolbar-trailing>
-    <OButton
-      variant="outline"
-      size="icon-sm"
-      icon-left="refresh"
+    <ORefreshButton
+      :last-run-at="dataUpdatedAt"
       :loading="fetching"
+      shortcut="channelsRefresh"
       data-test="channels-refresh"
       @click="refreshChannels"
-    >
-      <OTooltip side="bottom" :content="t('channels.reload')" shortcut-id="channelsRefresh" />
-    </OButton>
+    />
   </template>
 
   <!-- ONE empty slot handles both first-run and filtered states (see below) -->
   <template #empty>
     <OEmptyState
       v-if="!loading"
-      size="hero"
-      preset="no-channels"
-      :filtered="!!search || typeFilter !== 'all'"
+      :kind="isFiltered ? 'filtered' : 'first-run'"
+      :title="isFiltered ? t('channels.noMatch') : t('channels.emptyTitle')"
+      :text="isFiltered ? undefined : t('channels.emptyText')"
+      :action-label="isFiltered ? undefined : t('channels.newChannel')"
       @action="onEmptyAction"
     />
   </template>
@@ -200,25 +196,21 @@ for every list — don't ship a listing page without them.
 **Toolbar layout is fixed by `OTable`:** `#toolbar` sits on the left (make it fill
 with `w-full`/`flex-1`), the **column-visibility toggle is auto-injected**, and
 `#toolbar-trailing` (refresh) sits on the right. When a page has filters, put the
-filter controls **and** the search box together in `#toolbar` and set
-`:show-global-filter="false"` (the built-in global filter is only for the simplest
-search-only lists with no other filters).
+filter controls **and** the search box together in `#toolbar`. OTable draws no
+search box of its own.
 
 ### The mandatory listing toolbar
 
-**Search.** Two accepted ways:
-- **Built-in global filter** (simplest, client-side): set `show-global-filter`,
-  `v-model:global-filter`, and `:global-filter-placeholder`. Good when the full
-  list is in memory.
-- **Custom search in the `#toolbar` slot**: put an `OInput` (with a leading
-  `search` icon) that fills the bar — use this when search is server-driven or
-  needs extra controls (scope toggles, etc.). Set `:show-global-filter="false"`
-  and drive the query yourself.
+**Search.** An `OSearchInput width="list"` first in `#toolbar` (F1, F2):
+- **Client-side**: bind its text to `:global-filter` and OTable filters the rows.
+- **Server-driven**: drive the query yourself (and `filter-mode="server"` if you
+  still pass `:global-filter`).
 
-**Refresh.** An `OButton size="icon-sm" icon-left="refresh"` in the
-`#toolbar-trailing` slot, with `:loading` bound to the query's `isFetching` (the
-table's `:loading` is `isPending`, the cold-read skeleton). Attach an `OTooltip`
-with `shortcut-id` so it advertises the `r` shortcut.
+**Refresh.** One `ORefreshButton`, last in the toolbar, showing the data age
+(F9), in the `#toolbar-trailing` slot: `:last-run-at` from the query's
+`dataUpdatedAt`, `:loading` bound to its `isFetching` (the table's `:loading` is
+`isPending`, the cold-read skeleton), and `shortcut` so its tooltip advertises
+the `r` shortcut. Never an icon-only `OButton` with a refresh glyph.
 
 The click goes to a **named handler that forces every read the page shows** —
 the list and any secondary read (counts, "Used by", dropdown options). Mount,
@@ -255,11 +247,11 @@ three and the button silently won't appear.
 **A footer is never hand-built.** `OTable` draws the same bar on every list: the
 pager on the end edge and, on the start edge, nothing — until the page has a
 reason to put something there. There is **no total label** ("12 Channels"): the
-pager's "x – y of z" is the count, so a line that only restates the row total is
-not written at all.
+pager's "1–20 of 143" is the count, so a line that only restates the row total is
+not written at all, and an empty table has no pager (D5).
 
-- **Bulk actions → `#selection-actions`.** While rows are selected the bar shows
-  "N of M selected", a divider, then this slot. Hand it **the buttons only** — no
+- **Bulk actions → `#selection-actions`.** While rows are selected the bar turns
+  into the selection bar (D6): "3 selected", this slot, then Clear. Hand it **the buttons only** — no
   wrapper, no `v-if` on the selection length (the table already hides the slot
   with nothing selected), no margin / height / padding classes, every button
   `size="sm"`, a destructive action last. The count appears once, in the bar:
@@ -275,10 +267,10 @@ not written at all.
 ```vue
 <OTable … selection="multiple" v-model:selected-ids="selectedIds">
   <template #selection-actions>
-    <OButton variant="outline" size="sm" icon-left="download" data-test="channels-export-selected" @click="exportSelected">
+    <OButton variant="secondary" size="sm" icon="download" data-test="channels-export-selected" @click="exportSelected">
       {{ t("common.export") }}
     </OButton>
-    <OButton variant="outline-destructive" size="sm" icon-left="delete" :loading="deleting" data-test="channels-delete-selected" @click="confirmBulkDelete = true">
+    <OButton variant="danger-ghost" size="sm" :loading="deleting" data-test="channels-delete-selected" @click="confirmBulkDelete = true">
       {{ t("common.delete") }}
     </OButton>
   </template>
@@ -325,18 +317,18 @@ blocks:
 - **First-run / genuinely empty** (no data yet): a `preset` supplies the
   "nothing here — create your first one" copy + create/import action cards.
 - **Filtered / searched to zero** (data exists, but the current search/filter
-  matches nothing): `OEmptyState` automatically swaps to the "No results found"
-  title, description, the magnifier illustration, and a single **Clear filters**
-  action — driven entirely by `:filtered="true"`.
+  matches nothing): `kind="filtered"`, a title naming the query, and the default
+  **Clear filters** action (K5, F5).
+- **Failed load**: `kind="error"` in `#error` with Retry — never the first-run kind.
 
 ```vue
 <template #empty>
   <OEmptyState
     v-if="!loading"
-    size="hero"
-    preset="no-channels"                       <!-- first-run copy + create/import cards -->
-    :filtered="!!search || typeFilter !== 'all'"  <!-- true → 'No results found' + Clear -->
-    @action="onEmptyAction"
+    :kind="isFiltered ? 'filtered' : 'first-run'"
+    :title="isFiltered ? t('channels.noMatch') : t('channels.emptyTitle')"
+    :action-label="isFiltered ? undefined : t('channels.newChannel')"
+    @action="isFiltered ? clearFilters() : openCreate()"
   />
 </template>
 ```
@@ -439,8 +431,8 @@ visible data.
   `OEmptyState` (above) and, if fetch can fail, an `#error` slot. Never leave a
   blank table.
 - **Primary action** (New) is in the header `#actions`; **row actions**
-  (edit/delete/…) go through `OTable` `row-actions` in the `isAction` column (three
-  buttons at most, fixed order Edit, own actions, Delete, one kebab below md);
+  (edit/delete/…) go through `OTable` `row-actions` + `row-menu` (two inline at
+  most, the rest in ⋯ with Delete last and red, one kebab below md; B7);
   **destructive delete** goes through `ConfirmDialog` + `useConfirmDialog`. A
   hand-written `#cell-actions` keeps the `max-md:hidden` buttons plus one
   `md:hidden` kebab mirror — see
@@ -464,13 +456,21 @@ visible data.
 A detail or create/edit screen that is the page's *primary* task (not a small
 form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
 
-- `OPageHeader` with a **back** target (`:back="{ label, to }"`) so the leading
-  icon tile becomes a Back button, and the title reflects the item.
+- `OPageLayout` with a **back** target, `:back="{ label: t('<parent title key>'), to: parentRoute }"`,
+  so the context line reads "‹ Parent" (H4). `label` is the parent page's own
+  name (H7), never "Back". The link's href is `to`, so it opens in a new tab like
+  any link; a click is smart (N3): it pops history when there is an in-app entry,
+  so the list comes back exactly as the user left it, and pushes `to` from a deep
+  link. Pass `onClick` instead of `to` only for an in-page parent with no route
+  (closing an editor mode); a handler that must do work first navigates with
+  `useSmartBack`, never `router.back()`.
+- The title is the item's name; its status chip goes in `#status` (H5). Never a
+  hand-built back button or a "← Back" text link beside the header (H4).
 - Body = the form, built with `OForm` + a colocated Zod schema (see
-  [forms-validation.md](forms-validation.md)). Save/Cancel follow the standard
-  pair (cancel `outline` / save `primary`, `size="sm-action"`).
-- Sub-sections use `OCard` (+ `OCardSection`); tabs within the editor use the
-  `OTabs` family or the header's `#tabs` slot.
+  [forms-validation.md](forms-validation.md)). Save/Cancel sit in the sticky
+  footer of the form column (V2), Cancel then primary (O7), default size.
+- Sub-sections use `OCard` (`title`, `#actions`, `#footer`); the editor's peer
+  tabs go in `#header-tabs`, their own row under the header (H8).
 
 ---
 
@@ -479,7 +479,7 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
 An always-editable page of saved values (Settings › General, Organization
 parameters, Password policy): no edit mode, no dialog, one Save for the page.
 
-- The shell supplies the header (`OPageHeader`, title + one-line subtitle); the
+- The shell supplies the header (`OPageHeader`: the title, with the page's one-line help behind `about`); the
   page adds no second title.
 - `OForm validate-on="leave"` with a colocated schema; list fields that are
   checked together in `coupled`.
@@ -512,7 +512,7 @@ parameters, Password policy): no edit mode, no dialog, one Save for the page.
       :description="t('settings.maxSeriesDesc')"
       :loading="isLoading"
     >
-      <OFormInput name="max_series" type="number" width="xs" />
+      <OFormInput name="max_series" type="number" width="s" />
     </OSettingRow>
   </OFormSection>
   <Teleport defer :to="SAVE_BAR_SLOT">
@@ -533,28 +533,25 @@ Components: [forms-specialized.md](forms-specialized.md) § OSaveBar + useLeaveG
 
 ## Listing-page checklist
 
-- [ ] Full-height flex skeleton: root `flex flex-col h-full p-0`, header
-      `shrink-0 border-b border-border-default` (OPageHeader self-insets with
-      `px-page-edge` — no `px-*` on it), table wrapper
-      `card-container flex-1 min-h-0 overflow-hidden` — **no page padding**, table
-      runs **flush**.
-- [ ] `OPageHeader` on top (description via **`subtitle`** prop); primary
-      **New** action in `#actions`, **label-only — no `icon-left="add"`**.
-- [ ] `OTable :frame="false"`; filters + **search** in `#toolbar`
-      (`:show-global-filter="false"`), or the built-in global filter for a
-      search-only list.
-- [ ] **Refresh** button in `#toolbar-trailing` (`variant="outline"
-      size="icon-sm" icon-left="refresh"`, `:loading` from `isFetching`), with an
-      `OTooltip shortcut-id`; its named handler **forces** the list and every
-      secondary read on the page.
+- [ ] `OPageLayout bleed` skeleton: the header carries the one 16 px gutter (L3),
+      no `px-*` or `border-b` on it, no page padding, the table runs **flush**.
+- [ ] Stacked header (H1): context line derived from the route, title = the page
+      name, **no icon and no subtitle** (H2, help in `:about`); primary
+      **New <object>** action in `#actions`, **label only, no `+`** (H6, B4);
+      peer tabs in `#header-tabs` (H8).
+- [ ] Filters + **search** (`OSearchInput`) in `#toolbar`; OTable draws no
+      search box and has no frame props.
+- [ ] **Refresh** is one `ORefreshButton` in `#toolbar-trailing` showing the
+      data age (F9), `:loading` from `isFetching`, with a `shortcut-id`; its
+      named handler **forces** the list and every secondary read on the page.
 - [ ] Rows come from a declared query (`useQuery` or `fetchQuery`) — no raw
       service/`http` call, no Vuex copy; writes invalidate the domain.
 - [ ] **Column show/hide toggle** present — i.e. `:persist-columns="true"` +
       `table-id` + at least one `hideable` column.
 - [ ] Non-essential columns **hidden by default** via `:column-visibility`.
-- [ ] Single `#empty` `OEmptyState` with a `preset` + **`:filtered`** (true when
-      search/filter active) + an `@action` that resets on `clear-filters`;
-      `#error` if fetch can fail; `:loading` bound. **No first-run state in an
+- [ ] Single `#empty` `OEmptyState` of the right `kind` (`filtered` when
+      search/filter active, its action clearing them; `first-run` otherwise);
+      `#error` with `kind="error"` if fetch can fail; `:loading` bound. **No first-run state in an
       outer `v-if` branch** — the table must mount even when the list is empty.
 - [ ] **`:forbidden`** bound to a ref the page sets from a 403 on *its own* list
       request (cleared at the start of every load path), so a denied user sees

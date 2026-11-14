@@ -219,7 +219,7 @@ const globalStubs = {
   },
   OProgressBar: {
     template: '<div class="o-progress-bar" />',
-    props: ["value", "variant", "size"],
+    props: ["value", "tone"],
   },
   OSearchInput: {
     template: '<input class="o-search-input" />',

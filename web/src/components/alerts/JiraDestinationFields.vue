@@ -5,7 +5,7 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
@@ -277,7 +277,6 @@ onMounted(() => {
               : t('alerts.prebuiltDestinations.jiraPersonalAccessToken')
           "
           type="password"
-          revealable
           required
           autocomplete="new-password"
           :help-text="t('alerts.prebuiltDestinations.jiraTokenTip')"
@@ -287,8 +286,7 @@ onMounted(() => {
       <div class="flex flex-wrap items-center gap-3 py-1">
         <OButton
           data-test="jira-connect-button"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :loading="loading === 'connect'"
           @click="connect"
         >
@@ -305,11 +303,11 @@ onMounted(() => {
           })
         }}
       </OText>
-      <OButton data-test="jira-change-button" variant="outline" size="sm" @click="change">
+      <OButton data-test="jira-change-button" variant="secondary" @click="change">
         {{ t("alerts.prebuiltDestinations.jiraChange") }}
       </OButton>
     </div>
-    <OBanner v-if="error" variant="error" dense data-test="jira-setup-error">{{ error }}</OBanner>
+    <OInlineNotice v-if="error" tone="err" data-test="jira-setup-error">{{ error }}</OInlineNotice>
 
     <template v-if="connectedAs">
       <OText variant="card-title" as="div" class="mt-2">
@@ -366,19 +364,18 @@ onMounted(() => {
       </div>
 
       <template v-if="createMeta">
-        <OBanner v-if="!createMeta.hasLabels" variant="error" dense data-test="jira-labels-missing">
+        <OInlineNotice v-if="!createMeta.hasLabels" tone="err" data-test="jira-labels-missing">
           {{
             t("alerts.prebuiltDestinations.jiraLabelsMissing", {
               issueType: createMeta.issueTypeName,
               project: createMeta.projectName,
             })
           }}
-        </OBanner>
+        </OInlineNotice>
         <template v-for="requiredField in createMeta.requiredFields" :key="requiredField.id">
-          <OBanner
+          <OInlineNotice
             v-if="requiredField.kind === 'unsupported'"
-            variant="error"
-            dense
+            tone="err"
             :data-test="`jira-unsupported-field-${requiredField.id}`"
           >
             {{
@@ -387,7 +384,7 @@ onMounted(() => {
                 issueType: createMeta.issueTypeName,
               })
             }}
-          </OBanner>
+          </OInlineNotice>
           <div v-else class="w-1/2 py-1">
             <OFormSelect
               v-if="requiredField.kind === 'option' || requiredField.kind === 'options'"

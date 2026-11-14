@@ -25,16 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           class="me-2"
           variant="ghost"
-          size="sm"
           :disabled="
             queryData.queryResults.hasOwnProperty('hits') && !queryData.queryResults.hits.length
           "
           :title="t('search.exportLogs')"
           @click="downloadLogs"
-          icon-left="download"
+          icon="download"
         />
         <div class="float-left" v-show="queryData.streamType !== 'enrichment_tables'">
-          <DateTime
+          <ODateTimeRange
             data-test="logs-search-bar-date-time-dropdown"
             auto-apply
             calendar-presets
@@ -52,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
             variant="primary"
-            size="sm-action"
             :title="t('search.runQuery')"
             @click="searchData"
             >{{ t("search.runQuery") }}</OButton
@@ -81,7 +79,7 @@ import { defineComponent, ref, onBeforeMount } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useLogs from "@/composables/useLogs";
 import type { IDateTime } from "@/ts/interfaces";
@@ -101,7 +99,7 @@ export default defineComponent({
     },
   },
   components: {
-    DateTime,
+    ODateTimeRange,
     OButton,
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
   },

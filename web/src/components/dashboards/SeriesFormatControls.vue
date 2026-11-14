@@ -27,15 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-series-format-match-by"
           @update:model-value="onMatchBy"
         >
-          <OToggleGroupItem value="name" size="sm" data-test="dashboard-series-format-match-name">{{
+          <OToggleGroupItem value="name" data-test="dashboard-series-format-match-name">{{
             t("dashboard.seriesOverrideMatchExact")
           }}</OToggleGroupItem>
-          <OToggleGroupItem
-            value="regex"
-            size="sm"
-            data-test="dashboard-series-format-match-regex"
-            >{{ t("dashboard.seriesOverrideMatchRegex") }}</OToggleGroupItem
-          >
+          <OToggleGroupItem value="regex" data-test="dashboard-series-format-match-regex">{{
+            t("dashboard.seriesOverrideMatchRegex")
+          }}</OToggleGroupItem>
         </OToggleGroup>
         <OInput
           :model-value="override.value"
@@ -349,8 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="self-start"
           data-test="dashboard-series-format-value-mapping-add"
           @click="addValueMapping"

@@ -36,13 +36,12 @@ limitations under the License. -->
         <OButton
           v-if="result.issue && /^https?:\/\//i.test(result.issue.url)"
           data-test="test-success-issue-link"
-          as="a"
           :href="result.issue.url"
           target="_blank"
           rel="noopener noreferrer"
-          variant="ghost-primary"
-          size="xs"
-          icon-right="open-in-new"
+          variant="accent-ghost"
+          size="sm"
+          icon-end="open-in-new"
           class="mb-1"
         >
           {{ t("alerts.prebuiltDestinations.jiraOpenIssue") }}
@@ -118,7 +117,7 @@ limitations under the License. -->
         <!-- Error Details Expansion -->
         <OCollapsible
           v-if="result.error || result.responseBody"
-          v-model="errorDetailsOpen"
+          v-model:open="errorDetailsOpen"
           data-test="test-failure-details-expansion"
           class="mt-2 bg-transparent"
         >
@@ -165,10 +164,10 @@ limitations under the License. -->
         >
           <OButton
             data-test="test-retry-button"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             @click="$emit('retry')"
-            icon-left="refresh"
+            icon="refresh"
           >
             {{ t("alerts.retry") }}
           </OButton>
@@ -183,7 +182,7 @@ limitations under the License. -->
       class="rounded-default border-theme-accent flex gap-3 border-s-3 border-solid bg-[rgba(33,150,243,0.08)] px-4 py-3 dark:bg-[rgba(33,150,243,0.12)]"
     >
       <div class="text-theme-accent shrink-0 pt-0.5">
-        <OSpinner size="xs" />
+        <OSpinner />
       </div>
       <div class="min-w-0 flex-1">
         <div class="text-compact mb-1 leading-[1.4] font-medium">

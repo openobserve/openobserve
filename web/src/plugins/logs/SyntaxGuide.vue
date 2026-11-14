@@ -23,10 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="menuItem"
           data-cy="syntax-guide-button"
           variant="ghost"
-          size="sm"
-          class="rounded-default! h-auto! w-full! justify-start! gap-2! px-3! py-1.5! font-normal!"
+          class="rounded-default! w-full! justify-start! gap-2! px-3! py-1.5! font-normal!"
         >
-          <template #icon-left>
+          <template #icon>
             <span
               class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
             >
@@ -38,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Toolbar style: outline button matching sibling toolbar buttons (e.g. Reset) -->
         <OButton
           v-else-if="toolbar"
+          :icon-only="!label"
           data-cy="syntax-guide-button"
-          variant="outline"
-          :size="label ? 'sm-toolbar' : 'icon-toolbar'"
+          variant="secondary"
           :class="sqlmode ? 'sql-mode' : 'normal-mode'"
         >
           <OIcon name="help" size="sm" />
@@ -52,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           data-cy="syntax-guide-button"
           variant="ghost"
-          size="sm"
           :class="[
             noBorder ? 'display-none!' : 'ms-1',
             sqlmode ? 'sql-mode' : 'normal-mode',
@@ -60,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? 'm-0! w-full justify-start border-0! bg-transparent! p-0! hover:bg-transparent!'
               : '',
           ]"
-          class="h-4.5!"
         >
           <OIcon name="help" size="sm" />
           <span v-if="label">{{ label }}</span>

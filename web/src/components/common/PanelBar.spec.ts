@@ -6,33 +6,17 @@ describe("PanelBar", () => {
   const createWrapper = (options = {}) =>
     mount(PanelBar, { slots: { default: "Panel title" }, ...options });
 
-  it("carries the header tint, so every chart bar reads as a header", () => {
-    // The whole reason this component exists: the tint used to be a copied
-    // class string and three of the five bars silently missed it.
-    expect(createWrapper().classes()).toContain("bg-panel-bar-bg");
-  });
-
-  it("owns the bar's box — height, padding and bottom border", () => {
+  it("is the 40 px panel header: subtle bottom border, no tint", () => {
     const classes = createWrapper().classes();
     expect(classes).toEqual(
-      expect.arrayContaining(["min-h-7", "border-b", "border-panel-bar-border", "px-2", "py-1"]),
+      expect.arrayContaining(["min-h-10", "border-b", "border-border-subtle"]),
     );
+    expect(classes.some((c) => c.startsWith("bg-"))).toBe(false);
   });
 
-  it("divides itself from the body with its OWN border, not the app default", () => {
-    // At this fill, `border-default` IS the fill colour in light mode (1.00:1)
-    // and the header's bottom edge disappears. The bar therefore carries a
-    // border token that moves with the fill.
-    const classes = createWrapper().classes();
-    expect(classes).toContain("border-panel-bar-border");
-    expect(classes).not.toContain("border-border-default");
-  });
-
-  it("owns the title type, so a bare label needs no wrapper", () => {
-    // SloPreviewChart passes its label as raw text with no inner element.
-    const classes = createWrapper().classes();
-    expect(classes).toEqual(
-      expect.arrayContaining(["text-compact", "text-text-heading", "font-medium"]),
+  it("owns the 13/600 title type, so a bare label needs no wrapper", () => {
+    expect(createWrapper().classes()).toEqual(
+      expect.arrayContaining(["text-compact", "text-text-heading", "font-semibold"]),
     );
   });
 
@@ -43,18 +27,9 @@ describe("PanelBar", () => {
     expect(wrapper.find(".hint").text()).toBe("2d ago");
   });
 
-  it("MERGES consumer layout classes with its own instead of replacing them", () => {
-    // Consumers pass layout through `class` (PanelContainer sends
-    // `rounded-t-default w-full flex-nowrap`, the SLO bars send
-    // `justify-between`). If fallthrough ever stopped merging, every bar would
-    // lose its tint and border at once — which is exactly how the unresolved
-    // component registration was caught.
-    const wrapper = createWrapper({
-      attrs: { class: "rounded-t-default w-full flex-nowrap" },
-    });
-    const classes = wrapper.classes();
-    expect(classes).toEqual(expect.arrayContaining(["rounded-t-default", "w-full", "flex-nowrap"]));
-    expect(classes).toEqual(expect.arrayContaining(["bg-panel-bar-bg", "border-panel-bar-border"]));
+  it("merges consumer layout classes with its own", () => {
+    const classes = createWrapper({ attrs: { class: "w-full flex-nowrap" } }).classes();
+    expect(classes).toEqual(expect.arrayContaining(["w-full", "flex-nowrap", "min-h-10"]));
   });
 
   it("passes attributes such as data-test through to the bar element", () => {

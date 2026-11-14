@@ -33,38 +33,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="oncall-team-detail-skeleton"
     class="flex flex-col gap-5"
   >
-    <OCard variant="glass">
-      <OCardSection dense class="flex flex-col gap-2">
-        <OSkeleton type="text" class="h-4 w-1/3" />
-        <OSkeleton type="text" class="h-4 w-1/2" />
-      </OCardSection>
+    <OCard>
+      <div class="flex flex-col gap-2">
+        <OSkeleton class="h-4 w-1/3" />
+        <OSkeleton class="h-4 w-1/2" />
+      </div>
     </OCard>
 
     <div class="flex gap-4">
-      <OSkeleton v-for="tab in 5" :key="tab" type="text" class="h-6 w-24" />
+      <OSkeleton v-for="tab in 5" :key="tab" class="h-6 w-24" />
     </div>
 
     <div
       class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-2 border px-4 py-3"
     >
-      <OSkeleton type="text" class="h-4 w-40" />
-      <OSkeleton type="rect" class="h-16 w-full" />
+      <OSkeleton class="h-4 w-40" />
+      <OSkeleton shape="block" class="h-16 w-full" />
     </div>
 
-    <OCard variant="glass">
-      <OCardSection role="header" dense>
-        <OSkeleton type="text" class="h-4 w-32" />
-      </OCardSection>
-      <OCardSection role="body" dense class="flex flex-col gap-2">
-        <OSkeleton v-for="row in 3" :key="row" type="text" class="h-4 w-full" />
-      </OCardSection>
+    <OCard>
+      <template #header>
+        <OSkeleton class="h-4 w-32" />
+      </template>
+      <div class="flex flex-col gap-2">
+        <OSkeleton v-for="row in 3" :key="row" class="h-4 w-full" />
+      </div>
     </OCard>
   </div>
 </template>
 
 <script setup lang="ts">
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { useI18nTyped } from "@/types/i18n";
 

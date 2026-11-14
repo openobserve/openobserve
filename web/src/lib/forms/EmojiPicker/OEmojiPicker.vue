@@ -146,11 +146,12 @@ watch(flatEmojis, (list) => {
        against. -->
   <span class="relative inline-flex">
     <OPopover
+      size="md"
       v-model:open="open"
       side="bottom"
       align="start"
       :z-index="popoverZIndex"
-      content-class="w-72 p-2"
+      content-class="p-2"
     >
       <template #trigger>
         <button

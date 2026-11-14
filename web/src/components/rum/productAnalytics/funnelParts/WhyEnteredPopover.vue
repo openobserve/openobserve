@@ -16,14 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPopover
+    size="lg"
     :open="open"
     side="bottom"
     align="start"
-    content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
+    content-class="p-3"
     @update:open="setOpen"
   >
     <template #trigger>
-      <OButton variant="ghost-primary" size="xs" data-test="rum-analytics-funnel-why-btn">{{
+      <OButton variant="accent-ghost" size="sm" data-test="rum-analytics-funnel-why-btn">{{
         t("rum.analytics.funnel.whyLink", { count: addCommasToNumber(count) })
       }}</OButton>
     </template>
@@ -43,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-funnel-why-error"
         >{{ t("rum.analytics.funnel.whyFailed") }}
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           data-test="rum-analytics-funnel-why-retry"
           @click="emit('retry')"
           >{{ t("common.retry") }}</OButton

@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{ 'background-color': backgroundColor, border: `1px solid ${borderColor}` }"
     >
       <!-- eslint-enable local/no-hardcoded-px -->
-      <OSpinner variant="dots" size="lg" />
+      <OSpinner size="lg" />
       <div class="text-text-secondary mt-3 font-medium" style="font-size: var(--text-sm)">
         {{ t("rum.translatingStackTrace") }}
       </div>
@@ -37,16 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Uploaded JS source maps cannot resolve native mobile frames -->
     <OEmptyState
       v-else-if="isMobileError"
-      size="block"
       :title="t('rum.mobileSourceMapsNotApplicable')"
-      :description="t('rum.mobileSourceMapsNotApplicableBody', { tab: t('rum.stackTraceRaw') })"
-      :hide-action="true"
+      :text="t('rum.mobileSourceMapsNotApplicableBody', { tab: t('rum.stackTraceRaw') })"
+      icon="code-off"
       data-test="rum-pretty-stack-trace-mobile-unsupported"
-    >
-      <template #illustration>
-        <OIcon name="code-off" size="xl" />
-      </template>
-    </OEmptyState>
+    />
 
     <!-- No source maps available message -->
     <!-- eslint-disable local/no-hardcoded-px -- 1px container border — a border width, optical not layout; it must not thicken with the message text -->
@@ -86,13 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="badge-value font-semibold">{{ props.error.version }}</span>
         </span>
       </div>
-      <OButton
-        variant="primary"
-        size="sm-action"
-        icon-left="upload"
-        class="my-2"
-        @click="navigateToUpload"
-      >
+      <OButton variant="primary" icon="upload" class="my-2" @click="navigateToUpload">
         {{ t("rum.uploadSourceMaps") }}
       </OButton>
     </div>

@@ -19,35 +19,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="border-border-default relative h-full w-full border-t"
     data-test="logs-build-query-page"
   >
-    <OBanner
-      v-if="freeTextNotice"
-      variant="info"
-      icon="info"
-      dense
-      data-test="logs-build-free-text-notice"
-    >
+    <OInlineNotice v-if="freeTextNotice" tone="info" data-test="logs-build-free-text-notice">
       {{ heldFilter ? t("search.searchQueryEmptyOrInvalid") : t("search.freeTextBuildNotice") }}
-    </OBanner>
-    <OBanner
+    </OInlineNotice>
+    <OInlineNotice
       v-if="parserLoadFailed || retryingParser"
-      variant="error-soft"
-      icon="error-outline"
-      role="alert"
-      dense
+      tone="err"
       data-test="logs-build-parser-error"
     >
       {{ t("logs.buildQueryPage.parserLoadFailed") }}
       <template #actions>
         <OButton
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           data-test="logs-build-parser-retry"
           :loading="retryingParser"
           @click="retryParser"
           >{{ t("common.retry") }}</OButton
         >
       </template>
-    </OBanner>
+    </OInlineNotice>
     <PanelEditor
       ref="panelEditorRef"
       pageType="build"
@@ -83,7 +74,7 @@ import {
 } from "@/utils/query/sqlQueryParser";
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
 import { parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useNotifications from "@/composables/useNotifications";
 import { searchState } from "@/composables/useLogs/searchState";

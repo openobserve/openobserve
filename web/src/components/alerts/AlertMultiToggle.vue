@@ -53,7 +53,6 @@
           :name="name"
           type="radio"
           orientation="horizontal"
-          size="sm"
           :options="options"
           :disabled="disabled"
           data-test="alerts-alertmultitoggle-choice"

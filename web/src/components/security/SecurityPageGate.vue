@@ -18,10 +18,9 @@ const denials = [viewDenial("security", "get")];
   <div class="flex h-full items-center justify-center p-4" data-test="security-page-gate">
     <OEmptyState
       v-if="access.failed.value"
-      preset="load-error"
-      size="hero"
+      kind="error"
       :title="t('siem.access.checkFailedTitle')"
-      :description="t('siem.access.checkFailedHint')"
+      :text="t('siem.access.checkFailedHint')"
       data-test="security-page-gate-failed"
     >
       <template #actions>
@@ -34,6 +33,6 @@ const denials = [viewDenial("security", "get")];
         />
       </template>
     </OEmptyState>
-    <SecurityAccessLock v-else :denials="denials" size="hero" data-test="security-page-lock" />
+    <SecurityAccessLock v-else :denials="denials" data-test="security-page-lock" />
   </div>
 </template>

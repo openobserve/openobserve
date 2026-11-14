@@ -114,7 +114,7 @@ const detail = (over: Parameters<typeof apiDetail>[0] = {}) =>
   });
 
 const DrawerStub = {
-  props: ["open", "title", "subTitle"],
+  props: ["open", "title", "subtitle"],
   template: '<div data-test="drawer-stub"><h2>{{ title }}</h2><slot /></div>',
 };
 const CodeStub = {
@@ -233,7 +233,7 @@ describe("FleetCollectorDrawer", () => {
     await flushPromises();
     const delivery = wrapper.find(sel("delivery"));
     expect(delivery.text()).toContain("Running");
-    expect(delivery.findComponent({ name: "OBadge" }).props("variant")).toBe("default-outline");
+    expect(delivery.findComponent({ name: "OBadge" }).props("tone")).toBe("outline");
     expect(wrapper.find(sel("delivery-offline")).text()).toContain(
       "Last reported before going offline:",
     );

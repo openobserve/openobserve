@@ -18,23 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full flex-col p-0">
     <template v-if="!showImportDialog">
       <OPageLayout
-        overflow-first
         :title="t('synthetics.locations.title')"
-        icon="location-on"
-        :subtitle="t('synthetics.locations.description')"
+        :about="t('synthetics.locations.description')"
         bleed
       >
         <template #actions-overflow>
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             @click="openImportDialog"
             data-test="synthetics-locations-import-btn"
             >{{ t("synthetics.locations.importTitle") }}</OButton
           >
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             @click="exportLocations"
             data-test="synthetics-locations-export-btn"
             >{{ t("synthetics.locations.exportTitle") }}</OButton
@@ -44,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="synthetics-locations-add-btn"
             variant="primary"
-            size="sm"
             @click="openCreateDialog"
             >{{ t("synthetics.locations.addLocation") }}</OButton
           >
@@ -53,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
           <OTable
             ref="oTableRef"
-            :frame="false"
             data-test="synthetics-locations-list-table"
             :data="visibleRows"
             :columns="columns"
@@ -73,14 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sorting="client"
             filter-mode="client"
             :default-columns="false"
-            show-index
             :enable-column-resize="true"
             :persist-columns="true"
             table-id="settings-synthetics-locations"
-            :show-global-filter="false"
             :loading="listLoading"
             :row-actions="rowActions"
-            row-actions-more-data-test="synthetics-locations-row-more-actions"
+            :row-menu="rowMenu"
+            row-menu-data-test="synthetics-locations-row-more-actions"
             @update:selected-ids="handleSelectedIdsUpdate"
           >
             <template #toolbar>
@@ -92,9 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #toolbar-trailing>
               <OButton
-                variant="outline"
-                size="icon-toolbar"
-                icon-left="refresh"
+                icon-only
+                variant="secondary"
+                icon="refresh"
                 :loading="listLoading"
                 data-test="synthetics-locations-refresh-btn"
                 @click="fetchLocations"
@@ -104,46 +97,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #empty>
               <OEmptyState
-                v-if="!listLoading && filterQuery !== ''"
-                size="hero"
-                preset="no-search-results"
-                :filtered="true"
-                @action="(id?: string) => (id === 'clear-filters' ? (filterQuery = '') : undefined)"
-              />
-              <OEmptyState
-                v-else-if="!listLoading"
-                size="hero"
-                variant="create"
-                illustration="box"
-                :title="t('synthetics.locations.emptyState.title')"
-                :description="t('synthetics.locations.emptyState.description')"
-                :actions="emptyActions"
-                @action="(id?: string) => (id === 'create' ? openCreateDialog() : undefined)"
+                v-if="!listLoading"
+                :kind="filterQuery !== '' ? 'filtered' : 'first-run'"
+                :title="
+                  filterQuery !== ''
+                    ? t('emptyState.filtered.title', {
+                        noun: t('emptyState.filtered.fallbackNoun'),
+                      })
+                    : t('synthetics.locations.emptyState.title')
+                "
+                :text="
+                  filterQuery !== ''
+                    ? t('emptyState.filtered.description', {
+                        noun: t('emptyState.filtered.fallbackNoun'),
+                      })
+                    : t('synthetics.locations.emptyState.description')
+                "
+                :action-label="
+                  filterQuery !== '' ? undefined : t('synthetics.locations.addLocation')
+                "
+                @action="filterQuery !== '' ? (filterQuery = '') : openCreateDialog()"
               />
             </template>
             <template #selection-actions>
               <OButton
-                variant="outline"
-                size="sm"
-                icon-left="play-arrow"
+                variant="secondary"
+                icon="play-arrow"
                 data-test="synthetics-locations-enable-selected-btn"
                 :disabled="!!bulkActionLoading"
                 @click="bulkToggleEnabled(true)"
                 >{{ t("synthetics.locations.enable") }}</OButton
               >
               <OButton
-                variant="outline"
-                size="sm"
-                icon-left="pause"
+                variant="secondary"
+                icon="pause"
                 data-test="synthetics-locations-disable-selected-btn"
                 :disabled="!!bulkActionLoading"
                 @click="bulkToggleEnabled(false)"
                 >{{ t("synthetics.locations.disable") }}</OButton
               >
               <OButton
-                variant="outline-destructive"
-                size="sm"
-                icon-left="delete"
+                variant="danger-ghost"
+                icon="delete"
                 data-test="synthetics-locations-delete-selected-btn"
                 :loading="!!bulkActionLoading"
                 @click="openBulkDeleteConfirm"
@@ -183,8 +178,11 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -283,24 +281,6 @@ export default defineComponent({
         size: 160,
         minSize: 100,
         meta: { align: "left" },
-      },
-      {
-        id: "actions",
-        header: t("common.actions"),
-        isAction: true,
-        pinned: "right",
-        size: 130,
-        minSize: 130,
-        sortable: false,
-      },
-    ];
-
-    const emptyActions: EmptyStateAction[] = [
-      {
-        id: "create",
-        icon: "add",
-        titleKey: "synthetics.locations.addLocation",
-        descriptionKey: "synthetics.locations.emptyState.actionDesc",
       },
     ];
 
@@ -499,7 +479,7 @@ export default defineComponent({
         title: t("synthetics.locations.deleteConfirmTitle"),
         messageKeypath: "synthetics.locations.deleteConfirmMessage",
         messageName: row.label,
-        confirmVariant: "destructive",
+        kind: "destructive",
       });
       if (ok) {
         await deleteLocation(row.id);
@@ -530,7 +510,7 @@ export default defineComponent({
       const ok = await confirm({
         title: t("synthetics.locations.bulkDeleteConfirmTitle"),
         message: t("synthetics.locations.bulkDeleteConfirmMessage", { count }),
-        confirmVariant: "destructive",
+        kind: "destructive",
       });
       if (ok) {
         await bulkDeleteLocations();
@@ -618,7 +598,7 @@ export default defineComponent({
         id: "edit",
         label: t("common.edit"),
         icon: "edit",
-        onSelect: (row) => openEditDialog(row),
+        onClick: (row) => openEditDialog(row),
         dataTest: (row) => `synthetics-locations-${row.id}-edit-btn`,
       },
       {
@@ -633,14 +613,17 @@ export default defineComponent({
               : t("synthetics.locations.enabling"),
             dataTest: `synthetics-locations-${row.id}-toggle-spinner`,
           },
-        onSelect: (row) => toggleLocationEnabled(row),
+        onClick: (row) => toggleLocationEnabled(row),
         dataTest: (row) =>
           `synthetics-locations-${row.id}-${row.enabled ? "disable" : "enable"}-btn`,
       },
+    ];
+    const rowMenu: OTableRowMenuItem<SyntheticsLocationRecord>[] = [
       {
         id: "delete",
         label: t("common.delete"),
         icon: "delete",
+        destructive: true,
         onSelect: (row) => confirmDelete(row),
         dataTest: (row) => `synthetics-locations-${row.id}-delete-btn`,
       },
@@ -657,7 +640,7 @@ export default defineComponent({
       oTableRef,
       columns,
       rowActions,
-      emptyActions,
+      rowMenu,
       locations,
       listLoading,
       visibleRows,

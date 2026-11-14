@@ -19,18 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="alert-list-page" class="flex h-full flex-col">
     <OPageLayout
-      overflow-first
       bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :title="t('alerts.header')"
-      icon="shield-alert-outline"
-      :subtitle="t('alerts.subtitle')"
-      tabs-below
     >
-      <!-- The header names the GROUP the four tabs form — "Alerts" — not the
-           page; the active tab says which sibling you are on. Same title,
-           subtitle and icon on all four (PipelineSectionTabs makes the same
-           trade). -->
+      <!-- The title names the group the peer tabs form, so it stays put on every tab (H8). -->
       <template #header-tabs>
         <AlertSectionTabs />
       </template>
@@ -40,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              only discoverable once the export dialog is already open. -->
         <OTooltip v-if="anomalyTabLicenseLocked" :content="anomalyLockedReason">
           <span class="inline-flex">
-            <OButton data-test="alert-list-add-alert-btn" variant="primary" size="sm" disabled>
-              <template #icon-left>
+            <OButton data-test="alert-list-add-alert-btn" variant="primary" disabled>
+              <template #icon>
                 <OIcon
                   name="lock"
                   class="lock-chip"
@@ -58,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           data-test="alert-list-add-alert-btn"
           variant="primary"
-          size="sm"
           :disabled="!templates.length"
           :aria-label="
             hasNewDraft ? t('common.editorDraft.newDot', { label: t('alerts.add') }) : undefined
@@ -90,26 +82,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Import button -->
         <OButton
           :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           @click="importAlert"
           data-test="alert-import"
-          icon-left="upload-file"
+          icon="upload-file"
         >
           <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
           <OTooltip
             v-if="isCompactToolbar"
             :content="t('dashboard.import')"
             side="bottom"
-            shortcut-id="alertsImport"
+            shortcut="alertsImport"
           />
         </OButton>
         <OButton
           v-if="showAlertLibrary"
           :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
-          variant="outline"
-          size="sm"
-          icon-left="menu-book"
+          variant="secondary"
+          icon="menu-book"
           data-test="alert-list-alert-library-btn"
           @click="goToAlertLibrary"
         >
@@ -129,19 +119,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Right: Table -->
         <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-          <div class="bg-card-glass-bg @container/alert-toolbar flex h-full flex-col">
+          <div class="bg-card-glass-bg flex h-full flex-col">
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable
               class="min-h-0 flex-1"
               ref="oTableRef"
-              :frame="false"
               v-model:selected-ids="selectedAlertIds"
               :is-row-selectable="(row: any) => !anomalyRowLocked(row)"
               selection="multiple"
               data-test="alert-list-table"
               :data="displayedAlerts"
               :columns="columns"
-              show-index
               row-key="alert_id"
               :loading="loading || refreshing"
               :loading-reset-key="`${activeFolderId}:${activeTab}`"
@@ -158,8 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :sort-order="sortOrder"
               @update:sort-by="sortBy = $event"
               @update:sort-order="sortOrder = $event"
-              width="100%"
-              :show-global-filter="false"
               :default-columns="false"
               :enable-column-resize="true"
               :persist-columns="true"
@@ -168,13 +154,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :get-row-style="alertRowStyle"
               @row-click="triggerExpand"
             >
-              <!-- A level from an Overview link has no chip, so it shows as a removable filter here. -->
-              <template v-if="levelFilter" #subheader>
-                <div class="px-3 pt-2" data-test="alert-list-level-filter">
+              <!-- Summary strip: at-a-glance operational counts for the folder.
+                     Rendered via OTable's #subheader slot so it sits BELOW the
+                     search/tabs and above the rows. Always rendered (skeleton
+                     while loading) so data arriving never shifts the layout. -->
+              <template #subheader>
+                <div v-if="levelFilter" class="px-3 pt-2" data-test="alert-list-level-filter">
                   <OButton
-                    variant="outline"
-                    size="xs"
-                    icon-right="close"
+                    variant="secondary"
+                    size="sm"
+                    icon-end="close"
                     data-test="alert-list-level-filter-clear"
                     :aria-label="t('alerts.levelFilterRemove', { label: levelFilterLabel })"
                     @click="clearLevelFilter"
@@ -182,12 +171,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ levelFilterLabel }}
                   </OButton>
                 </div>
+                <div
+                  class="px-page-edge border-table-row-divider border-b py-1.5"
+                  data-test="alert-list-summary"
+                >
+                  <OStatStrip
+                    :items="summaryStats"
+                    :loading="loading"
+                    stacked
+                    selectable
+                    multiple
+                    :selected-keys="stateFilters"
+                    @update:selected-keys="onStateFiltersUpdate"
+                  />
+                </div>
               </template>
 
               <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
               <template #toolbar>
-                <!-- Children of the toolbar row, so the chips can wrap below them; label queries read the table column. -->
-                <div class="contents">
+                <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
+                <div
+                  class="@container/alert-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
+                >
                   <OToggleGroup
                     mobile-dropdown
                     :model-value="activeTab"
@@ -197,86 +202,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-for="tab in alertTabs" :key="tab.value">
                       <OToggleGroupItem
                         :value="tab.value"
-                        size="sm"
                         :icon-left="tab.icon"
                         :icon-right="tab.locked ? 'lock' : undefined"
                         :tooltip="tab.locked ? anomalyLockedReason : undefined"
                         :title="lgUp || tab.locked ? undefined : tab.label"
                         :data-test="`alert-list-tab-${tab.value}`"
                       >
-                        <span class="@max-[52rem]/alert-toolbar:hidden">{{ tab.label }}</span>
+                        <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
                       </OToggleGroupItem>
                     </template>
                   </OToggleGroup>
                   <!-- flex-1 is basis-0, so below lg the full-width basis is what wraps the input before its scope chips spill. -->
-                  <div class="min-w-0 flex-1 md:min-w-48 md:max-lg:basis-full">
-                    <OInput
+                  <div class="min-w-0 flex-1 md:max-lg:basis-full">
+                    <OSearchInput
                       v-model="dynamicQueryModel"
                       :placeholder="
                         searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')
                       "
-                      :clearable="searchAcrossFolders"
                       @clear="clearSearchHistory"
                       data-test="alert-list-search-input"
                       class="w-full"
-                    >
-                      <template #icon-left>
-                        <OIcon name="search" size="sm" />
-                      </template>
-                      <template #icon-right>
-                        <OToggleGroup
-                          :model-value="searchAcrossFolders ? 'all' : 'this'"
-                          type="single"
-                          class="me-1 self-center"
-                          @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
-                        >
-                          <OToggleGroupItem
-                            value="this"
-                            size="xs"
-                            icon-left="folder-outline"
-                            data-test="alert-list-search-scope-current"
-                            :title="t('alerts.searchThisFolderTooltip')"
-                            ><span class="max-md:hidden @max-[52rem]/alert-toolbar:hidden">{{
-                              t("alerts.searchThisFolder")
-                            }}</span></OToggleGroupItem
-                          >
-                          <OToggleGroupItem
-                            value="all"
-                            size="xs"
-                            icon-left="search"
-                            data-test="alert-list-search-across-folders-toggle"
-                            :title="t('alerts.searchAllFoldersTooltip')"
-                            ><span class="max-md:hidden @max-[52rem]/alert-toolbar:hidden">{{
-                              t("alerts.searchAllFolders")
-                            }}</span></OToggleGroupItem
-                          >
-                        </OToggleGroup>
-                      </template>
-                    </OInput>
+                      :scope="searchAcrossFolders ? 'all' : 'this'"
+                      :scope-options="[
+                        {
+                          value: 'this',
+                          label: t('alerts.searchThisFolder'),
+                          icon: 'folder-outline',
+                          tooltip: t('alerts.searchThisFolderTooltip'),
+                          dataTest: 'alert-list-search-scope-current',
+                        },
+                        {
+                          value: 'all',
+                          label: t('alerts.searchAllFolders'),
+                          icon: 'search',
+                          tooltip: t('alerts.searchAllFoldersTooltip'),
+                          dataTest: 'alert-list-search-across-folders-toggle',
+                        },
+                      ]"
+                      @update:scope="(v) => (searchAcrossFolders = v === 'all')"
+                    />
                   </div>
-                  <OStatStrip
-                    :items="summaryStats"
-                    :loading="loading"
-                    compact
-                    selectable
-                    :row="false"
-                    multiple
-                    :selected-keys="stateFilters"
-                    default-key="total"
-                    class="max-md:order-last"
-                    data-test="alert-list-summary"
-                    @update:selected-keys="onStateFiltersUpdate"
-                  />
                 </div>
               </template>
               <template #toolbar-trailing>
                 <ORefreshButton
-                  layout="inline"
-                  variant="outline"
                   :last-run-at="lastUpdatedAt"
                   :loading="fetching"
-                  :spinner="!tableKeepsRows"
-                  shortcut-id="alertsRefresh"
+                  shortcut="alertsRefresh"
                   data-test="alert-list-refresh-btn"
                   @click="refreshAlerts"
                 />
@@ -296,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTruncatedText>{{ row.name || "--" }}</OTruncatedText>
                   <OTag
                     v-if="leftFilterIds.has(String(row.alert_id))"
-                    variant="default-outline"
+                    tone="outline"
                     size="sm"
                     class="shrink-0"
                     :label="t('alerts.rowAction.leftFilter')"
@@ -319,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <template v-if="row.alert_type === 'Composite'">
                     <OTag
-                      variant="warning-soft"
+                      tone="warn"
                       size="sm"
                       :label="t('alerts.compositeAlert')"
                       :data-test="`alert-list-composite-badge-${row.alert_id}`"
@@ -357,11 +329,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        the row that says what it watches. The badge marks the
                        family; the label names the SLO and goes there. -->
                   <template v-if="isSloRow(row)">
-                    <!-- `indigo-soft`, not teal: teal is already `scheduled` in
-                         badgeGroups, and two alert families wearing the same
-                         colour in one table is worse than no colour at all. -->
                     <OTag
-                      variant="indigo-soft"
+                      tone="neutral"
                       size="sm"
                       :label="t('alerts.sloBadge')"
                       :data-test="`alert-list-${row.name}-slo-badge`"
@@ -450,7 +419,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (row.status === 'failed' || isAnomalyDataReadinessStatus(row.status)) &&
                       row.last_error
                     "
-                    :max-width="'25rem'"
                     :content="row.last_error"
                   />
                 </span>
@@ -544,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OTag
                     v-else
-                    variant="default-soft"
+                    tone="neutral"
                     dot
                     :label="t('alerts.groups.firingCount', { count: 0 })"
                     size="sm"
@@ -585,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop
                   >
                     <OTag
-                      variant="default-soft"
+                      tone="neutral"
                       icon="notifications-paused"
                       size="sm"
                       :label="t('alerts.downtimes.mute.firingMuted')"
@@ -595,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
                 <OTooltip v-else-if="isAckedFiring(row)" :content="runOutcomeTooltip(row)">
                   <OTag
-                    variant="default-soft"
+                    tone="neutral"
                     icon="person"
                     size="sm"
                     :label="t('alerts.ack.firingAcknowledged')"
@@ -628,24 +596,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <span class="ms-1 inline-flex max-md:hidden">
                       <OButton
+                        icon-only
                         :data-row-action="row.enabled ? 'pause' : 'resume'"
                         :data-test="`alert-list-${row.name}-pause-start-alert`"
                         :aria-label="row.enabled ? t('alerts.pause') : t('alerts.start')"
                         variant="ghost"
-                        size="icon-sm"
-                        icon-left="lock"
+                        icon="lock"
                         disabled
                       />
                     </span>
                   </OTooltip>
                   <OButton
                     v-else
+                    icon-only
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
                     class="ms-1 max-md:hidden"
-                    :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                    size="icon-xs-sq"
-                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    :variant="row.enabled ? 'danger-ghost' : 'ghost'"
+                    size="sm"
+                    :icon="row.enabled ? 'pause' : 'play-arrow'"
                     :loading="!!alertStateLoadingMap[row.uuid]"
                     @click.stop="toggleAlertState(row)"
                   >
@@ -653,7 +622,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       side="bottom"
                       exclusive
                       :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                      :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
+                      :shortcut="row.enabled ? 'alertsRowPause' : undefined"
                     />
                   </OButton>
                   <OTooltip
@@ -663,23 +632,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <span class="inline-flex max-md:hidden">
                       <OButton
+                        icon-only
                         data-row-action="edit"
                         :data-test="`alert-list-${row.name}-update-alert`"
                         :aria-label="t('alerts.edit')"
                         variant="ghost"
-                        size="icon-sm"
-                        icon-left="lock"
+                        icon="lock"
                         disabled
                       />
                     </span>
                   </OTooltip>
                   <OButton
                     v-else
+                    icon-only
                     data-row-action="edit"
                     :data-test="`alert-list-${row.name}-update-alert`"
                     variant="ghost"
-                    size="icon-xs-sq"
-                    icon-left="edit"
+                    size="sm"
+                    icon="edit"
                     class="max-md:hidden"
                     @click.stop="editAlert(row)"
                   >
@@ -687,7 +657,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       side="bottom"
                       exclusive
                       :content="t('alerts.edit')"
-                      shortcut-id="alertsRowEdit"
+                      shortcut="alertsRowEdit"
                     />
                   </OButton>
                   <!-- Clone is disabled for SLO alerts (D1). The explanation
@@ -708,10 +678,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :content="t('alerts.sloCloneDisabled')"
                     />
                     <OButton
+                      icon-only
                       data-row-action="duplicate"
                       variant="ghost"
-                      size="icon-xs-sq"
-                      :icon-left="anomalyRowLocked(row) ? 'lock' : 'content-copy'"
+                      size="sm"
+                      :icon="anomalyRowLocked(row) ? 'lock' : 'content-copy'"
                       :disabled="isSloRow(row) || anomalyRowLocked(row)"
                       :aria-label="isSloRow(row) ? t('alerts.sloCloneDisabled') : t('alerts.clone')"
                       @click.stop="duplicateAlert(row)"
@@ -722,7 +693,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         side="bottom"
                         exclusive
                         :content="t('alerts.clone')"
-                        shortcut-id="alertsRowDuplicate"
+                        shortcut="alertsRowDuplicate"
                       />
                     </OButton>
                   </span>
@@ -748,9 +719,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ODropdown>
                     <template #trigger>
                       <OButton
+                        icon-only
                         variant="ghost"
-                        size="icon-xs-sq"
-                        icon-left="more-vert"
+                        size="sm"
+                        icon="more-vert"
                         :aria-label="t('alerts.moreActions')"
                         @click.stop="openMenu($event, row)"
                         :data-test="`alert-list-${row.name}-more-options`"
@@ -759,12 +731,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownItem
                       class="md:hidden"
                       :disabled="!!alertStateLoadingMap[row.uuid] || anomalyRowLocked(row)"
-                      :focusable-unavailable="anomalyRowLocked(row)"
-                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
+                      :disabled-reason="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-pause-start-alert-menu`"
                       @select="toggleAlertState(row)"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <OIcon
                           :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
                           :name="
@@ -778,12 +749,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownItem
                       class="md:hidden"
                       :disabled="rowAnomalyLocked(row)"
-                      :focusable-unavailable="rowAnomalyLocked(row)"
-                      :description="rowAnomalyLocked(row) ? anomalyLockedReason : undefined"
+                      :disabled-reason="rowAnomalyLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-update-alert-menu`"
                       @select="editAlert(row)"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <OIcon
                           :class="rowAnomalyLocked(row) ? 'lock-chip' : undefined"
                           :name="rowAnomalyLocked(row) ? 'lock' : 'edit'"
@@ -795,12 +765,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownItem
                       class="md:hidden"
                       :disabled="isSloRow(row) || anomalyRowLocked(row)"
-                      :focusable-unavailable="anomalyRowLocked(row)"
-                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
+                      :disabled-reason="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-clone-alert-menu`"
                       @select="duplicateAlert(row)"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <OIcon
                           :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
                           :name="anomalyRowLocked(row) ? 'lock' : 'content-copy'"
@@ -812,12 +781,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
                       :disabled="anomalyRowLocked(row)"
-                      :focusable-unavailable="anomalyRowLocked(row)"
-                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
+                      :disabled-reason="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-move-alert`"
                       @select="moveAlertToAnotherFolder(row)"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <OIcon
                           :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
                           :name="anomalyRowLocked(row) ? 'lock' : 'drive-file-move'"
@@ -829,12 +797,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="canAcknowledgeRow(row)">
                       <ODropdownSeparator />
                       <ODropdownItem
+                        icon="check"
                         :data-test="`alert-list-${row.name}-acknowledge`"
                         @select="acknowledgeRow(row)"
                       >
-                        <template #icon-left>
-                          <OIcon name="check" size="sm" />
-                        </template>
                         {{ t("alerts.ack.acknowledge") }}
                       </ODropdownItem>
                     </template>
@@ -865,32 +831,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <ODropdownSeparator />
                     <ODropdownItem
                       :disabled="anomalyRowLocked(row)"
-                      :focusable-unavailable="anomalyRowLocked(row)"
-                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
-                      :data-test="`alert-list-${row.name}-delete-alert`"
-                      variant="destructive"
-                      shortcut-id="alertsRowDelete"
-                      @select="showDeleteDialogFn({ row })"
-                    >
-                      <template #icon-left>
-                        <OIcon
-                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
-                          :name="anomalyRowLocked(row) ? 'lock' : 'delete'"
-                          size="sm"
-                        />
-                      </template>
-                      {{ t("alerts.delete") }}
-                    </ODropdownItem>
-                    <ODropdownSeparator />
-                    <ODropdownItem
-                      :disabled="anomalyRowLocked(row)"
-                      :focusable-unavailable="anomalyRowLocked(row)"
-                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
+                      :disabled-reason="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
                       :data-test="`alert-list-${row.name}-export-alert`"
-                      shortcut-id="alertsRowExport"
+                      shortcut="alertsRowExport"
                       @select="exportAlert(row)"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <OIcon
                           size="sm"
                           :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
@@ -904,12 +850,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="row.type === 'anomaly'">
                       <ODropdownItem
                         :disabled="anomalyLicenseLocked"
-                        :focusable-unavailable="anomalyLicenseLocked"
-                        :description="anomalyLicenseLocked ? anomalyLockedReason : undefined"
+                        :disabled-reason="anomalyLicenseLocked ? anomalyLockedReason : undefined"
                         :data-test="`alert-list-${row.name}-trigger-detection`"
                         @select="triggerAlert(row)"
                       >
-                        <template #icon-left>
+                        <template #icon>
                           <OIcon
                             size="sm"
                             :class="anomalyLicenseLocked ? 'lock-chip' : undefined"
@@ -920,12 +865,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </ODropdownItem>
                       <ODropdownItem
                         :disabled="anomalyLicenseLocked"
-                        :focusable-unavailable="anomalyLicenseLocked"
-                        :description="anomalyLicenseLocked ? anomalyLockedReason : undefined"
+                        :disabled-reason="anomalyLicenseLocked ? anomalyLockedReason : undefined"
                         :data-test="`alert-list-${row.name}-retrain-anomaly`"
                         @select="retrainAnomaly(row)"
                       >
-                        <template #icon-left>
+                        <template #icon>
                           <OIcon
                             size="sm"
                             :class="anomalyLicenseLocked ? 'lock-chip' : undefined"
@@ -941,10 +885,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`alert-list-${row.name}-trigger-alert`"
                       @select="triggerAlert(row)"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <OIcon size="sm" name="sound-sampler" />
                       </template>
                       {{ t("alerts.triggerAlert") }}
+                    </ODropdownItem>
+                    <ODropdownSeparator />
+                    <ODropdownItem
+                      :disabled="anomalyRowLocked(row)"
+                      :disabled-reason="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
+                      :data-test="`alert-list-${row.name}-delete-alert`"
+                      tone="danger"
+                      shortcut="alertsRowDelete"
+                      @select="showDeleteDialogFn({ row })"
+                    >
+                      <template #icon>
+                        <OIcon
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
+                          :name="anomalyRowLocked(row) ? 'lock' : 'delete'"
+                          size="sm"
+                        />
+                      </template>
+                      {{ t("alerts.delete") }}
                     </ODropdownItem>
                   </ODropdown>
                 </div>
@@ -953,24 +915,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #empty>
                 <OEmptyState
                   v-if="!templates.length"
-                  size="hero"
-                  preset="no-alert-templates"
-                  :description="t('alerts.noTemplatesMsg')"
+                  :title="t('emptyState.noAlertTemplates.title')"
+                  icon="notifications"
+                  :text="t('alerts.noTemplatesMsg')"
                   data-test="alert-list-create-template-text"
+                  :action-label="t('emptyState.noAlertTemplates.action')"
                   @action="routeTo('alertTemplates')"
                 />
                 <OEmptyState
                   v-else
-                  size="block"
-                  preset="no-alerts"
-                  :filtered="!!(filterQuery || searchQuery || stateFilters.length || levelFilter)"
+                  :kind="
+                    filterQuery || searchQuery || stateFilters.length || levelFilter
+                      ? 'filtered'
+                      : 'first-run'
+                  "
+                  :title="
+                    filterQuery || searchQuery || stateFilters.length || levelFilter
+                      ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.alerts') })
+                      : t('emptyState.noAlerts.title')
+                  "
+                  :text="
+                    filterQuery || searchQuery || stateFilters.length || levelFilter
+                      ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.alerts') })
+                      : t('emptyState.noAlerts.description')
+                  "
+                  :icon="
+                    filterQuery || searchQuery || stateFilters.length || levelFilter
+                      ? undefined
+                      : 'notifications'
+                  "
                   @action="
-                    (id) =>
-                      id === 'clear-filters' &&
-                      ((filterQuery = ''),
-                      (searchQuery = ''),
-                      (stateFilters = []),
-                      (levelFilter = null))
+                    ((filterQuery = ''),
+                    (searchQuery = ''),
+                    (stateFilters = []),
+                    (levelFilter = null))
                   "
                 >
                   <!-- First run only: the filtered state keeps its single Clear filters action. -->
@@ -982,7 +960,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="showAlertLibrary"
                       variant="primary"
                       size="lg"
-                      icon-left="menu-book"
+                      icon="menu-book"
                       data-test="alert-list-empty-alert-library"
                       @click="goToAlertLibrary"
                     >
@@ -992,16 +970,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!showAlertLibrary"
                       variant="primary"
                       size="lg"
-                      icon-left="add"
+                      icon="add"
                       data-test="alert-list-empty-new-alert"
                       @click="showAddUpdateFn({})"
                     >
                       {{ t("emptyState.noAlerts.action") }}
                     </OButton>
                     <OButton
-                      variant="outline"
+                      variant="secondary"
                       size="lg"
-                      icon-left="upload-file"
+                      icon="upload-file"
                       data-test="alert-list-empty-import"
                       @click="importAlert"
                     >
@@ -1009,9 +987,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       v-if="showAlertLibrary"
-                      variant="outline"
+                      variant="secondary"
                       size="lg"
-                      icon-left="add"
+                      icon="add"
                       data-test="alert-list-empty-new-alert"
                       @click="showAddUpdateFn({})"
                     >
@@ -1024,30 +1002,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #selection-actions>
                 <OButton
                   data-test="alert-list-move-across-folders-btn"
-                  variant="outline"
-                  size="sm"
-                  icon-left="drive-file-move"
-                  focusable-unavailable
+                  variant="secondary"
+                  icon="drive-file-move"
                   :disabled="bulkWriteBusy"
                   @click="moveMultipleAlerts"
                   >{{ t("common.move") }}</OButton
                 >
                 <OButton
                   data-test="alert-list-export-alerts-btn"
-                  variant="outline"
-                  size="sm"
-                  icon-left="download"
-                  focusable-unavailable
+                  variant="secondary"
+                  icon="download"
                   :disabled="bulkWriteBusy"
                   @click="multipleExportAlert"
                   >{{ t("common.export") }}</OButton
                 >
                 <OButton
                   data-test="alert-list-pause-alerts-btn"
-                  variant="outline"
-                  size="sm"
-                  icon-left="pause"
-                  focusable-unavailable
+                  variant="secondary"
+                  icon="pause"
                   :disabled="bulkWriteBusy && bulkToggleBusy !== 'pause'"
                   :loading="bulkToggleBusy === 'pause'"
                   @click="bulkToggleAlerts('pause')"
@@ -1055,10 +1027,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 <OButton
                   data-test="alert-list-unpause-alerts-btn"
-                  variant="outline"
-                  size="sm"
-                  icon-left="play-arrow"
-                  focusable-unavailable
+                  variant="secondary"
+                  icon="play-arrow"
                   :disabled="bulkWriteBusy && bulkToggleBusy !== 'resume'"
                   :loading="bulkToggleBusy === 'resume'"
                   @click="bulkToggleAlerts('resume')"
@@ -1073,11 +1043,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ODropdown side="top">
                     <template #trigger>
                       <OButton
-                        variant="outline"
-                        size="sm"
-                        icon-left="notifications-paused"
+                        variant="secondary"
+                        icon="notifications-paused"
                         data-test="alert-list-mute-alerts-btn"
-                        focusable-unavailable
                         :disabled="bulkWriteBusy"
                       >
                         {{ t("alerts.downtimes.mute.bulk") }}
@@ -1094,10 +1062,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OButton
                   data-test="alert-list-delete-alerts-btn"
-                  variant="outline-destructive"
-                  size="sm"
-                  icon-left="delete"
-                  focusable-unavailable
+                  variant="danger-ghost"
+                  icon="delete"
                   :disabled="bulkWriteBusy && !bulkDeleteLoading"
                   :loading="bulkDeleteLoading"
                   @click="openBulkDeleteDialog"
@@ -1138,7 +1104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.deleteAlertTitle')"
       message-keypath="alerts.deleteAlertMessage"
       :message-name="selectedDelete?.name"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -1147,7 +1113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('alerts.deleteAlertsTitle')"
       :message="t('alerts.confirmDeleteAlerts', { count: selectedAlerts.length })"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="bulkDeleteAlerts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -1168,14 +1134,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODialog
         data-test="alert-list-form-dialog"
         v-model:open="showForm"
-        persistent
         size="sm"
         :title="t('alerts.cloneTitle')"
-        :secondary-button-label="t('alerts.cancel')"
-        :primary-button-label="t('alerts.save')"
-        :primary-button-disabled="
-          isSubmitting || isCloneSourceLoading || !toBeCloneAlertName.trim()
-        "
+        :dirty="isCloneFormChanged"
+        :secondary="{ label: t('alerts.cancel') }"
+        :primary="{
+          label: t('alerts.save'),
+          disabled: isSubmitting || isCloneSourceLoading || !toBeCloneAlertName.trim(),
+          loading: isSubmitting,
+        }"
         @click:secondary="showForm = false"
         @click:primary="submitForm"
       >
@@ -1353,6 +1320,7 @@ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -1448,6 +1416,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OInput,
+    OSearchInput,
     OTooltip,
     SelectFolderDropDown,
     OButton,
@@ -1957,7 +1926,7 @@ export default defineComponent({
     const summaryStats = computed<StatItem[]>(() => {
       const c = stateCounts.value;
       const hasData = c.total > 0;
-      const v = (n: number): string | number => (hasData ? n : "—");
+      const v = (n: number): number | null => (hasData ? n : null);
       const share = hasData ? c.total : undefined;
       // Severity-descending, matching the Incidents / Eval Jobs strips; Total stays last.
       return [
@@ -1966,7 +1935,7 @@ export default defineComponent({
           label: t("alerts.summaryFailed"),
           value: v(c.failed),
           icon: "error-outline",
-          tone: "error",
+          tone: "err",
           max: share,
           dataTest: "alert-summary-failed",
         },
@@ -1975,7 +1944,7 @@ export default defineComponent({
           label: t("alerts.summaryFiring"),
           value: v(c.firing),
           icon: "notifications-active",
-          tone: "error",
+          tone: "err",
           max: share,
           dataTest: "alert-summary-firing",
         },
@@ -1984,7 +1953,7 @@ export default defineComponent({
           label: t("alerts.ack.tile"),
           value: v(c.acknowledged),
           icon: "person",
-          tone: "blue",
+          tone: "neutral",
           max: share,
           dataTest: "alert-summary-acknowledged",
         },
@@ -1993,7 +1962,7 @@ export default defineComponent({
           label: t("alerts.summaryEvalError"),
           value: v(c.error),
           icon: "report-problem",
-          tone: "error",
+          tone: "err",
           max: share,
           dataTest: "alert-summary-error",
         },
@@ -2002,7 +1971,7 @@ export default defineComponent({
           label: t("alerts.summaryDeliveryFailed"),
           value: v(c.notify_failed),
           icon: "notifications-paused",
-          tone: "error",
+          tone: "err",
           max: share,
           dataTest: "alert-summary-notify-failed",
         },
@@ -2011,7 +1980,7 @@ export default defineComponent({
           label: t("alerts.summaryRecent"),
           value: v(c.recent),
           icon: "bolt",
-          tone: "warning",
+          tone: "warn",
           max: share,
           dataTest: "alert-summary-recent",
         },
@@ -2020,7 +1989,7 @@ export default defineComponent({
           label: t("alerts.summaryActive"),
           value: v(c.active),
           icon: "check-circle",
-          tone: "success",
+          tone: "ok",
           max: share,
           dataTest: "alert-summary-active",
         },
@@ -2038,10 +2007,7 @@ export default defineComponent({
           label: t("common.allStates"),
           value: v(c.total),
           icon: "format-list-bulleted",
-          tone: "primary",
-          // Total is clickable (clears the filter) but never shows the ring — the
-          // selected key is only ever a real state, never "total". No bar (its
-          // share of itself is always 100%).
+          all: true,
           dataTest: "alert-summary-total",
         },
       ];
@@ -2161,11 +2127,11 @@ export default defineComponent({
     const clearLevelFilter = () => {
       levelFilter.value = null;
     };
-    const onStatSelect = (key: string) => {
+    const onStatSelect = (key: string | null) => {
       levelFilter.value = null;
-      stateFilters.value = toggleFilterKey(stateFilters.value, key, "total");
+      stateFilters.value = key === null ? [] : toggleFilterKey(stateFilters.value, key, "total");
     };
-    // Any chip change drops the linked level, as the level has no chip of its own.
+    // Any tile change drops the linked level, as the level has no tile of its own.
     const onStateFiltersUpdate = (keys: string[]) => {
       levelFilter.value = null;
       stateFilters.value = keys.filter(isAlertStateKey);
@@ -3324,6 +3290,17 @@ export default defineComponent({
       showAddAlertDialog.value = true;
     };
 
+    // The clone form as it opened, so a stray dismiss asks before dropping an edit (V5).
+    const cloneFormState = () =>
+      JSON.stringify([
+        toBeCloneAlertName.value,
+        toBeClonestreamType.value,
+        toBeClonestreamName.value,
+        folderIdToBeCloned.value,
+      ]);
+    const cloneOpenedWith = ref("");
+    const isCloneFormChanged = computed(() => cloneFormState() !== cloneOpenedWith.value);
+
     const duplicateAlert = async (row: any) => {
       if (anomalyRowLocked(row)) return;
       // SLO alerts are not clonable (D1). The dialog's first act is to demand a
@@ -3357,6 +3334,7 @@ export default defineComponent({
       const request = ++cloneSourceRequest;
       toBeClonedAlert.value = null;
       isCloneSourceLoading.value = needsSource;
+      cloneOpenedWith.value = cloneFormState();
       showForm.value = true;
       // Load the stream-name options for the pre-filled stream type so the
       // dialog's dropdown reflects it instead of showing an empty list. A
@@ -3850,7 +3828,7 @@ export default defineComponent({
     let withdrawLeftFilterNote: (() => void) | null = null;
     // A write that settles after the page is left must not announce on the page the user went to.
     let leftFilterNoteOwned = true;
-    // The polite line is the screen reader's confirmation; sighted users have the tag and the tile counts, so there is no toast.
+    // The polite line says the row left the filter; the Undo toast only names the change.
     const announceLeftFilter = (names: string[], enabled: boolean) => {
       if (!leftFilterNoteOwned || !names.length) return;
       const params = { name: raw(names[0]), count: names.length };
@@ -3886,7 +3864,19 @@ export default defineComponent({
       if (hit) store.dispatch("setAllAlertsListByFolderId", next);
     };
 
-    const toggleAlertState = (row: any) => {
+    // Pause and resume apply at once and offer Undo instead of a confirmation (V8, K1).
+    const offerStateUndo = (names: string[], enabled: boolean, undo: () => void) => {
+      const params = { name: raw(names[0]), count: names.length };
+      toast({
+        variant: "success",
+        message: enabled
+          ? t("alerts.rowAction.resumed", params, names.length)
+          : t("alerts.rowAction.paused", params, names.length),
+        action: { label: t("common.undo"), handler: undo },
+      });
+    };
+
+    const toggleAlertState = (row: any, offerUndo = true) => {
       if (anomalyRowLocked(row)) return;
       alertStateLoadingMap.value[row.uuid] = true;
 
@@ -3903,6 +3893,7 @@ export default defineComponent({
           const isEnabled = res.data.enabled;
           if (applyConfirmedState(row.alert_id, isEnabled))
             announceLeftFilter([row.name], isEnabled);
+          if (offerUndo) offerStateUndo([row.name], isEnabled, () => toggleAlertState(row, false));
         })
         .catch(() => {
           /* the mutation handler already toasts the failure; this only keeps the rejection handled */
@@ -4545,15 +4536,50 @@ export default defineComponent({
       }
       if (request !== bulkRequestSeq) return;
       bulkToggleBusy.value = null;
-      // No success toast: the rows' buttons, tags and the tile counts already show the result.
       if (!failed.length) {
         selectedAlerts.value = [];
+        offerStateUndo(
+          payload.names,
+          isResuming,
+          () => void undoBulkToggle(alertsToToggle, !isResuming),
+        );
         return;
       }
       if (failureMessage) toast({ variant: "error", message: failureMessage });
       // Only the rows that failed stay selected, so a retry is one click.
       selectedAlertIds.value = failed.map((a: any) => a.alert_id);
       for (const row of filteredResults.value as any[]) row.selected = false;
+    };
+
+    // Sends the reverse write for the rows a bulk pause or resume changed; it offers no Undo of its own.
+    const undoBulkToggle = async (rows: any[], enabled: boolean) => {
+      const org = store.state.selectedOrganization.identifier;
+      try {
+        const response = await alertsService.bulkToggleState(org, enabled, {
+          ids: rows.map((a: any) => a.alert_id),
+          names: rows.map((a: any) => a.name),
+        });
+        const refused = new Set((response?.data?.unsuccessful ?? []).map(String));
+        queryClient.invalidateQueries({ queryKey: alertKeys.firing(org) });
+        for (const row of rows)
+          if (!refused.has(String(row.alert_id))) applyConfirmedState(row.alert_id, enabled);
+        if (!refused.size) return;
+        const params = { failed: refused.size, total: rows.length };
+        toast({
+          variant: "error",
+          message: enabled
+            ? t("alerts.rowAction.bulkResumeFailed", params, rows.length)
+            : t("alerts.rowAction.bulkPauseFailed", params, rows.length),
+        });
+      } catch (error: any) {
+        if (error?.response?.status === 403) return;
+        toast({
+          variant: "error",
+          message: enabled
+            ? t("toastMessages.alerts.errorResumingAlerts")
+            : t("toastMessages.alerts.errorPausingAlerts"),
+        });
+      }
     };
 
     const confirmBulkDelete = ref<boolean>(false);
@@ -4791,6 +4817,7 @@ export default defineComponent({
       handleActionQuery,
       showDeleteDialogFn,
       duplicateAlert,
+      isCloneFormChanged,
       showAddAlertDialog,
       alertDrafts,
       hasNewDraft,

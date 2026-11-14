@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isLoading.length">
       <div class="flex h-[calc(100vh-11.875rem)] items-center justify-center pt-1 pb-4 text-center">
         <div>
-          <OSpinner size="md" class="mx-auto block" data-test="rum-loading-indicator" />
+          <OSpinner size="lg" class="mx-auto block" data-test="rum-loading-indicator" />
           <div class="w-full text-center">
             {{ t("rum.loadingMsg") }}
           </div>
@@ -27,18 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <OPageHeader
-        v-if="showTabs"
-        :title="t('rum.title')"
-        :subtitle="t('rum.subtitle')"
-        icon="devices"
-        tabs-below
-        class="shrink-0"
-      >
+      <OPageHeader v-if="showTabs" :title="t('menu.rum')">
         <template #tabs>
           <!-- Section navigation stays live on a license-locked page. -->
           <FeatureLockExempt class="contents">
-            <OTabs v-model="activeTab" align="left" @change="changeTab">
+            <OTabs v-model="activeTab" @change="changeTab">
               <OTab
                 v-for="tab in tabs"
                 :key="tab.value"

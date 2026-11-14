@@ -16,18 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="xl"
     :open="open"
-    :width="85"
     :title="issue?.title"
-    :sub-title="issue ? raw(`${issue.id} · ${issue.started}`) : undefined"
+    :subtitle="issue ? raw(`${issue.id} · ${issue.started}`) : undefined"
     bleed
     data-test="autoobserve-issue-drawer"
     @update:open="(v) => emit('update:open', v)"
   >
     <template #header-right>
       <OTag
-        variant="purple-soft"
-        size="xs"
+        tone="neutral"
+        size="sm"
         :label="t('autoobserve2.demoTag')"
         data-test="autoobserve-sample-tag-drawer"
       />
@@ -37,12 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTab name="overview" :label="t('alerts.insights.tabs.overview')" />
         <OTab name="analysis" :label="t('alerts.incidents.incidentAnalysis')" />
         <OTab name="graph" :label="t('autoobserve.drawer.unfoldTab')" />
-        <OTab name="firings">
-          <div class="flex items-center gap-1.5">
-            <span>{{ t("alerts.incidents.alertTriggers") }}</span>
-            <OTag type="countChip" value="neutral">{{ firingTotal }}</OTag>
-          </div>
-        </OTab>
+        <OTab name="firings" :label="t('alerts.incidents.alertTriggers')" :count="firingTotal" />
       </OTabs>
       <AutoObserveAnalysis
         v-if="tab === 'analysis'"
@@ -88,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag type="severity" :value="issue.severity" size="sm" />
           <OTag
             v-if="issue.deferred"
-            variant="default-soft"
+            tone="neutral"
             size="sm"
             icon="schedule"
             :label="t('autoobserve.issues.heldForDigest')"
@@ -97,29 +92,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-for="svc in issue.services"
             :key="svc"
-            variant="default-soft"
-            shape="rounded"
+            tone="neutral"
             size="sm"
             :label="raw(svc)"
           />
         </div>
 
-        <OCard v-if="issue.proposal" variant="glass" data-test="autoobserve-issue-proposal">
-          <OCardSection role="header" dense>
+        <OCard v-if="issue.proposal" data-test="autoobserve-issue-proposal">
+          <template #header>
             <OIcon
               :name="issue.proposal.kind === 'fix' ? 'build' : 'lightbulb-outline'"
               size="sm"
               class="text-text-secondary"
             />
-            <OText variant="panel-title">{{
-              issue.proposal.kind !== "fix"
-                ? t("autoobserve.drawer.caughtEarlier")
-                : proposalEntry?.status === "awaiting"
-                  ? t("autoobserve.drawer.waitingForOk")
-                  : t("autoobserve.drawer.proposedFix")
-            }}</OText>
-          </OCardSection>
-          <OCardSection role="body" dense class="flex items-start gap-4 max-md:flex-col">
+            <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+              {{
+                issue.proposal.kind !== "fix"
+                  ? t("autoobserve.drawer.caughtEarlier")
+                  : proposalEntry?.status === "awaiting"
+                    ? t("autoobserve.drawer.waitingForOk")
+                    : t("autoobserve.drawer.proposedFix")
+              }}
+            </h3>
+          </template>
+          <div class="flex items-start gap-4 max-md:flex-col">
             <div class="flex min-w-0 flex-1 flex-col gap-1">
               <span class="text-text-heading text-sm font-medium">{{ issue.proposal.title }}</span>
               <span class="text-text-secondary text-xs">{{ issue.proposal.detail }}</span>
@@ -127,7 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="proposalEntry?.status === 'awaiting'"
               variant="primary"
-              size="sm"
               data-test="autoobserve-issue-proposal-approve"
               @click="approve"
             >
@@ -135,11 +130,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OTag
               v-else-if="proposalEntry"
-              :variant="LEDGER_STATUS[proposalEntry.status].variant"
+              :tone="LEDGER_STATUS[proposalEntry.status].variant"
               size="sm"
               :label="t(LEDGER_STATUS[proposalEntry.status].key)"
             />
-          </OCardSection>
+          </div>
         </OCard>
 
         <div
@@ -148,12 +143,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="contents @min-[64rem]:flex @min-[64rem]:min-w-0 @min-[64rem]:flex-col @min-[64rem]:gap-4"
           >
-            <OCard variant="glass" data-test="autoobserve-issue-rca">
-              <OCardSection role="header" dense>
+            <OCard data-test="autoobserve-issue-rca">
+              <template #header>
                 <OIcon name="psychology" size="sm" class="text-text-secondary" />
-                <OText variant="panel-title">{{ t("autoobserve.drawer.rca") }}</OText>
-              </OCardSection>
-              <OCardSection role="body" dense class="flex flex-col gap-3">
+                <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+                  {{ t("autoobserve.drawer.rca") }}
+                </h3>
+              </template>
+              <div class="flex flex-col gap-3">
                 <p class="text-text-body text-sm">{{ issue.summary }}</p>
                 <div class="bg-surface-subtle rounded-surface flex flex-col gap-1.5 p-3">
                   <span class="text-text-body text-xs font-medium">{{
@@ -166,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("autoobserve.drawer.confidence")
                   }}</span>
                   <OTag
-                    :variant="issue.confidence === 'high' ? 'success-soft' : 'default-soft'"
+                    :tone="issue.confidence === 'high' ? 'ok' : 'neutral'"
                     size="sm"
                     :label="t(CONFIDENCE_LABEL[issue.confidence])"
                     data-test="autoobserve-issue-confidence"
@@ -185,126 +182,128 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   v-if="issue.evidence.length"
-                  variant="ghost-primary"
-                  size="xs"
+                  variant="accent-ghost"
+                  size="sm"
                   class="self-start"
                   data-test="autoobserve-issue-see-evidence"
                   @click="seeEvidence"
                 >
                   {{ t("autoobserve.drawer.seeEvidence", { count: issue.evidence.length }) }}
                 </OButton>
-              </OCardSection>
+              </div>
             </OCard>
             <OCard
-              variant="glass"
               class="order-1 @min-[64rem]:order-none"
               data-test="autoobserve-issue-notification"
             >
-              <OCardSection role="header" dense>
+              <template #header>
                 <OIcon
                   :name="issue.deferred ? 'schedule' : 'send'"
                   size="sm"
                   class="text-text-secondary"
                 />
-                <OText variant="panel-title">{{
-                  issue.deferred
-                    ? t("autoobserve.issues.heldForDigest")
-                    : t("autoobserve.drawer.notification")
-                }}</OText>
+                <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+                  {{
+                    issue.deferred
+                      ? t("autoobserve.issues.heldForDigest")
+                      : t("autoobserve.drawer.notification")
+                  }}
+                </h3>
                 <span class="text-text-secondary ms-auto text-xs">{{ issue.channel }}</span>
-              </OCardSection>
-              <OCardSection role="body" dense>
-                <p v-if="!issue.thread.length" class="text-text-secondary text-sm">
-                  {{ t("autoobserve.drawer.notSent") }}
-                </p>
+              </template>
+
+              <p v-if="!issue.thread.length" class="text-text-secondary text-sm">
+                {{ t("autoobserve.drawer.notSent") }}
+              </p>
+              <div
+                v-else
+                class="border-border-default bg-surface-base rounded-surface flex flex-col border"
+              >
                 <div
-                  v-else
-                  class="border-border-default bg-surface-base rounded-surface flex flex-col border"
+                  v-for="(msg, i) in issue.thread"
+                  :key="i"
+                  class="flex gap-3 p-3"
+                  :class="i > 0 ? 'border-border-subtle bg-surface-subtle ms-8 border-t' : ''"
                 >
                   <div
-                    v-for="(msg, i) in issue.thread"
-                    :key="i"
-                    class="flex gap-3 p-3"
-                    :class="i > 0 ? 'border-border-subtle bg-surface-subtle ms-8 border-t' : ''"
+                    class="bg-accent text-text-inverse rounded-default flex size-9 shrink-0 items-center justify-center"
                   >
-                    <div
-                      class="bg-accent text-text-inverse rounded-default flex size-9 shrink-0 items-center justify-center"
-                    >
-                      <OIcon name="navigation" size="sm" />
+                    <OIcon name="navigation" size="sm" />
+                  </div>
+                  <div class="flex min-w-0 flex-col gap-1">
+                    <div class="flex items-baseline gap-2">
+                      <span class="text-text-heading text-sm font-semibold">{{
+                        t("autoobserve.drawer.sender")
+                      }}</span>
+                      <span class="text-text-secondary text-xs">{{ msg.at }}</span>
+                      <span v-if="i > 0" class="text-text-secondary text-xs">{{
+                        t("autoobserve.drawer.threadReply")
+                      }}</span>
                     </div>
-                    <div class="flex min-w-0 flex-col gap-1">
-                      <div class="flex items-baseline gap-2">
-                        <span class="text-text-heading text-sm font-semibold">{{
-                          t("autoobserve.drawer.sender")
-                        }}</span>
-                        <span class="text-text-secondary text-xs">{{ msg.at }}</span>
-                        <span v-if="i > 0" class="text-text-secondary text-xs">{{
-                          t("autoobserve.drawer.threadReply")
-                        }}</span>
-                      </div>
-                      <p
-                        v-for="(line, j) in msg.lines"
-                        :key="j"
-                        class="text-sm"
-                        :class="
-                          i === 0 && j === 0 ? 'text-text-heading font-semibold' : 'text-text-body'
-                        "
-                      >
-                        {{ line }}
-                      </p>
-                      <div v-if="msg.fields" class="mt-1 grid grid-cols-2 gap-2">
-                        <div v-for="f in msg.fields" :key="f.label" class="flex flex-col">
-                          <span class="text-text-heading text-xs font-semibold">{{ f.label }}</span>
-                          <span class="text-text-secondary text-xs">{{ f.value }}</span>
-                        </div>
+                    <p
+                      v-for="(line, j) in msg.lines"
+                      :key="j"
+                      class="text-sm"
+                      :class="
+                        i === 0 && j === 0 ? 'text-text-heading font-semibold' : 'text-text-body'
+                      "
+                    >
+                      {{ line }}
+                    </p>
+                    <div v-if="msg.fields" class="mt-1 grid grid-cols-2 gap-2">
+                      <div v-for="f in msg.fields" :key="f.label" class="flex flex-col">
+                        <span class="text-text-heading text-xs font-semibold">{{ f.label }}</span>
+                        <span class="text-text-secondary text-xs">{{ f.value }}</span>
                       </div>
                     </div>
                   </div>
                 </div>
-                <p v-if="issue.severity === 'p1'" class="text-text-secondary mt-2 text-xs">
-                  {{ t("autoobserve.drawer.p1Note") }}
-                </p>
-                <p v-else-if="issue.thread.length" class="text-text-secondary mt-2 text-xs">
-                  {{ t("autoobserve.drawer.gateNote") }}
-                </p>
-              </OCardSection>
+              </div>
+              <p v-if="issue.severity === 'p1'" class="text-text-secondary mt-2 text-xs">
+                {{ t("autoobserve.drawer.p1Note") }}
+              </p>
+              <p v-else-if="issue.thread.length" class="text-text-secondary mt-2 text-xs">
+                {{ t("autoobserve.drawer.gateNote") }}
+              </p>
             </OCard>
           </div>
           <div
             class="contents @min-[64rem]:flex @min-[64rem]:min-w-0 @min-[64rem]:flex-col @min-[64rem]:gap-4"
           >
-            <OCard variant="glass" data-test="autoobserve-issue-timeline">
-              <OCardSection role="header" dense>
+            <OCard data-test="autoobserve-issue-timeline">
+              <template #header>
                 <OIcon name="timeline" size="sm" class="text-text-secondary" />
-                <OText variant="panel-title">{{ t("autoobserve.drawer.timeline") }}</OText>
-              </OCardSection>
-              <OCardSection role="body" dense>
-                <OTimeline>
-                  <OTimelineItem
-                    v-for="(entry, i) in issue.timeline"
-                    :key="i"
-                    :label="raw(entry.at)"
-                    :title="entry.title"
-                    :subtitle="entry.detail"
-                    :variant="entry.variant"
-                  />
-                </OTimeline>
-              </OCardSection>
+                <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+                  {{ t("autoobserve.drawer.timeline") }}
+                </h3>
+              </template>
+
+              <OTimeline>
+                <OTimelineItem
+                  v-for="(entry, i) in issue.timeline"
+                  :key="i"
+                  :label="raw(entry.at)"
+                  :title="entry.title"
+                  :subtitle="entry.detail"
+                  :variant="entry.variant"
+                />
+              </OTimeline>
             </OCard>
-            <OCard variant="glass" data-test="autoobserve-issue-blast">
-              <OCardSection role="header" dense>
+            <OCard data-test="autoobserve-issue-blast">
+              <template #header>
                 <OIcon name="hub" size="sm" class="text-text-secondary" />
-                <OText variant="panel-title">{{ t("autoobserve.drawer.blastRadius") }}</OText>
-              </OCardSection>
-              <OCardSection role="body" dense class="flex flex-col gap-3">
+                <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+                  {{ t("autoobserve.drawer.blastRadius") }}
+                </h3>
+              </template>
+              <div class="flex flex-col gap-3">
                 <div v-for="group in blast" :key="group.key" class="flex flex-col gap-1.5">
                   <span class="text-text-secondary text-xs font-medium">{{ group.label }}</span>
                   <div class="flex flex-wrap gap-1">
                     <OTag
                       v-for="svc in group.services"
                       :key="svc"
-                      :variant="group.key === 'affected' ? 'error-soft' : 'default-soft'"
-                      shape="rounded"
+                      :tone="group.key === 'affected' ? 'err' : 'neutral'"
                       size="sm"
                       :label="raw(svc)"
                     />
@@ -313,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</span>
                   </div>
                 </div>
-              </OCardSection>
+              </div>
             </OCard>
           </div>
         </div>
@@ -333,9 +332,7 @@ import RcaReportContent from "@/components/alerts/rca/RcaReportContent.vue";
 import IncidentAlertTriggersTable from "@/components/alerts/IncidentAlertTriggersTable.vue";
 import type { IncidentAlert } from "@/services/incidents";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";

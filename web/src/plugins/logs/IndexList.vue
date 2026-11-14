@@ -27,14 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="shrink-0"
       >
         <OButton
+          icon-only
           data-test="log-search-index-list-back-to-logs-btn"
-          variant="outline"
-          size="icon-sm"
-          class="border-border-default rounded-default h-8 w-8 shrink-0 border p-0"
+          variant="secondary"
+          class="border-border-default rounded-default shrink-0 border"
           @click="onStreamTypeChange('logs')"
         >
           <OIcon name="swap-horiz" size="sm" />
-          <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
+          <OTooltip :content="t('search.switchToLogs')" side="bottom" />
         </OButton>
       </FeatureLockExempt>
       <div class="min-w-0 flex-1" data-recent-searches-avoid>
@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ streamPickerAnnouncement }}</span
         >
         <OSelect
+          searchable
           ref="streamSelect"
           :aria-label="t('search.selectStream')"
           data-test="log-search-index-list-select-stream"
@@ -71,10 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSelect>
         <OTooltip
           v-if="searchObj.data.stream.selectedStream.length > 1"
-          :delay="500"
           side="bottom"
-          align="start"
-          max-width="17.5rem"
           :content="raw(searchObj.data.stream.selectedStream.join(', '))"
         />
       </div>
@@ -82,7 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!searchObj.data.stream.selectedStream.length" class="index-table mt-1">
       <OEmptyState
         data-test="logs-search-no-stream-selected"
-        preset="no-stream-selected"
+        :title="t('emptyState.noStreamSelected.title')"
+        :text="t('emptyState.noStreamSelected.description')"
         size="inline"
         icon="database"
       >
@@ -109,9 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="stream in group.streams"
                 :key="stream.value"
                 :data-test="`logs-search-stream-quick-pick-${stream.value}`"
-                variant="outline"
-                size="sm"
-                icon-left="database"
+                variant="secondary"
+                icon="database"
                 class="w-full justify-start"
                 @click="quickSelectStream(stream.value)"
               >
@@ -182,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #after-list="bottomProps">
-          <GroupedFieldListPagination
+          <FieldListFooter
             data-test-prefix="logs-page"
             :show-schema-toggle="showUserDefinedSchemaToggle"
             :show-quick-mode="searchObj.meta.quickMode"
@@ -192,13 +190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :interesting-fields-toggle-options="selectedFieldsBtnGroupOption"
             :current-page="bottomProps.currentPage"
             :pages-number="bottomProps.totalPages"
-            :is-first-page="bottomProps.isFirstPage"
-            :is-last-page="bottomProps.isLastPage"
             :total-fields-count="totalFieldsCount"
             @toggle-schema="toggleSchema"
             @toggle-interesting-fields="toggleInterestingFields"
-            @first-page="bottomProps.firstPage()"
-            @last-page="bottomProps.lastPage()"
             @set-page="setPage"
             @reset-fields="resetSelectedFileds"
           />
@@ -215,61 +209,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="logs-indexlist-fieldlist-loading-skeleton" class="flex w-full flex-col">
             <!-- Group 1 header -->
             <div class="flex h-7 items-center justify-between px-2">
-              <OSkeleton type="rect" class="rounded-default h-3 w-24" />
-              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
+              <OSkeleton shape="block" class="h-3 w-24" />
+              <OSkeleton shape="block" class="h-3 w-3" />
             </div>
             <!-- Group 1 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="flex-1" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="w-3/4" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="flex-1" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="w-4/5" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="w-4/5" />
             </div>
             <!-- Group 2 header -->
             <div class="mt-2 flex h-7 items-center justify-between px-2">
-              <OSkeleton type="rect" class="rounded-default h-3 w-16" />
-              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
+              <OSkeleton shape="block" class="h-3 w-16" />
+              <OSkeleton shape="block" class="h-3 w-3" />
             </div>
             <!-- Group 2 field -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="w-2/3" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="w-2/3" />
             </div>
             <!-- Group 3 header -->
             <div class="mt-2 flex h-7 items-center justify-between px-2">
-              <OSkeleton type="rect" class="rounded-default h-3 w-32" />
-              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
+              <OSkeleton shape="block" class="h-3 w-32" />
+              <OSkeleton shape="block" class="h-3 w-3" />
             </div>
             <!-- Group 3 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="flex-1" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="w-4/5" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="w-4/5" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="flex-1" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="w-3/4" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="flex-1" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="flex-1" />
             </div>
           </div>
         </template>
@@ -316,7 +310,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import GroupedFieldList from "@/components/common/GroupedFieldList.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
 import FieldExpansion from "@/components/common/FieldExpansion.vue";
-import GroupedFieldListPagination from "@/components/common/FieldListPagination.vue";
+import FieldListFooter from "@/components/common/FieldListFooter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelectHeaderRow from "@/lib/forms/Select/OSelectHeaderRow.vue";
 import { useStreamPickerOptions, type PickerStream } from "@/composables/useStreamPickerOptions";
@@ -344,7 +338,7 @@ export default defineComponent({
     GroupedFieldList,
     FieldRow,
     FieldExpansion,
-    GroupedFieldListPagination,
+    FieldListFooter,
     OButton,
     FeatureLockExempt,
     OSelect,
@@ -2088,8 +2082,8 @@ export default defineComponent({
 <style scoped>
 /* keep(lib-override:o2-table): `.logs-index-menu` and both `.index-table` divs are
    this component's own template, but the tbody/tr/td they lay out are OTable's
-   internal render (via GroupedFieldList) and `.schema-field-toggle` is
-   FieldListPagination's DOM — child DOM this owner can only reach with :deep().
+   internal render (via GroupedFieldList) — child DOM this owner can only reach
+   with :deep().
    The `.logs-index-menu` ancestor is kept so the selectors match at their original
    specificity. */
 .logs-index-menu .index-table {
@@ -2109,13 +2103,5 @@ export default defineComponent({
   display: block;
   height: fit-content;
   overflow: hidden;
-}
-
-.logs-index-menu .index-table :deep(.schema-field-toggle) {
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel toggle border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-card-glass-border);
-  border-radius: 0.325rem;
-  background-color: transparent;
-  line-height: 0.625rem;
 }
 </style>

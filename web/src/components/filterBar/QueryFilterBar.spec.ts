@@ -387,16 +387,13 @@ describe("QueryFilterBar", () => {
       expect(sql(state)).toBe("level = 'a' OR level = 'b'");
     });
 
-    it("toggles a connector from the keyboard", async () => {
+    it("toggles a connector from a native button, so Enter and Space work", async () => {
       const state = mountBar({ modelValue: parseSqlFilter("level = 'a' AND level = 'b'")! });
       const connector = wrapper!.find('[data-test="query-filter-bar-connector-1"]');
       expect(connector.element.tagName).toBe("BUTTON");
-      await connector.trigger("keydown", { key: "Enter" });
+      expect(connector.attributes("type")).toBe("button");
+      await connector.trigger("click");
       expect(sql(state)).toBe("level = 'a' OR level = 'b'");
-      await wrapper!
-        .find('[data-test="query-filter-bar-connector-1"]')
-        .trigger("keydown", { key: " " });
-      expect(sql(state)).toBe("level = 'a' AND level = 'b'");
     });
 
     it("sets the next connector by typing or, and Backspace puts it back to AND", async () => {

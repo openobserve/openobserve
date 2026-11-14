@@ -29,15 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="ai-queue-detail-page"
     :back="backTarget"
     :title="queue?.name ? raw(queue.name) : t('aiObservability.queues.detail.fallbackTitle')"
-    :subtitle="raw(queue?.description)"
-    icon="fact-check"
+    :about="queue?.description ? raw(queue.description) : undefined"
     bleed
     :scroll="false"
   >
     <template #actions>
       <OButton
         variant="primary"
-        size="sm"
         :disabled="!items.length"
         data-test="ai-queue-detail-start-review"
         @click="startReviewing()"
@@ -64,8 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-for="cfg in queue.scoreConfigs"
             :key="cfg.scoreConfigId"
-            :variant="isStale(cfg) ? 'orange-soft' : 'default-soft'"
-            shape="rounded"
+            :tone="isStale(cfg) ? 'warn' : 'neutral'"
           >
             {{ raw(`${cfg.name} v${cfg.version}`) }}
           </OTag>
@@ -77,8 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="queue?.targetDatasetId"
           variant="ghost"
-          size="sm"
-          icon-left="table-chart"
+          icon="table-chart"
           data-test="ai-queue-detail-dataset"
           @click="openDataset"
         >
@@ -97,24 +93,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="loading"
-        show-index
         :global-filter="search"
-        :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="ai-queue-items"
-        width="100%"
         class="h-full w-full"
         @row-click="startReviewing"
       >
+        <!-- Status split as filter tiles: the counts are what tells a reviewer
+             whether this queue is worth opening. -->
+        <template #subheader>
+          <div
+            class="px-page-edge border-table-row-divider border-b py-1.5"
+            data-test="ai-queue-detail-summary"
+          >
+            <OStatStrip
+              :items="summaryStats"
+              :loading="loading"
+              selectable
+              multiple
+              :selected-keys="statusFilters"
+              @update:selected-keys="statusFilters = $event as LlmQueueItemStatus[]"
+            />
+          </div>
+        </template>
+
         <template #toolbar-trailing>
           <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+            icon-only
+            variant="secondary"
+            icon="refresh"
             :loading="loading"
             data-test="ai-queue-detail-refresh-btn"
             @click="refresh"
@@ -126,33 +137,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="search"
-            class="min-w-0 flex-1 md:min-w-48"
+            class="min-w-0 flex-1"
             :placeholder="t('aiObservability.queues.detail.searchPlaceholder')"
             data-test="ai-queue-detail-search-input"
-            clearable
-          />
-          <OStatStrip
-            :items="summaryStats"
-            :loading="loading"
-            selectable
-            :row="false"
-            multiple
-            :selected-keys="statusFilters"
-            default-key="all"
-            class="max-md:order-last"
-            data-test="ai-queue-detail-summary"
-            @update:selected-keys="statusFilters = $event as LlmQueueItemStatus[]"
           />
         </template>
 
         <template #empty>
           <div class="flex items-center justify-center py-8">
             <OEmptyState
-              size="hero"
-              illustration="check"
+              :kind="Boolean(search) || statusFilters.length > 0 ? 'filtered' : 'first-run'"
+              :icon="Boolean(search) || statusFilters.length > 0 ? undefined : 'task-alt'"
               :title="t('aiObservability.queues.detail.emptyTitle')"
-              :description="t('aiObservability.queues.detail.emptyBody')"
-              :filtered="Boolean(search) || statusFilters.length > 0"
+              :text="t('aiObservability.queues.detail.emptyBody')"
               data-test="ai-queue-detail-empty-state"
               @action="clearFilters"
             />
@@ -160,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-refType="{ row }">
-          <OTag :variant="refTypeVariant(row.refType)" shape="rounded">
+          <OTag :tone="refTypeVariant(row.refType)">
             {{ raw(row.refType) }}
           </OTag>
         </template>
@@ -182,10 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-status="{ row }">
-          <OTag
-            :variant="row.status === 'reviewed' ? 'success-soft' : 'default-soft'"
-            shape="rounded"
-          >
+          <OTag :tone="row.status === 'reviewed' ? 'ok' : 'neutral'">
             {{ t(`aiObservability.queues.detail.status.${row.status}`) }}
           </OTag>
         </template>
@@ -193,9 +187,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <div class="flex justify-end">
             <OButton
-              variant="outline"
-              size="sm-toolbar"
-              icon-right="arrow-forward"
+              variant="secondary"
+              icon-end="arrow-forward"
               :data-test="`ai-queue-detail-review-${row.id}`"
               @click.stop="startReviewing(row)"
             >
@@ -217,7 +210,6 @@ import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
-import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -229,7 +221,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -261,14 +253,9 @@ const loading = ref(false);
 const search = ref("");
 const statusFilters = ref<LlmQueueItemStatus[]>([]);
 
-// Real browser back when there's history to pop.
-const { goBack: backToQueues } = useSmartBack(() => ({
-  name: "aiQueues",
-  query: orgQuery.value,
-}));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.queues"),
-  onClick: backToQueues,
+  to: { name: "aiQueues", query: orgQuery.value },
 }));
 
 const pendingCount = computed(() => items.value.filter((i) => i.status === "pending").length);
@@ -282,14 +269,14 @@ const visibleItems = computed(() =>
 
 const summaryStats = computed<StatItem[]>(() => {
   const total = items.value.length;
-  const value = (n: number): string | number => (total ? n : DASH);
+  const value = (n: number): number | null => (total ? n : null);
   return [
     {
       key: "pending",
       label: t("aiObservability.queues.detail.status.pending"),
       value: value(pendingCount.value),
       icon: "fiber-manual-record",
-      tone: "warning",
+      tone: "warn",
       max: total || undefined,
       dataTest: "ai-queue-detail-summary-pending",
     },
@@ -298,7 +285,7 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("aiObservability.queues.detail.status.reviewed"),
       value: value(reviewedCount.value),
       icon: "check-circle",
-      tone: "success",
+      tone: "ok",
       max: total || undefined,
       dataTest: "ai-queue-detail-summary-reviewed",
     },
@@ -307,7 +294,6 @@ const summaryStats = computed<StatItem[]>(() => {
       label: t("aiObservability.queues.detail.allItems"),
       value: value(total),
       icon: "format-list-bulleted",
-      tone: "primary",
       dataTest: "ai-queue-detail-summary-all",
     },
   ];
@@ -322,10 +308,10 @@ function isStale(cfg: LlmQueueBinding): boolean {
   return cfg.latestVersion !== undefined && cfg.latestVersion > cfg.version;
 }
 
-function refTypeVariant(refType: QueueRefType): BadgeVariant {
-  if (refType === "span") return "purple-soft";
-  if (refType === "session") return "teal-soft";
-  return "blue-soft";
+function refTypeVariant(refType: QueueRefType): ChipTone {
+  if (refType === "span") return "neutral";
+  if (refType === "session") return "neutral";
+  return "neutral";
 }
 
 const columns = computed<OTableColumnDef<LlmQueueItem>[]>(() => [

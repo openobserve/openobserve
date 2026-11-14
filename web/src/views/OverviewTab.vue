@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :tooltip="dataAsOf"
           @click="() => loadAll(true)"
         />
-        <DateTime
+        <ODateTimeRange
           ref="dateTimeRef"
           auto-apply
           menu-align="end"
@@ -46,25 +46,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <OBanner
+    <OInlineNotice
       v-if="showOverviewCards && overviewRefreshFailed"
-      variant="warning"
-      inline-actions
+      tone="warn"
       data-test="overview-stale-notice"
     >
       {{ t("overview.stale.message", { time: generatedAtLabel }) }}
       <template #actions>
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="refresh"
+          variant="secondary"
+          icon="refresh"
           data-test="overview-stale-retry-btn"
           @click="() => loadOverview(true)"
         >
           {{ t("overview.stale.retry") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
     <OverviewHeadlineStrip
       v-if="showOverviewCards"
@@ -128,8 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </OText>
         <OButton
-          variant="ghost-primary"
-          size="sm"
+          variant="accent-ghost"
           data-test="overview-incidents-view-all"
           @click="goToAllIncidents"
         >
@@ -195,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 })
               "
             />
-            <OButton variant="ghost-primary" size="sm" @click="goToIncident(inc)">
+            <OButton variant="accent-ghost" @click="goToIncident(inc)">
               {{ t("overview.investigate") }}
             </OButton>
           </span>
@@ -325,8 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OText>
           <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
             <OButton
-              variant="ghost-primary"
-              size="sm"
+              variant="accent-ghost"
               :aria-disabled="tracesLock.locked.value || undefined"
               data-test="overview-services-view-all"
               @click="goToServiceGraph"
@@ -394,8 +390,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
                   <span class="ms-1 inline-flex shrink-0 items-center" @click.stop>
                     <OButton
-                      variant="ghost-muted"
-                      size="icon"
+                      icon-only
+                      variant="ghost"
+                      size="xs"
                       disabled
                       :aria-label="t('traces.servicesCatalog.viewTraces')"
                       data-test="overview-service-view-traces"
@@ -411,8 +408,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
                 <span v-else class="ms-1 inline-flex shrink-0 items-center">
                   <OButton
-                    variant="ghost-muted"
-                    size="icon"
+                    icon-only
+                    variant="ghost"
+                    size="xs"
                     :title="t('traces.servicesCatalog.viewTraces')"
                     data-test="overview-service-view-traces"
                     @click="goToService(svc, $event)"
@@ -563,8 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
             </OText>
             <OButton
-              variant="ghost-primary"
-              size="sm"
+              variant="accent-ghost"
               data-test="overview-anomalies-view-all"
               @click="goToAnomalies"
             >
@@ -605,7 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="shrink-0 whitespace-nowrap opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
               >
-                <OButton variant="ghost-primary" size="sm" @click="goToAlert(item)">
+                <OButton variant="accent-ghost" @click="goToAlert(item)">
                   {{ t("overview.investigate") }}
                 </OButton>
               </span>
@@ -654,8 +651,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
             </OText>
             <OButton
-              variant="ghost-primary"
-              size="sm"
+              variant="accent-ghost"
               data-test="overview-recent-events-view-all"
               @click="() => openAlertList()"
             >
@@ -725,14 +721,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-if="pageState === 'forbidden' || errorIsForbidden"
-      preset="no-access"
-      size="block"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
       data-test="overview-no-access-empty-state"
     />
     <OEmptyState
       v-else-if="pageState === 'error'"
-      preset="load-error"
-      size="hero"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="t('emptyState.loadError.description')"
       data-test="overview-load-error-empty-state"
     >
       <template #actions>
@@ -747,13 +745,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OEmptyState>
     <OEmptyState
       v-else-if="pageState === 'not-monitored'"
-      illustration="alert"
-      size="hero"
-      :hide-action="true"
+      icon="notifications"
       data-test="overview-not-monitored-empty-state"
+      :title="t('overview.notMonitoredTitle')"
+      :text="t('overview.notMonitoredDesc')"
     >
-      <template #title>{{ t("overview.notMonitoredTitle") }}</template>
-      <template #description>{{ t("overview.notMonitoredDesc") }}</template>
       <template #actions>
         <OTooltip
           v-if="showAlertsCard"
@@ -827,7 +823,7 @@ import { useStore } from "vuex";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { useRouter } from "vue-router";
 import anomalyService from "@/services/anomaly_detection";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -853,7 +849,7 @@ import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
 import OverviewAskAiButton from "./overview/OverviewAskAiButton.vue";
 import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
 import { buildOverviewAskAi, type OverviewAskAiTarget } from "./overview/overviewAskAi";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { safeTimezone } from "@/utils/dashboard/calendarPeriods";

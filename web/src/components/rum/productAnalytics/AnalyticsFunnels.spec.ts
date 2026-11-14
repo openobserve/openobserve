@@ -708,9 +708,9 @@ describe("AnalyticsFunnels", () => {
     const trigger = wrapper!
       .findAllComponents(OButton)
       .find((b) => b.attributes("data-test") === "rum-analytics-funnel-dropoff-1")!;
-    expect(trigger.props("variant")).toBe("ghost-primary");
-    expect(trigger.props("size")).toBe("xs");
-    expect(trigger.props("iconRight")).toBe("chevron-right");
+    expect(trigger.props("variant")).toBe("accent-ghost");
+    expect(trigger.props("size")).toBe("sm");
+    expect(trigger.props("iconEnd")).toBe("chevron-right");
     expect(trigger.attributes("aria-haspopup")).toBe("dialog");
     expect(trigger.text()).toMatch(/^40 dropped \(\d+\.\d%\)$/);
     expect(trigger.attributes("aria-label")).toBe(
@@ -795,7 +795,7 @@ describe("AnalyticsFunnels", () => {
         .findAllComponents({ name: "OButton" })
         .find((b) => b.attributes("data-test") === "rum-analytics-funnel-add-dashboard-btn")!;
       expect(btn.props("disabled")).toBe(true);
-      expect(btn.props("iconLeft")).toBe("lock");
+      expect(btn.props("icon")).toBe("lock");
       await btn.trigger("click");
       await flushPromises();
       expect(wrapper!.findComponent({ name: "AddToDashboard" }).exists()).toBe(false);
@@ -862,7 +862,7 @@ describe("AnalyticsFunnels", () => {
         .findAllComponents({ name: "OButton" })
         .find((b) => b.attributes("data-test") === "rum-analytics-funnel-alert-btn")!;
       expect(btn.props("disabled")).toBe(true);
-      expect(btn.props("iconLeft")).toBe("lock");
+      expect(btn.props("icon")).toBe("lock");
       await btn.trigger("click");
       expect(alertCreationDialog.value).toBeNull();
     } finally {
@@ -881,7 +881,7 @@ describe("AnalyticsFunnels", () => {
   });
   const has = (dt: string) => wrapper!.find(`[data-test="${dt}"]`).exists();
   const skeletonsIn = (dt: string) =>
-    wrapper!.find(`[data-test="${dt}"]`).findAll(".bg-skeleton-base");
+    wrapper!.find(`[data-test="${dt}"]`).findAll(".from-skeleton-base");
   const serveEvent = () => {
     const row = api.seedEvent("web", "Dashboards", {
       rules: [{ t: "view", op: "eq", value: "/web/dashboards" }],
@@ -2501,7 +2501,7 @@ describe("AnalyticsFunnels", () => {
       expectLabelFocusesSelect("rum-analytics-funnel-window-select", "who finish steps in");
       expectLabelFocusesSelect("rum-analytics-funnel-compare-select", "Compare to");
       const window = wrapper!.findComponent('[data-test="rum-analytics-funnel-window-select"]');
-      expect(window.props("width")).toBe("sm");
+      expect(window.props("width")).toBe("s");
     });
 
     it("the who finish steps in trigger shows a short window while its menu keeps the long labels", async () => {
@@ -2510,7 +2510,7 @@ describe("AnalyticsFunnels", () => {
       await patch({ unit: "users", window: "session" });
       const select = wrapper!.findComponent('[data-test="rum-analytics-funnel-window-select"]');
       const trigger = () => at("rum-analytics-funnel-window-select-trigger").text().trim();
-      expect(select.props("width")).toBe("sm");
+      expect(select.props("width")).toBe("s");
       expect(trigger()).toBe("the same session");
       await patch({ window: "1d" });
       expect(trigger()).toBe("1 day");
@@ -2556,7 +2556,7 @@ describe("AnalyticsFunnels", () => {
         "rum-analytics-funnel-overall-p90",
       ];
       for (const id of ids) {
-        expect(badge(id)?.props("variant")).toBe("default-soft");
+        expect(badge(id)?.props("tone")).toBe("neutral");
         expect(badge(id)?.props("size")).toBe("sm");
       }
       expect(text("rum-analytics-funnel-overall-count")).toBe("40 of 200 sessions");
@@ -2573,7 +2573,7 @@ describe("AnalyticsFunnels", () => {
       await mountFunnels();
       await threeSteps();
       await patch({ unit: "users", window: "1d" });
-      expect(badge("rum-analytics-funnel-overall-window")?.props("variant")).toBe("default-soft");
+      expect(badge("rum-analytics-funnel-overall-window")?.props("tone")).toBe("neutral");
       expect(text("rum-analytics-funnel-overall-window")).toBe("within 1 day of step 1");
       expect(
         follows(
@@ -2593,8 +2593,8 @@ describe("AnalyticsFunnels", () => {
       const by = badge("rum-analytics-funnel-overall-breakdown")!;
       expect(by).toBeDefined();
       expect(by.text()).toBe("by Browser");
-      expect(by.props("clickable")).toBe(true);
-      expect(by.props("variant")).toBe("primary-soft");
+      expect(by.props("toggle")).toBe(true);
+      expect(by.props("pressed")).toBe(true);
       expect(by.element.tagName).toBe("BUTTON");
       expect(by.attributes("aria-expanded")).toBe("true");
       expect(at("rum-analytics-funnel-overall-median").exists()).toBe(false);
@@ -2848,9 +2848,9 @@ describe("AnalyticsFunnels", () => {
     });
 
     it.each([
-      ["down", [100, 60, 30], "error-soft"],
-      ["up", [100, 60, 10], "success-soft"],
-      ["low volume", [10, 6, 3], "default-soft"],
+      ["down", [100, 60, 30], "err"],
+      ["up", [100, 60, 10], "ok"],
+      ["low volume", [10, 6, 3], "neutral"],
     ] as const)(
       "the headline change is a badge toned by its direction (%s)",
       async (kind, counts, tone) => {
@@ -2860,7 +2860,7 @@ describe("AnalyticsFunnels", () => {
         const change = wrapper!
           .findAllComponents(OBadge)
           .find((b) => b.attributes("data-test") === "rum-analytics-funnel-overall-change");
-        expect(change?.props("variant")).toBe(tone);
+        expect(change?.props("tone")).toBe(tone);
         expect(change?.props("size")).toBe("sm");
         if (kind === "low volume") expect(change!.text()).toMatch(/low volume/i);
       },
@@ -2996,7 +2996,7 @@ describe("AnalyticsFunnels", () => {
       await mountFunnels({ period: "1d" });
       await setSteps(threeSteps);
       const trigger = () => wrapper!.find(`[data-test="${COMPARE}-trigger"]`);
-      expect(compareSelect().props("width")).toBe("sm");
+      expect(compareSelect().props("width")).toBe("s");
       expect(trigger().text().trim()).toBe("Off");
       await pickCompare("prev");
       const range = useProductAnalytics().range.value!;
@@ -3375,8 +3375,8 @@ describe("AnalyticsFunnels", () => {
       expectLabelFocusesSelect(FROM, "Conversion from");
       expectLabelFocusesSelect(TO, "to");
       expectLabelFocusesSelect("rum-analytics-funnel-trend-interval-select", "Interval");
-      expect(sel(FROM).props("width")).toBe("md");
-      expect(sel(TO).props("width")).toBe("md");
+      expect(sel(FROM).props("width")).toBe("m");
+      expect(sel(TO).props("width")).toBe("m");
     });
 
     it("from lists steps 1 to n-1 and to the later steps, as N · step name, with the last step marked", async () => {
@@ -3599,7 +3599,7 @@ describe("AnalyticsFunnels", () => {
           .findAllComponents(OButton)
           .find((b) => b.text() === "Remove breakdown" && !b.element.closest("aside"));
         expect(remove).toBeTruthy();
-        expect(remove!.props("variant")).toBe("outline");
+        expect(remove!.props("variant")).toBe("secondary");
         await remove!.trigger("click");
         await settle();
         expect(useProductAnalytics().funnel.value.breakdown).toBeFalsy();

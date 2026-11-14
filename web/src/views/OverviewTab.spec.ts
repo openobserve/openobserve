@@ -84,9 +84,9 @@ vi.mock("@/composables/useOrgHasUserData", async () => {
     useOrgHasUserData: () => ({ hasUserData: ref(undefined), isFetching: ref(false) }),
   };
 });
-vi.mock("@/components/DateTime.vue", () => ({
+vi.mock("@/lib/forms/DateTimeRange/ODateTimeRange.vue", () => ({
   default: {
-    name: "DateTime",
+    name: "ODateTimeRange",
     props: ["autoApply", "menuAlign", "defaultType", "defaultAbsoluteTime", "defaultRelativeTime"],
     emits: ["on:date-change"],
     setup: () => ({ triggerLabel: "Past 15 Minutes" }),
@@ -341,7 +341,7 @@ describe("OverviewTab", () => {
     it("tracks a time range the user picked, but not one the picker replayed", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
-      const picker = wrapper.findComponent({ name: "DateTime" });
+      const picker = wrapper.findComponent({ name: "ODateTimeRange" });
       picker.vm.$emit("on:date-change", {
         startTime: 1,
         endTime: 2,
@@ -1822,7 +1822,7 @@ describe("OverviewTab", () => {
       const first = vi.mocked(streamService.nameList).mock.calls.length;
       expect(first).toBeGreaterThan(0);
 
-      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      wrapper.findComponent({ name: "ODateTimeRange" }).vm.$emit("on:date-change", {
         startTime: 1,
         endTime: 2,
         relativeTimePeriod: "1h",

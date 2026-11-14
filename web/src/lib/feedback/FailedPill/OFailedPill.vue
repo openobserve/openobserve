@@ -35,7 +35,7 @@ const { t } = useI18nTyped();
 
 <template>
   <span
-    class="rounded-default border-status-error-text bg-status-error-bg text-status-error-text inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 border ps-2 text-xs"
+    class="rounded-default border-banner-error-soft-border bg-banner-error-soft-bg text-banner-error-soft-text h-control-xs inline-flex max-w-full min-w-0 items-center gap-1.5 border ps-2 text-xs"
     :class="!retry && 'pe-2'"
     :data-test="dataTest"
   >
@@ -46,7 +46,7 @@ const { t } = useI18nTyped();
       class="rounded-default focus-visible:outline-focus-ring-accent inline-flex min-w-0 items-center gap-1 whitespace-nowrap outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
     >
       <!-- First child, so the tooltip binds to this focusable marker, not to its hidden text. -->
-      <OTooltip :content="sentence" max-width="22.5rem" />
+      <OTooltip :content="sentence" />
       <OIcon name="error-outline" size="xs" class="shrink-0" />
       <span aria-hidden="true">{{ marker }}</span>
       <span class="sr-only">{{ sentence }}</span>
@@ -56,11 +56,11 @@ const { t } = useI18nTyped();
       <OTruncatedText class="min-w-0">{{ sentence }}</OTruncatedText>
     </template>
     <template v-if="retry">
-      <span class="bg-status-error-text h-3 w-px shrink-0 opacity-40" aria-hidden="true" />
+      <span class="bg-banner-error-soft-text h-3 w-px shrink-0 opacity-40" aria-hidden="true" />
       <OButton
-        variant="ghost-destructive"
-        size="xs"
-        icon-left="refresh"
+        variant="danger-ghost"
+        size="sm"
+        icon="refresh"
         class="shrink-0"
         :data-test="`${dataTest}-retry`"
         @click="emit('retry', $event)"

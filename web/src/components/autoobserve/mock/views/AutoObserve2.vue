@@ -18,21 +18,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     bleed
     :title="header.title"
-    :icon="page ? undefined : 'navigation'"
     :back="header.back"
-    :subtitle="header.subtitle"
+    :about="header.about"
     :title-data-test="header.titleTest"
   >
-    <template #title-trail>
+    <template #status>
       <OTag
-        variant="purple-soft"
-        size="xs"
+        tone="neutral"
+        size="sm"
         :label="t('autoobserve2.demoTag')"
         data-test="autoobserve-sample-tag"
       />
-    </template>
-    <template v-if="!page" #subtitle>
-      <TopBarStatus :live="live" :date="liveData.today.value" :checked="liveData.checked.value" />
+      <TopBarStatus
+        v-if="!page"
+        class="text-text-secondary text-xs"
+        :live="live"
+        :date="liveData.today.value"
+        :checked="liveData.checked.value"
+      />
     </template>
     <template v-if="!page" #actions>
       <TopBar @open="openNamed" @search="searchIssues" />
@@ -40,12 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else-if="page === 'issues'" #actions>
       <ODropdown align="end">
         <template #trigger>
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-right="expand-more"
-            data-test="autoobserve2-issues-range"
-          >
+          <OButton variant="secondary" icon-end="expand-more" data-test="autoobserve2-issues-range">
             {{ t(ISSUES_RANGE_LABEL[issuesRange]) }}
           </OButton>
         </template>
@@ -58,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="setIssuesRange(option)"
         >
           <span class="flex-1">{{ t(ISSUES_RANGE_LABEL[option]) }}</span>
-          <template #icon-right>
+          <template #end>
             <OIcon
               name="check"
               size="sm"
@@ -115,15 +113,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-border-default rounded-surface order-4 mt-6 flex flex-wrap items-center justify-center gap-2 border border-dashed px-4 py-3"
               data-test="autoobserve2-scenario"
             >
-              <OTag variant="purple-soft" size="xs" :label="t('autoobserve2.demoTag')" />
+              <OTag tone="neutral" size="sm" :label="t('autoobserve2.demoTag')" />
               <!-- OSelect drops its id on the popover trigger, so a wrapping label names it; prevent stops a second toggle. -->
               <label class="flex items-center gap-2" @click.prevent>
                 <span class="text-text-body text-xs">{{ t("autoobserve2.scenarioLabel") }}</span>
                 <OSelect
                   :model-value="scenario"
                   :options="scenarioOptions"
-                  size="sm"
-                  width="sm"
+                  width="s"
                   data-test="autoobserve2-scenario-select"
                   @update:model-value="(v) => setScenario(v as Scenario)"
                 />
@@ -186,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSkeleton
                     v-for="w in ['w-full', 'w-3/5']"
                     :key="w"
-                    animation="none"
+                    shape="block"
                     class="my-1 h-4 max-w-full"
                     :class="w"
                     data-test="autoobserve2-coverage-sentence-skeleton"
@@ -204,10 +201,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex w-full flex-col gap-2"
                 aria-hidden="true"
               >
-                <OSkeleton animation="none" class="h-2 w-full" />
+                <OSkeleton shape="block" class="h-2 w-full" />
                 <div class="flex gap-4">
-                  <OSkeleton animation="none" class="h-3 w-20" />
-                  <OSkeleton animation="none" class="h-3 w-26" />
+                  <OSkeleton shape="block" class="h-3 w-20" />
+                  <OSkeleton shape="block" class="h-3 w-26" />
                 </div>
               </div>
               <CoverageBar
@@ -329,6 +326,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import TopBar from "@/components/autoobserve/v2/TopBar.vue";
 import TopBarStatus from "@/components/autoobserve/mock/v2/TopBarStatus.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import type { PageHeaderBack } from "@/lib/core/PageHeader/OPageHeader.types";
 import ThisWeek from "@/components/autoobserve/mock/v2/ThisWeek.vue";
 import Suggestions from "@/components/autoobserve/mock/v2/Suggestions.vue";
 import PageFooter from "@/components/autoobserve/v2/PageFooter.vue";
@@ -609,12 +607,6 @@ const openChange = (ledgerId: string) => {
   openActivity(ledgerId);
 };
 
-// Back pops history when the page was opened from here, so browser Forward still returns to it.
-const closePage = () => {
-  if (window.history.state?.back) router.back();
-  else void router.replace({ query: { ...route.query, ...PAGE_QUERY } });
-};
-
 const PAGE_TITLE: Record<(typeof PAGES)[number], { title: I18nKey; test: string }> = {
   coverage: { title: "autoobserve2.coveragePage.title", test: "autoobserve2-coverage-title" },
   issues: { title: "autoobserve2.issuesPage.title", test: "autoobserve2-issues-title" },
@@ -625,14 +617,14 @@ const PAGE_TITLE: Record<(typeof PAGES)[number], { title: I18nKey; test: string 
 const header = computed<{
   title: I18nText;
   titleTest: string;
-  subtitle?: I18nText;
-  back?: { label: I18nText; onClick: () => void; dataTest: string };
+  about?: I18nText;
+  back?: PageHeaderBack;
 }>(() => {
   if (!page.value) return { title: t("autoobserve.title"), titleTest: "autoobserve2-title" };
   return {
     title: t(PAGE_TITLE[page.value].title),
     titleTest: PAGE_TITLE[page.value].test,
-    subtitle:
+    about:
       page.value === "issues"
         ? t("autoobserve2.issuesPage.sentence", {
             within: t(ISSUES_RANGE_WITHIN[issuesRange.value]),
@@ -640,7 +632,7 @@ const header = computed<{
         : undefined,
     back: {
       label: t("autoobserve.title"),
-      onClick: closePage,
+      to: { query: { ...route.query, ...PAGE_QUERY } },
       dataTest: `autoobserve2-${page.value}-back`,
     },
   };

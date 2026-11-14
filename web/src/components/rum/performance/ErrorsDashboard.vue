@@ -25,21 +25,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
     >
       <div>
-        <OSpinner size="md" class="mx-auto block" />
+        <OSpinner size="lg" class="mx-auto block" />
         <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
       </div>
     </div>
 
     <OEmptyState
       v-else-if="showEmptyState"
+      icon="monitor-heart"
       data-test="errors-dashboard-empty"
-      size="block"
-      illustration="pulse"
-      :hide-action="true"
-    >
-      <template #title>{{ t("rum.performanceEmptyTitle") }}</template>
-      <template #description>{{ t("rum.performanceEmptyDescription") }}</template>
-    </OEmptyState>
+      :title="t('rum.performanceEmptyTitle')"
+      :text="t('rum.performanceEmptyDescription')"
+    />
 
     <template v-else>
       <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
@@ -66,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
       >
         <div>
-          <OSpinner size="md" class="mx-auto block" />
+          <OSpinner size="lg" class="mx-auto block" />
           <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
         </div>
       </div>

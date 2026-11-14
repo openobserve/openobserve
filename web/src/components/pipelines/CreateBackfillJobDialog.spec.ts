@@ -29,9 +29,9 @@ vi.mock("@/services/backfill", () => ({
   },
 }));
 
-vi.mock("@/components/DateTime.vue", () => ({
+vi.mock("@/lib/forms/DateTimeRange/ODateTimeRange.vue", () => ({
   default: {
-    name: "DateTime",
+    name: "ODateTimeRange",
     template: '<div data-test="time-range-picker" />',
     props: ["defaultType", "defaultAbsoluteTime", "defaultRelativeTime"],
     emits: ["on:date-change"],
@@ -57,7 +57,7 @@ const validRange = () => ({ type: "absolute", from: VALID_FROM, to: VALID_TO });
 
 // Stub for ODrawer/ODialog: forwards props, exposes all named slots so the
 // inner template renders, and emits the same click:primary / click:secondary
-// / click:neutral / update:open events as the real components.
+// / click:extra / update:open events as the real components.
 const ODrawerStub = {
   name: "ODrawer",
   template: `
@@ -73,38 +73,38 @@ const ODrawerStub = {
         type="button"
         data-test="stub-secondary-btn"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
       <button
         type="button"
         data-test="stub-primary-btn"
-        :disabled="primaryButtonDisabled || primaryButtonLoading"
+        :disabled="primary?.disabled || primary?.loading"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
     </div>
   `,
   props: [
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
     "formId",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 const ODialogStub = {
@@ -118,36 +118,36 @@ const ODialogStub = {
         type="button"
         data-test="stub-dialog-secondary-btn"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
       <button
         type="button"
         data-test="stub-dialog-primary-btn"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
     </div>
   `,
   props: [
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 function createWrapper(props: Record<string, any> = {}) {
@@ -209,19 +209,19 @@ describe("CreateBackfillJobDialog – mount and structure", () => {
   it("forwards 'Cancel' as the secondary button label", () => {
     const wrapper = createWrapper();
     const drawer = wrapper.findComponent(ODrawerStub);
-    expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+    expect(drawer.props("secondary")?.label).toBe("Cancel");
   });
 
   it("forwards 'Create Backfill Job' as the primary button label", () => {
     const wrapper = createWrapper();
     const drawer = wrapper.findComponent(ODrawerStub);
-    expect(drawer.props("primaryButtonLabel")).toBe("Create Backfill Job");
+    expect(drawer.props("primary")?.label).toBe("Create Backfill Job");
   });
 
-  it("forwards width=47 to ODrawer", () => {
+  it("opens the ODrawer at the fixed md (640) size", () => {
     const wrapper = createWrapper();
     const drawer = wrapper.findComponent(ODrawerStub);
-    expect(drawer.props("width")).toBe(47);
+    expect(drawer.props("size")).toBe("md");
   });
 
   it("renders data-test='advanced-options-section' inside the default slot", () => {
@@ -480,20 +480,17 @@ describe("CreateBackfillJobDialog – delete-confirmation ODialog", () => {
     expect(dialog.props("title")).toBe("Confirm Data Deletion");
   });
 
-  it("uses size='sm' and persistent on the confirmation ODialog", () => {
+  it("uses size='sm' on the confirmation ODialog, which a busy delete keeps open", () => {
     const wrapper = createWrapper();
     const dialog = wrapper.findComponent(ODialogStub);
     expect(dialog.props("size")).toBe("sm");
-    // persistent is passed as an attribute without an explicit value, which
-    // Vue coerces to "" — treat any non-falsy value as enabled.
-    expect(dialog.props("persistent")).toBeDefined();
-    expect(dialog.props("persistent")).not.toBeNull();
+    expect(dialog.props("primary")?.variant).toBe("danger");
   });
 
   it("uses 'destructive' variant for the confirmation primary button", () => {
     const wrapper = createWrapper();
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog.props("primary")?.variant).toBe("danger");
   });
 
   it("closes the confirmation ODialog when click:secondary is emitted", async () => {

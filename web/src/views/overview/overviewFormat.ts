@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 import type {
   SegmentedBarSegment,
   SegmentedBarVariant,
@@ -59,10 +59,10 @@ export function limitStatus(percent: number): LimitStatus {
   return "ok";
 }
 
-export function limitBarVariant(percent: number): ProgressBarVariant {
+export function limitBarVariant(percent: number): ProgressBarTone {
   const status = limitStatus(percent);
-  if (status === "over") return "danger";
-  return status === "approaching" ? "warning" : "default";
+  if (status === "over") return "err";
+  return status === "approaching" ? "warn" : "accent";
 }
 
 // a rule whose notification failed still fired

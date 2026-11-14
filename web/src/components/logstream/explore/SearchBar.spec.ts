@@ -60,9 +60,9 @@ vi.mock("@/composables/useLogs", () => ({
   }),
 }));
 
-vi.mock("@/components/DateTime.vue", () => ({
+vi.mock("@/lib/forms/DateTimeRange/ODateTimeRange.vue", () => ({
   default: {
-    name: "DateTime",
+    name: "ODateTimeRange",
     template: '<div data-test="datetime-stub"></div>',
     props: {
       defaultType: null,
@@ -253,7 +253,7 @@ describe("SearchBar (logstream/explore)", () => {
     it("lets the picker keep a calendar range shared from Logs", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      expect(wrapper.findComponent({ name: "DateTime" }).props("calendarPresets")).toBe(true);
+      expect(wrapper.findComponent({ name: "ODateTimeRange" }).props("calendarPresets")).toBe(true);
     });
   });
 

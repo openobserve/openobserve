@@ -15,11 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OBanner
+  <OInlineNotice
     v-if="banner"
-    :variant="bannerVariant"
-    inline-actions
-    dense
+    :tone="bannerTone"
     data-test="logs-permalink-banner"
     :data-state="banner.state"
     class="mx-2.5 mt-2"
@@ -39,8 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <OButton
         v-if="actionVisible"
-        variant="outline"
-        size="sm"
+        variant="secondary"
         :loading="permalinkResolving"
         :data-test="actionDataTest"
         @click="onAction"
@@ -48,50 +45,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ actionLabel }}
       </OButton>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="close"
+        icon="close"
         :aria-label="t('search.linePermalink.bannerDismiss')"
         data-test="logs-permalink-banner-dismiss"
         @click="dismissPermalinkBanner"
       />
     </template>
-  </OBanner>
-  <OBanner
+  </OInlineNotice>
+  <OInlineNotice
     v-else-if="sharedPageNotice"
-    variant="info"
-    inline-actions
-    dense
+    tone="info"
     data-test="logs-shared-page-notice"
     class="mx-2.5 mt-2"
   >
     <span>{{ t("search.linePermalink.pageNotice", { page: sharedPageNotice.page }) }}</span>
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         data-test="logs-shared-page-go-btn"
         @click="emit('go-to-page', goToPage)"
       >
         {{ goToLabel }}
       </OButton>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="close"
+        icon="close"
         :aria-label="t('search.linePermalink.bannerDismiss')"
         data-test="logs-shared-page-notice-dismiss"
         @click="dismissPageNotice"
       />
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
 import { logsPageCount } from "@/utils/logs/pageCount";
 import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { LOG_LINK_I18N } from "@/utils/logs/logPermalink";
 import {
@@ -114,11 +108,11 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const { searchObj } = searchState();
 
-const VARIANT = { info: "info", warning: "warning", error: "error" } as const;
+const TONE = { info: "info", warning: "warn", error: "err" } as const;
 
 const banner = computed(() => permalinkBanner.value);
 
-const bannerVariant = computed(() => (banner.value ? VARIANT[banner.value.severity] : "info"));
+const bannerTone = computed(() => (banner.value ? TONE[banner.value.severity] : "info"));
 
 const hasStreamParam = computed(() => banner.value?.messageParams?.stream !== undefined);
 

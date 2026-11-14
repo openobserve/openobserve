@@ -13,7 +13,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <OButton variant="row" block class="rounded-none">
+  <OButton variant="ghost" block class="rounded-none">
     <!-- the row runs edge to edge in its card, with the card's own inset on the text -->
     <span
       :class="[

@@ -17,16 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="raw(name)"
-    :subtitle="raw(subtitle)"
+    :about="about"
     :back="{ label: t('fleet.tabs.configurations'), to: backTo }"
     bleed
-    overflow-first
     data-test="fleet-config-editor-page"
   >
-    <template #title-trail>
+    <template #status>
       <OTag
         class="max-md:min-w-0 max-md:shrink-999"
-        :variant="modeChip.variant"
+        :tone="modeChip.variant"
         dot
         data-test="fleet-config-editor-mode-chip"
       >
@@ -36,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #actions-overflow>
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         :disabled="!loaded || saving"
         data-test="fleet-config-editor-save"
         @click="save"
@@ -46,8 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <span v-if="undeployed" class="inline-flex">
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :disabled="!loaded || publishUnchanged"
           data-test="fleet-config-editor-publish"
           @click="onPublish"
@@ -62,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span v-if="!undeployed" class="inline-flex">
         <OButton
           variant="primary"
-          size="sm"
           :disabled="!loaded || publishUnchanged"
           data-test="fleet-config-editor-publish"
           @click="onPublish"
@@ -74,8 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="undeployed">
         <OButton
           variant="primary"
-          size="sm"
-          icon-left="rocket-launch"
+          icon="rocket-launch"
           data-test="fleet-config-editor-start-rollout"
           @click="rolloutOpen = true"
         >
@@ -95,7 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="inline-flex">
             <OToggleGroupItem
               value="visual"
-              size="sm"
               icon-left="account-tree"
               :disabled="!graph"
               data-test="fleet-config-editor-mode-visual"
@@ -104,14 +98,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
             <OTooltip v-if="!graph" :content="t('fleet.editor.visualUnavailable')" />
           </span>
-          <OToggleGroupItem value="yaml" size="sm" icon-left="code">
+          <OToggleGroupItem value="yaml" icon-left="code">
             {{ t("fleet.configs.yaml") }}
           </OToggleGroupItem>
         </OToggleGroup>
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="fact-check"
+          variant="secondary"
+          icon="fact-check"
           :disabled="!loaded"
           data-test="fleet-config-editor-validate"
           @click="validate"
@@ -120,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OTag
           v-if="issues"
-          :variant="errorCount ? 'error-soft' : issueCount ? 'warning-soft' : 'success-soft'"
+          :tone="errorCount ? 'err' : issueCount ? 'warn' : 'ok'"
           dot
           :label="
             errorCount
@@ -137,9 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-for="action in iconActions"
               :key="action.id"
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              :icon-left="action.icon"
+              :icon="action.icon"
               :disabled="action.disabled"
               :data-test="`fleet-config-editor-${action.id}`"
               @click="action.run"
@@ -149,8 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <OButton
             variant="ghost"
-            size="sm"
-            icon-left="history"
+            icon="history"
             data-test="fleet-config-editor-history"
             @click="openPanel('history')"
           >
@@ -158,8 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             variant="ghost"
-            size="sm"
-            icon-left="key"
+            icon="key"
             data-test="fleet-config-editor-variables"
             @click="openPanel('variables')"
           >
@@ -167,17 +158,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <ODropdown align="end">
             <template #trigger>
-              <OButton
-                variant="ghost"
-                size="sm"
-                icon-right="expand-more"
-                data-test="fleet-config-editor-more"
-              >
+              <OButton variant="ghost" icon-end="expand-more" data-test="fleet-config-editor-more">
                 {{ t("fleet.editor.more") }}
               </OButton>
             </template>
             <ODropdownItem
-              icon-left="content-copy"
+              icon="content-copy"
               :disabled="isNew || !loaded"
               data-test="fleet-config-editor-duplicate"
               @select="duplicate"
@@ -185,8 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("fleet.editor.duplicate") }}
             </ODropdownItem>
             <ODropdownItem
-              variant="destructive"
-              icon-left="delete"
+              tone="danger"
+              icon="delete"
               :disabled="isNew || !loaded"
               data-test="fleet-config-editor-delete"
               @select="deleteOpen = true"
@@ -213,8 +199,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OEmptyState
           v-else-if="!loaded && loadFailed"
-          size="block"
-          preset="load-error"
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="t('emptyState.loadError.description')"
           data-test="fleet-config-editor-load-error"
           @action="retryLoad"
         />
@@ -223,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex h-full items-center justify-center"
           data-test="fleet-config-editor-loading"
         >
-          <OSpinner />
+          <OSpinner size="lg" />
         </div>
         <FleetEditorCanvas
           v-else-if="graph && mode === 'visual'"
@@ -259,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="fleet-config-editor-panel"
       >
         <div class="border-border-default flex shrink-0 items-center border-b pe-2">
-          <OTabs v-model="panelTab" dense class="min-w-0 flex-1">
+          <OTabs v-model="panelTab" size="compact" class="min-w-0 flex-1">
             <OTab
               v-if="graph"
               name="properties"
@@ -270,9 +257,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTab name="variables" :label="t('fleet.editor.variablesShort')" />
           </OTabs>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="close"
+            icon="close"
             data-test="fleet-config-editor-panel-close"
             @click="panelOpen = false"
           >
@@ -293,11 +280,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OEmptyState
                 v-else
-                size="block"
                 icon="account-tree"
                 :title="t('fleet.editor.nothingSelected')"
-                :description="t('fleet.editor.nothingSelectedHint')"
-                hide-action
+                :text="t('fleet.editor.nothingSelectedHint')"
               />
             </template>
           </template>
@@ -333,9 +318,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="publishOpen"
       size="sm"
       :title="t('fleet.editor.publishVersion')"
-      :primary-button-label="t('fleet.editor.publish')"
-      :primary-button-loading="publishing"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{ label: t('fleet.editor.publish'), loading: publishing }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="fleet-config-editor-publish-dialog"
       @click:secondary="publishOpen = false"
       @click:primary="confirmPublish"
@@ -350,21 +334,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="deleteOpen"
       size="sm"
       :title="t('fleet.editor.deleteTitle', { name: raw(name) })"
-      :primary-button-label="t('fleet.editor.delete')"
-      primary-button-variant="destructive"
-      :primary-button-loading="deleting"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{ label: t('fleet.editor.delete'), variant: 'danger', loading: deleting }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="fleet-config-editor-delete-dialog"
       @click:secondary="deleteOpen = false"
       @click:primary="deleteConfig"
     >
       <div class="flex flex-col gap-3">
         <OText variant="body">{{ t("fleet.editor.deleteBody") }}</OText>
-        <OBanner
+        <OInlineNotice
           v-if="deleteRefs"
-          variant="error"
-          dense
-          :content="
+          tone="err"
+          :message="
             t('fleet.editor.deleteInUse', {
               fleets: deleteRefs.fleets,
               collectors: deleteRefs.collectors,
@@ -417,7 +398,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -444,7 +425,7 @@ import FleetCreateConfigDialog from "@/components/fleet/FleetCreateConfigDialog.
 import FleetNewRolloutDialog from "@/components/fleet/FleetNewRolloutDialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import {
   addFromCatalog,
   CATALOG,
@@ -574,8 +555,9 @@ const unsaved = computed(
 );
 // Taken off the list page at load and applied only once the draft baseline is the seed.
 let pendingImport: string | null = null;
-const subtitle = computed(() =>
-  isNew.value ? t("fleet.editor.newDescription") : (detail.value?.description ?? ""),
+// The config's own description is what the page is about; a new config has none yet.
+const about = computed(() =>
+  !isNew.value && detail.value?.description ? raw(detail.value.description) : undefined,
 );
 const savedYaml = computed(
   () => detail.value?.draft?.yaml ?? savedVersion.version.value?.yaml ?? "",
@@ -592,26 +574,26 @@ const undeployed = computed(() =>
 const variableNames = computed(() => envVariables(yamlText.value));
 
 // The editor always says which of three things you are looking at.
-const modeChip = computed<{ variant: BadgeVariant; label: I18nText }>(() => {
+const modeChip = computed<{ variant: ChipTone; label: I18nText }>(() => {
   if (isNew.value || dirty.value || detail.value?.draft)
-    return { variant: "warning-soft", label: t("fleet.editor.modeDraft") };
+    return { variant: "warn", label: t("fleet.editor.modeDraft") };
   const latest = latestVersion.value;
   if (latest?.state === "rolling_out")
     return {
-      variant: "primary-soft",
+      variant: "accent",
       label: t("fleet.editor.modeRollingOut", { version: latest.version }),
     };
   if (latest?.state === "published")
     return {
-      variant: "default-soft",
+      variant: "neutral",
       label: t("fleet.editor.modePublished", { version: latest.version }),
     };
   if (detail.value?.live_version)
     return {
-      variant: "success-soft",
+      variant: "ok",
       label: t("fleet.editor.modeRunning", { version: detail.value.live_version }),
     };
-  return { variant: "warning-soft", label: t("fleet.editor.modeDraft") };
+  return { variant: "warn", label: t("fleet.editor.modeDraft") };
 });
 
 const errorCount = computed(() =>

@@ -7,7 +7,7 @@ describe("statusVariant", () => {
   it("maps healthy/active states to success-soft with a dot", () => {
     for (const v of ["active", "Enabled", "healthy", "PAID", "success"]) {
       const r = statusVariant(v);
-      expect(r.variant).toBe("success-soft");
+      expect(r.variant).toBe("ok");
       expect(r.tone).toBe("success");
       expect(r.dot).toBe(true);
     }
@@ -15,25 +15,25 @@ describe("statusVariant", () => {
 
   it("maps transient states to warning-soft", () => {
     for (const v of ["paused", "pending", "degraded", "training", "queued"]) {
-      expect(statusVariant(v).variant).toBe("warning-soft");
+      expect(statusVariant(v).variant).toBe("warn");
     }
   });
 
   it("maps failure states to error-soft", () => {
     for (const v of ["failed", "error", "overdue", "critical", "down"]) {
-      expect(statusVariant(v).variant).toBe("error-soft");
+      expect(statusVariant(v).variant).toBe("err");
     }
   });
 
   it("maps running/scheduled to blue-soft (info)", () => {
     for (const v of ["running", "scheduled", "processing"]) {
-      expect(statusVariant(v).variant).toBe("blue-soft");
+      expect(statusVariant(v).variant).toBe("info");
     }
   });
 
   it("maps draft/disabled/unknown to default-soft (neutral)", () => {
     for (const v of ["draft", "disabled", "inactive", "whatisthis"]) {
-      expect(statusVariant(v).variant).toBe("default-soft");
+      expect(statusVariant(v).variant).toBe("neutral");
     }
   });
 

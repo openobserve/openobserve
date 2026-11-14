@@ -40,10 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`query-profile-node-${row.cluster ? 'cluster' : 'meta'}-${row.id}`"
         >{{ meta }}</OTruncatedText
       >
-      <OBadge v-if="row.straggler" size="xs" shape="rounded" variant="error-soft">{{
+      <OBadge v-if="row.straggler" size="sm" tone="err">{{
         t("search.queryProfile.straggler")
       }}</OBadge>
-      <OBadge v-if="row.skipped" size="xs" shape="rounded" variant="default-outline">{{
+      <OBadge v-if="row.skipped" size="sm" tone="outline">{{
         t("search.queryProfile.skipped")
       }}</OBadge>
     </div>

@@ -28,9 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-for="(bucket, index) in buckets"
         :key="String(bucket.key)"
-        variant="outline"
-        size="chip"
-        :active="!!filter && bucketSelected(filter, bucket)"
+        variant="secondary"
+        size="xs"
+        :pressed="!!filter && bucketSelected(filter, bucket)"
         :aria-pressed="String(!!filter && bucketSelected(filter, bucket))"
         :data-test="`quality-distribution-key-${index}`"
         @click="(event: MouseEvent) => emit('select', bucket, event.shiftKey)"

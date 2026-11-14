@@ -76,31 +76,31 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
+      :data-primary-label="primary?.label"
     >
       <slot name="header-left" />
       <slot name="header" />
@@ -109,7 +109,7 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-close"
         @click="$emit('update:open', false)"
@@ -622,11 +622,11 @@ describe("BackfillJobsList – delete confirmation", () => {
     expect(confirm.find('[data-test="confirm-dialog-name"]').text()).toBe("pipe-42");
   });
 
-  it("makes the delete button destructive and keeps its OK label", async () => {
+  it("makes the delete button destructive and names the verb, never OK", async () => {
     const confirm = await openDelete(makeJob());
     const dialog = confirm.findComponent(ODialogStub);
-    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
-    expect(dialog.props("primaryButtonLabel")).toBe(i18n.global.t("confirmDialog.ok"));
+    expect(dialog.props("primary")?.variant).toBe("danger");
+    expect(dialog.props("primary")?.label).toBe(i18n.global.t("common.delete"));
   });
 
   it("keeps the pause confirmation plain and non-destructive", async () => {
@@ -636,6 +636,6 @@ describe("BackfillJobsList – delete confirmation", () => {
     await nextTick();
     const confirm = wrapper.findComponent(ConfirmDialog);
     expect(confirm.find('[data-test="confirm-dialog-name"]').exists()).toBe(false);
-    expect(confirm.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("primary");
+    expect(confirm.findComponent(ODialogStub).props("primary")?.variant).toBe("primary");
   });
 });

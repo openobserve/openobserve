@@ -1,5 +1,5 @@
 import { reactive, ref } from "vue";
-import type { ToastVariant, ToastOptions, ToastPosition, ToastDetail } from "./OToast.types";
+import type { ToastVariant, ToastOptions } from "./OToast.types";
 import type { I18nText } from "@/types/i18n";
 import { isLicenseDenialToast } from "@/composables/useFeatureLock";
 
@@ -9,42 +9,21 @@ interface ToastRecord {
   id: string;
   variant: ToastVariant;
   message: I18nText;
-  title?: I18nText;
   timeout: number; // ms; 0 = persistent
-  position: ToastPosition;
   open: boolean; // Reka controls enter/exit animation via this
   action?: ToastOptions["action"];
   count: number; // number of identical toasts collapsed into this one
-  timerKey: number; // increments on each dedup reset; drives progress bar restart
   timer?: ReturnType<typeof setTimeout>; // auto-dismiss handle, reset on dedup
   timerStart?: number; // epoch ms when the current timer was started
   remainingTimeout?: number; // ms left when the timer was last paused
-  details?: ToastDetail[];
-  titleCount?: number;
   onDismiss?: () => void;
 }
 
-// ── Default timeouts per variant ─────────────────────────────────────────────
-
-const defaultTimeouts: Record<ToastVariant, number> = {
-  success: 5000,
-  error: 30000,
-  warning: 30000,
-  info: 5000,
-  loading: 0,
-  default: 5000,
-};
-
-// ── Default positions per variant ────────────────────────────────────────────
-
-const defaultPositions: Record<ToastVariant, ToastPosition> = {
-  success: "bottom-center",
-  error: "bottom-center",
-  warning: "bottom-center",
-  info: "bottom-center",
-  loading: "bottom-center",
-  default: "bottom-center",
-};
+// A result is read in 4 s; an offered Undo needs the time to decide (K1).
+export const TOAST_TIMEOUT_MS = 4000;
+export const TOAST_ACTION_TIMEOUT_MS = 8000;
+// A failure often carries a server reason the user has to read and act on.
+export const TOAST_PROBLEM_TIMEOUT_MS = 30000;
 
 // ── Module-level singleton — survives outside Vue lifecycle ──────────────────
 
@@ -82,7 +61,7 @@ if (typeof document !== "undefined") {
 // ── Public dismiss-function type ─────────────────────────────────────────────
 
 /** Closes the toast; `id` is its record's id, the same one a collapsed duplicate returns. */
-type DismissFn = ((replacement?: Pick<ToastOptions, "variant" | "message" | "title">) => void) & {
+type DismissFn = ((replacement?: Pick<ToastOptions, "variant" | "message">) => void) & {
   readonly id: string;
 };
 
@@ -125,25 +104,25 @@ function toast(options: ToastOptions): DismissFn {
   // The license warning toast already names the features a refused request needed.
   if (variant === "error" && isLicenseDenialToast(options.message))
     return Object.assign(() => {}, { id: "" });
-  const position: ToastPosition = options.position ?? defaultPositions[variant];
-  const timeout = options.timeout !== undefined ? options.timeout : defaultTimeouts[variant];
+  const isProblem = variant === "error" || variant === "warning";
+  const timeout =
+    options.timeout ??
+    (isProblem
+      ? TOAST_PROBLEM_TIMEOUT_MS
+      : options.action
+        ? TOAST_ACTION_TIMEOUT_MS
+        : TOAST_TIMEOUT_MS);
 
   // Collapse identical, still-open toasts into a single record with a count
-  // badge instead of stacking duplicates (e.g. a polling request that keeps
+  // instead of stacking duplicates (e.g. a polling request that keeps
   // returning the same 403).
   const existing = toastRecords.find(
-    (r) =>
-      r.open &&
-      r.variant === variant &&
-      r.message === options.message &&
-      r.title === options.title &&
-      r.position === position,
+    (r) => r.open && r.variant === variant && r.message === options.message,
   );
   if (existing) {
     existing.count++;
-    existing.timerKey++; // causes progress bar element to remount and restart
     scheduleAutoDismiss(existing); // keep it visible while duplicates arrive
-    return makeDismissFn(existing.id, position);
+    return makeDismissFn(existing.id);
   }
 
   const id = String(++idCounter);
@@ -153,54 +132,27 @@ function toast(options: ToastOptions): DismissFn {
     variant,
     // Shown as written: a message often starts with a name (alert, stream, user) that must not be recased.
     message: options.message,
-    title: options.title,
     timeout,
-    position,
     open: true,
     action: options.action,
     count: 1,
-    timerKey: 0,
-    details: options.details,
-    titleCount: options.titleCount,
     onDismiss: options.onDismiss,
   };
 
   // Loading variant is suppressed — callers use the returned dismiss fn to
-  // swap in a success/error result toast; no spinner is shown in the UI.
+  // swap in a success/error result toast; progress belongs in the busy control.
   if (variant !== "loading") {
     toastRecords.push(record);
     scheduleAutoDismiss(record);
   }
 
-  return makeDismissFn(id, position);
+  return makeDismissFn(id);
 }
 
-// Update mutable fields of an existing open toast in-place.
-// Used by the unauthorized-error grouper to append newly-failed resources
-// to an already-visible notification rather than stacking a second one.
-function updateToast(
-  id: string,
-  updates: { title?: I18nText; message?: I18nText; details?: ToastDetail[]; titleCount?: number },
-): void {
-  const record = toastRecords.find((r) => r.id === id);
-  if (!record) return;
-  if (updates.title !== undefined) record.title = updates.title;
-  if (updates.message !== undefined) record.message = updates.message;
-  if (updates.details !== undefined) record.details = updates.details;
-  if (updates.titleCount !== undefined) record.titleCount = updates.titleCount;
-}
-
-function makeDismissFn(id: string, position: ToastPosition): DismissFn {
-  const close = (replacement?: Pick<ToastOptions, "variant" | "message" | "title">) => {
+function makeDismissFn(id: string): DismissFn {
+  const close = (replacement?: Pick<ToastOptions, "variant" | "message">) => {
     dismiss(id);
-    if (replacement) {
-      toast({
-        variant: replacement.variant,
-        message: replacement.message,
-        title: replacement.title,
-        position,
-      });
-    }
+    if (replacement) toast({ variant: replacement.variant, message: replacement.message });
   };
   return Object.assign(close, { id });
 }
@@ -245,5 +197,5 @@ export function useToast(): UseToastReturn {
 }
 
 // ── Direct export — for use outside Vue tree (services, main.ts) ─────────────
-export { toast, toastRecords, dismissAll, pauseTimer, resumeTimer, updateToast };
+export { toast, toastRecords, dismissAll, pauseTimer, resumeTimer };
 export type { ToastRecord, DismissFn };

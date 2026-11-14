@@ -26,7 +26,6 @@ if (import.meta.env.DEV && !form) {
       <OInput
         v-bind="$attrs"
         :label="props.label"
-        :label-position="props.labelPosition"
         :placeholder="props.placeholder"
         :type="props.type"
         :model-modifiers="props.modelModifiers"
@@ -35,14 +34,14 @@ if (import.meta.env.DEV && !form) {
         :required="props.required"
         :help-text="props.helpText"
         :clearable="props.clearable"
-        :autogrow="props.autogrow"
-        :rows="props.rows"
         :maxlength="props.maxlength"
         :debounce="props.debounce"
         :mask="props.mask"
         :prefix="props.prefix"
         :suffix="props.suffix"
-        :revealable="props.revealable"
+        :icon="props.icon"
+        :copyable="props.copyable"
+        :mono="props.mono"
         :autofocus="props.autofocus"
         :autocomplete="props.autocomplete"
         :name="props.name"
@@ -59,25 +58,14 @@ if (import.meta.env.DEV && !form) {
         @update:model-value="(val: unknown) => field.handleChange(val)"
         @blur="field.handleBlur"
       >
-        <!-- Forward OInput's presentational slots (e.g. a password visibility
-             toggle in #icon-right) so form fields keep full OInput affordances. -->
-        <template v-if="$slots['icon-left']" #icon-left>
-          <slot name="icon-left" />
+        <template v-if="$slots.icon" #icon>
+          <slot name="icon" />
         </template>
-        <template v-if="$slots['icon-right']" #icon-right>
-          <slot name="icon-right" />
-        </template>
-        <template v-if="$slots.prefix" #prefix>
-          <slot name="prefix" />
-        </template>
-        <template v-if="$slots.suffix" #suffix>
-          <slot name="suffix" />
+        <template v-if="$slots['icon-end']" #icon-end>
+          <slot name="icon-end" />
         </template>
         <template v-if="$slots.tooltip" #tooltip>
           <slot name="tooltip" />
-        </template>
-        <template v-if="$slots.append" #append>
-          <slot name="append" />
         </template>
       </OInput>
       <!-- #error slot: when provided the consumer OWNS the message — only the

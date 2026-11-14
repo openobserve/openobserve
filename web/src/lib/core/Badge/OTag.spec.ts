@@ -3,10 +3,11 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import OTag from "./OTag.vue";
+import OBadge from "./OBadge.vue";
 import { BADGE_GROUPS } from "./badgeGroups";
 import { raw } from "@/types/i18n";
 
-const DOT_CLASS = "size-1.75";
+const DOT_CLASS = "size-1.5";
 
 const DOT_SAMPLES: Record<string, string> = {
   alertStatus: "active",
@@ -45,69 +46,86 @@ describe("OTag dot rendering", () => {
     expect(html.includes(DOT_CLASS)).toBe(false);
   });
 
-  it("plain-mode group renders no dot", () => {
+  it("a status tone in a plain-mode group still gets a dot (never colour alone)", () => {
     const html = mount(OTag, { props: { type: "logLevel", value: "error" } }).html();
+    expect(html.includes(DOT_CLASS)).toBe(true);
+  });
+
+  it("a neutral plain-mode value renders no dot", () => {
+    const html = mount(OTag, { props: { type: "logLevel", value: "debug" } }).html();
     expect(html.includes(DOT_CLASS)).toBe(false);
   });
 
-  it("manual badge (no type) renders NO dot", () => {
+  it("manual neutral chip renders NO dot", () => {
     const html = mount(OTag, {
-      props: { variant: "default-soft" },
+      props: { tone: "neutral" },
       slots: { default: "12" },
     }).html();
     expect(html.includes(DOT_CLASS)).toBe(false);
   });
 
-  it("manual badge with a value but no type renders NO dot", () => {
+  it("manual accent chip with a value but no type renders NO dot", () => {
     const html = mount(OTag, {
-      props: { variant: "primary-soft", value: "x" },
+      props: { tone: "accent", value: "x" },
       slots: { default: "x" },
     }).html();
     expect(html.includes(DOT_CLASS)).toBe(false);
   });
 });
 
-describe("OTag shape", () => {
-  it("status group is pill (rounded-full)", () => {
-    const html = mount(OTag, { props: { type: "alertStatus", value: "active" } }).html();
-    expect(html.includes("rounded-full")).toBe(true);
+describe("OTag look", () => {
+  it("every chip has radius 4", () => {
+    for (const props of [
+      { type: "alertStatus", value: "active" },
+      { type: "fieldType", value: "string" },
+      { tone: "neutral" as const },
+    ]) {
+      expect(mount(OTag, { props }).classes()).toContain("rounded-chip");
+    }
   });
-  it("group declaring shape 'pill' renders rounded-full", () => {
-    const html = mount(OTag, { props: { type: "alertStatus", value: "active" } }).html();
-    expect(html.includes("rounded-full")).toBe(true);
-  });
-  it("fieldType (dtype chip) renders rounded, matching the wildcard pattern chip", () => {
-    const html = mount(OTag, { props: { type: "fieldType", value: "string" } }).html();
-    expect(html.includes("rounded-default")).toBe(true);
-  });
-  it("groups that opt into rounded render rounded-default", () => {
-    const html = mount(OTag, { props: { type: "logsResultChip", value: "neutral" } }).html();
-    expect(html.includes("rounded-default")).toBe(true);
-  });
-  it("group-declared class is merged onto the badge (qualityStatus naked dot)", () => {
+
+  it("group-declared class is merged onto the chip (qualityStatus bare dot)", () => {
     const html = mount(OTag, { props: { type: "qualityStatus", value: "healthy" } }).html();
     expect(html.includes("!bg-transparent")).toBe(true);
   });
-  it("manual badge defaults to pill", () => {
-    const html = mount(OTag, {
-      props: { variant: "default-soft" },
-      slots: { default: "5" },
-    }).html();
-    expect(html.includes("rounded-full")).toBe(true);
+
+  it("a per-call tone wins over the registry", () => {
+    const w = mount(OTag, { props: { type: "alertStatus", value: "active", tone: "neutral" } });
+    expect(w.findComponent(OBadge).props("tone")).toBe("neutral");
+  });
+
+  it("mono is forwarded", () => {
+    const w = mount(OTag, { props: { tone: "neutral", mono: true }, slots: { default: "v1" } });
+    expect(w.classes()).toContain("font-mono");
+  });
+
+  it("renders the dash for an empty typed value", () => {
+    const w = mount(OTag, { props: { type: "alertStatus", value: "" } });
+    expect(w.text()).toBe("—");
   });
 });
 
 describe("OTag size", () => {
-  it("typed and untyped badges both default to sm (matching height)", () => {
-    const typed = mount(OTag, { props: { type: "userRole", value: "admin" } }).html();
-    const untyped = mount(OTag, {
-      props: { value: "custom" },
-      slots: { default: "Custom" },
-    }).html();
-    expect(typed.includes("py-1.5")).toBe(true);
-    expect(untyped.includes("py-1.5")).toBe(true);
-    expect(typed.includes("py-2")).toBe(false);
-    expect(untyped.includes("py-2")).toBe(false);
+  it("typed and untyped chips both default to sm (20 px)", () => {
+    const typed = mount(OTag, { props: { type: "userRole", value: "admin" } });
+    const untyped = mount(OTag, { props: { value: "custom" }, slots: { default: "Custom" } });
+    expect(typed.classes()).toContain("h-5");
+    expect(untyped.classes()).toContain("h-5");
+  });
+
+  it("a registry md group renders 24 px", () => {
+    const w = mount(OTag, { props: { type: "cliPreset", value: "kubectl" } });
+    expect(w.classes()).toContain("h-control-xs");
+  });
+});
+
+describe("OTag toggle", () => {
+  it("renders a pressed toggle button and re-emits click", async () => {
+    const w = mount(OTag, { props: { toggle: true, pressed: true, label: raw("Has alerts") } });
+    expect(w.element.tagName).toBe("BUTTON");
+    expect(w.attributes("aria-pressed")).toBe("true");
+    await w.trigger("click");
+    expect(w.emitted("click")).toHaveLength(1);
   });
 });
 
@@ -136,7 +154,7 @@ describe("OTag removable", () => {
   });
 
   it("does not also fire the chip's own click", async () => {
-    const w = mount(OTag, { props: { value: "prod", removable: true, clickable: true } });
+    const w = mount(OTag, { props: { value: "prod", removable: true, toggle: true } });
     await w.find("[data-test='o2-badge-remove']").trigger("click");
     expect(w.emitted("remove")).toHaveLength(1);
     expect(w.emitted("click")).toBeUndefined();
@@ -144,8 +162,8 @@ describe("OTag removable", () => {
 
   // A button inside a button is invalid markup browsers repair by hoisting the
   // inner one out of the chip.
-  it("keeps a removable clickable chip a span, not a nested button", () => {
-    const w = mount(OTag, { props: { value: "prod", removable: true, clickable: true } });
+  it("keeps a removable toggle chip a span, not a nested button", () => {
+    const w = mount(OTag, { props: { value: "prod", removable: true, toggle: true } });
     // The ✕ is the ONLY button; the chip itself stays a span.
     expect(w.findAll("button")).toHaveLength(1);
     expect(w.find("button").attributes("data-test")).toBe("o2-badge-remove");

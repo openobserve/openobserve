@@ -17,18 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <OPageLayout
-    :title="t('iam.basicUsers')"
-    :subtitle="t('user.subtitle', { org: store.state.selectedOrganization?.label ?? '' })"
-    icon="person"
-    bleed
-  >
+  <OPageLayout :title="t('iam.basicUsers')" bleed>
     <template #actions>
       <OButton
         v-if="config.isCloud === 'true' && canInvite"
         variant="primary"
-        size="sm"
-        icon-left="person-add"
+        icon="person-add"
         data-test="invite-members-btn"
         @click="openInviteDialog()"
       >
@@ -37,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="config.isCloud !== 'true'"
         variant="primary"
-        size="sm"
         @click="addRoutePush({})"
         data-test="add-basic-user"
       >
@@ -48,18 +41,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg h-full">
         <OTable
           :key="tableKey"
-          :frame="false"
           :data="displayedRows"
           :columns="columns"
           row-key="email"
           :row-actions="rowActions"
-          row-actions-more-data-test="user-list-row-more-actions"
+          :row-menu="rowMenu"
+          row-menu-data-test="user-list-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
           forbidden-resource="users"
           :selected-ids="selectedUserIds"
           v-model:global-filter="filterQuery"
-          :show-global-filter="false"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -68,52 +60,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-row-selectable="(row: any) => row.enableDelete"
           filter-mode="client"
           :default-columns="false"
-          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-users-list"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <template #toolbar>
-            <div class="contents">
-              <OSearchInput
-                v-model="filterQuery"
-                :placeholder="t('user.search')"
-                data-test="user-list-search-input"
-                class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48"
-              />
-              <!-- Counts role membership: a role is a category, not a severity, so no status tones. -->
+          <!-- Access screens have no health state, so the strip counts ROLE
+               MEMBERSHIP and doubles as the role facet: the org's biggest roles
+               first, the tail folded into one tile, Total last and never
+               highlighted. Deliberately no green/amber/red — a role is a category,
+               not a severity. -->
+          <template #subheader>
+            <div
+              class="px-page-edge border-table-row-divider border-b py-1.5"
+              data-test="user-list-summary"
+            >
               <OStatStrip
                 :items="summaryStats"
                 :loading="loading"
                 selectable
-                :row="false"
                 multiple
                 :selected-keys="roleFilters"
-                default-key="total"
-                class="max-md:order-last"
-                data-test="user-list-summary"
                 @update:selected-keys="roleFilters = $event"
+              />
+            </div>
+          </template>
+
+          <template #toolbar>
+            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+              <OSearchInput
+                v-model="filterQuery"
+                :placeholder="t('user.search')"
+                data-test="user-list-search-input"
+                class="flex-1"
               />
             </div>
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="iamUsersRefresh"
+              shortcut="iamUsersRefresh"
               data-test="user-list-refresh-btn"
               @click="refreshUsers"
             />
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-users"
-              :filtered="!!(filterQuery || roleFilters.length)"
-              @action="(id) => (id === 'clear-filters' ? clearFilters() : openAddFlow())"
+              :kind="filterQuery || roleFilters.length ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery || roleFilters.length
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.users') })
+                  : t('emptyState.noUsers.title')
+              "
+              :text="
+                filterQuery || roleFilters.length
+                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.users') })
+                  : t('emptyState.noUsers.description')
+              "
+              :icon="filterQuery || roleFilters.length ? undefined : 'group'"
+              :action-label="
+                filterQuery || roleFilters.length ? undefined : t('emptyState.noUsers.action')
+              "
+              @action="filterQuery || roleFilters.length ? clearFilters() : openAddFlow()"
             >
               <template v-if="searchInviteEmail" #actions>
                 <EmptyStateActionCard
@@ -152,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="(roleName, idx) in row.roles || []"
                 :key="`${roleName}-${idx}`"
                 :type="isBuiltinRole(roleName) ? 'userRole' : undefined"
-                :variant="isBuiltinRole(roleName) ? undefined : 'default-soft'"
+                :tone="isBuiltinRole(roleName) ? undefined : 'neutral'"
                 :value="roleName"
               />
               <OTag v-if="row.status === 'pending'" type="userStatus" value="invited" />
@@ -174,9 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #selection-actions>
             <OButton
               data-test="users-list-delete-users-btn"
-              variant="outline-destructive"
-              size="sm"
-              icon-left="delete"
+              variant="danger-ghost"
+              icon="delete"
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
@@ -213,47 +221,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @invite-sent="handleInviteSent"
     />
 
-    <ODialog
+    <ConfirmDialog
+      v-model="confirmDelete"
+      kind="destructive"
       data-test="user-delete-dialog"
-      v-model:open="confirmDelete"
-      size="sm"
       :title="t('user.confirmDeleteHead')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.ok')"
-      primary-button-variant="destructive"
-      @click:secondary="confirmDelete = false"
-      @click:primary="deleteUser"
-    >
-      <i18n-t keypath="user.confirmDeleteMsg" tag="p" data-test="user-delete-dialog-message">
-        <template #name
-          ><span class="text-text-heading font-semibold break-all">{{
-            deleteUserEmail
-          }}</span></template
-        >
-      </i18n-t>
-    </ODialog>
+      message-keypath="user.confirmDeleteMsg"
+      :message-name="deleteUserEmail"
+      :cancel-label="t('user.cancel')"
+      @update:ok="deleteUser"
+      @update:cancel="confirmDelete = false"
+    />
 
-    <ODialog
+    <ConfirmDialog
+      v-model="confirmBlock"
       data-test="user-block-dialog"
-      v-model:open="confirmBlock"
-      size="sm"
       :title="t('user.confirmBlockHead')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.block')"
-      @click:secondary="confirmBlock = false"
-      @click:primary="blockUser"
-    >
-      <p>{{ t("user.confirmBlockMsg", { email: blockUserEmail }) }}</p>
-    </ODialog>
+      :message="t('user.confirmBlockMsg', { email: blockUserEmail })"
+      :ok-label="t('user.block')"
+      :cancel-label="t('user.cancel')"
+      @update:ok="blockUser"
+      @update:cancel="confirmBlock = false"
+    />
 
     <ODialog
       data-test="user-revoke-dialog"
       v-model:open="confirmRevoke"
-      size="xs"
+      size="sm"
       :title="t('user.revokeInvitationTitle')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.ok')"
-      primary-button-variant="destructive"
+      :secondary="{ label: t('user.cancel') }"
+      :primary="{ label: t('user.ok'), variant: 'danger' }"
       @click:secondary="confirmRevoke = false"
       @click:primary="revokeInvite"
     >
@@ -271,9 +268,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="confirmBulkDelete"
       size="sm"
       :title="t('user.deleteUsersTitle')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.ok')"
-      primary-button-variant="destructive"
+      :secondary="{ label: t('user.cancel') }"
+      :primary="{ label: t('user.ok'), variant: 'danger' }"
       @click:secondary="confirmBulkDelete = false"
       @click:primary="bulkDeleteUsers"
     >
@@ -306,9 +302,14 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -347,6 +348,7 @@ export default defineComponent({
     OTag,
     OStatStrip,
     ODialog,
+    ConfirmDialog,
     OEmptyState,
     EmptyStateActionCard,
     OSearchInput,
@@ -507,13 +509,6 @@ export default defineComponent({
         meta: { align: "left" },
       });
 
-      cols.push({
-        id: "actions",
-        header: t("user.actions"),
-        isAction: true,
-        pinned: "right",
-      });
-
       return cols;
     });
 
@@ -524,36 +519,39 @@ export default defineComponent({
         id: "edit",
         label: t("user.update"),
         icon: "edit",
-        onSelect: (row) => addRoutePush(row),
-        visible: canEditRow,
+        onClick: (row) => addRoutePush(row),
+        hidden: (row) => !canEditRow(row),
         dataTest: (_row, index) => `edit-basic-user-${index}`,
       },
+    ];
+    const rowMenu: OTableRowMenuItem[] = [
       {
         id: "block",
         label: t("user.block"),
         icon: "block",
-        tone: "destructive",
+        destructive: true,
         shortcut: "delete",
         onSelect: (row) => confirmBlockAction(row),
-        visible: (row) => canRemoveRow(row) && !!row.isDomainMapped,
+        hidden: (row) => !(canRemoveRow(row) && !!row.isDomainMapped),
         dataTest: (row) => `block-basic-user-${row.email}`,
       },
       {
         id: "revoke",
         label: t("user.revoke_invite"),
         icon: "cancel",
-        tone: "destructive",
+        destructive: true,
         shortcut: "delete",
         onSelect: (row) => confirmRevokeAction(row),
-        visible: (row) => row.status == "pending" && !!row.token,
+        hidden: (row) => !(row.status == "pending" && !!row.token),
         dataTest: (row) => `revoke-invite-${row.email}`,
       },
       {
         id: "delete",
         label: t("user.delete"),
         icon: "delete",
+        destructive: true,
         onSelect: (row) => confirmDeleteAction(row),
-        visible: (row) => canRemoveRow(row) && !row.isDomainMapped,
+        hidden: (row) => !(canRemoveRow(row) && !row.isDomainMapped),
         dataTest: (row) => `delete-basic-user-${row.email}`,
       },
     ];
@@ -650,15 +648,6 @@ export default defineComponent({
       ).length;
     });
 
-    // Built-in roles keep the privilege ramp; every custom role reads teal so it is
-    // visibly "not a built-in" without each one inventing its own colour.
-    const roleTone = (key: string): StatItem["tone"] => {
-      if (key === "root" || key === "admin") return "orange";
-      if (key === "editor" || key === "member") return "blue";
-      if (key === "user" || key === "viewer") return "neutral";
-      if (key === "serviceaccount") return "purple";
-      return "teal";
-    };
     const roleIcon = (key: string): IconName => {
       if (key === "root" || key === "admin") return "admin-panel-settings";
       if (key === "editor" || key === "member") return "edit";
@@ -704,8 +693,8 @@ export default defineComponent({
       );
     });
 
-    const onStatSelect = (key: string) => {
-      roleFilters.value = toggleFilterKey(roleFilters.value, key, "total");
+    const onStatSelect = (key: string | null) => {
+      roleFilters.value = key === null ? [] : toggleFilterKey(roleFilters.value, key, "total");
     };
 
     const hasInvited = computed(() => (rows.value || []).some((row: any) => isInvited(row)));
@@ -716,7 +705,7 @@ export default defineComponent({
     const summaryStats = computed<StatItem[]>(() => {
       const total = searchedRows.value.length;
       const hasData = (rows.value || []).length > 0;
-      const v = (n: number): string | number => (hasData ? n : "—");
+      const v = (n: number): number | null => (hasData ? n : null);
       const share = total > 0 ? total : undefined;
 
       const tiles: StatItem[] = visibleRoles.value.map((role) => ({
@@ -725,7 +714,6 @@ export default defineComponent({
         label: raw(role.label),
         value: v(countRole(role.key)),
         icon: roleIcon(role.key),
-        tone: roleTone(role.key),
         max: share,
         dataTest: `user-summary-role-${role.key}`,
       }));
@@ -736,7 +724,6 @@ export default defineComponent({
           label: t("iam.summaryOtherRoles", { count: overflowRoles.value.length }),
           value: v(overflowUserCount.value),
           icon: "more-horiz",
-          tone: "teal",
           max: share,
           dataTest: "user-summary-other-roles",
         });
@@ -749,7 +736,6 @@ export default defineComponent({
           label: t("iam.summaryInvited"),
           value: v(invitedCount.value),
           icon: "person-add",
-          tone: "purple",
           max: share,
           dataTest: "user-summary-invited",
         });
@@ -760,8 +746,7 @@ export default defineComponent({
         label: t("common.all"),
         value: v(total),
         icon: "group-work",
-        tone: "primary",
-        // Clickable (it clears the facet) but never shows the ring.
+        all: true,
         dataTest: "user-summary-total",
       });
       return tiles;
@@ -1739,6 +1724,7 @@ export default defineComponent({
       rows,
       displayedRows,
       rowActions,
+      rowMenu,
       roleFilters,
       onStatSelect,
       summaryStats,

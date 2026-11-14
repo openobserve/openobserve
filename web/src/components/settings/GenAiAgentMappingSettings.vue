@@ -1,20 +1,16 @@
 <template>
   <OPageLayout
-    overflow-first
     data-test="gen-ai-agent-mapping-settings"
-    :subtitle="t('genAiAgentMapping.subtitle')"
-    icon="account-tree"
+    :title="t('genAiAgentMapping.tabLabel')"
+    title-data-test="gen-ai-agent-mapping-page-title"
+    :about="t('genAiAgentMapping.subtitle')"
     bleed
   >
-    <template #title>
-      <span data-test="gen-ai-agent-mapping-page-title">{{ t("genAiAgentMapping.title") }}</span>
-    </template>
     <!-- Acts on the stored registry, not the form, so it lives in the header. -->
     <template #actions>
       <OButton
         data-test="gen-ai-agent-registry-clear-btn"
-        variant="outline-destructive"
-        size="sm"
+        variant="danger-ghost"
         :loading="clearingRegistry"
         :disabled="!loaded || loadingDefaults || saving"
         @click="openClearRegistryDialog"
@@ -24,18 +20,24 @@
     </template>
 
     <div v-if="loading" class="flex flex-1 items-center justify-center">
-      <OSpinner size="md" />
+      <OSpinner size="lg" />
     </div>
 
     <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
-      <OEmptyState size="hero" preset="no-access" data-test="gen-ai-agent-mapping-forbidden" />
+      <OEmptyState
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('emptyState.noAccess.description')"
+        data-test="gen-ai-agent-mapping-forbidden"
+      />
     </div>
 
     <!-- No form on a failed load: saving what an empty form holds would wipe the stored mapping. -->
     <div v-else-if="loadError" class="flex flex-1 items-center justify-center">
       <OEmptyState
-        size="hero"
-        preset="load-error"
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
         data-test="gen-ai-agent-mapping-load-error"
         @action="loadConfig()"
       />
@@ -156,9 +158,8 @@
               :description="t('readableSessions.settings.help')"
             >
               <OButton
-                variant="outline"
-                size="sm"
-                icon-left="add"
+                variant="secondary"
+                icon="add"
                 data-test="gen-ai-harness-add-agent"
                 @click="addHarnessRule"
               >
@@ -191,16 +192,14 @@
                     :data-test="`gen-ai-harness-agent-${i}`"
                   />
                   <OButton
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     :data-test="`gen-ai-harness-defaults-${i}`"
                     @click="rule.patternsText = DEFAULT_HARNESS_PATTERNS.join('\n')"
                   >
                     {{ t("readableSessions.settings.codingAgentDefaults") }}
                   </OButton>
                   <OButton
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     :loading="testing === rule.id"
                     :disabled="!rule.agent.trim()"
                     :data-test="`gen-ai-harness-test-${i}`"
@@ -211,8 +210,7 @@
                   <span class="flex-1" />
                   <OButton
                     variant="ghost"
-                    size="sm"
-                    icon-left="delete"
+                    icon="delete"
                     :aria-label="t('readableSessions.settings.remove')"
                     :data-test="`gen-ai-harness-remove-${i}`"
                     @click="removeHarnessRule(rule.id)"
@@ -282,8 +280,7 @@
         <template #start>
           <OButton
             data-test="gen-ai-agent-mapping-apply-defaults-btn"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :loading="loadingDefaults"
             @click="applyDefaults"
           >
@@ -291,8 +288,7 @@
           </OButton>
           <OButton
             data-test="gen-ai-agent-mapping-reset-empty-btn"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             @click="resetToEmpty"
           >
             {{ t("genAiAgentMapping.resetToEmpty") }}
@@ -306,10 +302,12 @@
       data-test="gen-ai-agent-registry-clear-dialog"
       size="sm"
       :title="t('genAiAgentMapping.clearRegistryTitle')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('genAiAgentMapping.clearRegistryConfirm')"
-      primary-button-variant="destructive"
-      :primary-button-loading="clearingRegistry"
+      :secondary="{ label: t('confirmDialog.cancel') }"
+      :primary="{
+        label: t('genAiAgentMapping.clearRegistryConfirm'),
+        variant: 'danger',
+        loading: clearingRegistry,
+      }"
       @click:secondary="clearRegistryDialogOpen = false"
       @click:primary="clearAgentRegistry"
     >

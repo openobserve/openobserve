@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 
-/** No Apply button: a pick applies at once with Auto Run on, else defers (pending global/view refresh, ghost-warning panel refresh). */
+/** No Apply button: a pick applies at once with Auto Run on, else defers (a stale global, view or panel refresh). */
 export default class DashboardTimeRange {
   constructor(page) {
     this.page = page;
@@ -20,11 +20,17 @@ export default class DashboardTimeRange {
       .toBe(period);
   }
 
+  // UI v2 has no "ghost-warning" variant: a waiting panel refresh stays ghost and carries data-o2-stale.
   async expectPanelRefreshVariant(variant) {
+    if (variant === 'ghost-warning') {
+      await expect(this.panelRefreshBtn).toHaveAttribute('data-o2-stale', 'true');
+      return;
+    }
     await expect(this.panelRefreshBtn).toHaveAttribute('data-o2-variant', variant);
+    await expect(this.panelRefreshBtn).not.toHaveAttribute('data-o2-stale', 'true');
   }
 
   async expectPanelRefreshNotPending() {
-    await expect(this.panelRefreshBtn).not.toHaveAttribute('data-o2-variant', 'ghost-warning');
+    await expect(this.panelRefreshBtn).not.toHaveAttribute('data-o2-stale', 'true');
   }
 }

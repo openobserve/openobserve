@@ -31,24 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="workflows-list-page"
     class="flex h-full min-h-0 flex-col"
   >
-    <!-- OPageLayout owns the header now (it renders OPageHeader from these props
-         and forwards #title/#actions), so there is no nested header component and
-         no header-class: it draws its own bottom border. `bleed` keeps the table
-         flush to the page edge, as the old main-panel=false layout did. -->
-    <OPageLayout
-      :title="t('workflow.header')"
-      :subtitle="t('workflow.subtitle')"
-      icon="schema"
-      bleed
-    >
-      <!-- Beta tag rides INSIDE the title line. `#title-trail` would place it
-           after the whole title+subtitle column — i.e. past the subtitle's
-           width — leaving it stranded far from the word "Workflows". -->
-      <template #title>
-        <span class="inline-flex items-center gap-2">
-          {{ t("workflow.header") }}
-          <BetaBadge />
-        </span>
+    <OPageLayout :title="t('menu.workflows')" :about="t('workflow.subtitle')" bleed>
+      <template #status>
+        <BetaBadge />
       </template>
       <template #sidebar>
         <FolderList type="workflows" @update:activeFolderId="onFolderChange" />
@@ -56,12 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <!-- v1: only the Alert Fired trigger exists, so New Workflow goes
              straight to the editor (which pre-places the Alert Trigger). -->
-        <OButton
-          data-test="workflow-list-add-btn"
-          variant="primary"
-          size="sm"
-          @click="openCreateEditor()"
-        >
+        <OButton data-test="workflow-list-add-btn" variant="primary" @click="openCreateEditor()">
           {{ t("workflow.create") }}
         </OButton>
       </template>
@@ -70,7 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="card-container h-full">
           <OTable
             ref="oTableRef"
-            :frame="false"
             data-test="workflow-list-table"
             :data="filteredWorkflows"
             :columns="otableColumns"
@@ -89,7 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :persist-columns="true"
             :default-columns="false"
             table-id="workflows-workflow-list"
-            width="100%"
             class="h-full w-full"
             :current-page="currentPage"
             @update:current-page="onPageChange"
@@ -109,60 +87,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="tab in workflowTabs"
                     :key="tab.value"
                     :value="tab.value"
-                    size="sm"
                     :data-test="`workflow-list-tab-${tab.value}`"
                   >
                     {{ tab.label }}
                   </OToggleGroupItem>
                 </OToggleGroup>
                 <div class="min-w-0 flex-1 max-md:min-w-40">
-                  <OInput
+                  <OSearchInput
                     data-test="workflow-list-search-input"
                     v-model="filterQuery"
                     class="w-full"
                     :placeholder="t('workflow.search')"
-                  >
-                    <template #icon-left>
-                      <OIcon name="search" size="sm" />
-                    </template>
-                    <template #icon-right>
-                      <OToggleGroup
-                        :model-value="searchAcrossFolders ? 'all' : 'this'"
-                        type="single"
-                        class="me-1 self-center"
-                        @update:model-value="(v) => onFolderScopeChange(v as string)"
-                      >
-                        <OToggleGroupItem
-                          value="this"
-                          size="xs"
-                          icon-left="folder-outline"
-                          data-test="workflow-list-search-scope-current"
-                          :title="t('workflow.searchThisFolderTooltip')"
-                          ><span class="max-md:hidden @max-[34rem]/workflow-toolbar:hidden">{{
-                            t("workflow.searchThisFolder")
-                          }}</span></OToggleGroupItem
-                        >
-                        <OToggleGroupItem
-                          value="all"
-                          size="xs"
-                          icon-left="search"
-                          data-test="workflow-list-search-across-folders-toggle"
-                          :title="t('workflow.searchAllFoldersTooltip')"
-                          ><span class="max-md:hidden @max-[34rem]/workflow-toolbar:hidden">{{
-                            t("workflow.searchAllFolders")
-                          }}</span></OToggleGroupItem
-                        >
-                      </OToggleGroup>
-                    </template>
-                  </OInput>
+                    :scope="searchAcrossFolders ? 'all' : 'this'"
+                    :scope-options="[
+                      {
+                        value: 'this',
+                        label: t('workflow.searchThisFolder'),
+                        icon: 'folder-outline',
+                        tooltip: t('workflow.searchThisFolderTooltip'),
+                        dataTest: 'workflow-list-search-scope-current',
+                      },
+                      {
+                        value: 'all',
+                        label: t('workflow.searchAllFolders'),
+                        icon: 'search',
+                        tooltip: t('workflow.searchAllFoldersTooltip'),
+                        dataTest: 'workflow-list-search-across-folders-toggle',
+                      },
+                    ]"
+                    @update:scope="(v) => onFolderScopeChange(v as string)"
+                  />
                 </div>
               </div>
             </template>
 
             <template #toolbar-trailing>
               <ORefreshButton
-                layout="inline"
-                variant="outline"
                 :last-run-at="lastUpdatedAt"
                 :loading="fetching"
                 data-test="workflow-list-refresh"
@@ -176,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   v-if="row.is_draft"
                   :value="t('workflow.draft')"
-                  variant="default-soft"
+                  tone="neutral"
                   data-test="workflow-list-draft-tag"
                 />
               </div>
@@ -195,13 +155,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   v-if="row.trigger && row.trigger !== '—'"
                   :value="row.trigger"
-                  variant="amber-soft"
+                  tone="warn"
                   data-test="workflow-list-trigger-tag"
                 />
                 <span v-if="hooksOn && hasHttpEndpoint(row)" class="inline-flex shrink-0">
                   <OTag
                     :value="t('workflow.http.listTag')"
-                    variant="blue-soft"
+                    tone="neutral"
                     icon="webhook"
                     data-test="workflow-list-http-tag"
                   />
@@ -216,11 +176,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      omitted (no placeholder). -->
                 <OButton
                   v-if="!row.is_draft"
+                  icon-only
                   :data-test="`workflow-list-${row.name}-pause-start-action`"
                   :data-row-action="row.enabled ? 'pause' : 'resume'"
-                  :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                  size="icon-xs-sq"
-                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                  :variant="row.enabled ? 'danger-ghost' : 'ghost'"
+                  size="sm"
+                  :icon="row.enabled ? 'pause' : 'play-arrow'"
                   class="max-md:hidden"
                   @click.stop="toggleWorkflow(row)"
                 >
@@ -230,21 +191,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </OButton>
                 <OButton
+                  icon-only
                   :data-test="`workflow-list-${row.name}-view`"
                   variant="ghost"
-                  size="icon-xs-sq"
-                  icon-left="visibility"
+                  size="sm"
+                  icon="visibility"
                   :title="t('workflow.view')"
                 >
-                  <OTooltip max-width="none" side="left">
+                  <OTooltip side="left">
                     <template #content><WorkflowView :workflow="row" /></template>
                   </OTooltip>
                 </OButton>
                 <OButton
+                  icon-only
                   :data-test="`workflow-list-${row.name}-edit`"
                   variant="ghost"
-                  size="icon-xs-sq"
-                  icon-left="edit"
+                  size="sm"
+                  icon="edit"
                   class="max-md:hidden"
                   @click.stop="editWorkflow(row)"
                 >
@@ -252,10 +215,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   v-if="!row.is_draft"
+                  icon-only
                   :data-test="`workflow-list-${row.name}-move`"
                   variant="ghost"
-                  size="icon-xs-sq"
-                  icon-left="drive-file-move"
+                  size="sm"
+                  icon="drive-file-move"
                   :title="t('workflow.moveToFolder')"
                   @click.stop="openMoveDialog(row)"
                 >
@@ -264,17 +228,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown align="end">
                   <template #trigger>
                     <OButton
+                      icon-only
                       :aria-label="t('common.moreActions')"
                       variant="ghost"
-                      size="icon-xs-sq"
-                      icon-left="more-vert"
+                      size="sm"
+                      icon="more-vert"
                       :data-test="`workflow-list-${row.name}-more-options`"
                       @click.stop
                     />
                   </template>
                   <ODropdownItem
                     v-if="!row.is_draft"
-                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    :icon="row.enabled ? 'pause' : 'play-arrow'"
                     class="md:hidden"
                     :data-test="`workflow-list-${row.name}-pause-start-action-menu`"
                     @select="toggleWorkflow(row)"
@@ -282,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ row.enabled ? t("alerts.pause") : t("alerts.start") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="edit"
+                    icon="edit"
                     class="md:hidden"
                     :data-test="`workflow-list-${row.name}-edit-menu`"
                     @select="editWorkflow(row)"
@@ -291,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <ODropdownItem
                     v-if="hooksOn"
-                    icon-left="webhook"
+                    icon="webhook"
                     :data-test="`workflow-list-${row.name}-http-endpoint`"
                     @select="openHttpPanel(row)"
                   >
@@ -299,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <ODropdownItem
                     v-if="hooksOn && hasHttpEndpoint(row)"
-                    icon-left="link"
+                    icon="link"
                     :data-test="`workflow-list-${row.name}-copy-endpoint`"
                     @select="copyEndpointUrl(row)"
                   >
@@ -312,10 +277,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <ODropdownItem
                     :data-test="`workflow-list-${row.name}-delete`"
-                    variant="destructive"
+                    tone="danger"
                     @select="openDeleteDialog(row)"
                   >
-                    <template #icon-left><OIcon size="sm" name="delete" /></template>
+                    <template #icon><OIcon size="sm" name="delete" /></template>
                     {{ t("workflow.delete") }}
                   </ODropdownItem>
                 </ODropdown>
@@ -324,10 +289,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #empty>
               <OEmptyState
-                size="hero"
-                preset="no-workflows"
-                :filtered="!!filterQuery || activeTab !== 'all'"
-                @action="(id) => (id === 'clear-filters' ? clearFilters() : openCreateEditor())"
+                :kind="!!filterQuery || activeTab !== 'all' ? 'filtered' : 'first-run'"
+                :title="
+                  !!filterQuery || activeTab !== 'all'
+                    ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.workflows') })
+                    : t('emptyState.noWorkflows.title')
+                "
+                :text="
+                  !!filterQuery || activeTab !== 'all'
+                    ? t('emptyState.filtered.description', {
+                        noun: t('emptyState.nouns.workflows'),
+                      })
+                    : t('emptyState.noWorkflows.description')
+                "
+                :icon="!!filterQuery || activeTab !== 'all' ? undefined : 'account-tree'"
+                :action-label="
+                  !!filterQuery || activeTab !== 'all'
+                    ? undefined
+                    : t('emptyState.noWorkflows.action')
+                "
+                @action="!!filterQuery || activeTab !== 'all' ? clearFilters() : openCreateEditor()"
               />
             </template>
           </OTable>
@@ -355,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="confirmDialogMeta.title"
     message-keypath="workflow.deleteMessage"
     :message-name="confirmDialogMeta.messageName"
-    ok-variant="destructive"
+    kind="destructive"
     @update:ok="confirmDialogMeta.onConfirm()"
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
@@ -387,7 +368,7 @@ import { HttpEndpointError, httpErrorText } from "@/plugins/workflows/httpEndpoi
 import WorkflowHttpEndpointPanel from "@/components/workflows/WorkflowHttpEndpointPanel.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, defineAsyncComponent, onMounted, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useListViewState } from "@/composables/useListViewState";
 import { useStore } from "vuex";
@@ -405,7 +386,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -416,7 +397,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import WorkflowView from "@/components/workflows/WorkflowView.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
-import { TABLE_INDEX_COL_SIZE, COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 import workflowService from "@/services/workflows";
 import { hydrateWorkflow, triggerDef } from "@/plugins/workflows/useWorkflowCanvas";
@@ -473,9 +454,8 @@ const hooksOn = computed(() => workflowHooksEnabled(store.state.zoConfig));
 const orgId = computed(() => store.state.selectedOrganization.identifier as string);
 
 const shapeWorkflows = (list: any[]) =>
-  list.map((wf: any, index: number) => ({
+  list.map((wf: any) => ({
     ...wf,
-    "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
     trigger: triggerLabel(wf),
     updated_at_display: formatTs(wf.updated_at),
   }));
@@ -650,14 +630,6 @@ const formatTs = (ts?: number): string => {
 };
 
 const columns = computed<OTableColumnDef<any>[]>(() => [
-  {
-    id: "#",
-    header: raw("#"),
-    accessorKey: "#",
-    sortable: false,
-    size: TABLE_INDEX_COL_SIZE,
-    meta: { align: "left" },
-  },
   {
     id: "name",
     header: t("common.name"),

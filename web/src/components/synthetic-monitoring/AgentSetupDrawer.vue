@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="open"
     side="right"
-    size="lg"
+    size="md"
     :title="t('synthetics.privateLocations.setup.title')"
-    :sub-title="raw(locationName || undefined)"
+    :subtitle="raw(locationName || undefined)"
     data-test="synthetics-agent-setup-drawer"
     @update:open="emit('update:open', $event)"
   >
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step 1: deploy -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">{{ "1" }}</OTag>
+          <OTag tone="accent" size="sm">{{ "1" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step1Title") }}
           </span>
@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('synthetics.privateLocations.setup.locationNameLabel')"
               :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
               required
-              size="sm"
               data-test="synthetics-agent-setup-location-input"
             />
             <div class="flex flex-col gap-1">
@@ -54,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="draftAgentName"
                 :label="t('synthetics.privateLocations.setup.agentNameLabel')"
                 :placeholder="t('synthetics.privateLocations.setup.agentNamePlaceholder')"
-                size="sm"
                 data-test="synthetics-agent-setup-agent-name-input"
               />
               <p class="text-text-muted text-xs">
@@ -74,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OTabs
               v-model="selectedAgentType"
-              dense
+              size="compact"
               bordered
               data-test="synthetics-agent-setup-type-tabs"
             >
@@ -90,7 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
           </div>
 
-          <OTabs v-model="platform" dense bordered data-test="synthetics-agent-setup-platform-tabs">
+          <OTabs
+            v-model="platform"
+            size="compact"
+            bordered
+            data-test="synthetics-agent-setup-platform-tabs"
+          >
             <OTab name="docker" :label="t('synthetics.privateLocations.setup.tabDocker')" />
             <OTab name="k8s" :label="t('synthetics.privateLocations.setup.tabK8s')" />
             <!-- Native-binary platforms ship the Go agent only — install.sh's
@@ -114,9 +117,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="synthetics-agent-setup-install-cmd"
               >{{ composedCommand }}</pre>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="content-copy"
+              icon="content-copy"
               class="absolute top-1 right-1"
               :title="t('common.copy')"
               data-test="synthetics-agent-setup-copy-btn"
@@ -132,9 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="synthetics-agent-setup-install-cmd"
             >{{ install }}</pre>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="content-copy"
+            icon="content-copy"
             class="absolute top-1 right-1"
             :title="t('common.copy')"
             data-test="synthetics-agent-setup-copy-btn"
@@ -149,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step 2: wait for the agent to register -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">{{ "2" }}</OTag>
+          <OTag tone="accent" size="sm">{{ "2" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step2Title") }}
           </span>
@@ -162,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step 3: assign in checks -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">{{ "3" }}</OTag>
+          <OTag tone="accent" size="sm">{{ "3" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step3Title") }}
           </span>

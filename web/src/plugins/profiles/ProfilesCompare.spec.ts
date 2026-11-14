@@ -61,7 +61,7 @@ const stubs = {
     name: "OSelectStub",
     template:
       '<div :data-test="$attrs[\'data-test\']"><select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="o in options" :key="o.value" :value="o.value">{{ o.label }}</option></select></div>',
-    props: ["modelValue", "options", "loading", "label", "labelPosition"],
+    props: ["modelValue", "options", "loading", "label", "variant"],
     emits: ["update:modelValue"],
   },
   OButton: { template: "<button><slot /></button>" },
@@ -137,19 +137,19 @@ describe("ProfilesCompare", () => {
       const select = wrapper
         .findAllComponents({ name: "OSelectStub" })
         .find((item) => item.attributes("data-test") === dataTest)!;
-      return { label: select.props("label"), position: select.props("labelPosition") };
+      return { label: select.props("label"), variant: select.props("variant") };
     };
     expect(labelOf("profiles-compare-label")).toEqual({
       label: "Compare by label",
-      position: "inside",
+      variant: "filter",
     });
     expect(labelOf("profiles-compare-baseline")).toEqual({
       label: "Compare from",
-      position: "inside",
+      variant: "filter",
     });
     expect(labelOf("profiles-compare-comparison")).toEqual({
       label: "Compare to",
-      position: "inside",
+      variant: "filter",
     });
   });
 

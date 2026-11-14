@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <ODrawer
+      size="xl"
       data-test="pattern-details-dialog"
       bleed
       :open="modelValue"
       @update:open="$emit('update:modelValue', $event)"
-      :width="90"
       :title="t('search.patternDetailsTitle')"
-      :subTitle="
+      :subtitle="
         selectedPattern
           ? t('search.patternXofY', { index: selectedPattern.index + 1, total: totalPatterns })
           : undefined
@@ -88,31 +88,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OButton
               variant="primary"
-              size="xs"
+              size="sm"
               data-test="pattern-detail-include-btn"
               @click="onInclude"
             >
-              <template #icon-left><EqualIcon class="size-2.5" /></template>
+              <template #icon><EqualIcon class="size-2.5" /></template>
               {{ t("logs.patternList.includeInQuery") }}
             </OButton>
             <OButton
-              variant="outline-destructive"
-              size="xs"
+              variant="danger-ghost"
+              size="sm"
               data-test="pattern-detail-exclude-btn"
               @click="onExclude"
             >
-              <template #icon-left><NotEqualIcon class="size-2.5" /></template>
+              <template #icon><NotEqualIcon class="size-2.5" /></template>
               {{ t("logs.patternList.excludeFromQuery") }}
             </OButton>
             <OTooltip v-if="alertsLocked" :content="alertsLockedReason">
               <span class="inline-flex">
                 <OButton
-                  variant="warning"
-                  size="xs"
+                  variant="primary"
+                  size="sm"
                   disabled
                   data-test="pattern-detail-create-alert-btn"
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon
                       name="lock"
                       class="lock-chip"
@@ -126,9 +126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTooltip>
             <OButton
               v-else
-              variant="warning"
-              size="xs"
-              icon-left="notifications"
+              variant="primary"
+              size="sm"
+              icon="notifications"
               data-test="pattern-detail-create-alert-btn"
               @click="onCreateAlert"
             >
@@ -143,36 +143,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex gap-3">
               <div class="w-1/2">
-                <OCard class="bg-card-glass-solid border-card-glass-border border border-solid">
-                  <OCardSection class="p-1.5">
-                    <div class="text-xs" :class="'text-text-secondary'">
-                      {{ t("search.patternOccurrences") }}
-                    </div>
-                    <div
-                      class="text-primary mt-1 text-2xl font-bold font-semibold"
-                      :title="
-                        volumeCount !== null
-                          ? t('logs.patternList.exactCountTooltip', {
-                              count: volumeCount.toLocaleString(),
-                            })
-                          : undefined
-                      "
-                    >
-                      {{ occurrencesLabel }}
-                    </div>
-                  </OCardSection>
+                <OCard>
+                  <div class="text-xs" :class="'text-text-secondary'">
+                    {{ t("search.patternOccurrences") }}
+                  </div>
+                  <div
+                    class="text-primary mt-1 text-2xl font-bold font-semibold"
+                    :title="
+                      volumeCount !== null
+                        ? t('logs.patternList.exactCountTooltip', {
+                            count: volumeCount.toLocaleString(),
+                          })
+                        : undefined
+                    "
+                  >
+                    {{ occurrencesLabel }}
+                  </div>
                 </OCard>
               </div>
               <div class="w-1/2">
-                <OCard class="bg-card-glass-solid border-card-glass-border border border-solid">
-                  <OCardSection class="p-1.5">
-                    <div class="text-xs" :class="'text-text-secondary'">
-                      {{ t("search.patternPercentage") }}
-                    </div>
-                    <div class="text-primary mt-1 text-2xl font-bold font-semibold">
-                      {{ selectedPattern.pattern.percentage.toFixed(2) }}%
-                    </div>
-                  </OCardSection>
+                <OCard>
+                  <div class="text-xs" :class="'text-text-secondary'">
+                    {{ t("search.patternPercentage") }}
+                  </div>
+                  <div class="text-primary mt-1 text-2xl font-bold font-semibold">
+                    {{ selectedPattern.pattern.percentage.toFixed(2) }}%
+                  </div>
                 </OCard>
               </div>
             </div>
@@ -267,7 +263,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :columns="variableColumns"
               row-key="index"
               pagination="none"
-              :show-global-filter="false"
               :default-columns="false"
               :max-height="undefined"
               class="border-card-glass-border w-full border border-solid"
@@ -324,12 +319,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-nowrap items-center justify-between">
           <div class="col-auto">
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               data-test="pattern-detail-previous-btn"
               :disabled="selectedPattern?.index === 0"
               @click="$emit('navigate', false, true)"
-              icon-left="chevron-left"
+              icon="chevron-left"
             >
               {{ t("search.patternNavPrevious") }}
             </OButton>
@@ -346,12 +340,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-auto">
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               data-test="pattern-detail-next-btn"
               :disabled="(selectedPattern?.index ?? 0) >= totalPatterns - 1"
               @click="$emit('navigate', true, false)"
-              icon-right="chevron-right"
+              icon-end="chevron-right"
             >
               {{ t("search.patternNavNext") }}
             </OButton>
@@ -377,7 +370,6 @@ import { computed, inject, watch } from "vue";
 import useTheme from "@/composables/useTheme";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

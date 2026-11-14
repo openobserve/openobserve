@@ -1,12 +1,12 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <template>
   <ODrawer
+    size="xl"
     bleed
     :open="open"
     side="right"
-    :width="72"
     :title="raw(prompt?.name ?? '')"
-    :sub-title="
+    :subtitle="
       prompt ? t('aiObservability.promptManagement.promptSubtitle', { type: prompt.type }) : raw('')
     "
     data-test="prompt-detail-drawer"
@@ -21,19 +21,17 @@
           :options="versionOptions"
           label-key="label"
           value-key="value"
-          width="sm"
+          width="s"
           :label="t('aiObservability.promptManagement.viewingVersion')"
-          label-position="inside"
+          variant="filter"
           :disabled="loading"
-          size="sm"
           data-test="prompt-detail-version-select"
         />
         <div class="flex min-w-0 flex-1 flex-wrap gap-1">
           <OTag
             v-for="label in selectedLabels"
             :key="label.name"
-            :variant="protectedLabels.includes(label.name) ? 'amber-soft' : 'default-soft'"
-            shape="rounded"
+            :tone="protectedLabels.includes(label.name) ? 'warn' : 'neutral'"
           >
             {{
               t("aiObservability.promptManagement.versionLabel", {
@@ -46,9 +44,8 @@
         <div class="flex items-center gap-2 max-lg:w-full">
           <OButton
             v-if="showPlayground"
-            variant="outline"
-            size="sm"
-            icon-left="play-arrow"
+            variant="secondary"
+            icon="play-arrow"
             :title="t('aiObservability.promptManagement.openInPlayground')"
             data-test="prompt-detail-playground"
             :disabled="loading || !activeVersion"
@@ -60,7 +57,6 @@
           </OButton>
           <OButton
             variant="primary"
-            size="sm"
             data-test="prompt-detail-new-version"
             :disabled="loading || !activeVersion || prompt.status !== 'active'"
             @click="emit('edit', activeVersion)"
@@ -87,8 +83,9 @@
 
         <OEmptyState
           v-else-if="loadError"
-          preset="load-error"
-          :description="loadError"
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="loadError"
           @action="load"
         />
         <template v-else-if="activeVersion && activeTab === 'configuration'">
@@ -99,7 +96,7 @@
             >
               <dt>{{ t("aiObservability.promptManagement.status") }}</dt>
               <dd>
-                <OTag :variant="prompt.status === 'active' ? 'success-soft' : 'default-soft'">{{
+                <OTag :tone="prompt.status === 'active' ? 'ok' : 'neutral'">{{
                   prompt.status === "active"
                     ? t("aiObservability.promptManagement.active")
                     : t("aiObservability.promptManagement.archived")
@@ -129,7 +126,7 @@
               >
                 {{ t("aiObservability.promptManagement.parameters") }}
               </h4>
-              <OCode block>{{ jsonText(activeVersion.config.params) }}</OCode>
+              <OCodeBlock :code="jsonText(activeVersion.config.params)" lang="json" />
             </section>
             <section v-if="activeVersion.config.tools != null" class="flex flex-col gap-2">
               <h4
@@ -137,7 +134,7 @@
               >
                 {{ t("aiObservability.promptManagement.tools") }}
               </h4>
-              <OCode block>{{ jsonText(activeVersion.config.tools) }}</OCode>
+              <OCodeBlock :code="jsonText(activeVersion.config.tools)" lang="json" />
             </section>
             <section v-if="activeVersion.config.responseFormat != null" class="flex flex-col gap-2">
               <h4
@@ -145,7 +142,7 @@
               >
                 {{ t("aiObservability.promptManagement.responseFormat") }}
               </h4>
-              <OCode block>{{ jsonText(activeVersion.config.responseFormat) }}</OCode>
+              <OCodeBlock :code="jsonText(activeVersion.config.responseFormat)" lang="json" />
             </section>
           </div>
         </template>
@@ -178,16 +175,15 @@
                 <OSelect
                   :model-value="compared[0].version"
                   :options="versionOptions.filter((option) => option.value !== compared[1].version)"
-                  size="sm"
-                  width="xs"
+                  width="s"
                   :aria-label="t('aiObservability.promptManagement.form.baseVersion')"
                   data-test="prompt-version-compare-base"
                   @update:model-value="(value) => setCompared(0, Number(value))"
                 />
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-sm"
-                  icon-left="swap-horiz"
+                  icon="swap-horiz"
                   data-test="prompt-version-compare-swap"
                   @click="swapCompared"
                 >
@@ -196,8 +192,7 @@
                 <OSelect
                   :model-value="compared[1].version"
                   :options="versionOptions.filter((option) => option.value !== compared[0].version)"
-                  size="sm"
-                  width="xs"
+                  width="s"
                   :aria-label="t('aiObservability.promptManagement.form.targetVersion')"
                   data-test="prompt-version-compare-target"
                   @update:model-value="(value) => setCompared(1, Number(value))"
@@ -208,10 +203,10 @@
                   data-test="prompt-version-compare-mode"
                   @update:model-value="(value) => value && (diffMode = value as typeof diffMode)"
                 >
-                  <OToggleGroupItem value="split" size="sm">{{
+                  <OToggleGroupItem value="split">{{
                     t("aiObservability.promptManagement.form.split")
                   }}</OToggleGroupItem>
-                  <OToggleGroupItem value="unified" size="sm">{{
+                  <OToggleGroupItem value="unified">{{
                     t("aiObservability.promptManagement.form.unified")
                   }}</OToggleGroupItem>
                 </OToggleGroup>
@@ -233,11 +228,8 @@
             pagination="none"
             :fill-height="false"
             :default-columns="false"
-            :show-global-filter="false"
-            :show-footer="false"
             :empty-message="t('aiObservability.promptManagement.form.noMatchingVersions')"
             v-else
-            :frame="false"
             selection="multiple"
             :show-select-all="false"
             :selected-ids="compareIds"
@@ -252,7 +244,6 @@
                   v-model="versionSearch"
                   class="min-w-0 flex-1"
                   :placeholder="t('aiObservability.promptManagement.form.searchCommitMessage')"
-                  clearable
                   :aria-label="t('aiObservability.promptManagement.form.searchCommitMessage')"
                   data-test="prompt-version-search"
                 />
@@ -261,8 +252,7 @@
                   :options="sourceOptions"
                   label-key="label"
                   value-key="value"
-                  width="sm"
-                  size="sm"
+                  width="s"
                   :aria-label="t('aiObservability.promptManagement.source')"
                   data-test="prompt-version-source-filter"
                 />
@@ -277,8 +267,7 @@
                 >
                 <OTooltip :content="compareReason" :disabled="compareIds.length === 2">
                   <OButton
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     :disabled="compareIds.length !== 2"
                     data-test="prompt-version-compare-btn"
                     @click="openCompare"
@@ -303,13 +292,9 @@
                 class="flex flex-wrap gap-1"
                 :tooltip="raw(labelsForVersion(row.version).join(', '))"
               >
-                <OTag
-                  v-for="label in labelsForVersion(row.version)"
-                  :key="label"
-                  variant="default-soft"
-                  shape="rounded"
-                  >{{ label }}</OTag
-                >
+                <OTag v-for="label in labelsForVersion(row.version)" :key="label" tone="neutral">{{
+                  label
+                }}</OTag>
               </OTruncatedText>
               <span v-else class="text-text-secondary">{{ raw("—") }}</span>
             </template>
@@ -321,9 +306,9 @@
             </template>
             <template #cell-actions="{ row }">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="play-arrow"
+                icon="play-arrow"
                 :data-test="`prompt-version-playground-${row.version}`"
                 @click.stop="emit('open-playground', row)"
               >
@@ -342,11 +327,9 @@
     <ODialog
       :open="labelToDelete !== null"
       size="sm"
-      persistent
       :title="t('aiObservability.promptManagement.removeLabelNamed', { name: labelShown.name })"
-      :primary-button-label="t('aiObservability.promptManagement.delete')"
-      primary-button-variant="destructive"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{ label: t('aiObservability.promptManagement.delete'), variant: 'danger' }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="prompt-detail-delete-label-dialog"
       @update:open="(open: boolean) => !open && settleLabelDelete(false)"
       @click:primary="settleLabelDelete(true)"
@@ -384,7 +367,7 @@ import analytics from "@/services/product_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
-import OCode from "@/lib/core/Code/OCode.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import PromptLabelsPanel from "./PromptLabelsPanel.vue";

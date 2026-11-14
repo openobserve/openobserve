@@ -73,14 +73,14 @@ test.describe("Alerts Folder Switch Pagination Reset testcases", () => {
     async ({ page }) => {
       testLogger.info("Opening folder A and navigating to page 2");
       await pm.alertsPage.navigateToFolder(folderA.name);
-      await pm.alertsPage.expectPaginationInfoToMatch(/Showing 1 - 20 of 25/);
+      await pm.alertsPage.expectPaginationInfoToMatch(/^1–20 of 25$/);
 
       await pm.alertsPage.clickNextPage();
-      await pm.alertsPage.expectPaginationInfoToMatch(/Showing 21 - /);
+      await pm.alertsPage.expectPaginationInfoToMatch(/^21–/);
 
       testLogger.info("Switching to folder B");
       await pm.alertsPage.navigateToFolder(folderB.name);
-      await pm.alertsPage.expectPaginationInfoToMatch(/Showing 1 - 2 of 2/);
+      await pm.alertsPage.expectPaginationInfoToMatch(/^1–2 of 2$/);
       testLogger.info("Test completed");
     },
   );
@@ -91,15 +91,15 @@ test.describe("Alerts Folder Switch Pagination Reset testcases", () => {
     async ({ page }) => {
       testLogger.info("Opening folder A and navigating to page 2");
       await pm.alertsPage.navigateToFolder(folderA.name);
-      await pm.alertsPage.expectPaginationInfoToMatch(/Showing 1 - 20 of 25/);
+      await pm.alertsPage.expectPaginationInfoToMatch(/^1–20 of 25$/);
 
       await pm.alertsPage.clickNextPage();
-      await pm.alertsPage.expectPaginationInfoToMatch(/Showing 21 - /);
+      await pm.alertsPage.expectPaginationInfoToMatch(/^21–/);
 
       testLogger.info("Switching to the shorter folder B");
       await pm.alertsPage.navigateToFolder(folderB.name);
 
-      await pm.alertsPage.expectPaginationInfoToMatch(/Showing 1 - 2 of 2/);
+      await pm.alertsPage.expectPaginationInfoToMatch(/^1–2 of 2$/);
       await pm.alertsPage.expectAtLeastOneListRow();
       testLogger.info("Test completed");
     },

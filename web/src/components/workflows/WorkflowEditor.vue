@@ -26,58 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div data-test="workflow-editor-page" class="flex h-full min-h-0 flex-col">
-    <!-- Toolbar — the shared OPageHeader (same as the pipeline editor): a
-         back chevron in the module-icon slot, the workflow name input inline
-         after the title, and the Test / Cancel / Save actions right-aligned. -->
     <OPageHeader
-      :subtitle="headerModeLabel"
-      title-overflow="visible"
-      :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
-      class="border-border-default border-b px-4"
-      overflow-first
+      :back="{
+        label: t('menu.workflows'),
+        to: workflowsListRoute(),
+        dataTest: 'workflow-editor-back',
+      }"
     >
-      <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
-           after the title+subtitle column, stranding it far from the title). -->
-      <!-- The workflow NAME is the title, inline-edited in place, with the mode
-           as the subtitle — matching the panel, alert, function and pipeline
-           editors. Editable on CREATE only, exactly as before: on edit it was
-           already shown read-only as the header title. -->
-      <!-- Mode + description share the meta line, the same shape as the alert
-           editor's "Add Alert in <folder>". The description is inline-edited
-           here rather than beside the title, where a growing name pushed it
-           sideways on every keystroke. -->
-      <template #subtitle>
-        <span class="flex min-w-0 items-center gap-1 leading-normal">
-          <span class="whitespace-nowrap">
-            {{ t("workflow.modeInFolder", { mode: headerModeLabel }) }}
-          </span>
-          <InlineSelectFolderDropdown
-            v-if="!workflowObj.isEditWorkflow"
-            variant="inline"
-            :model-value="activeFolderId"
-            type="workflows"
-            data-test="workflow-editor-folder"
-            @update:model-value="activeFolderId = $event"
-          />
-          <OTruncatedText
-            v-else
-            data-test="workflow-editor-folder-static"
-            class="text-text-body font-medium"
-          >
-            {{ activeFolderName }}
-          </OTruncatedText>
-          <OInlineEdit
-            v-if="!workflowObj.isEditWorkflow"
-            v-model="workflowObj.currentSelectedWorkflow.description"
-            tone="meta"
-            data-test="workflow-editor-description"
-            :placeholder="t('workflow.descriptionPlaceholder')"
-            :aria-label="t('workflow.description')"
-            @update:model-value="markWorkflowDirty"
-          />
-        </span>
-      </template>
-
+      <!-- The name is the title, editable on create only. Folder and description stay beside it
+           because the editor has no other place to set them before the first save. -->
       <template #title>
         <!-- The name's sizer grid can't shrink below its text, so < md it needs an explicit max-w cap. -->
         <span class="inline-flex min-w-0 items-center gap-2">
@@ -96,18 +53,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <BetaBadge class="max-md:hidden" />
           <OTag
             v-if="workflowObj.currentSelectedWorkflow.isDraft"
-            variant="warning-soft"
+            tone="warn"
             size="sm"
             class="max-md:hidden"
             :label="t('workflow.draft')"
             data-test="workflow-editor-draft-tag"
           />
+          <span
+            class="text-text-secondary flex min-w-0 items-center gap-1 text-xs font-normal max-md:hidden"
+          >
+            <InlineSelectFolderDropdown
+              v-if="!workflowObj.isEditWorkflow"
+              variant="inline"
+              :model-value="activeFolderId"
+              type="workflows"
+              data-test="workflow-editor-folder"
+              @update:model-value="activeFolderId = $event"
+            />
+            <template v-else>
+              <OIcon name="folder" size="xs" class="shrink-0" />
+              <OTruncatedText data-test="workflow-editor-folder-static">
+                {{ activeFolderName }}
+              </OTruncatedText>
+            </template>
+            <OInlineEdit
+              v-if="!workflowObj.isEditWorkflow"
+              v-model="workflowObj.currentSelectedWorkflow.description"
+              tone="meta"
+              data-test="workflow-editor-description"
+              :placeholder="t('workflow.descriptionPlaceholder')"
+              :aria-label="t('workflow.description')"
+              @update:model-value="markWorkflowDirty"
+            />
+          </span>
         </span>
       </template>
-      <!-- Name is editable on CREATE only; on edit it's shown read-only as the
-           header title (mirrors the pipeline editor, where the name input is
-           gated to the create route). Enable/disable status isn't shown here —
-           it's managed from the list, same as pipelines. -->
 
       <template #actions-overflow>
         <!-- Past-run chip — shown when a run is loaded onto the canvas (arrived via
@@ -145,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="switchEditorRun"
         >
           <template #trigger>
-            <OButton variant="outline" size="sm-action" data-test="workflow-editor-history">
+            <OButton variant="secondary" data-test="workflow-editor-history">
               {{ t("workflow.history.open") }}
             </OButton>
           </template>
@@ -164,30 +144,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="showHttpButton"
           :chip="httpChip"
           :tooltip-key="httpTooltipKey"
-          size="sm-action"
+          size="md"
           data-test="workflow-editor-http-endpoint"
           @click="httpEditorState.panelOpen = true"
         />
-        <OButton
-          variant="outline"
-          size="sm-action"
-          data-test="workflow-editor-test"
-          @click="onTest"
-        >
+        <OButton variant="secondary" data-test="workflow-editor-test" @click="onTest">
           {{ t("workflow.test.button") }}
         </OButton>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          data-test="workflow-editor-cancel"
-          @click="goBack"
-        >
+        <OButton variant="secondary" data-test="workflow-editor-cancel" @click="goBack">
           {{ t("common.cancel") }}
         </OButton>
         <OButton
           v-if="!isExistingPublished"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           data-test="workflow-editor-save-draft"
           :loading="saving"
           :disabled="saving"
@@ -204,7 +173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="isExistingPublished"
           variant="primary"
-          size="sm-action"
           data-test="workflow-editor-save"
           :loading="saving"
           :disabled="saving || unchanged"
@@ -216,7 +184,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else
           variant="primary"
-          size="sm-action"
           data-test="workflow-editor-publish"
           :loading="saving"
           :disabled="saving"
@@ -324,16 +291,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="cancelDeleteNode"
     />
 
-    <!-- Unsaved-changes guard (T8) — blocks a leave with unsaved edits until the
-         user chooses Discard or Keep Editing. -->
-    <ConfirmDialog
-      v-model="unsavedDialog"
-      data-test="workflows-editor-unsaved-dialog"
-      :title="t('workflow.unsaved.title')"
-      :message="t('workflow.unsaved.message')"
-      :ok-label="t('workflow.unsaved.discard')"
-      @update:ok="onDiscardChanges"
-      @update:cancel="onKeepEditing"
+    <!-- The shared leave dialog (V4): Discard, Save, or ✕ / Escape to stay on the canvas. -->
+    <EditorDraftLeaveDialog
+      :open="unsavedDialog"
+      :entity-label="t('common.editorDraft.entities.workflow')"
+      :saving="saving"
+      :can-keep-draft="false"
+      :save-label="isExistingPublished ? null : t('workflow.saveDraft')"
+      @choose="onLeaveChoice"
     />
   </div>
 </template>
@@ -370,6 +335,8 @@ import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import EditorDraftLeaveDialog from "@/components/common/drafts/EditorDraftLeaveDialog.vue";
+import type { EditorDraftLeaveChoice } from "@/composables/useEditorDraft";
 import InlineSelectFolderDropdown from "@/components/common/sidebar/InlineSelectFolderDropdown.vue";
 import useWorkflowCanvas, {
   workflowObj,
@@ -417,11 +384,6 @@ const activeFolderName = computed(() => {
   );
 });
 
-// The name itself is the title now (see #title), so the header's meta line
-// carries the mode — the same shape as the panel, alert and pipeline editors.
-const headerModeLabel = computed(() =>
-  workflowObj.isEditWorkflow ? t("workflow.editMode") : t("workflow.create"),
-);
 const {
   resetWorkflowData,
   deleteNode,
@@ -613,16 +575,13 @@ const loadWorkflow = async (id: string) => {
   }
 };
 
-// Cancel / back — just navigate. The unsaved-changes guard (onBeforeRouteLeave)
-// intercepts if there are unsaved edits and prompts before the route actually
-// changes; resetWorkflowData runs on unmount, so it must NOT run here (it would
-// clear dirtyFlag and slip the guard). A clean editor navigates straight out.
-const goBack = () => {
-  router.push({
-    name: "workflows",
-    query: { org_identifier: orgId(), folder: activeFolderId.value },
-  });
-};
+const workflowsListRoute = () => ({
+  name: "workflows",
+  query: { org_identifier: orgId(), folder: activeFolderId.value },
+});
+// Only navigates: onBeforeRouteLeave prompts on unsaved edits, and resetting here
+// would clear dirtyFlag and slip that guard.
+const goBack = () => router.push(workflowsListRoute());
 
 // ── Unsaved-changes guard (T8) ──────────────────────────────────────────────
 // One prompt catches every exit path: Cancel/back and sidebar/programmatic nav
@@ -654,6 +613,15 @@ const onDiscardChanges = () => {
 const onKeepEditing = () => {
   unsavedDialog.value = false;
   pendingRoute.value = null;
+};
+// Save writes a draft unless the workflow is already published; a refused save stays so its errors show.
+const onLeaveChoice = async (choice: EditorDraftLeaveChoice) => {
+  if (choice === "discard") return onDiscardChanges();
+  if (choice !== "save") return onKeepEditing();
+  const saved = isExistingPublished.value ? await persist() : await persistDraft();
+  const to = pendingRoute.value;
+  onKeepEditing();
+  if (saved && to) router.push(to);
 };
 
 // Native browser prompt for tab close / reload while there are unsaved edits.

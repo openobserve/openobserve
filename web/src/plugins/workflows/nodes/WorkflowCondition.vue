@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="workflow-condition-guidelines-info"
       >
         <OIcon name="info" size="sm" />
-        <OTooltip side="right" align="start" :side-offset="8" max-width="22rem">
+        <OTooltip side="right">
           <template #content>
             <div class="flex flex-col gap-1.5 p-1 text-left">
               <div class="text-xs font-semibold">{{ t("workflow.node.conditionNoteTitle") }}</div>
@@ -76,8 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-start justify-between gap-2">
             <div class="text-sm font-bold">{{ t("workflow.node.conditionNoteTitle") }}</div>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
               data-test="workflow-condition-note-dismiss"
               :aria-label="t('common.close')"
               @click="dismissGuidelines"

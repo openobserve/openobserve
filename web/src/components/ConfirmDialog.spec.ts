@@ -33,35 +33,35 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-    "primaryButtonColor",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
     "initialFocus",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-color="primaryButtonColor"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
+      :data-primary-color="primary?.variant"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -70,22 +70,22 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
 
-// Stub OBanner — the component ConfirmDialog uses OBanner (not a raw banner element).
-// Render it with role="alert" (matching OBanner's warning variant behaviour)
+// Stub OInlineNotice — the component ConfirmDialog uses OInlineNotice (not a raw banner element).
+// Render it with role="alert" (matching OInlineNotice's warn tone behaviour)
 // so tests can locate it semantically via role query.
-const OBannerStub = {
-  name: "OBanner",
-  props: ["variant", "icon", "content", "dense", "inlineActions", "dataTest"],
-  template: `<div role="alert" data-test="o-banner-stub"><slot>{{ content }}</slot></div>`,
+const OInlineNoticeStub = {
+  name: "OInlineNotice",
+  props: ["tone", "icon", "message"],
+  template: `<div role="alert" data-test="o-banner-stub"><slot>{{ message }}</slot></div>`,
 };
 
 function buildWrapper(props: Record<string, any> = {}) {
@@ -100,7 +100,7 @@ function buildWrapper(props: Record<string, any> = {}) {
       plugins: [i18n, store],
       stubs: {
         ODialog: ODialogStub,
-        OBanner: OBannerStub,
+        OInlineNotice: OInlineNoticeStub,
       },
     },
   });
@@ -141,10 +141,10 @@ describe("ConfirmDialog", () => {
     expect(dialog.props("open")).toBe(true);
   });
 
-  it("renders i18n labels on the primary and secondary buttons", () => {
+  it("renders i18n labels on the primary and secondary buttons, never OK (B3)", () => {
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("primaryButtonLabel")).toBe("OK");
-    expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+    expect(dialog.props("primary")?.label).toBe("Confirm");
+    expect(dialog.props("secondary")?.label).toBe("Cancel");
   });
 
   it("uses size 'sm' when no warningMessage is provided", () => {
@@ -160,14 +160,14 @@ describe("ConfirmDialog", () => {
   });
 
   it("does not render the warning banner when warningMessage is empty", () => {
-    // No warningMessage → OBanner should not be rendered at all.
+    // No warningMessage → OInlineNotice should not be rendered at all.
     expect(wrapper.find('[role="alert"]').exists()).toBe(false);
   });
 
   it("renders the warning banner with its message when warningMessage is provided", () => {
     wrapper.unmount();
     wrapper = buildWrapper({ warningMessage: "Be careful" });
-    // OBanner renders with role="alert" for the warning variant.
+    // OInlineNotice renders with role="alert" for the warn tone.
     const banner = wrapper.find('[role="alert"]');
     expect(banner.exists()).toBe(true);
     expect(banner.text()).toContain("Be careful");
@@ -247,7 +247,7 @@ describe("ConfirmDialog", () => {
         plugins: [i18n, store],
         stubs: {
           ODialog: ODialogStub,
-          OBanner: OBannerStub,
+          OInlineNotice: OInlineNoticeStub,
         },
       },
     });
@@ -259,24 +259,30 @@ describe("ConfirmDialog", () => {
     wrapper.unmount();
     wrapper = buildWrapper({ okLabel: "Delete" });
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("primaryButtonLabel")).toBe("Delete");
+    expect(dialog.props("primary")?.label).toBe("Delete");
   });
 
-  it("renders custom okColor prop on ODialog primary button", () => {
-    wrapper.unmount();
-    wrapper = buildWrapper({ okColor: "destructive" });
-    const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("primaryButtonColor")).toBe("destructive");
+  it("draws a plain confirm with the primary variant", () => {
+    expect(wrapper.findComponent(ODialogStub).props("primary")?.variant).toBe("primary");
   });
 
-  it("starts on the primary button unless a destructive confirm asks for Cancel", () => {
-    expect(wrapper.findComponent(ODialogStub).props("initialFocus")).toBe("primary");
+  it("puts the verb on a red button for a destructive confirm, defaulting to Delete (V8)", () => {
     wrapper.unmount();
-    wrapper = buildWrapper({ focusCancel: true, okVariant: "destructive" });
+    wrapper = buildWrapper({ kind: "destructive" });
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("initialFocus")).toBe("secondary");
-    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog.props("primary")?.variant).toBe("danger");
+    expect(dialog.props("primary")?.label).toBe("Delete");
     expect(dialog.props("persistent")).toBeFalsy();
+  });
+
+  it("asks Discard changes? with Keep editing for the discard kind (V5)", () => {
+    wrapper.unmount();
+    wrapper = buildWrapper({ kind: "discard", title: undefined });
+    const dialog = wrapper.findComponent(ODialogStub);
+    expect(dialog.props("title")).toBe("Discard changes?");
+    expect(dialog.props("primary")?.label).toBe("Discard");
+    expect(dialog.props("primary")?.variant).toBe("danger");
+    expect(dialog.props("secondary")?.label).toBe("Keep editing");
   });
 
   it("closes when the dialog is dismissed with Escape", async () => {
@@ -284,11 +290,11 @@ describe("ConfirmDialog", () => {
     expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([false]);
   });
 
-  it("preserves default OK label when okLabel is not provided", () => {
+  it("falls back to Confirm, not OK, when okLabel is not provided", () => {
     wrapper.unmount();
     wrapper = buildWrapper();
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("primaryButtonLabel")).toBe("OK");
+    expect(dialog.props("primary")?.label).toBe("Confirm");
   });
 
   describe("type to confirm", () => {
@@ -297,27 +303,27 @@ describe("ConfirmDialog", () => {
 
     it("has no input and an enabled confirm without confirmText", () => {
       expect(wrapper.find('[data-test="confirm-dialog-type-to-confirm"]').exists()).toBe(false);
-      expect(primary().props("primaryButtonDisabled")).toBe(false);
+      expect(primary().props("primary")?.disabled).toBeFalsy();
     });
 
     it("keeps confirm disabled and ignores a click until the exact text is typed", async () => {
       wrapper.unmount();
-      wrapper = buildWrapper({ confirmText: "test1" });
+      wrapper = buildWrapper({ kind: "typeToConfirm", confirmText: "test1" });
       expect(wrapper.text()).toContain("To confirm, type test1 below");
-      expect(primary().props("primaryButtonDisabled")).toBe(true);
+      expect(primary().props("primary")?.disabled).toBe(true);
       await wrapper.find('[data-test="o-dialog-stub-primary"]').trigger("click");
       expect(wrapper.emitted("update:ok")).toBeUndefined();
       await input().setValue("test");
-      expect(primary().props("primaryButtonDisabled")).toBe(true);
+      expect(primary().props("primary")?.disabled).toBe(true);
       await input().setValue("test1");
-      expect(primary().props("primaryButtonDisabled")).toBe(false);
+      expect(primary().props("primary")?.disabled).toBeFalsy();
       await wrapper.find('[data-test="o-dialog-stub-primary"]').trigger("click");
       expect(wrapper.emitted("update:ok")).toHaveLength(1);
     });
 
     it("labels the input with the instruction", () => {
       wrapper.unmount();
-      wrapper = buildWrapper({ confirmText: "test1" });
+      wrapper = buildWrapper({ kind: "typeToConfirm", confirmText: "test1" });
       const label = wrapper.find("label");
       expect(label.text()).toContain("To confirm, type test1 below");
       expect(label.attributes("for")).toBe(input().attributes("id"));
@@ -325,12 +331,12 @@ describe("ConfirmDialog", () => {
 
     it("clears what was typed when the dialog closes", async () => {
       wrapper.unmount();
-      wrapper = buildWrapper({ confirmText: "test1" });
+      wrapper = buildWrapper({ kind: "typeToConfirm", confirmText: "test1" });
       await input().setValue("test1");
       await wrapper.setProps({ modelValue: false });
       await wrapper.setProps({ modelValue: true });
       expect((input().element as HTMLInputElement).value).toBe("");
-      expect(primary().props("primaryButtonDisabled")).toBe(true);
+      expect(primary().props("primary")?.disabled).toBe(true);
     });
   });
 
@@ -367,9 +373,9 @@ describe("ConfirmDialog", () => {
       wrapper = buildWrapper({
         messageKeypath: keypath,
         messageName: "cpu-high",
-        okVariant: "destructive",
+        kind: "destructive",
       });
-      expect(wrapper.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("destructive");
+      expect(wrapper.findComponent(ODialogStub).props("primary")?.variant).toBe("danger");
     });
   });
 
@@ -386,7 +392,7 @@ describe("ConfirmDialog", () => {
         messageName: "cpu-high",
         warningMessage: "Cannot be undone",
         okLabel: "Delete",
-        okVariant: "destructive",
+        kind: "destructive",
       });
       await wrapper.setProps({
         modelValue: false,
@@ -396,13 +402,13 @@ describe("ConfirmDialog", () => {
         message: "",
         warningMessage: "",
         okLabel: undefined,
-        okVariant: "primary",
+        kind: "confirm",
       });
       const dialog = wrapper.findComponent(ODialogStub);
       expect(dialog.props("open")).toBe(false);
       expect(dialog.props("title")).toBe("Delete alert");
-      expect(dialog.props("primaryButtonLabel")).toBe("Delete");
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("primary")?.label).toBe("Delete");
+      expect(dialog.props("primary")?.variant).toBe("danger");
       expect(dialog.props("size")).toBe("md");
       expect(wrapper.find('[data-test="confirm-dialog-name"]').text()).toBe("cpu-high");
       expect(body().text()).toContain("Cannot be undone");

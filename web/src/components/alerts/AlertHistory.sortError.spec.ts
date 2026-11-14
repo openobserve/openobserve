@@ -52,7 +52,7 @@ const mountHistory = async (stubs: Record<string, unknown> = {}) => {
       plugins: [i18n, store, router],
       stubs: {
         ODialog: true,
-        DateTime: { template: "<div />" },
+        ODateTimeRange: { template: "<div />" },
         OSelect: { template: "<div />" },
         NoData: { template: "<div />" },
         ...stubs,
@@ -99,10 +99,9 @@ describe("AlertHistory sort failure", () => {
     const button = wrapper.find(FAILED);
     expect(button.exists()).toBe(true);
     expect(button.attributes("aria-label")).toBe("Retry");
-    expect(button.find('[data-test="alert-history-refresh-btn-failed"]').text()).toMatch(
-      /^Refresh failed at .+ · showing data from .+$/,
-    );
-    expect(button.classes()).toContain("bg-status-error-bg!");
+    expect(button.find('[data-test="alert-history-refresh-btn-failed"]').text()).toBe("Failed");
+    const described = wrapper.find(`[id="${button.attributes("aria-describedby")}"]`);
+    expect(described.text()).toMatch(/^Refresh failed at .+ · showing data from .+$/);
     expect(wrapper.find('[data-test="o2-table-pagination-info"]').classes()).not.toContain(
       "invisible",
     );
@@ -177,7 +176,6 @@ describe("AlertHistory sort failure", () => {
   it("puts the failed read's times on the header's inline refresh button, and takes them off once a read lands", async () => {
     await mountHistory();
     const button = () => wrapper.findComponent({ name: "ORefreshButton" });
-    expect(button().props("layout")).toBe("inline");
     expect(button().props("dataTest")).toBe("alert-history-refresh-btn");
     expect(button().props("failedAt")).toBeFalsy();
 
@@ -186,8 +184,6 @@ describe("AlertHistory sort failure", () => {
     await flushPromises();
     expect(button().props("failedAt")).toBe(wrapper.vm.refreshFailure.failedAt);
     expect(button().props("failedAt")).toEqual(expect.any(Number));
-    expect(button().props("dataFrom")).toBe(wrapper.vm.refreshFailure.dataFrom);
-    expect(button().props("dataFrom")).toEqual(expect.any(Number));
     expect(wrapper.find('[data-test="alert-history-refresh-failed"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="o2-table-pagination-status-note"]').exists()).toBe(false);
 
@@ -228,9 +224,8 @@ describe("AlertHistory sort failure", () => {
     expect(wrapper.find('[data-test="o2-table-body"]').exists()).toBe(false);
     expect(wrapper.text()).toContain("Can't sort by that column");
     expect(wrapper.find(FAILED).exists()).toBe(false);
-    const range = wrapper.find('[data-test="o2-table-pagination-info"]');
-    expect(range.classes()).toContain("invisible");
-    expect(range.attributes("aria-hidden")).toBe("true");
+    // No rows and no total: no pager under the error (D5).
+    expect(wrapper.find('[data-test="o2-table-pagination-info"]').exists()).toBe(false);
   });
 
   it("retries the failed sort from the refresh button, which keeps focus", async () => {
@@ -352,7 +347,7 @@ describe("AlertHistory failed page read", { timeout: 30000 }, () => {
 
   it("keeps the shown page's range over its rows when a later page fails, and Retry asks for that page", async () => {
     await mountHistory(ROW_STUBS);
-    expect(range()).toBe("Showing 1 - 20 of 60");
+    expect(range()).toBe("1–20 of 60");
 
     failOnce();
     await wrapper.vm.onPaginationChange({ page: 3, size: 20 });
@@ -361,11 +356,11 @@ describe("AlertHistory failed page read", { timeout: 30000 }, () => {
     expect(wrapper.find(FAILED).exists()).toBe(true);
     expect(wrapper.find('[data-test="o2-table-body"]').text()).toContain("alert-1");
     expect(wrapper.vm.currentPage).toBe(1);
-    expect(range()).toBe("Showing 1 - 20 of 60");
+    expect(range()).toBe("1–20 of 60");
 
     expect(await retry()).toMatchObject({ from: "40", size: "20" });
     expect(wrapper.vm.currentPage).toBe(3);
-    expect(range()).toBe("Showing 41 - 60 of 60");
+    expect(range()).toBe("41–60 of 60");
     expect(wrapper.find('[data-test="o2-table-body"]').text()).toContain("alert-41");
   });
 
@@ -376,17 +371,17 @@ describe("AlertHistory failed page read", { timeout: 30000 }, () => {
     await flushPromises();
 
     expect(wrapper.vm.pageSize).toBe(20);
-    expect(range()).toBe("Showing 1 - 20 of 60");
+    expect(range()).toBe("1–20 of 60");
 
     expect(await retry()).toMatchObject({ from: "0", size: "50" });
-    expect(range()).toBe("Showing 1 - 50 of 60");
+    expect(range()).toBe("1–50 of 60");
   });
 
   it("drops the shown page when a new time range fails, and the table's Retry asks for the new range", async () => {
     await mountHistory(ROW_STUBS);
     await wrapper.vm.onPaginationChange({ page: 2, size: 20 });
     await flushPromises();
-    expect(range()).toBe("Showing 21 - 40 of 60");
+    expect(range()).toBe("21–40 of 60");
 
     failOnce();
     wrapper.vm.updateDateTime({ startTime: 1, endTime: 2, relativeTimePeriod: "1h" });
@@ -404,7 +399,7 @@ describe("AlertHistory failed page read", { timeout: 30000 }, () => {
       start_time: "1",
       end_time: "2",
     });
-    expect(range()).toBe("Showing 1 - 20 of 60");
+    expect(range()).toBe("1–20 of 60");
   });
 
   it("lets an open row menu act on the kept row after the refresh fails", async () => {

@@ -134,29 +134,21 @@ vi.mock("../../../utils/commons", () => ({
 // primary/secondary buttons via emits (click:primary / click:secondary).
 const ODialogStub = {
   name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "formId",
-  ],
+  props: ["open", "size", "title", "subtitle", "primary", "secondary", "formId"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div
       data-test-stub="o-dialog"
       :data-open="open"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <div data-test-stub="o-dialog-body"><slot /></div>
       <div data-test-stub="o-dialog-footer">
         <slot name="footer" />
-        <button data-test-stub="o-dialog-primary" @click="$emit('click:primary', $event)">{{ primaryButtonLabel }}</button>
-        <button data-test-stub="o-dialog-secondary" @click="$emit('click:secondary', $event)">{{ secondaryButtonLabel }}</button>
+        <button data-test-stub="o-dialog-primary" @click="$emit('click:primary', $event)">{{ primary?.label }}</button>
+        <button data-test-stub="o-dialog-secondary" @click="$emit('click:secondary', $event)">{{ secondary?.label }}</button>
       </div>
     </div>
   `,
@@ -338,8 +330,8 @@ describe("AddTab", () => {
     it("should expose primary (Save) and secondary (Cancel) buttons via ODialog", () => {
       wrapper = createWrapper();
       const dialog = findDialog(wrapper);
-      expect(dialog.props("primaryButtonLabel")).toBe("Save");
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog.props("primary")?.label).toBe("Save");
+      expect(dialog.props("secondary")?.label).toBe("Cancel");
     });
 
     it("should pass form-id to ODialog for enter-key submission", () => {

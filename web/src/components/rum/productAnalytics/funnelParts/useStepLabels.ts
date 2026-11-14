@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
 import type { NamedEvent } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelFilter, StepKind, StepRef } from "@/utils/rum/productAnalyticsQueries";
@@ -30,11 +30,11 @@ const KIND_LABEL = {
   e: "rum.analytics.kind.event",
   r: "rum.analytics.kind.error",
 } as const;
-const KIND_VARIANT: Record<StepKind, BadgeVariant> = {
-  p: "blue-soft",
-  c: "teal-soft",
-  e: "purple-soft",
-  r: "error-soft",
+const KIND_VARIANT: Record<StepKind, ChipTone> = {
+  p: "neutral",
+  c: "neutral",
+  e: "neutral",
+  r: "err",
 };
 
 /** How a funnel step is named and tagged, shared by every funnel part. */
@@ -53,7 +53,7 @@ export default function useStepLabels(
 
   const kindLabel = (s: StepRef) => t(KIND_LABEL[s.kind]);
 
-  const kindVariant = (s: StepRef): BadgeVariant => KIND_VARIANT[s.kind];
+  const kindVariant = (s: StepRef): ChipTone => KIND_VARIANT[s.kind];
 
   // A Property row names its condition as the row's own select does.
   const propCondition = (r: FunnelFilter): I18nText => {

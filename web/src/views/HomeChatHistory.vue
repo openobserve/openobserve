@@ -115,7 +115,7 @@ async function clearAll() {
   const ok = await confirm({
     title: t("chatHistory.clearAllTitle"),
     message: t("chatHistory.clearAllMessage"),
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (ok) {
     if (await clearAllHistory()) analytics.track("home_chat_history_cleared");
@@ -165,8 +165,9 @@ function formatTime(ts: string): string {
       <span class="flex items-center gap-0.5">
         <OButton
           v-if="persistenceEnabled"
-          variant="ghost-muted"
-          size="icon"
+          icon-only
+          variant="ghost"
+          size="xs"
           data-test="home-chat-history-shared-by-me"
           :aria-label="t('aiChatShare.sharedByMe')"
           @click="sharedByMeOpen = true"
@@ -175,8 +176,9 @@ function formatTime(ts: string): string {
           <OTooltip :content="t('aiChatShare.sharedByMe')" />
         </OButton>
         <OButton
-          variant="ghost-muted"
-          size="icon"
+          icon-only
+          variant="ghost"
+          size="xs"
           :title="t('chatHistory.newChat')"
           :aria-label="t('chatHistory.newChat')"
           @click="newChat"
@@ -223,8 +225,9 @@ function formatTime(ts: string): string {
         />
         <OButton
           v-if="searchTerm"
-          variant="ghost-subtle"
-          size="icon"
+          icon-only
+          variant="ghost"
+          size="xs"
           :aria-label="t('chatHistory.clearSearch')"
           @click="searchTerm = ''"
         >
@@ -277,8 +280,9 @@ function formatTime(ts: string): string {
         >
           <OButton
             v-if="canShare(chat)"
-            variant="ghost-muted"
-            size="icon"
+            icon-only
+            variant="ghost"
+            size="xs"
             :data-test="`home-chat-history-share-${chat.id}`"
             :aria-label="t('aiChatShare.share')"
             @click="openShare($event, chat)"
@@ -287,8 +291,9 @@ function formatTime(ts: string): string {
             <OTooltip :content="t('aiChatShare.share')" />
           </OButton>
           <OButton
-            variant="ghost-destructive"
-            size="icon"
+            icon-only
+            variant="danger-ghost"
+            size="xs"
             :title="t('chatHistory.delete')"
             :aria-label="t('chatHistory.delete')"
             :data-test="`home-chat-history-delete-${chat.id}`"
@@ -320,7 +325,7 @@ function formatTime(ts: string): string {
         aria-busy="true"
         data-test="home-chat-history-loading"
       >
-        <OSkeleton v-for="i in 3" :key="i" type="text" />
+        <OSkeleton v-for="i in 3" :key="i" />
       </div>
       <div
         v-else-if="filtered.length === 0"
@@ -334,7 +339,7 @@ function formatTime(ts: string): string {
       v-if="history.length > 0"
       class="border-t-card-glass-border shrink-0 border-t border-t-[0.0625em] px-2 py-[0.375em]"
     >
-      <OButton variant="ghost-subtle" :block="true" @click="clearAll">
+      <OButton variant="ghost" :block="true" @click="clearAll">
         <svg
           width="0.875em"
           height="0.875em"
@@ -363,10 +368,8 @@ function formatTime(ts: string): string {
       :open="chatToDelete !== null"
       size="sm"
       :title="t('aiAssistant.deleteChat')"
-      :primary-button-label="t('common.delete')"
-      primary-button-variant="destructive"
-      :secondary-button-label="t('common.cancel')"
-      initial-focus="secondary"
+      :primary="{ label: t('common.delete'), variant: 'danger' }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="home-chat-history-delete-dialog"
       @update:open="(open: boolean) => !open && (chatToDelete = null)"
       @click:primary="confirmDeleteChat"

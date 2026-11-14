@@ -123,7 +123,7 @@ function removeCookie(index: number) {
       <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.authNetwork.title") }}
       </h3>
-      <OBadge variant="default-soft" size="sm" class="ms-2">{{
+      <OBadge tone="neutral" size="sm" class="ms-2">{{
         t("synthetics.authNetwork.optional")
       }}</OBadge>
       <div class="flex-1" />
@@ -147,7 +147,7 @@ function removeCookie(index: number) {
           <div>
             <label class="text-text-body mb-1 block text-sm font-medium">
               {{ t("synthetics.authNetwork.password") }}
-              <OBadge variant="default-soft" size="sm" class="ms-1">{{
+              <OBadge tone="neutral" size="sm" class="ms-1">{{
                 t("synthetics.authNetwork.secret")
               }}</OBadge>
             </label>
@@ -193,9 +193,9 @@ function removeCookie(index: number) {
                 @update:model-value="updateHeader(index, 'value', String($event))"
               />
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="close"
+                icon="close"
                 :aria-label="t('synthetics.authNetwork.removeHeader', { index })"
                 :data-test="`synthetics-check-auth-network-remove-header-${index}-btn`"
                 @click="removeHeader(index)"
@@ -204,8 +204,7 @@ function removeCookie(index: number) {
           </ul>
           <OButton
             variant="ghost"
-            size="sm"
-            icon-left="add"
+            icon="add"
             class="self-start"
             data-test="synthetics-check-auth-network-add-header-btn"
             @click="addHeader"
@@ -249,9 +248,9 @@ function removeCookie(index: number) {
                 @update:model-value="updateCookie(index, 'domain', String($event))"
               />
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="close"
+                icon="close"
                 :aria-label="t('synthetics.authNetwork.removeCookie', { index })"
                 :data-test="`synthetics-check-auth-network-remove-cookie-${index}-btn`"
                 @click="removeCookie(index)"
@@ -260,8 +259,7 @@ function removeCookie(index: number) {
           </ul>
           <OButton
             variant="ghost"
-            size="sm"
-            icon-left="add"
+            icon="add"
             class="self-start"
             data-test="synthetics-check-auth-network-add-cookie-btn"
             @click="addCookie"

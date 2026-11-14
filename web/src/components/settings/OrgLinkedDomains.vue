@@ -20,14 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="settings-org-linked-domains"
   >
     <OTable
-      :frame="false"
       data-test="settings-org-linked-domains-table"
       :data="visibleRows"
       :columns="columns"
       row-key="id"
       pagination="client"
       sorting="client"
-      :show-global-filter="false"
       :loading="loading"
       :error="loadError"
     >
@@ -41,8 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #toolbar-trailing>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="domains.dataUpdatedAt.value || null"
           :loading="domains.isFetching.value || requests.isFetching.value"
           data-test="settings-org-linked-domains-refresh-btn"
@@ -52,20 +48,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <OEmptyState
           v-if="!loading"
-          size="hero"
-          preset="no-linked-domains"
-          :filtered="filterQuery !== ''"
-          @action="onEmptyAction"
+          :kind="filterQuery !== '' ? 'filtered' : 'first-run'"
+          :title="
+            filterQuery !== ''
+              ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.linkedDomains') })
+              : t('emptyState.noLinkedDomains.title')
+          "
+          :text="
+            filterQuery !== ''
+              ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.linkedDomains') })
+              : t('emptyState.noLinkedDomains.description')
+          "
+          :icon="filterQuery !== '' ? undefined : 'link'"
+          :action-label="filterQuery !== '' ? undefined : t('emptyState.noLinkedDomains.dns')"
+          :secondary-action-label="
+            filterQuery !== '' ? undefined : t('emptyState.noLinkedDomains.request')
+          "
+          @action="onEmptyAction(filterQuery !== '' ? 'clear-filters' : 'dns')"
+          @secondary-action="onEmptyAction('request')"
         />
       </template>
       <template #error="{ message }">
-        <OEmptyState preset="load-error" :description="raw(message)" @action="refresh" />
+        <OEmptyState
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="raw(message)"
+          @action="refresh"
+        />
       </template>
 
       <template #cell-state="{ row }">
         <span class="relative inline-flex">
           <OBadge
-            :variant="STATE_BADGES[row.state].variant"
+            :tone="STATE_BADGES[row.state].variant"
             size="sm"
             :data-test="`settings-org-linked-domains-state-${row.domain}`"
           >
@@ -73,7 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OBadge>
           <OTooltip
             v-if="stateReason(row)"
-            :max-width="'25rem'"
             :content="stateReason(row)!"
             :data-test="`settings-org-linked-domains-state-reason-${row.domain}`"
           />
@@ -88,9 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <div class="flex items-center justify-center gap-1">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="info"
+            icon="info"
             class="max-md:hidden"
             :title="t('settings.orgDomainMapping.details')"
             :data-test="`settings-org-linked-domains-details-${row.domain}`"
@@ -98,9 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             v-if="row.link"
-            variant="ghost-destructive"
-            size="icon-sm"
-            icon-left="delete"
+            icon-only
+            variant="danger-ghost"
+            icon="delete"
             class="max-md:hidden"
             :disabled="!settingsReady"
             :title="t('settings.orgDomainMapping.removeDomain')"
@@ -112,16 +126,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
-                icon-left="more-vert"
+                icon-only
+                icon="more-vert"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="md:hidden"
                 :data-test="`settings-org-linked-domains-more-${row.domain}`"
                 @click.stop
               />
             </template>
             <ODropdownItem
-              icon-left="info"
+              icon="info"
               class="md:hidden"
               :data-test="`settings-org-linked-domains-details-${row.domain}-menu`"
               @select="openDetails(row)"
@@ -130,8 +145,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
             <ODropdownItem
               v-if="row.link"
-              icon-left="delete"
-              variant="destructive"
+              icon="delete"
+              tone="danger"
               class="md:hidden"
               :disabled="!settingsReady"
               :data-test="`settings-org-linked-domains-remove-${row.domain}-menu`"
@@ -167,7 +182,7 @@ import { computed, ref, watch } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -228,12 +243,12 @@ const FAILURE_REASON_KEYS: Record<number, I18nKey> = {
   2: "settings.orgDomainMapping.failureReason.dnsFailed",
 };
 
-const STATE_BADGES: Record<RowState, { variant: BadgeVariant; labelKey: I18nKey }> = {
-  verified: { variant: "success-outline", labelKey: "settings.orgDomainMapping.state.verified" },
-  pending: { variant: "default-outline", labelKey: "settings.orgDomainMapping.state.pending" },
-  failed: { variant: "error-outline", labelKey: "settings.orgDomainMapping.state.failed" },
-  requested: { variant: "warning-outline", labelKey: "settings.orgDomainMapping.state.requested" },
-  rejected: { variant: "error-outline", labelKey: "settings.orgDomainMapping.state.rejected" },
+const STATE_BADGES: Record<RowState, { variant: ChipTone; labelKey: I18nKey }> = {
+  verified: { variant: "outline", labelKey: "settings.orgDomainMapping.state.verified" },
+  pending: { variant: "outline", labelKey: "settings.orgDomainMapping.state.pending" },
+  failed: { variant: "err", labelKey: "settings.orgDomainMapping.state.failed" },
+  requested: { variant: "outline", labelKey: "settings.orgDomainMapping.state.requested" },
+  rejected: { variant: "err", labelKey: "settings.orgDomainMapping.state.rejected" },
 };
 
 const METHOD_KEYS: Record<RowMethod, I18nKey> = {
@@ -388,9 +403,9 @@ function openLink(method: LinkMethod = "dns") {
   linkDialogOpen.value = true;
 }
 
-function onEmptyAction(id?: string) {
+function onEmptyAction(id: "clear-filters" | "dns" | "request") {
   if (id === "clear-filters") filterQuery.value = "";
-  else openLink(id === "request" ? "request" : "dns");
+  else openLink(id);
 }
 
 async function submitLink(domain: string, method: LinkMethod): Promise<boolean> {

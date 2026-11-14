@@ -265,7 +265,7 @@ describe("WorkloadDetails: CronJob, Job, PVC, HPA, Namespace", () => {
           {
             key: "infra.k8s2.conditionAvailable" as const,
             text: "Available",
-            variant: "success-soft" as const,
+            variant: "ok" as const,
           },
         ],
       };

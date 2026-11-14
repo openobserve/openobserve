@@ -35,10 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="billings-usagechart-waiting"
     >
       <OEmptyState
-        size="compact"
-        illustration="wave-bars"
+        icon="bar-chart"
         :title="t('billing.usageTrends.waitingTitle')"
-        :description="t('billing.usageTrends.waitingForData')"
+        :text="t('billing.usageTrends.waitingForData')"
       />
     </div>
   </div>

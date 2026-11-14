@@ -111,16 +111,16 @@ async function onPick(c: SubtestCandidate) {
 
 <template>
   <OPopover
+    size="lg"
     v-model:open="open"
     side="bottom"
     align="start"
     :aria-label="t('synthetics.journey.addMenu.addSubtest')"
-    content-class="w-[min(24rem,calc(100vw-1.5rem))]"
   >
     <template #trigger>
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         :disabled="disabled"
         data-test="synthetics-journey-add-subtest-btn"
       >
@@ -147,6 +147,7 @@ async function onPick(c: SubtestCandidate) {
       </div>
       <div ref="searchRef" class="px-3 py-2">
         <OSearchInput
+          size="sm"
           v-model="query"
           :placeholder="t('synthetics.journey.subtestMenu.searchPlaceholder')"
           :aria-label="t('synthetics.journey.subtestMenu.searchPlaceholder')"
@@ -161,15 +162,14 @@ async function onPick(c: SubtestCandidate) {
           role="status"
           data-test="synthetics-subtest-menu-loading"
         >
-          <OSpinner size="sm" />
+          <OSpinner size="lg" />
           <span>{{ t("synthetics.journey.subtestMenu.loading") }}</span>
         </div>
         <OEmptyState
           v-else-if="loadError"
           size="inline"
-          icon="error"
+          kind="error"
           :title="t('synthetics.journey.subtest.pickLoadFailed')"
-          :action-label="t('common.retry')"
           data-test="synthetics-subtest-menu-load-error"
           @action="onRetry"
         />

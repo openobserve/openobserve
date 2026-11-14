@@ -87,13 +87,13 @@ describe("RetentionCellDrawer", () => {
     await mountDrawer({ rum: "locked" });
 
     expect(sessionsBtn()?.props("disabled")).toBe(true);
-    expect(sessionsBtn()?.props("iconLeft")).toBe("lock");
+    expect(sessionsBtn()?.props("icon")).toBe("lock");
   });
 
   it("keeps View in sessions live when rum is enabled", async () => {
     await mountDrawer({ rum: "enabled" });
 
     expect(sessionsBtn()?.props("disabled")).toBeFalsy();
-    expect(sessionsBtn()?.props("iconRight")).toBe("arrow-forward");
+    expect(sessionsBtn()?.props("iconEnd")).toBe("arrow-forward");
   });
 });

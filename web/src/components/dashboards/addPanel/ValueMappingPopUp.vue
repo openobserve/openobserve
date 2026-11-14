@@ -24,10 +24,9 @@
     "
     :title="t('dashboard.valueMappingsTitle')"
     size="md"
-    :neutral-button-label="t('dashboard.valueMappingAddNew')"
-    neutral-button-variant="outline"
-    :primary-button-label="t('dashboard.valueMappingApply')"
-    @click:neutral="addValueMapping"
+    :extra="{ label: t('dashboard.valueMappingAddNew'), variant: 'secondary' }"
+    :primary="{ label: t('dashboard.valueMappingApply') }"
+    @click:extra="addValueMapping"
     @click:primary="applyValueMapping"
     data-test="dashboard-value-mapping-popup"
   >

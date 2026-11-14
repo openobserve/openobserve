@@ -10,9 +10,8 @@
       </div>
       <OButton
         v-if="!readonly"
-        variant="outline"
-        size="sm-action"
-        icon-left="add"
+        variant="secondary"
+        icon="add"
         @click="onAddClick"
         data-test="add-cross-link-btn"
       >
@@ -64,18 +63,18 @@
           <!-- Actions -->
           <div v-if="!readonly" class="ms-2 flex shrink-0 items-center gap-1">
             <OButton
+              icon-only
               :aria-label="t('common.edit')"
               variant="ghost"
-              size="icon-sm"
-              icon-left="edit"
+              icon="edit"
               @click="editLink(link)"
               :data-test="`cross-link-edit-${idx}`"
             />
             <OButton
+              icon-only
               :aria-label="t('common.delete')"
-              variant="ghost-destructive"
-              size="icon-sm"
-              icon-left="delete"
+              variant="danger-ghost"
+              icon="delete"
               @click="removeLink(idx)"
               :data-test="`cross-link-delete-${idx}`"
             />

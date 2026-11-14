@@ -25,7 +25,7 @@ vi.mock("reka-ui", async (importOriginal) => {
 });
 
 import en from "@/locales/languages/en-US.json";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCountBadge from "@/lib/core/Badge/OCountBadge.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { JourneySuggestion } from "@/utils/synthetics/journeySuggestions";
 
@@ -127,14 +127,14 @@ describe("JourneySuggestions", () => {
     const button = wrapper.findComponent({ name: "OButton" });
 
     expect(chip.element.tagName).toBe("BUTTON");
-    expect(button.props("variant")).toBe("outline");
-    expect(button.props("size")).toBe("icon-xs-sq");
+    expect(button.props("variant")).toBe("secondary");
+    expect(button.props("size")).toBe("sm");
     const bulb = chip.find('[data-icon="lightbulb"]');
     expect(bulb.exists()).toBe(true);
     expect(bulb.classes()).toContain("text-status-warning-text");
     expect(chip.find('[data-icon="warning"]').exists()).toBe(false);
-    const badge = wrapper.findComponent(OBadge);
-    expect(badge.props("variant")).toBe("warning");
+    const badge = wrapper.findComponent(OCountBadge);
+    expect(badge.props("tone")).toBe("accent");
     expect(badge.classes()).toEqual(expect.arrayContaining(["absolute", "-top-1.5", "-end-1.5"]));
     expect(chip.text()).toBe("1");
     expect(wrapper.find(".o-tooltip-stub").attributes("data-content")).toContain("1 suggestion");

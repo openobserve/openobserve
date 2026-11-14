@@ -224,11 +224,13 @@ const mountExplorer = (
         OButton: true,
         OIcon: true,
         OCheckbox: true,
-        // Renders its icon-right slot: the no-data scope toggle lives INSIDE the
-        // search field (as the dashboard list's folder scope does), so a stub that
-        // drops slots hides the control under test entirely.
+        // Renders its scope options: the no-data scope switch lives INSIDE the
+        // search field, so a stub that drops them hides the control under test.
         OSearchInput: {
-          template: '<div><slot name="icon-right" /></div>',
+          props: ["scopeOptions", "scope"],
+          emits: ["update:scope"],
+          template:
+            '<div><button v-for="o in scopeOptions" :key="o.value" :data-test="o.dataTest" @click="$emit(\'update:scope\', o.value)">{{ o.label }}</button></div>',
         },
         OSpinner: true,
         OTooltip: true,
@@ -476,7 +478,7 @@ describe("MetricsExplorer wiring", () => {
       expect(btn.exists()).toBe(true);
       // t() is mocked to echo the key — the label must come from i18n.
       expect(btn.text()).toContain("metrics.explorer.refresh");
-      expect(btn.attributes("size")).toBe("sm-toolbar");
+      expect(btn.attributes("size")).toBeUndefined();
       // Same treatment as the logs/traces Run Query button.
       expect(btn.attributes("variant")).toBe("primary");
     });
@@ -612,7 +614,7 @@ describe("MetricsExplorer wiring", () => {
             OTooltip: { template: "<div><slot /></div>" },
             OButton: {
               props: { disabled: Boolean },
-              template: '<button :disabled="disabled"><slot name="icon-left" /><slot /></button>',
+              template: '<button :disabled="disabled"><slot name="icon" /><slot /></button>',
             },
             OIcon: { template: "<i />" },
           },
@@ -2219,7 +2221,8 @@ describe("MetricsExplorer wiring", () => {
 
       stale.value = true;
       await wrapper.vm.$nextTick();
-      expect(wrapper.find(RUN).attributes("variant")).toBe("pending");
+      expect(wrapper.find(RUN).attributes("variant")).toBe("primary");
+      expect(wrapper.find(RUN).attributes("stale")).toBe("true");
       expect(wrapper.find(RUN).attributes("aria-label")).toBe("search.runQueryPendingLabel");
       expect(wrapper.find(RUN).attributes("data-run-pending")).toBe("true");
       expect((wrapper.vm as any).visualizeRunTooltip).toBe("search.autoRunPendingDot");
@@ -2479,13 +2482,9 @@ describe("MetricsExplorer wiring", () => {
       for (const stub of stubs) expect(stub.attributes("quiet")).toBeUndefined();
       const slots = wrapper.findAll('[data-test="metrics-explorer-card-placeholder"]');
       expect(slots).toHaveLength(1);
-      const slotLine = slots[0].findComponent({ name: "LoadingProgress" });
-      expect(slotLine.props()).toMatchObject({
-        loading: true,
-        loadingProgressPercentage: 0,
-        indeterminate: false,
-      });
-      expect(wrapper.findAllComponents({ name: "LoadingProgress" })).toHaveLength(1);
+      const slotLine = slots[0].findComponent({ name: "OLoadingLine" });
+      expect(slotLine.props("active")).toBe(true);
+      expect(wrapper.findAllComponents({ name: "OLoadingLine" })).toHaveLength(1);
     });
 
     it("a time change keeps the drawn charts: the grid is told the window changed, not wiped", async () => {

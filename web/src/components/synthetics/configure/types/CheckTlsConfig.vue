@@ -68,14 +68,14 @@ const verifyHostname = computed({
           v-model.number="port"
           type="number"
           :label="t('synthetics.protocolConfig.port')"
-          width="xs"
+          width="s"
           data-test="synthetics-check-tls-port-input"
         />
         <OInput
           v-model.number="timeoutMs"
           type="number"
           :label="t('synthetics.protocolConfig.timeoutMs')"
-          width="sm"
+          width="s"
           data-test="synthetics-check-tls-timeout-input"
         />
       </div>
@@ -83,7 +83,7 @@ const verifyHostname = computed({
         v-model.number="minDays"
         type="number"
         :label="t('synthetics.protocolConfig.tls.minDays')"
-        width="md"
+        width="m"
         data-test="synthetics-check-tls-min-days-input"
       />
       <OSwitch

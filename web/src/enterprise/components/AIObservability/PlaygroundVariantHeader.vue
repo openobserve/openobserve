@@ -28,10 +28,8 @@
         :model-value="selectedKey"
         :options="modelOptions"
         :placeholder="t('aiObservability.playground.modelPlaceholder')"
-        size="sm"
         searchable
         creatable
-        option-tooltip
         :data-test="`ai-playground-model-${variant.id}`"
         @update:model-value="onPick"
         @create="onCreate"
@@ -44,9 +42,9 @@
       <ODropdown align="start" side="bottom">
         <template #trigger>
           <OButton
-            variant="ghost-muted"
-            size="icon-xs"
-            icon-left="settings"
+            icon-only
+            variant="ghost"
+            icon="settings"
             class="shrink-0"
             :title="t('aiObservability.playground.variantSettings')"
             :data-test="`ai-playground-variant-settings-${label}`"
@@ -63,7 +61,6 @@
             max="2"
             step="0.1"
             :label="t('aiObservability.playground.temperature')"
-            size="sm"
             :data-test="`ai-playground-temperature-${variant.id}`"
             @update:model-value="(value: string | number) => patch({ temperature: String(value) })"
           />
@@ -80,9 +77,9 @@
          property resolve by stylesheet order, so an unmarked background loses
          to it silently. -->
     <OButton
+      icon-only
       :variant="schemaButton.variant"
-      size="icon-xs"
-      icon-left="data-object"
+      icon="data-object"
       class="shrink-0"
       :class="schemaButton.tint"
       :title="schemaButton.title"
@@ -93,10 +90,10 @@
     <!-- One button, not two: a blank column is almost never what someone wants
          next to a variant they have just tuned, so plus clones this one. -->
     <OButton
-      variant="ghost-muted"
-      size="icon-xs"
+      icon-only
+      variant="ghost"
       class="shrink-0"
-      icon-left="add"
+      icon="add"
       :disabled="!canDuplicate"
       :title="
         canDuplicate
@@ -107,19 +104,19 @@
       @click="canDuplicate && emit('duplicate')"
     />
     <OButton
-      variant="ghost-muted"
-      size="icon-xs"
+      icon-only
+      variant="ghost"
       class="shrink-0"
-      icon-left="save"
+      icon="save"
       :title="t('aiObservability.experiments.detail.saveAsPrompt')"
       :data-test="`ai-playground-variant-save-prompt-${label}`"
       @click="emit('save-as-prompt')"
     />
     <OButton
-      variant="ghost-muted"
-      size="icon-xs"
+      icon-only
+      variant="ghost"
       class="shrink-0"
-      icon-left="science"
+      icon="science"
       :title="t('aiObservability.playground.createExperiment')"
       :data-test="`ai-playground-variant-experiment-${label}`"
       @click="emit('create-experiment')"
@@ -128,19 +125,19 @@
          confirms first, because there is nothing left to recover from. This one
          only throws away one column's own edits, so it stays a single click. -->
     <OButton
-      variant="ghost-muted"
-      size="icon-xs"
+      icon-only
+      variant="ghost"
       class="shrink-0"
-      icon-left="refresh"
+      icon="refresh"
       :title="t('aiObservability.playground.resetVariant')"
       :data-test="`ai-playground-variant-reset-${label}`"
       @click="emit('reset')"
     />
     <OButton
-      variant="ghost-muted"
-      size="icon-xs"
+      icon-only
+      variant="ghost"
       class="shrink-0"
-      icon-left="close"
+      icon="close"
       :disabled="!canRemove"
       :title="t('aiObservability.playground.removeVariant')"
       :data-test="`ai-playground-variant-close-${label}`"
@@ -275,27 +272,27 @@ const schemaApproximated = computed(() => schemaSupport.value === "approximated"
 const schemaButton = computed(() => {
   if (!props.variant.responseSchema) {
     return {
-      variant: "ghost-muted" as const,
+      variant: "ghost" as const,
       tint: "",
       title: t("aiObservability.playground.schema"),
     };
   }
   if (schemaDropped.value) {
     return {
-      variant: "ghost-warning" as const,
+      variant: "ghost" as const,
       tint: "bg-banner-warning-bg!",
       title: t("aiObservability.playground.schemaIgnored"),
     };
   }
   if (schemaApproximated.value) {
     return {
-      variant: "ghost-warning" as const,
+      variant: "ghost" as const,
       tint: "bg-banner-warning-bg!",
       title: t("aiObservability.playground.schemaApproximated"),
     };
   }
   return {
-    variant: "ghost-primary" as const,
+    variant: "accent-ghost" as const,
     tint: "bg-accent/12!",
     title: t("aiObservability.playground.schemaOn"),
   };

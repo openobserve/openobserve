@@ -68,13 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="customNoDataText" #empty>
-            <OEmptyState
-              size="inline"
-              icon="bar-chart"
-              :title="noDataTitle"
-              :backdrop="false"
-              data-test="no-data"
-            />
+            <OEmptyState size="inline" icon="bar-chart" :title="noDataTitle" data-test="no-data" />
           </template>
         </TableRenderer>
         <div
@@ -197,11 +191,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip v-if="m.fullLabel" :content="m.fullLabel" />
           <OButton
             v-if="m.iconStyle"
+            icon-only
             :aria-label="t('common.copyToClipboard')"
             class="absolute"
             v-show="hoveredMetricIdx === m.idx || metricCopiedIdx === m.idx"
             variant="ghost"
-            size="icon-xs-sq"
+            size="sm"
             :style="m.iconStyle"
             @click="copyMetricItem(m)"
             data-test="dashboard-metric-copy-btn"
@@ -229,7 +224,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="inline"
         icon="bar-chart"
         :title="noDataTitle"
-        :backdrop="false"
         data-test="no-data"
         class="noData [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2"
       />
@@ -349,9 +343,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Cell explorer drawer -->
     <ODrawer
+      size="xl"
       v-model:open="cellDrawer.open"
       side="right"
-      :width="85"
       bleed
       :title="t('panel.logExplorer.title')"
       data-test="dashboard-cell-explorer-drawer"
@@ -2849,7 +2843,7 @@ export default defineComponent({
 <style scoped>
 /* keep(lib-override:o2-empty-state): container query hides OEmptyState's internally-rendered icon when the panel is too short — targets a deep descendant of the lib component, not expressible as a utility on this template */
 @container (max-height: 5rem) {
-  .noData :deep(.o2-empty-state__inline-icon) {
+  .noData :deep([data-test="o2-empty-state-icon"]) {
     display: none;
   }
 }

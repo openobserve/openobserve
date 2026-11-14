@@ -72,7 +72,7 @@ const fleetOf = (id: string, collectors: number, desired: [string, number] | nul
 
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "title", "formId", "primaryButtonLabel", "primaryButtonDisabled"],
+  props: ["open", "title", "formId", "primary", "primary"],
   template: `<div v-if="open" data-test="fleet-new-rollout-dialog"><slot /></div>`,
 };
 

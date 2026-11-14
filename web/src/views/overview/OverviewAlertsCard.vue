@@ -28,9 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #empty>
       <OEmptyState
-        size="slim"
+        size="inline"
         :title="t('overview.alerts.emptyTitle')"
-        :description="t('overview.alerts.emptyDesc')"
+        :text="t('overview.alerts.emptyDesc')"
         data-test="overview-alerts-empty"
       />
     </template>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`overview-alerts-frame-${box.key}`"
         >
           <OButton
-            variant="cell"
+            variant="link"
             class="flex-1"
             :data-test="`overview-alerts-box-${box.key}`"
             @click="emit('select', box.target)"
@@ -155,8 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OButton
         v-if="remaining > 0"
-        variant="ghost-primary"
-        size="sm"
+        variant="accent-ghost"
         class="ms-0.5 mb-2 self-start"
         data-test="overview-alerts-show-more"
         @click="emit('select', 'firing')"

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import type { RouteLocationRaw } from "vue-router";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineProps<{
@@ -52,7 +52,7 @@ const { t } = useI18nTyped();
       <OIcon name="chevron-right" size="xs" />
       <span aria-current="page">{{ t("synthetics.prefill.breadcrumbPage") }}</span>
     </nav>
-    <OBanner variant="info" data-test="synthetics-prefill-banner-text">
+    <OInlineNotice tone="info" data-test="synthetics-prefill-banner-text">
       <i18n-t
         :keypath="where ? 'synthetics.prefill.banner' : 'synthetics.prefill.bannerNoWhere'"
         tag="span"
@@ -65,6 +65,6 @@ const { t } = useI18nTyped();
         <template #service>{{ service }}</template>
         <template #save>{{ t("synthetics.newCheck.saveAndExit") }}</template>
       </i18n-t>
-    </OBanner>
+    </OInlineNotice>
   </div>
 </template>

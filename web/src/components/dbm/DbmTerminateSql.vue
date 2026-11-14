@@ -40,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ raw(statement) }}
     </OTruncatedText>
     <OButton
-      variant="ghost-muted"
-      size="icon-xs"
-      :icon-left="copied ? 'check' : 'content-copy'"
+      icon-only
+      variant="ghost"
+      :icon="copied ? 'check' : 'content-copy'"
       class="shrink-0"
       :data-test="`${dataTest}-copy`"
       @click.stop="copy"

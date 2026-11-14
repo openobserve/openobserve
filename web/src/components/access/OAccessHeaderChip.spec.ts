@@ -116,6 +116,6 @@ describe("OAccessHeaderChip", () => {
     screen.lgUp = false;
     wrapper = mount(OAccessHeaderChip, { attachTo: document.body, global: { plugins: [i18n] } });
     const chip = wrapper.find('[data-test="access-header-chip"]');
-    expect(chip.classes()).toContain("h-6");
+    expect(chip.classes()).toContain("h-control-xs");
   });
 });

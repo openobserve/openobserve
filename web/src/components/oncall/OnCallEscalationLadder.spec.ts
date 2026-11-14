@@ -36,7 +36,7 @@ vi.mock("@/services/users", () => ({
 const stubs = {
   OTag: {
     name: "OTag",
-    props: ["variant", "type", "value", "label"],
+    props: ["tone", "type", "value", "label"],
     template: "<span>{{ label }}<slot /></span>",
   },
   OTooltip: {
@@ -50,7 +50,6 @@ const stubs = {
     props: { label: null, title: null, subtitle: null, variant: null, framed: Boolean },
     template: '<li>{{ label }} {{ title }} {{ subtitle }}<slot name="subtitle" /><slot /></li>',
   },
-  OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OButton: {
     name: "OButton",
     props: ["variant", "size"],
@@ -272,12 +271,12 @@ describe("OnCallEscalationLadder", () => {
 
     const edit = header.findComponent('[data-test="oncall-policy-edit"]');
     expect(edit.text()).toBe("Edit");
-    expect(edit.props("variant")).toBe("outline-primary");
-    expect(edit.props("size")).toBe("sm");
+    expect(edit.props("variant")).toBe("secondary");
+    expect(edit.props("size")).toBeUndefined();
     const send = header.findComponent('[data-test="oncall-ladder-send-test"]');
     expect(send.text()).toContain("Send test page");
-    expect(send.props("variant")).toBe("outline");
-    expect(send.props("size")).toBe("sm");
+    expect(send.props("variant")).toBe("secondary");
+    expect(send.props("size")).toBeUndefined();
     expect(edit.element.parentElement?.classList.contains("ms-auto")).toBe(true);
   });
 
@@ -420,10 +419,10 @@ describe("OnCallEscalationLadder", () => {
         .find((chip) => chip.attributes("data-test") === `oncall-ladder-priority-${priority}`)
         ?.props("variant");
 
-    expect(variantOf("p3")).toBe("outline-primary");
-    expect(variantOf("p2")).toBe("outline-destructive");
+    expect(variantOf("p3")).toBe("secondary");
+    expect(variantOf("p2")).toBe("danger-ghost");
     // P4–P5 paging nobody is the default, so it is not drawn as a finding.
-    expect(variantOf("p5")).toBe("outline");
+    expect(variantOf("p5")).toBe("secondary");
   });
 
   /// The card header names the priority and its channels; the chip above already carries the step count.
@@ -485,7 +484,7 @@ describe("OnCallEscalationLadder", () => {
     const seat = person
       .findAllComponents({ name: "OTag" })
       .find((tag) => tag.text() === "Whoever is on call");
-    expect(seat?.props("variant")).toBe("default-outline");
+    expect(seat?.props("tone")).toBe("outline");
     expect(person.findComponent({ name: "OAvatar" }).props("value")).toBe("ana@o2.ai");
     expect(row.find('[data-test^="oncall-channel-icon-"]').exists()).toBe(false);
   });

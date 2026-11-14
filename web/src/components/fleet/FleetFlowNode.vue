@@ -19,13 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex w-36 cursor-pointer flex-col items-center gap-1.5"
     :data-test="`fleet-flow-node-${id}`"
   >
-    <OTag
-      v-if="data.badge"
-      variant="default-soft"
-      size="xs"
-      :label="data.badge"
-      class="max-w-full"
-    />
+    <OTag v-if="data.badge" tone="neutral" size="sm" :label="data.badge" class="max-w-full" />
     <div
       class="rounded-surface relative grid place-items-center border transition-colors"
       :class="[
@@ -50,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       <OTag
         v-if="data.count !== undefined"
-        variant="primary"
-        size="xs"
+        tone="accent"
+        size="sm"
         :label="raw(String(data.count))"
         class="absolute -end-2 -top-2"
       />

@@ -114,7 +114,7 @@ describe("LicenseExpiryBanner", () => {
   );
   it("dismiss persists for the session and a new expiry has its own signature", async () => {
     const { w: one } = await mountBanner();
-    await one.get('[data-test="license-expiry-dismiss"]').trigger("click");
+    await one.get('[data-test="license-expiry-banner-dismiss"]').trigger("click");
     one.unmount();
     const { w: two, store } = await mountBanner();
     expect(two.find('[data-test="license-expiry-banner"]').exists()).toBe(false);
@@ -158,5 +158,5 @@ it("an unchanged refresh preserves the expiry date, warning and recheck action",
   expect(w.text()).toContain("Your license expires on Nov 2, 2026.");
   expect(w.text()).toContain("License is up to date");
   expect(w.find('[data-test="license-expiry-refresh"]').exists()).toBe(true);
-  expect(w.findComponent({ name: "OBanner" }).props("variant")).toBe("warning");
+  expect(w.findComponent({ name: "OBanner" }).props("tone")).toBe("warn");
 });

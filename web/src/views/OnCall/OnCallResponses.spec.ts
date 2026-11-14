@@ -128,7 +128,7 @@ const stubs = {
     name: "OTable",
     props: [
       "data",
-      "rowTone",
+      "rowState",
       "columns",
       "selectedIds",
       "isRowSelectable",
@@ -246,11 +246,11 @@ const stubs = {
     template: "<button><slot /></button>",
   },
   ODropdownSeparator: { name: "ODropdownSeparator", template: "<hr />" },
-  OTag: { name: "OTag", template: "<span><slot /></span>" },
+  OTag: { name: "OTag", props: ["label"], template: "<span><slot>{{ label }}</slot></span>" },
   OEmptyState: {
     name: "OEmptyState",
-    props: ["preset", "filtered"],
-    template: "<div :data-preset='preset' />",
+    props: ["kind", "title"],
+    template: "<div :data-kind='kind' />",
   },
   OSelect: {
     name: "OSelect",
@@ -489,7 +489,7 @@ describe("OnCallResponses", () => {
   /// for something you must act on now.
   it("mutes a snoozed row", async () => {
     const wrapper = await withPages([page()]);
-    const rowTone = wrapper.findComponent({ name: "OTable" }).props("rowTone") as (
+    const rowState = wrapper.findComponent({ name: "OTable" }).props("rowState") as (
       row: TableRow,
     ) => string | null;
 
@@ -499,8 +499,8 @@ describe("OnCallResponses", () => {
       escalating: [],
       rowKey: p.id,
     });
-    expect(rowTone(asRow(page()))).toBeNull();
-    expect(rowTone(asRow(page({ snoozed_until: Date.now() * 1000 + 60_000_000 })))).toBe("muted");
+    expect(rowState(asRow(page()))).toBeNull();
+    expect(rowState(asRow(page({ snoozed_until: Date.now() * 1000 + 60_000_000 })))).toBe("paused");
   });
 
   /// A triage list read at 3am is newest-first. `state` and `firings` are said
@@ -888,8 +888,8 @@ describe("OnCallResponses", () => {
           .findAllComponents({ name: "OSelect" })
           .find((s) => s.attributes("data-test") === test);
 
-      expect(byTest("oncall-responses-team-filter")?.props("width")).toBe("sm");
-      expect(byTest("oncall-responses-priority-filter")?.props("width")).toBe("sm");
+      expect(byTest("oncall-responses-team-filter")?.props("width")).toBe("s");
+      expect(byTest("oncall-responses-priority-filter")?.props("width")).toBe("s");
     });
 
     /// Claiming is only offered while something is still escalating; a page
@@ -1243,7 +1243,7 @@ describe("OnCallResponses", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
-      expect(wrapper.find('[data-preset="no-oncall-responses"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-responses-empty"]').exists()).toBe(true);
     });
 
     // A checklist that flashes on every load would read as "your setup vanished".
@@ -1357,9 +1357,9 @@ describe("OnCallResponses", () => {
 
       expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="oncall-responses-table"]').exists()).toBe(true);
-      expect(wrapper.findComponent({ name: "OEmptyState" }).props("filtered")).toBe(true);
+      expect(wrapper.findComponent({ name: "OEmptyState" }).props("kind")).toBe("filtered");
 
-      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "clear-filters");
+      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action");
       await flushPromises();
       expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
     });
@@ -1861,8 +1861,8 @@ describe("OnCallResponses", () => {
 
       const empty = wrapper
         .findAllComponents({ name: "OEmptyState" })
-        .find((node) => node.props("preset") === "no-oncall-responses");
-      expect(empty?.props("filtered")).toBe(true);
+        .find((node) => node.attributes("data-test") === "oncall-responses-empty");
+      expect(empty?.props("kind")).toBe("filtered");
     });
 
     it("counts down the handover of the rotation the viewer holds, not the first one", async () => {

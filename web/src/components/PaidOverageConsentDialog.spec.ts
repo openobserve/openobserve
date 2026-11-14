@@ -48,7 +48,7 @@ function mountDialog() {
       plugins: [store, i18n],
       stubs: {
         ODialog: {
-          props: ["open", "primaryButtonDisabled"],
+          props: ["open", "primary"],
           template: '<section v-if="open"><slot /></section>',
         },
         OButton: {

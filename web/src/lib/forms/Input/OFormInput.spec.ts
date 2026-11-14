@@ -150,7 +150,7 @@ describe("OFormInput", () => {
     expect(form.state.values.threshold).toBe(95);
   });
 
-  it("forwards revealable so a password field gets its show/hide toggle", async () => {
+  it("gives a password field its show/hide toggle", async () => {
     wrapper = mount(OForm, {
       props: { defaultValues: { secret: "hunter2" } },
       slots: {
@@ -158,7 +158,6 @@ describe("OFormInput", () => {
           h(OFormInput, {
             name: "secret",
             type: "password",
-            revealable: true,
             "data-test": "secret",
           }),
       },

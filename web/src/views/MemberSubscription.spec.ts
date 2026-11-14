@@ -133,8 +133,7 @@ describe("MemberSubscription.vue", () => {
       wrapper = createWrapper("#token=test-token-123", true); // Prevent auto processing
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".rounded-default").exists()).toBe(true);
-      expect(wrapper.text()).toContain("Member Subscription");
+      expect(wrapper.find("h1").text()).toBe("Member Subscription");
     });
 
     it("should start with processing status", () => {

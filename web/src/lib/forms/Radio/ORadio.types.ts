@@ -4,7 +4,6 @@ import type { I18nText } from "@/types/i18n";
 
 import type { InjectionKey } from "vue";
 
-export type RadioSize = "xs" | "sm" | "md";
 export type RadioVariant = "default" | "card";
 export type RadioValue = string | number | boolean;
 
@@ -42,12 +41,10 @@ export interface RadioProps {
    * Compared against ORadioGroup's modelValue to determine checked state.
    */
   value?: RadioValue;
-  /** Compatibility alias for `value` */
-  val?: RadioValue;
   /** Accessible label */
   label?: I18nText;
-  /** Control size */
-  size?: RadioSize;
+  /** Secondary line under the label */
+  description?: I18nText;
   /** Prevents interaction */
   disabled?: boolean;
   /** Visual treatment for the label/control surface. */

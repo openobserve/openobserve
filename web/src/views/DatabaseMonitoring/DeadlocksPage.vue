@@ -48,14 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
-        :frame="false"
-        :toolbar-bordered="false"
         :error="error"
         :forbidden="forbidden"
         sorting="client"
         expansion="multiple"
         :expand-on-row-click="true"
-        :show-global-filter="false"
         table-id="dbm-deadlocks"
         persist-columns
         :get-row-style="rowStyle"
@@ -64,8 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #error="{ message }">
           <OEmptyState
-            preset="load-error"
-            :description="raw(message)"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="raw(message)"
             data-test="dbm-deadlocks-error"
             @action="onRefresh()"
           />
@@ -93,11 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               mobile-dropdown
               data-test="dbm-deadlocks-grouping"
             >
-              <OToggleGroupItem value="pairs" size="sm" data-test="dbm-deadlocks-grouping-pairs">
+              <OToggleGroupItem value="pairs" data-test="dbm-deadlocks-grouping-pairs">
                 {{ t("dbm.deadlocks.grouping.pairs") }}
                 <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.pairsHint')" />
               </OToggleGroupItem>
-              <OToggleGroupItem value="events" size="sm" data-test="dbm-deadlocks-grouping-events">
+              <OToggleGroupItem value="events" data-test="dbm-deadlocks-grouping-events">
                 {{ t("dbm.deadlocks.grouping.events") }}
                 <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.eventsHint')" />
               </OToggleGroupItem>
@@ -107,19 +105,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
-            <DateTime
+            <ODateTimeRange
               auto-apply
               menu-align="end"
               :default-type="range.type"
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-deadlocks-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
+              class="max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :loading="loading"
               :last-run-at="lastRunAt"
               data-test="dbm-deadlocks-refresh"
@@ -131,23 +127,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <OStatStrip
-            :items="summaryStats"
-            :loading="loading"
-            row
+          <div
+            class="px-page-edge border-table-row-divider border-b py-1.5"
             data-test="dbm-deadlocks-summary"
-          />
+          >
+            <OStatStrip :items="summaryStats" :loading="loading" />
+          </div>
 
           <!-- ONE storm band, not two. The completion-bias caution has no
                condition of its own beyond `storm`, so it rides inside this
                band — as its own band it could only ever arrive stacked under
                this one, saying something about the same situation. -->
-          <OBanner
+          <OInlineNotice
             v-if="storm"
-            variant="error"
-            dense
-            inline-actions
-            icon="warning-amber"
+            tone="err"
             class="border-status-error-text/25 rounded-none border-b"
             data-test="dbm-deadlocks-storm"
           >
@@ -157,8 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #actions>
               <OButton
                 variant="primary"
-                size="sm"
-                icon-left="content-copy"
+                icon="content-copy"
                 data-test="dbm-deadlocks-storm-copy"
                 @click="copyStormSummary()"
               >
@@ -170,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip side="bottom" :content="t('dbm.deadlocks.detail.copyForSlackHint')" />
               </OButton>
             </template>
-          </OBanner>
+          </OInlineNotice>
 
           <!-- The database logs every deadlock it resolves, so this is not a
                sample — unless the read hit its cap, which is what `truncated`
@@ -200,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </div>
             <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
-              <OTag type="dbSystem" :value="row.db_system" size="xs" />
+              <OTag type="dbSystem" :value="row.db_system" size="sm" />
               <template v-if="row.db_instance">
                 <span class="opacity-45">·</span>
                 <OTruncatedText>{{ raw(row.db_instance) }}</OTruncatedText>
@@ -293,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     })
                   }}
                 </span>
-                <OTag variant="default-soft" size="xs" shape="rounded">
+                <OTag tone="neutral" size="sm">
                   {{
                     t("dbm.deadlocks.detail.nthOf", {
                       index: row.selectedEventIndex + 1,
@@ -303,9 +295,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTag>
                 <div class="flex-1"></div>
                 <OButton
-                  variant="ghost-muted"
-                  size="sm"
-                  icon-left="chevron-left"
+                  variant="ghost"
+                  icon="chevron-left"
                   :disabled="row.selectedEventIndex >= row.count - 1"
                   data-test="dbm-deadlocks-earlier"
                   @click="stepEvent(row, 1)"
@@ -313,9 +304,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("dbm.deadlocks.detail.earlier") }}
                 </OButton>
                 <OButton
-                  variant="ghost-muted"
-                  size="sm"
-                  icon-left="chevron-right"
+                  variant="ghost"
+                  icon="chevron-right"
                   :disabled="row.selectedEventIndex <= 0"
                   data-test="dbm-deadlocks-later"
                   @click="stepEvent(row, -1)"
@@ -435,7 +425,7 @@ import { useStore } from "vuex";
 import DbmDeadlockCycle from "@/components/dbm/DbmDeadlockCycle.vue";
 import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
@@ -454,7 +444,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
@@ -810,15 +800,15 @@ const summaryStats = computed<StatItem[]>(() => [
   {
     key: "deadlocks",
     label: t("dbm.deadlocks.summary.deadlocks"),
-    value: notCollecting.value ? raw("—") : eventCount.value,
+    value: notCollecting.value ? null : eventCount.value,
     icon: "swap-horiz",
-    tone: eventCount.value > 0 ? "error" : "neutral",
+    tone: eventCount.value > 0 ? "err" : "neutral",
     dataTest: "dbm-deadlocks-summary-deadlocks",
   },
   {
     key: "pairs",
     label: t("dbm.deadlocks.summary.pairs"),
-    value: notCollecting.value ? raw("—") : rows.value.length,
+    value: notCollecting.value ? null : rows.value.length,
     icon: "filter-list",
     tone: "neutral",
     dataTest: "dbm-deadlocks-summary-pairs",

@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, provide, ref, toRef, watch, type ComponentPublicInstance } from "vue";
 import OChipInput from "@/lib/forms/ChipInput/OChipInput.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OFilterToken from "@/lib/core/Badge/OFilterToken.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -442,12 +441,10 @@ const draftOperator = computed(() => {
           <template #caret="{ index, groupId }">
             <div class="flex min-w-0 items-start gap-1.5" :data-test="`${dataTest}-draft-row`">
               <div class="flex h-6 w-10 shrink-0 items-center">
-                <OTag
+                <OButton
                   v-if="showPendingConnector"
-                  clickable
+                  variant="ghost"
                   size="xs"
-                  shape="rounded"
-                  variant="default-soft"
                   :label="raw(nextConnector)"
                   :aria-label="t('filterBar.toggleConnector')"
                   :data-test="`${dataTest}-pending-connector`"
@@ -507,12 +504,10 @@ const draftOperator = computed(() => {
         @add-condition="onAddCondition"
       >
         <template #caret>
-          <OTag
+          <OButton
             v-if="showPendingConnector && !connectorAfterDraft"
-            clickable
+            variant="ghost"
             size="xs"
-            shape="rounded"
-            variant="default-soft"
             :label="raw(nextConnector)"
             :aria-label="t('filterBar.toggleConnector')"
             :data-test="`${dataTest}-pending-connector`"
@@ -530,12 +525,10 @@ const draftOperator = computed(() => {
             :data-test="`${dataTest}-draft`"
           />
           <component :is="caret" :grow="caretAtEnd" />
-          <OTag
+          <OButton
             v-if="showPendingConnector && connectorAfterDraft"
-            clickable
+            variant="ghost"
             size="xs"
-            shape="rounded"
-            variant="default-soft"
             :label="raw(nextConnector)"
             :aria-label="t('filterBar.toggleConnector')"
             :data-test="`${dataTest}-pending-connector`"
@@ -550,8 +543,8 @@ const draftOperator = computed(() => {
           <span class="inline-flex">
             <OButton
               variant="ghost"
-              size="xs"
-              icon-left="add"
+              size="sm"
+              icon="add"
               :disabled="Boolean(limitReason)"
               :data-test="`${dataTest}-add-condition`"
               @mousedown.prevent
@@ -563,8 +556,8 @@ const draftOperator = computed(() => {
           <span v-if="editor.canGroupIn(modelValue.id)" class="inline-flex">
             <OButton
               variant="ghost"
-              size="xs"
-              icon-left="add"
+              size="sm"
+              icon="add"
               :disabled="Boolean(limitReason)"
               :data-test="`${dataTest}-add-group`"
               @mousedown.prevent
@@ -581,7 +574,7 @@ const draftOperator = computed(() => {
       <span v-if="showAddOrGroup" class="inline-flex">
         <OButton
           variant="ghost"
-          size="xs"
+          size="sm"
           :data-test="`${dataTest}-add-group`"
           @mousedown.prevent
           @click.stop="onAddOrGroup"
@@ -591,9 +584,10 @@ const draftOperator = computed(() => {
       </span>
       <OButton
         v-if="hasFilters && !disabled"
+        icon-only
         variant="ghost"
-        size="icon-xs-sq"
-        icon-left="close"
+        size="sm"
+        icon="close"
         :aria-label="t('filterBar.clearAll')"
         :data-test="`${dataTest}-clear`"
         @mousedown.prevent
@@ -613,7 +607,7 @@ const draftOperator = computed(() => {
         }}</span>
         <OButton
           variant="primary"
-          size="xs"
+          size="sm"
           :disabled="!selectedCount"
           :data-test="`${dataTest}-apply`"
           @mousedown.prevent

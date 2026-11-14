@@ -145,14 +145,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <OCard v-if="selected" variant="glass" class="shrink-0" data-test="autoobserve-unfold-detail">
-      <OCardSection role="header" dense>
+    <OCard v-if="selected" class="shrink-0" data-test="autoobserve-unfold-detail">
+      <template #header>
         <OIcon :name="iconOf(selected)" size="sm" :class="TONE[selected.tone].ink" />
-        <OText variant="panel-title">{{ selected.title }}</OText>
-        <OTag v-if="selected.tag" variant="primary-soft" size="sm" :label="t(selected.tag)" />
+        <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+          {{ selected.title }}
+        </h3>
+        <OTag v-if="selected.tag" tone="accent" size="sm" :label="t(selected.tag)" />
         <span class="text-text-secondary ms-auto text-xs">{{ laneName(selected.lane) }}</span>
-      </OCardSection>
-      <OCardSection role="body" dense class="flex items-start gap-6 max-md:flex-col">
+      </template>
+      <div class="flex items-start gap-6 max-md:flex-col">
         <div class="flex min-w-0 flex-1 flex-col gap-3">
           <p v-if="!selected.count && selected.detail" class="text-text-body text-sm">
             {{ selected.detail }}
@@ -170,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               v-for="(at, i) in selected.times"
               :key="i"
-              variant="default-soft"
+              tone="neutral"
               size="sm"
               :label="raw(at)"
             />
@@ -186,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span class="text-text-secondary text-xs">{{ t("autoobserve.unfold.chartNote") }}</span>
         </div>
-      </OCardSection>
+      </div>
     </OCard>
   </div>
 </template>
@@ -195,9 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";

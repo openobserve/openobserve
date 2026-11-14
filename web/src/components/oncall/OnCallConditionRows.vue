@@ -27,10 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="row.name"
         :options="fieldOptionsFor(row)"
         :placeholder="t('oncall.ruleEditorFieldPlaceholder')"
-        size="sm"
-        width="sm"
+        width="s"
         searchable
-        :dropdown-style="FIELD_DROPDOWN_STYLE"
         :aria-label="t('oncall.conditionFieldAria')"
         :data-test="`${testPrefix}-field-${index}`"
         @update:model-value="(v: unknown) => setField(row, v)"
@@ -40,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="row.op"
         :options="operatorOptions"
         :searchable="false"
-        size="sm"
-        width="xs"
+        width="s"
         :aria-label="t('oncall.conditionOperatorAria')"
         :data-test="`${testPrefix}-op-${index}`"
         @update:model-value="(v: unknown) => (row.op = v === 'prefix' ? 'prefix' : 'is')"
@@ -56,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="valueOptionsFor(row)"
           :placeholder="t('oncall.ruleEditorPickValue')"
           :disabled="!row.name"
-          size="sm"
           searchable
           creatable
           :aria-label="t('oncall.conditionValueAria')"
@@ -66,9 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </span>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="close"
+        icon="close"
         :aria-label="t('oncall.ruleEditorRemoveCondition')"
         :data-test="`${testPrefix}-remove-${index}`"
         @click="removeRow(index)"
@@ -84,9 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <OButton
-      variant="outline"
-      size="sm"
-      icon-left="add"
+      variant="secondary"
+      icon="add"
       class="self-start"
       :data-test="`${testPrefix}-add-condition`"
       @click="addRow"
@@ -166,8 +161,6 @@ let nextKey = 0;
 
 /// How many of a field group's telemetry fields the picker names before "+N more".
 const SOURCES_SHOWN = 3;
-/// Wider than the field so a caption of telemetry fields stays on its one-line row.
-const FIELD_DROPDOWN_STYLE = { minWidth: "24rem" };
 
 /// What discovery saw, or the whole vocabulary when it saw nothing; fields signals and rules carry are always added.
 const fieldIds = computed<string[]>(() => {

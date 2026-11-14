@@ -22,7 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-start gap-3 p-4">
       <div class="flex min-w-0 flex-1 flex-col gap-1">
         <OText variant="body-strong">{{ t("workflow.http.acceptRequests") }}</OText>
-        <OSkeleton v-if="phase === 'loading'" class="h-3 w-48" data-test="workflow-http-loading" />
+        <OSkeleton
+          v-if="phase === 'loading'"
+          shape="block"
+          class="h-3 w-48"
+          data-test="workflow-http-loading"
+        />
         <OText
           v-else-if="lastCall !== undefined"
           variant="meta"
@@ -69,15 +74,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OButton
         v-if="phase === 'error'"
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         data-test="workflow-http-retry"
         @click="refresh"
       >
         {{ t("common.retry") }}
       </OButton>
-      <OSkeleton v-else-if="phase === 'loading'" class="h-5 w-9 rounded-full" />
+      <OSkeleton v-else-if="phase === 'loading'" shape="block" class="h-5 w-9" />
       <OPopover
+        size="md"
         v-else-if="switchOn"
         v-model:open="disableOpen"
         side="bottom"
@@ -96,16 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </span>
         </template>
-        <div
-          data-test="workflow-http-disable-popover"
-          class="flex w-80 max-w-[calc(100vw-1.5rem)] flex-col gap-2 p-3"
-        >
+        <div data-test="workflow-http-disable-popover" class="flex flex-col gap-2 p-3">
           <OText variant="body-strong">{{ t("workflow.http.disableTitle") }}</OText>
           <OText variant="meta" as="p">{{ t("workflow.http.disableBody") }}</OText>
           <div class="flex justify-end gap-2">
             <OButton
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               data-test="workflow-http-disable-cancel"
               @click="disableOpen = false"
             >
@@ -113,7 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="primary"
-              size="sm-action"
               :loading="saving"
               data-test="workflow-http-disable-confirm"
               @click="confirmTurnOff"
@@ -133,12 +134,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-if="hasBody" class="border-border-default flex flex-col gap-4 border-t p-4">
-      <OBanner
+      <OInlineNotice
         v-if="actionError"
-        variant="error-soft"
-        dense
+        tone="err"
         data-test="workflow-http-error"
-        :content="actionError"
+        :message="actionError"
       />
       <OText v-if="endpointExists" variant="meta" as="p" data-test="workflow-http-exists-hint">
         {{ existsHint }}
@@ -146,7 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="phase === 'unsaved' && canTurnOn"
         variant="primary"
-        size="sm-action"
         class="self-start"
         :loading="creating"
         data-test="workflow-http-save-and-create"
@@ -154,19 +153,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("workflow.http.saveAndCreate") }}
       </OButton>
-      <OBanner
+      <OInlineNotice
         v-if="showDraftNotice"
-        variant="warning"
-        dense
+        tone="warn"
         data-test="workflow-http-draft-banner"
-        :content="t('workflow.http.draftBanner')"
+        :message="t('workflow.http.draftBanner')"
       />
-      <OBanner
+      <OInlineNotice
         v-else-if="status === 'paused'"
-        variant="warning"
-        dense
+        tone="warn"
         data-test="workflow-http-disabled-banner"
-        :content="t('workflow.http.disabledBanner')"
+        :message="t('workflow.http.disabledBanner')"
       />
       <WorkflowHttpReveal
         v-if="phase === 'revealing'"
@@ -197,7 +194,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";

@@ -43,8 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Wrap Content Button -->
           <OButton
+            icon-only
             variant="ghost"
-            size="icon"
+            size="xs"
             :class="{ 'bg-theme-accent! text-white!': wrapTableCells }"
             data-test="correlated-logs-table-wrap-content-btn"
             @click="wrapTableCells = !wrapTableCells"
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="pe-4">
             <ODropdown side="bottom" align="end" data-test="column-visibility-dropdown">
               <template #trigger>
-                <OButton variant="outline" size="sm" :disabled="!hasResults">
+                <OButton variant="secondary" :disabled="!hasResults">
                   <template v-if="true">
                     <OIcon name="view-column" size="sm" class="me-1" />
                     {{ t("search.showHideColumns") }}
@@ -76,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }
                   "
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <span @click.stop>
                       <OCheckbox
                         :model-value="areAllColumnsSelected"
@@ -111,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }
                   "
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <span @click.stop>
                       <OCheckbox
                         :model-value="visibleColumns.has(field)"
@@ -121,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
                   <span class="flex-1">{{ field }}</span>
-                  <template #icon-right>
+                  <template #end>
                     <OIcon
                       name="drag-indicator"
                       size="xs"
@@ -137,9 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Show skeleton while loading -->
       <div v-else class="flex flex-wrap items-center gap-3 p-3 max-md:flex-col max-md:items-start">
-        <OSkeleton class="h-8 w-50" />
-        <OSkeleton class="h-8 w-50" />
-        <OSkeleton class="h-8 w-50" />
+        <OSkeleton shape="block" class="h-8 w-50" />
+        <OSkeleton shape="block" class="h-8 w-50" />
+        <OSkeleton shape="block" class="h-8 w-50" />
       </div>
 
       <!-- Results Summary Row -->
@@ -171,9 +172,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-if="unifiedChips.length > 0 || props.hideDimensionFilters" #chip-actions>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon"
-          class="h-5!"
+          size="xs"
           :class="{ 'bg-theme-accent! text-white! hover:opacity-80': wrapTableCells }"
           data-test="correlated-logs-table-wrap-content-btn"
           @click="wrapTableCells = !wrapTableCells"
@@ -200,7 +201,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="isLoading"
             :row-key="correlatedRowKey"
             :default-columns="false"
-            :show-global-filter="false"
             pagination="none"
             :enable-column-reorder="true"
             :enable-column-resize="true"
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Loading indicator -->
             <div class="flex items-center justify-center gap-3 max-md:flex-col">
-              <OSpinner size="sm" />
+              <OSpinner size="lg" />
               <span class="text-sm opacity-70">
                 {{ t("correlation.logs.loading") }}
               </span>
@@ -309,21 +309,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Pagination bar -->
         <div
           v-if="hasResults && totalPages > 1"
-          class="border-card-glass-border bg-card-glass-bg flex shrink-0 items-center justify-between border-t border-solid px-4 py-2 text-xs"
+          class="border-card-glass-border bg-card-glass-bg flex shrink-0 items-center justify-end border-t border-solid px-4 py-2 text-xs"
           data-test="correlated-logs-pagination"
         >
-          <span class="opacity-60">
-            {{ (currentPage - 1) * displayPageSize + 1 }}–{{
-              Math.min(currentPage * displayPageSize, searchResults.length)
-            }}
-            {{ t("search.of") }} {{ searchResults.length }}
-          </span>
           <OPagination
-            :model-value="currentPage"
-            :max="totalPages"
-            :max-pages="5"
+            :page="currentPage"
+            :page-size="displayPageSize"
+            :total="searchResults.length"
             data-test="correlated-logs-pagination-control"
-            @update:model-value="goToPage"
+            @update:page="goToPage"
           />
         </div>
       </div>

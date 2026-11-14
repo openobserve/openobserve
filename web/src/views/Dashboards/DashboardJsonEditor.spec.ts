@@ -77,24 +77,15 @@ vi.mock("@/lib/overlay/Drawer/ODrawer.vue", async () => {
       "open",
       "width",
       "title",
-      "subTitle",
+      "subtitle",
       "showClose",
       "persistent",
       "size",
-      "primaryButtonLabel",
-      "secondaryButtonLabel",
-      "neutralButtonLabel",
-      "primaryButtonVariant",
-      "secondaryButtonVariant",
-      "neutralButtonVariant",
-      "primaryButtonDisabled",
-      "secondaryButtonDisabled",
-      "neutralButtonDisabled",
-      "primaryButtonLoading",
-      "secondaryButtonLoading",
-      "neutralButtonLoading",
+      "primary",
+      "secondary",
+      "extra",
     ],
-    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
     template: `
       <div data-test="o-drawer-stub" class="o-drawer-stub">
         <header data-test="o-drawer-header">
@@ -106,14 +97,14 @@ vi.mock("@/lib/overlay/Drawer/ODrawer.vue", async () => {
         <footer data-test="o-drawer-footer">
           <button
             data-test="o-drawer-secondary"
-            :disabled="secondaryButtonDisabled"
+            :disabled="secondary?.disabled"
             @click="$emit('click:secondary')"
-          >{{ secondaryButtonLabel }}</button>
+          >{{ secondary?.label }}</button>
           <button
             data-test="o-drawer-primary"
-            :disabled="primaryButtonDisabled"
+            :disabled="primary?.disabled"
             @click="$emit('click:primary')"
-          >{{ primaryButtonLabel }}</button>
+          >{{ primary?.label }}</button>
         </footer>
       </div>
     `,
@@ -213,11 +204,11 @@ describe("DashboardJsonEditor", () => {
     const drawer = wrapper.findComponent({ name: "ODrawer" });
     expect(drawer.exists()).toBe(true);
     expect(drawer.props("open")).toBe(true);
-    expect(drawer.props("width")).toBe(70);
+    expect(drawer.props("size")).toBe("xl");
     expect(drawer.props("title")).toBe("dashboard.editJson");
-    expect(drawer.props("primaryButtonLabel")).toBe("common.save");
-    expect(drawer.props("secondaryButtonLabel")).toBe("common.cancel");
-    expect(drawer.props("primaryButtonLoading")).toBe(false);
+    expect(drawer.props("primary")?.label).toBe("common.save");
+    expect(drawer.props("secondary")?.label).toBe("common.cancel");
+    expect(drawer.props("primary")?.loading).toBeFalsy();
   });
 
   // Test 3: Initial JSON content loading
@@ -460,7 +451,7 @@ describe("DashboardJsonEditor", () => {
     mockSaveJsonDashboard.isLoading.value = true;
     wrapper = createWrapper();
     const drawer = wrapper.findComponent({ name: "ODrawer" });
-    expect(drawer.props("primaryButtonLoading")).toBe(true);
+    expect(drawer.props("primary")?.loading).toBe(true);
   });
 
   // Test 21: ODrawer click:primary should trigger saveChanges (success path)

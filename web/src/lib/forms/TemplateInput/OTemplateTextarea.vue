@@ -86,7 +86,6 @@ function onKeydown(event: KeyboardEvent) {
       :id="props.id"
       :name="props.name"
       :autocomplete="props.autocomplete"
-      :size="props.size"
       :width="props.width"
       :fill="props.fill"
       @update:model-value="onUpdate"

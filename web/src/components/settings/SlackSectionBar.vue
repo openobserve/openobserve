@@ -83,8 +83,7 @@ onBeforeUnmount(() => {
     <OButton
       v-for="section in sections"
       :key="section.id"
-      variant="section-chip"
-      size="sm"
+      variant="ghost"
       :aria-current="active === section.id ? 'location' : undefined"
       :data-test="`slack-section-link-${section.id}`"
       @click="go(section.id)"

@@ -18,8 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AiPageShell
     data-test="ai-agent-graph"
     :title="t('aiObservability.nav.agentGraph')"
-    :subtitle="t('aiObservability.subtitle.agentGraph')"
-    icon="hub"
+    :about="t('aiObservability.subtitle.agentGraph')"
     :date-state="dateState"
     :last-run-at="graphLastRunAt"
     :is-loading="isGraphLoading"
@@ -76,10 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-secondary shrink-0"
             data-test="agent-graph-version-agnostic-hint"
           >
-            <OTooltip
-              :content="t('aiObservability.agentGraph.versionAgnosticHint')"
-              max-width="18.75rem"
-            />
+            <OTooltip :content="t('aiObservability.agentGraph.versionAgnosticHint')" />
           </OIcon>
         </template>
         <!-- Agent Graph's OWN visualization + layout selection. Kept fully
@@ -94,13 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="agent-graph-viz-type"
               @update:model-value="onVizTypeChange"
             >
-              <OToggleGroupItem value="tree" size="sm">
+              <OToggleGroupItem value="tree">
                 <template #icon-left>
                   <OIcon name="git-branch" size="sm" />
                 </template>
                 {{ t("traces.treeView") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="graph" size="sm">
+              <OToggleGroupItem value="graph">
                 <template #icon-left>
                   <OIcon name="share" size="sm" class="shrink-0" />
                 </template>
@@ -112,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="layoutOptions"
               :searchable="false"
               data-test="agent-graph-layout-type"
-              class="h-8! min-h-8! w-30"
+              class="w-30"
               :disabled="vizType === 'graph'"
               @update:model-value="onLayoutTypeChange"
             />
@@ -154,7 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <AiAgentsLoadError
         :error="agentsError ?? 'failed'"
-        size="block"
         data-test="agent-graph"
         @retry="loadAgents(true)"
       />
@@ -168,10 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex min-h-0 flex-1 items-center justify-center"
     >
       <OEmptyState
-        size="block"
-        illustration="service-graph"
+        icon="hub"
         :title="t('aiObservability.agentGraph.noAgentsTitle')"
-        :description="t('aiObservability.agentGraph.noAgentsDescription')"
+        :text="t('aiObservability.agentGraph.noAgentsDescription')"
       />
     </div>
     <!-- Agents / stream still resolving. -->
@@ -180,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="agent-graph-loading"
       class="flex min-h-0 flex-1 items-center justify-center"
     >
-      <OSpinner />
+      <OSpinner size="lg" />
     </div>
   </AiPageShell>
 </template>

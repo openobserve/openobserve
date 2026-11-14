@@ -54,9 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="tile"
           class="mx-1 flex h-12.75 shrink-0 flex-col items-center gap-0.5 py-1"
         >
-          <OSkeleton class="size-6.5" />
+          <OSkeleton shape="block" class="size-6.5" />
           <div class="flex h-3.75 items-center">
-            <OSkeleton type="text" class="h-2.5 w-12" />
+            <OSkeleton class="h-2.5 w-12" />
           </div>
         </div>
       </div>

@@ -31,16 +31,17 @@ const { t } = useI18nTyped();
 
 <template>
   <OToggleGroup
+    size="sm"
     v-model="colorBy"
     :label="t('traces.latencyHeatmap.colorBy.label')"
     label-position="left"
     mobile-dropdown
     :data-test="props.dataTest"
   >
-    <OToggleGroupItem value="spans" size="xs" :data-test="`${props.dataTest}-spans`">
+    <OToggleGroupItem value="spans" :data-test="`${props.dataTest}-spans`">
       {{ t("traces.latencyHeatmap.colorBy.spans") }}
     </OToggleGroupItem>
-    <OToggleGroupItem value="errors" size="xs" :data-test="`${props.dataTest}-errors`">
+    <OToggleGroupItem value="errors" :data-test="`${props.dataTest}-errors`">
       {{ t("traces.latencyHeatmap.colorBy.errors") }}
     </OToggleGroupItem>
   </OToggleGroup>

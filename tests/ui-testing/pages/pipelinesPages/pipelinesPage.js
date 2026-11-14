@@ -1166,9 +1166,30 @@ export class PipelinesPage {
         await this.settingsMenu.click();
         await this.pipelineDestinationsTab.click();
         await expect(this.destinationListAddBtn).toBeVisible({ timeout: 30000 });
-        await this.page
-            .locator(`[data-test="alert-destination-list-${name}-delete-destination"]`)
-            .waitFor({ state: 'visible', timeout: 30000 });
+        await this.pipelineDestinationEditBtn(name).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    /** A pipeline destination row's inline edit button; it anchors the row since Delete sits in the ⋯ menu. */
+    pipelineDestinationEditBtn(name) {
+        return this.page.locator(`[data-test="alert-destination-list-${name}-update-destination"]`);
+    }
+
+    /** Delete renders in the destination row's ⋯ menu (a portal), so open the menu before clicking it. */
+    async clickDeleteDestination(name) {
+        const row = this.page.locator('tr').filter({ has: this.pipelineDestinationEditBtn(name) });
+        await row.hover();
+        await row.locator('[data-test="alert-destination-list-row-more-actions"]').click();
+        await this.page.locator(`[data-test="alert-destination-list-${name}-delete-destination"]`).click();
+    }
+
+    /** Delete a pipeline destination and confirm; whether it is refused or goes through is the caller's check. */
+    async attemptDeletePipelineDestination(name) {
+        await this.clickDeleteDestination(name);
+        await this.confirmButton.click();
+    }
+
+    async expectPipelineDestinationRowVisible(name) {
+        await expect(this.pipelineDestinationEditBtn(name)).toBeVisible({ timeout: 10000 });
     }
 
     async deleteDestination(randomNodeName) {
@@ -1177,8 +1198,7 @@ export class PipelinesPage {
         await this.searchInput.click();
         await this.searchInput.fill(randomNodeName);
 
-        const deleteButton = this.page.locator(`[data-test="alert-destination-list-${randomNodeName}-delete-destination"]`);
-        await deleteButton.click();
+        await this.clickDeleteDestination(randomNodeName);
         await this.confirmButton.click();
 
         await expect(this.deletedSuccessfullyText).toBeVisible();
@@ -1505,7 +1525,7 @@ export class PipelinesPage {
      * yet stamped with a delete-btn data-test, etc.):
      *   - a row with a `-delete-pipeline` data-test, OR
      *   - the empty-state `no-data-message`, OR
-     *   - the OTable pagination footer "Showing X - Y" / "No data available"
+     *   - the OTable pagination footer "X–Y of Z" / "No data available"
      *     (matches the reportsPage settle pattern that proved stable in CI).
      */
     async waitForPipelineListSettled(timeout = 30000) {
@@ -1517,7 +1537,7 @@ export class PipelinesPage {
             const hasRow = !!table.querySelector('[data-test^="pipeline-list-"][data-test$="-update-pipeline"]');
             const hasEmpty = !!table.querySelector('[data-test="no-data-message"]');
             const text = table.textContent || '';
-            const hasFooter = /Showing \d+ - \d+/.test(text) || text.includes('No data available');
+            const hasFooter = /[\d,]+–[\d,]+ of/.test(text) || text.includes('No data available');
             return hasRow || hasEmpty || hasFooter;
         }, undefined, { timeout }).catch(() => {});
     }
@@ -2889,8 +2909,12 @@ export class PipelinesPage {
         if (scheduledVisible) {
             await scheduledTrigger.click();
             await this.scheduledStreamNameSelectPopover.waitFor({ state: 'visible', timeout: 10000 });
-            await this.scheduledStreamNameSelectSearch.waitFor({ state: 'visible', timeout: 10000 });
-            await this.scheduledStreamNameSelectSearch.fill(streamName);
+            // OSelect renders its search box only past eight options; a short list shows every row.
+            await this.scheduledStreamNameSelectPopover.locator('[data-test-value]').first()
+                .waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+            if (await this.scheduledStreamNameSelectSearch.count()) {
+                await this.scheduledStreamNameSelectSearch.fill(streamName);
+            }
             const option = this.scheduledStreamNameOptionByValue(streamName);
             await option.waitFor({ state: 'visible', timeout: 10000 });
             await option.click();

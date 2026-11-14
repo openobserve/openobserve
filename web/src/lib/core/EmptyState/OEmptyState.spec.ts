@@ -14,81 +14,40 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { h } from "vue";
+import { mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
-import store from "@/test/unit/helpers/store";
-
-// ── Mock illustrations module — must be hoisted so the component import sees it ─
-// Each preset references an illustration component by name from the illustrations
-// catalog. The Proxy returns a lightweight stub for every key so no illustration
-// .vue files are loaded and we never rely on their internal rendering.
-const illustrationsProxy = vi.hoisted(
-  () =>
-    new Proxy({} as Record<string, unknown>, {
-      get: () => ({
-        name: "IllustrationStub",
-        props: ["width", "animated"],
-        template: '<div data-test="illustration-stub"></div>',
-      }),
-    }),
-);
-
-vi.mock("./illustrations", () => ({
-  illustrations: illustrationsProxy,
-}));
+import { raw } from "@/types/i18n";
 
 import OEmptyState from "./OEmptyState.vue";
-import { emptyStatePresets, presetNouns } from "./presets";
+import { EMPTY_STATE_KINDS, EMPTY_STATE_SIZES, type EmptyStateProps } from "./OEmptyState.types";
 
-// ── Child component stubs ──────────────────────────────────────────────────────
-// EmptyStateActionCard: renders a button with the translated label, emits click.
-// OEmptyState's `data-test` / `data-empty-state-action` attrs fall through onto
-// the stub's button, so tests select cards by the action attribute.
-const CARD = "[data-empty-state-action]";
-const EmptyStateActionCardStub = {
-  name: "EmptyStateActionCard",
-  props: ["icon", "label", "sublabel"],
-  emits: ["click"],
-  template: `
-    <button
-      :data-label="label"
-      @click="$emit('click')"
-    >{{ label }}</button>
-  `,
-};
-
-// OIcon: no-op span.
 const OIconStub = {
   name: "OIcon",
   props: ["name", "size"],
-  template: '<span data-test="o-icon-stub"></span>',
+  template: '<span data-test="o-icon-stub" :data-name="name"></span>',
 };
 
-// OButton: renders a button with slot content, emits click.
 const OButtonStub = {
   name: "OButton",
-  props: ["variant", "size", "iconLeft"],
+  props: ["variant", "size", "icon"],
   emits: ["click"],
-  template: "<button @click=\"$emit('click')\"><slot /></button>",
+  template:
+    '<button :data-variant="variant" :data-size="size" :data-icon="icon" @click="$emit(\'click\')"><slot /></button>',
 };
 
-// ── Mount factory ──────────────────────────────────────────────────────────────
-// Defaults to the "no-dashboards" preset which has 3 bundled action cards and a
-// "block" size — exercising the most common render path. Individual tests override
-// props to target specific branches.
-function buildWrapper(props = {}) {
+function mountState(props: EmptyStateProps = {}, slots: Record<string, () => unknown> = {}) {
   return mount(OEmptyState, {
-    props: { preset: "no-dashboards", ...props },
-    global: {
-      plugins: [store, i18n],
-      stubs: {
-        EmptyStateActionCard: EmptyStateActionCardStub,
-        OIcon: OIconStub,
-        OButton: OButtonStub,
-      },
-    },
+    props: { title: raw("No alerts yet"), ...props },
+    slots,
+    global: { plugins: [i18n], stubs: { OIcon: OIconStub, OButton: OButtonStub } },
   });
 }
+
+const iconName = (w: VueWrapper) => w.find('[data-test="o-icon-stub"]').attributes("data-name");
+const tile = (w: VueWrapper) => w.find('[data-test="o2-empty-state-icon"]');
+const primary = (w: VueWrapper) => w.find('[data-test="o2-empty-state-action"]');
+const secondary = (w: VueWrapper) => w.find('[data-test="o2-empty-state-secondary-action"]');
 
 describe("OEmptyState", () => {
   let wrapper: VueWrapper;
@@ -98,481 +57,156 @@ describe("OEmptyState", () => {
     vi.clearAllMocks();
   });
 
-  // ── columns prop ────────────────────────────────────────────────────────────
-
-  describe("columns prop", () => {
-    it("uses flex-wrap on the actions wrapper when columns is true", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ columns: true });
-
-      // Assert — the actions wrapper (which receives the conditional flex
-      // classes) should have flex-wrap and should NOT have flex-nowrap.
-      const flexWrapEl = wrapper.find(".flex-wrap");
-      const flexNowrapEl = wrapper.find(".flex-nowrap");
-
-      expect(flexWrapEl.exists()).toBe(true);
-      expect(flexNowrapEl.exists()).toBe(false);
-    });
-
-    it("wraps the stretched cards only once they run out of room when columns is false", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ columns: false });
-
-      // Assert — no viewport-pinned nowrap: a narrow container must wrap at any viewport.
-      const row = wrapper.find(".flex-wrap");
-
-      expect(row.exists()).toBe(true);
-      expect(row.classes()).toContain("items-stretch");
-      expect(wrapper.find(".lg\\:flex-nowrap").exists()).toBe(false);
-    });
-
-    it("wraps the stretched cards only once they run out of room when columns is omitted (default)", () => {
-      // Arrange & Act — no columns prop at all
-      wrapper = buildWrapper();
-
-      // Assert — default is false, so the row stretches its cards and has no nowrap pin
-      const row = wrapper.find(".flex-wrap");
-
-      expect(row.exists()).toBe(true);
-      expect(row.classes()).toContain("items-stretch");
-      expect(wrapper.find(".lg\\:flex-nowrap").exists()).toBe(false);
-    });
-
-    it("renders exactly one wrapping row when columns is false", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ columns: false });
-
-      // Assert
-      expect(wrapper.findAll(".flex-wrap")).toHaveLength(1);
-    });
-
-    it("does not stretch the cards when columns is true", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ columns: true });
-
-      // Assert
-      expect(wrapper.find(".flex-wrap").classes()).not.toContain("items-stretch");
-    });
-
-    it("does not apply flex-nowrap to any element when columns is true", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ columns: true });
-
-      // Assert
-      expect(wrapper.findAll(".flex-nowrap")).toHaveLength(0);
+  describe("API constants", () => {
+    it("exposes the four kinds and two sizes", () => {
+      expect(EMPTY_STATE_KINDS).toEqual(["first-run", "filtered", "denied", "error"]);
+      expect(EMPTY_STATE_SIZES).toEqual(["page", "inline"]);
     });
   });
 
-  // ── Preset rendering ────────────────────────────────────────────────────────
-
-  describe("preset rendering", () => {
-    it("keeps every preset title, description and noun under emptyState", () => {
-      const keys = [
-        ...Object.values(emptyStatePresets).flatMap((p) => [p.titleKey, p.descriptionKey]),
-        ...Object.values(presetNouns),
-      ].filter(Boolean);
-      expect(keys.filter((k) => !String(k).startsWith("emptyState."))).toEqual([]);
+  describe("kind", () => {
+    it("defaults to first-run with the inbox icon on a neutral tile", () => {
+      wrapper = mountState();
+      expect(wrapper.attributes("data-kind")).toBe("first-run");
+      expect(iconName(wrapper)).toBe("inbox");
+      expect(tile(wrapper).classes()).toContain("bg-surface-subtle");
     });
 
-    it("renders the root element with the o2-empty-state data-test", () => {
-      // Arrange & Act
-      wrapper = buildWrapper();
-
-      // Assert
-      expect(wrapper.find('[data-test="o2-empty-state"]').exists()).toBe(true);
-    });
-
-    it("renders the illustration stub from the preset", () => {
-      // Arrange & Act — no-dashboards preset maps to illustration "board",
-      // which the Proxy resolves to IllustrationStub.
-      wrapper = buildWrapper();
-
-      // Assert
-      expect(wrapper.find('[data-test="illustration-stub"]').exists()).toBe(true);
-    });
-
-    it("renders the title from the preset i18n key", () => {
-      // Arrange & Act
-      wrapper = buildWrapper();
-
-      // Assert — the title is an <h2> element for block size, with the text
-      // resolved from emptyState.noDashboards.title
-      const title = wrapper.find("h2");
-      expect(title.exists()).toBe(true);
-      expect(title.text()).toContain("Create your first dashboard");
-    });
-
-    it("renders the description from the preset i18n key", () => {
-      // Arrange & Act
-      wrapper = buildWrapper();
-
-      // Assert — description is a <p> with text-secondary class
-      const description = wrapper.find("p");
-      expect(description.exists()).toBe(true);
-      expect(description.text()).toContain("Dashboards bring your metrics");
-    });
-
-    // On-call's empty tabs state a title and one action, with no sub-sentence, in one wording.
     it.each([
-      ["no-oncall-members", "No members yet", "Add members"],
-      ["no-oncall-rules", "No routing rules yet", "New rule"],
-      ["no-oncall-schedule", "Create your first rotation", "From scratch"],
-    ])("renders %s as a title and its action only", (preset, title, action) => {
-      wrapper = buildWrapper({ preset });
-      expect(wrapper.find("h2").text()).toBe(title);
-      expect(wrapper.find("p").exists()).toBe(false);
-      expect(wrapper.text()).toContain(action);
+      ["filtered", "search-off"],
+      ["denied", "lock"],
+      ["error", "warning-amber"],
+    ] as const)("%s uses the %s icon", (kind, icon) => {
+      wrapper = mountState({ kind });
+      expect(iconName(wrapper)).toBe(icon);
     });
 
-    // The on-call schedule cards use the Add rotation menu's two words, each with a short line.
-    it("labels the on-call schedule cards as the Add rotation menu does", () => {
-      wrapper = buildWrapper({ preset: "no-oncall-schedule" });
-      const cards = wrapper.findAllComponents({ name: "EmptyStateActionCard" });
-      expect(cards.map((card) => [card.props("label"), card.props("sublabel")])).toEqual([
-        ["From a template", "Follow the sun, weekdays and weekend, and more"],
-        ["From scratch", "Set the shift rules yourself"],
-      ]);
+    it("tints the tile red only for error", () => {
+      wrapper = mountState({ kind: "error" });
+      expect(tile(wrapper).classes()).toContain("bg-status-error-bg");
+      wrapper.unmount();
+      wrapper = mountState({ kind: "denied" });
+      expect(tile(wrapper).classes()).not.toContain("bg-status-error-bg");
     });
 
-    it("uses an inline p tag for title when size is inline", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ size: "inline" });
-
-      // Assert — inline size renders title as a <p>, not <h2>
-      expect(wrapper.find("h2").exists()).toBe(false);
-      expect(wrapper.find("p").exists()).toBe(true);
+    it("lets icon override the kind default", () => {
+      wrapper = mountState({ kind: "filtered", icon: "dashboard" });
+      expect(iconName(wrapper)).toBe("dashboard");
     });
+  });
 
-    it("renders a text-only p title for slim, with no icon or illustration", () => {
-      wrapper = buildWrapper({ size: "slim" });
-
-      expect(wrapper.find("h2").exists()).toBe(false);
-      expect(wrapper.find("p").exists()).toBe(true);
-      expect(wrapper.find('[data-test="o-icon-stub"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="illustration-stub"]').exists()).toBe(false);
-    });
-
-    it("draws no dot-grid backdrop for slim or inline unless asked for", () => {
-      expect(buildWrapper({ size: "slim" }).find('[aria-hidden="true"].absolute').exists()).toBe(
-        false,
+  describe("size", () => {
+    it("page renders a 40 px surface tile and an h2 title", () => {
+      wrapper = mountState();
+      expect(tile(wrapper).classes()).toEqual(
+        expect.arrayContaining(["size-10", "rounded-surface"]),
       );
-      expect(buildWrapper({ size: "inline" }).find('[aria-hidden="true"].absolute').exists()).toBe(
-        false,
+      expect(wrapper.find("h2").text()).toBe("No alerts yet");
+      expect(wrapper.find("h2").classes()).toContain("text-base");
+    });
+
+    it("inline renders a 32 px menu tile, a 14 px title and 13 px text", () => {
+      wrapper = mountState({ size: "inline", text: raw("Try another search.") });
+      expect(tile(wrapper).classes()).toEqual(expect.arrayContaining(["size-8", "rounded-menu"]));
+      expect(wrapper.find("h2").exists()).toBe(false);
+      expect(wrapper.find('[data-test="o2-empty-state-title"]').classes()).toContain("text-sm");
+      expect(wrapper.find('[data-test="o2-empty-state-text"]').classes()).toContain("text-compact");
+    });
+  });
+
+  describe("copy", () => {
+    it("renders text in 14 px secondary reading text", () => {
+      wrapper = mountState({ text: raw("Alerts watch a query.") });
+      const text = wrapper.find('[data-test="o2-empty-state-text"]');
+      expect(text.text()).toBe("Alerts watch a query.");
+      expect(text.classes()).toEqual(expect.arrayContaining(["text-sm", "text-text-secondary"]));
+    });
+
+    it("renders the #text slot in place of the text prop", () => {
+      wrapper = mountState({}, { text: () => h("strong", "rich") });
+      expect(wrapper.find('[data-test="o2-empty-state-text"] strong').text()).toBe("rich");
+    });
+
+    it("omits the text paragraph when there is no text", () => {
+      wrapper = mountState();
+      expect(wrapper.find('[data-test="o2-empty-state-text"]').exists()).toBe(false);
+    });
+
+    it("shows the request id in mono under an error", () => {
+      wrapper = mountState({ kind: "error", requestId: "7f3a9c21" });
+      const meta = wrapper.find('[data-test="o2-empty-state-request-id"]');
+      expect(meta.text()).toContain("7f3a9c21");
+      expect(meta.classes()).toEqual(expect.arrayContaining(["font-mono", "text-text-muted"]));
+    });
+
+    it("shows who can grant access when denied", () => {
+      wrapper = mountState({ kind: "denied", contact: raw("Ask an org admin.") });
+      expect(wrapper.find('[data-test="o2-empty-state-contact"]').text()).toBe("Ask an org admin.");
+    });
+  });
+
+  describe("actions", () => {
+    it("renders no action without a label or a listener", () => {
+      wrapper = mountState({ kind: "error" });
+      expect(primary(wrapper).exists()).toBe(false);
+    });
+
+    it("renders a primary lg CTA for first-run and calls onAction", async () => {
+      const onAction = vi.fn();
+      wrapper = mountState({ actionLabel: raw("New alert"), onAction });
+      expect(primary(wrapper).attributes("data-variant")).toBe("primary");
+      expect(primary(wrapper).attributes("data-size")).toBe("lg");
+      await primary(wrapper).trigger("click");
+      expect(onAction).toHaveBeenCalledTimes(1);
+      expect(onAction).toHaveBeenCalledWith();
+    });
+
+    it("does not render a first-run action from a listener alone", () => {
+      wrapper = mountState({ onAction: vi.fn() });
+      expect(primary(wrapper).exists()).toBe(false);
+    });
+
+    it("defaults error to Retry with the refresh icon when someone listens", () => {
+      wrapper = mountState({ kind: "error", onAction: vi.fn() });
+      expect(primary(wrapper).text()).toBe("Retry");
+      expect(primary(wrapper).attributes("data-icon")).toBe("refresh");
+      expect(primary(wrapper).attributes("data-variant")).toBe("secondary");
+    });
+
+    it("defaults filtered to Clear filters when someone listens", () => {
+      wrapper = mountState({ kind: "filtered", onAction: vi.fn() });
+      expect(primary(wrapper).text()).toBe("Clear filters");
+      expect(primary(wrapper).attributes("data-icon")).toBeUndefined();
+      expect(primary(wrapper).attributes("data-variant")).toBe("secondary");
+    });
+
+    it("keeps an explicit label over the kind default", () => {
+      wrapper = mountState({ kind: "error", actionLabel: raw("Reconnect"), onAction: vi.fn() });
+      expect(primary(wrapper).text()).toBe("Reconnect");
+      expect(primary(wrapper).attributes("data-icon")).toBeUndefined();
+    });
+
+    it("renders the secondary action and calls onSecondaryAction", async () => {
+      const onSecondaryAction = vi.fn();
+      wrapper = mountState({ secondaryActionLabel: raw("Import"), onSecondaryAction });
+      expect(secondary(wrapper).attributes("data-variant")).toBe("secondary");
+      expect(secondary(wrapper).attributes("data-size")).toBe("lg");
+      await secondary(wrapper).trigger("click");
+      expect(onSecondaryAction).toHaveBeenCalledTimes(1);
+    });
+
+    it("lets the #actions slot replace the buttons", () => {
+      wrapper = mountState(
+        { actionLabel: raw("New alert") },
+        { actions: () => h("a", { "data-test": "custom" }, "Docs") },
       );
-      expect(
-        buildWrapper({ size: "slim", backdrop: true })
-          .find('[aria-hidden="true"].absolute')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="custom"]').exists()).toBe(true);
+      expect(primary(wrapper).exists()).toBe(false);
     });
 
-    it("does not render the illustration when size is inline", () => {
-      // Arrange & Act — inline never renders the full illustration
-      wrapper = buildWrapper({ size: "inline" });
-
-      // Assert
-      expect(wrapper.find('[data-test="illustration-stub"]').exists()).toBe(false);
+    it("renders the #extra slot below the actions", () => {
+      wrapper = mountState({}, { extra: () => h("p", { "data-test": "extra" }, "More") });
+      expect(wrapper.find('[data-test="extra"]').exists()).toBe(true);
     });
-
-    it("renders an inline icon when size is inline", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ size: "inline" });
-
-      // Assert — the inline icon wrapper + OIcon stub should be present
-      expect(wrapper.find('[data-test="o-icon-stub"]').exists()).toBe(true);
-    });
-
-    it("keeps the inline icon grey for an error unless toneIcon is set", () => {
-      wrapper = buildWrapper({ size: "inline", variant: "error" });
-      const icon = wrapper.find(".o2-empty-state__inline-icon");
-      expect(icon.classes()).toContain("bg-surface-subtle");
-      expect(icon.classes()).not.toContain("bg-status-error-bg");
-    });
-
-    it("tints the inline icon red for an error when toneIcon is set", () => {
-      wrapper = buildWrapper({ size: "inline", variant: "error", toneIcon: true });
-      const icon = wrapper.find(".o2-empty-state__inline-icon");
-      expect(icon.classes()).toContain("bg-status-error-bg");
-      expect(icon.classes()).toContain("text-status-error-text");
-      expect(icon.classes()).not.toContain("bg-surface-subtle");
-    });
-
-    it("keeps a neutral inline icon grey even with toneIcon", () => {
-      wrapper = buildWrapper({ size: "inline", variant: "neutral", toneIcon: true });
-      expect(wrapper.find(".o2-empty-state__inline-icon").classes()).toContain("bg-surface-subtle");
-    });
-  });
-
-  // ── filtered state ──────────────────────────────────────────────────────────
-
-  describe("filtered state", () => {
-    it("shows a Clear filters action card when filtered is true", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ filtered: true });
-
-      // Assert — exactly one action card with the Clear filters label
-      const cards = wrapper.findAll(CARD);
-      expect(cards).toHaveLength(1);
-      expect(cards[0].attributes("data-label")).toBe("Clear filters");
-    });
-
-    it("shows filtered title with noun substitution", () => {
-      // Arrange & Act — "no-dashboards" preset → noun = "dashboards"
-      wrapper = buildWrapper({ filtered: true });
-
-      // Assert — title contains the noun injected into the filtered template
-      const title = wrapper.find("h2");
-      expect(title.text()).toBe("No dashboards found");
-    });
-
-    it("shows filtered description with noun substitution", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ filtered: true });
-
-      // Assert
-      const description = wrapper.find("p");
-      expect(description.text()).toContain("No dashboards match your current filters");
-    });
-
-    it("does not render preset actions when filtered is true", () => {
-      // Arrange & Act — "no-dashboards" has 3 actions for first-run, but
-      // filtered replaces them with the single Clear filters card.
-      wrapper = buildWrapper({ filtered: true });
-
-      // Assert
-      const cards = wrapper.findAll(CARD);
-      expect(cards).toHaveLength(1);
-      expect(cards[0].attributes("data-label")).toBe("Clear filters");
-    });
-
-    it("renders the no-results illustration when filtered is true", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ filtered: true });
-
-      // Assert — illustration stub is still rendered (the filtered path
-      // forces illustrationName to "no-results").
-      expect(wrapper.find('[data-test="illustration-stub"]').exists()).toBe(true);
-    });
-
-    it("falls back to generic noun when preset has no noun mapping", () => {
-      // Arrange — "no-data" preset is not listed in presetNouns, so it falls
-      // back to emptyState.filtered.fallbackNoun = "results".
-      // Act
-      wrapper = mount(OEmptyState, {
-        props: { preset: "no-data", filtered: true },
-        global: {
-          plugins: [store, i18n],
-          stubs: {
-            EmptyStateActionCard: EmptyStateActionCardStub,
-            OIcon: OIconStub,
-            OButton: OButtonStub,
-          },
-        },
-      });
-
-      // Assert
-      const title = wrapper.find("h2");
-      expect(title.text()).toBe("No results found");
-    });
-  });
-
-  // ── Preset actions ──────────────────────────────────────────────────────────
-
-  describe("preset actions", () => {
-    it("renders all action cards from the preset when not filtered", () => {
-      // Arrange & Act — "no-dashboards" has 3 actions
-      wrapper = buildWrapper();
-
-      // Assert
-      const cards = wrapper.findAll(CARD);
-      expect(cards).toHaveLength(3);
-    });
-
-    it("renders action cards with translated labels", () => {
-      // Arrange & Act
-      wrapper = buildWrapper();
-
-      // Assert — the three "no-dashboards" actions with their English labels
-      const cards = wrapper.findAll(CARD);
-      const labels = cards.map((c) => c.attributes("data-label"));
-      expect(labels).toEqual(["New dashboard", "Import dashboard", "Browse templates"]);
-    });
-
-    it("does not render action cards when hideAction is true", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ hideAction: true });
-
-      // Assert — actions are suppressed entirely
-      expect(wrapper.find(CARD).exists()).toBe(false);
-    });
-
-    it("does not render the actions wrapper when there are no actions", () => {
-      // Arrange — "no-data" preset has no actions array
-      // Act
-      wrapper = mount(OEmptyState, {
-        props: { preset: "no-data" },
-        global: {
-          plugins: [store, i18n],
-          stubs: {
-            EmptyStateActionCard: EmptyStateActionCardStub,
-            OIcon: OIconStub,
-            OButton: OButtonStub,
-          },
-        },
-      });
-
-      // Assert — neither action cards nor the wrapper flex div exists.
-      // The wrapper div itself has no data-test, but it is the parent of
-      // action card stubs. If no cards render, the wrapper never appears.
-      expect(wrapper.find(CARD).exists()).toBe(false);
-      // Additionally, the flex-wrap/flex-nowrap classes should not appear
-      // anywhere since the actions wrapper div is not rendered.
-      expect(wrapper.find(".flex-nowrap").exists()).toBe(false);
-    });
-  });
-
-  // ── action event ────────────────────────────────────────────────────────────
-
-  describe("action event", () => {
-    it('emits "action" with the action id when an action card is clicked', async () => {
-      // Arrange
-      wrapper = buildWrapper();
-      const firstCard = wrapper.find(CARD);
-
-      // Act
-      await firstCard.trigger("click");
-
-      // Assert — the first "no-dashboards" action is "create"
-      const emitted = wrapper.emitted("action");
-      expect(emitted).toBeTruthy();
-      expect(emitted![0]).toEqual(["create"]);
-    });
-
-    it('emits "action" with "clear-filters" id when filtered and the card is clicked', async () => {
-      // Arrange
-      wrapper = buildWrapper({ filtered: true });
-      const card = wrapper.find(CARD);
-
-      // Act
-      await card.trigger("click");
-
-      // Assert
-      const emitted = wrapper.emitted("action");
-      expect(emitted).toBeTruthy();
-      expect(emitted![0]).toEqual(["clear-filters"]);
-    });
-
-    it('emits "action" once per click', async () => {
-      // Arrange
-      wrapper = buildWrapper();
-      const card = wrapper.find(CARD);
-
-      // Act
-      await card.trigger("click");
-
-      // Assert
-      expect(wrapper.emitted("action")).toHaveLength(1);
-    });
-  });
-
-  // ── Edge cases ──────────────────────────────────────────────────────────────
-
-  describe("edge cases", () => {
-    it("renders the component with backdrop when backdrop is explicitly true", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ backdrop: true });
-
-      // Assert — the root element renders correctly.
-      expect(wrapper.find('[data-test="o2-empty-state"]').exists()).toBe(true);
-    });
-
-    it("renders the component without backdrop when backdrop is explicitly false", () => {
-      // Arrange & Act
-      wrapper = buildWrapper({ backdrop: false });
-
-      // Assert — the root element still renders.
-      expect(wrapper.find('[data-test="o2-empty-state"]').exists()).toBe(true);
-    });
-
-    it("renders actionLabel and secondaryActionLabel as OButton stubs when no preset actions exist", () => {
-      // Arrange — explicit actionLabel + secondaryActionLabel bypass the card
-      // path entirely. No preset actions, no cards.
-      // Act
-      wrapper = mount(OEmptyState, {
-        props: {
-          preset: "no-data",
-          actionLabel: "Retry",
-          secondaryActionLabel: "Cancel",
-        },
-        global: {
-          plugins: [store, i18n],
-          stubs: {
-            EmptyStateActionCard: EmptyStateActionCardStub,
-            OIcon: OIconStub,
-            OButton: OButtonStub,
-          },
-        },
-      });
-
-      // Assert
-      const buttons = wrapper.findAll(CARD);
-      expect(buttons).toHaveLength(2);
-    });
-  });
-
-  // ── action data-test (RUM action name) ─────────────────────────────────────
-
-  describe("action data-test", () => {
-    it("gives every preset action card its own data-test from the action id", () => {
-      wrapper = buildWrapper();
-      const cards = wrapper.findAll(CARD);
-      expect(cards.map((c) => c.attributes("data-test"))).toEqual([
-        "o2-empty-state-action-create",
-        "o2-empty-state-action-import",
-        "o2-empty-state-action-templates",
-      ]);
-      expect(cards.map((c) => c.attributes("data-empty-state-action"))).toEqual([
-        "create",
-        "import",
-        "templates",
-      ]);
-      // The root keeps its own marker, distinct from the actions.
-      expect(wrapper.attributes("data-test")).toBe("o2-empty-state");
-    });
-
-    it("names the simple buttons by actionId / secondaryActionId, with stable defaults", () => {
-      const mountButtons = (props: Record<string, unknown>) =>
-        mount(OEmptyState, {
-          props: {
-            preset: "no-data",
-            actionLabel: "Retry",
-            secondaryActionLabel: "Cancel",
-            ...props,
-          },
-          global: {
-            plugins: [store, i18n],
-            stubs: {
-              EmptyStateActionCard: EmptyStateActionCardStub,
-              OIcon: OIconStub,
-              OButton: OButtonStub,
-            },
-          },
-        });
-      const defaults = mountButtons({});
-      expect(defaults.findAll(CARD).map((b) => b.attributes("data-test"))).toEqual([
-        "o2-empty-state-action-primary",
-        "o2-empty-state-action-secondary",
-      ]);
-      const named = mountButtons({ actionId: "retry", secondaryActionId: "dismiss" });
-      expect(named.findAll(CARD).map((b) => b.attributes("data-empty-state-action"))).toEqual([
-        "retry",
-        "dismiss",
-      ]);
-    });
-  });
-  it("uses compact spacing above an inline recovery form", () => {
-    wrapper = buildWrapper({ size: "compact" });
-    expect(wrapper.classes()).toContain("min-h-0");
-    expect(wrapper.classes()).toContain("py-4");
   });
 });

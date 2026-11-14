@@ -311,7 +311,7 @@ describe("DropoffDrawer", () => {
   it("opens full height with a scrim, not pinned under the sub-tabs", async () => {
     await mountDrawer();
     const drawer = wrapper!.findComponent(ODrawer);
-    expect(drawer.props("size")).toBe("lg");
+    expect(drawer.props("size")).toBe("md");
     expect(drawer.props("anchor") ?? null).toBeNull();
     expect(drawer.props("seamless")).toBe(false);
   });
@@ -321,8 +321,8 @@ describe("DropoffDrawer", () => {
     const btn = wrapper!
       .findAllComponents(OButton)
       .find((b) => b.attributes("data-test") === "rum-analytics-dropoff-paths-btn")!;
-    expect(btn.props("iconRight")).toBe("arrow-forward");
-    expect(btn.props("iconLeft")).toBe("account-tree");
+    expect(btn.props("iconEnd")).toBe("arrow-forward");
+    expect(btn.props("icon")).toBe("account-tree");
   });
 
   it("See paths of dropped sessions hands the cohort to Paths (AC-25)", async () => {

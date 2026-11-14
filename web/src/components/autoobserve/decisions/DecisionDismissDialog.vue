@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="md"
     :title="copy.dismissTitle(subjectTitle)"
     :form-id="formId"
-    :primary-button-label="copy.dismissButton()"
-    primary-button-data-test="decision-dismiss-submit"
-    :primary-button-disabled="!canSubmit"
-    :secondary-button-label="t('common.cancel')"
-    secondary-button-variant="outline"
+    :primary="{
+      label: copy.dismissButton(),
+      disabled: !canSubmit,
+      dataTest: 'decision-dismiss-submit',
+    }"
+    :secondary="{ label: t('common.cancel'), variant: 'secondary' }"
     data-test="decision-dismiss-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"

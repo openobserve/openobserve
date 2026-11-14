@@ -170,7 +170,7 @@ describe("ModelPricingGaps", () => {
 
     // A later timestamp gives the retried read a new window, so it never reuses the failed one.
     const now = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 1000);
-    await w.find('[data-test="o2-empty-state-action-retry"]').trigger("click");
+    await w.find('[data-test="o2-empty-state-action"]').trigger("click");
     await flushPromises();
     now.mockRestore();
 
@@ -182,7 +182,7 @@ describe("ModelPricingGaps", () => {
     w = mountPage();
     await vi.waitFor(() => expect(w.find('[data-test="o2-table-forbidden"]').exists()).toBe(true));
     expect(w.find('[data-test="model-pricing-unpriced-error"]').exists()).toBe(false);
-    expect(w.find('[data-test="o2-empty-state-action-retry"]').exists()).toBe(false);
+    expect(w.find('[data-test="o2-empty-state-action"]').exists()).toBe(false);
   });
 
   it("Back returns to the price list", async () => {

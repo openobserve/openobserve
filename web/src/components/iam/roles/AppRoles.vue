@@ -15,39 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout :title="t('iam.roles')" icon="shield" bleed>
-    <template #subtitle>
-      <span data-test="iam-roles-subtitle">
-        {{ t("iam.rolesPage.subtitle") }}
-      </span>
-    </template>
+  <OPageLayout :title="t('iam.roles')" :about="t('iam.rolesPage.subtitle')" bleed>
     <template #actions>
-      <OButton data-test="iam-roles-add-role-btn" variant="primary" size="sm" @click="addRole">
+      <OButton data-test="iam-roles-add-role-btn" variant="primary" @click="addRole">
         {{ t("iam.addRole") }}
       </OButton>
     </template>
     <!-- ?member=<email> (from the token popup's "Assign a role" link) drives the Assign column below. -->
-    <OBanner
-      v-if="assignTarget"
-      variant="info"
-      icon="shield"
-      inline-actions
-      dense
-      data-test="iam-roles-assign-banner"
-      class="mb-3"
-    >
-      {{ t("iam.rolesPage.assignBannerText", { member: assignTarget }) }}
-      <template #actions>
-        <OButton
-          data-test="iam-roles-assign-banner-dismiss"
-          variant="ghost"
-          size="sm"
-          @click="clearAssignTarget"
-        >
-          {{ t("iam.rolesPage.assignBannerDone") }}
-        </OButton>
-      </template>
-    </OBanner>
+    <template v-if="assignTarget" #banner>
+      <OBanner tone="info" icon="shield" data-test="iam-roles-assign-banner">
+        {{ t("iam.rolesPage.assignBannerText", { member: assignTarget }) }}
+        <template #actions>
+          <OButton
+            data-test="iam-roles-assign-banner-dismiss"
+            variant="ghost"
+            @click="clearAssignTarget"
+          >
+            {{ t("iam.rolesPage.assignBannerDone") }}
+          </OButton>
+        </template>
+      </OBanner>
+    </template>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <RoleTable
@@ -78,11 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="iamRolesRefresh"
+              shortcut="iamRolesRefresh"
               data-test="iam-roles-refresh-btn"
               @click="refreshRoles"
             />
@@ -97,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     message-keypath="iam.appRoles.deleteConfirm"
     :message-name="deleteConformDialog.data?.role_name"
     :warning-message="deleteImpactMessage"
-    ok-variant="destructive"
+    kind="destructive"
     @update:ok="_deleteRole"
     @update:cancel="deleteConformDialog.show = false"
     v-model="deleteConformDialog.show"
@@ -105,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('iam.appRoles.bulkDeleteRoles')"
     :message="t('iam.appRoles.bulkDeleteConfirm', { count: selectedRoleNames.length })"
-    ok-variant="destructive"
+    kind="destructive"
     :warning-message="bulkDeleteImpactMessage"
     @update:ok="bulkDeleteUserRoles"
     @update:cancel="confirmBulkDelete = false"

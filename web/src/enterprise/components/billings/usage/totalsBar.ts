@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const PX_PER_REM = 16;
 
@@ -22,7 +21,6 @@ const PX_PER_REM = 16;
 export function totalsGridTemplate(
   columns: OTableColumnDef<any>[],
   visibility: Record<string, boolean> = {},
-  showIndex = true,
 ): string {
   const tracks = columns
     .filter((column) => visibility[column.id ?? ""] !== false)
@@ -31,7 +29,5 @@ export function totalsGridTemplate(
         ? "minmax(0, 1fr)"
         : `${column.size / PX_PER_REM}rem`,
     );
-  return [showIndex ? `${TABLE_INDEX_COL_SIZE / PX_PER_REM}rem` : null, ...tracks]
-    .filter(Boolean)
-    .join(" ");
+  return tracks.join(" ");
 }

@@ -52,6 +52,7 @@
         "ariaLabel": "Waiting for data"
       }
     },
+    "requestId": "Request {id}",
     "createFirstItem": "Create your first item",
     "newBrowserCheck": "New browser check",
     "allCaughtUp": "You're all caught up",
@@ -792,6 +793,9 @@
       "popoverLabel": "Hidden parts of this page"
     }
   },
+  "pageHeader": {
+    "about": "About this page"
+  },
   "common": {
     "loadingNoun": "Loading {noun}…",
     "loadingNouns": {
@@ -801,6 +805,7 @@
       "charts": "charts"
     },
     "dismiss": "Dismiss",
+    "undo": "Undo",
     "exitFullscreen": "Exit full screen",
     "moreActions": "More actions",
     "moreOptions": "More options",
@@ -1276,7 +1281,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "collector configuration"
+        "fleet_config": "collector configuration",
+        "workflow": "workflow"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -2066,7 +2072,7 @@
     "freeTextBuildNotice": "This filter has text search; edit it in SQL."
   },
   "menu": {
-    "alertCalibration": "Alert Calibration",
+    "alertCalibration": "Alert calibration",
     "autoobserve": "AutoObserve",
     "upgradeToProPlan": "Upgrade to PRO Plan",
     "home": "Home",
@@ -4169,8 +4175,8 @@
         }
       },
       "buttons": {
-        "contact_sales": "Contact Sales",
-        "learn_more": "Learn More"
+        "contact_sales": "Contact sales",
+        "learn_more": "Learn more"
       },
       "tooltip": {
         "high_availability_mode_only": "High Availability mode only"
@@ -4461,7 +4467,7 @@
     "usersDesc": "People with access to this organization",
     "serviceAccountsDesc": "Programmatic access tokens for APIs",
     "ingestionTokensDesc": "Tokens for ingesting data into this organization",
-    "mcpServerLabel": "MCP Server",
+    "mcpServerLabel": "MCP server",
     "mcpServerDesc": "Connect AI clients over the {product}",
     "mcpServerHeader": "MCP Server",
     "mcpServerHeaderSubtitle": "Connect Claude, Cursor, VS Code and other AI clients to this organization.",
@@ -4471,7 +4477,7 @@
     "quotaDesc": "Usage limits applied per role",
     "organizationsDesc": "Organizations you can access",
     "nameHelpText": "Use alphanumeric and '_' characters only, without spaces.",
-    "groups": "User Groups",
+    "groups": "User groups",
     "roles": "Roles",
     "organizations": "Organizations",
     "addGroup": "New user group",
@@ -4491,8 +4497,8 @@
     "searchRole": "Search Role",
     "searchGroup": "Search User Group",
     "serviceAccounts": "Service Accounts",
-    "ingestionTokens": "Ingestion Tokens",
-    "syntheticsTokens": "Synthetics Tokens",
+    "ingestionTokens": "Ingestion tokens",
+    "syntheticsTokens": "Synthetics tokens",
     "syntheticsTokensDesc": "Org-level o2syn_ tokens your private synthetics agents use to pull jobs",
     "serviceAccountsName": "Service Accounts Name",
     "basicUsers": "Users",
@@ -8623,6 +8629,12 @@
     "dateFormatEpochms": "Epoch milliseconds (epochms)",
     "dateFormatEpochus": "Epoch microseconds (epochus)",
     "newFolder": "New Folder",
+    "inlineCreate": {
+      "folderName": "New folder name",
+      "createFolder": "Create folder",
+      "tabName": "New tab name",
+      "createTab": "Create tab"
+    },
     "updateFolder": "Update Folder",
     "newReport": "New Report",
     "scheduledDashboards": "Scheduled Dashboards",
@@ -12004,6 +12016,8 @@
   "alerts": {
     "rowAction": {
       "leftFilter": "No longer matches filter",
+      "paused": "{name} paused | {count} alerts paused",
+      "resumed": "{name} resumed | {count} alerts resumed",
       "pausedLeftFilter": "{name} paused. No longer matches filter | {count} alerts paused. No longer match filter",
       "resumedLeftFilter": "{name} resumed. No longer matches filter | {count} alerts resumed. No longer match filter",
       "bulkPauseFailed": "{failed} of {total} alert couldn't be paused | {failed} of {total} alerts couldn't be paused",
@@ -14938,7 +14952,8 @@
         "mute": "You can't mute this.",
         "onCall": "On call: {people}",
         "canAct": "Can also act: {people}",
-        "people": "On call: {onCall}. Can also act: {canAct}"
+        "people": "On call: {onCall}. Can also act: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "This alert is not firing, so there is nothing to acknowledge.",
@@ -16108,7 +16123,7 @@
   },
   "settings": {
     "header": "Settings",
-    "correlationSettings": "Correlation Settings",
+    "correlationSettings": "Correlation settings",
     "generalLabel": "General Settings",
     "groupGeneral": "General",
     "groupAccessSecurity": "Access & Security",
@@ -16129,7 +16144,7 @@
     "aiToolsetsDesc": "MCP servers and CLI tools the AI assistant can use",
     "regexPatternsDesc": "Reusable regex patterns for redaction",
     "domainManagementDesc": "SSO claim parsing and sign-in restrictions by domain",
-    "passwordPolicy": "Password Policy",
+    "passwordPolicy": "Password policy",
     "passwordPolicyDesc": "Authentication policies for native email/password accounts, applied instance-wide.",
     "pipelineDestinationsDesc": "External targets for pipeline output",
     "templatesDesc": "Reusable alert message templates",
@@ -16140,13 +16155,13 @@
     "nodesDesc": "Cluster nodes and their health",
     "licenseDesc": "Enterprise license details",
     "organizationManagementDesc": "Create and manage organizations",
-    "queryManagement": "Query Management",
+    "queryManagement": "Query management",
     "scrapintervalLabel": "Scrape Interval (In Seconds) *",
     "logoLabel": "Drag & Drop Logo Image",
     "deleteLogoTitle": "Delete Logo",
-    "deleteLogoMessage": "Are you sure you want to delete the {name} logo image? Click OK to delete.",
+    "deleteLogoMessage": "Are you sure you want to delete the {name} logo image?",
     "customLogoText": "Custom logo text",
-    "orgLabel": "Organization Parameters",
+    "orgLabel": "Organization parameters",
     "logDetails": "Log Details",
     "tracesHeading": "Traces",
     "traceIdFieldName": "Trace ID field name",
@@ -16176,7 +16191,7 @@
     "cipherKeys": "Cipher Keys",
     "llmModelPricing": "LLM Model Pricing",
     "nodes": "Nodes",
-    "organizationManagement": "Organization Management",
+    "organizationManagement": "Organization management",
     "extendTrial": "Extend Trial",
     "searchOrgs": "Search Orgs",
     "org_name": "Org Name",
@@ -16185,7 +16200,7 @@
     "created_on": "Created on",
     "trial_expiry": "Trial Expiry",
     "actions": "Actions",
-    "ssoDomainRestrictions": "SSO Management",
+    "ssoDomainRestrictions": "SSO management",
     "domainRestrictionsSubsection": "Domain Restrictions",
     "domainRestrictionsSubsectionDescription": "Control which domains and specific users are allowed to login using SSO providers",
     "domainAndAllowedUsers": "Domain and allowed users",
@@ -17989,7 +18004,7 @@
     }
   },
   "aiToolset": {
-    "header": "AI Toolsets",
+    "header": "AI toolsets",
     "add": "New toolset",
     "search": "Search AI toolsets",
     "update": "Update AI Toolset",
@@ -18143,7 +18158,7 @@
     "searchRegion": "Search region"
   },
   "regex_patterns": {
-    "title": "Sensitive Data Redaction",
+    "title": "Sensitive data redaction",
     "create_pattern": "New pattern",
     "search": "Search pattern",
     "name": "Name",
@@ -21860,12 +21875,26 @@
     "minutesAgo": "{min}m ago",
     "hoursAgo": "{h}h ago",
     "notYetRefreshed": "Not yet refreshed",
-    "dataFresh": "Data is fresh",
-    "dataGettingStale": "Data is getting stale",
-    "dataStale": "Data is stale",
     "lastRefreshed": "Last refreshed: {time}",
     "refresh": "Refresh",
-    "refreshWithAge": "Refresh, last refreshed {age}"
+    "refreshWithAge": "Refresh, last refreshed {age}",
+    "refreshing": "Refreshing",
+    "failed": "Failed",
+    "autoRefresh": "Auto refresh",
+    "autoOn": "Auto · {interval}",
+    "every": "Every {interval}",
+    "interval": {
+      "10s": "10 s",
+      "30s": "30 s",
+      "1m": "1 min",
+      "5m": "5 min",
+      "15m": "15 min"
+    }
+  },
+  "copyButton": {
+    "copy": "Copy",
+    "copied": "Copied",
+    "failed": "Copy blocked · press Ctrl C"
   },
   "synthetics": {
     "variables": {
@@ -23911,7 +23940,17 @@
       "tokenLinkTooltip": "Choose which ingestion token the snippets use",
       "copiedWithToken": "Copied with org token {name}",
       "tokenIncludedHint": "Copy includes the org's ingestion token, which stays hidden here.",
-      "maskedSelectionWarning": "The hidden token was copied as dots. Use Copy, or Reveal it first."
+      "maskedSelectionWarning": "The hidden token was copied as dots. Use Copy, or Reveal it first.",
+      "wrapLines": "Wrap lines",
+      "showAll": "Show all {count} line | Show all {count} lines",
+      "showLess": "Show less"
+    },
+    "jsonViewer": {
+      "include": "Filter for this value",
+      "exclude": "Filter out this value",
+      "copyValue": "Copy value",
+      "fieldCount": "{count} field | {count} fields",
+      "itemCount": "{count} item | {count} items"
     },
     "spinner": {
       "loading": "Loading"
@@ -23921,13 +23960,16 @@
       "stepOf": "Step {current} of {total}",
       "swipeHint": "swipe to see the rest"
     },
+    "tabs": {
+      "more": "More",
+      "unsaved": "Unsaved changes",
+      "locked": "Locked"
+    },
     "statStrip": {
       "filters": "Filters",
       "showOnly": "Show only {label}",
       "alsoShow": "Also show {label}",
-      "stopShowing": "Stop showing {label}",
-      "scrollBack": "Show previous filters",
-      "scrollForward": "Show more filters"
+      "stopShowing": "Stop showing {label}"
     },
     "attributeValueCell": {
       "addIcon": "Add icon"
@@ -23964,7 +24006,10 @@
       "moreInfo": "More information"
     },
     "dialog": {
-      "closeDialog": "Close dialog"
+      "closeDialog": "Close dialog",
+      "discardChanges": "Discard changes?",
+      "keepEditing": "Keep editing",
+      "discard": "Discard"
     },
     "drawer": {
       "closeDrawer": "Close drawer"
@@ -23987,8 +24032,32 @@
       "clear": "Clear"
     },
     "file": {
-      "removeFile": "Remove file",
-      "clearAll": "Clear all"
+      "removeNamed": "Remove {name}",
+      "sourceLabel": "Import from",
+      "sourceFile": "File",
+      "sourceUrl": "URL",
+      "sourcePaste": "Paste",
+      "dropPrompt": "Drop a file here or {choose}",
+      "dropPromptMultiple": "Drop files here or {choose}",
+      "chooseAFile": "choose a file",
+      "chooseFiles": "choose files",
+      "chooseFileButton": "Choose file",
+      "chooseFilesButton": "Choose files",
+      "noFileChosen": "No file chosen",
+      "dropToUpload": "Drop to upload",
+      "upToSize": "up to {size}",
+      "upToSizeEach": "up to {size} each",
+      "oneFile": "one file",
+      "upToFiles": "up to {count} files",
+      "typeRejected": "Only {allowed} files are accepted",
+      "sizeRejected": "{size} is over the {max} limit",
+      "countRejected": "Only {count} file at a time | Only {count} files at a time",
+      "uploadFailed": "Upload failed",
+      "uploaded": "Uploaded",
+      "urlPlaceholder": "File URL",
+      "urlHelp": "We fetch it once when you import.",
+      "textPlaceholder": "Paste the content here",
+      "invalidJson": "Not valid JSON: {detail}"
     },
     "date": {
       "openCalendar": "Open calendar",
@@ -24001,7 +24070,14 @@
     "pagination": {
       "pagination": "Pagination",
       "previousPage": "Previous page",
-      "nextPage": "Next page"
+      "nextPage": "Next page",
+      "onFirstPage": "Already on the first page",
+      "onLastPage": "Already on the last page",
+      "range": "{from}–{to} of {total}",
+      "rangeOfMany": "{from}–{to} of many",
+      "pageOf": "Page {page} of {pages}",
+      "perPage": "{size} per page",
+      "pageSize": "Rows per page"
     },
     "select": {
       "more": "more",
@@ -24011,6 +24087,10 @@
       "noOptionsFound": "No options found",
       "multiSelect": "Multi select",
       "singleSelect": "Single select",
+      "any": "Any",
+      "noMatches": "No matches for \"{term}\"",
+      "clearSearch": "Clear search",
+      "addOption": "Add \"{value}\"",
       "moreInfoAbout": "More information about {field}",
       "moreInfo": "More information"
     },
@@ -24053,7 +24133,10 @@
       "removeColumnAria": "Remove column",
       "formatColumnAria": "Format column",
       "selectedOfTotal": "{selected} of {total} selected",
-      "selectedCount": "{selected} selected"
+      "selectedCount": "{selected} selected",
+      "clearSelection": "Clear",
+      "rowActions": "Row actions",
+      "moreRowActions": "More actions"
     },
     "predefinedThemes": {
       "title": "Theme",
@@ -28190,6 +28273,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Suppress the page",
     "savePolicyFailed": "Could not save the policy",
+    "savePolicyFailedReason": "Policy not saved. {reason}",
     "state_triggered": "Triggered",
     "state_triaged": "Triaged",
     "state_acknowledged": "Acknowledged",

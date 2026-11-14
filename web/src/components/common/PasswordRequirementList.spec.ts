@@ -42,16 +42,15 @@ describe("PasswordRequirementList", () => {
     expect(bar.exists()).toBe(true);
     expect(bar.attributes("data-test")).toBe("password-requirements-strength");
     // One of four rows is met: only lowercase.
-    expect(bar.props("value")).toBeCloseTo(1 / 4);
-    expect(bar.props("variant")).toBe("default");
-    expect(bar.props("size")).toBe("xs");
+    expect(bar.props("value")).toBeCloseTo(25);
+    expect(bar.props("tone")).toBe("accent");
   });
 
   it("turns the meter green only once every requirement is met", () => {
     const wrapper = mountList({ password: "Abcdefg1", showStrength: true });
 
-    expect(wrapper.findComponent(OProgressBar).props("value")).toBe(1);
-    expect(wrapper.findComponent(OProgressBar).props("variant")).toBe("success");
+    expect(wrapper.findComponent(OProgressBar).props("value")).toBe(100);
+    expect(wrapper.findComponent(OProgressBar).props("tone")).toBe("ok");
   });
 
   it("shows no meter unless asked for", () => {

@@ -46,12 +46,7 @@
         data-test="alerts-alertgroupchart-range"
         @update:model-value="onRangeChange"
       >
-        <OToggleGroupItem
-          v-for="option in rangeOptions"
-          :key="option.value"
-          :value="option.value"
-          size="sm"
-        >
+        <OToggleGroupItem v-for="option in rangeOptions" :key="option.value" :value="option.value">
           {{ option.label }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -59,7 +54,7 @@
 
     <div :class="compact ? 'h-52' : 'h-62.5'" class="relative w-full">
       <!-- The renderer's own line only starts once a schema exists, so this one covers the alert GET and generate_sql. -->
-      <LoadingProgress :loading="pending" :loading-progress-percentage="0" />
+      <OLoadingLine :active="pending" class="absolute inset-x-0 top-0 z-10" />
       <PanelSchemaRenderer
         v-if="chartData"
         :height="5"
@@ -99,7 +94,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
-import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";

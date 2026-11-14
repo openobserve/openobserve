@@ -31,11 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex gap-2" :class="collapsed ? 'flex-col items-center' : 'items-center'">
             <OButton
               v-if="footerItem"
-              variant="outline-primary"
-              :size="collapsed ? 'icon-md' : 'md'"
-              :active="activeSection === footerItem.key"
-              :icon-left="collapsed ? undefined : 'play-arrow'"
-              :icon-right="footerItem.locked && !collapsed ? 'lock' : undefined"
+              :icon-only="collapsed"
+              variant="secondary"
+              :pressed="activeSection === footerItem.key"
+              :icon="collapsed ? undefined : 'play-arrow'"
+              :icon-end="footerItem.locked && !collapsed ? 'lock' : undefined"
               :aria-label="collapsed ? footerItem.label : undefined"
               :aria-current="activeSection === footerItem.key ? 'page' : undefined"
               :class="collapsed ? undefined : 'flex-1'"
@@ -54,9 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #trigger>
                 <OButton
-                  variant="outline"
-                  size="icon-md"
-                  :active="configureActive"
+                  icon-only
+                  variant="secondary"
+                  :pressed="configureActive"
                   :aria-label="t('aiObservability.nav.tools')"
                   data-test="ai-rail-tools"
                 >
@@ -73,13 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdownItem
                   v-for="entry in configureItems"
                   :key="entry.key"
-                  :icon-left="entry.icon"
+                  :icon="entry.icon"
                   :aria-current="activeSection === entry.key ? 'page' : undefined"
                   :data-test="entry.locked ? `${entry.dataTest}-locked` : entry.dataTest"
                   @select="openEntry(entry)"
                 >
                   {{ entry.label }}
-                  <template v-if="entry.locked" #icon-right>
+                  <template v-if="entry.locked" #end>
                     <OIcon name="lock" size="xs" />
                   </template>
                 </ODropdownItem>
@@ -319,7 +319,7 @@ function openTab(key: string | number) {
   );
 }
 
-const ITEM_SUBTITLES: Record<AiObservabilityTabbedItemKey, I18nKey> = {
+const ITEM_ABOUT: Record<AiObservabilityTabbedItemKey, I18nKey> = {
   agents: "aiObservability.itemSubtitle.agents",
   costUsage: "aiObservability.itemSubtitle.costUsage",
   evaluations: "aiObservability.itemSubtitle.evaluations",
@@ -329,8 +329,7 @@ const ITEM_SUBTITLES: Record<AiObservabilityTabbedItemKey, I18nKey> = {
 const activeItemHeader = computed(() => {
   const key = TAB_OF_SECTION.get(activeTab.value);
   if (!key) return null;
-  const item = AI_OBSERVABILITY_TABBED_ITEMS[key];
-  return { title: t(item.labelKey), subtitle: t(ITEM_SUBTITLES[key]), icon: item.icon };
+  return { title: t(AI_OBSERVABILITY_TABBED_ITEMS[key].labelKey), about: t(ITEM_ABOUT[key]) };
 });
 provide(AI_SECTION_TABS, {
   tabs: activeTabs,

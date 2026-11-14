@@ -52,7 +52,7 @@ const GLOBAL = env("global", { id: "global_default", is_global: true });
 const BASE_URL = { name: "BASE_URL", kind: "plain", has_value: true } as SyntheticsVariable;
 
 const ODialogStub = {
-  props: ["open", "title", "primaryButtonLabel", "primaryButtonVariant"],
+  props: ["open", "title", "primary", "primary"],
   emits: ["click:primary", "click:secondary", "update:open"],
   template: '<div v-if="open"><slot /></div>',
 };
@@ -171,7 +171,7 @@ describe("SyntheticsVariablesTab — deleting an environment", () => {
     await flushPromises();
 
     expect(dialog().props("open")).toBe(true);
-    expect(dialog().props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog().props("primary")?.variant).toBe("danger");
     const name = wrapper.find('[data-test="synthetics-environment-delete-name"]');
     expect(name.text()).toBe("staging");
     expect(name.classes()).toContain("font-semibold");

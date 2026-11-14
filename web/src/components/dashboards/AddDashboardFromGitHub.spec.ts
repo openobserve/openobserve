@@ -99,23 +99,23 @@ const ODrawerStub = {
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral", "close"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra", "close"],
   template: `
     <div
       data-test-stub="o-drawer"
@@ -123,10 +123,10 @@ const ODrawerStub = {
       :data-title="title"
       :data-size="size"
       :data-side="side"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-disabled="primaryButtonDisabled"
-      :data-primary-loading="primaryButtonLoading"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
+      :data-primary-disabled="primary?.disabled"
+      :data-primary-loading="primary?.loading"
     >
       <slot name="header" />
       <slot />
@@ -142,23 +142,23 @@ const ODialogStub = {
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test-stub="o-dialog"
@@ -166,10 +166,10 @@ const ODialogStub = {
       :data-title="title"
       :data-size="size"
       :data-persistent="persistent"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-disabled="primaryButtonDisabled"
-      :data-primary-loading="primaryButtonLoading"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
+      :data-primary-disabled="primary?.disabled"
+      :data-primary-loading="primary?.loading"
     >
       <slot name="header" />
       <slot />
@@ -183,7 +183,7 @@ const OButtonStub = {
   props: ["variant", "size", "disabled", "loading"],
   emits: ["click"],
   inheritAttrs: false,
-  template: `<button data-test-stub="o-button" :data-test="$attrs['data-test']" :disabled="disabled" @click="$emit('click', $event)"><slot name="icon-left" /><slot /></button>`,
+  template: `<button data-test-stub="o-button" :data-test="$attrs['data-test']" :disabled="disabled" @click="$emit('click', $event)"><slot name="icon" /><slot /></button>`,
 };
 
 describe("AddDashboardFromGitHub Component", () => {
@@ -764,7 +764,7 @@ describe("AddDashboardFromGitHub Component", () => {
       const name = wrapper.find('[data-test="add-dashboard-github-replace-confirm-name"]');
       expect(name.text()).toBe("Host Metrics");
       expect(name.classes()).toContain("font-semibold");
-      expect(replaceDialog().props("primaryButtonVariant")).toBe("destructive");
+      expect(replaceDialog().props("primary")?.variant).toBe("danger");
       // Nothing is destroyed before the user answers.
       expect(dashboardsService.delete).not.toHaveBeenCalled();
       expect(dashboardsService.create).not.toHaveBeenCalled();

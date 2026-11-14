@@ -1,24 +1,24 @@
 <template>
-  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 30rem; max-width: 50rem">
-    <!-- Header -->
-    <div class="px-2 py-3">
-      <OCardSection role="header" class="w-full">
-        <div class="flex w-full items-center justify-between">
-          <div class="text-base font-bold" data-test="queryList-title-text">
-            {{ t("queries.queryList") }}
-          </div>
-          <OButton
-            :aria-label="t('common.close')"
-            variant="ghost"
-            size="icon-xs-sq"
-            data-test="queryList-cancel"
-            @click="$emit('close')"
-            icon-left="close"
-          />
-        </div>
-      </OCardSection>
-      <OSeparator />
-    </div>
+  <OCard flush class="h-full max-w-200 min-w-120">
+    <template #header>
+      <h3
+        class="text-text-heading text-compact min-w-0 truncate font-semibold"
+        data-test="queryList-title-text"
+      >
+        {{ t("queries.queryList") }}
+      </h3>
+    </template>
+    <template #actions>
+      <OButton
+        icon-only
+        :aria-label="t('common.close')"
+        variant="ghost"
+        size="sm"
+        data-test="queryList-cancel"
+        @click="$emit('close')"
+        icon="close"
+      />
+    </template>
 
     <OTable
       class="my-sticky-virtscroll-table o2-table-hide-header"
@@ -27,7 +27,6 @@
       :default-columns="false"
       row-key="_rowKey"
       pagination="none"
-      dense
       data-test="queryList-table"
     >
       <template #cell-value="{ value }">
@@ -48,14 +47,12 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 const WRAP_MAX_CHARS = 300;
 
 export default defineComponent({
   name: "QueryList",
-  components: { OSeparator, OButton, OTable, OCard, OCardSection },
+  components: { OButton, OTable, OCard },
   emits: ["save", "close"],
   props: {
     schemaData: Object,

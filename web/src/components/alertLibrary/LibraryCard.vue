@@ -59,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex items-start gap-2">
       <OCheckbox
-        size="sm"
         :model-value="selected"
         :disabled="!!licenseLockedReason"
         :aria-label="t('alert_library.selectAlert', { title: entry.title })"
@@ -106,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- The CHIP is neutral and only its icon carries the warning colour: most alerts are not ingested on a typical org. -->
       <OTag
         v-if="!ready"
-        variant="warning-quiet"
+        tone="neutral"
         class="shrink-0"
         :title="
           entry.stream ? t('alert_library.notIngestedHint', { stream: entry.stream }) : undefined
@@ -127,11 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="mt-auto flex items-center gap-1.5 pt-1">
       <!-- Neutral because most alerts are PromQL: colouring the query language would colour the norm. -->
-      <OTag
-        variant="default-soft"
-        :label="queryTypeLabelText"
-        data-test="alert-library-card-query-type"
-      />
+      <OTag tone="neutral" :label="queryTypeLabelText" data-test="alert-library-card-query-type" />
       <OTag
         v-if="isAnomaly"
         type="alertType"
@@ -146,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTooltip>
       <OTag
         v-else-if="locked"
-        variant="default-soft"
+        tone="neutral"
         icon="lock"
         :label="t('alert_library.enterprise')"
         :title="t('alert_library.enterpriseHint')"
@@ -158,9 +153,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The editor prefill speaks the scheduled alert shape only. -->
         <OButton
           v-if="!isAnomaly"
-          variant="outline"
-          size="icon-sm"
-          icon-left="edit"
+          icon-only
+          variant="secondary"
+          icon="edit"
           :aria-label="t('alert_library.drawer.customize')"
           :aria-describedby="titleId"
           :data-test="`alert-library-card-customize-${entry.id}`"
@@ -169,9 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('alert_library.card.customizeTooltip')" />
         </OButton>
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="add"
+          variant="secondary"
+          icon="add"
           :title="t('alert_library.drawer.install')"
           :aria-describedby="titleId"
           :data-test="`alert-library-card-add-${entry.id}`"

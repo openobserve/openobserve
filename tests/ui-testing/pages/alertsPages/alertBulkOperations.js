@@ -294,10 +294,11 @@ export class AlertBulkOperations {
      */
     async getAlertCount() {
         try {
-            const paginationText = await this.page.locator('text=/Showing \\d+ - \\d+ of/').textContent({ timeout: 3000 });
-            const match = paginationText.match(/of (\d+)/);
+            // The pager reads "1–20 of 143".
+            const paginationText = await this.page.locator('[data-test="o2-table-pagination-info"]').first().textContent({ timeout: 3000 });
+            const match = paginationText.match(/of ([\d,]+)/);
             if (match) {
-                const count = parseInt(match[1], 10);
+                const count = parseInt(match[1].replace(/,/g, ''), 10);
                 testLogger.debug('Current alert count', { count });
                 return count;
             }

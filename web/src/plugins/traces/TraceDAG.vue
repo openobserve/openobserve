@@ -26,11 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else-if="error" data-test="traces-trace-dag-error-message" class="p-3">
-      <OBanner
-        variant="error"
-        icon="error"
-        :content="t('traces.traceDAG.failedToLoad', { error })"
-      />
+      <OInlineNotice tone="err" :message="t('traces.traceDAG.failedToLoad', { error })" />
     </div>
 
     <div
@@ -90,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="spanStatus"
               :value="data.span_status"
               :label="t('traces.errLabel')"
-              class="text-3xs mt-0.5 h-3.5 px-1"
+              class="mt-0.5"
             />
           </div>
           <Handle
@@ -121,7 +117,7 @@ import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
@@ -157,7 +153,7 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTag,
-    OBanner,
+    OInlineNotice,
     OTruncatedText,
   },
   props: {

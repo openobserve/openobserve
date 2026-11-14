@@ -20,9 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="sm"
     :title="t('dashboard.panelDraft.restoreTitle')"
-    :primary-button-label="t('dashboard.panelDraft.continueDraft')"
-    primary-button-data-test="dashboard-panel-draft-continue"
-    :secondary-button-label="t('dashboard.panelDraft.startFresh')"
+    :primary="{
+      label: t('dashboard.panelDraft.continueDraft'),
+      dataTest: 'dashboard-panel-draft-continue',
+    }"
+    :secondary="{ label: t('dashboard.panelDraft.startFresh') }"
     data-test="dashboard-panel-draft-restore-dialog"
     @update:open="onOpenChange"
     @click:primary="emit('continue')"
@@ -32,11 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p class="text-text-body text-sm" data-test="dashboard-panel-draft-restore-message">
         {{ t("dashboard.panelDraft.restoreMessage", { date: savedAtText }) }}
       </p>
-      <OBanner
+      <OInlineNotice
         v-if="changedOnServer"
-        variant="warning"
-        icon="warning"
-        :content="t('dashboard.panelDraft.changedOnServer')"
+        tone="warn"
+        :message="t('dashboard.panelDraft.changedOnServer')"
         data-test="dashboard-panel-draft-changed-on-server"
       />
     </div>
@@ -48,7 +49,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { formatPanelDraftTime } from "@/composables/dashboard/usePanelDraft";
 
 const props = defineProps<{

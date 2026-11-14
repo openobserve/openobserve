@@ -17,14 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto pb-4">
     <OEmptyState
-      illustration="no-results"
-      :size="fieldSearchOpen ? 'compact' : 'block'"
-      :hide-action="true"
       class="w-full shrink-0"
+      icon="search-off"
       data-test="logs-no-fts-panel"
+      :title="title"
+      :text="description"
     >
-      <template #title>{{ title }}</template>
-      <template #description>{{ description }}</template>
       <template #actions>
         <EmptyStateActionCard
           :hide-chevron="true"

@@ -37,9 +37,9 @@ test.describe.configure({ retries: 1 });
  * - [data-test="dashboard-config-rows-per-page-info"] - Info icon for rows per page
  *
  * TABLE PAGINATION ELEMENTS:
- * - Records per page dropdown
- * - Row count display (e.g., "1-10 of 100")
- * - Navigation buttons (first, prev, next, last)
+ * - Page-size select ("10 per page")
+ * - Row count display (e.g., "1–10 of 100")
+ * - Navigation buttons (prev, next; first and last only past 10 pages)
  */
 test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
   test.beforeEach(async ({ page }) => {
@@ -254,9 +254,9 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     const tableBottom = pm.dashboardPanelConfigs.tablePaginationInTable;
     await expect(tableBottom).toBeVisible();
 
-    // Check for "Records per page" text
-    const rowsPerPageText = pm.dashboardPanelConfigs.tableRowsPerPageLabel;
-    await expect(rowsPerPageText).toBeVisible();
+    // Check for the page-size select
+    const rowsPerPageSelect = pm.dashboardPanelConfigs.tableRowsPerPageSelect;
+    await expect(rowsPerPageSelect).toBeVisible();
 
     testLogger.info('Verified pagination controls are visible in table');
 
@@ -306,9 +306,9 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Verify "Records per page" text is NOT visible
-    const rowsPerPageText = pm.dashboardPanelConfigs.tableRowsPerPageLabel;
-    await expect(rowsPerPageText).not.toBeVisible();
+    // Verify the page-size select is NOT visible
+    const rowsPerPageSelect = pm.dashboardPanelConfigs.tableRowsPerPageSelect;
+    await expect(rowsPerPageSelect).not.toBeVisible();
 
     testLogger.info('Verified pagination controls are hidden when disabled');
 
@@ -487,12 +487,12 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // Wait for row count text to show actual data in format "X-Y of Z"
+    // Wait for row count text to show actual data in format "X–Y of Z"
     // (After re-apply, rows load asynchronously so we poll until the text matches)
     await page.waitForFunction(
       () => {
         const el = document.querySelector('[data-test="dashboard-table-row-count"]');
-        return el && /\d+-\d+\s+of\s+\d+/.test(el.textContent ?? "");
+        return el && /[\d,]+\s*[-–]\s*[\d,]+\s+of\s+[\d,]+/.test(el.textContent ?? "");
       },
       undefined,
       { timeout: 15000 }
@@ -500,8 +500,8 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     const rowCount = pm.dashboardPanelConfigs.tableRowCount;
     const bottomText = await rowCount.textContent();
 
-    // Verify the text contains the expected format (e.g., "1-10 of 100" or similar)
-    expect(bottomText).toMatch(/\d+-\d+\s+of\s+\d+/);
+    // Verify the text contains the expected format (e.g., "1–10 of 100" or similar)
+    expect(bottomText).toMatch(/[\d,]+\s*[-–]\s*[\d,]+\s+of\s+[\d,]+/);
 
     testLogger.info('Verified row count information is displayed correctly');
 
@@ -952,9 +952,9 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify pagination controls are visible
-    const rowsPerPageText = pm.dashboardPanelConfigs.tableRowsPerPageLabel;
-    await rowsPerPageText.waitFor({ state: "visible" });
-    await expect(rowsPerPageText).toBeVisible();
+    const rowsPerPageSelect = pm.dashboardPanelConfigs.tableRowsPerPageSelect;
+    await rowsPerPageSelect.waitFor({ state: "visible" });
+    await expect(rowsPerPageSelect).toBeVisible();
 
     testLogger.info('Verified pagination works with custom SQL query table');
 
@@ -1152,16 +1152,16 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
     const tableBottom = pm.dashboardPanelConfigs.tablePagination;
     await tableBottom.waitFor({ state: "visible", timeout: 15000 });
 
-    // Verify "Records per page" text is visible
-    const rowsPerPageText = pm.dashboardPanelConfigs.tableRowsPerPageLabel;
-    await expect(rowsPerPageText).toBeVisible({ timeout: 10000 });
+    // Verify the page-size select is visible
+    const rowsPerPageSelect = pm.dashboardPanelConfigs.tableRowsPerPageSelect;
+    await expect(rowsPerPageSelect).toBeVisible({ timeout: 10000 });
 
     const paginationInfo = pm.dashboardPanelConfigs.tableRowCount;
-    await expect(paginationInfo).toHaveText(/^\s*\d+-\d+\s+of\s+\d+\s*$/, { timeout: 15000 });
+    await expect(paginationInfo).toHaveText(/^\s*[\d,]+\s*[-–]\s*[\d,]+\s+of\s+[\d,]+\s*$/, { timeout: 15000 });
 
-    // The page size must bound the range: "1-10 of N" with N > 10, never "1-N of N" (#15544).
+    // The page size must bound the range: "1–10 of N" with N > 10, never "1–N of N" (#15544).
     const paginationText = (await paginationInfo.textContent()).trim();
-    const match = paginationText.match(/^1-(\d+)\s+of\s+(\d+)$/);
+    const match = paginationText.replace(/,/g, "").match(/^1\s*[-–]\s*(\d+)\s+of\s+(\d+)$/);
     expect(match, `unexpected footer text "${paginationText}"`).not.toBeNull();
     const total = Number(match[2]);
     // The run's cpu_usage series count varies, so the second page is only checked when one exists.
@@ -1171,7 +1171,9 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
       const nextPage = page.locator('[data-test="dashboard-table-pagination-next-page"]');
       await expect(nextPage).toBeVisible();
       await nextPage.click();
-      await expect(paginationInfo).toHaveText(new RegExp(`^\\s*11-\\d+\\s+of\\s+${total}\\s*$`));
+      await expect(paginationInfo).toHaveText(
+        new RegExp(`^\\s*11\\s*[-\\u2013]\\s*[\\d,]+\\s+of\\s+${total.toLocaleString("en-US")}\\s*$`)
+      );
     }
 
     testLogger.info(`Verified PromQL table pagination: ${paginationText}`);

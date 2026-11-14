@@ -131,7 +131,7 @@ describe("RankedKeysTable navigation actions name where they go", () => {
       [`${DT}-row-0-define-event-btn`, "bookmark-add", "Create a named event"],
     ];
     for (const [id, icon, tip] of cases) {
-      expect(btn(id).props("iconLeft")).toBe(icon);
+      expect(btn(id).props("icon")).toBe(icon);
       expect(btn(id).findComponent(OTooltip).props("content")).toBe(tip);
     }
   });

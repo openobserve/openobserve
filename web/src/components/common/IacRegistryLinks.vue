@@ -82,9 +82,7 @@ const REGISTRIES = computed(() => [
       v-for="registry in REGISTRIES"
       :key="registry.key"
       :class="props.compact ? 'min-w-0! px-2! py-0!' : ''"
-      variant="outline"
-      size="sm"
-      as="a"
+      variant="secondary"
       :href="registry.url"
       target="_blank"
       rel="noopener noreferrer"
@@ -92,13 +90,12 @@ const REGISTRIES = computed(() => [
       :data-test="`${dataTest}-${registry.key}`"
     >
       <!-- Slot, not `icon-left`: that prop is typed to the icon enum and these are brand art. -->
-      <template #icon-left><OIcon :name="registry.icon" size="sm" /></template>
+      <template #icon><OIcon :name="registry.icon" size="sm" /></template>
       <template v-if="!props.compact">{{ registry.name }}</template>
       <OTooltip
         v-if="props.compact"
         :content="t('common.openProviderOnRegistry', { registry: registry.registry })"
         side="bottom"
-        align="end"
       />
     </OButton>
   </div>

@@ -348,7 +348,7 @@ document.body.appendChild(appNode);
 // Stubs shared across all mounts — one place to update when the template changes
 // ---------------------------------------------------------------------------
 const sharedStubs = {
-  DateTime: {
+  ODateTimeRange: {
     template: '<div data-test="logs-search-bar-date-time-dropdown" />',
     props: {
       autoApply: null,
@@ -444,7 +444,7 @@ const sharedStubs = {
   ODropdownItem: {
     name: "ODropdownItem",
     template:
-      '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
+      '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon" /><slot /><slot name="end" /></div>',
     emits: ["select"],
   },
   ODropdownGroup: {
@@ -459,8 +459,8 @@ const sharedStubs = {
   ODropdownSub: {
     name: "ODropdownSub",
     template:
-      '<div class="o-dropdown-sub-stub" v-bind="$attrs"><slot name="icon-left" /><slot name="trigger" /><slot name="icon-right" /><slot /></div>',
-    props: ["open", "textValue", "description"],
+      '<div class="o-dropdown-sub-stub" v-bind="$attrs">{{ label }}<slot name="end" /><slot /></div>',
+    props: ["open", "label", "icon", "description"],
   },
 };
 
@@ -1740,7 +1740,7 @@ describe("SearchBar", () => {
       wrapper = mountSearchBar();
       await flushPromises();
       expect(alertItem().attributes("disabled")).toBe("true");
-      expect(alertItem().attributes("description")).toBe("Pick a stream first");
+      expect(alertItem().attributes("disabled-reason")).toBe("Pick a stream first");
       await alertItem().trigger("click");
       expect(alertAction.createAlert).not.toHaveBeenCalled();
     });
@@ -2507,35 +2507,33 @@ describe("SearchBar", () => {
       expect((wrapper.vm as any).saveViewDialogOpen).toBe(true);
     });
 
-    it("separates the menu and the save button with a divider", async () => {
+    it("joins the menu and the save button as one secondary button group", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
       const group = wrapper.find('[data-test="traces-search-bar-saved-views"]');
-      const separator = group.findComponent({ name: "OSeparator" });
-      expect(separator.exists()).toBe(true);
-      expect(separator.props("vertical")).toBe(true);
+      for (const id of ["saved-views-btn", "saved-views-create-btn"]) {
+        const button = group.find(`[data-test="traces-search-bar-${id}"]`);
+        expect(button.attributes("data-o2-variant")).toBe("secondary");
+      }
     });
 
-    it("is as tall as Reset and More: a hairline border around full-height children", async () => {
+    it("is as tall as Reset and More", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
       const group = wrapper.find('[data-test="traces-search-bar-saved-views"]');
-      expect(group.classes()).toContain("border");
-      expect(group.classes()).toContain("p-0");
-      expect(group.classes()).toContain("h-8.5");
       expect(group.find('[data-test="traces-search-bar-saved-views-btn"]').classes()).toContain(
-        "h-full!",
+        "h-control-md",
       );
       expect(
         group.find('[data-test="traces-search-bar-saved-views-create-btn"]').classes(),
-      ).toContain("h-full!");
+      ).toContain("size-control-md");
       for (const neighbour of [
         "traces-search-bar-reset-filters-btn",
         "traces-search-bar-more-menu-btn",
       ]) {
-        expect(wrapper.find(`[data-test="${neighbour}"]`).classes()).toContain("h-8.5");
+        expect(wrapper.find(`[data-test="${neighbour}"]`).attributes("data-o2-size")).toBe("md");
       }
     });
 
@@ -2825,7 +2823,7 @@ describe("SearchBar", () => {
           title: "search.deleteSavedView",
           messageKeypath: "search.deleteSavedViewConfirm",
           messageName: tracesView.view_name,
-          confirmVariant: "destructive",
+          kind: "destructive",
         });
         expect(mockSavedViewsDelete).toHaveBeenCalledWith(expect.any(String), "t1");
         expect(dialog().props("favoriteIds")).toEqual([]);
@@ -2924,7 +2922,7 @@ describe("SearchBar", () => {
           expect.objectContaining({
             messageKeypath: "search.overwriteSavedViewConfirm",
             messageName: "checkout errors",
-            focusCancel: true,
+            kind: "destructive",
           }),
         );
         expect(mockSavedViewsPut).toHaveBeenCalledTimes(1);

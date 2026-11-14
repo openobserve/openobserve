@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-surface-base absolute inset-0 z-20 flex items-center justify-center text-center"
       >
         <div>
-          <OSpinner size="md" class="mx-auto block" data-test="video-player-loading-indicator" />
+          <OSpinner size="lg" class="mx-auto block" data-test="video-player-loading-indicator" />
           <div class="w-full text-center">
             {{ t("rum.loadingSessions") }}
           </div>
@@ -171,14 +171,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             v-if="fullscreenSupported"
+            icon-only
             class="ms-2"
             variant="ghost"
-            size="icon-sm"
             :aria-label="fullscreenLabel"
             data-test="video-player-fullscreen-btn"
             @click="handleFullscreenToggle"
           >
-            <template #icon-left
+            <template #icon
               ><OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="sm"
             /></template>
             <OTooltip :content="fullscreenLabel" />

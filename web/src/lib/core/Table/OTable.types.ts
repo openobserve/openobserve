@@ -7,20 +7,116 @@ import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { RouteLocationRaw } from "vue-router";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { Row, Table } from "@tanstack/vue-table";
-import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
+
+// ─── Density ─────────────────────────────────────────────────────
+/** Row and header height (L7): default 36 / 32, compact 28 / 28. */
+export type OTableDensity = "default" | "compact";
+
+/** Row heights in px, the virtualizer's first estimate before it measures a rendered row. */
+export const TABLE_ROW_HEIGHT_PX: Record<OTableDensity, number> = { default: 36, compact: 28 };
+
+// ─── Row state ───────────────────────────────────────────────────
+/**
+ * Calm-signal row state (C3): `exception` takes the error rail and wash, `warn` the warning
+ * rail, `paused` recedes, `recent` gets a soft tint. Healthy rows return null and stay clean.
+ */
+export type OTableRowState = "exception" | "warn" | "paused" | "recent";
+
+// ─── Row actions ─────────────────────────────────────────────────
+/** A value, or one read from the row. */
+export type OTableRowValue<T, TData = any> = T | ((row: TData) => T);
+
+/** Names a marked action: the spinner of a running one, or the dot of one with news (a kept draft). */
+export interface OTableRowActionMark {
+  label?: I18nText;
+  dataTest?: string;
+}
+
+/** Where a badge is asked for: the inline button, the menu item, or the ⋯ trigger of a marked item. */
+export type OTableRowActionPlacement = "inline" | "menu" | "more";
+
+/** A row action's data-test: fixed, or read from the row and its index. */
+export type OTableRowDataTest<TData = any> = string | ((row: TData, index: number) => string);
+
+/** An inline row action: an icon button shown on row hover, always on touch (B7). */
+export interface OTableRowAction<TData = any> {
+  id: string;
+  icon: OTableRowValue<IconName, TData>;
+  /** Names the button: its aria-label and tooltip (B5). */
+  label: OTableRowValue<I18nText, TData>;
+  onClick: (row: TData) => void;
+  hidden?: (row: TData) => boolean;
+  disabled?: (row: TData) => boolean;
+  /** Tooltip while disabled, for an action that will become available (B9). */
+  disabledReason?: (row: TData) => I18nText | undefined;
+  /** Row shortcut the button answers (`data-row-action`). Defaults to `id`. */
+  shortcut?: OTableRowValue<string, TData>;
+  /** A spinner replaces the button while true; the mark names it. */
+  loading?: (row: TData) => boolean | OTableRowActionMark;
+  /** A dot on the button; it stays visible when the row is not hovered. */
+  badge?: (row: TData) => boolean | OTableRowActionMark;
+  /** Defaults to `o2-table-row-action-<id>`; the folded menu item appends `-menu`. */
+  dataTest?: OTableRowDataTest<TData>;
+}
+
+/** An item of the row's ⋯ menu; destructive items render last, in red (B7). */
+export interface OTableRowMenuItem<TData = any> {
+  id: string;
+  label: OTableRowValue<I18nText, TData>;
+  icon?: OTableRowValue<IconName, TData>;
+  onSelect: (row: TData) => void;
+  hidden?: (row: TData) => boolean;
+  disabled?: (row: TData) => boolean;
+  /** Shown under the label while disabled (B9). */
+  disabledReason?: (row: TData) => I18nText | undefined;
+  destructive?: boolean;
+  /** Row shortcut the item answers from its closed menu (`data-row-action`). Defaults to `id`. */
+  shortcut?: OTableRowValue<string, TData>;
+  /** A dot on the item, repeated on the ⋯ trigger so a closed menu still shows it. */
+  badge?: (row: TData, placement: OTableRowActionPlacement) => boolean | OTableRowActionMark;
+  dataTest?: OTableRowDataTest<TData>;
+}
+
+/** Id of the actions column OTable appends for `rowActions` / `rowMenu`. */
+export const ROW_ACTIONS_COLUMN_ID = "__row_actions__";
+
+/** Hands `rowActions` / `rowMenu` to the cell of the appended actions column. */
+export interface OTableRowActionsContext {
+  actions: ComputedRef<OTableRowAction[]>;
+  menu: ComputedRef<OTableRowMenuItem[]>;
+  menuDataTest: ComputedRef<OTableRowDataTest | undefined>;
+}
+
+export const OTableRowActionsKey: InjectionKey<OTableRowActionsContext> =
+  Symbol("OTableRowActions");
+
+/** Ids of default-rendered columns whose values are numbers: right-aligned and tabular (D3). */
+export const OTableNumericColumnsKey: InjectionKey<ComputedRef<ReadonlySet<string>>> =
+  Symbol("OTableNumericColumns");
 
 // ─── Row rail / row tone ─────────────────────────────────────────
 /**
- * Colour of a row's left rail. `StatTone` so a rail matches the `OStatStrip`
- * tile that filters to it, plus the five alert priorities, which are their own
- * semantic ramp (`--color-priority-p*`) rather than a status tone — a P1 row is
- * not "an error", it is a P1.
+ * Colour of a row's left rail: a status tone, or one of the five alert priorities,
+ * which are their own semantic ramp (`--color-priority-p*`) rather than a status tone.
  */
-export type RowRailTone = StatTone | "amber" | "p1" | "p2" | "p3" | "p4" | "p5";
-
-/** How a row is de-emphasised. One value today; a union so it can grow. */
-export type RowTone = "muted";
+export type RowRailTone =
+  | "success"
+  | "warning"
+  | "error"
+  | "primary"
+  | "info"
+  | "orange"
+  | "blue"
+  | "teal"
+  | "purple"
+  | "neutral"
+  | "amber"
+  | "p1"
+  | "p2"
+  | "p3"
+  | "p4"
+  | "p5";
 
 // ─── Body sections ───────────────────────────────────────────────
 /**
@@ -47,8 +143,6 @@ export const ROW_RAIL_TONE_CLASS: Record<RowRailTone, string> = {
   p3: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p3",
   p4: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p4",
   p5: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-priority-p5",
-  // Status tones use the SAME tokens as the matching OStatCard tone, so a rail
-  // and the stat tile that filters to it are provably one colour.
   success: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-success-text",
   warning: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-warning-text",
   error: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-icon-chip-error-text",
@@ -63,9 +157,18 @@ export const ROW_RAIL_TONE_CLASS: Record<RowRailTone, string> = {
   amber: "[&>td:first-child]:border-s-4 [&>td:first-child]:border-s-badge-amber-soft-text",
 };
 
-/** Tone → utility classes for a de-emphasised row. */
-export const ROW_TONE_CLASS: Record<RowTone, string> = {
-  muted: "bg-surface-panel text-text-secondary",
+/** Rail of a row state; a page's own rail (`rowRailTone`, `getRowStyle`) replaces it. */
+export const ROW_STATE_RAIL_CLASS: Partial<Record<OTableRowState, string>> = {
+  exception: ROW_RAIL_TONE_CLASS.error,
+  warn: ROW_RAIL_TONE_CLASS.warning,
+};
+
+/** Fill of a row state; selection and the active row paint over it. */
+export const ROW_STATE_FILL_CLASS: Record<OTableRowState, string> = {
+  exception: "bg-status-error-bg",
+  warn: "",
+  paused: "bg-surface-panel text-text-secondary",
+  recent: "bg-status-info-bg/60",
 };
 
 // ─── Cell hover-actions context ──────────────────────────────────
@@ -118,15 +221,6 @@ export const TABLE_CELL_CLIP_ATTR = "data-o2-cell-clip";
  * style), the same edge line the first data column and toolbar search bar use.
  */
 export const TABLE_CHECKBOX_COL_SIZE = 44;
-/**
- * Fixed width (px) of the row-index ("#") column. Fits a 4-digit number at
- * text-xs after the `--spacing-table-edge` left inset (14px) + right padding.
- * Paired with `tabular-nums` on the cell so every digit is the same advance
- * width — otherwise a proportional font makes wide-glyph values (209, 200) clip
- * to "2…" while narrow ones (215) fit, at the same column width.
- */
-export const TABLE_INDEX_COL_SIZE = 56;
-
 export const COL = {
   name: 200,
   firstName: 130,
@@ -200,6 +294,8 @@ export interface OTableColumnMeta {
   isName?: boolean;
   /** Format function applied to cell value before rendering */
   format?: (value: any, row: any) => any;
+  /** A long machine id: mono and cut in the middle so both ends stay readable (D3). */
+  identifier?: boolean;
   /**
    * Elastic column: no explicit width, so it absorbs the leftover. In a
    * `horizontalScroll` table it is content-sized — it grows to its longest
@@ -215,51 +311,12 @@ export interface OTableColumnMeta {
   cellOverflowTooltip?: boolean;
   /** Show the per-column "format this column" icon (requires `enableColumnFormat` on OTable) */
   formattable?: boolean;
-  /** Buttons the actions column is sized for. Ignored when the table has `rowActions`. */
+  /** Buttons an action column is sized for; OTable sets it on the column it appends. */
   actionCount?: number;
   /** Renders the cell as a link that opens the item. Return undefined for a row that cannot be opened. */
   link?: (row: any) => RouteLocationRaw | (() => void) | undefined;
   /** Arbitrary metadata for custom cell renderers */
   [key: string]: any;
-}
-
-// ── Row actions ──────────────────────────────────────────────────
-
-/** A value, or one read from the row. */
-export type OTableRowValue<T, TData = any> = T | ((row: TData) => T);
-
-export type OTableRowActionTone = "destructive" | "success";
-
-/** `"more"` is the menu trigger, asked when the action sits inside the menu. */
-export type OTableRowActionPlacement = "inline" | "menu" | "more";
-
-export interface OTableRowActionMark {
-  /** Names the marked part: the button tooltip, the menu dot tooltip, or the menu trigger. */
-  label?: I18nText;
-  dataTest?: string;
-}
-
-export interface OTableRowAction<TData = any> {
-  /** "edit" and "delete" are placed first and last; any other id is the item's own action. */
-  id: string;
-  label: OTableRowValue<I18nText, TData>;
-  icon: OTableRowValue<IconName, TData>;
-  onSelect: (row: TData) => void;
-  visible?: (row: TData) => boolean;
-  /** `true`, or the reason shown in the tooltip. */
-  disabled?: (row: TData) => boolean | I18nText;
-  /** Keeps this action inline when more than three exist. At most two are honoured. */
-  inline?: boolean;
-  /** Colour of the button. `id: "delete"` is destructive without it. */
-  tone?: OTableRowValue<OTableRowActionTone | undefined, TData>;
-  /** Row shortcut this action answers (`data-row-action`), also from inside the menu. Defaults to `id`. */
-  shortcut?: OTableRowValue<string, TData>;
-  /** A spinner replaces the button while true; the mark names it. */
-  loading?: (row: TData) => boolean | OTableRowActionMark;
-  /** A dot on the action, for example a kept unsaved copy. */
-  badge?: (row: TData, placement: OTableRowActionPlacement) => boolean | OTableRowActionMark;
-  /** Full data-test for the inline button; the menu item appends "-menu". */
-  dataTest?: (row: TData, index: number) => string;
 }
 
 export interface OTableColumnDef<TData = any> {
@@ -349,12 +406,6 @@ export interface OTableProps<TData = any> {
   data: TData[];
   /** Column definitions */
   columns: OTableColumnDef<TData>[];
-  /** Row actions the table draws in its actions column; a `#cell-<actions column id>` slot wins. */
-  rowActions?: OTableRowAction<TData>[];
-  /** data-test of the row's "more actions" trigger. Default `o2-table-row-more-actions`. */
-  rowActionsMoreDataTest?: string | ((row: TData, index: number) => string);
-  /** Rows whose actions are drawn by the `#row-actions` slot. With the slot and no prop: every row. */
-  rowActionsSlot?: (row: TData) => boolean;
 
   // ── Pagination ──
   pagination?: OTablePaginationMode;
@@ -384,12 +435,9 @@ export interface OTableProps<TData = any> {
   sortDisabledReason?: I18nText;
 
   // ── Filtering ──
-  /** Global search/filter text */
+  /** Text the rows are filtered by; the search field itself lives in `#toolbar`. */
   globalFilter?: string;
-  /** Placeholder for global filter input */
-  globalFilterPlaceholder?: I18nText;
-  /** Show built-in global filter search bar (default: true) */
-  showGlobalFilter?: boolean;
+  /** "server" leaves `globalFilter` to the caller's fetch instead of filtering the rows. */
   filterMode?: OTableFilterMode;
 
   // ── Selection ──
@@ -470,8 +518,6 @@ export interface OTableProps<TData = any> {
    * expand. Opt-in: it measures every rendered row from the DOM.
    */
   measureExpandedRows?: boolean;
-  /** Fixed row height for virtual scroll calculations (default 48) */
-  virtualScrollItemSize?: number;
   /**
    * Rows rendered beyond the visible window on each side while virtualizing
    * (default 100). Lower it (e.g. 10–20) for heavy rows / moderate datasets so
@@ -482,15 +528,6 @@ export interface OTableProps<TData = any> {
   maxHeight?: string | number;
 
   // ── Column Features ──
-  /**
-   * Auto-render a fixed-width row-index ("#") column as the first data column.
-   * OTable injects the column, fixes its width (TABLE_INDEX_COL_SIZE), and
-   * numbers rows by their position (accounting for the page offset under
-   * server-side pagination). Pages no longer need to declare a `#` column or
-   * inject a `"#"` value into row data. Ignored if the caller already provides
-   * a column with id `"#"`.
-   */
-  showIndex?: boolean;
   /**
    * Render the header's select-all checkbox. Set false when selection is
    * bounded (e.g. a comparison that accepts exactly two rows), where
@@ -550,20 +587,8 @@ export interface OTableProps<TData = any> {
   forbiddenResource?: string;
   /** Text shown when data is empty and not loading */
   emptyMessage?: I18nText;
-  dense?: boolean;
-  /** Short rows (`--table-row-height-compact`) with no cell padding, for small list dialogs; overrides `dense`. */
-  compact?: boolean;
-  bordered?: boolean;
-  /**
-   * Draws the outer frame (border) around the whole table region. Default true.
-   * Set false when the table is embedded inside an already-bordered container
-   * (e.g. a page card) so it renders flush without a double border.
-   */
-  frame?: boolean;
-  /** Draws the hairline divider under the toolbar row (default true); set false when a subheader below would read as a double line. */
-  toolbarBordered?: boolean;
-  /** Draws the hairline above the built-in pager (default true); set false when the table sits flush in a dialog. */
-  paginationBordered?: boolean;
+  /** Row and header height (L7). One value per view; never per call site in a row. */
+  density?: OTableDensity;
   striped?: boolean;
   stickyHeader?: boolean;
   showHeader?: boolean;
@@ -579,8 +604,6 @@ export interface OTableProps<TData = any> {
    * Pair with `wrap=false` for long, unbroken content (e.g. SQL strings).
    */
   horizontalScroll?: boolean;
-  /** Fixed table width (CSS value) */
-  width?: string | number;
 
   // ── Highlighting ──
   /** Keyword(s) to highlight in cells */
@@ -597,17 +620,22 @@ export interface OTableProps<TData = any> {
   disableRowReorder?: (row: TData) => boolean;
 
   // ── Row Styling ──
+  /** Calm-signal state of a row (C3): rail, wash, recede or tint. Null keeps a healthy row clean. */
+  rowState?: (row: TData) => OTableRowState | null;
   /**
    * Token-backed 4px left rail per row — the calm-signal "row state rail".
    * Return a tone, or `null` for no rail. Replaces injecting a colour string
    * through `getRowStyle`, which forces the call site to reach a raw `var()`.
    */
   rowRailTone?: (row: TData) => RowRailTone | null;
-  /**
-   * De-emphasise a row without an `!important` class override — e.g. a snoozed
-   * page that is still listed but is not currently anybody's problem.
-   */
-  rowTone?: (row: TData) => RowTone | null;
+  /** Up to two inline icon actions per row, shown on hover and always on touch (B7). */
+  rowActions?: OTableRowAction<TData>[];
+  /** The row's ⋯ menu; destructive items render last, in red (B7). */
+  rowMenu?: OTableRowMenuItem<TData>[];
+  /** data-test of the row's ⋯ trigger. Default `o2-table-row-menu`. */
+  rowMenuDataTest?: OTableRowDataTest<TData>;
+  /** Rows whose actions cell the `#row-actions` slot draws. With the slot and no prop: every row. */
+  rowActionsSlot?: (row: TData) => boolean;
   /** Static class or dynamic function for row <tr> */
   rowClass?: string | ((row: TData) => string);
   activeRowIndex?: number | null;
@@ -619,8 +647,6 @@ export interface OTableProps<TData = any> {
   getCellStyle?: (params: { columnId: string; row: TData; value: any }) => Record<string, any>;
   /** Show hover-visible copy button on each cell */
   enableCellCopy?: boolean;
-  /** Fixed row height in px (for virtual scroll accuracy) */
-  rowHeight?: number;
 
   // ── Scroll ──
   /** External scroll element (for shared scroll containers) */
@@ -728,7 +754,7 @@ export interface OTableSlots<TData = any> {
     value: any;
     active?: boolean;
   }) => any;
-  /** Replaces the `rowActions` buttons on the rows `rowActionsSlot` names. */
+  /** Replaces the `rowActions` / `rowMenu` cell on the rows `rowActionsSlot` names. */
   "row-actions"?: (props: { row: TData; index: number }) => any;
   /** Inline actions right of the built-in copy button (requires `enable-cell-copy`). */
   "copy-actions"?: (props: { columnId: string; row: TData; value: any }) => any;
@@ -755,7 +781,7 @@ export interface OTableSlots<TData = any> {
   "toolbar-trailing"?: () => any;
   /** Full-width content between the toolbar and the table body (e.g. a summary-stat strip). */
   subheader?: () => any;
-  /** A caller-drawn pager: replaces the built-in pagination bar and still renders with `pagination="none"`. */
+  /** Replaces the footer bar with a caller-drawn band (a totals row, a panel's own pager); renders with `pagination="none"` too. */
   "pagination-bar"?: (props: {
     currentPage: number;
     pageSize: number;
@@ -768,6 +794,7 @@ export interface OTableSlots<TData = any> {
     prevPage: () => void;
     nextPage: () => void;
     lastPage: () => void;
+    goToPage: (page: number) => void;
   }) => any;
   /** Bulk-action buttons after the footer's "N of M selected" count while rows are selected; the built-in bar hosts them, so `pagination="none"` or `#pagination-bar` renders none. */
   "selection-actions"?: () => any;

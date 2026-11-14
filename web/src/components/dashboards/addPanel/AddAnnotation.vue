@@ -3,7 +3,6 @@
   <ODialog
     data-test="add-annotation-dialog"
     v-model:open="isOpen"
-    persistent
     size="lg"
     :title="
       isEditMode
@@ -11,18 +10,18 @@
         : t('dashboard.addAnnotation.addAnnotation')
     "
     form-id="add-annotation-form"
-    :primary-button-label="
-      annotationData.annotation_id
+    :primary="{
+      label: annotationData.annotation_id
         ? t('dashboard.addAnnotation.update')
-        : t('dashboard.addAnnotation.save')
-    "
-    :secondary-button-label="t('dashboard.addAnnotation.cancel')"
-    :neutral-button-label="
-      annotationData.annotation_id ? t('dashboard.addAnnotation.delete') : undefined
-    "
-    neutral-button-variant="destructive"
+        : t('dashboard.addAnnotation.save'),
+    }"
+    :secondary="{ label: t('dashboard.addAnnotation.cancel') }"
+    :extra="{
+      label: annotationData.annotation_id ? t('dashboard.addAnnotation.delete') : undefined,
+      variant: 'danger',
+    }"
     @click:secondary="handleClose"
-    @click:neutral="handleDeleteWithConfirm"
+    @click:extra="handleDeleteWithConfirm"
   >
     <OForm
       id="add-annotation-form"
@@ -46,7 +45,7 @@
 
         <OFormSelect
           name="panels"
-          :hint="t('dashboard.addAnnotation.panelsHint')"
+          :help-text="t('dashboard.addAnnotation.panelsHint')"
           :options="groupedPanelsOptions"
           multiple
           :label="t('dashboard.addAnnotation.selectPanels')"
@@ -62,12 +61,14 @@
     <ODialog
       data-test="add-annotation-delete-confirm-dialog"
       v-model:open="showDeleteConfirm"
-      size="xs"
+      size="sm"
       :title="t('dashboard.addAnnotation.confirmDelete')"
-      :secondary-button-label="t('dashboard.addAnnotation.cancel')"
-      :primary-button-label="t('dashboard.addAnnotation.delete')"
-      primary-button-variant="destructive"
-      :primary-button-loading="deleteAnnotation.isLoading.value"
+      :secondary="{ label: t('dashboard.addAnnotation.cancel') }"
+      :primary="{
+        label: t('dashboard.addAnnotation.delete'),
+        variant: 'danger',
+        loading: deleteAnnotation.isLoading.value,
+      }"
       @click:secondary="showDeleteConfirm = false"
       @click:primary="deleteAnnotation.execute()"
     >

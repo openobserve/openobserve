@@ -25,13 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   would make the same state shout and fade at once.
 -->
 <template>
-  <OBanner
-    variant="default"
-    icon="sensors-off"
-    dense
-    inline-actions
-    data-test="alert-library-empty-state"
-  >
+  <OInlineNotice tone="neutral" icon="sensors-off" data-test="alert-library-empty-state">
     <span class="flex flex-wrap gap-x-1">
       <span class="text-text-heading font-medium">{{ t("alert_library.noCollectorTitle") }}</span>
       <span class="text-text-secondary">{{
@@ -40,21 +34,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="open-in-new"
+        variant="secondary"
+        icon="open-in-new"
         data-test="alert-library-empty-state-action"
         @click="emit('action')"
       >
         {{ t("alert_library.setupGuide") }}
       </OButton>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 const props = defineProps<{

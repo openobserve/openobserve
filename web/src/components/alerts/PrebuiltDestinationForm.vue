@@ -225,20 +225,18 @@ limitations under the License.
       <div class="flex items-center gap-2">
         <OButton
           data-test="destination-preview-button"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           @click="$emit('preview')"
-          icon-left="preview"
+          icon="preview"
         >
           {{ t("alerts.preview") }}
         </OButton>
         <OButton
           data-test="destination-test-button"
           :loading="isTesting"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           @click="$emit('test')"
-          icon-left="send"
+          icon="send"
         >
           {{ t("common.test") }}
         </OButton>

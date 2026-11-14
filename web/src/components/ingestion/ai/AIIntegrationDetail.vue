@@ -29,7 +29,7 @@ import { safeHttpUrl, type CardSubstitutions } from "./content/renderMarkdown";
 import { getRichCardContent } from "./content/richCard/registry";
 import AIIntegrationCard from "./content/AIIntegrationCard.vue";
 import AIRichSetupCard from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import CodingAgentSetup from "./CodingAgentSetup.vue";
@@ -122,7 +122,7 @@ const agentGuideName = computed(
   <div v-if="integration" class="p-2">
     <OTabs
       :model-value="activeTab"
-      dense
+      size="compact"
       bordered
       data-test="ai-integration-setup-tabs"
       @update:model-value="selectTab"
@@ -148,11 +148,11 @@ const agentGuideName = computed(
       :doc-url="richContent?.docUrl ?? docURL"
       :passcode-forbidden="passcodeForbidden"
     />
-    <OBanner
+    <OInlineNotice
       v-else-if="passcodeForbidden && richContent && richContentNeedsPasscode"
-      variant="warning"
+      tone="warn"
       data-test="ai-integration-detail-passcode-forbidden"
-      :content="t('ingestion.passcodeForbiddenMessage')"
+      :message="t('ingestion.passcodeForbiddenMessage')"
     />
     <AIRichSetupCard
       v-else-if="richContent"

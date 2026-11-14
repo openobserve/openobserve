@@ -108,7 +108,7 @@ const baseStubs = {
   },
   OButton: {
     template: '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot /></button>',
-    props: ["variant", "size", "iconLeft", "disabled", "loading", "title"],
+    props: ["variant", "size", "icon", "disabled", "loading", "title"],
     inheritAttrs: true,
   },
   OBadge: {

@@ -4,8 +4,6 @@
 
 import type { I18nText } from "@/types/i18n";
 
-import type { TooltipContentProps } from "reka-ui";
-
 /** Set on every element that owns an OTooltip, so shared tooltips (e.g. OTable's) can avoid doubling it. */
 export const TOOLTIP_TRIGGER_ATTR = "data-o-tooltip-trigger";
 
@@ -19,50 +17,26 @@ export const TOOLTIP_TRIGGER_OVERFLOW = "overflow";
 export const TOOLTIP_OFF_ATTR = "data-o-tooltip-off";
 
 export type TooltipSide = "top" | "right" | "bottom" | "left";
-export type TooltipAlign = "start" | "center" | "end";
 
 export interface TooltipProps {
-  /** Tooltip text ΓÇö shorthand for `#content` slot when content is plain text */
+  /** One line: the action or the fact, sentence case. Use the `#content` slot for a second line. */
   content?: I18nText;
-  /** Which side of the trigger to render the tooltip on */
+  /** Flips once when there is no room. @default "top" */
   side?: TooltipSide;
-  /** Alignment along the chosen side */
-  align?: TooltipAlign;
-  /** Gap in pixels between trigger edge and tooltip bubble */
-  sideOffset?: TooltipContentProps["sideOffset"];
-  /** Shift along the alignment axis */
-  alignOffset?: TooltipContentProps["alignOffset"];
-  /** Milliseconds before tooltip shows on hover (maps to delayDuration) */
-  delay?: number;
-  /** CSS max-width of the tooltip content bubble */
-  maxWidth?: string;
   /** When true, the tooltip never opens */
   disabled?: boolean;
-  /**
-   * When true, the tooltip stays open while the pointer moves onto the bubble,
-   * so its content can be hovered/selected/copied (useful for long error text
-   * or paths). Default false keeps the standard non-interactive tooltip that
-   * closes as soon as the pointer leaves the trigger.
-   */
+  /** Keeps the bubble open while the pointer is on it, so its text can be selected. */
   hoverable?: boolean;
-  /** Controlled open state ΓÇö omit for uncontrolled */
+  /** Controlled open state — omit for uncontrolled */
   open?: boolean;
-  /** Extra CSS class applied to the tooltip bubble element */
+  /** Extra classes on the bubble; never a width, which is capped at 280 (guideline O1). */
   contentClass?: string;
   /** Fill class for the arrow, so it matches a `contentClass` background */
   arrowClass?: string;
-  /**
-   * Renders a keyboard-shortcut hint (OShortcut keycaps) after the content.
-   * Accepts a pre-symbolised string (`"⌘⇧A"`) or an array of keycaps
-   * (`["⌘", "⇧", "A"]`). Omit to show no hint.
-   */
-  shortcut?: string | string[];
-  /**
-   * Registry shortcut id — resolves the hint keys from `shortcutRegistry.ts`
-   * (the single source of truth) so a key change there updates this tooltip too.
-   * Prefer this over `shortcut`; `shortcut` wins if both are set.
-   */
-  shortcutId?: string;
+  /** Shortcut registry id; its keys show after the content (B6, KB3), as on OButton. */
+  shortcut?: string;
+  /** Keys to show when there is no registry binding. */
+  keys?: string | string[];
   /** Open only when the trigger's text is actually cut off; without `content` it shows that text. */
   overflowOnly?: boolean;
   /** Closes when another exclusive tooltip opens, so a row's tooltips never show side by side. */

@@ -19,16 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-card-glass-bg"
     data-test="profiles-page"
     :title="t('profiles.title')"
-    :subtitle="t('profiles.subtitle')"
-    icon="memory"
+    :about="t('profiles.subtitle')"
     title-data-test="profiles-page-title"
     bleed
   >
-    <template #title>
-      <span class="inline-flex items-center gap-2">
-        {{ t("profiles.title") }}
-        <BetaBadge />
-      </span>
+    <template #status>
+      <BetaBadge />
     </template>
     <template #actions>
       <!-- Applies a picked window at once, as on Logs and Traces: Run query is the apply step. -->
@@ -37,13 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="dateState"
         :auto-apply-dashboard="true"
         :hide-range-shift="isMobile"
-        class="h-8"
         data-test="profiles-date-picker"
       />
       <ShareButton
         :url="shareUrl"
-        variant="outline"
-        size="icon-toolbar"
+        variant="secondary"
         :disabled="!hasProfileData"
         class="h-8"
         data-test="profiles-share-btn"
@@ -52,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButtonGroup>
         <!-- All labels share one grid cell, so the button keeps the widest label's width in every language. -->
         <OButton
-          :variant="queryLoading ? 'cancel-query' : runPending ? 'warning' : 'primary'"
-          size="sm-toolbar"
+          :stale="!queryLoading && runPending"
+          :variant="queryLoading ? 'secondary' : 'primary'"
           :disabled="!queryLoading && !canQuery"
           :data-run-pending="runPending && !queryLoading ? 'true' : undefined"
           :data-test="queryLoading ? 'profiles-cancel-query' : 'profiles-run-query'"
@@ -88,9 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #trigger>
             <OButton
-              :variant="queryLoading ? 'cancel-query' : runPending ? 'warning' : 'primary'"
-              size="sm-toolbar"
-              icon-left="arrow-drop-down"
+              :variant="queryLoading ? 'secondary' : 'primary'"
+              icon="arrow-drop-down"
               class="px-1"
               :disabled="!queryLoading && !canQuery"
               :aria-label="t('profiles.runOptions')"
@@ -98,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <ODropdownItem data-test="profiles-auto-run-toggle" @select="toggleAutoRun">
-            <template #icon-left>
+            <template #icon>
               <OIcon
                 :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
                 size="sm"
@@ -124,9 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
         >
           <OSelect
+            width="full"
             v-model="selectedStream"
             :label="t('profiles.stream')"
-            label-position="inside"
+            variant="filter"
             :options="streamOptions"
             :disabled="!streamOptions.length"
             class="w-full"
@@ -137,9 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
         >
           <OSelect
+            width="full"
             v-model="selectedService"
             :label="t('profiles.service')"
-            label-position="inside"
+            variant="filter"
             :options="serviceOptions"
             class="w-full"
             data-test="profiles-service-select"
@@ -149,9 +144,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="max-w-44 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
         >
           <OSelect
+            width="full"
             v-model="selectedProfileType"
             :label="t('profiles.profileType')"
-            label-position="inside"
+            variant="filter"
             :options="profileTypeSelectOptions"
             class="w-full"
             data-test="profiles-type-select"
@@ -180,9 +176,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
       >
         <OEmptyState
-          size="block"
-          preset="load-error"
-          :description="raw(errorMessage)"
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="raw(errorMessage)"
           data-test="profiles-error"
           @action="retry"
         />
@@ -193,10 +189,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
       >
         <OEmptyState
-          size="block"
-          preset="no-streams"
+          :text="t('emptyState.noStreams.description')"
+          icon="link"
           :title="t('profiles.noStreams')"
-          :actions="noStreamsActions"
+          :action-label="t('profiles.setupIngestion')"
           data-test="profiles-no-stream"
           @action="openProfilesIngestion"
         />
@@ -208,7 +204,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
         data-test="profiles-search-cancelled"
       >
-        <OEmptyState preset="search-cancelled" size="block" @action="runQuery(true)" />
+        <OEmptyState
+          kind="filtered"
+          :title="t('emptyState.searchCancelled.title')"
+          :text="t('emptyState.searchCancelled.description')"
+          :action-label="t('emptyState.searchCancelled.action')"
+          @action="runQuery(true)"
+        />
       </div>
 
       <div
@@ -216,26 +218,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
         data-test="profiles-no-results"
       >
-        <OEmptyState preset="no-profiles" size="block" :hide-action="true" />
+        <OEmptyState
+          kind="filtered"
+          :title="t('emptyState.noProfiles.title')"
+          :text="t('emptyState.noProfiles.description')"
+        />
       </div>
 
       <OContent v-else class="flex flex-col gap-2.5 py-2.5 md:min-h-0 md:flex-1">
         <!-- A failed re-run keeps the last results and says so. -->
-        <OBanner
+        <OInlineNotice
           v-if="errorMessage"
-          variant="error"
-          dense
-          inline-actions
+          tone="err"
           class="shrink-0"
           data-test="profiles-error-banner"
         >
           {{ errorMessage }}
           <template #actions>
-            <OButton variant="outline" size="sm" data-test="profiles-error-retry" @click="retry">{{
+            <OButton variant="secondary" data-test="profiles-error-retry" @click="retry">{{
               t("emptyState.loadError.action")
             }}</OButton>
           </template>
-        </OBanner>
+        </OInlineNotice>
         <section
           v-show="!resultsExpanded"
           class="bg-surface-panel border-border-default rounded-default shrink-0 border"
@@ -254,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="line in seriesLines"
                 :key="line.key"
                 variant="ghost"
-                size="xs"
+                size="sm"
                 :disabled="line.others"
                 :data-test="`profiles-breakdown-chip-${line.key}`"
                 @click="filterToBreakdownValue(line)"
@@ -281,8 +285,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('profiles.breakdown')"
                 :model-value="breakdownLabel ?? BREAKDOWN_NONE"
                 :options="breakdownOptions"
-                size="xs"
-                width="sm"
+                size="sm"
+                width="s"
                 :disabled="!lastRun"
                 data-test="profiles-breakdown-select"
                 @update:model-value="setBreakdown"
@@ -292,8 +296,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="h-36 p-3">
             <OSkeleton
               v-if="showSkeleton || seriesLoading"
-              type="rect"
-              class="rounded-default h-full w-full"
+              shape="block"
+              class="h-full w-full"
               data-test="profiles-series-skeleton"
             />
             <ChartRenderer
@@ -324,25 +328,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="profiles-view"
               @update:model-value="setView"
             >
-              <OToggleGroupItem
-                value="top"
-                size="sm"
-                icon-left="table-chart"
-                data-test="profiles-view-top"
-              >
+              <OToggleGroupItem value="top" icon-left="table-chart" data-test="profiles-view-top">
                 {{ t("profiles.viewTop") }}
               </OToggleGroupItem>
-              <OToggleGroupItem
-                value="flame"
-                size="sm"
-                icon-left="flame"
-                data-test="profiles-view-flame"
-              >
+              <OToggleGroupItem value="flame" icon-left="flame" data-test="profiles-view-flame">
                 {{ t("profiles.viewFlame") }}
               </OToggleGroupItem>
               <OToggleGroupItem
                 value="tree"
-                size="sm"
                 icon-left="account-tree"
                 data-test="profiles-view-tree"
               >
@@ -350,7 +343,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
               <OToggleGroupItem
                 value="sandwich"
-                size="sm"
                 icon-left="swap-vert"
                 data-test="profiles-view-sandwich"
               >
@@ -358,7 +350,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
               <OToggleGroupItem
                 value="compare"
-                size="sm"
                 icon-left="compare-arrows"
                 data-test="profiles-view-compare"
               >
@@ -380,9 +371,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <!-- Same expand toggle as the Logs query editor: the results take the chart's space too. -->
             <OButton
-              :icon-left="resultsExpanded ? 'fullscreen-exit' : 'fullscreen'"
+              icon-only
+              :icon="resultsExpanded ? 'fullscreen-exit' : 'fullscreen'"
               variant="ghost"
-              size="icon-toolbar"
               :aria-label="resultsExpanded ? t('search.collapse') : t('search.expand')"
               data-test="profiles-results-expand"
               @click="resultsExpanded = !resultsExpanded"
@@ -390,17 +381,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="resultsExpanded ? t('search.collapse') : t('search.expand')" />
             </OButton>
           </header>
-          <OBanner
+          <OInlineNotice
             v-if="sampledPercent"
-            variant="info"
-            icon="info"
-            dense
-            bar
+            tone="info"
             class="shrink-0"
             data-test="profiles-partial-result"
           >
             {{ t("profiles.partialResult", { percent: sampledPercent }) }}
-          </OBanner>
+          </OInlineNotice>
           <!-- Views on the left, Function details beside them (below them on phones). -->
           <div class="md:flex md:min-h-0 md:flex-1">
             <div class="md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col">
@@ -420,11 +408,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :overscan="isMobile ? 100 : 20"
                 :scroll-el="isMobile ? resultsScrollEl : null"
                 :scroll-margin="0"
-                :show-global-filter="false"
-                :frame="false"
                 :fill-height="!isMobile"
                 class="md:min-h-0 md:flex-1"
-                :row-height="28"
+                density="compact"
                 :enable-column-resize="true"
                 data-test="profiles-top-table"
               >
@@ -473,8 +459,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSkeleton
                     v-for="width in FLAME_SKELETON_WIDTHS"
                     :key="width"
-                    type="rect"
-                    class="rounded-default h-6"
+                    shape="block"
+                    class="h-6"
                     :class="width"
                   />
                 </div>
@@ -499,9 +485,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="max-w-120 min-w-0 flex-1 max-md:min-w-full">
                     <OSelect
+                      width="full"
                       :model-value="sandwichName"
                       :label="t('profiles.function')"
-                      label-position="inside"
+                      variant="filter"
                       :options="functionOptions"
                       searchable
                       class="w-full"
@@ -524,8 +511,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSkeleton
                     v-for="width in FLAME_SKELETON_WIDTHS"
                     :key="width"
-                    type="rect"
-                    class="rounded-default h-6"
+                    shape="block"
+                    class="h-6"
                     :class="width"
                   />
                 </div>
@@ -577,11 +564,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 tree-column-id="name"
                 sorting="none"
                 pagination="none"
-                :show-global-filter="false"
-                :frame="false"
                 :fill-height="!isMobile"
                 class="md:min-h-0 md:flex-1"
-                :row-height="28"
+                density="compact"
                 :enable-column-resize="true"
                 data-test="profiles-stack-table"
               >
@@ -655,7 +640,6 @@ import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useThemeRevision } from "@/composables/useTheme";
 import { useRoute, useRouter, type LocationQuery } from "vue-router";
-import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -674,7 +658,7 @@ import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import CommonFlameGraph from "@/components/common/FlameGraphView.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -1919,14 +1903,6 @@ const retry = async () => {
   await runQuery();
 };
 
-const noStreamsActions: EmptyStateAction[] = [
-  {
-    id: "setup-ingestion",
-    icon: "cloud-upload",
-    titleKey: "profiles.setupIngestion",
-    descriptionKey: "profiles.setupIngestionDesc",
-  },
-];
 /** The in-app Data Sources profiles page, where ingestion is set up. */
 const openProfilesIngestion = () => {
   router.push({ name: "ingestProfiles", query: { org_identifier: orgIdentifier.value } });

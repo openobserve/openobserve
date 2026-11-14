@@ -41,7 +41,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import SyntheticsVariableForm from "./SyntheticsVariableForm.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 
 function mountForm(props: Record<string, unknown> = {}) {
   return shallowMount(SyntheticsVariableForm, {
@@ -67,7 +67,7 @@ function mountFormWithInputs(props: Record<string, unknown> = {}) {
       stubs: {
         ODrawer: { template: "<div><slot /></div>" },
         OFormSelect: { template: "<div />", props: ["name", "options", "disabled", "hint"] },
-        OBanner: { template: "<div><slot /></div>", props: ["variant"] },
+        OInlineNotice: { template: "<div><slot /></div>", props: ["tone"] },
       },
     },
   }) as VueWrapper;
@@ -171,7 +171,7 @@ describe("SyntheticsVariableForm — kind is fixed at creation", () => {
 
   it("warns that a global value reaches production, and only on the global tab", () => {
     const warnings = () =>
-      wrapper.findAllComponents(OBanner).filter((b) => b.props("variant") === "warning");
+      wrapper.findAllComponents(OInlineNotice).filter((b) => b.props("tone") === "warn");
     wrapper = mountForm({ environment: null });
     expect(warnings()).toHaveLength(1);
     wrapper.unmount();

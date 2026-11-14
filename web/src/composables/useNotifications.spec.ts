@@ -34,7 +34,7 @@ describe("useNotifications composable", () => {
   });
 
   describe("showErrorNotification", () => {
-    it("should add an error toast with default timeout 30000", () => {
+    it("should add an error toast with the 30 s problem timeout", () => {
       notifications.showErrorNotification("Test error message");
       expect(toastRecords).toHaveLength(1);
       expect(toastRecords[0].variant).toBe("error");
@@ -98,11 +98,11 @@ describe("useNotifications composable", () => {
   });
 
   describe("showPositiveNotification", () => {
-    it("should add a success toast with default timeout 5000", () => {
+    it("should add a success toast with the 4 s default timeout", () => {
       notifications.showPositiveNotification("Saved!");
       expect(toastRecords[0].variant).toBe("success");
       expect(toastRecords[0].message).toBe("Saved!");
-      expect(toastRecords[0].timeout).toBe(5000);
+      expect(toastRecords[0].timeout).toBe(4000);
     });
 
     it("should auto-dismiss after timeout", () => {
@@ -113,11 +113,11 @@ describe("useNotifications composable", () => {
   });
 
   describe("showInfoNotification", () => {
-    it("should add an info toast with default timeout 5000", () => {
+    it("should add an info toast with the 4 s default timeout", () => {
       notifications.showInfoNotification("FYI");
       expect(toastRecords[0].variant).toBe("info");
       expect(toastRecords[0].message).toBe("FYI");
-      expect(toastRecords[0].timeout).toBe(5000);
+      expect(toastRecords[0].timeout).toBe(4000);
     });
   });
 });

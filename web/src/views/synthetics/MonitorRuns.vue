@@ -41,14 +41,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="kpiHasLoadedOnce && synthetics.kpi.value.totalRuns === 0">
       <div class="flex flex-1 items-center justify-center">
         <OEmptyState
-          size="hero"
-          :illustration="lastTriggeredAt > 0 ? 'no-results' : 'browser-check'"
+          :kind="lastTriggeredAt > 0 ? 'filtered' : 'first-run'"
+          :icon="lastTriggeredAt > 0 ? undefined : 'web'"
           :title="
             lastTriggeredAt > 0
               ? t('synthetics.results.noRunsInWindow')
               : t('synthetics.results.noRunsYet')
           "
-          :description="
+          :text="
             lastTriggeredAt > 0
               ? t('synthetics.results.noRunsInWindowDesc')
               : t('synthetics.results.noRunsYetDesc')
@@ -110,11 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                   >
                     <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
-                      <SkeletonBox width="6.25rem" height="0.875rem" rounded-default />
+                      <OSkeleton shape="block" class="h-3.5 w-25 shrink-0" />
                       <span class="flex-1" />
-                      <SkeletonBox width="2.8125rem" height="0.75rem" rounded-default />
-                      <SkeletonBox width="3.125rem" height="0.75rem" rounded-default />
-                      <SkeletonBox width="2.8125rem" height="0.75rem" rounded-default />
+                      <OSkeleton shape="block" class="h-3 w-11.25 shrink-0" />
+                      <OSkeleton shape="block" class="h-3 w-12.5 shrink-0" />
+                      <OSkeleton shape="block" class="h-3 w-11.25 shrink-0" />
                     </div>
                     <div class="border-border-default border-t" />
                     <div class="flex flex-col gap-1 px-3.5 py-2">
@@ -130,9 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="h-5 w-5 shrink-0" />
                       </div>
                       <div class="flex justify-between">
-                        <SkeletonBox width="3.75rem" height="0.625rem" rounded-default />
-                        <SkeletonBox width="5rem" height="0.625rem" rounded-default />
-                        <SkeletonBox width="3.75rem" height="0.625rem" rounded-default />
+                        <OSkeleton shape="block" class="h-2.5 w-15 shrink-0" />
+                        <OSkeleton shape="block" class="h-2.5 w-20 shrink-0" />
+                        <OSkeleton shape="block" class="h-2.5 w-15 shrink-0" />
                       </div>
                     </div>
                   </div>
@@ -187,8 +187,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :key="n"
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-2 border px-3.5 pt-2.5 pb-2.5"
                     >
-                      <SkeletonBox width="60%" height="0.6875rem" rounded-default />
-                      <SkeletonBox width="55%" height="1.375rem" rounded-default />
+                      <OSkeleton shape="block" class="h-2.75 w-3/5 shrink-0" />
+                      <OSkeleton shape="block" class="h-5.5 w-[55%] shrink-0" />
                     </div>
                   </div>
                 </div>
@@ -238,26 +238,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                        <SkeletonBox width="6.875rem" height="0.875rem" rounded-default />
+                        <OSkeleton shape="block" class="h-3.5 w-27.5 shrink-0" />
                         <span class="flex-1" />
-                        <SkeletonBox width="5rem" height="1.25rem" rounded-default />
+                        <OSkeleton shape="block" class="h-5 w-20 shrink-0" />
                       </div>
                       <div class="border-border-default border-t" />
                       <div class="p-4">
-                        <SkeletonBox width="100%" height="10rem" rounded-default />
+                        <OSkeleton shape="block" class="h-40 w-full shrink-0" />
                       </div>
                     </div>
                     <div
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                        <SkeletonBox width="7.5rem" height="0.875rem" rounded-default />
+                        <OSkeleton shape="block" class="h-3.5 w-30 shrink-0" />
                         <span class="flex-1" />
-                        <SkeletonBox width="5.625rem" height="1.25rem" rounded-default />
+                        <OSkeleton shape="block" class="h-5 w-22.5 shrink-0" />
                       </div>
                       <div class="border-border-default border-t" />
                       <div class="p-4">
-                        <SkeletonBox width="100%" height="10rem" rounded-default />
+                        <OSkeleton shape="block" class="h-40 w-full shrink-0" />
                       </div>
                     </div>
                   </div>
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ t("synthetics.results.responseTime") }}
                         </span>
                         <span class="flex-1" />
-                        <OBadge v-if="!histogramError" variant="default" size="sm">
+                        <OBadge v-if="!histogramError" tone="neutral" size="sm">
                           {{ t("synthetics.results.p95Label") }} {{ p95Label }}
                         </OBadge>
                         <span
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ t("synthetics.runs.errorsOverTime") }}
                         </span>
                         <span class="flex-1" />
-                        <OBadge v-if="!histogramError" variant="error" size="sm">
+                        <OBadge v-if="!histogramError" tone="err" size="sm">
                           {{ t("synthetics.runs.failedCount", { count: failCount }) }}
                         </OBadge>
                         <span
@@ -350,8 +350,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                        <SkeletonBox width="1rem" height="1rem" :custom-radius="'0.25rem'" />
-                        <SkeletonBox width="6.875rem" height="0.875rem" rounded-default />
+                        <OSkeleton shape="block" class="h-4 w-4 shrink-0" />
+                        <OSkeleton shape="block" class="h-3.5 w-27.5 shrink-0" />
                       </div>
                       <div class="border-border-default border-t" />
                       <div class="flex flex-col px-2 py-2">
@@ -360,10 +360,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="row"
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
-                          <SkeletonBox width="1rem" height="1rem" :custom-radius="'0.25rem'" />
-                          <SkeletonBox width="4.375rem" height="0.75rem" rounded-default />
+                          <OSkeleton shape="block" class="h-4 w-4 shrink-0" />
+                          <OSkeleton shape="block" class="h-3 w-17.5 shrink-0" />
                           <div class="bg-border-default h-1.5 flex-1 rounded-full opacity-30" />
-                          <SkeletonBox width="2.25rem" height="0.75rem" rounded-default />
+                          <OSkeleton shape="block" class="h-3 w-9 shrink-0" />
                         </div>
                       </div>
                     </div>
@@ -622,7 +622,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="so in statusOptions"
                     :key="so.key"
                     :value="so.key"
-                    size="sm"
                     :data-test="`monitor-runs-status-filter-${so.key}`"
                   >
                     <template #icon-left>
@@ -640,7 +639,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="browserFilter"
                   :options="browserOptions"
                   icon-key="icon"
-                  size="md"
                   class="w-35!"
                   data-test="monitor-runs-filter-browser"
                 />
@@ -649,7 +647,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="deviceFilter"
                   :options="deviceOptions"
                   icon-key="icon"
-                  size="md"
                   class="w-35!"
                   data-test="monitor-runs-filter-device"
                 />
@@ -657,7 +654,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="locationFilter"
                   :options="locationOptions"
                   icon-key="icon"
-                  size="md"
                   class="w-35!"
                   data-test="monitor-runs-filter-location"
                 />
@@ -668,13 +664,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSelect
                     v-model="failedStepFilter"
                     :options="failedStepOptions"
-                    size="sm"
                     class="w-40"
                     data-test="monitor-runs-filter-step"
                   />
                   <OInput
                     v-model="locatorFilter"
-                    size="sm"
                     :placeholder="t('synthetics.runs.locatorPlaceholder')"
                     class="w-42.5"
                     data-test="monitor-runs-filter-locator"
@@ -682,7 +676,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSelect
                     v-model="actionFilter"
                     :options="actionOptions"
-                    size="sm"
                     class="w-32.5"
                     data-test="monitor-runs-filter-action"
                   />
@@ -708,12 +701,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-text-secondary text-xs">{{
                   t("synthetics.runs.filteringByErrorLabel")
                 }}</span>
-                <OBadge variant="error" size="sm" class="gap-1">
+                <OBadge tone="err" size="sm" class="gap-1">
                   {{ errorFilter }}
                   <OButton
+                    icon-only
                     :aria-label="t('common.clearFilter')"
                     variant="ghost"
-                    size="icon-xs"
                     class="text-inherit"
                     data-test="synthetics-monitor-runs-clear-error-filter-btn"
                     @click.stop="clearErrorFilter"
@@ -724,7 +717,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Runs table -->
-              <OCard class="p-0">
+              <OCard flush>
                 <OTable
                   ref="runsTableRef"
                   :columns="runColumns"
@@ -743,14 +736,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:sort-by="sortBy = $event"
                   @update:sort-order="sortOrder = $event"
                   row-key="id"
-                  :show-global-filter="false"
                   :enable-column-resize="true"
                   :enable-column-reorder="true"
                   data-test="monitor-runs-runs-table"
                   @row-click="openRun"
                 >
                   <template #cell-status="{ row }">
-                    <OBadge :variant="(row as VisibleRun).statusBadgeVariant" size="sm" dot>
+                    <OBadge :tone="(row as VisibleRun).statusBadgeVariant" size="sm" dot>
                       {{ (row as VisibleRun).statusLabel }}
                     </OBadge>
                   </template>
@@ -819,10 +811,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Monitor has runs elsewhere — guide to last run + optionally clear filters -->
                       <OEmptyState
                         v-if="synthetics.kpi.value.totalRuns > 0"
-                        size="block"
-                        illustration="no-results"
+                        icon="search-off"
                         :title="t('synthetics.results.noRunsInWindow')"
-                        :description="t('synthetics.results.noRunsInWindowDesc')"
+                        :text="t('synthetics.results.noRunsInWindowDesc')"
                         data-test="monitor-runs-empty"
                       >
                         <template #actions>
@@ -847,10 +838,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Monitor has never been run — prompt to trigger -->
                       <OEmptyState
                         v-else
-                        size="block"
-                        illustration="browser-check"
+                        icon="web"
                         :title="t('synthetics.results.noRunsYet')"
-                        :description="t('synthetics.results.noRunsYetDesc')"
+                        :text="t('synthetics.results.noRunsYetDesc')"
                         data-test="monitor-runs-empty"
                       >
                         <template #actions>
@@ -910,22 +900,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                   >
                     <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <SkeletonBox width="6.25rem" height="0.875rem" rounded-default />
+                      <OSkeleton shape="block" class="h-3.5 w-25 shrink-0" />
                     </div>
                     <div class="border-border-default border-t" />
                     <div class="p-4">
-                      <SkeletonBox width="100%" height="10rem" rounded-default />
+                      <OSkeleton shape="block" class="h-40 w-full shrink-0" />
                     </div>
                   </div>
                   <div
                     class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                   >
                     <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <SkeletonBox width="6.25rem" height="0.875rem" rounded-default />
+                      <OSkeleton shape="block" class="h-3.5 w-25 shrink-0" />
                     </div>
                     <div class="border-border-default border-t" />
                     <div class="p-4">
-                      <SkeletonBox width="100%" height="10rem" rounded-default />
+                      <OSkeleton shape="block" class="h-40 w-full shrink-0" />
                     </div>
                   </div>
                 </div>
@@ -943,7 +933,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</OTruncatedText>
                   <OButton
                     variant="ghost"
-                    size="xs"
+                    size="sm"
                     class="text-xs! underline!"
                     data-test="monitor-runs-steps-retry-btn"
                     @click="emit('refresh')"
@@ -956,17 +946,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Real content -->
               <template v-else>
                 <!-- Steps Analysis Table -->
-                <OCard class="p-0">
+                <OCard flush>
                   <OTable
                     :data="stepTableRows"
                     :columns="stepTableColumns"
                     row-key="id"
                     :pagination="'none'"
                     :sorting="'client'"
-                    :show-global-filter="false"
                     :show-header="true"
-                    :dense="true"
-                    :bordered="true"
                     :enable-column-resize="true"
                     :enable-column-reorder="true"
                     :fill-height="false"
@@ -1083,7 +1070,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
 
-              <OCard class="p-0">
+              <OCard flush>
                 <div
                   class="bg-surface-subtle border-border-default text-2xs text-text-secondary grid grid-cols-[1fr_6.25rem_10rem_2rem] gap-2.5 border-b px-4 py-2 font-semibold tracking-wide uppercase"
                 >
@@ -1137,7 +1124,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -1157,7 +1144,7 @@ import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
 import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import syntheticsService from "@/services/synthetics";
 import analytics from "@/services/product_analytics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
@@ -2339,7 +2326,7 @@ const failedStepOptions = computed<SelectOption[]>(() => {
 // ── OTable columns ───────────────────────────────────────────────────────
 interface VisibleRun {
   id: number;
-  statusBadgeVariant: BadgeVariant;
+  statusBadgeVariant: ChipTone;
   statusLabel: string;
   /** Severity order for sorting the status column — ascending surfaces the
    * runs that need attention first. Sorting the translated `statusLabel`
@@ -2371,7 +2358,7 @@ const visibleRuns = computed<VisibleRun[]>(() => {
     const isError = run.status === "error";
     return {
       id: run.id,
-      statusBadgeVariant: isPass ? "success-soft" : isWarning ? "warning-soft" : "error-soft",
+      statusBadgeVariant: isPass ? "ok" : isWarning ? "warn" : "err",
       statusLabel: isPass
         ? t("synthetics.results.passed")
         : isWarning

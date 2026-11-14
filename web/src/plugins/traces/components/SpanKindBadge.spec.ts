@@ -119,32 +119,11 @@ describe("SpanKindBadge", () => {
   // -------------------------------------------------------------------------
 
   describe("CSS modifier class", () => {
-    it('should apply "bg-badge-blue-soft-bg" class when kind is "Client"', () => {
-      wrapper = mountBadge("Client");
-      const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-client"]');
-
-      expect(badge.classes()).toContain("bg-badge-blue-soft-bg");
-    });
-
-    it('should apply "bg-badge-purple-soft-bg" class when kind is "Server"', () => {
-      wrapper = mountBadge("Server");
-      const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-server"]');
-
-      expect(badge.classes()).toContain("bg-badge-purple-soft-bg");
-    });
-
-    it('should apply "bg-badge-teal-soft-bg" class when kind is "Producer"', () => {
-      wrapper = mountBadge("Producer");
-      const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-producer"]');
-
-      expect(badge.classes()).toContain("bg-badge-teal-soft-bg");
-    });
-
-    it('should apply "bg-badge-amber-soft-bg" class when kind is "Consumer"', () => {
-      wrapper = mountBadge("Consumer");
-      const badge = wrapper.find('[data-test="trace-tree-span-kind-badge-consumer"]');
-
-      expect(badge.classes()).toContain("bg-badge-amber-soft-bg");
+    // Span kinds are categories, so every kind is a neutral chip (guideline C1).
+    it.each(["Client", "Server", "Producer", "Consumer"])("draws %s as a neutral chip", (kind) => {
+      wrapper = mountBadge(kind);
+      const badge = wrapper.find(`[data-test="trace-tree-span-kind-badge-${kind.toLowerCase()}"]`);
+      expect(badge.classes()).toContain("bg-badge-default-soft-bg");
     });
 
     it('should apply "bg-badge-default-soft-bg" class when kind is "Internal"', () => {

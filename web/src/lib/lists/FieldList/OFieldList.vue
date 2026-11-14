@@ -13,17 +13,13 @@
          how this drifted to four different values. `searchClass` remains as an
          escape hatch for a panel that genuinely needs to differ. -->
     <div v-if="showSearch" class="px-page-edge shrink-0 py-1.5" :class="searchClass">
-      <OInput
+      <OSearchInput
         :model-value="searchModel"
         data-test="o-field-list-search"
         :placeholder="searchPlaceholder ?? t('common.searchFields')"
-        clearable
         @update:model-value="onSearchChange"
       >
-        <template #icon-left>
-          <OIcon name="search" size="sm" class="o-field-list__search-icon" />
-        </template>
-      </OInput>
+      </OSearchInput>
     </div>
 
     <!-- Scrollable field list body -->
@@ -137,7 +133,7 @@
 <script setup lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { computed, ref, watch } from "vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "./OFieldRow.vue";
 import OFieldLabel from "./OFieldLabel.vue";

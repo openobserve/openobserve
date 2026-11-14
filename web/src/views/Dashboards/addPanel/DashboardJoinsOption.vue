@@ -20,17 +20,15 @@
         >
           <OButtonGroup
             class="axis-field border-border-default border-s-badge-teal-ol-border bg-surface-panel border border-s-2 [&>*:not(:first-child)]:!border-s"
-            radius="sm"
-            :divided="true"
           >
             <ODropdown>
               <template #trigger>
                 <OButton
                   variant="ghost"
-                  size="chip-12"
+                  size="xs"
                   class="!pe-1"
                   :data-test="`dashboard-join-item-${index}`"
-                  icon-right="arrow-drop-down"
+                  icon-end="arrow-drop-down"
                 >
                   <div class="flex items-center gap-1.5">
                     <LeftJoinTypeSvg
@@ -61,25 +59,26 @@
               </div>
             </ODropdown>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-chip"
-              class="!w-4"
+              size="xs"
               :data-test="`dashboard-join-item-${index}-remove`"
               @click="handleRemoveJoin(index)"
               :aria-label="t('panel.removeJoin')"
             >
-              <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+              <template #icon><OIcon name="close" size="xs" class="!size-2.5" /></template>
               <OTooltip :content="t('panel.removeJoin')" />
             </OButton>
           </OButtonGroup>
         </div>
         <OButton
-          variant="outline"
-          size="icon-chip"
+          icon-only
+          variant="secondary"
+          size="xs"
           data-test="dashboard-add-join-btn"
           @click="handleAddJoin"
           :aria-label="t('panel.addJoin')"
-          icon-left="add"
+          icon="add"
         >
           <OTooltip :content="t('panel.addJoin')" />
         </OButton>

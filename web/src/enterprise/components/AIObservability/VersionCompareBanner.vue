@@ -26,28 +26,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Renders empty when enoughSample is true AND overlap is "concurrent".
 -->
 <template>
-  <OBanner v-if="!enoughSample" variant="warning" data-test="version-compare-banner-small-sample">
+  <OInlineNotice v-if="!enoughSample" tone="warn" data-test="version-compare-banner-small-sample">
     {{ t("aiObservability.versionCompare.banner.smallSample", { nA, nB }) }}
-  </OBanner>
-  <OBanner
+  </OInlineNotice>
+  <OInlineNotice
     v-else-if="overlap === 'disjoint'"
-    variant="warning"
+    tone="warn"
     data-test="version-compare-banner-overlap-disjoint"
   >
     {{ t("aiObservability.versionCompare.banner.disjoint") }}
-  </OBanner>
-  <OBanner
+  </OInlineNotice>
+  <OInlineNotice
     v-else-if="overlap === 'partial'"
-    variant="warning"
+    tone="warn"
     data-test="version-compare-banner-overlap-partial"
   >
     {{ t("aiObservability.versionCompare.banner.partial") }}
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
 import { useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import type { OverlapState } from "@/plugins/traces/versionCompare/windows";
 
 defineProps<{

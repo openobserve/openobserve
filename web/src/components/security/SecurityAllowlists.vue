@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { computed, ref } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -71,9 +71,8 @@ async function onDelete(list: AllowList) {
       }}</span>
       <OButton
         v-if="!editing"
-        variant="outline"
-        size="sm"
-        icon-left="add"
+        variant="secondary"
+        icon="add"
         :disabled="!canAuthor"
         data-test="security-allowlists-add"
         @click="editing = 'new'"
@@ -96,20 +95,18 @@ async function onDelete(list: AllowList) {
     <div v-if="query.isLoading.value" class="flex items-center justify-center py-6">
       <OSpinner size="sm" />
     </div>
-    <OBanner
+    <OInlineNotice
       v-else-if="query.isError.value && !isForbiddenError(query.error.value)"
-      variant="error-soft"
-      icon="error-outline"
-      dense
+      tone="err"
       data-test="security-allowlists-error"
-      >{{ t("siem.tuning.allowlists.loadError") }}</OBanner
+      >{{ t("siem.tuning.allowlists.loadError") }}</OInlineNotice
     >
     <OEmptyState
       v-else-if="!lists.length && !editing"
       size="inline"
       icon="checklist"
       :title="t('siem.tuning.allowlists.empty')"
-      :description="t('siem.tuning.allowlists.emptyHint')"
+      :text="t('siem.tuning.allowlists.emptyHint')"
       data-test="security-allowlists-empty"
     />
     <ul
@@ -127,7 +124,7 @@ async function onDelete(list: AllowList) {
           <div class="flex flex-wrap items-center gap-1.5">
             <span class="text-text-heading text-sm font-semibold">{{ list.name }}</span>
             <span class="text-text-secondary font-mono text-xs">{{ list.id }}</span>
-            <OTag variant="primary-soft" size="xs">{{
+            <OTag tone="accent" size="sm">{{
               t(`siem.tuning.allowlists.purpose.${list.purpose}`)
             }}</OTag>
           </div>
@@ -138,8 +135,8 @@ async function onDelete(list: AllowList) {
             <OTag
               v-for="v in list.values.slice(0, VISIBLE_VALUES)"
               :key="v"
-              variant="default-soft"
-              size="xs"
+              tone="neutral"
+              size="sm"
               class="font-mono"
               >{{ v }}</OTag
             >
@@ -158,25 +155,21 @@ async function onDelete(list: AllowList) {
         <OButton
           v-if="canAuthor"
           variant="ghost"
-          size="icon-sm"
-          icon-left="edit"
-          :aria-label="t('siem.tuning.allowlists.edit')"
+          icon-only
+          icon="edit"
+          :label="t('siem.tuning.allowlists.edit')"
           :data-test="`security-allowlist-edit-${list.id}`"
           @click="editing = list"
-        >
-          <OTooltip :content="t('siem.tuning.allowlists.edit')" />
-        </OButton>
+        />
         <OButton
           v-if="canAdmin"
-          variant="ghost-destructive"
-          size="icon-sm"
-          icon-left="delete"
-          :aria-label="t('siem.tuning.allowlists.delete')"
+          variant="danger-ghost"
+          icon-only
+          icon="delete"
+          :label="t('siem.tuning.allowlists.delete')"
           :data-test="`security-allowlist-delete-${list.id}`"
           @click="onDelete(list)"
-        >
-          <OTooltip :content="t('siem.tuning.allowlists.delete')" />
-        </OButton>
+        />
       </li>
     </ul>
   </div>

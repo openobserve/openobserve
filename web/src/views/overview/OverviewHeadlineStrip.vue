@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- a tile without a list behind it is plain text, so it never looks clickable -->
         <component
           :is="item.selectable ? OButton : 'div'"
-          v-bind="item.selectable ? { variant: 'cell' } : {}"
+          v-bind="item.selectable ? { variant: 'link' } : {}"
           class="flex flex-1 flex-col"
           :data-test="`overview-headline-${item.key}`"
           @click="item.selectable && emit('select', item.key)"
@@ -38,7 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span :class="['text-text-label text-xs', item.ask && askVisible ? 'pe-6' : '']">{{
               item.label
             }}</span>
-            <OSkeleton v-if="item.loading" class="h-9 w-16" data-test="overview-tile-skeleton" />
+            <OSkeleton
+              v-if="item.loading"
+              shape="block"
+              class="h-9 w-16"
+              data-test="overview-tile-skeleton"
+            />
             <span v-else class="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
               <span
                 :class="['text-3xl font-bold tabular-nums', item.tone]"

@@ -8,6 +8,7 @@ import OTableBodyRow from "./OTableBodyRow.vue";
 import { ENTER_FADE } from "@/lib/styles/motion";
 import { PAGE_ENTRANCE_KEY } from "@/lib/core/PageLayout/pageEntrance";
 import { VueDraggableNext } from "vue-draggable-next";
+import type { OTableRowState } from "../OTable.types";
 
 // The parent's attrs belong on the data tbody, not the body-start one.
 defineOptions({ inheritAttrs: false });
@@ -32,11 +33,10 @@ const props = defineProps<{
   shouldHighlightColumn?: (columnId: string) => boolean;
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
   wrap?: boolean;
-  dense?: boolean;
-  compact?: boolean;
-  bordered?: boolean;
   striped?: boolean;
   rowClass?: string | ((row: any) => string);
+  rowState?: (row: any) => OTableRowState | null;
+  hasOwnRail?: boolean;
   activeRowIndex?: number | null;
   rowStyleFn?: (row: any) => Record<string, any>;
   loading?: boolean;
@@ -265,11 +265,10 @@ const headingColspan = computed(
       :should-highlight-column="shouldHighlightColumn"
       :get-highlighted-html="getHighlightedHtml"
       :wrap="wrap"
-      :dense="dense"
-      :compact="compact"
-      :bordered="bordered"
       :striped="striped"
       :row-class-fn="rowClass"
+      :row-state-fn="rowState"
+      :has-own-rail="hasOwnRail"
       :is-active="isActiveRow(getRowForItem(item))"
       :row-style-fn="rowStyleFn"
       :status-bar-color="getStatusBarColor?.(item)"
@@ -310,7 +309,7 @@ const headingColspan = computed(
         :data-test="`o2-table-section-${item.sectionKey}`"
         class="bg-surface-panel"
       >
-        <td :colspan="headingColspan" :class="bordered ? 'border-table-row-divider border-b' : ''">
+        <td :colspan="headingColspan" class="border-table-row-divider border-b">
           <slot name="group-header" :section-key="item.sectionKey" :rows="item.rows" />
         </td>
       </tr>
@@ -331,11 +330,10 @@ const headingColspan = computed(
         :should-highlight-column="shouldHighlightColumn"
         :get-highlighted-html="getHighlightedHtml"
         :wrap="wrap"
-        :dense="dense"
-        :compact="compact"
-        :bordered="bordered"
         :striped="striped"
         :row-class-fn="rowClass"
+        :row-state-fn="rowState"
+        :has-own-rail="hasOwnRail"
         :is-active="isActiveRow(item.row)"
         :row-style-fn="rowStyleFn"
         :status-bar-color="getStatusBarColor?.(item.row.original)"
@@ -402,11 +400,10 @@ const headingColspan = computed(
       :should-highlight-column="shouldHighlightColumn"
       :get-highlighted-html="getHighlightedHtml"
       :wrap="wrap"
-      :dense="dense"
-      :compact="compact"
-      :bordered="bordered"
       :striped="striped"
       :row-class-fn="rowClass"
+      :row-state-fn="rowState"
+      :has-own-rail="hasOwnRail"
       :is-active="isActiveRow(getRowForIndex(virtualRow.index))"
       :status-bar-color="getStatusBarColor?.(getRowForIndex(virtualRow.index)?.original)"
       :enable-cell-copy="enableCellCopy"

@@ -26,8 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Field panel toggle — same style as logs page -->
         <OButton
-          variant="outline"
-          size="icon-xs-sq"
+          icon-only
+          variant="secondary"
+          size="sm"
           class="me-1.5 shrink-0"
           data-test="traces-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
@@ -63,13 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-busy="countState.loading ? 'true' : undefined"
         >
           <template v-if="countState.loading">
-            <OSkeleton
-              type="text"
-              animation="none"
-              class="w-11"
-              data-test="traces-count-skeleton"
-              aria-hidden="true"
-            />
+            <OSkeleton class="w-11" data-test="traces-count-skeleton" aria-hidden="true" />
             <span class="sr-only">{{ t("common.loading") }}</span>
             <span aria-hidden="true">{{ countNoun }}</span>
           </template>
@@ -82,14 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-error-count-badge"
           type="logsResultChip"
           value="error"
-          :clickable="true"
+          toggle
+          :pressed="showErrorOnly"
           class="tabular-nums transition-opacity"
-          :class="[
-            showErrorOnly
-              ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
-              : 'bg-error-tag-bg! text-error-tag-text!',
-            { 'opacity-60': headerDimmed },
-          ]"
+          :class="{ 'opacity-60': headerDimmed }"
           :aria-disabled="regionBusy ? 'true' : undefined"
           @click="toggleErrorOnly"
         >
@@ -123,12 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-search-result-data-age"
         >
           <ORefreshButton
-            layout="inline"
-            age-format="clock"
             :last-run-at="searchObj.meta.lastRunAt"
             :failed-at="searchObj.meta.refreshFailedAt"
             :loading="regionBusy"
-            :spinner="false"
             data-test="traces-search-result-refresh"
             @click="$emit('run-query')"
           />
@@ -137,9 +125,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              the widest thing on a row, and clipping it hides the part that
              distinguishes one trace or span from the next. -->
         <OButton
-          variant="outline"
-          size="icon-chip"
-          :active="searchObj.meta.resultGrid.wrapCells"
+          icon-only
+          variant="secondary"
+          size="xs"
+          :pressed="searchObj.meta.resultGrid.wrapCells"
           @click.stop="toggleWrapCells"
           data-test="traces-search-result-wrap-btn"
         >
@@ -157,18 +146,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
             class="select-pagination ms-1 me-1 mt-0!"
-            size="sm"
             :searchable="false"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
           />
           <OPagination
-            :model-value="searchObj.data.resultGrid.currentPage + 1"
-            :max="totalPages"
-            class="paginator-section float-right mt-0! min-w-54 justify-end"
+            :page="searchObj.data.resultGrid.currentPage + 1"
+            :page-count="totalPages"
+            class="paginator-section min-w-31 justify-end"
             data-test="traces-search-result-pagination"
-            @update:model-value="(page: number) => changePage(page)"
-          />
+            @update:page="(page: number) => changePage(page)"
+          >
+            <template #range />
+          </OPagination>
         </div>
       </div>
 

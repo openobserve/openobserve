@@ -21,17 +21,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     :persistent="saving"
     :title="t('dashboard.panelDraft.leaveTitle')"
-    :primary-button-label="canSave ? t('panel.save') : undefined"
-    primary-button-data-test="dashboard-panel-leave-save"
-    :primary-button-loading="saving"
-    :secondary-button-label="secondaryLabel"
-    :neutral-button-label="t('common.editorDraft.discard')"
-    neutral-button-variant="ghost-destructive"
+    :primary="{
+      label: canSave ? t('panel.save') : undefined,
+      loading: saving,
+      dataTest: 'dashboard-panel-leave-save',
+    }"
+    :secondary="{ label: secondaryLabel }"
+    :extra="{ label: t('common.editorDraft.discard'), variant: 'danger-ghost' }"
     data-test="dashboard-panel-leave-dialog"
     @update:open="onOpenChange"
     @click:primary="emit('choose', 'save')"
     @click:secondary="emit('choose', canKeepDraft ? 'keep' : 'stay')"
-    @click:neutral="emit('choose', 'discard')"
+    @click:extra="emit('choose', 'discard')"
   >
     <div class="flex items-start gap-1">
       <div class="flex min-w-0 flex-1 flex-col gap-2">

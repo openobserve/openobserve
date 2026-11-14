@@ -21,12 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex h-11 shrink-0 items-center gap-6 border-b px-3 pt-0.75"
       data-test="billings-usageview-tabs-loading"
     >
-      <OSkeleton
-        v-for="width in TAB_SKELETON_WIDTHS"
-        :key="width"
-        type="text"
-        :class="['h-4', width]"
-      />
+      <OSkeleton v-for="width in TAB_SKELETON_WIDTHS" :key="width" :class="['h-4', width]" />
     </div>
     <!-- With Overview as the only view, a one-tab bar is just noise, so it goes. -->
     <OTabs
@@ -43,58 +38,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OTabs>
 
     <!-- A member's own page shows usage only, so it says where the costs went. -->
-    <OBanner
-      v-if="payer !== null"
-      variant="info"
-      icon="info"
-      dense
-      data-test="billings-usageview-payer"
-    >
+    <OInlineNotice v-if="payer !== null" tone="info" data-test="billings-usageview-payer">
       {{ t("billing.usageV2.billedThrough", { payer }) }}
-    </OBanner>
+    </OInlineNotice>
 
     <!-- Account-wide, so it sits above every tab as it did on main; same cases and wording as the AI chat notice. -->
-    <OBanner
-      v-if="aiCreditsMessage"
-      variant="warning"
-      icon="warning"
-      inline-actions
-      dense
-      data-test="billings-usageview-ai-exhausted"
-    >
+    <OInlineNotice v-if="aiCreditsMessage" tone="warn" data-test="billings-usageview-ai-exhausted">
       <span class="font-semibold">{{ t("aiAssistant.creditsExhausted") }}</span>
       <span class="ms-1">{{ aiCreditsMessage }}</span>
       <template v-if="aiCreditsAction" #actions>
         <OButton
-          variant="warning"
-          size="xs"
+          variant="primary"
+          size="sm"
           data-test="billings-usageview-ai-exhausted-action"
           @click="aiCreditsAction.run"
           >{{ aiCreditsAction.label }}</OButton
         >
       </template>
-    </OBanner>
+    </OInlineNotice>
 
     <!-- A failed Refresh keeps the last good numbers on screen and says so, rather than wiping them. -->
-    <OBanner
-      v-if="refreshFailed"
-      variant="warning"
-      icon="warning"
-      inline-actions
-      dense
-      data-test="billings-usageview-refresh-failed"
-    >
+    <OInlineNotice v-if="refreshFailed" tone="warn" data-test="billings-usageview-refresh-failed">
       {{ t("billing.usageV2.refreshFailed") }}
       <template #actions>
         <OButton
-          variant="warning"
-          size="xs"
+          variant="primary"
+          size="sm"
           data-test="billings-usageview-refresh-retry"
           @click="loadDetails"
           >{{ t("common.retry") }}</OButton
         >
       </template>
-    </OBanner>
+    </OInlineNotice>
 
     <!-- The page's own shape, not a spinner: nothing moves once the data lands. -->
     <div v-if="loading && lastLoadedAt === null" class="min-h-0 flex-1 overflow-hidden">
@@ -104,17 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Nothing loaded yet: a load failure replaces the tabs, in plain words with a way to try again. -->
     <div v-else-if="loadFailure" class="min-h-0 flex-1" data-test="billings-usageview-error">
       <OEmptyState
-        size="hero"
-        variant="error"
-        illustration="broken-panel"
+        kind="error"
         :title="t('billing.usageV2.loadFailedTitle')"
-        :description="
+        :text="
           loadFailure === 'network'
             ? t('billing.usageV2.loadFailedNetwork')
             : t('billing.usageV2.loadFailedServer')
         "
-        :action-label="t('common.retry')"
-        action-icon="refresh"
         @action="loadDetails"
       />
     </div>
@@ -172,7 +143,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import config from "@/aws-exports";

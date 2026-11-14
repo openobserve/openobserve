@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default rounded-default mt-2 flex flex-col gap-1 border px-3 py-2"
       >
         <div class="flex flex-wrap items-baseline gap-2">
-          <OBadge variant="default-soft" size="sm">{{ selectedMethod }}</OBadge>
+          <OBadge tone="neutral" size="sm">{{ selectedMethod }}</OBadge>
           <span class="text-text-body font-mono text-xs break-all">{{
             selectedDestination.url
           }}</span>

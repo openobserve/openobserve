@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LiveNoticeState
       v-if="notice"
       :notice="notice"
-      size="block"
+      size="page"
       :detail="incidentsState.detail"
       :busy="busy"
       data-test="autoobserve-live-history-error"
@@ -41,11 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-subtle flex gap-3 border-b py-3 last:border-b-0"
       >
         <span class="flex h-5 w-3 shrink-0 items-center justify-center">
-          <OSkeleton animation="none" class="size-2 rounded-full" />
+          <OSkeleton shape="circle" class="size-2" />
         </span>
         <span class="flex min-w-0 flex-1 flex-col gap-1">
-          <OSkeleton animation="none" class="h-4 w-16" />
-          <OSkeleton animation="none" class="h-5 w-3/4" />
+          <OSkeleton shape="block" class="h-4 w-16" />
+          <OSkeleton shape="block" class="h-5 w-3/4" />
         </span>
       </li>
     </ul>
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OTag
                 v-if="row.undone"
-                variant="default-soft"
+                tone="neutral"
                 size="sm"
                 class="ms-1 align-middle"
                 :label="t('insight.decisions.applied.undone')"
@@ -92,9 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
             <OButton
               v-if="row.incidentId"
-              variant="ghost-primary"
-              size="xs"
-              icon-right="arrow-forward"
+              variant="accent-ghost"
+              size="sm"
+              icon-end="arrow-forward"
               class="-ms-2 self-start"
               :data-test="`autoobserve-live-history-open-${row.incidentId}`"
               @click="router.push(incidentLink(org, row.incidentId))"

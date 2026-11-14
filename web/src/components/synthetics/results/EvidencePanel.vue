@@ -40,7 +40,7 @@ import {
 import { useEvidenceFilters } from "@/composables/synthetics/useEvidenceFilters";
 import EvidenceEvents from "./EvidenceEvents.vue";
 import EvidenceFilters from "./EvidenceFilters.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -224,18 +224,12 @@ const stepSelectOptions = computed<SelectOptionInput[]>(() => {
 
     <template v-else>
       <div v-if="loading" class="flex flex-col gap-2" data-test="synthetics-evidence-loading">
-        <OSkeleton v-for="i in 4" :key="i" type="text" class="h-4 w-full" />
+        <OSkeleton v-for="i in 4" :key="i" class="h-4 w-full" />
       </div>
 
       <!-- A failed fetch is reported, never rendered as an empty run. The owner
            holds the bundle, so retrying is its call, not this panel's. -->
-      <OBanner
-        v-else-if="loadError"
-        variant="error-soft"
-        dense
-        inline-actions
-        data-test="synthetics-evidence-error"
-      >
+      <OInlineNotice v-else-if="loadError" tone="err" data-test="synthetics-evidence-error">
         <div class="flex min-w-0 flex-col gap-0.5">
           <span>{{ errorMessage }}</span>
           <!-- The HTTP status stays readable — it is the first thing anyone
@@ -253,7 +247,7 @@ const stepSelectOptions = computed<SelectOptionInput[]>(() => {
           <OButton
             v-if="needsReload"
             variant="ghost"
-            size="xs"
+            size="sm"
             data-test="synthetics-evidence-reload-btn"
             @click="reloadPage"
           >
@@ -262,14 +256,14 @@ const stepSelectOptions = computed<SelectOptionInput[]>(() => {
           <OButton
             v-else-if="canRetry"
             variant="ghost"
-            size="xs"
+            size="sm"
             data-test="synthetics-evidence-retry-btn"
             @click="emit('retry')"
           >
             {{ t("synthetics.evidence.retry") }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
 
       <template v-else>
         <!-- X-8.2: reduced fidelity is reported. A silently short list reads as a

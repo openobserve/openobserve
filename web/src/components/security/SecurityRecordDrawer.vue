@@ -160,9 +160,9 @@ const shownFacts = computed(() =>
 
 <template>
   <ODrawer
+    size="lg"
     :open="open"
     side="right"
-    :width="50"
     seamless
     :modal="false"
     :aria-label="eyebrow ? `${eyebrow}: ${title}` : title"
@@ -191,7 +191,7 @@ const shownFacts = computed(() =>
               class="text-text-secondary text-2xs font-semibold tracking-wide uppercase"
               >{{ eyebrow }}</span
             >
-            <OSkeleton v-if="loading && !title" type="text" class="h-6 w-2/3" />
+            <OSkeleton v-if="loading && !title" class="h-6 w-2/3" />
             <h2
               v-else
               class="text-text-heading line-clamp-2 text-xl leading-snug font-semibold"
@@ -209,34 +209,34 @@ const shownFacts = computed(() =>
               class="border-border-default rounded-default ms-1 flex items-center border"
             >
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="keyboard-arrow-up"
+                icon="keyboard-arrow-up"
                 :disabled="!hasPrev"
                 :data-test="`${dataTest}-prev`"
                 @click="emit('prev')"
               >
-                <OTooltip :content="t('siem.record.prev')" shortcut-id="securityRecordPrev" />
+                <OTooltip :content="t('siem.record.prev')" shortcut="securityRecordPrev" />
               </OButton>
               <span class="text-text-secondary text-2xs px-1 tabular-nums">
                 {{ t("siem.record.position", { n: index + 1, total }) }}
               </span>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="keyboard-arrow-down"
+                icon="keyboard-arrow-down"
                 :disabled="!hasNext"
                 :data-test="`${dataTest}-next`"
                 @click="emit('next')"
               >
-                <OTooltip :content="t('siem.record.next')" shortcut-id="securityRecordNext" />
+                <OTooltip :content="t('siem.record.next')" shortcut="securityRecordNext" />
               </OButton>
             </div>
             <OButton
               v-if="shareUrl"
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              :icon-left="linkCopied ? 'check' : 'link'"
+              :icon="linkCopied ? 'check' : 'link'"
               :data-test="`${dataTest}-share`"
               @click="copyLink"
             >
@@ -245,9 +245,9 @@ const shownFacts = computed(() =>
               />
             </OButton>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="close"
+              icon="close"
               :data-test="`${dataTest}-close`"
               @click="close"
             >

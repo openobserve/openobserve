@@ -176,7 +176,7 @@ const createWrapper = (props = {}, options = {}) => {
           >
             <slot></slot>
           </button>`,
-          props: ["loading", "type", "variant", "size", "iconLeft", "iconRight", "label"],
+          props: ["loading", "type", "variant", "size", "icon", "iconEnd", "label"],
           emits: ["click"],
         },
         OFile: {
@@ -209,8 +209,8 @@ const createWrapper = (props = {}, options = {}) => {
               :data-open='String(open)'
               :data-size='size'
               :data-title='title'
-              :data-primary-label='primaryButtonLabel'
-              :data-secondary-label='secondaryButtonLabel'
+              :data-primary-label='primary?.label'
+              :data-secondary-label='secondary?.label'
             >
               <slot name='header' />
               <slot />
@@ -218,34 +218,34 @@ const createWrapper = (props = {}, options = {}) => {
               <button
                 data-test-stub='o-dialog-primary'
                 @click='$emit("click:primary")'
-              >{{ primaryButtonLabel }}</button>
+              >{{ primary?.label }}</button>
               <button
                 data-test-stub='o-dialog-secondary'
                 @click='$emit("click:secondary")'
-              >{{ secondaryButtonLabel }}</button>
+              >{{ secondary?.label }}</button>
             </div>`,
           props: [
             "open",
             "size",
             "title",
-            "subTitle",
+            "subtitle",
             "persistent",
             "showClose",
             "width",
-            "primaryButtonLabel",
-            "secondaryButtonLabel",
-            "neutralButtonLabel",
-            "primaryButtonVariant",
-            "secondaryButtonVariant",
-            "neutralButtonVariant",
-            "primaryButtonDisabled",
-            "secondaryButtonDisabled",
-            "neutralButtonDisabled",
-            "primaryButtonLoading",
-            "secondaryButtonLoading",
-            "neutralButtonLoading",
+            "primary",
+            "secondary",
+            "extra",
+            "primary",
+            "secondary",
+            "extra",
+            "primary",
+            "secondary",
+            "extra",
+            "primary",
+            "secondary",
+            "extra",
           ],
-          emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+          emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
         },
         OColor: {
           template: '<div data-test-stub="o-color" :data-value="modelValue"></div>',
@@ -991,18 +991,18 @@ describe("General", () => {
       const deleteDialog = dialogs[0];
       // Component template uses size="sm" for delete confirmation dialog
       expect(deleteDialog.attributes("data-size")).toBe("sm");
-      expect(deleteDialog.attributes("data-primary-label")).toBe("OK");
+      expect(deleteDialog.attributes("data-primary-label")).toBe("Delete");
       expect(deleteDialog.attributes("data-secondary-label")).toBe("Cancel");
     });
 
-    it("names the logo theme in bold and uses a destructive OK button", async () => {
+    it("names the logo theme in bold and uses a destructive Delete button", async () => {
       const wrapper = createWrapper();
       wrapper.vm.confirmDeleteLogo("dark");
       await nextTick();
       const dialog = wrapper.findAllComponents({ name: "ODialog" })[0];
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
-      const message = wrapper.find('[data-test="general-delete-image-message"]');
-      const name = message.find("span.font-semibold");
+      expect(dialog.props("primary")?.variant).toBe("danger");
+      const message = wrapper.find('[data-test="dialog-box"]');
+      const name = message.find('[data-test="confirm-dialog-name"]');
       expect(name.text()).toBe("Dark Mode");
       expect(message.text()).toContain("Dark Mode");
     });
@@ -1013,7 +1013,7 @@ describe("General", () => {
       // Select by title (order-independent — the delete-org confirmation dialog also
       // exists and would otherwise be the last dialog in the template).
       const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick Custom Color");
-      expect(colorDialog.attributes("data-size")).toBe("xs");
+      expect(colorDialog.attributes("data-size")).toBe("sm");
       expect(colorDialog.attributes("data-primary-label")).toBe("Close");
     });
   });

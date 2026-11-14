@@ -38,10 +38,10 @@ const ODropdownStub = {
 };
 const ODropdownItemStub = {
   name: "ODropdownItem",
-  props: ["disabled", "iconLeft", "variant"],
+  props: ["disabled", "icon", "tone", "checked"],
   emits: ["select"],
   template:
-    '<div role="menuitem" @click="$emit(\'select\', $event)"><slot name="icon-left" /><slot /><slot name="icon-right" /></div>',
+    '<div role="menuitem" :aria-checked="checked" @click="$emit(\'select\', $event)"><slot name="icon" /><slot /><slot name="end" /></div>',
 };
 const ODropdownGroupStub = {
   name: "ODropdownGroup",
@@ -107,13 +107,13 @@ describe("ReplayEnvironmentMenu", () => {
     wrapper = mountMenu();
 
     const selected = wrapper.get(item("env-stg"));
-    expect(selected.find('[data-icon="check"]').exists()).toBe(true);
+    expect(selected.attributes("aria-checked")).toBe("true");
     expect(selected.find(".sr-only").text()).toBe("Selected");
     expect(selected.find(".text-accent").text()).toBe("Staging");
     expect(selected.text()).toContain("stg.test");
 
     const other = wrapper.get(item("env-prod"));
-    expect(other.find('[data-icon="check"]').exists()).toBe(false);
+    expect(other.attributes("aria-checked")).toBe("false");
     expect(other.text()).not.toContain("Selected");
     expect(other.find(".text-accent").exists()).toBe(false);
     expect(other.text()).toContain("Production");
@@ -181,8 +181,8 @@ describe("ReplayEnvironmentMenu", () => {
     const trigger = wrapper
       .findAllComponents(OButton)
       .find((b) => b.attributes("data-test") === "synthetics-journey-replay-menu-trigger");
-    expect(trigger?.props("variant")).toBe("outline");
-    expect(trigger?.props("size")).toBe("xs");
+    expect(trigger?.props("variant")).toBe("secondary");
+    expect(trigger?.props("size")).toBe("sm");
   });
 
   it("the trigger has a name and a tooltip, and follows disabled", async () => {

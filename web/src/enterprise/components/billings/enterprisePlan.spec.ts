@@ -311,9 +311,12 @@ describe("enterprisePlan.vue price line", () => {
 
   it("keeps the seven subgrid rows as the card's direct children, priced or not", () => {
     expect(mountPlan().classes()).toContain("grid-rows-subgrid");
-    const priced = mountPlan({ price: { price: "Custom", note: "volume discounts, BYOB" } });
-    expect(priced.element.children).toHaveLength(7);
-    expect(mountPlan().element.children).toHaveLength(7);
+    const rows = (w: ReturnType<typeof mountPlan>) =>
+      w.get('[data-test="o-card-body"]').element.children;
+    expect(
+      rows(mountPlan({ price: { price: "Custom", note: "volume discounts, BYOB" } })),
+    ).toHaveLength(7);
+    expect(rows(mountPlan())).toHaveLength(7);
   });
 
   it("renders no price line without a price", () => {

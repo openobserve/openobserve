@@ -210,6 +210,13 @@
   --duration-dialog-out: 150ms;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
+  /* Control heights: a size name is one height in every component, and controls that
+     share a row share one token (guidelines S1, S2). Never override them at a call site. */
+  --spacing-control-xs: 1.5rem; /* 24px — chips, filter chips, in-row icon buttons */
+  --spacing-control-sm: 1.75rem; /* 28px — compact density, panel headers, table footer */
+  --spacing-control-md: 2rem; /* 32px — default: inputs, selects, buttons, toggles, date pickers */
+  --spacing-control-lg: 2.25rem; /* 36px — sign-in and empty-state call to action only */
+
   /* Floating menus and popovers: the 1px ring lives in the shadow; dark values in dark.css. */
   /* eslint-disable local/no-hardcoded-px -- optical shadow geometry, not layout */
   --shadow-overlay:
@@ -399,13 +406,18 @@
   --color-warning-600: var(--color-warning-600);
   --color-warning-700: var(--color-warning-700);
 
-  /* Radius / Shadow (re-exports from base.css for @theme registration).
-     Two real tiers only: rounded-default (controls) + rounded-surface (large
-     surfaces), plus rounded-full. sm/md/lg/xl were retired — see base.css. */
+  /* Radius / Shadow (re-exports from base.css for @theme registration). */
+  --radius-chip: var(--radius-chip);
   --radius-default: var(--radius-default);
+  --radius-menu: var(--radius-menu);
   --radius-surface: var(--radius-surface);
   --radius-full: var(--radius-full);
-  --radius-checkbox: var(--radius-checkbox);
+
+  /* Control heights: h-control-*, min-h-control-*, size-control-* (see :root above). */
+  --spacing-control-xs: var(--spacing-control-xs);
+  --spacing-control-sm: var(--spacing-control-sm);
+  --spacing-control-md: var(--spacing-control-md);
+  --spacing-control-lg: var(--spacing-control-lg);
 
   /* --- Shadows: the ONLY shadows the app has — geometry here, colour separate.
      Templates compose the two: `shadow-md shadow-ai-accent/35`. Stylesheets

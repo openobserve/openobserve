@@ -13,9 +13,8 @@
     :open="open"
     size="md"
     :title="t('aiObservability.playground.schemaTitle')"
-    :primary-button-label="t('common.apply')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-disabled="enabled && invalid"
+    :primary="{ label: t('common.apply'), disabled: enabled && invalid }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="ai-playground-schema-dialog"
     @update:open="emit('update:open', $event)"
     @click:primary="apply"
@@ -24,17 +23,17 @@
     <div class="flex flex-col gap-3">
       <!-- Read before the schema is written rather than after an answer comes
            back as prose: the request drops it with nothing else to say so. -->
-      <OBanner v-if="dropped" variant="warning" data-test="ai-playground-schema-unsupported">
+      <OInlineNotice v-if="dropped" tone="warn" data-test="ai-playground-schema-unsupported">
         {{ t("aiObservability.playground.schemaUnsupported") }}
-      </OBanner>
+      </OInlineNotice>
       <!-- Softer than a drop: the answer is JSON, only its shape is not guaranteed. -->
-      <OBanner
+      <OInlineNotice
         v-else-if="approximated"
-        variant="info"
+        tone="info"
         data-test="ai-playground-schema-approximated"
       >
         {{ t("aiObservability.playground.schemaApproximatedHelp") }}
-      </OBanner>
+      </OInlineNotice>
       <OCheckbox
         v-model="enabled"
         :label="t('aiObservability.playground.schemaToggle')"
@@ -43,7 +42,6 @@
       <OTextarea
         v-model="text"
         :rows="12"
-        size="sm"
         fill
         :disabled="!enabled"
         :error="enabled && invalid"
@@ -61,7 +59,7 @@ import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 
 const props = defineProps<{
   open: boolean;

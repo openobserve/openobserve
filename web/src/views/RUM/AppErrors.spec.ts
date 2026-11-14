@@ -314,7 +314,7 @@ const ERROR_TREND_CELL_STUB = {
 };
 
 const DATETIME_STUB = {
-  name: "DateTime",
+  name: "ODateTimeRange",
   template: '<div data-test="datetime-stub" />',
   props: ["autoApply", "menuAlign", "defaultType", "defaultAbsoluteTime", "defaultRelativeTime"],
   emits: ["on:date-change"],
@@ -380,7 +380,7 @@ async function mountAppErrors({ routeQuery = {} }: MountOptions = {}) {
         OButton: OBUTTON_STUB,
         ErrorIssueCell: ERROR_ISSUE_CELL_STUB,
         ErrorTrendCell: ERROR_TREND_CELL_STUB,
-        DateTime: DATETIME_STUB,
+        ODateTimeRange: DATETIME_STUB,
         SyntaxGuide: { template: "<div />" },
         SearchFieldList: SEARCH_FIELD_LIST_STUB,
         NoData: NO_DATA_STUB,

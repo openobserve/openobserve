@@ -150,9 +150,8 @@ const runLinkAll = async (): Promise<void> => {
   >
     <template v-if="!managed" #actions>
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="manage-accounts"
+        variant="secondary"
+        icon="manage-accounts"
         data-test="slack-linking-manage"
         @click="peopleOpen = true"
       >
@@ -160,12 +159,12 @@ const runLinkAll = async (): Promise<void> => {
       </OButton>
     </template>
 
-    <OSkeleton v-if="linking.isPending.value" class="h-32 w-full" />
+    <OSkeleton v-if="linking.isPending.value" shape="block" class="h-32 w-full" />
     <OEmptyState
       v-else-if="linking.isError.value"
-      size="compact"
-      preset="load-error"
-      :backdrop="false"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="t('emptyState.loadError.description')"
       data-test="slack-linking-error"
       @action="linking.refetch()"
     />
@@ -256,9 +255,8 @@ const runLinkAll = async (): Promise<void> => {
         data-test="slack-linking-matches"
       >
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="link"
+          variant="secondary"
+          icon="link"
           :loading="linkAll.isPending.value"
           :disabled="readOnly"
           @click="runLinkAll"
@@ -268,7 +266,7 @@ const runLinkAll = async (): Promise<void> => {
       </OSettingRow>
 
       <OSettingRow control-at="end" :label="t('slackApp.linking.appHome')">
-        <OTag variant="success-soft" :label="t('slackApp.linking.enabled')" />
+        <OTag tone="ok" :label="t('slackApp.linking.enabled')" />
       </OSettingRow>
     </OForm>
 

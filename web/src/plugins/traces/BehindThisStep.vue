@@ -38,8 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <div>
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         data-test="behind-this-step-open-waterfall"
         @click="timeline.openInWaterfall(step.spanId)"
       >

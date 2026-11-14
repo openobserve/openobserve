@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import type { IllustrationName } from "@/lib/core/EmptyState/illustrations";
+import type { EmptyStateKind } from "@/lib/core/EmptyState/OEmptyState.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { SlackLinkRefusal } from "@/utils/slackLink";
 import SlackLinkCard from "./SlackLinkCard.vue";
@@ -34,7 +35,8 @@ const emit = defineEmits<{ resend: []; retry: [] }>();
 const { t } = useI18nTyped();
 
 interface RefusalCopy {
-  illustration: IllustrationName;
+  icon?: IconName;
+  kind?: EmptyStateKind;
   title: I18nText;
   description?: I18nText;
   resend: boolean;
@@ -46,7 +48,7 @@ const copy = computed<RefusalCopy>(() => {
   switch (props.refusal.kind) {
     case "expired":
       return {
-        illustration: "hourglass",
+        icon: "hourglass-empty",
         title: t("slackApp.link.expiredTitle"),
         description: t("slackApp.link.expiredDetail"),
         resend: props.canResend,
@@ -54,7 +56,7 @@ const copy = computed<RefusalCopy>(() => {
       };
     case "unknown":
       return {
-        illustration: "hourglass",
+        icon: "hourglass-empty",
         title: t("slackApp.link.expiredTitle"),
         description: t("slackApp.link.unknownDetail"),
         resend: false,
@@ -63,7 +65,7 @@ const copy = computed<RefusalCopy>(() => {
     case "noAccess":
       // The server's sentence names the workspace, so it replaces the generic title instead of repeating it.
       return {
-        illustration: "lock",
+        kind: "denied",
         title: server ?? t("slackApp.link.noAccessTitle"),
         description: server ? undefined : t("slackApp.link.noAccessDetail"),
         resend: false,
@@ -71,7 +73,7 @@ const copy = computed<RefusalCopy>(() => {
       };
     case "wrongAccount":
       return {
-        illustration: "users",
+        icon: "group",
         title: t("slackApp.link.wrongAccountTitle"),
         description: server ?? t("slackApp.link.wrongAccountDetail"),
         resend: false,
@@ -79,7 +81,7 @@ const copy = computed<RefusalCopy>(() => {
       };
     case "rateLimited":
       return {
-        illustration: "hourglass",
+        icon: "hourglass-empty",
         title: t("slackApp.link.rateLimitedTitle"),
         description: t("slackApp.link.rateLimitedDetail"),
         resend: false,
@@ -87,7 +89,7 @@ const copy = computed<RefusalCopy>(() => {
       };
     default:
       return {
-        illustration: "broken-panel",
+        kind: "error",
         title: t("slackApp.link.failedTitle"),
         description: t("slackApp.link.failedDetail"),
         resend: false,
@@ -105,7 +107,8 @@ const helpContact = computed<I18nText>(() =>
 
 <template>
   <SlackLinkCard
-    :illustration="copy.illustration"
+    :kind="copy.kind"
+    :icon="copy.icon"
     :title="copy.title"
     :description="copy.description"
     :data-test="`slack-link-state-${refusal.kind}`"
@@ -114,7 +117,6 @@ const helpContact = computed<I18nText>(() =>
       <OButton
         v-if="copy.resend"
         variant="primary"
-        size="sm-action"
         :loading="busy"
         data-test="slack-link-resend"
         @click="emit('resend')"
@@ -124,7 +126,6 @@ const helpContact = computed<I18nText>(() =>
       <OButton
         v-if="copy.retry"
         variant="primary"
-        size="sm-action"
         :loading="busy"
         data-test="slack-link-retry"
         @click="emit('retry')"

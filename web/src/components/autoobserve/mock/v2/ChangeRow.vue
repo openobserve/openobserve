@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="flex shrink-0 items-center gap-2.5">
           <span v-if="when" class="text-text-secondary text-xs tabular-nums">{{ when }}</span>
           <OTag
-            :variant="STATE_LOOK[change.state].variant"
+            :tone="STATE_LOOK[change.state].variant"
             :icon="STATE_LOOK[change.state].icon"
             size="sm"
             :label="stateLabel"
@@ -65,9 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <div class="-ms-2 mt-1.5 flex flex-wrap items-center gap-x-1 gap-y-2">
         <OButton
-          variant="ghost-muted"
-          size="xs"
-          :icon-right="open ? 'expand-less' : 'expand-more'"
+          variant="ghost"
+          size="sm"
+          :icon-end="open ? 'expand-less' : 'expand-more'"
           :aria-expanded="open"
           :aria-controls="detailsId"
           :data-test="`autoobserve2-change-${entry.id}-details-toggle`"
@@ -81,9 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="canUndo(change)"
-          variant="ghost-muted"
-          size="xs"
-          icon-left="undo"
+          variant="ghost"
+          size="sm"
+          icon="undo"
           :data-test="`autoobserve2-change-${entry.id}-undo`"
           @click="onUndo"
         >
@@ -126,7 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="min-w-0"
             :code="entry.before"
             :lang="codeLang(entry.before)"
-            chrome="editor"
             :filename="t('autoobserve.activity.before')"
             wrap
             :copyable="false"
@@ -136,7 +135,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="min-w-0"
             :code="entry.after"
             :lang="codeLang(entry.after)"
-            chrome="editor"
             :filename="t('autoobserve.activity.after')"
             wrap
             :copyable="false"

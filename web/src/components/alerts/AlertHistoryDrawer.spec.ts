@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -56,12 +56,12 @@ document.body.appendChild(node);
 // the events the test suite drives state through.
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "width", "showClose", "persistent", "size", "title", "titleDataTest", "subTitle"],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  props: ["open", "width", "showClose", "persistent", "size", "title", "titleDataTest", "subtitle"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div data-test-stub="o-drawer" :data-open="open">
       <span v-if="title" :data-test="titleDataTest">{{ title }}</span>
-      <span v-if="subTitle" data-test-stub="o-drawer-sub-title">{{ subTitle }}</span>
+      <span v-if="subtitle" data-test-stub="o-drawer-sub-title">{{ subtitle }}</span>
       <div data-test-stub="o-drawer-header"><slot name="header" /></div>
       <div data-test-stub="o-drawer-header-left"><slot name="header-left" /></div>
       <div data-test-stub="o-drawer-header-right"><slot name="header-right" /></div>
@@ -424,7 +424,7 @@ describe("AlertHistoryDrawer.vue", () => {
         data: mockHistoryData,
       } as any);
 
-      const dateTimeComponent = wrapper.findComponent(DateTime);
+      const dateTimeComponent = wrapper.findComponent(ODateTimeRange);
       await dateTimeComponent.vm.$emit("on:date-change", {
         startTime: 1699800000000000,
         endTime: 1699900000000000,
@@ -443,7 +443,7 @@ describe("AlertHistoryDrawer.vue", () => {
         data: mockHistoryData,
       } as any);
 
-      const dateTimeComponent = wrapper.findComponent(DateTime);
+      const dateTimeComponent = wrapper.findComponent(ODateTimeRange);
       await dateTimeComponent.vm.$emit("on:date-change", {
         startTime: 1699800000000000,
         endTime: 1699900000000000,
@@ -458,7 +458,7 @@ describe("AlertHistoryDrawer.vue", () => {
       const vm = wrapper.vm as any;
       vm.currentPage = 3;
 
-      const dateTimeComponent = wrapper.findComponent(DateTime);
+      const dateTimeComponent = wrapper.findComponent(ODateTimeRange);
       await dateTimeComponent.vm.$emit("on:date-change", {
         startTime: 1699800000000000,
         endTime: 1699900000000000,
@@ -614,7 +614,6 @@ describe("AlertHistoryDrawer.vue", () => {
       // columns use 'id' property (OTable OTableColumnDef type), not 'name'
       const columnIds = vm.historyTableColumns.map((col: any) => col.id);
       expect(columnIds).toEqual([
-        "#",
         "timestamp",
         "status",
         "condition",

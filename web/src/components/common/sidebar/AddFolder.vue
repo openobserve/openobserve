@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t(folderKey(type, 'dashboard.updateFolder'))
         : t(folderKey(type, 'common.addFolder'))
     "
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="t('common.save')"
+    :secondary="{ label: t('common.cancel') }"
+    :primary="{ label: t('common.save') }"
     form-id="add-folder-sidebar-form"
     data-test="dashboard-folder-dialog"
     @update:open="$emit('update:open', $event)"

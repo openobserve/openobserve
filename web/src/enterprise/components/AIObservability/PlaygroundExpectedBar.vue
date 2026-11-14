@@ -49,7 +49,6 @@
         :placeholder="t('aiObservability.playground.expectedPlaceholder')"
         :rows="1"
         :max-rows="3"
-        size="sm"
         autogrow
         data-test="ai-playground-expected-input"
         @update:model-value="(value: string) => emit('set-expected', value)"
@@ -60,9 +59,9 @@
          would silently re-break the scoring they just fixed. -->
     <OButton
       v-if="expected && !required"
-      variant="ghost-muted"
-      size="icon-xs"
-      icon-left="close"
+      icon-only
+      variant="ghost"
+      icon="close"
       class="mt-0.5 shrink-0"
       :title="t('aiObservability.playground.removeExpected')"
       data-test="ai-playground-remove-expected"

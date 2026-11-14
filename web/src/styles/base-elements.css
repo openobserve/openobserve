@@ -314,9 +314,8 @@ textarea:disabled {
   cursor: not-allowed;
 }
 
-[data-o2-variant="destructive"] [data-destructive-icon="true"],
-[data-o2-variant="outline-destructive"] [data-destructive-icon="true"],
-[data-o2-variant="ghost-destructive"] [data-destructive-icon="true"] {
+[data-o2-variant="danger"] [data-destructive-icon="true"],
+[data-o2-variant="danger-ghost"] [data-destructive-icon="true"] {
   color: inherit !important;
 }
 

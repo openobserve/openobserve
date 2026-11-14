@@ -43,12 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="fleet-flow-overview-telemetry"
           @update:model-value="(v) => onSignalChange(v as FlowSignal)"
         >
-          <OToggleGroupItem
-            v-for="opt in telemetryOptions"
-            :key="opt.value"
-            :value="opt.value"
-            size="sm"
-          >
+          <OToggleGroupItem v-for="opt in telemetryOptions" :key="opt.value" :value="opt.value">
             <template v-if="opt.dot" #icon-left>
               <span
                 class="size-2 shrink-0 rounded-full"
@@ -62,8 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
         <div class="flex items-center gap-2">
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="flowQuery.lastUpdatedAt.value || null"
             :loading="flowQuery.fetching.value"
             data-test="fleet-flow-overview-refresh"
@@ -75,14 +68,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="fleet-flow-overview-window"
             @update:model-value="(v) => onWindowChange(v as FlowWindow)"
           >
-            <OToggleGroupItem v-for="w in windows" :key="w" :value="w" size="sm">
+            <OToggleGroupItem v-for="w in windows" :key="w" :value="w">
               {{ raw(w) }}
             </OToggleGroupItem>
           </OToggleGroup>
           <OButton
-            variant="outline"
-            size="icon-sm"
-            :icon-left="expanded ? 'close-fullscreen' : 'open-in-full'"
+            icon-only
+            variant="secondary"
+            :icon="expanded ? 'close-fullscreen' : 'open-in-full'"
             :aria-label="expandLabel"
             data-test="fleet-flow-overview-expand"
             @click="expanded = !expanded"
@@ -92,20 +85,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <OBanner
+      <OInlineNotice
         v-if="loadError"
         class="mx-3 mb-3"
-        variant="error"
-        dense
-        :content="t('fleet.pipelines.loadFailed')"
+        tone="err"
+        :message="t('fleet.pipelines.loadFailed')"
         data-test="fleet-flow-overview-error"
       >
         <template #actions>
-          <OButton variant="outline" size="sm" data-test="fleet-flow-overview-retry" @click="retry">
+          <OButton variant="secondary" data-test="fleet-flow-overview-retry" @click="retry">
             {{ t("common.retry") }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
 
       <div ref="canvasEl" class="relative min-h-0 flex-1 max-lg:min-h-112">
         <div
@@ -113,7 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="absolute inset-0 grid place-items-center"
           data-test="fleet-flow-overview-forbidden"
         >
-          <OEmptyState size="block" preset="no-access" />
+          <OEmptyState
+            kind="denied"
+            :title="t('emptyState.noAccess.title')"
+            :text="t('emptyState.noAccess.description')"
+          />
         </div>
 
         <VueFlow
@@ -171,9 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="fleet-flow-overview-zoom"
         >
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="add"
+            icon="add"
             class="rounded-none"
             :aria-label="t('fleet.flow.zoomIn')"
             data-test="fleet-flow-overview-zoom-in"
@@ -183,9 +179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OSeparator />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="remove"
+            icon="remove"
             class="rounded-none"
             :aria-label="t('fleet.flow.zoomOut')"
             data-test="fleet-flow-overview-zoom-out"
@@ -195,9 +191,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OSeparator />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="fullscreen"
+            icon="fullscreen"
             class="rounded-none"
             :aria-label="t('fleet.flow.fitView')"
             data-test="fleet-flow-overview-fit"
@@ -235,10 +231,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="fleet-flow-overview-no-fleets"
         >
           <OEmptyState
-            size="block"
-            preset="no-data"
-            :description="t('fleet.pipelines.noFleets')"
-            hide-action
+            :title="t('emptyState.noData.title')"
+            :text="t('fleet.pipelines.noFleets')"
           />
         </div>
         <div
@@ -247,16 +241,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="fleet-flow-overview-empty"
         >
           <OEmptyState
-            size="block"
-            preset="no-data"
-            :description="
+            :title="t('emptyState.noData.title')"
+            :text="
               hiddenByLegend ? t('fleet.pipelines.hiddenByLegend') : t('fleet.pipelines.emptyHint')
             "
-            hide-action
           />
         </div>
 
-        <OInnerLoading :showing="loading" data-test="fleet-flow-overview-loading" />
+        <OLoadingLine
+          :active="loading"
+          class="absolute inset-x-0 top-0 z-10"
+          data-test="fleet-flow-overview-loading"
+        />
       </div>
       <p
         v-if="!forbidden"
@@ -301,8 +297,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";

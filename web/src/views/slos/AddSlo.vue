@@ -27,39 +27,32 @@
 <template>
   <OPageLayout
     :title="isEdit ? t('slos.editTitle') : t('slos.newTitle')"
-    icon="target"
     :back="{ to: backTarget, label: t('slos.title') }"
     scroll
     pad-y
     title-data-test="slos-addslo-title"
   >
     <template #actions>
-      <OButton variant="outline" size="sm-action" data-test="slos-addslo-cancel" @click="cancel">
+      <OButton variant="secondary" data-test="slos-addslo-cancel" @click="cancel">
         {{ t("common.cancel") }}
       </OButton>
-      <OButton
-        variant="primary"
-        size="sm-action"
-        :loading="saving"
-        data-test="slos-addslo-save"
-        @click="save()"
-      >
+      <OButton variant="primary" :loading="saving" data-test="slos-addslo-save" @click="save()">
         {{ t("common.save") }}
       </OButton>
     </template>
 
     <!-- A regeneration is not a normal edit: it discards every measurement
          taken under the old definition. Warned before saving, not after. -->
-    <OBanner
+    <OInlineNotice
       v-if="isEdit && definitionChanged"
-      variant="warning"
+      tone="warn"
       icon="restart-alt"
       class="mb-3"
       data-test="slos-addslo-regen-warning"
     >
       <span class="font-bold">{{ t("slos.regenerate.title") }}</span>
       {{ t("slos.regenerate.body") }}
-    </OBanner>
+    </OInlineNotice>
 
     <!-- The right column is 33rem (was 22rem, +50%): it now hosts the two
          preview charts as well as the summary, and bars need the width to
@@ -124,10 +117,9 @@
               />
             </div>
           </div>
-          <OInput
+          <OTextarea
             v-model="form.description"
             :label="t('slos.field.description')"
-            type="textarea"
             class="mt-3"
             data-test="slos-addslo-description"
           />
@@ -139,7 +131,6 @@
               v-for="opt in sliTypeOptions"
               :key="opt.value"
               :value="opt.value"
-              size="sm"
               :data-test="`slos-addslo-sli-type-${opt.value}`"
             >
               <template #icon-left>
@@ -191,7 +182,6 @@
                 v-for="opt in queryLanguageOptions"
                 :key="opt.value"
                 :value="opt.value"
-                size="sm"
                 :data-test="`slos-addslo-count-language-${opt.value}`"
               >
                 {{ opt.label }}
@@ -301,7 +291,6 @@
                 v-for="opt in queryLanguageOptions"
                 :key="opt.value"
                 :value="opt.value"
-                size="sm"
                 :data-test="`slos-addslo-timeslice-language-${opt.value}`"
               >
                 {{ opt.label }}
@@ -394,14 +383,14 @@
             <p class="text-text-secondary mt-1 text-xs" data-test="slos-addslo-alert-source-hint">
               {{ t("slos.alertSli.sourceHint") }}
             </p>
-            <OBanner
+            <OInlineNotice
               v-if="!isFetchingAlertSources && !hasEligibleAlert && !alertSourceError"
-              variant="info"
+              tone="info"
               class="mt-3"
               data-test="slos-addslo-alert-source-empty"
             >
               {{ t("slos.alertSli.noneEligible") }}
-            </OBanner>
+            </OInlineNotice>
           </template>
         </OFormSection>
 
@@ -436,7 +425,6 @@
                 v-for="opt in windowOptions"
                 :key="opt.value"
                 :value="opt.value"
-                size="sm"
                 :data-test="`slos-addslo-window-${opt.value}`"
               >
                 {{ opt.label }}
@@ -452,7 +440,6 @@
                 :key="opt.value"
                 :value="opt.value"
                 :disabled="opt.disable"
-                size="sm"
                 :data-test="`slos-addslo-slice-${opt.value}`"
               >
                 {{ opt.label }}
@@ -499,7 +486,7 @@
             v-if="isGrouped"
             v-model.number="form.groups_estimate"
             :label="t('slos.field.groupsEstimate')"
-            :hint="t('slos.field.groupsEstimateHint')"
+            :help-text="t('slos.field.groupsEstimateHint')"
             type="number"
             class="mt-3"
             data-test="slos-addslo-groups-estimate"
@@ -577,9 +564,9 @@
             <dd>{{ reservationLabel }}</dd>
           </dl>
 
-          <OBanner variant="info" class="mt-3">
+          <OInlineNotice tone="info" class="mt-3">
             {{ t("slos.backfillNote") }}
-          </OBanner>
+          </OInlineNotice>
         </OFormSection>
       </div>
     </div>
@@ -595,7 +582,7 @@ import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import SloAlertPreview from "@/components/slos/SloAlertPreview.vue";
@@ -604,6 +591,7 @@ import SloTimeSlicePreview from "@/components/slos/SloTimeSlicePreview.vue";
 import SloExpressionField from "@/components/slos/SloExpressionField.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

@@ -46,33 +46,33 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
     "formId",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <slot name="header" />
       <slot />
@@ -80,11 +80,11 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -236,13 +236,13 @@ describe("SelectDashboardDropdown", () => {
     it("should render i18n label on secondary (cancel) button", () => {
       const wrapper = mountComponent({}, store);
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(drawer.props("secondary")?.label).toBe("Cancel");
     });
 
     it("should render i18n label on primary (save) button", () => {
       const wrapper = mountComponent({}, store);
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("primaryButtonLabel")).toBe("Save");
+      expect(drawer.props("primary")?.label).toBe("Save");
     });
 
     it("should keep data-test hook on the drawer", () => {

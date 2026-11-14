@@ -114,7 +114,7 @@ function viewTrace(traceId: string) {
   >
     <OIcon name="error" size="xs" />
     <span>{{ t("llmDataTrust.health.loadError") }}</span>
-    <OButton variant="ghost-primary" size="xs" @click="emit('rerun')">{{
+    <OButton variant="accent-ghost" size="sm" @click="emit('rerun')">{{
       t("llmDataTrust.health.rerun")
     }}</OButton>
   </div>
@@ -157,13 +157,15 @@ function viewTrace(traceId: string) {
 
   <ODrawer
     v-model:open="drawerOpen"
-    size="md"
+    size="sm"
     :title="t('llmDataTrust.health.drawerTitle')"
-    :sub-title="t('llmDataTrust.health.drawerSubtitle', { stream })"
-    :primary-button-label="t('llmDataTrust.health.rerun')"
-    :primary-button-loading="loading"
-    primary-button-data-test="llm-data-health-rerun"
-    :secondary-button-label="t('llmDataTrust.health.close')"
+    :subtitle="t('llmDataTrust.health.drawerSubtitle', { stream })"
+    :primary="{
+      label: t('llmDataTrust.health.rerun'),
+      loading: loading,
+      dataTest: 'llm-data-health-rerun',
+    }"
+    :secondary="{ label: t('llmDataTrust.health.close') }"
     @click:primary="emit('rerun')"
     @click:secondary="drawerOpen = false"
   >

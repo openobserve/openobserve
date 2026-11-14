@@ -42,8 +42,8 @@ vi.mock("vue-router", () => ({
 // drawer open/close interactions without rendering the real overlay.
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  props: ["open", "width", "showClose", "persistent", "size", "title", "subtitle"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div data-test-stub="o-drawer" :data-open="open" :data-title="title" :data-size="size">
       <div data-test-stub="o-drawer-header"><slot name="header" /></div>
@@ -130,10 +130,10 @@ describe("EnrichmentSchema.vue Branch Coverage", () => {
       );
     });
 
-    it('should pass size "lg" to ODrawer', async () => {
+    it('should pass size "md" (640) to ODrawer', async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
       await flushPromises();
-      expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-size")).toBe("lg");
+      expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-size")).toBe("md");
     });
 
     it("should propagate ODrawer update:open event to parent", async () => {

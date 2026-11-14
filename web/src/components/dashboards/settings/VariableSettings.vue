@@ -31,15 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- show variables dependencies if variables exist -->
             <OButton
               v-if="dashboardVariablesList.length > 0"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               @click="showVariablesDependenciesGraphPopUp = true"
               data-test="dashboard-variable-dependencies-btn"
               >{{ t("dashboard.showDependencies") }}</OButton
             >
             <OButton
               variant="primary"
-              size="sm"
               @click="addVariables"
               data-test="dashboard-add-variable-btn"
               >{{ t("dashboard.newVariable") }}</OButton
@@ -57,15 +55,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="dashboardVariablesList"
           :columns="columns"
           row-key="name"
-          :frame="false"
           pagination="none"
           sorting="none"
           selection="none"
           :default-columns="false"
-          :show-global-filter="false"
         >
           <template #empty>
-            <OEmptyState size="hero" preset="no-variables" @action="() => addVariables()" />
+            <OEmptyState
+              :title="t('emptyState.noVariables.title')"
+              :text="t('emptyState.noVariables.description')"
+              :action-label="t('emptyState.noVariables.action')"
+              @action="() => addVariables()"
+            />
           </template>
 
           <template #cell-drag>
@@ -75,10 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="drag-indicator" size="sm" />
             </div>
-          </template>
-
-          <template #cell-index="{ row }">
-            {{ formatIndex(row) }}
           </template>
 
           <template #cell-name="{ row }">
@@ -162,39 +159,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <div class="flex justify-center gap-2">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon"
+                size="xs"
                 :title="t('dashboard.edit')"
                 @click="editVariableFn(row.name)"
                 :data-test="`dashboard-edit-variable-${row.name}`"
-                icon-left="edit"
+                icon="edit"
                 class="max-md:hidden"
               >
               </OButton>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon"
+                size="xs"
                 :title="t('dashboard.delete')"
                 @click.stop="showDeleteDialogFn({ row: { name: row.name } })"
                 data-test="dashboard-delete-variable"
                 class="max-md:hidden"
               >
-                <template #icon-left><OIcon name="delete" size="sm" /></template>
+                <template #icon><OIcon name="delete" size="sm" /></template>
               </OButton>
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
-                    icon-left="more-vert"
+                    icon-only
+                    icon="more-vert"
                     :title="t('dashboard.moreActions')"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="sm"
                     class="md:hidden"
                     data-test="dashboard-variable-row-more-actions"
                     @click.stop
                   />
                 </template>
                 <ODropdownItem
-                  icon-left="edit"
+                  icon="edit"
                   class="md:hidden"
                   :data-test="`dashboard-edit-variable-${row.name}-menu`"
                   @select="editVariableFn(row.name)"
@@ -202,8 +202,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("dashboard.edit") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="delete"
-                  variant="destructive"
+                  icon="delete"
+                  tone="danger"
                   class="md:hidden"
                   data-test="dashboard-delete-variable-menu"
                   @select="showDeleteDialogFn({ row: { name: row.name } })"
@@ -219,15 +219,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('dashboard.deleteVariable')"
           message-keypath="dashboard.deleteVariableMsg"
           :message-name="selectedDelete?.name"
-          ok-variant="destructive"
+          kind="destructive"
           @update:ok="deleteVariableFn"
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"
         />
         <ODialog
+          size="lg"
           data-test="variable-settings-dependencies-graph-dialog"
           v-model:open="showVariablesDependenciesGraphPopUp"
-          :width="60"
           :title="t('dashboard.variableSettingsPage.variablesDependencyGraph')"
         >
           <div class="h-[60vh]">
@@ -277,7 +277,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { COL, TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useDashboardSettingsDraft } from "./dashboardSettingsDraft";
 
@@ -326,12 +326,6 @@ export default defineComponent({
         meta: { align: "center" },
       },
       {
-        id: "index",
-        header: raw("#"),
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
-      {
         id: "name",
         header: t("dashboard.name"),
         accessorKey: "name",
@@ -364,12 +358,6 @@ export default defineComponent({
         meta: { align: "center", actionCount: 2 },
       },
     ];
-
-    // Zero-padded position label ("01", "02", …).
-    const formatIndex = (variable: any) => {
-      const index = dashboardVariablesList.value.indexOf(variable);
-      return index < 9 ? `0${index + 1}` : `${index + 1}`;
-    };
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
@@ -667,7 +655,6 @@ export default defineComponent({
       getPanelName,
       tableWrapper,
       columns,
-      formatIndex,
       handleDragEnd,
     };
   },

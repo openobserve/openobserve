@@ -21,36 +21,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   to have no home on this page at all.
 -->
 <template>
-  <OCard variant="glass" data-test="oncall-what-fired">
-    <OCardSection role="header" dense>
-      <OText variant="card-title">{{ t("oncall.whatFired") }}</OText>
-    </OCardSection>
-
-    <OCardSection role="body" dense>
-      <ODescriptionList dense label-width="narrow">
-        <ODescriptionItem
-          :label="t('alerts.groups.criticalCondition')"
-          :stacked="conditionIsQuery"
-          data-test="oncall-what-fired-condition-item"
+  <OCard :title="t('oncall.whatFired')" data-test="oncall-what-fired">
+    <ODescriptionList :layout="conditionIsQuery ? 'stacked' : 'auto'">
+      <ODescriptionItem
+        :label="t('alerts.groups.criticalCondition')"
+        data-test="oncall-what-fired-condition-item"
+      >
+        <span
+          class="font-mono text-sm wrap-anywhere whitespace-pre-wrap"
+          data-test="oncall-what-fired-condition"
         >
-          <span
-            class="font-mono text-sm wrap-anywhere whitespace-pre-wrap"
-            data-test="oncall-what-fired-condition"
-          >
-            {{ raw(conditionText) }}
-          </span>
-        </ODescriptionItem>
+          {{ raw(conditionText) }}
+        </span>
+      </ODescriptionItem>
 
-        <ODescriptionItem v-if="hasWarning" :label="t('alerts.groups.warningCondition')">
-          <span
-            class="font-mono text-sm wrap-anywhere whitespace-pre-wrap"
-            data-test="oncall-what-fired-warning"
-          >
-            {{ raw(warningText) }}
-          </span>
-        </ODescriptionItem>
-      </ODescriptionList>
-    </OCardSection>
+      <ODescriptionItem v-if="hasWarning" :label="t('alerts.groups.warningCondition')">
+        <span
+          class="font-mono text-sm wrap-anywhere whitespace-pre-wrap"
+          data-test="oncall-what-fired-warning"
+        >
+          {{ raw(warningText) }}
+        </span>
+      </ODescriptionItem>
+    </ODescriptionList>
   </OCard>
 </template>
 
@@ -58,8 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import {
@@ -79,5 +70,6 @@ const { t } = useI18nTyped();
 const conditionText = computed(() => alertConditionText(props.alert));
 const warningText = computed(() => alertWarningConditionText(props.alert));
 const hasWarning = computed(() => warningText.value !== "—");
+// A SQL condition reads only at full width, so the list stacks its labels above the values.
 const conditionIsQuery = computed(() => alertConditionIsQuery(props.alert));
 </script>

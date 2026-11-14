@@ -4,9 +4,7 @@
       :data="filteredRows"
       :columns="columns"
       row-key="id"
-      :frame="false"
       :pagination="filteredRows.length ? 'client' : 'none'"
-      :show-global-filter="false"
       :row-class="rowClass"
       table-id="oncall-team-members"
       class="h-full min-h-0"
@@ -16,7 +14,6 @@
         <div class="flex w-full flex-wrap items-center gap-2">
           <OSearchInput
             v-model="memberFilter"
-            clearable
             class="min-w-0 flex-1 max-md:min-w-40"
             :placeholder="t('oncall.memberSearchShort')"
             data-test="oncall-members-search"
@@ -24,8 +21,7 @@
           <OButton
             v-if="canConfigure"
             variant="primary"
-            size="sm"
-            icon-left="person-add"
+            icon="person-add"
             data-test="oncall-members-add-open"
             @click="openAddDialog"
           >
@@ -41,18 +37,18 @@
             <OTruncatedText class="text-text-heading text-sm font-medium">
               {{ raw(row.name) }}
             </OTruncatedText>
-            <OTag v-if="row.state === 'on_call'" variant="success-soft" size="sm">
+            <OTag v-if="row.state === 'on_call'" tone="ok" size="sm">
               {{ t("oncall.badgeOnCallNow") }}
             </OTag>
-            <OTag v-else-if="row.state === 'next'" variant="primary-soft" size="sm">
+            <OTag v-else-if="row.state === 'next'" tone="accent" size="sm">
               {{ t("oncall.badgeNextUp") }}
             </OTag>
             <span v-else-if="row.away" class="flex items-center gap-1">
-              <OTag variant="warning-soft" size="sm" :data-test="`oncall-members-away-${row.id}`">
+              <OTag tone="warn" size="sm" :data-test="`oncall-members-away-${row.id}`">
                 {{ awayLabel(row.away) }}
               </OTag>
             </span>
-            <OTag v-if="row.unreachable" variant="error-soft" size="sm">
+            <OTag v-if="row.unreachable" tone="err" size="sm">
               {{ t("oncall.contactUnreachable") }}
             </OTag>
           </span>
@@ -102,9 +98,9 @@
         <div class="flex items-center justify-end">
           <OButton
             v-if="mayMarkAway(row.user_email) && row.away"
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="event-available"
+            icon="event-available"
             class="max-md:hidden"
             :aria-label="t('oncall.awayClear')"
             :data-test="`oncall-members-clear-away-${row.id}`"
@@ -114,9 +110,9 @@
           </OButton>
           <OButton
             v-else-if="mayMarkAway(row.user_email)"
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="event-busy"
+            icon="event-busy"
             class="max-md:hidden"
             :aria-label="t('oncall.awayMark')"
             :data-test="`oncall-members-mark-away-${row.id}`"
@@ -127,9 +123,9 @@
           <span v-else class="size-8 shrink-0 max-md:hidden" aria-hidden="true" />
           <OButton
             v-if="canConfigure"
-            variant="ghost-destructive"
-            size="icon-sm"
-            icon-left="delete-outline"
+            icon-only
+            variant="danger-ghost"
+            icon="delete-outline"
             class="max-md:hidden"
             :aria-label="t('oncall.removeMember')"
             :data-test="`oncall-members-remove-${row.id}`"
@@ -140,9 +136,10 @@
           <ODropdown v-if="canConfigure || mayMarkAway(row.user_email)" side="bottom" align="end">
             <template #trigger>
               <OButton
-                icon-left="more-vert"
+                icon-only
+                icon="more-vert"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="md:hidden"
                 :aria-label="t('oncall.moreActions')"
                 data-test="oncall-members-row-more-actions"
@@ -151,7 +148,7 @@
             </template>
             <ODropdownItem
               v-if="mayMarkAway(row.user_email) && row.away"
-              icon-left="event-available"
+              icon="event-available"
               class="md:hidden"
               :data-test="`oncall-members-clear-away-${row.id}-menu`"
               @select="removeAbsence(row.away)"
@@ -160,7 +157,7 @@
             </ODropdownItem>
             <ODropdownItem
               v-else-if="mayMarkAway(row.user_email)"
-              icon-left="event-busy"
+              icon="event-busy"
               class="md:hidden"
               :data-test="`oncall-members-mark-away-${row.id}-menu`"
               @select="openAway(row.user_email)"
@@ -169,8 +166,8 @@
             </ODropdownItem>
             <ODropdownItem
               v-if="canConfigure"
-              icon-left="delete-outline"
-              variant="destructive"
+              icon="delete-outline"
+              tone="danger"
               class="md:hidden"
               :data-test="`oncall-members-remove-${row.id}-menu`"
               @select="memberToRemove = row"
@@ -183,12 +180,29 @@
 
       <template #empty>
         <OEmptyState
-          size="hero"
-          preset="no-oncall-members"
-          :filtered="!!memberFilter"
-          :hide-action="!canConfigure && !memberFilter"
+          :kind="memberFilter ? 'filtered' : 'first-run'"
+          :title="
+            memberFilter
+              ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+              : t('emptyState.noOncallMembers.title')
+          "
+          :text="
+            memberFilter
+              ? t('emptyState.filtered.description', {
+                  noun: t('emptyState.filtered.fallbackNoun'),
+                })
+              : undefined
+          "
+          :icon="memberFilter ? undefined : 'group'"
           data-test="oncall-members-empty"
-          @action="(id) => (id === 'clear-filters' ? (memberFilter = '') : focusMemberPicker())"
+          :action-label="
+            !canConfigure && !memberFilter
+              ? undefined
+              : memberFilter
+                ? undefined
+                : t('emptyState.noOncallMembers.action')
+          "
+          @action="memberFilter ? (memberFilter = '') : focusMemberPicker()"
         />
       </template>
     </OTable>
@@ -197,15 +211,15 @@
       v-model:open="addOpen"
       size="md"
       :title="t('oncall.membersAddOpen')"
-      :primary-button-label="
-        pendingEmails.length
+      :primary="{
+        label: pendingEmails.length
           ? t('oncall.membersAddCta', { count: pendingEmails.length }, pendingEmails.length)
-          : t('oncall.membersAddOpen')
-      "
-      :secondary-button-label="t('oncall.cancel')"
-      :primary-button-disabled="!pendingEmails.length"
-      :primary-button-loading="adding"
-      primary-button-data-test="oncall-members-add-btn"
+          : t('oncall.membersAddOpen'),
+        disabled: !pendingEmails.length,
+        loading: adding,
+        dataTest: 'oncall-members-add-btn',
+      }"
+      :secondary="{ label: t('oncall.cancel') }"
       data-test="oncall-members-add-dialog"
       @click:primary="addMembers"
       @click:secondary="addOpen = false"
@@ -260,9 +274,9 @@
               }}</OTruncatedText>
             </span>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="close"
+              icon="close"
               :aria-label="t('oncall.membersAddUnstage', { name: raw(nameOf(email)) })"
               :data-test="`oncall-members-add-unstage-${email}`"
               @click="selected = selected.filter((one) => one !== email)"
@@ -294,8 +308,7 @@
       :title="removeTitle"
       :message="removeMessage"
       :ok-label="t('oncall.removeMemberConfirm')"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       @update:ok="confirmRemoveMember"
       @update:cancel="memberToRemove = null"
     />

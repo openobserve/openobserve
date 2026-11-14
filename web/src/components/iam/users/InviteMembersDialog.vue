@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="sm"
     :title="t('user.inviteMembers')"
-    :sub-title="t('user.inviteMembersSubtitle')"
+    :subtitle="t('user.inviteMembersSubtitle')"
     :form-id="FORM_ID"
-    :primary-button-label="t('user.sendInvites')"
-    :secondary-button-label="t('user.cancel')"
+    :primary="{ label: t('user.sendInvites') }"
+    :secondary="{ label: t('user.cancel') }"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </OForm>
     <div v-else class="flex justify-center py-6" data-test="invite-members-dialog-loading">
-      <OSpinner size="md" />
+      <OSpinner size="lg" />
     </div>
   </ODialog>
 </template>

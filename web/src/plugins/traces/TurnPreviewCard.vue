@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        (the slotted chip). Wrapper is `display:contents` so it adds no box. -->
   <span class="contents">
     <slot />
-    <OTooltip :side="side" :delay="delay" max-width="16.25rem" content-class="p-0!">
+    <OTooltip :side="side" content-class="p-0!">
       <template #content>
         <div
           class="text-text-body w-63 px-3 py-2.75 text-xs"
@@ -42,11 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("traces.sessionDetail.turnLabel") }} {{ index + 1 }}
             </span>
             <span class="text-3xs text-text-muted">{{ timeLabel }}</span>
-            <OBadge
-              size="sm"
-              class="ms-auto"
-              :variant="turn.status === 'error' ? 'error-soft' : 'success-soft'"
-            >
+            <OBadge size="sm" class="ms-auto" :tone="turn.status === 'error' ? 'err' : 'ok'">
               {{
                 turn.status === "error"
                   ? t("traces.sessionDetail.statusError")

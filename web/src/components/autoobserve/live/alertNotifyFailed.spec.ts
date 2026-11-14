@@ -80,7 +80,7 @@ describe("alert_notify_failed suggestions (C15)", () => {
   it("words the All suggestions row as a red failure with its counts, next step, CTA and Dismiss", () => {
     const [row] = toSuggestionRows(gt, ZONE, [notifyFailed()], NOW_MS);
     expect(row.kind).toBe("Notification failed");
-    expect(row.kindVariant).toBe("error-soft");
+    expect(row.kindVariant).toBe("err");
     expect(row.headline).toBe("checkout-errors fired, and 3 of 5 notifications failed.");
     expect(String(row.note)).toContain("Check its destination.");
     expect(row.where).toBe("Folder ops");
@@ -109,7 +109,7 @@ describe("alert_notify_failed suggestions (C15)", () => {
     expect(request.copy.label).toBe("Notification failed");
     expect(request.insight.chip).toMatchObject({
       label: "Notification failed",
-      variant: "error-soft",
+      variant: "err",
       tone: "failure",
     });
     expect(request.insight.headline).toBe(

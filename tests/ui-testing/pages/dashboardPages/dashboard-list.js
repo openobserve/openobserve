@@ -8,7 +8,7 @@ export default class DashboardListPage {
   constructor(page) {
     this.page = page;
     // List-level pagination controls (OTable pagination bar) and the pagination
-    // info span that renders "Showing X - Y of Z".
+    // info span that renders "X–Y of Z".
     this.nextPageBtn = page.locator('[data-test="o2-table-next-page-btn"]');
     this.paginationInfo = page.locator('[data-test="o2-table-pagination-info"]');
   }
@@ -144,7 +144,7 @@ export default class DashboardListPage {
     await this.nextPageBtn.click();
   }
 
-  // Read the pagination info text ("Showing X - Y of Z"), whitespace-normalised.
+  // Read the pagination info text ("X–Y of Z"), whitespace-normalised.
   // The span interpolates across template newlines, so collapse runs of
   // whitespace to single spaces before returning.
   async getPaginationInfoText() {
@@ -153,7 +153,7 @@ export default class DashboardListPage {
   }
 
   // Assert the pagination info matches a regex (auto-retrying). The span renders
-  // "Showing {from} - {to} of {count}", e.g. "Showing 21 - 25 of 25".
+  // "{from}–{to} of {count}", e.g. "21–25 of 25".
   async expectPaginationInfoToMatch(pattern) {
     await expect
       .poll(async () => await this.getPaginationInfoText(), { timeout: 20000 })

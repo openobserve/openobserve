@@ -146,14 +146,15 @@
               </div>
 
               <OButton
-                variant="outline"
-                size="icon"
+                icon-only
+                variant="secondary"
+                size="xs"
                 class="shrink-0"
                 :data-test="`dashboard-join-condition-remove-${argIndex}`"
                 :disabled="modelValue.conditions.length === 1"
                 @click="handleRemoveCondition(argIndex)"
                 :aria-label="t('panel.removeClause')"
-                icon-left="close"
+                icon="close"
               >
                 <OTooltip :content="t('dashboard.addJoinPopUp.removeClause')" />
               </OButton>
@@ -162,10 +163,9 @@
         </div>
 
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="mt-2 w-fit shrink-0"
-          icon-left="add"
+          icon="add"
           data-test="dashboard-join-add-clause"
           @click="handleAddCondition(modelValue.conditions.length - 1)"
         >

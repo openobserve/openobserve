@@ -77,8 +77,8 @@ export default function useExclusionSuggestions() {
     return null;
   });
 
-  const banner = computed<"warning" | "info" | null>(() =>
-    ua.value.length ? "warning" : identity.value ? "info" : null,
+  const banner = computed<"warn" | "info" | null>(() =>
+    ua.value.length ? "warn" : identity.value ? "info" : null,
   );
 
   return { loadUa, ua, identity, banner };

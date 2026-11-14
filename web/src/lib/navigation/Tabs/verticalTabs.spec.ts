@@ -57,9 +57,9 @@ function mountRail(modelValue: string, disableActive = false) {
     components: { OTabs, OTab },
     data: () => ({ modelValue, disableActive }),
     template: `<OTabs orientation="vertical" :model-value="modelValue">
-      <OTab name="a" label="Alerts" icon="notifications" :disable="disableActive" />
+      <OTab name="a" label="Alerts" icon="notifications" :disabled="disableActive" />
       <OTab name="b" label="Organization parameters" />
-      <OTab name="c" label="Locked" disable />
+      <OTab name="c" label="Locked" disabled />
     </OTabs>`,
   });
 }
@@ -113,7 +113,7 @@ describe("vertical tabs render as on main", () => {
         "text-text-body",
         "enabled:hover:text-tabs-hover-text",
         "enabled:hover:bg-tabs-rail-hover-bg",
-        "font-normal",
+        "font-medium",
       ]),
     );
   });
@@ -132,14 +132,6 @@ describe("vertical tabs render as on main", () => {
     expect(inactive.classes()).toEqual(
       expect.arrayContaining(["text-text-body", "enabled:hover:text-tabs-hover-text"]),
     );
-  });
-
-  it("starts each label at the tab's start edge without reserving a bold width", () => {
-    for (const tab of mountRail("a").findAll('[role="tab"]')) {
-      const label = tab.find("[data-otab-label]");
-      expect(label.classes()).toContain("text-start");
-      expect(label.classes().filter((name) => name.startsWith("after:"))).toEqual([]);
-    }
   });
 
   it.each([

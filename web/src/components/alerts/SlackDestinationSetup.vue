@@ -8,7 +8,7 @@ import { useStore } from "vuex";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -273,29 +273,26 @@ onMounted(() => {
 
 <template>
   <section class="flex w-full flex-col gap-4" data-test="slack-destination-setup">
-    <OBanner
+    <OInlineNotice
       v-if="!isCloud && isEnterprise && slackState.enabled"
-      variant="info"
-      dense
+      tone="info"
       icon="forum"
-      inline-actions
       data-test="slack-form-app-banner"
     >
       {{ t("alert_destinations.slackOAuth.selfHostedApp") }}
       <template #actions>
         <OButton
-          as="a"
           :href="slackSettingsHref"
           target="_blank"
           rel="noopener noreferrer"
-          variant="ghost-primary"
-          size="xs"
-          icon-right="open-in-new"
+          variant="accent-ghost"
+          size="sm"
+          icon-end="open-in-new"
         >
           {{ t("alert_destinations.slackOAuth.openSlackSettings") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
     <div>
       <div class="text-sm font-medium">
@@ -313,7 +310,7 @@ onMounted(() => {
             <span class="flex flex-col gap-1">
               <span class="flex flex-wrap items-center gap-2">
                 <span>{{ t("alert_destinations.slackOAuth.oauthMethodTitle") }}</span>
-                <OTag variant="primary-soft" size="xs">
+                <OTag tone="accent" size="sm">
                   {{ t("alert_destinations.slackOAuth.recommended") }}
                 </OTag>
               </span>
@@ -333,7 +330,7 @@ onMounted(() => {
             <span class="flex flex-col gap-1">
               <span class="flex flex-wrap items-center gap-2">
                 <span>{{ t("alert_destinations.slackOAuth.manifestMethodTitle") }}</span>
-                <OTag variant="primary-soft" size="xs">
+                <OTag tone="accent" size="sm">
                   {{ t("alert_destinations.slackOAuth.recommended") }}
                 </OTag>
               </span>
@@ -367,9 +364,9 @@ onMounted(() => {
     </div>
 
     <template v-if="setupMethod === 'oauth' && isCloud">
-      <OBanner
+      <OInlineNotice
         v-if="upgradeCandidate && !connected"
-        variant="info"
+        tone="info"
         icon="sync"
         data-test="slack-form-upgrade-banner"
       >
@@ -391,7 +388,6 @@ onMounted(() => {
         <template #actions>
           <OButton
             variant="primary"
-            size="sm-action"
             :loading="connecting"
             data-test="slack-form-upgrade-button"
             @click="connectSlack"
@@ -399,33 +395,25 @@ onMounted(() => {
             {{ t("slackApp.connect.upgradeButton") }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
 
-      <OBanner variant="info" dense icon="verified-user" data-test="slack-oauth-permission-note">
+      <OInlineNotice tone="info" icon="verified-user" data-test="slack-oauth-permission-note">
         {{ consentNote }}
-      </OBanner>
+      </OInlineNotice>
 
-      <OBanner
-        v-if="connected"
-        variant="success"
-        dense
-        icon="check-circle"
-        data-test="slack-oauth-connected"
-      >
+      <OInlineNotice v-if="connected" tone="ok" data-test="slack-oauth-connected">
         {{
           t("alert_destinations.slackOAuth.connected", {
             workspace: slackTeamName,
             channel: channelName,
           })
         }}
-      </OBanner>
+      </OInlineNotice>
 
-      <OBanner
+      <OInlineNotice
         v-if="showLinkPeople"
-        variant="info"
-        dense
+        tone="info"
         icon="groups"
-        inline-actions
         data-test="slack-form-link-people"
       >
         {{
@@ -435,25 +423,23 @@ onMounted(() => {
         }}
         <template #actions>
           <OButton
-            as="a"
             :href="slackSettingsHref"
             target="_blank"
             rel="noopener noreferrer"
-            variant="ghost-primary"
-            size="xs"
-            icon-right="open-in-new"
+            variant="accent-ghost"
+            size="sm"
+            icon-end="open-in-new"
           >
             {{ t("alert_destinations.slackOAuth.linkPeopleEdit") }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
 
       <OButton
         v-if="connected"
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         class="w-fit"
-        icon-left="refresh"
+        icon="refresh"
         :loading="connecting"
         data-test="slack-oauth-reconnect-button"
         @click="connectSlack"
@@ -463,9 +449,8 @@ onMounted(() => {
       <OButton
         v-else
         variant="primary"
-        size="sm-action"
         class="w-fit"
-        icon-left="link"
+        icon="link"
         :loading="connecting"
         data-test="slack-oauth-connect-button"
         @click="connectSlack"
@@ -498,8 +483,7 @@ onMounted(() => {
           <OButton
             class="w-fit"
             variant="primary"
-            size="sm-action"
-            icon-right="arrow-forward"
+            icon-end="arrow-forward"
             :disabled="!canContinueManifest"
             data-test="slack-manifest-continue-button"
             @click="continueManifest"
@@ -515,37 +499,33 @@ onMounted(() => {
         :done="manifestStep > 2"
       >
         <div class="flex flex-col gap-3 pt-3">
-          <OBanner variant="info" dense icon="verified-user">
+          <OInlineNotice tone="info" icon="verified-user">
             {{ t("alert_destinations.slackOAuth.manifestPermissionNote") }}
-          </OBanner>
+          </OInlineNotice>
           <p class="text-text-secondary m-0 text-sm">
             {{ t("alert_destinations.slackOAuth.manifestReviewHelp") }}
           </p>
           <OCodeBlock
             :code="manifestCode"
             lang="json"
-            chrome="editor"
             filename="manifest.json"
             :max-lines="16"
             data-test="slack-manifest-code"
           />
           <div class="flex flex-wrap items-center gap-2">
             <OButton
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               data-test="slack-manifest-back-button"
               @click="goBackManifest"
             >
               {{ t("alert_destinations.slackOAuth.manifestBack") }}
             </OButton>
             <OButton
-              as="a"
               :href="manifestUrl"
               target="_blank"
               rel="noopener noreferrer"
               variant="primary"
-              size="sm-action"
-              icon-right="open-in-new"
+              icon-end="open-in-new"
               data-test="slack-manifest-open-slack"
               @click="advanceToWebhook"
             >
@@ -557,14 +537,13 @@ onMounted(() => {
 
       <OStep :name="3" :title="t('alert_destinations.slackOAuth.manifestStepWebhook')">
         <div class="flex flex-col gap-3 pt-3">
-          <OBanner variant="info" dense icon="info" data-test="slack-manifest-where-to-find">
+          <OInlineNotice tone="info" data-test="slack-manifest-where-to-find">
             {{ t("alert_destinations.slackOAuth.manifestWhereToFind") }}
-          </OBanner>
+          </OInlineNotice>
           <SlackWebhookFields show-secret-note />
           <OButton
             class="w-fit"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="slack-manifest-back-button"
             @click="goBackManifest"
           >

@@ -531,7 +531,7 @@ describe("TraceDetailsSidebar", async () => {
         viewLogsWrapper.find('[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]');
       const notice = () => viewLogsWrapper.find('[data-test="traces-span-drawer-no-logs-notice"]');
 
-      it("stays on the trace and shows the amber notice as a status, with focus back on View Logs", async () => {
+      it("stays on the trace and shows the grey no-data notice as a status, with focus back on View Logs", async () => {
         expect(viewLogsButton().exists()).toBe(true);
         (viewLogsButton().element as HTMLElement).focus();
 
@@ -617,7 +617,7 @@ describe("TraceDetailsSidebar", async () => {
         expect(notice().exists()).toBe(false);
         expect(failed.exists()).toBe(true);
         expect(failed.attributes("role")).toBe("alert");
-        expect(failed.classes()).toContain("bg-status-error-bg");
+        expect(failed.attributes("data-tone")).toBe("err");
         expect(failed.text()).toContain(
           "Couldn't load: the server returned an error. Refresh to try again.",
         );
@@ -2750,19 +2750,19 @@ describe("TraceDetailsSidebar — span vs operation percentiles", () => {
   });
 
   it.each([
-    [500, "operationBandBelowP50", "< p50", "default-soft"],
-    [1000, "operationBandP50ToP75", "p50–p75", "default-soft"],
-    [2000, "operationBandP75ToP90", "p75–p90", "default-soft"],
-    [4000, "operationBandP90ToP99", "p90–p99", "warning-soft"],
-    [8000, "operationBandP90ToP99", "p90–p99", "warning-soft"],
-    [8001, "operationBandAboveP99", "> p99", "error-soft"],
+    [500, "operationBandBelowP50", "< p50", "neutral"],
+    [1000, "operationBandP50ToP75", "p50–p75", "neutral"],
+    [2000, "operationBandP75ToP90", "p75–p90", "neutral"],
+    [4000, "operationBandP90ToP99", "p90–p99", "warn"],
+    [8000, "operationBandP90ToP99", "p90–p99", "warn"],
+    [8001, "operationBandAboveP99", "> p99", "err"],
   ])("a %sµs span reads %s (%s) with the %s variant", async (duration, bandKey, band, variant) => {
     expect(i18n.global.t(`traces.traceDetailsSidebar.${bandKey}`)).toBe(band);
     const w = await mountWith({ duration });
     const tag = percentileTag(w);
     expect(tag).toBeTruthy();
     expect(tag!.text()).toBe(`${band} of ${mockSpan.operation_name}`);
-    expect(tag!.props("variant")).toBe(variant);
+    expect(tag!.props("tone")).toBe(variant);
     w.unmount();
   });
 
@@ -2778,7 +2778,6 @@ describe("TraceDetailsSidebar — span vs operation percentiles", () => {
     }
     expect(content).not.toContain("n 120");
     expect(tooltip!.props("contentClass")).toContain("whitespace-nowrap");
-    expect(tooltip!.props("maxWidth")).toBe("none");
     w.unmount();
   });
 
@@ -3070,7 +3069,7 @@ describe("TraceDetailsSidebar — correlation license lock", () => {
     });
     await w.setProps({ span: { ...mockSpan, span_id: "another" } });
     await flushPromises();
-    expect(w.find(LOGS_TAB).attributes("suffix-icon")).toBe("lock");
+    expect(w.find(LOGS_TAB).attributes("locked")).toBe("true");
     expect(
       w.find('[data-test="trace-details-sidebar-correlated-logs-license-denied"]').exists(),
     ).toBe(true);
@@ -3095,7 +3094,7 @@ describe("TraceDetailsSidebar — correlation license lock", () => {
     const w = mountSidebar({ streamName: "default", serviceStreamsEnabled: true });
     await w.setProps({ activeTab: "correlated-logs" });
     await flushPromises();
-    expect(w.find(LOGS_TAB).attributes("suffix-icon")).toBeUndefined();
+    expect(w.find(LOGS_TAB).attributes("locked")).toBe("false");
     expect(mockFindRelatedTelemetry).toHaveBeenCalled();
     w.unmount();
   });

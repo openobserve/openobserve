@@ -262,21 +262,21 @@ const buildGlobalConfig = (
         "open",
         "width",
         "title",
-        "subTitle",
+        "subtitle",
         "showClose",
         "persistent",
         "size",
-        "primaryButtonLabel",
-        "secondaryButtonLabel",
-        "neutralButtonLabel",
-        "primaryButtonVariant",
-        "secondaryButtonVariant",
-        "neutralButtonVariant",
-        "primaryButtonDisabled",
-        "secondaryButtonDisabled",
-        "primaryButtonLoading",
+        "primary",
+        "secondary",
+        "extra",
+        "primary",
+        "secondary",
+        "extra",
+        "primary",
+        "secondary",
+        "primary",
       ],
-      emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+      emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
       template:
         '<div data-test-stub="o-drawer" :data-open="open" :data-title="title"><slot /></div>',
     },
@@ -286,16 +286,16 @@ const buildGlobalConfig = (
         "open",
         "width",
         "title",
-        "subTitle",
+        "subtitle",
         "showClose",
         "persistent",
         "size",
-        "primaryButtonLabel",
-        "secondaryButtonLabel",
-        "neutralButtonLabel",
+        "primary",
+        "secondary",
+        "extra",
         "formId",
       ],
-      emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+      emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
       template:
         '<div data-test-stub="o-dialog" :data-open="open" :data-title="title"><slot /></div>',
     },
@@ -908,7 +908,7 @@ describe("Dashboards.vue", () => {
       expect(dialog.props()).toMatchObject({
         messageKeypath: "dashboard.deleteDashboardConfirmMsg",
         messageName: "cpu-overview",
-        okVariant: "destructive",
+        kind: "destructive",
       });
     });
 
@@ -919,7 +919,7 @@ describe("Dashboards.vue", () => {
       const dialog = wrapper
         .findAllComponents({ name: "ConfirmDialog" })
         .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-confirm-bulk-delete-dialog");
-      expect(dialog.props("okVariant")).toBe("destructive");
+      expect(dialog.props("kind")).toBe("destructive");
     });
   });
 

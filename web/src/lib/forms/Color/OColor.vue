@@ -55,8 +55,8 @@ const effectiveError = computed(() => props.errorMessage || (props.error ? " " :
 const hasError = computed(() => !!effectiveError.value);
 
 const heightClasses: Record<NonNullable<ColorProps["size"]>, string> = {
-  sm: "h-8 text-xs",
-  md: "h-10 text-sm",
+  sm: "h-control-sm text-compact",
+  md: "h-control-md text-compact",
 };
 
 const swatchSize: Record<NonNullable<ColorProps["size"]>, string> = {

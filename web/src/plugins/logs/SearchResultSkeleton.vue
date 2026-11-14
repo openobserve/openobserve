@@ -25,12 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       inert
     >
-      <OButton variant="outline" size="icon-xs-sq" class="ms-1.5 shrink-0">
+      <OButton icon-only variant="secondary" size="sm" class="ms-1.5 shrink-0">
         <OIcon :name="collapseIcon" size="sm" />
       </OButton>
       <div class="min-w-0 flex-1 ps-2 max-md:min-w-32" />
       <div class="flex flex-none items-center justify-end gap-1 pe-2 max-md:ms-auto">
-        <OButton v-if="narrow" variant="outline" size="icon-chip">
+        <OButton v-if="narrow" icon-only variant="secondary" size="xs">
           <OIcon name="more-horiz" size="sm" />
         </OButton>
         <template v-else>
@@ -44,7 +44,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div v-if="logsTab" class="inline-flex items-center gap-0.5">
-            <OButton variant="outline" size="icon-chip" :active="!!searchObj.meta.toggleSourceWrap">
+            <OButton
+              icon-only
+              variant="secondary"
+              size="xs"
+              :pressed="!!searchObj.meta.toggleSourceWrap"
+            >
               <OIcon name="wrap-text" size="sm" />
             </OButton>
           </div>
@@ -55,19 +60,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :model-value="searchObj.meta.resultGrid.rowsPerPage"
               :options="ROWS_PER_PAGE"
               class="select-pagination min-w-[4.5rem]"
-              size="sm"
               :searchable="false"
               :disabled="searchObj.loading"
             />
           </span>
           <span>
             <OPagination
-              :disable="searchObj.loading"
-              :model-value="1"
-              :max="1"
-              :max-pages="narrow ? 3 : 5"
+              :loading="searchObj.loading"
+              :page="1"
+              :page-count="1"
               class="paginator-section"
-            />
+            >
+              <template #range />
+            </OPagination>
           </span>
         </template>
       </div>

@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPopover
+    size="lg"
     v-model:open="open"
     :aria-label="t('serviceVersions.envEdit.title')"
     :side-offset="sideOffset ?? POPOVER_GAP"
-    content-class="w-[27rem]"
   >
     <template #trigger><slot /></template>
     <div class="flex flex-col px-4 py-3.5 text-sm" data-test="svcver-env-popover" @click.stop>
@@ -31,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           class="ms-auto"
           variant="ghost"
-          size="xs"
-          icon-left="close"
+          size="sm"
+          icon="close"
           :aria-label="t('common.close')"
           data-test="svcver-env-close"
           @click="open = false"
@@ -44,7 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dim-key="env"
           :key-label="t('serviceVersions.compare.envChip')"
           :value="identity.no_env ? t('serviceVersions.env.noEnv') : identity.env"
-          :variant="identity.no_env ? 'default-soft' : 'success-soft'"
           :muted="identity.no_env"
           :value-tooltip="false"
         />
@@ -58,8 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("serviceVersions.envEdit.readonly") }}
       </div>
       <div v-else-if="loading" class="flex flex-col gap-2" data-test="svcver-env-loading">
-        <OSkeleton class="h-8 w-full" />
-        <OSkeleton class="h-24 w-full" />
+        <OSkeleton shape="block" class="h-8 w-full" />
+        <OSkeleton shape="block" class="h-24 w-full" />
       </div>
       <div
         v-else-if="loadFailed"
@@ -67,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="svcver-env-load-error"
       >
         <span>{{ t("serviceVersions.envEdit.loadError") }}</span>
-        <OButton variant="ghost-primary" size="xs" @click="reload">{{
+        <OButton variant="accent-ghost" size="sm" @click="reload">{{
           t("serviceVersions.actions.retry")
         }}</OButton>
       </div>
@@ -138,7 +137,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dim-key="env"
                 :key-label="t('serviceVersions.compare.envChip')"
                 :value="row.env"
-                variant="success-soft"
                 :value-tooltip="false"
               />
               <span class="text-text-secondary text-xs tabular-nums">{{ row.note }}</span>
@@ -152,7 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OInput
                 v-model="newValue"
-                size="sm"
                 autofocus
                 :placeholder="t('serviceVersions.envEdit.newPlaceholder')"
                 :error="Boolean(newError)"
@@ -202,16 +199,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>{{ undo.error || undo.message }}</span>
       <OButton
         v-if="undo.canUndo && !undo.error"
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :loading="undo.busy"
         data-test="svcver-env-undo"
         @click="runUndo"
         >{{ t("serviceVersions.envEdit.undo") }}</OButton
       >
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="svcver-env-view-overrides"
         @click="viewOverrides"
         >{{ t("serviceVersions.envEdit.viewOverrides") }}</OButton

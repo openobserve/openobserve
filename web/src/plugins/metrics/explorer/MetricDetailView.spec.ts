@@ -79,12 +79,12 @@ const SERIES = { resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]]
 
 const OPageHeaderStub = {
   name: "OPageHeader",
-  props: ["title", "subtitle", "back"],
+  props: ["title", "about", "back"],
   template: `
     <header>
       <button data-test="detail-back" @click="back.onClick()" />
       <h1>{{ title }}</h1>
-      <slot name="title-trail" />
+      <slot name="status" />
       <slot name="actions" />
     </header>
   `,
@@ -221,29 +221,25 @@ describe("MetricDetailView", () => {
       wrapper = mountView();
       await flushPromises();
       const overview = wrapper.find('[data-test="metrics-detail-overview"]');
-      const line = () => overview.findComponent({ name: "LoadingProgress" });
+      const line = () => overview.findComponent({ name: "OLoadingLine" });
       expect(line().element).toBe(overview.element.firstElementChild);
-      expect(line().props()).toMatchObject({
-        loading: true,
-        loadingProgressPercentage: 0,
-        indeterminate: false,
-      });
+      expect(line().props("active")).toBe(true);
 
       first(SERIES);
       await flushPromises();
-      expect(line().props("loading")).toBe(false);
+      expect(line().props("active")).toBe(false);
 
       let answer!: (value: any) => void;
       runQuery.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
       await wrapper.setProps({ timeRange: { start_time: 2, end_time: 3 } });
       await flushPromises();
-      expect(line().props("loading")).toBe(true);
+      expect(line().props("active")).toBe(true);
       expect(wrapper.findComponent({ name: "MetricCardChart" }).props("results")).toEqual([SERIES]);
       expect(wrapper.find('[data-test="metrics-detail-overview-refreshing"]').exists()).toBe(false);
 
       answer(SERIES);
       await flushPromises();
-      expect(line().props("loading")).toBe(false);
+      expect(line().props("active")).toBe(false);
     });
 
     it("queries once per window, not again when the card is rebuilt unchanged", async () => {
@@ -1285,7 +1281,7 @@ describe("MetricDetailView", () => {
     it("labels the back button once with Back to, through the real header", async () => {
       wrapper = mountView({}, { realHeader: true });
       const back = wrapper.find('[data-test="metrics-detail-close"]');
-      expect(back.attributes("aria-label")).toBe("Back to metrics");
+      expect(back.attributes("aria-label")).toBe("Back to Metrics");
     });
 
     it("keeps Open in Visualize named when its label is hidden on a phone", () => {
@@ -1349,16 +1345,14 @@ describe("MetricDetailView", () => {
     const sel = (action: string) => `[data-test="metrics-explorer-card-${action}-${NAME}"]`;
     const HELP = "Time spent serving one request, by bucket.";
 
-    it("shows the metric's full help text from an info button, announced in full", () => {
+    it("shows the metric's full help text behind the header's About button", () => {
       wrapper = mountView({ card: { ...SELECTED, help: HELP } });
-      const help = wrapper.find(sel("help"));
-      expect(help.element.tagName).toBe("BUTTON");
-      expect(help.attributes("aria-label")).toContain(HELP);
+      expect(wrapper.findComponent({ name: "OPageHeader" }).props("about")).toBe(HELP);
     });
 
-    it("has no info button for a metric without help text", () => {
+    it("has no About text for a metric without help text", () => {
       wrapper = mountView();
-      expect(wrapper.find(sel("help")).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OPageHeader" }).props("about")).toBeUndefined();
     });
 
     it("offers a labelled Configure function button on a configurable metric", async () => {

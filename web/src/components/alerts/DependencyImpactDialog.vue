@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     :size="isTemplateFocus ? 'lg' : 'sm'"
-    :max-height="86"
     @update:open="(v) => emit('update:open', v)"
   >
     <template #header>
@@ -59,15 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-secondary flex h-72 items-center justify-center gap-2 text-sm"
         data-test="dependency-impact-loading"
       >
-        <OSpinner size="sm" />
+        <OSpinner size="lg" />
         {{ t("alert_dependencies.loading") }}
       </div>
 
-      <OBanner
+      <OInlineNotice
         v-else-if="error"
-        variant="error"
-        icon="error"
-        :content="t('alert_dependencies.failedToLoad', { error })"
+        tone="err"
+        :message="t('alert_dependencies.failedToLoad', { error })"
         data-test="dependency-impact-error"
       />
 
@@ -285,8 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #footer>
       <div class="flex w-full items-center">
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="ms-auto"
           data-test="dependency-impact-close"
           @click="emit('update:open', false)"
@@ -302,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('alert_dependencies.deleteTitle', { name: confirm.node?.name || '' })"
     :message-keypath="deleteMessageKey"
     :message-name="confirm.node?.name"
-    ok-variant="destructive"
+    kind="destructive"
     @update:ok="performDelete"
     @update:cancel="cancelDelete"
   />
@@ -323,7 +320,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import DependencyEntityRow from "./DependencyEntityRow.vue";

@@ -81,7 +81,7 @@ const props = withDefaults(
     compact?: boolean;
     dataTest?: string;
   }>(),
-  { refTraceId: undefined, variant: "outline", compact: false, dataTest: undefined },
+  { refTraceId: undefined, variant: "secondary", compact: false, dataTest: undefined },
 );
 
 const emit = defineEmits<{

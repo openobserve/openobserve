@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { utilizationTint } from "../useHostsList";
 import { KIND_INFO, type DetailKind, type MetricFamily, type QueryId } from "./kubernetesQueries";
@@ -48,7 +48,7 @@ export type QosClass = "Guaranteed" | "Burstable" | "BestEffort";
 export interface StatusChip {
   text?: string;
   key?: I18nKey;
-  variant: BadgeVariant;
+  variant: ChipTone;
 }
 
 export interface Owner {
@@ -182,7 +182,7 @@ export interface ConditionWord {
   // A synthesized word keeps its raw text only as the search token; the key is what renders.
   text: string;
   key?: I18nKey;
-  variant: BadgeVariant;
+  variant: ChipTone;
 }
 
 export interface DeploymentRow extends RowBase {
@@ -355,13 +355,12 @@ export const TONE_TEXT_CLASS: Record<Tone, string> = {
   neutral: "text-text-secondary",
 };
 
-const VARIANT_TONE: Partial<Record<BadgeVariant, Tone>> = {
-  "success-soft": "success",
-  "error-soft": "error",
-  "warning-soft": "warning",
-  "amber-soft": "warning",
-  "blue-soft": "info",
-  "default-soft": "neutral",
+const VARIANT_TONE: Partial<Record<ChipTone, Tone>> = {
+  ok: "success",
+  err: "error",
+  warn: "warning",
+  info: "info",
+  neutral: "neutral",
 };
 
 const PHASE_ORDER: Phase[] = ["Failed", "Pending", "Unknown", "Running", "Succeeded"];
@@ -372,23 +371,23 @@ const UID_QUERIES: QueryId[] = ["P1", "P2", "P11", "P12"];
 const NEAR_LIMIT_PCT = 90;
 
 const NODE_STATUS: Record<Readiness, StatusChip> = {
-  true: { key: "infra.k8s2.nodeReady", variant: "success-soft" },
-  false: { key: "infra.k8s2.nodeNotReady", variant: "error-soft" },
-  unknown: { key: "infra.k8s2.nodeUnknown", variant: "amber-soft" },
+  true: { key: "infra.k8s2.nodeReady", variant: "ok" },
+  false: { key: "infra.k8s2.nodeNotReady", variant: "err" },
+  unknown: { key: "infra.k8s2.nodeUnknown", variant: "warn" },
 };
 
-const NODE_CONDITION_VARIANT: Record<string, BadgeVariant> = {
-  Ready: "success-soft",
-  MemoryPressure: "warning-soft",
-  DiskPressure: "warning-soft",
-  PIDPressure: "warning-soft",
-  NetworkUnavailable: "error-soft",
+const NODE_CONDITION_VARIANT: Record<string, ChipTone> = {
+  Ready: "ok",
+  MemoryPressure: "warn",
+  DiskPressure: "warn",
+  PIDPressure: "warn",
+  NetworkUnavailable: "err",
 };
 
-const DEPLOYMENT_CONDITION_VARIANT: Record<string, BadgeVariant> = {
-  Available: "success-soft",
-  Progressing: "blue-soft",
-  ReplicaFailure: "error-soft",
+const DEPLOYMENT_CONDITION_VARIANT: Record<string, ChipTone> = {
+  Available: "ok",
+  Progressing: "info",
+  ReplicaFailure: "err",
 };
 
 // One index per pods array (never mutated in place), so a page of rows reads members without a scan per row.
@@ -767,12 +766,12 @@ export const formatCores = (value: number | null) => {
   return value < 1 ? `${Math.round(value * 1000)}m` : value.toFixed(2);
 };
 
-export const usageBarVariant = (pctValue: number | null): ProgressBarVariant => {
+export const usageBarVariant = (pctValue: number | null): ProgressBarTone => {
   const tint = utilizationTint(pctValue);
-  return tint === "critical" ? "danger" : tint === "warn" ? "warning" : "default";
+  return tint === "critical" ? "err" : tint === "warn" ? "warn" : "accent";
 };
 
-export const toneOf = (variant: BadgeVariant | undefined): Tone =>
+export const toneOf = (variant: ChipTone | undefined): Tone =>
   (variant && VARIANT_TONE[variant]) || "neutral";
 
 export const chipLabel = (chip: StatusChip, t: TranslateFn): I18nText =>
@@ -831,9 +830,9 @@ export function nodeConditionWords(row: NodeRow): ConditionWord[] {
     .filter(([, status]) => status === "true")
     .map(([condition]) => ({
       text: condition,
-      variant: NODE_CONDITION_VARIANT[condition] ?? "default-soft",
+      variant: NODE_CONDITION_VARIANT[condition] ?? "neutral",
     }));
-  if (row.unschedulable) words.push({ text: "SchedulingDisabled", variant: "warning-soft" });
+  if (row.unschedulable) words.push({ text: "SchedulingDisabled", variant: "warn" });
   return words;
 }
 
@@ -842,7 +841,7 @@ export function derivedDeploymentConditions(
   available: number | null,
 ): ConditionWord[] {
   return desired != null && available != null && available >= desired
-    ? [{ key: "infra.k8s2.conditionAvailable", text: "Available", variant: "success-soft" }]
+    ? [{ key: "infra.k8s2.conditionAvailable", text: "Available", variant: "ok" }]
     : [];
 }
 
@@ -855,7 +854,7 @@ export function observedDeploymentConditions(object: K8sObject): ConditionWord[]
     .sort((a, b) => String(a.type).localeCompare(String(b.type)))
     .map((c) => ({
       text: String(c.type),
-      variant: DEPLOYMENT_CONDITION_VARIANT[c.type] ?? "default-soft",
+      variant: DEPLOYMENT_CONDITION_VARIANT[c.type] ?? "neutral",
     }));
 }
 
@@ -998,19 +997,19 @@ function podStatus(
   ready: Readiness | null,
 ): StatusChip | null {
   if (!acc || !phase) return null;
-  if (acc.statusReasons.has("Evicted")) return { text: "Evicted", variant: "error-soft" };
+  if (acc.statusReasons.has("Evicted")) return { text: "Evicted", variant: "err" };
   const waiting = pickReason(acc.waiting);
   if (waiting) {
-    return { text: waiting, variant: ERROR_REASONS.has(waiting) ? "error-soft" : "warning-soft" };
+    return { text: waiting, variant: ERROR_REASONS.has(waiting) ? "err" : "warn" };
   }
-  if (phase === "Failed") return { text: phase, variant: "error-soft" };
-  if (phase === "Pending") return { text: phase, variant: "warning-soft" };
-  if (phase === "Unknown") return { text: phase, variant: "amber-soft" };
+  if (phase === "Failed") return { text: phase, variant: "err" };
+  if (phase === "Pending") return { text: phase, variant: "warn" };
+  if (phase === "Unknown") return { text: phase, variant: "warn" };
   if (phase === "Running") {
-    if (ready === "true") return { text: phase, variant: "success-soft" };
-    if (ready) return { key: "infra.k8s2.podRunningNotReady", variant: "warning-soft" };
+    if (ready === "true") return { text: phase, variant: "ok" };
+    if (ready) return { key: "infra.k8s2.podRunningNotReady", variant: "warn" };
   }
-  return { text: phase, variant: "default-soft" };
+  return { text: phase, variant: "neutral" };
 }
 
 function buildContainers(results: QueryResults, acc: PodAcc | undefined): ContainerRow[] {

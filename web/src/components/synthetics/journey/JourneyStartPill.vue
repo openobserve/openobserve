@@ -160,14 +160,15 @@ function onToggleEnvironment(id: string) {
 <template>
   <div class="flex items-center gap-2">
     <OPopover
+      size="lg"
       v-model:open="urlOpen"
       :aria-label="t('synthetics.journey.startPill.urlTitle')"
-      content-class="w-[min(26rem,calc(100vw-1.5rem))] p-3"
+      content-class="p-3"
     >
       <template #trigger>
         <OButton
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           :disabled="disabled"
           :aria-label="t('synthetics.journey.startPill.urlAria', { url })"
           data-test="synthetics-journey-start-pill-url"
@@ -220,14 +221,15 @@ function onToggleEnvironment(id: string) {
     </OPopover>
 
     <OPopover
+      size="lg"
       v-model:open="envsOpen"
       :aria-label="t('synthetics.journey.startPill.envTitle')"
-      content-class="w-[min(26rem,calc(100vw-1.5rem))] p-3"
+      content-class="p-3"
     >
       <template #trigger>
         <OButton
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           :disabled="disabled"
           :aria-label="
             t('synthetics.journey.startPill.envAria', { count: selectedCount }, selectedCount)

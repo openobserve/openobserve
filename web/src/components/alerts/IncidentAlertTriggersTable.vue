@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-column-resize="true"
       :persist-columns="true"
       :table-id="tableId"
-      :show-global-filter="false"
       @row-click="onRowClick"
     >
       <template #empty>
@@ -59,14 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-if="row.alert_kind === 'external' && row.detected_source"
           data-test="trigger-source-badge"
-          variant="default-outline"
+          tone="outline"
         >
           {{ row.detected_source }}
         </OTag>
         <OTag
           v-else-if="row.alert_kind === 'autoobserve'"
           data-test="trigger-source-autoobserve"
-          variant="default-outline"
+          tone="outline"
         >
           {{ t("alerts.incidents.triggerSourceAutoObserve") }}
         </OTag>
@@ -84,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(value, key) in row.labels"
             :key="key"
             data-test="trigger-label-chip"
-            variant="default-outline"
+            tone="outline"
           >
             {{ key }}={{ value }}
           </OTag>
@@ -97,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="reasonLabel(row)"
             data-test="correlation-reason-label"
-            variant="default-soft"
+            tone="neutral"
             size="sm"
             :label="raw(reasonLabel(row) ?? '')"
           />
@@ -115,10 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <OButton
           v-if="row.alert_kind === 'external'"
+          icon-only
           data-test="trigger-view-payload-btn"
           variant="ghost"
-          size="icon-sm"
-          icon-left="visibility"
+          icon="visibility"
           :title="t('alerts.incidents.viewPayload')"
           @click.stop="openPayload(row)"
         />
@@ -130,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="payloadDialogOpen"
       size="md"
       :title="t('alerts.incidents.rawPayloadTitle')"
-      :primary-button-label="t('common.close')"
+      :primary="{ label: t('common.close') }"
       @click:primary="payloadDialogOpen = false"
     >
       <div v-if="payloadLoading" class="text-text-secondary py-4 text-center text-sm">

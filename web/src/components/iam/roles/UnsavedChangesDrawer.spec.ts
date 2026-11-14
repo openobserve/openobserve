@@ -39,18 +39,12 @@ const ACTION_LABELS: Record<string, string> = { AllowList: "List", AllowGet: "Ge
 
 // The real drawer portals its lazy body; the stub renders it in place with the footer buttons it is given.
 const ODrawerStub = {
-  props: [
-    "open",
-    "secondaryButtonLabel",
-    "secondaryButtonDisabled",
-    "primaryButtonLabel",
-    "primaryButtonDataTest",
-  ],
+  props: ["open", "secondary", "secondary", "primary", "primary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `<div>
     <slot />
-    <button data-test="o-drawer-secondary-btn" :disabled="secondaryButtonDisabled" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-    <button :data-test="primaryButtonDataTest" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+    <button data-test="o-drawer-secondary-btn" :disabled="secondary?.disabled" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
+    <button :data-test="primary?.dataTest" @click="$emit('click:primary')">{{ primary?.label }}</button>
   </div>`,
 };
 

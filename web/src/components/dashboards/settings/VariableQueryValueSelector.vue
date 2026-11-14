@@ -26,10 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip :content="t(disabledTooltipKey, disabledTooltipParams ?? {})" side="bottom" />
     </div>
     <OSelect
+      searchable
       ref="selectRef"
       :model-value="oSelectModelValue"
       :label="variableItem?.label || variableItem?.name"
-      label-position="inside"
+      variant="filter"
       :options="computedOptions"
       labelKey="label"
       valueKey="value"
@@ -100,12 +101,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-center justify-center py-2"
           data-test="variable-query-value-selector-loading-more"
         >
-          <OSpinner size="sm" />
+          <OSpinner size="lg" />
         </div>
       </template>
       <template #empty>
         <div v-if="variableItem.isLoading" class="flex items-center justify-center py-3">
-          <OSpinner size="sm" />
+          <OSpinner size="lg" />
         </div>
         <div
           v-else-if="currentSearchTerm && !isSearchTermExistingOption"

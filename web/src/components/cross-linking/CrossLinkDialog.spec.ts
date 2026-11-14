@@ -43,10 +43,10 @@ describe("CrossLinkDialog Component", () => {
               "title",
               "showClose",
               "formId",
-              "primaryButtonLabel",
-              "secondaryButtonLabel",
+              "primary",
+              "secondary",
             ],
-            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+            emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
           },
           // OFormCombobox (chip-builder scratch input) renders REAL so the
           // newFieldName form-field binding + forwarded clear() are exercised.

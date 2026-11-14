@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="xl"
+    size="lg"
     :title="mode === 'list' ? t('fleet.enrollment.tokens') : t('fleet.enrollment.newToken')"
-    :sub-title="fleetName"
+    :subtitle="fleetName"
     data-test="fleet-tokens-drawer"
     @update:open="onOpen"
   >
@@ -29,33 +29,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }}</OText>
       <div v-if="mode !== 'list'" class="flex flex-col gap-5">
         <div>
-          <OButton
-            variant="ghost"
-            size="sm"
-            icon-left="arrow-back"
-            data-test="fleet-tokens-back"
-            @click="toList"
-          >
+          <OButton variant="ghost" icon="arrow-back" data-test="fleet-tokens-back" @click="toList">
             {{ t("fleet.enrollment.allTokens") }}
           </OButton>
         </div>
         <FleetTokenForm v-if="mode === 'create'" :fleet-id="fleetId" @created="onCreated" />
         <div v-else-if="created" class="flex flex-col gap-3">
-          <OBanner variant="info" dense :content="t('fleet.enrollment.copyOnce')" />
+          <OInlineNotice tone="info" :message="t('fleet.enrollment.copyOnce')" />
           <OCodeBlock
             :code="created.token"
             lang="plaintext"
-            chrome="editor"
             :filename="t('fleet.enrollment.tokenLabel')"
             data-test="fleet-tokens-new-token"
           />
           <div>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              data-test="fleet-tokens-done"
-              @click="toList"
-            >
+            <OButton variant="primary" data-test="fleet-tokens-done" @click="toList">
               {{ t("fleet.common.done") }}
             </OButton>
           </div>
@@ -67,14 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="tokens"
         :columns="columns"
         row-key="id"
-        :frame="false"
         pagination="client"
         :page-size="20"
-        :show-global-filter="false"
         :loading="loading"
         :error="loadError"
         :forbidden="forbidden"
-        :row-tone="(row: TokenRow) => (stateOf(row) === 'active' ? null : 'muted')"
+        :row-state="(row: TokenRow) => (stateOf(row) === 'active' ? null : 'paused')"
         data-test="fleet-tokens-table"
       >
         <template #toolbar>
@@ -82,8 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               v-model="search"
               class="w-full"
-              size="sm"
-              clearable
               :placeholder="t('fleet.enrollment.search')"
               data-test="fleet-tokens-search"
             />
@@ -92,17 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastUpdatedAt"
             :loading="fetching"
             data-test="fleet-tokens-refresh"
             @click="refresh"
           />
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="add"
+            variant="secondary"
+            icon="add"
             data-test="fleet-tokens-create"
             @click="mode = 'create'"
           >
@@ -117,15 +98,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`fleet-tokens-prefix-${row.id}`"
               >{{ masked(row.prefix) }}</span
             >
-            <OButton
+            <OCopyButton
               v-if="row.token"
-              variant="ghost-muted"
-              size="icon-xs"
-              icon-left="content-copy"
-              :aria-label="t('fleet.enrollment.copyToken')"
-              :title="t('fleet.enrollment.copyToken')"
               :data-test="`fleet-tokens-copy-${row.id}`"
-              @click="copyToken(row.token)"
+              size="md"
+              :label="t('fleet.enrollment.copyToken')"
+              :value="row.token"
             />
           </span>
         </template>
@@ -143,11 +121,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span :data-test="`fleet-tokens-state-${row.id}`">
             <OTag
               v-if="expiresSoon(row)"
-              variant="warning-soft"
+              tone="warn"
               dot
               :label="t('fleet.enrollment.expiresSoon')"
             />
-            <OTag v-else :variant="STATE_VARIANT[stateOf(row)]" dot :label="stateLabel(row)" />
+            <OTag v-else :tone="STATE_VARIANT[stateOf(row)]" dot :label="stateLabel(row)" />
           </span>
         </template>
 
@@ -177,9 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <OButton
             v-if="!row.revoked"
-            variant="ghost-destructive"
-            size="icon-sm"
-            icon-left="block"
+            icon-only
+            variant="danger-ghost"
+            icon="block"
             :aria-label="t('fleet.enrollment.revoke')"
             :disabled="revokeToken.isPending.value"
             :data-test="`fleet-tokens-revoke-${row.id}`"
@@ -191,13 +169,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #empty>
           <div data-test="fleet-tokens-empty">
-            <OEmptyState size="block" preset="no-data" :filtered="!!search" @action="search = ''" />
+            <OEmptyState
+              :kind="search ? 'filtered' : 'first-run'"
+              :title="
+                search
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+                  : t('emptyState.noData.title')
+              "
+              :text="
+                search
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.filtered.fallbackNoun'),
+                    })
+                  : t('emptyState.noData.description')
+              "
+              @action="search = ''"
+            />
           </div>
         </template>
 
         <template #error>
           <div data-test="fleet-tokens-error">
-            <OEmptyState size="block" preset="load-error" @action="refresh" />
+            <OEmptyState
+              kind="error"
+              :title="t('emptyState.loadError.title')"
+              :text="t('emptyState.loadError.description')"
+              @action="refresh"
+            />
           </div>
         </template>
       </OTable>
@@ -222,14 +220,14 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { revokeFleetTokenMutation } from "@/services/fleet.queries";
@@ -250,14 +248,11 @@ import {
 const props = defineProps<{ open: boolean; fleetId: string; fleetName: I18nText }>();
 const emit = defineEmits<{ "update:open": [value: boolean] }>();
 
-const STATE_VARIANT: Record<
-  TokenState,
-  "success-soft" | "default-soft" | "warning-soft" | "error-soft"
-> = {
-  active: "success-soft",
-  expired: "default-soft",
-  exhausted: "warning-soft",
-  revoked: "error-soft",
+const STATE_VARIANT: Record<TokenState, "ok" | "neutral" | "warn" | "err"> = {
+  active: "ok",
+  expired: "neutral",
+  exhausted: "warn",
+  revoked: "err",
 };
 
 const { t } = useI18nTyped();
@@ -322,9 +317,6 @@ const stateOf = (row: TokenRow) => tokenState(row, Date.now());
 const expiresSoon = (row: TokenRow) =>
   stateOf(row) === "active" && tokenExpiresSoon(row, Date.now());
 const masked = (prefix: string) => raw(`${prefix}••••••••••••`);
-const copyToken = (token: string) =>
-  copyToClipboard(token, t, { successMessage: t("fleet.enrollment.tokenCopied") });
-
 function stateLabel(row: TokenRow): I18nText {
   const labels: Record<TokenState, I18nText> = {
     active: t("fleet.enrollment.active"),

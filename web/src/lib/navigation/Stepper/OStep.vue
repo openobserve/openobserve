@@ -146,8 +146,8 @@ function handleClick(): void {
 const indicatorClasses = computed<string>(() => {
   const base = [
     "flex items-center justify-center",
-    "size-8 rounded-full shrink-0",
-    "text-sm font-semibold leading-none",
+    "size-control-md rounded-full shrink-0",
+    "text-compact font-semibold leading-none",
     "transition-colors duration-150",
   ].join(" ");
 
@@ -166,7 +166,7 @@ const indicatorClasses = computed<string>(() => {
 });
 
 const titleClasses = computed<string>(() => {
-  const base = "text-sm font-medium leading-tight";
+  const base = "text-compact font-medium leading-tight";
   if (isActive.value) return `${base} text-stepper-title-active`;
   if (props.done) return `${base} text-stepper-title-done`;
   return `${base} text-stepper-title-default`;

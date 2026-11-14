@@ -28,11 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="!formRows.length">
         <OButton
           data-test="alert-conditions-add-btn"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="mt-2"
           @click="addFormRow"
-          icon-left="add"
+          icon="add"
         >
           {{ t("alerts.addCondition") }}
         </OButton>
@@ -80,21 +79,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="alerts-condition-action ms-0 mb-3">
             <OButton
+              icon-only
               data-test="alert-conditions-delete-condition-btn"
               class="ms-1"
               variant="ghost"
-              size="icon-circle-sm"
+              size="sm"
               :title="t('alert_templates.edit')"
               @click="removeFormRow(index)"
             >
               <OIcon name="delete" size="sm" />
             </OButton>
             <OButton
-              data-test="alert-conditions-add-condition-btn"
               v-if="index === formRows.length - 1"
+              icon-only
+              data-test="alert-conditions-add-condition-btn"
               class="ms-1"
               variant="ghost"
-              size="icon-circle-sm"
+              size="sm"
               :title="t('alert_templates.edit')"
               @click="addFormRow()"
             >
@@ -114,11 +115,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="!fields.length">
         <OButton
           data-test="alert-conditions-add-btn"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="mt-2"
           @click="addApiHeader"
-          icon-left="add"
+          icon="add"
         >
           {{ t("alerts.addCondition") }}
         </OButton>
@@ -194,21 +194,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="alerts-condition-action ms-0 mb-3">
             <OButton
+              icon-only
               data-test="alert-conditions-delete-condition-btn"
               class="ms-1"
               variant="ghost"
-              size="icon-circle-sm"
+              size="sm"
               :title="t('alert_templates.edit')"
               @click="deleteApiHeader(field)"
             >
               <OIcon name="delete" size="sm" />
             </OButton>
             <OButton
-              data-test="alert-conditions-add-condition-btn"
               v-if="index === fields.length - 1"
+              icon-only
+              data-test="alert-conditions-add-condition-btn"
               class="ms-1"
               variant="ghost"
-              size="icon-circle-sm"
+              size="sm"
               :title="t('alert_templates.edit')"
               @click="addApiHeader()"
             >

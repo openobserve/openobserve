@@ -18,17 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="bg-card-glass-bg discovered-services flex h-full w-full flex-col">
     <!-- Loading State -->
     <div v-if="loading" class="flex flex-1 items-center justify-center">
-      <OSpinner size="sm" data-test="discovered-services-loading-indicator" />
+      <OSpinner size="lg" data-test="discovered-services-loading-indicator" />
     </div>
 
     <div v-else-if="error" class="flex flex-1 items-center justify-center">
-      <OEmptyState size="hero" preset="load-error" :description="raw(error)" hide-action>
+      <OEmptyState kind="error" :title="t('emptyState.loadError.title')" :text="raw(error)">
         <template #actions>
           <OButton
             data-test="retry-discovered-services-btn"
-            variant="outline"
-            size="sm-action"
-            icon-left="refresh"
+            variant="secondary"
+            icon="refresh"
             @click="() => loadServices()"
           >
             {{ t("settings.correlation.retry") }}
@@ -45,8 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-else
-        size="hero"
-        preset="no-access"
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('emptyState.noAccess.description')"
         data-test="discovered-services-forbidden"
       />
     </div>
@@ -70,8 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
             <OButton
               v-if="tile.id === 'overrides'"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="svcver-tile-overrides-view"
               @click="$emit('navigate-to-env-versions')"
               ><span data-test="svcver-overrides-link">{{
@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <OButton
               v-else-if="tile.id === 'names'"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="svcver-tile-names-review"
               @click="setView('name-review')"
               >{{ t("serviceVersions.discovered.tiles.review") }}</OButton
@@ -104,16 +104,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="svcver-discovered-view"
           @update:model-value="setView"
         >
-          <OToggleGroupItem value="services" size="sm" data-test="svcver-discovered-view-services"
+          <OToggleGroupItem value="services" data-test="svcver-discovered-view-services"
             >{{ t("serviceVersions.discovered.view.services") }}
             <span class="text-text-secondary ms-1.5 text-xs tabular-nums">{{
               raw(serviceCount)
             }}</span></OToggleGroupItem
           >
-          <OToggleGroupItem
-            value="name-review"
-            size="sm"
-            data-test="svcver-discovered-view-name-review"
+          <OToggleGroupItem value="name-review" data-test="svcver-discovered-view-name-review"
             >{{ t("serviceVersions.discovered.view.nameReview") }}
             <span class="text-text-secondary ms-1.5 text-xs tabular-nums">{{
               raw(namesTotal ?? "–")
@@ -125,8 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="activeView === 'services'"
             data-test="reset-discovered-services-btn"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :loading="resetting"
             @click="confirmResetServices"
           >
@@ -134,8 +130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('settings.correlation.resetServicesTooltip')" side="top" />
           </OButton>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastLoadedAt"
             :loading="refreshing"
             data-test="refresh-discovered-services-btn"
@@ -155,10 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div v-else-if="services.length === 0" class="flex flex-1 items-center justify-center">
         <OEmptyState
-          size="hero"
-          preset="no-discovered-services"
+          icon="timeline"
           :title="t('settings.correlation.noServicesYet')"
-          :description="t('settings.correlation.noServicesDescription')"
+          :text="t('settings.correlation.noServicesDescription')"
           data-test="discovered-services-empty-state"
         />
       </div>
@@ -171,16 +164,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OBanner
           v-else
-          variant="info"
-          icon="info"
-          inline-actions
+          tone="info"
           class="mx-page-edge mt-3 shrink-0"
-          :content="t('settings.correlation.discoveredServicesDescription')"
+          :message="t('settings.correlation.discoveredServicesDescription')"
         >
           <template #actions>
             <OButton
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               data-test="discovered-services-go-to-configuration"
               @click="$emit('navigate-to-configuration')"
             >
@@ -190,7 +180,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OBanner>
         <div class="min-h-0 flex-1 overflow-hidden">
           <OTable
-            :frame="false"
             :data="refreshing ? [] : flatRows"
             :columns="columns"
             :loading="refreshing"
@@ -207,7 +196,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :enable-column-resize="true"
             :persist-columns="true"
             table-id="settings-discovered-services-v2"
-            :show-global-filter="false"
             :pivot-row-columns="[{ name: 'service_name' }]"
             :keep-page-on-data-change="true"
             :current-page="currentPage"
@@ -227,7 +215,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t('settings.correlation.searchServiceName')
                 "
                 data-test="service-search-input"
-                clearable
               />
               <div class="w-44 shrink-0">
                 <OSelect
@@ -264,8 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="activeView === 'services'"
                 data-test="reset-discovered-services-btn"
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 :loading="resetting"
                 @click="confirmResetServices"
               >
@@ -273,8 +259,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('settings.correlation.resetServicesTooltip')" side="top" />
               </OButton>
               <ORefreshButton
-                layout="inline"
-                variant="outline"
                 :last-run-at="lastLoadedAt"
                 :loading="refreshing"
                 data-test="refresh-discovered-services-btn"
@@ -283,11 +267,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #empty>
               <OEmptyState
-                size="hero"
-                preset="no-discovered-services"
-                :filtered="!!searchQuery"
-                :hide-action="!searchQuery"
-                @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+                :kind="searchQuery ? 'filtered' : 'first-run'"
+                :title="
+                  searchQuery
+                    ? t('emptyState.filtered.title', {
+                        noun: t('emptyState.filtered.fallbackNoun'),
+                      })
+                    : t('emptyState.noDiscoveredServices.title')
+                "
+                :text="
+                  searchQuery
+                    ? t('emptyState.filtered.description', {
+                        noun: t('emptyState.filtered.fallbackNoun'),
+                      })
+                    : t('emptyState.noDiscoveredServices.description')
+                "
+                :icon="searchQuery ? undefined : 'timeline'"
+                @action="searchQuery = ''"
               />
             </template>
             <template #cell-service_name="{ row }">
@@ -361,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tooltip
                 />
                 <span v-if="identityChips(row.disambiguation).rest.length" class="shrink-0">
-                  <OTag variant="default-outline" size="sm">{{
+                  <OTag tone="outline" size="sm">{{
                     raw(`+${identityChips(row.disambiguation).rest.length}`)
                   }}</OTag>
                   <OTooltip
@@ -490,12 +486,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           if (!val) selectedService = null;
         }
       "
-      size="lg"
+      size="md"
       :title="raw(selectedService ? displayOf(selectedService) : undefined)"
       data-test="service-side-panel"
     >
       <template #header-right>
-        <OTag variant="default-outline" size="sm">{{ selectedService?.set_id }}</OTag>
+        <OTag tone="outline" size="sm">{{ selectedService?.set_id }}</OTag>
       </template>
 
       <!-- Default set warning banner -->
@@ -631,7 +627,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('settings.correlation.resetServicesConfirmTitle')"
       :message="t('settings.correlation.resetServicesConfirmMessage')"
       :warningMessage="t('settings.correlation.resetServicesConfirmWarning')"
-      ok-variant="destructive"
+      kind="destructive"
+      :ok-label="t('settings.correlation.resetServices')"
       @update:ok="doResetServices"
       @update:cancel="confirmResetOpen = false"
       v-model="confirmResetOpen"

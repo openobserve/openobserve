@@ -51,7 +51,7 @@ import {
   MICROS_PER_MINUTE,
   MICROS_PER_WEEK,
 } from "@/ts/interfaces/oncall";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { RowRailTone } from "@/lib/core/Table/OTable.types";
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
@@ -167,18 +167,18 @@ export function priorityLabel(priority: number): string {
 }
 
 /** Severity colour for `OTag`, matching the alerts list. */
-export function priorityTagVariant(priority: number): BadgeVariant {
+export function priorityTagVariant(priority: number): ChipTone {
   switch (priority) {
     case 1:
-      return "error-soft";
+      return "err";
     case 2:
-      return "orange-soft";
+      return "warn";
     case 3:
-      return "amber-soft";
+      return "warn";
     case 4:
-      return "blue-soft";
+      return "neutral";
     default:
-      return "default-soft";
+      return "neutral";
   }
 }
 
@@ -211,18 +211,18 @@ export const CHANNEL_WAKES: Record<Channel, boolean> = {
   webhook: false,
 };
 
-export function stateTagVariant(state: ResponseState): BadgeVariant {
+export function stateTagVariant(state: ResponseState): ChipTone {
   switch (state) {
     case "triggered":
-      return "error-soft";
+      return "err";
     case "triaged":
-      return "amber-soft";
+      return "warn";
     case "acknowledged":
-      return "blue-soft";
+      return "info";
     case "resolved":
-      return "success-soft";
+      return "ok";
     default:
-      return "default-soft";
+      return "neutral";
   }
 }
 
@@ -2590,6 +2590,3 @@ export function formatCountdown(secs: number): string {
   if (hours > 0) return `${hours}:${pad(minutes)}:${pad(s % 60)}`;
   return `${minutes}:${pad(s % 60)}`;
 }
-
-/** Pins a start picker's dropdown to its field, so long condition rows fit chips to that width instead of stretching it. */
-export const START_PICKER_DROPDOWN_STYLE = { width: "var(--reka-popover-trigger-width)" };

@@ -249,8 +249,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span v-if="logsLocked" class="inline-flex">
                         <OButton
-                          variant="outline"
-                          size="icon"
+                          icon-only
+                          variant="secondary"
+                          size="xs"
                           disabled
                           :aria-label="t('traces.viewLogs')"
                           :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
@@ -261,8 +262,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <OButton
                         v-else
-                        variant="outline"
-                        size="icon"
+                        icon-only
+                        variant="secondary"
+                        size="xs"
                         :title="t('traces.viewLogs')"
                         @click.stop="viewSpanLogs((spans as any[])[virtualRow.index])"
                         :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
@@ -299,15 +301,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          than on the error variant's red alone. -->
                     <OBadge
                       v-if="getEventSummary((spans as any[])[virtualRow.index]).total > 0"
-                      size="xs"
-                      shape="square"
-                      :variant="
+                      size="sm"
+                      :tone="
                         getEventSummary((spans as any[])[virtualRow.index]).errors > 0
-                          ? 'error-outline'
-                          : 'default-outline'
+                          ? 'outline'
+                          : 'outline'
                       "
                       icon="event-note"
-                      class="me-1 rounded!"
+                      class="me-1"
                       :title="getEventCountLabel((spans as any[])[virtualRow.index])"
                       data-test="span-event-count-badge"
                       :data-test-span="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"

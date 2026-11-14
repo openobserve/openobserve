@@ -19,9 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODropdown v-model:open="open" side="bottom" align="start">
     <template #trigger>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-chip"
-        icon-left="more-vert"
+        size="xs"
+        icon="more-vert"
         class="shrink-0"
         :aria-label="t('profiles.functionActions', { name })"
         :data-test="`${dataTest}-menu`"
@@ -29,28 +30,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
     <ODropdownItem
-      icon-left="content-copy"
+      icon="content-copy"
       :data-test="`${dataTest}-copy`"
       @select="emit('copy', name)"
       >{{ t("profiles.copyFunctionName") }}</ODropdownItem
     >
-    <ODropdownItem
-      icon-left="search"
-      :data-test="`${dataTest}-search`"
-      @select="emit('search', name)"
-      >{{ t("profiles.searchForFunction") }}</ODropdownItem
-    >
-    <ODropdownItem icon-left="flame" :data-test="`${dataTest}-show`" @select="emit('show')">{{
+    <ODropdownItem icon="search" :data-test="`${dataTest}-search`" @select="emit('search', name)">{{
+      t("profiles.searchForFunction")
+    }}</ODropdownItem>
+    <ODropdownItem icon="flame" :data-test="`${dataTest}-show`" @select="emit('show')">{{
       focusable ? t("profiles.focusInFlameGraph") : t("profiles.showInFlameGraph")
     }}</ODropdownItem>
     <ODropdownItem
-      icon-left="info-outline"
+      icon="info-outline"
       :data-test="`${dataTest}-details`"
       @select="emit('details', name)"
       >{{ t("profiles.functionDetails") }}</ODropdownItem
     >
     <ODropdownItem
-      icon-left="swap-vert"
+      icon="swap-vert"
       :data-test="`${dataTest}-sandwich`"
       @select="emit('sandwich', name)"
       >{{ t("profiles.showCallersAndCallees") }}</ODropdownItem

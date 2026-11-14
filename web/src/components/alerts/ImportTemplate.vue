@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="template"
     :is-importing="isTemplateImporting"
     container-class=""
-    @back="arrowBackFn"
-    @cancel="router.back()"
+    :back="{ label: t('alerts.header'), to: listRoute }"
+    @cancel="goBack"
     @import="importJson"
   >
     <!-- Output Section with Template-specific Error Display -->
@@ -190,6 +190,7 @@ import { defineComponent, ref, computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -474,14 +475,11 @@ export default defineComponent({
       }
     };
 
-    const arrowBackFn = () => {
-      router.push({
-        name: "alertTemplates",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
+    const listRoute = computed(() => ({
+      name: "alertTemplates",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    }));
+    const { goBack } = useSmartBack(() => listRoute.value);
 
     return {
       t,
@@ -495,7 +493,8 @@ export default defineComponent({
       userSelectedTemplateTypes,
       updateTemplateType,
       updateTemplateName,
-      arrowBackFn,
+      listRoute,
+      goBack,
       userSelectedTemplateNames,
       userSelectedTemplateBodies,
       userSelectedTemplateTitles,

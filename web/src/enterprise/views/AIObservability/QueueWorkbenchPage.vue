@@ -26,13 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="ai-queue-workbench-page"
     :title="queue?.name ? raw(queue.name) : t('aiObservability.queues.detail.fallbackTitle')"
-    :subtitle="
-      t('aiObservability.queues.workbench.subtitle', {
-        reviewed: reviewedCount,
-        total: items.length,
-      })
-    "
-    :back="backTarget"
+    :back="backRoute"
     bleed
     :scroll="false"
   >
@@ -47,18 +41,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </i18n-t>
         </span>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="chevron-left"
+          icon="chevron-left"
           :disabled="currentIndex <= 0"
           :aria-label="t('aiObservability.queues.workbench.prev')"
           data-test="ai-queue-workbench-prev"
           @click="selectItem(currentIndex - 1)"
         />
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="chevron-right"
+          icon="chevron-right"
           :disabled="currentIndex >= items.length - 1"
           :aria-label="t('aiObservability.queues.workbench.next')"
           data-test="ai-queue-workbench-next"
@@ -91,12 +85,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ percent }}%
             </span>
           </div>
-          <OProgressBar :value="fraction" :variant="cleared ? 'success' : 'default'" size="sm" />
+          <OProgressBar :value="fraction * 100" :tone="cleared ? 'ok' : 'accent'" />
         </div>
         <OTabs
           :model-value="String(currentIndex)"
           orientation="vertical"
-          dense
+          size="compact"
           class="min-h-0 flex-1 overflow-y-auto px-1 py-1"
           data-test="ai-queue-workbench-nav"
         >
@@ -104,7 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(item, i) in items"
             :key="item.id"
             :name="String(i)"
-            class="min-h-6"
             :data-test="`ai-queue-workbench-nav-item-${i}`"
             @click="selectItem(i)"
           >
@@ -174,8 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex shrink-0 flex-col gap-1.5">
                 <div class="flex items-center gap-2">
                   <OButton
-                    variant="outline"
-                    size="icon-chip"
+                    icon-only
+                    variant="secondary"
+                    size="xs"
                     class="shrink-0"
                     data-test="ai-queue-workbench-nav-toggle"
                     @click="navCollapsed = !navCollapsed"
@@ -195,9 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       side="bottom"
                     />
                   </OButton>
-                  <OTag variant="blue-soft" shape="rounded" class="shrink-0">{{
-                    currentItem.refType
-                  }}</OTag>
+                  <OTag tone="neutral" class="shrink-0">{{ currentItem.refType }}</OTag>
                   <OTruncatedText
                     as="h2"
                     class="text-text-heading flex-1 text-lg font-semibold"
@@ -208,12 +200,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
                     <span class="inline-flex shrink-0">
                       <OButton
-                        variant="outline"
-                        size="sm"
+                        variant="secondary"
                         disabled
                         data-test="ai-queue-workbench-open-trace"
                       >
-                        <template #icon-left>
+                        <template #icon>
                           <OIcon
                             name="lock"
                             class="text-icon-locked"
@@ -227,9 +218,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OTooltip>
                   <OButton
                     v-else
-                    variant="outline"
-                    size="sm"
-                    icon-left="open-in-new"
+                    variant="secondary"
+                    icon="open-in-new"
                     class="shrink-0"
                     :disabled="!currentDetail"
                     data-test="ai-queue-workbench-open-trace"
@@ -300,7 +290,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="ms in currentCase.machineScores"
                     :key="ms.key"
                     side="top"
-                    max-width="17.5rem"
                     hoverable
                     content-class="p-0!"
                   >
@@ -522,12 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="text-text-secondary text-2xs ms-auto">{{ a.time }}</span>
                       </div>
                       <div class="flex flex-wrap items-center gap-1.5">
-                        <OTag
-                          v-for="s in a.scores"
-                          :key="s.name"
-                          variant="default-soft"
-                          class="text-2xs font-mono"
-                        >
+                        <OTag v-for="s in a.scores" :key="s.name" tone="neutral" mono>
                           {{ s.name }} {{ s.value }}
                         </OTag>
                       </div>
@@ -554,9 +538,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </span>
                 <OProgressBar
-                  :value="boundConfigs.length ? scoredCount / boundConfigs.length : 0"
-                  :variant="scoredCount === boundConfigs.length ? 'success' : 'default'"
-                  size="sm"
+                  :value="boundConfigs.length ? (scoredCount / boundConfigs.length) * 100 : 0"
+                  :tone="scoredCount === boundConfigs.length ? 'ok' : 'accent'"
                 />
                 <!-- Distill to dataset — the second destination for a human
                      judgment (the first being the score itself). Only a REVIEWED
@@ -570,9 +553,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("aiObservability.queues.workbench.distill.title") }}
                   </span>
                   <OButton
-                    variant="outline"
-                    size="sm"
-                    icon-right="arrow-forward"
+                    variant="secondary"
+                    icon-end="arrow-forward"
                     class="ms-auto"
                     :disabled="!canDistill"
                     data-test="ai-queue-workbench-distill-btn"
@@ -589,8 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <div class="flex items-center gap-2">
                   <OButton
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     class="flex-1"
                     data-test="ai-queue-workbench-skip"
                     @click="skip"
@@ -599,8 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     variant="primary"
-                    size="sm"
-                    icon-right="arrow-forward"
+                    icon-end="arrow-forward"
                     class="flex-1"
                     :disabled="!canSubmit || submitting"
                     :loading="submitting"
@@ -622,12 +602,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODrawer
       v-model:open="distillOpen"
       side="right"
-      size="lg"
+      size="md"
       :title="t('aiObservability.queues.workbench.distill.title')"
-      :primary-button-label="t('aiObservability.queues.workbench.distill.confirm')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-disabled="!canConfirmDistill"
-      :primary-button-loading="distilling"
+      :primary="{
+        label: t('aiObservability.queues.workbench.distill.confirm'),
+        disabled: !canConfirmDistill,
+        loading: distilling,
+      }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="ai-queue-workbench-distill-drawer"
       @click:primary="confirmDistill"
       @click:secondary="distillOpen = false"
@@ -673,7 +655,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="currentCase.output"
             variant="ghost"
-            size="sm"
             class="self-start"
             data-test="ai-queue-workbench-distill-use-output"
             @click="distillExpected = currentCase.output"
@@ -710,7 +691,6 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
-import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -794,14 +774,6 @@ const backRoute = computed(() =>
         },
       },
 );
-// Real browser back when there's history to pop; the fallback above only
-// fires with no history to pop (direct link / reload).
-const { goBack: backToParent } = useSmartBack(() => backRoute.value.to);
-const backTarget = computed(() => ({
-  label: backRoute.value.label,
-  to: backRoute.value.to,
-  onClick: backToParent,
-}));
 const items = ref<LlmQueueItem[]>([]);
 const configOptions = ref<LlmScoreConfigOption[]>([]);
 const currentDetail = ref<LlmQueueItemDetail | null>(null);

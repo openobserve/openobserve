@@ -401,10 +401,17 @@ export default class DashboardImport {
   }
 
   // Folder workflows
+  // "New folder" sits at the foot of the folder select's list and opens an inline name row.
   async openCreateFolderDrawerFromMove() {
     await this.page
-      .locator('[data-test="dashboard-folder-move-new-add"]')
+      .locator('[data-test="index-dropdown-stream_type-trigger"]')
+      .first()
       .click();
+    const newFolderBtn = this.page.locator(
+      '[data-test="dashboard-folder-move-new-add"]'
+    );
+    await newFolderBtn.waitFor({ state: "visible", timeout: 10000 });
+    await newFolderBtn.click();
   }
 
   async fillNewFolderName(folderName) {
@@ -420,11 +427,10 @@ export default class DashboardImport {
   }
 
   async confirmFolderMoveDrawer() {
+    await this.page.locator('[data-test="dashboard-folder-add-create"]').click();
     await this.page
-      .locator(
-        '[data-test="dashboard-folder-move-dialog"] [data-test="o-dialog-primary-btn"]'
-      )
-      .click();
+      .locator('[data-test="dashboard-folder-new-inline"]')
+      .waitFor({ state: "hidden", timeout: 15000 });
   }
 
   async deleteFolderByName(folderName) {

@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="!item.hideOnDashboard"
           class="max-w-37.5!"
           v-model="item.value"
-          :label="item.label || item.name"
-          label-position="inside"
+          :prefix="`${item.label || item.name}:`"
+          :aria-label="item.label || item.name"
           readonly
           :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(Number(index))"
@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="max-w-37.5!"
           :debounce="textboxDebounce"
           v-model="item.value"
-          :label="item.label || item.name"
-          label-position="inside"
+          :prefix="`${item.label || item.name}:`"
+          :aria-label="item.label || item.name"
           :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(Number(index))"
         />
@@ -74,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="!item.hideOnDashboard"
           class="w-37.5!"
           v-model="item.value"
-          :label="item.label || item.name"
-          label-position="inside"
+          :prefix="`${item.label || item.name}:`"
+          :aria-label="item.label || item.name"
           :clearable="!item.readOnly"
           :readonly="item.readOnly === true"
           :data-test="`variable-selector-${item.name}`"
@@ -103,11 +103,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Add Variable Button -->
     <div v-if="showAddVariableButton">
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         @click="openAddVariable"
         data-test="dashboard-add-variable-btn"
-        icon-left="add"
+        icon="add"
       >
         {{ t("dashboard.newVariable") }}
       </OButton>

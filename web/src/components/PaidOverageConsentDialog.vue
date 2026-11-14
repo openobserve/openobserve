@@ -4,10 +4,12 @@
     :open="showInDialog"
     size="sm"
     :title="t('paidUsage.consentTitle')"
-    :primary-button-label="canEnable ? t('paidUsage.enablePaidUsage') : undefined"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-disabled="!acknowledgementChecked || !canEnable"
-    :primary-button-loading="isSubmitting"
+    :primary="{
+      label: canEnable ? t('paidUsage.enablePaidUsage') : undefined,
+      disabled: !acknowledgementChecked || !canEnable,
+      loading: isSubmitting,
+    }"
+    :secondary="{ label: t('common.cancel') }"
     :persistent="isSubmitting"
     :show-close="!isSubmitting"
     data-test="paid-overage-consent-dialog"

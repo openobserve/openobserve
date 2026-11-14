@@ -835,10 +835,12 @@ describe("SearchResult header through a re-run (T-3)", () => {
     const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
     expect(dataAge.exists()).toBe(true);
     expect(dataAge.find('[data-test="traces-search-result-refresh"]').exists()).toBe(true);
-    expect(dataAge.text()).toContain("Updated");
+    expect(dataAge.find('[data-test="traces-search-result-refresh-age"]').text()).toMatch(
+      /ago|just now/,
+    );
   });
 
-  it("keeps the data age readable and the control focusable through a run, with no spinner of its own", async () => {
+  it("keeps the control focusable through a run and swaps its glyph for a spinner", async () => {
     (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
     wrapper = mount(SearchResult, { global: globalOptions, attachTo: document.body });
     await flushPromises();
@@ -851,9 +853,11 @@ describe("SearchResult header through a re-run (T-3)", () => {
     expect(control().attributes("aria-busy")).toBe("true");
     expect(control().attributes("disabled")).toBeUndefined();
     expect(document.activeElement).toBe(control().element);
-    expect(control().find(".animate-spin").exists()).toBe(false);
+    expect(control().find(".animate-spin").exists()).toBe(true);
     expect(control().find(".text-transparent").exists()).toBe(false);
-    expect(wrapper.find('[data-test="traces-search-result-data-age"]').text()).toContain("Updated");
+    expect(wrapper.find('[data-test="traces-search-result-refresh-age"]').text()).toBe(
+      "Refreshing",
+    );
   });
 
   it("dims the kept values with the auto-run toggle on, as the rows do", async () => {
@@ -937,7 +941,7 @@ describe("SearchResult header through a re-run (T-3)", () => {
 
     expect(pagerGroup().attributes("aria-disabled")).toBe("true");
     expect(errorChip().attributes("aria-disabled")).toBe("true");
-    wrapper.findComponent({ name: "OPagination" }).vm.$emit("update:modelValue", 129);
+    wrapper.findComponent({ name: "OPagination" }).vm.$emit("update:page", 129);
     wrapper
       .find('[data-test="traces-search-result-records-per-page"]')
       .findComponent({ name: "OSelect" })
@@ -951,7 +955,7 @@ describe("SearchResult header through a re-run (T-3)", () => {
     settle(30, 2);
     await wrapper.vm.$nextTick();
     expect(pagerGroup().attributes("aria-disabled")).toBeUndefined();
-    wrapper.findComponent({ name: "OPagination" }).vm.$emit("update:modelValue", 2);
+    wrapper.findComponent({ name: "OPagination" }).vm.$emit("update:page", 2);
     expect(mockSearchObj.data.resultGrid.currentPage).toBe(1);
     expect(wrapper.emitted("update:scroll")).toHaveLength(1);
     mockSearchObj.data.resultGrid.currentPage = 1;
@@ -975,7 +979,7 @@ describe("SearchResult header through a re-run (T-3)", () => {
     expect(wrapper.emitted("error-only-toggled")).toBeUndefined();
   });
 
-  it("swaps the data age for the red failed-refresh sentence and keeps the old age", async () => {
+  it("marks the refresh as failed, says when in its description, and keeps the old age", async () => {
     (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
     wrapper = mount(SearchResult, { global: globalOptions });
     await flushPromises();
@@ -986,7 +990,9 @@ describe("SearchResult header through a re-run (T-3)", () => {
     await wrapper.vm.$nextTick();
 
     const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
-    expect(dataAge.find('[data-test="traces-search-result-refresh-failed"]').text()).toContain(
+    expect(dataAge.find('[data-test="traces-search-result-refresh-failed"]').text()).toBe("Failed");
+    const button = dataAge.find('[data-test="traces-search-result-refresh"]');
+    expect(dataAge.find(`[id="${button.attributes("aria-describedby")}"]`).text()).toContain(
       "Refresh failed at",
     );
     expect((mockSearchObj.meta as any).lastRunAt).toBe(Date.UTC(2026, 10, 1, 10, 42));
@@ -1075,15 +1081,15 @@ describe("SearchResult header holds still as the first data lands", () => {
     mockSearchObj.meta.resultGrid.rowsPerPage = 25;
     Object.assign(mockSearchObj.data.queryResults, { total: 0 });
     wrapper = mount(SearchResult, { global: globalOptions });
+    // Wide enough for all four buttons, so First and Last arriving past ten pages move nothing.
     const pager = () => wrapper.findComponent({ name: "OPagination" });
-    expect(pager().props("maxPages")).toBe(5);
     expect(wrapper.find('[data-test="traces-search-result-data-age"]').classes()).toContain(
       "@min-[58rem]/results:min-w-33",
     );
-    expect(pager().classes()).toEqual(expect.arrayContaining(["min-w-54", "justify-end"]));
+    expect(pager().classes()).toEqual(expect.arrayContaining(["min-w-31", "justify-end"]));
     Object.assign(mockSearchObj.data.queryResults, { total: 1284 });
     await flushPromises();
-    expect(pager().classes()).toEqual(expect.arrayContaining(["min-w-54", "justify-end"]));
+    expect(pager().classes()).toEqual(expect.arrayContaining(["min-w-31", "justify-end"]));
   });
 
   it("draws no results progress line, even through a run", async () => {

@@ -1073,7 +1073,7 @@ describe("AnnotationSettings", () => {
     expect(document.body.textContent).not.toContain("Its panels were deleted");
 
     hint.element.dispatchEvent(new MouseEvent("pointermove", { bubbles: true }));
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, 400));
     await nextTick();
     expect(document.body.textContent).toContain("Its panels were deleted");
 
@@ -1081,7 +1081,7 @@ describe("AnnotationSettings", () => {
     await nextTick();
 
     hint.element.dispatchEvent(new Event("focus"));
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, 400));
     await nextTick();
     expect(document.body.textContent).toContain("Its panels were deleted");
   });

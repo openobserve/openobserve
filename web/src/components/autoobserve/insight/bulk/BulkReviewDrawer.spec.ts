@@ -146,7 +146,7 @@ describe("BulkReviewDrawer — review", () => {
     // The drawer's own title and sub-title, so it reads like every other drawer (T5-29).
     const drawer = wrapper!.findComponent({ name: "ODrawer" });
     expect(drawer.props("title")).toBe("Add 12 no-data alerts");
-    expect(String(drawer.props("subTitle"))).toContain(
+    expect(String(drawer.props("subtitle"))).toContain(
       "Nothing is saved until you click Add alerts.",
     );
     expect(text("bulk-review-rule")).toContain("Nothing is saved until you click Add alerts.");
@@ -502,7 +502,7 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     expect(input.getAttribute("placeholder")).toBe("Set value");
     expect(input.value).toBe("0");
     expect(wrapper!.findComponent('[data-test="bulk-review-threshold-errs"]').props("size")).toBe(
-      "xs",
+      "sm",
     );
     expect(text("bulk-review-no-usual-errs")).toBe("None in 7 days");
   });

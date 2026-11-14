@@ -277,8 +277,8 @@ const baseStubs = {
   OButton: {
     // Slot names mirror the real OButton (icon-left / default / icon-right).
     template:
-      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot name="icon-left" /><slot /><slot name="icon-right" /></button>',
-    props: ["variant", "size", "disabled", "loading", "class", "iconLeft"],
+      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot name="icon" /><slot /><slot name="icon-end" /></button>',
+    props: ["variant", "size", "disabled", "loading", "class", "icon"],
     inheritAttrs: true,
   },
   OInput: {
@@ -304,14 +304,7 @@ const baseStubs = {
   },
   ODialog: {
     template: '<div v-if="open" :data-test="$attrs[\'data-test\']"><slot /></div>',
-    props: [
-      "open",
-      "size",
-      "title",
-      "primaryButtonLabel",
-      "secondaryButtonLabel",
-      "primaryButtonVariant",
-    ],
+    props: ["open", "size", "title", "primary", "secondary", "primary"],
     emits: ["click:primary", "click:secondary", "update:open"],
     inheritAttrs: true,
   },
@@ -476,12 +469,8 @@ const baseStubs = {
   },
   OEmptyState: {
     template: '<div :data-test="$attrs[\'data-test\']"><slot name="actions" /></div>',
-    props: ["preset", "size"],
+    props: ["kind", "size"],
     inheritAttrs: true,
-  },
-  EmptyBrowserCheck: {
-    template: "<div />",
-    props: ["width"],
   },
   Teleport: {
     template: "<div><slot /></div>",
@@ -491,8 +480,9 @@ const baseStubs = {
 // ── Missing component stubs required by OPageLayout ──────────────────────
 const pageLayoutStubs = {
   OPageLayout: {
-    template: '<div><div data-test="page-actions"><slot name="actions" /></div><slot /></div>',
-    props: ["title", "subtitle", "back", "class", "bleed"],
+    template:
+      '<div><div data-test="page-status"><slot name="status" /></div><div data-test="page-actions"><slot name="actions" /></div><slot /></div>',
+    props: ["title", "back", "class", "bleed"],
   },
 };
 
@@ -1810,8 +1800,7 @@ describe("CreateBrowserTest", () => {
   });
 
   describe("phone layout", () => {
-    const subtitle = (w: VueWrapper) =>
-      w.findComponent(pageLayoutStubs.OPageLayout).props("subtitle") as string;
+    const usedByChip = (w: VueWrapper) => w.find('[data-test="synthetics-journey-used-by-count"]');
 
     async function mountUsedBy(hidden: number) {
       mockGetFoldersListByType.mockResolvedValue([{ folderId: "folder-1", name: "Checkout" }]);
@@ -1824,21 +1813,21 @@ describe("CreateBrowserTest", () => {
       return mountValidEdit();
     }
 
-    it("on a phone the used-by count moves into the subtitle", async () => {
+    it("on a phone the used-by count moves beside the title", async () => {
       wrapper = await mountUsedBy(0);
-      expect(subtitle(wrapper)).toBe("Checkout");
+      expect(usedByChip(wrapper).exists()).toBe(false);
       wrapper.unmount();
 
       mockBreakpoint.mobile = true;
       wrapper = await mountUsedBy(0);
-      expect(subtitle(wrapper)).toBe("Checkout · used by 1 test");
+      expect(usedByChip(wrapper).text()).toBe("Used by 1 test");
       wrapper.unmount();
 
       wrapper = await mountUsedBy(2);
-      expect(subtitle(wrapper)).toBe("Checkout · used by 3 tests");
+      expect(usedByChip(wrapper).text()).toBe("Used by 3 tests");
     });
 
-    it("on a phone a test in the default folder shows the used-by count alone", async () => {
+    it("on a phone a test in the default folder shows the used-by count", async () => {
       mockBreakpoint.mobile = true;
       mockServiceReferencedBy.mockResolvedValue({
         data: {
@@ -1852,7 +1841,7 @@ describe("CreateBrowserTest", () => {
       wrapper = mountPage({ editId: "check-123" });
       await flushPromises();
 
-      expect(subtitle(wrapper)).toBe("Used by 1 test");
+      expect(usedByChip(wrapper).text()).toBe("Used by 1 test");
     });
   });
 

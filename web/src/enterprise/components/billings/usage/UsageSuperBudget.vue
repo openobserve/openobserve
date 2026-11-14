@@ -18,13 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- A failed read is not "no budgets": saving then would replace every stored budget. -->
   <div v-if="loadFailed" class="h-full min-h-0" data-test="billings-usagesuperbudget-error">
     <OEmptyState
-      size="hero"
-      variant="error"
-      illustration="broken-panel"
+      kind="error"
       :title="t('billing.usageV2.budgetLoadFailedTitle')"
-      :description="t('billing.usageV2.budgetLoadFailed')"
-      :action-label="t('common.retry')"
-      action-icon="refresh"
+      :text="t('billing.usageV2.budgetLoadFailed')"
       @action="load"
     />
   </div>
@@ -34,18 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="billings-usagesuperbudget-root"
   >
     <!-- Wide: only the org table scrolls, so the save bar stays in view. Stacked: the tab scrolls. -->
-    <KpiCardRow :columns="4" class="shrink-0" data-test="billings-usagesuperbudget-kpis">
-      <UsageKpiCard
-        v-for="card in kpiCards"
-        :key="card.key"
-        :label="card.label"
-        :icon="card.icon"
-        :value="card.value"
-        :hint="card.hint"
-        :tone="card.tone"
-        :data-test="`billings-usagesuperbudget-kpi-${card.key}`"
-      />
-    </KpiCardRow>
+    <OStatStrip
+      :items="kpiStats"
+      size="lg"
+      stacked
+      class="shrink-0"
+      data-test="billings-usagesuperbudget-kpis"
+    />
 
     <div
       class="grid items-stretch gap-3 @min-[62rem]/super-budget:min-h-0 @min-[62rem]/super-budget:flex-1 @min-[62rem]/super-budget:grid-cols-[minmax(0,1.55fr)_minmax(18.75rem,0.85fr)]"
@@ -77,12 +68,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="totalDraft.budget > 0">
             <div class="relative mt-2">
               <OProgressBar
-                :value="Math.min(usedPercent / 100, 1)"
-                :variant="progressVariant(totalStatus)"
+                :value="Math.min(usedPercent, 100)"
+                :tone="progressVariant(totalStatus)"
                 data-test="billings-usagesuperbudget-meter"
               />
               <span
-                class="bg-text-secondary absolute -top-1 h-4 w-0.5"
+                class="bg-text-secondary absolute -top-1.5 h-4 w-0.5"
                 :style="{ left: `calc(${totalDraft.warnPercent}% - 0.0625rem)` }"
                 :title="t('billing.usageV2.warnAt')"
               />
@@ -113,10 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="id"
           pagination="none"
           sorting="none"
-          :show-global-filter="false"
           :default-columns="false"
           :loading="costsLoading"
-          dense
           class="min-h-0 flex-1"
           data-test="billings-usagesuperbudget-table"
         >
@@ -126,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-spend="{ row }">
             <!-- Hovering the spend shows what makes it up, meter by meter. -->
-            <OTooltip side="bottom" align="start" :delay="150" :disabled="!row.meters.length">
+            <OTooltip side="bottom" :disabled="!row.meters.length">
               <div class="flex min-w-0 flex-col gap-1">
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="font-semibold tabular-nums">
@@ -140,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <OBadge
                     v-if="!costsFailed"
-                    :variant="STATUS_BADGE[row.status]"
+                    :tone="STATUS_BADGE[row.status]"
                     size="sm"
                     :data-test="`billings-usagesuperbudget-status-${row.id}`"
                   >
@@ -149,10 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <OProgressBar
                   v-if="row.draft.budget > 0 && !costsFailed"
-                  size="xs"
                   class="max-w-40"
-                  :value="Math.min(row.spend / row.draft.budget, 1)"
-                  :variant="progressVariant(row.status)"
+                  :value="Math.min(row.spend / row.draft.budget, 1) * 100"
+                  :tone="progressVariant(row.status)"
                 />
               </div>
               <template #content>
@@ -189,7 +177,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OInput
                 :model-value="row.draft.budget || undefined"
                 type="number"
-                size="sm"
                 prefix="$"
                 :placeholder="raw('0.00')"
                 :aria-label="t('billing.usageV2.budgetFor', { org: row.label })"
@@ -204,7 +191,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OInput
                   :model-value="row.draft.budget > 0 ? percentLabel(row.draft) : undefined"
                   type="number"
-                  size="sm"
                   suffix="%"
                   :disabled="row.draft.budget <= 0"
                   :aria-label="t('billing.usageV2.warnPercentFor', { org: row.label })"
@@ -224,7 +210,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-alerts="{ row }">
             <OSwitch
               :model-value="row.draft.alertsOn"
-              size="sm"
               :disabled="row.draft.budget <= 0"
               :aria-label="t('billing.usageV2.alertsFor', { org: row.label })"
               :data-test="`billings-usagesuperbudget-alerts-${row.id}`"
@@ -247,7 +232,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             :model-value="totalDraft.budget || undefined"
             type="number"
-            size="md"
             prefix="$"
             :label="t('billing.usageV2.overallBudgetLabel')"
             :help-text="allocationNote"
@@ -278,7 +262,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OSwitch
               v-model="totalDraft.alertsOn"
-              size="sm"
               :disabled="totalDraft.budget <= 0"
               :aria-label="t('billing.usageV2.emailAlerts')"
               data-test="billings-usagesuperbudget-total-alerts"
@@ -295,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span class="text-text-secondary min-w-0 flex-1 truncate text-sm">{{ pendingText }}</span>
       <OButton
-        variant="outline"
+        variant="secondary"
         :disabled="!pending.any || saving"
         data-test="billings-usagesuperbudget-discard"
         @click="resetDrafts"
@@ -321,7 +304,7 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -330,10 +313,10 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import organizations from "@/services/organizations";
-import UsageKpiCard from "./UsageKpiCard.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import { usageKpiStats } from "./usageKpiStats";
 import UsagePaneHeader from "./UsagePaneHeader.vue";
 import UsageWarnAt from "./UsageWarnAt.vue";
 import {
@@ -385,15 +368,15 @@ const STATUS_LABEL: Record<BudgetStatus, I18nKey> = {
   over: "billing.usageV2.statusOver",
 };
 
-const STATUS_BADGE: Record<BudgetStatus, BadgeVariant> = {
-  none: "default-soft",
-  ok: "success-soft",
-  warn: "warning-soft",
-  over: "error-soft",
+const STATUS_BADGE: Record<BudgetStatus, ChipTone> = {
+  none: "neutral",
+  ok: "ok",
+  warn: "warn",
+  over: "err",
 };
 
 const progressVariant = (status: BudgetStatus) =>
-  status === "over" ? "danger" : status === "warn" ? "warning" : "default";
+  status === "over" ? "err" : status === "warn" ? "warn" : "accent";
 
 const orgId = computed<string>(() => store.state.selectedOrganization.identifier);
 
@@ -650,4 +633,6 @@ const kpiCards = computed(() => {
   ];
   return cards;
 });
+
+const kpiStats = computed(() => usageKpiStats(kpiCards.value, "billings-usagesuperbudget-kpi"));
 </script>

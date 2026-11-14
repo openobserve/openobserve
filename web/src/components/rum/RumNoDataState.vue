@@ -15,10 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OEmptyState illustration="radar" size="hero" :hide-action="true">
-    <template #title>{{ t("rum.emptyState.title") }}</template>
-    <template #description>{{ t("rum.emptyState.description") }}</template>
-
+  <OEmptyState
+    icon="radar"
+    :title="t('rum.emptyState.title')"
+    :text="t('rum.emptyState.description')"
+  >
     <template #actions>
       <EmptyStateIngestionCard
         icon="devices"

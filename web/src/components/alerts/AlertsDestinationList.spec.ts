@@ -138,7 +138,7 @@ const OTableStub = {
 
 const ConfirmDialogStub = {
   name: "ConfirmDialog",
-  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
+  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "kind"],
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: '<div data-test="confirm-dialog-stub" :data-open="modelValue" />',
 };
@@ -432,7 +432,7 @@ describe("AlertsDestinationList", () => {
           (c: any) => c.props("messageKeypath") === "alert_destinations.deleteDestinationMessage",
         );
       expect(dialog!.props("messageName")).toBe(dest.name);
-      expect(dialog!.props("okVariant")).toBe("destructive");
+      expect(dialog!.props("kind")).toBe("destructive");
     });
 
     it("calls destinationService.delete with correct args on deleteDestination()", async () => {
@@ -609,7 +609,7 @@ describe("AlertsDestinationList", () => {
           (c: any) =>
             c.props("title") === i18n.global.t("alert_destinations.deleteDestinationsTitle"),
         );
-      expect(dialog!.props("okVariant")).toBe("destructive");
+      expect(dialog!.props("kind")).toBe("destructive");
     });
   });
 

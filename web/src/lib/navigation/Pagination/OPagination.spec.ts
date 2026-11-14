@@ -2,124 +2,121 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import OPagination from "./OPagination.vue";
 
-const factory = (props = {}) => mount(OPagination, { props: { modelValue: 1, max: 10, ...props } });
-
-describe("OPagination", () => {
-  it("renders a div element with role=navigation", () => {
-    const wrapper = factory();
-    expect(wrapper.element.tagName).toBe("DIV");
-    expect(wrapper.attributes("role")).toBe("navigation");
+const factory = (props: Record<string, unknown> = {}) =>
+  mount(OPagination, {
+    props: { page: 1, pageSize: 20, total: 143, ...props },
+    attrs: { "data-test": "pg" },
   });
 
-  it("passes through attrs to the root element", () => {
-    const wrapper = factory({ "data-test": "pg" } as any);
+const button = (wrapper: ReturnType<typeof factory>, part: string) =>
+  wrapper.find(`[data-test="pg-${part}"]`);
+
+describe("OPagination", () => {
+  it("renders one navigation landmark carrying the caller's attrs", () => {
+    const wrapper = factory();
+    expect(wrapper.element.tagName).toBe("NAV");
     expect(wrapper.attributes("data-test")).toBe("pg");
   });
 
-  // ─── Page window ────────────────────────────────────────────────────────────
+  // ─── Range ──────────────────────────────────────────────────────────────────
 
-  it("renders all pages when max <= maxPages", () => {
-    const wrapper = factory({ modelValue: 1, max: 4 });
-    const btns = wrapper.findAll("[aria-label^='Page']");
-    expect(btns.map((b) => b.text())).toEqual(["1", "2", "3", "4"]);
+  it('states the range as "1–20 of 143"', () => {
+    expect(button(factory(), "range").text()).toBe("1–20 of 143");
+    expect(button(factory({ page: 8 }), "range").text()).toBe("141–143 of 143");
   });
 
-  it("renders maxPages=5 buttons when max > 5", () => {
-    const wrapper = factory({ modelValue: 5, max: 20 });
-    const btns = wrapper.findAll("[aria-label^='Page']");
-    expect(btns).toHaveLength(5);
+  it('reads "of many" for a lower-bound total', () => {
+    expect(button(factory({ totalExact: false }), "range").text()).toBe("1–20 of many");
   });
 
-  it("honours a custom maxPages prop", () => {
-    const wrapper = factory({ modelValue: 5, max: 20, maxPages: 3 });
-    const btns = wrapper.findAll("[aria-label^='Page']");
-    expect(btns).toHaveLength(3);
+  it('reads "Page 4 of 31" when only the page count is known', () => {
+    const wrapper = factory({ page: 4, total: undefined, pageCount: 31 });
+    expect(button(wrapper, "range").text()).toBe("Page 4 of 31");
   });
 
-  it("centres window around current page", () => {
-    const wrapper = factory({ modelValue: 8, max: 20, maxPages: 5 });
-    const btns = wrapper.findAll("[aria-label^='Page']");
-    expect(btns.map((b) => b.text())).toEqual(["6", "7", "8", "9", "10"]);
+  it("lets a caller replace the range", () => {
+    const wrapper = mount(OPagination, {
+      props: { page: 1, total: 10 },
+      slots: { range: "<span data-test='own-range'>own</span>" },
+    });
+    expect(wrapper.find('[data-test="own-range"]').exists()).toBe(true);
   });
 
-  it("clamps window at the start", () => {
-    const wrapper = factory({ modelValue: 2, max: 20, maxPages: 5 });
-    const btns = wrapper.findAll("[aria-label^='Page']");
-    expect(btns[0].text()).toBe("1");
-    expect(btns).toHaveLength(5);
+  // ─── Paging ─────────────────────────────────────────────────────────────────
+
+  it("emits the next and previous page", async () => {
+    const wrapper = factory({ page: 3 });
+    await button(wrapper, "next").trigger("click");
+    await button(wrapper, "prev").trigger("click");
+    expect(wrapper.emitted("update:page")).toEqual([[4], [2]]);
   });
 
-  it("clamps window at the end", () => {
-    const wrapper = factory({ modelValue: 20, max: 20, maxPages: 5 });
-    const btns = wrapper.findAll("[aria-label^='Page']");
-    expect(btns[btns.length - 1].text()).toBe("20");
-    expect(btns).toHaveLength(5);
+  it("disables previous on the first page and next on the last, with a reason", () => {
+    const first = factory({ page: 1 });
+    expect(button(first, "prev").attributes("aria-disabled")).toBe("true");
+    expect(button(first, "next").attributes("aria-disabled")).toBeUndefined();
+    const last = factory({ page: 8 });
+    expect(button(last, "next").attributes("aria-disabled")).toBe("true");
   });
 
-  it("marks the active page with aria-current=page", () => {
-    const wrapper = factory({ modelValue: 3, max: 10 });
-    const active = wrapper.find("[aria-current='page']");
-    expect(active.text()).toBe("3");
+  it("shows first and last only past ten pages", async () => {
+    expect(button(factory(), "first").exists()).toBe(false);
+    const long = factory({ page: 5, total: 1000 });
+    expect(button(long, "first").exists()).toBe(true);
+    await button(long, "last").trigger("click");
+    await button(long, "first").trigger("click");
+    expect(long.emitted("update:page")).toEqual([[50], [1]]);
   });
 
-  // ─── Navigation ─────────────────────────────────────────────────────────────
-
-  it("emits update:modelValue when a page button is clicked", async () => {
-    const wrapper = factory({ modelValue: 1, max: 10 });
-    const page3 = wrapper.find("[aria-label='Page 3']");
-    await page3.trigger("click");
-    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([3]);
+  it("omits last page when the total is a lower bound", () => {
+    const wrapper = factory({ page: 5, total: 1000, totalExact: false });
+    expect(button(wrapper, "first").exists()).toBe(true);
+    expect(button(wrapper, "last").exists()).toBe(false);
   });
 
-  it("emits next page on next button click", async () => {
-    const wrapper = factory({ modelValue: 3, max: 10 });
-    await wrapper.find("[aria-label='Next page']").trigger("click");
-    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([4]);
+  it("ignores paging while loading but keeps the range", async () => {
+    const wrapper = factory({ page: 3, loading: true });
+    await button(wrapper, "next").trigger("click");
+    expect(wrapper.emitted("update:page")).toBeUndefined();
+    expect(button(wrapper, "next").attributes("aria-disabled")).toBe("true");
+    expect(button(wrapper, "range").text()).toBe("41–60 of 143");
   });
 
-  it("emits prev page on prev button click", async () => {
-    const wrapper = factory({ modelValue: 5, max: 10 });
-    await wrapper.find("[aria-label='Previous page']").trigger("click");
-    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([4]);
+  // ─── Page size ──────────────────────────────────────────────────────────────
+
+  it("renders the page-size select only with page sizes", () => {
+    expect(button(factory(), "size").exists()).toBe(false);
+    expect(button(factory({ pageSizes: [20, 50, 100] }), "size").exists()).toBe(true);
   });
 
-  it("does not emit when clicking the active page button", async () => {
-    const wrapper = factory({ modelValue: 3, max: 10 });
-    await wrapper.find("[aria-current='page']").trigger("click");
-    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  it("puts every control at the sm height (S8)", () => {
+    const wrapper = factory({ pageSizes: [20, 50, 100] });
+    const select = wrapper.findComponent({ name: "OSelect" });
+    expect(select.props("size")).toBe("sm");
+    for (const b of wrapper.findAllComponents({ name: "OButton" })) {
+      expect(b.props("size")).toBe("sm");
+    }
   });
 
-  // ─── Boundary guards ────────────────────────────────────────────────────────
-
-  it("prev button is disabled on page 1", () => {
-    const wrapper = factory({ modelValue: 1, max: 10 });
-    const prev = wrapper.find("[aria-label='Previous page']");
-    expect(prev.attributes("disabled")).toBeDefined();
+  it("lists a configured size outside the choices so the select never reads blank", () => {
+    const wrapper = factory({ pageSizes: [20, 50, 100], pageSize: 25 });
+    const options = wrapper.findComponent({ name: "OSelect" }).props("options") as {
+      value: number;
+    }[];
+    expect(options.map((o) => o.value)).toEqual([20, 25, 50, 100]);
   });
 
-  it("next button is disabled on the last page", () => {
-    const wrapper = factory({ modelValue: 10, max: 10 });
-    const next = wrapper.find("[aria-label='Next page']");
-    expect(next.attributes("disabled")).toBeDefined();
+  it("emits a new page size", async () => {
+    const wrapper = factory({ pageSizes: [20, 50, 100] });
+    wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", 50);
+    expect(wrapper.emitted("update:pageSize")).toEqual([[50]]);
   });
 
-  // ─── Disabled state ──────────────────────────────────────────────────────────
-
-  it("does not emit when disabled", async () => {
-    const wrapper = factory({ modelValue: 3, max: 10, disable: true });
-    await wrapper.find("[aria-label='Next page']").trigger("click");
-    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
-  });
-
-  // ─── Edge cases ──────────────────────────────────────────────────────────────
-
-  it("renders nothing when max is 0", () => {
-    const wrapper = factory({ modelValue: 1, max: 0 });
-    expect(wrapper.findAll("[aria-label^='Page']")).toHaveLength(0);
-  });
-
-  it("renders a single page button when max is 1", () => {
-    const wrapper = factory({ modelValue: 1, max: 1 });
-    expect(wrapper.findAll("[aria-label^='Page']")).toHaveLength(1);
+  it("names its parts by the explicit test ids when given", () => {
+    const wrapper = mount(OPagination, {
+      props: { page: 1, total: 50, testIds: { next: "table-next", range: "table-range" } },
+    });
+    expect(wrapper.find('[data-test="table-next"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="table-range"]').text()).toBe("1–20 of 50");
   });
 });

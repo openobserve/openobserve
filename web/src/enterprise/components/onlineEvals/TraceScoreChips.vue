@@ -20,9 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSkeleton
       v-for="n in 2"
       :key="n"
-      type="rect"
-      animation="wave"
-      class="rounded-default me-[0.325rem] h-5.5 w-16 shrink-0"
+      shape="block"
+      class="me-[0.325rem] h-5.5 w-16 shrink-0"
       :data-test="`trace-score-chips-skeleton-${n}`"
     />
   </template>
@@ -31,20 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-for="chip in visibleChips"
     :key="chip.key"
     side="bottom"
-    max-width="17.5rem"
     hoverable
     content-class="p-0!"
   >
     <OTag
+      tone="outline"
       type="metricChip"
-      class="text-2xs bg-surface-base border-border-default border-s-badge-success-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+      class="shrink-0"
       :data-test="`trace-score-chip-${chip.key}`"
     >
       <template #icon><OIcon name="task-alt" size="xs" /></template>
-      <span class="text-3xs text-text-secondary me-0.75 max-w-20 truncate font-medium">{{
+      <span class="text-text-secondary me-0.75 max-w-20 truncate font-medium">{{
         chip.label
       }}</span>
-      <span class="text-3xs text-text-body font-semibold">{{ chip.value }}</span>
+      <span class="text-text-body font-semibold">{{ chip.value }}</span>
     </OTag>
 
     <template #content>
@@ -54,13 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <ODropdown v-if="overflowCount > 0" side="bottom" align="start" content-class="p-0!">
     <template #trigger>
-      <OTag
-        type="metricChip"
-        clickable
-        class="text-2xs bg-surface-base border-border-default hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 cursor-pointer border border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
-        data-test="trace-score-chips-overflow"
-      >
-        <span class="text-3xs text-text-body font-semibold">{{
+      <OTag type="metricChip" toggle class="shrink-0" data-test="trace-score-chips-overflow">
+        <span class="text-text-body font-semibold">{{
           t("onlineEvals.traceScoreChip.moreCount", { count: overflowCount })
         }}</span>
       </OTag>

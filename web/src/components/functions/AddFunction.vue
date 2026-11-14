@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!hideTestPanel"
       id="add-function-form"
       :form="addFunctionForm"
-      class="border-border-default shrink-0 border-b px-2"
+      class="shrink-0"
       v-slot="{ isSubmitting }"
     >
       <FunctionsToolbar

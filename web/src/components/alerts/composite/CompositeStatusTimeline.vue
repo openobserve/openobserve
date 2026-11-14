@@ -109,7 +109,6 @@ onMounted(fetch);
           v-for="w in WINDOWS"
           :key="w.value"
           :value="w.value"
-          size="sm"
           :data-test="`alerts-composite-timeline-window-${w.value}`"
         >
           {{ raw(w.value) }}
@@ -144,7 +143,7 @@ onMounted(fetch);
             v-if="lane.accessible && lane.current_level"
             type="alertLevel"
             :value="lane.current_level"
-            size="xs"
+            size="sm"
             :data-test="`alerts-composite-timeline-level-${lane.alert_id}`"
           />
         </div>

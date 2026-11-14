@@ -14,12 +14,7 @@
 <template>
   <ODropdown v-model:open="menuOpen" align="end" side="bottom">
     <template #trigger>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        icon-right="expand-more"
-        data-test="ai-playground-scorers-btn"
-      >
+      <OButton variant="secondary" icon-end="expand-more" data-test="ai-playground-scorers-btn">
         {{
           selectedIds.length
             ? t("aiObservability.playground.scoreCount", { count: selectedIds.length })
@@ -45,7 +40,6 @@
         <div class="flex items-center gap-2">
           <OCheckbox
             :model-value="selectedIds.includes(entry.id)"
-            size="sm"
             :disabled="entry.blocked"
             :data-test="`ai-playground-scorer-${entry.id}`"
             @update:model-value="(checked: unknown) => toggle(entry.id, checked === true)"
@@ -58,7 +52,7 @@
           </OTruncatedText>
           <OTag
             v-if="entry.referenceBased"
-            variant="warning-soft"
+            tone="warn"
             size="sm"
             :label="t('aiObservability.playground.scorerReferenceBased')"
           />
@@ -86,8 +80,8 @@
             }}
           </span>
           <OButton
-            variant="outline"
-            size="xs"
+            variant="secondary"
+            size="sm"
             class="shrink-0"
             data-test="ai-playground-focus-expected"
             @click="goToExpected"
@@ -103,7 +97,6 @@
         <div class="flex items-center gap-2">
           <OCheckbox
             :model-value="autoScore"
-            size="sm"
             :label="t('aiObservability.playground.autoScore')"
             data-test="ai-playground-auto-score"
             @update:model-value="(checked: unknown) => emit('update:auto-score', checked === true)"
@@ -130,7 +123,6 @@
           </span>
           <OButton
             variant="primary"
-            size="sm-action"
             :loading="scoring"
             :disabled="!selectedIds.length || !canScore"
             :title="t('aiObservability.playground.scoreNowTooltip')"

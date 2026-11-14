@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="tracePage"
     style="min-height: auto"
   >
+    <OPageHeader :title="t('menu.traces')" title-data-test="traces-page-title" />
     <FirstDataPanel
       v-if="firstDataArrival"
       signal="traces"
@@ -204,17 +205,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       <OEmptyState
-                        preset="no-query-applied"
-                        size="hero"
+                        kind="filtered"
+                        :title="t('emptyState.noQueryApplied.title')"
+                        :text="t('emptyState.noQueryApplied.description')"
                         data-test="traces-search-not-started-text"
+                        :action-label="t('emptyState.noQueryApplied.action')"
                         @action="() => searchData()"
                       />
                     </div>
                     <div v-else-if="searchCancelled && !searchObj.loading">
                       <OEmptyState
-                        preset="search-cancelled"
-                        size="hero"
+                        kind="filtered"
+                        :title="t('emptyState.searchCancelled.title')"
+                        :text="t('emptyState.searchCancelled.description')"
                         data-test="traces-search-cancelled-state"
+                        :action-label="t('emptyState.searchCancelled.action')"
                         @action="() => searchData()"
                       />
                     </div>
@@ -274,17 +279,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </ODrawer>
 
-    <ODialog
-      v-model:open="streamChangeDialog.show"
+    <ConfirmDialog
+      v-model="streamChangeDialog.show"
       :title="t('traces.index.changeStreamTitle')"
-      size="sm"
-      :primary-button-label="t('traces.index.switchStream')"
-      :secondary-button-label="t('traces.index.cancel')"
-      @click:primary="applyStreamChange(streamChangeDialog.pendingStream)"
-      @click:secondary="streamChangeDialog.show = false"
-    >
-      <p>{{ t("traces.index.changeStreamMessage") }}</p>
-    </ODialog>
+      :message="t('traces.index.changeStreamMessage')"
+      :ok-label="t('traces.index.switchStream')"
+      :cancel-label="t('traces.index.cancel')"
+      @update:ok="applyStreamChange(streamChangeDialog.pendingStream)"
+      @update:cancel="streamChangeDialog.show = false"
+    />
     <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="traces-row-nav-live">
       {{ tracesRowNavAnnouncement }}
     </div>
@@ -346,7 +349,7 @@ import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isRangeSelectionCurrent } from "@/plugins/traces/metrics/latencyHeatmap";
 import { isLLMTrace } from "@/utils/llmUtils";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -354,6 +357,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";

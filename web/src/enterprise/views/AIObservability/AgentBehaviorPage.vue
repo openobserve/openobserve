@@ -18,8 +18,7 @@
   <AiPageShell
     data-test="ai-agent-behavior"
     :title="t('aiObservability.nav.agentBehavior')"
-    :subtitle="t('aiObservability.subtitle.agentBehavior')"
-    icon="troubleshoot"
+    :about="t('aiObservability.subtitle.agentBehavior')"
     :date-state="dateState"
     :last-run-at="behaviorLastRunAt"
     :is-loading="isLoading"

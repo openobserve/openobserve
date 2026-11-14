@@ -25,9 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdown side="bottom" align="end">
         <template #trigger>
           <OButton
+            icon-only
             :aria-label="t('traces.redActions.durationActions')"
             variant="ghost"
-            size="icon"
+            size="xs"
             class="shrink-0"
             data-test="traces-duration-actions-btn"
           >
@@ -36,14 +37,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <ODropdownItem
           data-test="traces-duration-create-alert"
-          icon-left="shield-alert-outline"
+          icon="shield-alert-outline"
           @select="emit('create-alert')"
         >
           {{ t("dashboard.panelContainer.exploreCreateAlert") }}
         </ODropdownItem>
         <ODropdownItem
           data-test="traces-duration-add-to-dashboard"
-          icon-left="dashboard"
+          icon="dashboard"
           @select="emit('add-to-dashboard')"
         >
           {{ t("dashboard.panelContainer.exploreAddToDashboard") }}
@@ -55,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-busy="refetching ? 'true' : undefined"
       data-test="traces-latency-heatmap-body"
     >
-      <LoadingProgress
-        :loading="status === 'loading' || refetching"
-        :loading-progress-percentage="0"
+      <OLoadingLine
+        :active="status === 'loading' || refetching"
+        class="absolute inset-x-0 top-0 z-10"
       />
       <PanelChartPlaceholder
         v-if="status === 'loading'"
@@ -79,7 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="inline"
         icon="bar-chart"
         :title="t('traces.latencyHeatmap.noData')"
-        :backdrop="false"
         data-test="traces-latency-heatmap-no-data"
         class="h-full"
       />
@@ -103,14 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :open="popoverOpen"
           side="right"
           align="start"
-          content-class="w-[min(18rem,calc(100vw-1.5rem))]"
           @update:open="popoverOpen = $event"
         >
           <template #trigger>
             <OButton
+              icon-only
               variant="secondary"
-              size="icon-xs-sq"
-              icon-left="more-horiz"
+              size="sm"
+              icon="more-horiz"
               class="pointer-events-auto absolute top-0.5 right-0.5"
               :aria-label="t('traces.latencyHeatmap.selection.reopen')"
               data-test="traces-latency-heatmap-selection-reopen"
@@ -144,16 +144,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <ODropdownSeparator />
             <ODropdownItem
-              icon-left="filter-alt"
-              shortcut="f"
+              icon="filter-alt"
+              keys="f"
               data-test="traces-latency-heatmap-selection-filter"
               @select="filterSelection"
             >
               {{ t("traces.latencyHeatmap.selection.filter") }}
             </ODropdownItem>
             <ODropdownItem
-              icon-left="timeline"
-              shortcut="d"
+              icon="timeline"
+              keys="d"
               data-test="traces-latency-heatmap-selection-drill-down"
               @select="drillDown"
             >
@@ -164,14 +164,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-latency-heatmap-selection-ask-ai"
               @select="askAi"
             >
-              <template #icon-left>
+              <template #icon>
                 <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
               </template>
               {{ t("traces.latencyHeatmap.selection.askAi") }}
             </ODropdownItem>
             <ODropdownItem
-              icon-left="close"
-              shortcut="esc"
+              icon="close"
+              keys="esc"
               data-test="traces-latency-heatmap-selection-clear"
               @select="clearSelection"
             >
@@ -198,7 +198,7 @@ import useTheme from "@/composables/useTheme";
 import { useAiIcon } from "@/composables/useAiIcon";
 import searchService from "@/services/search";
 import PanelBar from "@/components/common/PanelBar.vue";
-import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

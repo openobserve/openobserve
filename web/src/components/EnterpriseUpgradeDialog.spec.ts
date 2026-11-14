@@ -150,7 +150,7 @@ const createWrapper = (props: Record<string, any> = {}) =>
         OButton: {
           name: "OButton",
           template:
-            '<button data-test-stub="o-button" :data-variant="variant" @click="$emit(\'click\')"><slot /><slot name="icon-right" /></button>',
+            '<button data-test-stub="o-button" :data-variant="variant" @click="$emit(\'click\')"><slot /><slot name="icon-end" /></button>',
           props: ["variant", "size", "disabled", "loading"],
           emits: ["click"],
         },

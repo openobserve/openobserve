@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODialog
+    size="lg"
     v-model:open="showDialog"
     data-test="enterprise-upgrade-dialog"
     :show-close="false"
-    :width="75"
     @update:open="(v) => !v && onDialogHide()"
   >
     <div
@@ -28,9 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Close Button -->
       <div class="text-text-secondary hover:text-text-body absolute top-4 right-4 z-100">
         <OButton
+          icon-only
           :aria-label="t('common.close')"
           variant="ghost"
-          size="icon"
+          size="xs"
           @click="showDialog = false"
         >
           <svg
@@ -84,12 +85,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Loading State: Show skeleton -->
               <template v-if="isLoadingLicense && dialogConfig.showUsageIndicator">
                 <OSkeleton
-                  class="h-10 w-10 shrink-0 rounded-full"
+                  shape="circle"
+                  class="h-10 w-10 shrink-0"
                   data-test="enterprise-upgrade-usage-indicator-skeleton"
                 />
                 <OSkeleton
-                  class="rounded-default shrink-0"
-                  style="width: 12.5rem; height: 2.75rem"
+                  shape="block"
+                  class="h-11 w-50 shrink-0"
                   data-test="enterprise-upgrade-offer-badge-skeleton"
                 />
               </template>
@@ -126,8 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Loading skeleton -->
               <template v-if="isLoadingLicense">
                 <OSkeleton
-                  class="chart-skeleton rounded-default"
-                  style="height: 9.375rem"
+                  preset="chart"
+                  class="h-37.5"
                   data-test="enterprise-upgrade-chart-skeleton"
                 />
               </template>
@@ -155,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — shadow offsets/blurs and the 1px active-press nudge must not scale with text -->
               <OButton
                 v-if="dialogConfig.showPrimaryButton"
-                variant="on-dark-primary"
+                variant="secondary"
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
@@ -163,26 +165,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- eslint-enable local/no-hardcoded-px -->
                 {{ dialogConfig.primaryButtonText }}
-                <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
+                <template v-if="dialogConfig.primaryButtonIcon" #icon-end>
                   <OIcon :name="dialogConfig.primaryButtonIcon" size="sm" />
                 </template>
               </OButton>
               <OButton
                 v-if="dialogConfig.showContactSales"
-                variant="on-dark-ghost"
+                variant="secondary"
                 size="lg"
                 @click="contactSales"
-                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.0125rem] transition-all duration-300 hover:[transform:translateX(0.25rem)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
               >
                 {{ t("about.enterprise_offer.buttons.contact_sales") }}
               </OButton>
               <OButton
                 v-else
-                variant="on-dark-ghost"
+                variant="secondary"
                 size="lg"
                 @click="openDocsLink"
                 data-test="enterprise-upgrade-learn-more-btn"
-                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.0125rem] transition-all duration-300 hover:[transform:translateX(0.25rem)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
               >
                 {{ t("about.enterprise_offer.buttons.learn_more") }}
               </OButton>

@@ -30,10 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size-options="pageSizeOptions"
       expansion="single"
       v-model:expanded-ids="expandedIds"
-      show-index
-      :show-global-filter="false"
       :default-columns="false"
-      width="100%"
       @row-click="onExpandRow"
     >
       <template #empty>
@@ -49,8 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput v-model="filterQuery" class="mb-1" :placeholder="t('logStream.search')" />
           </div>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             class="ms-3 mb-1"
             :last-run-at="lastUpdatedAt"
             data-test="log-stream-refresh-stats-btn"
@@ -61,21 +56,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #expansion>
         <div v-show="loadingFunctions" class="py-1 ps-3" style="height: 3.75rem">
-          <OInnerLoading
-            :showing="loadingFunctions"
-            :label="t('logStream.fetchingFunctions')"
-            size="sm"
-          />
+          <div
+            class="flex flex-col gap-2 pe-3 pt-2"
+            role="status"
+            :aria-label="t('logStream.fetchingFunctions')"
+          >
+            <OSkeleton class="w-3/4" />
+            <OSkeleton class="w-1/2" />
+          </div>
         </div>
         <div v-show="!loadingFunctions">
           <OTable
             :data-test="`associated-functions-${expandedRow.name}-table`"
             class="border"
-            bordered
             :data="displayFunctionsList"
             :columns="functionsColumns"
             pagination="none"
-            :show-global-filter="false"
             :default-columns="false"
           >
             <template #top>
@@ -85,18 +81,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <OButton
                   data-test="stream-association-associate-function-btn"
-                  variant="outline"
-                  size="sm-action"
+                  variant="secondary"
                   class="ms-3 mb-1"
                   @click="addFunctionInProgress = true"
                 >
                   {{ t("logStream.associateFunction") }}
                 </OButton>
               </div>
-            </template>
-
-            <template #[`cell-#`]="{ row, index }">
-              <span v-if="!row._isAddRow">{{ index + 1 }}</span>
             </template>
 
             <template #cell-name="{ row }">
@@ -132,12 +123,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-actions="{ row }">
               <OButton
                 v-if="!row._isAddRow"
+                icon-only
                 data-test="stream-association-delete-function-btn"
                 :title="t('function.deleteAssociatedFunction')"
                 class="ms-1"
-                variant="ghost-destructive"
-                size="icon-sm"
-                icon-left="delete"
+                variant="danger-ghost"
+                icon="delete"
               />
             </template>
 
@@ -154,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="associated-stream-function-index-schema-drawer"
       bleed
       v-model:open="showIndexSchemaDialog"
-      size="lg"
+      size="md"
     >
       <SchemaIndex v-model="schemaData" />
     </ODrawer>
@@ -177,7 +168,7 @@ import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -194,7 +185,7 @@ export default defineComponent({
     OButton,
     ORefreshButton,
     ODrawer,
-    OInnerLoading,
+    OSkeleton,
     OSwitch,
     OSelect,
     OSearchInput,
@@ -313,13 +304,6 @@ export default defineComponent({
 
     const functionsColumns = computed<OTableColumnDef[]>(() => {
       const cols: OTableColumnDef[] = [
-        {
-          id: "#",
-          header: raw("#"),
-          cell: " ",
-          size: 50,
-          meta: { align: "left" },
-        },
         {
           id: "name",
           accessorKey: "name",

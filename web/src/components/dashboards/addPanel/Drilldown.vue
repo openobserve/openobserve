@@ -39,8 +39,7 @@
       </div>
     </div>
     <OButton
-      variant="outline"
-      size="sm"
+      variant="secondary"
       @click="addNewDrilldown"
       data-test="dashboard-addpanel-config-drilldown-add-btn"
     >

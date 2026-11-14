@@ -23,7 +23,7 @@ import store from "@/test/unit/helpers/store";
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
+  OTag: { name: "OTag", props: ["tone"], template: "<span><slot /></span>" },
   OSelect: {
     name: "OSelect",
     props: ["modelValue", "options", "error", "errorMessage"],

@@ -18,33 +18,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="metrics-detail-used-in">
     <OSkeleton
       v-if="status === 'loading'"
+      shape="block"
       class="h-24"
-      animation="wave"
       data-test="metrics-detail-used-in-loading"
     />
-    <OBanner
+    <OInlineNotice
       v-else-if="status === 'error'"
-      variant="error"
-      :content="t('metrics.explorer.detail.usedIn.error')"
+      tone="err"
+      :message="t('metrics.explorer.detail.usedIn.error')"
       data-test="metrics-detail-used-in-error"
     >
       <template #actions>
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="replay"
+          variant="secondary"
+          icon="replay"
           data-test="metrics-detail-used-in-retry"
           @click="emit('retry')"
           >{{ t("metrics.explorer.retry") }}</OButton
         >
       </template>
-    </OBanner>
+    </OInlineNotice>
     <template v-else-if="usage">
-      <OBanner
+      <OInlineNotice
         v-if="usage.unparsed"
-        variant="info"
+        tone="info"
         class="mb-3"
-        :content="
+        :message="
           t('metrics.explorer.detail.usedIn.unparsed', { count: usage.unparsed }, usage.unparsed)
         "
         data-test="metrics-detail-used-in-unparsed"
@@ -87,7 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip
               v-if="item.match === 'text'"
               :content="t('metrics.explorer.detail.usedIn.textMatchHelp')"
-              max-width="22.5rem"
             >
               <!-- Focusable so the explanation reaches a keyboard user too. -->
               <span
@@ -95,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default focus-visible:outline-accent/40 inline-flex focus:outline-none focus-visible:outline-2"
               >
                 <OBadge
-                  variant="warning-outline"
-                  size="xs"
+                  tone="outline"
+                  size="sm"
                   :data-test="`metrics-detail-used-in-text-match-${group.kind}-${item.id}`"
                   >{{ t("metrics.explorer.detail.usedIn.textMatch") }}</OBadge
                 >
@@ -115,7 +113,7 @@ import type { RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

@@ -167,11 +167,10 @@ const stubs = {
           </select>`,
       },
       OStatStrip: {
-        props: ["items", "selectedKeys", "defaultKey"],
+        props: ["items", "selectedKeys"],
         emits: ["update:selectedKeys"],
-        template: `<div data-test="stat-strip" :data-selected="(selectedKeys || []).join(',')" :data-default="defaultKey" :data-order="items.map((i) => i.key).join(',')">
-            <button v-for="i in items" :key="i.key" :data-test="i.dataTest" :data-icon="i.icon" :data-bar="i.max ?? ''" @click="$emit('update:selectedKeys', i.key === defaultKey ? [] : selectedKeys.includes(i.key) ? selectedKeys.filter((k) => k !== i.key) : [...selectedKeys, i.key])">{{ i.value }}</button>
-            <slot />
+        template: `<div data-test="stat-strip" :data-selected="(selectedKeys || []).join(',')" :data-order="items.map((i) => i.key).join(',')">
+            <button v-for="i in items" :key="i.key" :data-test="i.dataTest" :data-icon="i.icon" :data-bar="i.max ?? ''" :data-all="i.all ? 'true' : ''" @click="$emit('update:selectedKeys', i.all ? [] : selectedKeys.includes(i.key) ? selectedKeys.filter((k) => k !== i.key) : [...selectedKeys, i.key])">{{ i.value }}</button>
           </div>`,
       },
       OTable: {
@@ -250,9 +249,10 @@ describe("ExperimentComparisonPanel", () => {
     expect(wrapper.get('[data-test="ai-experiment-count-improved"]').attributes("data-icon")).toBe(
       "trending-up",
     );
-    // Total is the strip's default chip, so it reads as active while nothing is filtered.
-    expect(wrapper.get('[data-test="ai-experiment-count-total"]').attributes("data-bar")).toBe("");
-    expect(strip.attributes("data-default")).toBe("total");
+    // Total is the reset tile: no share bar, and it clears rather than filters.
+    const total = wrapper.get('[data-test="ai-experiment-count-total"]');
+    expect(total.attributes("data-bar")).toBe("");
+    expect(total.attributes("data-all")).toBe("true");
   });
 
   it("clears the filter from Total without selecting it", async () => {
@@ -269,7 +269,7 @@ describe("ExperimentComparisonPanel", () => {
     expect(wrapper.findAll('[data-test="row"]')).toHaveLength(2);
   });
 
-  it("renders the buckets as filter chips whose All chip resets the rows", async () => {
+  it("renders the buckets as filter tiles whose All tile resets the rows", async () => {
     const wrapper = mount(ExperimentComparisonPanel, {
       props: { comparison },
       global: {
@@ -279,10 +279,13 @@ describe("ExperimentComparisonPanel", () => {
     });
     const group = wrapper.get('[data-test="ai-experiment-counts"] [role="group"]');
     expect(group.get('[data-test="ai-experiment-count-total"]').attributes("aria-pressed")).toBe(
-      "true",
+      "false",
     );
     await group.get('[data-test="ai-experiment-count-regressed"]').trigger("click");
     expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
+    expect(
+      group.get('[data-test="ai-experiment-count-regressed"]').attributes("aria-pressed"),
+    ).toBe("true");
     await group.get('[data-test="ai-experiment-count-total"]').trigger("click");
     expect(wrapper.findAll('[data-test="row"]')).toHaveLength(2);
     expect(wrapper.find('[data-test="ai-experiment-comparison-threshold"]').exists()).toBe(true);

@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import type { OperatorCategory, PhaseId, VariantRole } from "@/utils/queryProfile";
 
@@ -61,7 +61,7 @@ export interface FoldNotice {
 }
 
 export interface AnalyzeNotice {
-  variant: "info" | "error";
+  tone: "info" | "err";
   text: I18nText;
 }
 
@@ -150,18 +150,18 @@ export const CATEGORY_STYLE: Record<OperatorCategory, CategoryStyle> = {
   },
 };
 
-export const SHARE_BADGE: Record<"none" | "low" | "mid" | "high", BadgeVariant> = {
-  none: "default-soft",
-  low: "success-soft",
-  mid: "warning-soft",
-  high: "error-soft",
+export const SHARE_BADGE: Record<"none" | "low" | "mid" | "high", ChipTone> = {
+  none: "neutral",
+  low: "ok",
+  mid: "warn",
+  high: "err",
 };
 
-export const SHARE_BAR: Record<"none" | "low" | "mid" | "high", ProgressBarVariant> = {
-  none: "neutral",
-  low: "success",
-  mid: "warning",
-  high: "danger",
+export const SHARE_BAR: Record<"none" | "low" | "mid" | "high", ProgressBarTone> = {
+  none: "accent",
+  low: "ok",
+  mid: "warn",
+  high: "err",
 };
 
 export const PHASE_STYLE: Record<PhaseId, { labelKey: I18nKey; swatch: string }> = {

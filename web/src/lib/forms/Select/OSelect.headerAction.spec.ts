@@ -62,7 +62,7 @@ describe("OSelect header actions", () => {
     wrapper = mount(OSelect, {
       attachTo: document.body,
       attrs: { "data-test": "unit", ...attrs },
-      props: { multiple: true, options: OPTIONS, ...props },
+      props: { multiple: true, searchable: true, options: OPTIONS, ...props },
     });
     await wrapper.find("button").trigger("click");
     await flushPromises();

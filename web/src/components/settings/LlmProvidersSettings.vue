@@ -11,22 +11,20 @@
 
     <OPageLayout
       v-else
-      icon="smart-toy"
-      :subtitle="t('llmProviders.subtitle')"
+      :title="t('llmProviders.tabLabel')"
+      title-data-test="llm-providers-settings-title"
+      :about="t('llmProviders.subtitle')"
       bleed
       :scroll="false"
     >
-      <template #title>
-        <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
-      </template>
       <template #actions>
-        <OButton data-test="llm-providers-add-btn" variant="primary" size="sm" @click="openCreate">
+        <OButton data-test="llm-providers-add-btn" variant="primary" @click="openCreate">
           {{ t("llmProviders.newButton") }}
         </OButton>
       </template>
 
       <div v-if="isLoading" class="flex flex-1 items-center justify-center">
-        <OSpinner size="md" />
+        <OSpinner size="lg" />
       </div>
 
       <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
@@ -35,7 +33,13 @@
           :features="forbidden"
           data-test="llm-providers-license-denied"
         />
-        <OEmptyState v-else size="hero" preset="no-access" data-test="llm-providers-forbidden" />
+        <OEmptyState
+          v-else
+          kind="denied"
+          :title="t('emptyState.noAccess.title')"
+          :text="t('emptyState.noAccess.description')"
+          data-test="llm-providers-forbidden"
+        />
       </div>
 
       <div v-else-if="!providers.length" class="flex flex-1 items-center justify-center">
@@ -44,12 +48,11 @@
              surface in this page reads consistently with the rest of the
              app (matches Scorers' "Add a Provider First" treatment). -->
         <OEmptyState
-          size="hero"
-          preset="no-llm-providers"
           :title="t('llmProviders.empty.title')"
-          :description="t('llmProviders.empty.description')"
+          :text="t('llmProviders.empty.description')"
           data-test="llm-providers-empty-state"
-          @action="(id) => id === 'create' && openCreate()"
+          :action-label="t('emptyState.noLlmProviders.action')"
+          @action="openCreate()"
         />
       </div>
 
@@ -63,11 +66,10 @@
           :loading="isLoading"
           :forbidden="forbidden"
           :global-filter="searchQuery"
-          :show-global-filter="false"
           :row-actions="rowActions"
-          row-actions-more-data-test="llm-providers-row-more-actions"
+          :row-menu="rowMenu"
+          row-menu-data-test="llm-providers-row-more-actions"
           :default-columns="false"
-          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-llm-providers"
@@ -80,7 +82,6 @@
           @update:current-page="currentPage = $event"
           @update:sort-by="sortBy = $event"
           @update:sort-order="sortOrder = $event"
-          width="100%"
           class="h-full w-full"
           @row-click="(row: any) => openEdit(row)"
         >
@@ -94,22 +95,29 @@
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="isFetching"
-              shortcut-id="llmProvidersRefresh"
+              shortcut="llmProvidersRefresh"
               data-test="llm-providers-list-refresh-btn"
               @click="() => loadProviders(true)"
             />
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-llm-providers"
-              :filtered="!!searchQuery"
-              :hide-action="!searchQuery"
-              @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+              :kind="searchQuery ? 'filtered' : 'first-run'"
+              :title="
+                searchQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.llmProviders') })
+                  : t('emptyState.noLlmProviders.title')
+              "
+              :text="
+                searchQuery
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.nouns.llmProviders'),
+                    })
+                  : t('emptyState.noLlmProviders.description')
+              "
+              @action="searchQuery = ''"
             />
           </template>
           <template #cell-type="{ row }">
@@ -132,7 +140,7 @@
       :title="t('onlineEvals.deleteTitle', { label: t('onlineEvals.singular.providers') })"
       message-keypath="onlineEvals.deleteConfirmMessage"
       :message-name="pendingDeleteRow?.name ?? ''"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="performDelete"
       @update:cancel="cancelDelete"
     />
@@ -166,7 +174,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { COL, type OTableRowAction } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableRowAction, type OTableRowMenuItem } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
@@ -278,14 +286,6 @@ const columns = computed(() => [
     size: COL.defaultModel,
     meta: { align: "left" },
   },
-  {
-    id: "actions",
-    header: t("onlineEvals.scoreConfig.columns.actions"),
-    sortable: false,
-    isAction: true,
-    size: 100,
-    meta: { cellClass: "actions-column" },
-  },
 ]);
 
 const rowActions = computed<OTableRowAction<Provider>[]>(() => [
@@ -293,13 +293,17 @@ const rowActions = computed<OTableRowAction<Provider>[]>(() => [
     id: "edit",
     label: t("onlineEvals.actions.edit"),
     icon: "edit",
-    onSelect: openEdit,
+    onClick: openEdit,
     dataTest: (row) => `llm-providers-${row.name}-edit-btn`,
   },
+]);
+
+const rowMenu = computed<OTableRowMenuItem<Provider>[]>(() => [
   {
     id: "delete",
     label: t("onlineEvals.actions.delete"),
     icon: "delete",
+    destructive: true,
     onSelect: confirmDelete,
     dataTest: (row) => `llm-providers-${row.name}-delete-btn`,
   },

@@ -247,11 +247,11 @@ describe("priorityLabel", () => {
 
 describe("tag variants", () => {
   it("gives the most urgent priority the loudest variant", () => {
-    expect(priorityTagVariant(1)).toBe("error-soft");
-    expect(priorityTagVariant(2)).toBe("orange-soft");
-    expect(priorityTagVariant(3)).toBe("amber-soft");
-    expect(priorityTagVariant(4)).toBe("blue-soft");
-    expect(priorityTagVariant(5)).toBe("default-soft");
+    expect(priorityTagVariant(1)).toBe("err");
+    expect(priorityTagVariant(2)).toBe("warn");
+    expect(priorityTagVariant(3)).toBe("warn");
+    expect(priorityTagVariant(4)).toBe("neutral");
+    expect(priorityTagVariant(5)).toBe("neutral");
   });
 
   it("maps every lifecycle state to a distinct variant", () => {

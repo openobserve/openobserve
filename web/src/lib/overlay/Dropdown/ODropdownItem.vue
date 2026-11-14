@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import type { DropdownItemProps, DropdownItemEmits, DropdownItemSlots } from "./ODropdown.types";
 import { computed, useAttrs, useId } from "vue";
-import OText from "../../core/Typography/OText.vue";
 import { DropdownMenuItem } from "reka-ui";
-import OIcon from "../../core/Icon/OIcon.vue";
-import OShortcut from "../../core/Shortcut/OShortcut.vue";
+import OMenuItemContent from "@/lib/overlay/shared/OMenuItemContent.vue";
+import { menuItemClasses } from "@/lib/overlay/shared/menuItem";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 const props = withDefaults(defineProps<DropdownItemProps>(), {
   as: "div",
   disabled: false,
-  focusableUnavailable: false,
-  variant: "default",
+  tone: "default",
+  checked: undefined,
 });
 
 const emit = defineEmits<DropdownItemEmits>();
@@ -21,8 +20,14 @@ defineSlots<DropdownItemSlots>();
 const attrs = useAttrs();
 const id = useId();
 const isDisabled = useLockedDisabled(() => props.disabled);
-const unavailable = computed(() => isDisabled.value && props.focusableUnavailable);
-const reasonId = computed(() => props.descriptionId ?? `${attrs["data-test"] ?? id}-reason`);
+// A disabled item that says why stays in the keyboard order, so the reason can be read.
+const unavailable = computed(() => isDisabled.value && !!props.disabledReason);
+const note = computed(() => (isDisabled.value ? props.disabledReason : null) || props.description);
+const noteId = computed(() => `${attrs["data-test"] ?? id}-reason`);
+// Only a single-choice item overrides the role; an undefined one would wipe reka's `menuitem` through as-child.
+const choiceAttrs = computed(() =>
+  props.checked === undefined ? {} : { role: "menuitemradio", "aria-checked": props.checked },
+);
 
 function blockActivation(event: Event) {
   if (!unavailable.value) return;
@@ -41,30 +46,15 @@ function onSelect(event: Event) {
   }
   emit("select", event);
 }
-
-const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> = {
-  default: "text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg",
-  destructive:
-    "text-dropdown-item-destructive-text data-[highlighted]:bg-dropdown-item-destructive-hover-bg",
-};
 </script>
 
 <template>
   <DropdownMenuItem
-    :disabled="isDisabled && !focusableUnavailable"
+    :disabled="isDisabled && !unavailable"
     as-child
-    :aria-describedby="description ? reasonId : undefined"
+    :aria-describedby="note ? noteId : undefined"
     :text-value="textValue"
-    :class="[
-      'group/item relative flex items-center gap-2',
-      'rounded-default w-full px-3 py-1.5',
-      'cursor-pointer outline-none select-none',
-      'transition-colors duration-(--duration-control) ease-(--ease-control)',
-      variantClasses[variant],
-      'data-[disabled]:text-dropdown-item-disabled data-[disabled]:cursor-not-allowed',
-      unavailable &&
-        'text-text-secondary! data-[highlighted]:text-text-heading! focus-visible:ring-focus-ring-accent cursor-not-allowed focus-visible:ring-2 focus-visible:ring-inset',
-    ]"
+    :class="menuItemClasses(tone, unavailable, !!note)"
     @click.capture="blockActivation"
     @keydown.capture="onKeydown"
     @select="onSelect"
@@ -73,35 +63,22 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
       :is="as"
       :type="as === 'button' ? 'button' : undefined"
       :aria-disabled="isDisabled || undefined"
+      v-bind="choiceAttrs"
     >
-      <slot name="icon-left">
-        <OIcon
-          v-if="props.iconLeft"
-          :name="props.iconLeft"
-          size="sm"
-          :class="props.iconLeft === 'lock' ? 'lock-chip' : undefined"
-        />
-      </slot>
-      <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span><slot /></span>
-        <OText
-          :id="reasonId"
-          aria-hidden="true"
-          :data-test="reasonId"
-          as="span"
-          variant="meta"
-          class="text-text-secondary! group-data-[highlighted]/item:text-text-heading! leading-snug! whitespace-normal"
-          >{{ description }}</OText
-        >
-      </span>
-      <slot v-else />
-      <slot name="icon-right" />
-      <OShortcut
-        v-if="props.shortcut || props.shortcutId"
-        :keys="props.shortcut"
-        :id="props.shortcutId"
-        class="ms-auto ps-4"
-      />
+      <OMenuItemContent
+        :icon="icon"
+        :tone="tone"
+        :checked="checked"
+        :shortcut="shortcut"
+        :keys="keys"
+        :note="note"
+        :note-id="noteId"
+        :muted="unavailable"
+      >
+        <template v-if="$slots.icon" #icon><slot name="icon" /></template>
+        <slot />
+        <template v-if="$slots.end" #end><slot name="end" /></template>
+      </OMenuItemContent>
     </component>
   </DropdownMenuItem>
 </template>

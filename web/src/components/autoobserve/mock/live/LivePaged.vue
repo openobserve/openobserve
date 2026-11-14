@@ -47,8 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-body min-w-0 truncate">{{ newText }}</span>
         <span aria-hidden="true">·</span>
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           class="-my-1 shrink-0"
           data-test="autoobserve2-paged-show-new"
           @click="paged.showNew()"
@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         aria-hidden="true"
         data-test="autoobserve2-paged-subtitle-skeleton"
       >
-        <OSkeleton animation="none" class="h-3 w-full" />
-        <OSkeleton animation="none" class="h-3 w-[70%]" />
+        <OSkeleton shape="block" class="h-3 w-full" />
+        <OSkeleton shape="block" class="h-3 w-[70%]" />
       </div>
       <OTruncatedText
         v-else-if="slotKind === 'subtitle'"
@@ -108,18 +108,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-border-subtle rounded-default flex flex-col gap-1.5 border px-3 py-2.5"
         >
           <div class="flex h-5 items-center">
-            <OSkeleton animation="none" class="h-3 w-[85%]" />
+            <OSkeleton shape="block" class="h-3 w-[85%]" />
           </div>
           <div class="flex h-5 items-center gap-1.5">
-            <OSkeleton animation="none" class="h-4 w-8" />
-            <OSkeleton animation="none" class="h-4 w-14" />
-            <OSkeleton animation="none" class="h-3 w-24" />
+            <OSkeleton shape="block" class="h-4 w-8" />
+            <OSkeleton shape="block" class="h-4 w-14" />
+            <OSkeleton shape="block" class="h-3 w-24" />
           </div>
           <div class="flex h-5 items-center gap-1.5">
-            <OSkeleton animation="none" class="h-4 w-20" />
-            <OSkeleton animation="none" class="h-3 w-28" />
+            <OSkeleton shape="block" class="h-4 w-20" />
+            <OSkeleton shape="block" class="h-3 w-28" />
           </div>
-          <div class="flex h-7 items-center"><OSkeleton animation="none" class="h-4 w-24" /></div>
+          <div class="flex h-7 items-center"><OSkeleton shape="block" class="h-4 w-24" /></div>
         </li>
       </ul>
       <LiveNoticeState
@@ -135,19 +135,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-else-if="settled && !rows.length && waiting"
         size="inline"
-        variant="neutral"
         icon="hourglass-empty"
         :title="waiting.title"
-        :description="waiting.desc"
+        :text="waiting.desc"
         data-test="autoobserve2-paged-empty-learning"
       />
       <OEmptyState
         v-else-if="settled && !rows.length && !paging"
         size="inline"
-        variant="neutral"
         icon="toggle-off"
         :title="copy.offTitle"
-        :description="copy.offDesc"
+        :text="copy.offDesc"
         data-test="autoobserve2-paged-empty-off"
       />
       <OEmptyState
@@ -155,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="inline"
         icon="task-alt"
         :title="copy.emptyTitle"
-        :description="copy.emptyDesc"
+        :text="copy.emptyDesc"
         data-test="autoobserve2-paged-empty"
       />
       <ul v-else-if="settled" class="flex flex-col gap-2.5" data-test="autoobserve2-paged-list">
@@ -194,14 +192,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex h-5 min-w-0 items-center gap-1.5">
               <OBadge
-                :variant="RCA_BADGE_VARIANT[row.analysis.tone]"
+                :tone="RCA_BADGE_VARIANT[row.analysis.tone]"
                 size="sm"
                 class="shrink-0"
                 :data-tone="row.analysis.tone"
                 data-test="autoobserve2-paged-analysis"
               >
                 <template v-if="row.analysis.spinner" #icon>
-                  <OSpinner size="xs" />
+                  <OSpinner />
                 </template>
                 {{ row.analysis.label }}
               </OBadge>
@@ -241,8 +239,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="autoobserve2-paged-actions"
             >
               <OButton
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 data-test="autoobserve2-paged-open"
                 @click="router.push(incidentLink(org, row.incidentId))"
               >
@@ -250,8 +248,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="row.analysis.hasRun"
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 data-test="autoobserve2-paged-view-analysis"
                 @click="router.push(analysisLink(org, row.incidentId))"
               >
@@ -259,8 +257,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="row.logs"
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 data-test="autoobserve2-paged-logs"
                 @click="router.push(row.logs)"
               >
@@ -268,8 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="row.copy.page?.routing"
-                variant="outline"
-                size="xs"
+                variant="secondary"
+                size="sm"
                 data-test="autoobserve2-paged-routing"
                 @click="router.push({ name: 'onCallRouting', query: { org_identifier: org } })"
               >
@@ -277,9 +275,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="canAsk && row.ai"
-                variant="ghost-primary"
-                size="xs"
-                icon-left="auto-awesome"
+                variant="accent-ghost"
+                size="sm"
+                icon="auto-awesome"
                 data-test="autoobserve2-paged-ask-ai"
                 @click="ask(row.ai)"
               >
@@ -311,9 +309,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OButton
           v-if="hasMore"
-          variant="ghost-primary"
-          size="xs"
-          icon-right="arrow-forward"
+          variant="accent-ghost"
+          size="sm"
+          icon-end="arrow-forward"
           class="ms-auto shrink-0"
           data-test="autoobserve2-paged-see-all"
           @click="router.push({ query: { ...route.query, org_identifier: org, page: 'issues' } })"

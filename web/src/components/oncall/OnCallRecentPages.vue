@@ -31,10 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ windowLabel }}
       </OText>
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         class="ms-auto"
-        icon-left="open-in-new"
+        icon="open-in-new"
         data-test="oncall-recent-pages-view-all"
         @click="emit('view-all')"
       >
@@ -46,10 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="rows"
       :columns="columns"
       row-key="id"
-      :frame="false"
       :loading="loading"
       pagination="none"
-      :show-global-filter="false"
       table-id="oncall-recent-pages"
       data-test="oncall-recent-pages-table"
       @row-click="(row: OnCallResponse) => emit('open', row)"
@@ -62,10 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Only the two outcomes worth a second look are labelled: a page
                answered by the first person it woke is the norm, and tagging the
                norm is what made this list unreadable. -->
-          <OTag v-if="!row.acked_by" variant="error-soft" size="sm">
+          <OTag v-if="!row.acked_by" tone="err" size="sm">
             {{ t("oncall.teamNeverAcked") }}
           </OTag>
-          <OTag v-else-if="isEscalated(row)" variant="amber-soft" size="sm">
+          <OTag v-else-if="isEscalated(row)" tone="warn" size="sm">
             {{ t("oncall.escalate") }}
           </OTag>
         </span>
@@ -104,7 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #empty>
-        <OEmptyState preset="no-oncall-responses" size="inline" hide-action />
+        <OEmptyState
+          :title="t('emptyState.noOncallResponses.title')"
+          :text="t('emptyState.noOncallResponses.description')"
+          icon="task-alt"
+          size="inline"
+        />
       </template>
     </OTable>
   </div>

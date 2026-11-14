@@ -35,7 +35,7 @@ const oDrawerStub = {
     '<div data-test="o-drawer" v-if="open">' +
     '<div data-test="o-drawer-body"><slot /></div>' +
     "</div>",
-  props: ["open", "width", "showClose", "title", "subTitle", "size", "persistent"],
+  props: ["open", "width", "showClose", "title", "subtitle", "size", "persistent"],
   emits: ["update:open", "close"],
 };
 
@@ -1074,7 +1074,7 @@ describe("SearchResult Component", () => {
       const drawer = wrapper.findComponent(oDrawerStub);
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("open")).toBe(true);
-      expect(drawer.props("width")).toBe(85);
+      expect(drawer.props("size")).toBe("xl");
     });
 
     it("closes the Detail ODrawer when update:open=false (v-model:open contract) and calls reDrawChart", async () => {

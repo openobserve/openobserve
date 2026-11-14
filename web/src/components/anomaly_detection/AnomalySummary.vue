@@ -33,14 +33,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-show="showScrollToBottom" class="pointer-events-none absolute right-5 bottom-5 z-1000">
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
         class="!border-accent !text-accent !bg-surface-overlay pointer-events-auto !border-2 shadow-sm backdrop-blur-sm"
         data-test="anomaly-summary-scroll-btn"
         @click="scrollToBottom"
       >
         <OIcon name="arrow-downward" size="sm" />
-        <OTooltip :content="t('alerts.anomaly.scrollToBottom')" side="top" align="center" />
+        <OTooltip :content="t('alerts.anomaly.scrollToBottom')" side="top" />
       </OButton>
     </div>
   </div>

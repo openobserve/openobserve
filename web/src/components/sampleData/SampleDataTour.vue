@@ -19,8 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="tour!.minimized && current" class="fixed end-4 bottom-4 z-40">
       <OButton
         variant="primary"
-        size="sm"
-        icon-left="flag"
+        icon="flag"
         class="shadow-lg"
         data-test="sample-tour-pill"
         @click="session.setTourMinimized(false)"
@@ -46,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
         <OButton
           v-if="current"
+          icon-only
           variant="ghost"
-          size="icon-sm"
           :aria-label="t('sampleData.tour.minimize')"
           data-test="sample-tour-minimize"
           @click="session.setTourMinimized(true)"
@@ -55,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="remove" size="sm" />
         </OButton>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
           :aria-label="t('sampleData.tour.close')"
           data-test="sample-tour-close"
           @click="session.stopTour()"
@@ -79,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-col gap-1.5">
           <OTag
             :label="capabilityLabel(current.capability)"
-            variant="primary-soft"
+            tone="accent"
             size="sm"
             class="self-start"
           />
@@ -95,9 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-2">
           <OButton
             v-if="previousIndex !== undefined"
-            variant="outline"
-            size="sm"
-            icon-left="arrow-back"
+            variant="secondary"
+            icon="arrow-back"
             :disabled="navigating"
             data-test="sample-tour-back"
             @click="back"
@@ -107,8 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex-1" />
           <OButton
             variant="primary"
-            size="sm"
-            icon-right="arrow-forward"
+            icon-end="arrow-forward"
             :disabled="navigating"
             data-test="sample-tour-next"
             @click="next"
@@ -125,28 +122,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <ul class="m-0 flex list-none flex-wrap gap-1.5 p-0">
           <li v-for="cap in capabilities" :key="cap">
-            <OTag :label="capabilityLabel(cap)" variant="success-soft" size="sm" icon="check" />
+            <OTag :label="capabilityLabel(cap)" tone="ok" size="sm" icon="check" />
           </li>
         </ul>
         <div class="flex flex-col gap-2">
-          <OButton
-            variant="primary"
-            size="sm"
-            data-test="sample-tour-connect"
-            @click="connectOwnData"
-          >
+          <OButton variant="primary" data-test="sample-tour-connect" @click="connectOwnData">
             {{ t("sampleData.tour.finale.connect") }}
           </OButton>
           <div class="flex items-center justify-between gap-2">
-            <OButton variant="outline" size="sm" data-test="sample-tour-restart" @click="restart">
+            <OButton variant="secondary" data-test="sample-tour-restart" @click="restart">
               {{ t("sampleData.tour.finale.restart") }}
             </OButton>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="sample-tour-finish"
-              @click="session.stopTour()"
-            >
+            <OButton variant="secondary" data-test="sample-tour-finish" @click="session.stopTour()">
               {{ t("sampleData.tour.finale.finish") }}
             </OButton>
           </div>

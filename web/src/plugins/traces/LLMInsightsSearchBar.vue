@@ -48,8 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OButton
         v-if="draft"
+        icon-only
         variant="ghost"
-        size="icon-xs-sq"
+        size="sm"
         :aria-label="t('llmInsightsDrill.searchClear')"
         data-test="llm-insights-search-clear"
         @click="clear"

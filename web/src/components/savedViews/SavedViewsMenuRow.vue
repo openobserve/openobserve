@@ -67,11 +67,11 @@ const onRowKeydown = (event: KeyboardEvent) => {
     @select="emit('apply')"
     @keydown="onRowKeydown"
   >
-    <template #icon-left>
+    <template #icon>
       <OIcon name="saved-search" size="sm" class="text-text-secondary" />
     </template>
     <OTruncatedText class="min-w-0 flex-1">{{ props.view.view_name }}</OTruncatedText>
-    <template #icon-right>
+    <template #end>
       <span class="ms-auto flex shrink-0 items-center gap-0.5">
         <OIcon
           v-if="props.applied"
@@ -83,8 +83,9 @@ const onRowKeydown = (event: KeyboardEvent) => {
           :data-test="`${props.dataTestPrefix}-applied-${viewId}`"
         />
         <OButton
-          variant="ghost-neutral"
-          size="icon-xs-sq"
+          icon-only
+          variant="ghost"
+          size="sm"
           :aria-pressed="props.favorite"
           :aria-label="t('search.favoriteViewNamed', { name: raw(props.view.view_name) })"
           :data-test="`${props.dataTestPrefix}-favorite-${viewId}`"
@@ -100,26 +101,28 @@ const onRowKeydown = (event: KeyboardEvent) => {
           <OTooltip :content="t('search.favoriteViewNamed', { name: raw(props.view.view_name) })" />
         </OButton>
         <OButton
-          variant="ghost-neutral"
-          size="icon-xs-sq"
-          icon-left="edit"
+          icon-only
+          :disabled-reason="props.updateReason ?? undefined"
+          variant="ghost"
+          size="sm"
+          icon="edit"
           :aria-label="t('search.overwriteSavedViewNamed', { name: raw(props.view.view_name) })"
           :disabled="!!props.updateReason"
-          focusable-unavailable
           :data-test="`${props.dataTestPrefix}-update-${viewId}`"
           @click.stop.prevent="emit('update')"
           @keydown.enter.stop.prevent="emit('update')"
           @keydown.space.stop
         >
           <OTooltip
+            v-if="!props.updateReason"
             :content="t('search.overwriteSavedViewNamed', { name: raw(props.view.view_name) })"
           />
-          <template #unavailable-reason>{{ props.updateReason }}</template>
         </OButton>
         <OButton
-          variant="ghost-neutral"
-          size="icon-xs-sq"
-          icon-left="delete"
+          icon-only
+          variant="ghost"
+          size="sm"
+          icon="delete"
           :aria-label="t('search.deleteViewNamed', { name: raw(props.view.view_name) })"
           :data-test="`${props.dataTestPrefix}-delete-${viewId}`"
           @click.stop.prevent="emit('delete')"

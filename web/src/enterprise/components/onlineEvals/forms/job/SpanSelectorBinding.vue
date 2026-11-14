@@ -5,7 +5,6 @@
       :model-value="binding || undefined"
       :options="selectorOptions"
       :placeholder="t('onlineEvals.job.spanSelector.select')"
-      size="sm"
       clearable
       class="min-w-[11.875rem] flex-1"
       :data-test="`span-selector-binding-${scorerId}`"
@@ -14,8 +13,8 @@
 
     <OButton
       type="button"
-      size="xs"
-      variant="outline"
+      size="sm"
+      variant="secondary"
       :aria-label="t('onlineEvals.job.spanSelector.createForScorerTitle')"
       :title="t('onlineEvals.job.spanSelector.createForScorerTitle')"
       :data-test="`span-selector-create-${scorerId}`"
@@ -26,24 +25,24 @@
     <OButton
       v-if="boundSelector"
       type="button"
-      size="xs"
-      variant="ghost-primary"
+      size="sm"
+      variant="accent-ghost"
       :data-test="`span-selector-edit-${scorerId}`"
       @click="editSelector(boundSelector)"
     >
       {{ t("common.edit") }}
     </OButton>
-    <OTag v-if="!boundSelector" variant="warning-soft" size="xs">
+    <OTag v-if="!boundSelector" tone="warn" size="sm">
       {{ t("onlineEvals.job.inputMapping.systemProvided.selectorRequired") }}
     </OTag>
 
     <ODrawer
       v-model:open="drawerOpen"
       :title="t('onlineEvals.job.spanSelector.editorTitle')"
-      size="lg"
+      size="md"
       :form-id="formId"
-      :primary-button-label="t('common.save')"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{ label: t('common.save') }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="span-selector-drawer"
       @click:secondary="drawerOpen = false"
     >
@@ -54,7 +53,6 @@
           name="name"
           :label="t('onlineEvals.job.spanSelector.name')"
           required
-          size="sm"
           data-test="span-selector-name"
         />
 
@@ -66,14 +64,13 @@
               purpose="selector"
               :stream-fields="streamFields"
             />
-            <OBanner
+            <OInlineNotice
               v-if="field.state.meta.errors.length > 0"
-              variant="error-soft"
-              dense
+              tone="err"
               data-test="span-selector-filter-error"
             >
               {{ firstFieldError(field.state.meta.errors) }}
-            </OBanner>
+            </OInlineNotice>
           </template>
         </component>
 
@@ -100,7 +97,7 @@
             <OTag
               v-for="field in DEFAULT_FIELDS"
               :key="field"
-              variant="primary-soft"
+              tone="accent"
               size="sm"
               :data-test="`span-selector-default-field-${field}`"
             >
@@ -118,7 +115,6 @@
           multiple
           searchable
           required
-          size="md"
           data-test="span-selector-fields"
         />
 
@@ -133,7 +129,6 @@
           min="1"
           :help-text="t('onlineEvals.job.spanSelector.budget')"
           required
-          size="sm"
           data-test="span-selector-maximum-spans"
         />
       </OForm>
@@ -146,7 +141,7 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";

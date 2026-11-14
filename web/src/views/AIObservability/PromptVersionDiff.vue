@@ -4,11 +4,9 @@
     <section class="flex flex-col gap-2">
       <h4 :class="headingClass">
         {{ t("aiObservability.promptManagement.form.promptText") }}
-        <OTag
-          :variant="payloadChanged ? 'amber-soft' : 'default-soft'"
-          data-test="prompt-diff-payload-status"
-          >{{ statusLabel(payloadChanged) }}</OTag
-        >
+        <OTag :tone="payloadChanged ? 'warn' : 'neutral'" data-test="prompt-diff-payload-status">{{
+          statusLabel(payloadChanged)
+        }}</OTag>
         <span
           v-if="payloadChanged"
           class="ms-auto inline-flex gap-2 font-mono text-xs font-normal"
@@ -30,11 +28,9 @@
     <section class="flex flex-col gap-2">
       <h4 :class="headingClass">
         {{ t("aiObservability.promptManagement.configuration") }}
-        <OTag
-          :variant="changedFields ? 'amber-soft' : 'default-soft'"
-          data-test="prompt-diff-config-status"
-          >{{ statusLabel(Boolean(changedFields)) }}</OTag
-        >
+        <OTag :tone="changedFields ? 'warn' : 'neutral'" data-test="prompt-diff-config-status">{{
+          statusLabel(Boolean(changedFields))
+        }}</OTag>
         <span v-if="changedFields" class="text-text-secondary ms-auto text-xs font-normal">{{
           t("aiObservability.promptManagement.form.fieldsChanged", {
             changed: changedFields,

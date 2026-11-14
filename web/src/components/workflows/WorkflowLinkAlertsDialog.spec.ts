@@ -48,22 +48,14 @@ import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 // ── stubs ────────────────────────────────────────────────────────────────────
 const ODialogStub = {
   name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "primaryButtonLabel",
-    "primaryButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLabel",
-  ],
+  props: ["open", "size", "title", "primary", "primary", "primary", "secondary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div class="o-dialog">
-      <button class="dlg-primary" :disabled="primaryButtonDisabled"
-        :data-loading="String(!!primaryButtonLoading)"
-        @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
-      <button class="dlg-secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+      <button class="dlg-primary" :disabled="primary?.disabled"
+        :data-loading="String(!!primary?.loading)"
+        @click="$emit('click:primary')">{{ primary?.label }}</button>
+      <button class="dlg-secondary" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
       <button class="dlg-dismiss" @click="$emit('update:open', false)">x</button>
       <slot />
     </div>`,

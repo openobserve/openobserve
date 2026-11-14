@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <h4 class="text-text-heading m-0 text-sm font-semibold">
         {{ t("synthetics.inherited.title") }}
       </h4>
-      <OBadge variant="default" size="sm">{{ rows.length }}</OBadge>
+      <OBadge tone="neutral" size="sm">{{ rows.length }}</OBadge>
       <OTooltip :content="t('synthetics.inherited.titleTooltip')" side="bottom">
         <OIcon
           name="info"
@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           :model-value="filter"
           :options="filterOptions"
-          size="sm"
           class="w-30!"
           :aria-label="t('synthetics.inherited.filterLabel')"
           data-test="synthetics-inherited-filter"

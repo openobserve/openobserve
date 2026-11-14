@@ -22,9 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="@container flex flex-nowrap items-center gap-2.5"
     :class="variant === 'report' ? 'max-md:flex-wrap' : ''"
   >
-    <ODropdown align="start" content-class="w-80">
+    <ODropdown align="start">
       <template #trigger>
-        <OButton data-test="rca-run-selector" variant="outline" size="sm" class="min-w-0">
+        <OButton data-test="rca-run-selector" variant="secondary" class="min-w-0">
           <span
             v-if="selectedIsLive"
             class="bg-status-positive me-1.5 inline-block size-1.75 shrink-0 animate-pulse rounded-full motion-reduce:animate-none"
@@ -63,16 +63,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           ref="copyButton"
           data-test="rca-report-copy-btn"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="shrink-0"
-          icon-left="content-copy"
+          icon="content-copy"
           :disabled="!hasReport"
           @click="$emit('copy-report')"
         >
           {{ t("alerts.incidents.rcaCopy") }}
         </OButton>
         <OPopover
+          size="lg"
           :open="!!copyPreview"
           :anchor="copyAnchor"
           align="end"
@@ -80,10 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('alerts.incidents.rcaLight.copiedTitle')"
           @update:open="!$event && $emit('close-preview')"
         >
-          <section
-            data-test="rca-copy-preview"
-            class="flex w-[min(48rem,calc(100vw-1.5rem))] flex-col"
-          >
+          <section data-test="rca-copy-preview" class="flex flex-col">
             <header class="border-border-default flex items-center gap-2 border-b py-2 ps-3 pe-2">
               <OIcon name="check-circle" size="sm" class="text-status-positive shrink-0" />
               <span class="text-text-heading text-compact font-semibold">
@@ -93,10 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("alerts.incidents.rcaLight.copiedHint") }}
               </span>
               <OButton
+                icon-only
                 data-test="rca-copy-preview-close"
                 variant="ghost"
-                size="icon-sm"
-                icon-left="close"
+                icon="close"
                 :aria-label="t('alerts.incidents.rcaLight.closePreview')"
                 @click="$emit('close-preview')"
               />
@@ -109,10 +106,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OPopover>
         <OButton
           data-test="rca-report-download-btn"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="shrink-0"
-          icon-left="download"
+          icon="download"
           :disabled="!hasReport"
           @click="$emit('download-report')"
         >
@@ -122,10 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="hasThread"
         data-test="rca-report-open-thread-btn"
-        variant="outline"
-        size="sm"
+        variant="secondary"
         class="shrink-0"
-        icon-left="forum"
+        icon="forum"
         @click="$emit('open-thread')"
       >
         {{ t("alerts.incidents.rcaLight.openThread") }}
@@ -136,10 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="live"
         data-test="rca-cancel-btn"
-        variant="ghost-destructive"
-        size="sm"
+        variant="danger-ghost"
         class="shrink-0"
-        icon-left="stop-circle"
+        icon="stop-circle"
         :loading="cancelling"
         @click="$emit('cancel')"
       >
@@ -149,10 +143,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="!live && canAsk"
         data-test="rca-ask-btn"
-        variant="outline"
-        size="sm"
+        variant="secondary"
         class="shrink-0"
-        icon-left="auto-awesome"
+        icon="auto-awesome"
         @click="$emit('ask')"
       >
         <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaAsk.button") }}</span>
@@ -167,9 +160,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="inline-flex shrink-0">
           <OButton
             data-test="rca-reanalyze-btn"
-            variant="outline"
-            size="sm"
-            :icon-left="startLockedReason ? 'lock' : 'refresh'"
+            variant="secondary"
+            :icon="startLockedReason ? 'lock' : 'refresh'"
             :loading="triggering"
             :disabled="resuming || !!startLockedReason"
             @click="$emit('reanalyze')"
@@ -179,12 +171,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </OTooltip>
 
-      <ODropdown align="end" content-class="w-55">
+      <ODropdown align="end">
         <template #trigger>
           <OButton
+            icon-only
             data-test="rca-more-btn"
-            variant="outline"
-            size="icon-toolbar"
+            variant="secondary"
             class="shrink-0"
             :aria-label="t('alerts.incidents.rcaRun.more')"
           >
@@ -193,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <ODropdownItem
           data-test="rca-copy-btn"
-          icon-left="content-copy"
+          icon="content-copy"
           :disabled="!hasReport"
           @select="$emit('copy-report')"
         >
@@ -201,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdownItem>
         <ODropdownItem
           data-test="rca-download-btn"
-          icon-left="download"
+          icon="download"
           :disabled="!hasReport"
           @select="$emit('download-report')"
         >
@@ -209,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdownItem>
         <ODropdownItem
           data-test="rca-copy-thread-btn"
-          icon-left="forum"
+          icon="forum"
           :disabled="!hasThread"
           @select="$emit('copy-thread')"
         >

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { StatItem, StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { formatSeconds } from "./format";
 import { ADVICE_LABEL, LIMITATION_LABEL, QUALITY_REASON_LABEL } from "./rules";
@@ -342,10 +342,23 @@ export const countOrDash = (count: number | null | undefined, locale: string): I
 export const countTile = (
   count: number | null | undefined,
   locale: string,
-): Pick<StatItem, "value"> =>
-  typeof count === "number" && Math.abs(count) >= 1000
+): Pick<StatItem, "value"> => {
+  if (typeof count !== "number") return { value: null };
+  return Math.abs(count) >= 1000
     ? { value: raw(compactCount(locale).format(count)) }
     : { value: countOrDash(count, locale) };
+};
+
+const COVERAGE_STAT_TONE: Record<"success" | "warning" | "error" | "neutral", StatTone> = {
+  success: "ok",
+  warning: "warn",
+  error: "err",
+  neutral: "neutral",
+};
+
+/** A coverage verdict tone as a stat tile tone. */
+export const coverageStatTone = (tone: keyof typeof COVERAGE_STAT_TONE): StatTone =>
+  COVERAGE_STAT_TONE[tone];
 
 const compactCount = (locale: string) =>
   new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 });

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`autoobserve2-problem-priority-${problem.severity}`"
         />
         <OTag
-          :variant="OUTCOME[problem.outcome].tag"
+          :tone="OUTCOME[problem.outcome].tag"
           size="sm"
           :label="outcomeLabel"
           :data-test="`autoobserve2-problem-outcome-${problem.outcome}`"

@@ -23,7 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex min-h-0 flex-1 items-center justify-center"
       data-test="sessions-empty-no-streams"
     >
-      <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
+      <OEmptyState
+        :title="t('emptyState.noLLMSessions.title')"
+        :text="t('emptyState.noLLMSessions.description')"
+        icon="insights"
+        :action-label="t('emptyState.noLLMSessions.action')"
+        @action="onEmptyAction"
+      />
     </div>
 
     <!-- Scope control — left-aligned Stream/Agent bar directly under the page
@@ -49,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="searchKeyword"
         :placeholder="t('traces.sessionsList.search.placeholder')"
         :title="t('traces.sessionsList.search.title')"
-        clearable
         :debounce="300"
         class="w-full"
         data-test="sessions-list-search"
@@ -57,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Exact user from a `?user=` link (Users page "Sessions"). -->
       <OTag
         v-if="searchUser"
-        variant="primary-soft"
+        tone="accent"
         :label="t('traces.sessionsList.search.user', { user: searchUser })"
         removable
         :remove-label="t('traces.sessionsList.search.clearUser')"
@@ -118,7 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="tableColumns"
       :loading="loading"
       row-key="sessionId"
-      show-index
       pagination="server"
       sorting="server"
       :sort-by="sortBy"
@@ -133,9 +137,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :persist-columns="true"
       table-id="ai-sessions-list"
       :default-columns="false"
-      :show-global-filter="false"
-      :frame="false"
-      width="100%"
       class="h-full w-full"
       data-test="sessions-list-table"
       @row-click="(row: any) => handleRowClick(row)"
@@ -147,15 +148,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <OEmptyState
           v-if="error && hasLoadedOnce"
-          size="hero"
-          illustration="broken-panel"
-          variant="error"
+          kind="error"
           data-test="sessions-empty-error"
           :title="t('traces.sessionsList.failedToLoad')"
-          :description="raw(error || '')"
-          :action-label="t('traces.sessionsList.retry')"
-          action-id="retry"
-          action-icon="refresh"
+          :text="raw(error || '')"
           @action="loadSessions()"
         />
         <!-- Agent mode whose agents list failed to load: not "no agents". -->
@@ -167,13 +163,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OEmptyState
           v-else-if="agentEmpty"
-          size="hero"
-          illustration="constellation"
           data-test="sessions-empty-no-agents"
+          icon="insights"
           :title="t('traces.sessionsList.noAgentsTitle')"
-          :description="t('traces.sessionsList.noAgentsDescription')"
+          :text="t('traces.sessionsList.noAgentsDescription')"
           :action-label="t('traces.sessionsList.viewByStream')"
-          action-id="view-by-stream"
           @action="onFilterModeChange('stream')"
         />
         <!-- A search that matched nothing is NOT a first-run situation — the
@@ -181,17 +175,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              "instrument your app" screen here; offer to clear the search. -->
         <OEmptyState
           v-else-if="searchActive"
-          size="hero"
-          illustration="no-results"
           data-test="sessions-empty-search"
+          icon="search-off"
           :title="t('traces.sessionsList.search.noResultsTitle')"
-          :description="t('traces.sessionsList.search.noResultsDescription')"
+          :text="t('traces.sessionsList.search.noResultsDescription')"
           :action-label="t('traces.sessionsList.search.clear')"
-          action-id="clear-search"
           @action="clearSearch"
         />
         <div v-else class="flex items-center justify-center py-12" data-test="sessions-empty">
-          <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
+          <OEmptyState
+            :title="t('emptyState.noLLMSessions.title')"
+            :text="t('emptyState.noLLMSessions.description')"
+            icon="insights"
+            :action-label="t('emptyState.noLLMSessions.action')"
+            @action="onEmptyAction"
+          />
         </div>
       </template>
       <!-- Last activity -->
@@ -586,8 +584,7 @@ const agentFilterClause = computed(() =>
 // `instrument` is the only action id the preset emits. Send the user to
 // the in-app AI integrations page (the closest "set this up" surface) so
 // they don't have to leave the product to find the OpenTelemetry guide.
-function onEmptyAction(id?: string) {
-  if (id !== "instrument") return;
+function onEmptyAction() {
   router.push({
     name: "ai-integrations",
     query: {

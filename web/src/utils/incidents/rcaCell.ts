@@ -17,19 +17,18 @@
 
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import type { Incident, RcaBand, RcaOutcome, RcaRunState, RcaSummary } from "@/services/incidents";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { timezoneAbbr } from "@/utils/formatters";
 
 export type RcaCellTone = "muted" | "warn" | "warn-strong" | "ok" | "err";
 
-// Strong warning uses the orange family of the list's P2 row rail.
-export const RCA_BADGE_VARIANT: Record<RcaCellTone, BadgeVariant> = {
-  muted: "default",
-  warn: "warning",
-  "warn-strong": "orange-outline",
-  ok: "success",
-  err: "error",
+export const RCA_BADGE_VARIANT: Record<RcaCellTone, ChipTone> = {
+  muted: "neutral",
+  warn: "warn",
+  "warn-strong": "warn",
+  ok: "ok",
+  err: "err",
 };
 
 export interface RcaCellModel {

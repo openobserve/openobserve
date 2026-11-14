@@ -38,8 +38,15 @@ const REMOVED_PROPS = new Set([
   "footerTitle",
   "custom-pagination-bar",
   "customPaginationBar",
+  "show-index",
+  "showIndex",
+  "show-global-filter",
+  "showGlobalFilter",
+  "row-height",
+  "rowHeight",
+  "dense",
+  "frame",
 ]);
-const BAR_SLOTS = new Set(["selection-actions", "footer-note"]);
 
 const propName = (prop: TemplateProp): string | undefined => {
   if (prop.type === ATTRIBUTE) return prop.name;
@@ -90,14 +97,15 @@ const leftoversIn = (file: string, table: TemplateNode): string[] => [
     .map((slot) => `${file}:${slot.line} #bottom`),
 ];
 
+// Without a pager the built-in bar still appears as the selection bar, so only the note is inert there.
 const inertSlotsIn = (file: string, table: TemplateNode): string[] => {
   const slots = slotsOf(table);
-  const noBar =
-    (table.props ?? []).some(isPaginationNone) ||
-    slots.some((slot) => slot.name === "pagination-bar");
-  if (!noBar) return [];
+  const ownBar = slots.some((slot) => slot.name === "pagination-bar");
+  const unpaged = (table.props ?? []).some(isPaginationNone);
+  if (!ownBar && !unpaged) return [];
+  const inert = ownBar ? ["selection-actions", "footer-note"] : ["footer-note"];
   return slots
-    .filter((slot) => BAR_SLOTS.has(slot.name))
+    .filter((slot) => inert.includes(slot.name))
     .map((slot) => `${file}:${slot.line} #${slot.name}`);
 };
 
@@ -137,7 +145,6 @@ describe("OTable call sites", () => {
     ]);
     expect(found.flatMap((table) => inertSlotsIn("fixture.vue", table))).toEqual([
       "fixture.vue:3 #footer-note",
-      "fixture.vue:4 #selection-actions",
       "fixture.vue:6 #footer-note",
     ]);
   });

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OBanner variant="warning" icon="warning" dense data-test="logs-missing-stream-banner">
+  <OInlineNotice tone="warn" data-test="logs-missing-stream-banner">
     <div
       class="flex flex-wrap items-center gap-2"
       :data-test="noFtsStreams.length ? 'logs-no-fts-mixed-banner' : undefined"
@@ -38,26 +38,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex w-full flex-col gap-2">
         <div class="flex flex-wrap items-center gap-2">
           <OButton
-            variant="outline"
-            size="chip"
+            variant="secondary"
+            size="xs"
             data-test="logs-no-fts-search-fields-btn"
             @click="openFieldSearch"
             >{{ t("search.noFtsRecovery.searchField") }}</OButton
           >
           <OButton
-            variant="outline"
-            size="chip"
+            variant="secondary"
+            size="xs"
             data-test="logs-no-fts-clear-run-btn"
             @click="emit('clear-run')"
             >{{ t("search.noFtsRecovery.clearRun") }}</OButton
           >
           <OButton
-            variant="outline"
-            size="chip"
+            variant="secondary"
+            size="xs"
             data-test="logs-no-fts-configure-btn"
             :disabled="!canConfigure"
-            focusable-unavailable
-            :description-id="permissionId"
+            :disabled-reason="t('search.noFtsRecovery.editPermission')"
             @click="openSettings"
             >{{ t("search.freeTextSetField") }}</OButton
           >
@@ -75,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
@@ -83,7 +82,7 @@ import type { I18nText } from "@/types/i18n";
 import { toRef, useId } from "vue";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import LogsNoFtsFieldSearch from "./LogsNoFtsFieldSearch.vue";
 import { useNoFtsRecovery } from "./useNoFtsRecovery";

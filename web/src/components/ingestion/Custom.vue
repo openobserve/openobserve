@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #tabs>
       <!-- The rail only navigates, so a license-locked guide still lets the reader move to a free one. -->
       <FeatureLockExempt class="contents">
-        <ORouteTab
+        <OTab
           name="ingestLogs"
           data-test="ingestion-custom-tab-ingestLogs"
           :to="{
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :label="t('ingestion.logsLabel')"
         />
-        <ORouteTab
+        <OTab
           name="ingestMetrics"
           data-test="ingestion-custom-tab-ingestMetrics"
           :to="{
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :label="t('ingestion.metricsLabel')"
         />
-        <ORouteTab
+        <OTab
           v-if="store.state.zoConfig?.profiling_enabled"
           name="ingestProfiles"
           data-test="ingestion-custom-tab-ingestProfiles"
@@ -53,9 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             },
           }"
           :label="t('ingestion.profilesLabel')"
-          :suffix-icon="profilesLocked ? 'lock' : undefined"
+          :locked="profilesLocked"
         />
-        <ORouteTab
+        <OTab
           name="ingestTraces"
           data-test="ingestion-custom-tab-ingestTraces"
           :to="{
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
@@ -97,7 +97,7 @@ import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 
 export default defineComponent({
   name: "CustomPage",
-  components: { ORouteTab, DataSourceSidebarLayout, FeatureLockExempt },
+  components: { OTab, DataSourceSidebarLayout, FeatureLockExempt },
   props: {
     currOrgIdentifier: {
       type: String,

@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <template v-if="isMetaOrg">
     <OTable
-      :frame="false"
       data-test="running-queries-table"
       :data="rows"
       :columns="columns"
@@ -31,13 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
-      show-index
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="settings-query-management"
-      :show-global-filter="false"
       :row-actions="rowActions"
-      row-actions-more-data-test="running-queries-row-more-actions"
+      :row-menu="rowMenu"
+      row-menu-data-test="running-queries-row-more-actions"
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #toolbar>
@@ -53,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="visual in searchTypes"
               :key="visual as string"
               :value="visual as string"
-              size="sm"
             >
               {{ getSearchTypeLabel(visual as string) }}
             </OToggleGroupItem>
@@ -62,8 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #toolbar-trailing>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="lastRefreshedAt"
           data-test="running-queries-refresh-btn"
           @click="$emit('refresh')"
@@ -71,11 +66,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #empty>
         <OEmptyState
-          size="hero"
-          preset="no-queries"
-          :filtered="filtered"
-          :hide-action="!filtered"
-          @action="(id) => id === 'clear-filters' && $emit('clear:filters')"
+          :kind="filtered ? 'filtered' : 'first-run'"
+          :title="
+            filtered
+              ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.queries') })
+              : t('emptyState.noQueries.title')
+          "
+          :text="
+            filtered
+              ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.queries') })
+              : t('emptyState.noQueries.description')
+          "
+          :icon="filtered ? undefined : 'query-stats'"
+          @action="$emit('clear:filters')"
         />
       </template>
       <template #cell-user_id="{ row }">
@@ -94,15 +97,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #selection-actions>
         <OButton
           data-test="qm-multiple-cancel-query-btn"
-          variant="outline-destructive"
-          size="sm"
+          variant="danger-ghost"
           @click="handleMultiQueryCancel"
         >
           {{ t("queries.cancelQuery") }}
         </OButton>
       </template>
     </OTable>
-    <ODrawer bleed v-model:open="showListSchemaDialog" size="lg" data-test="list-schema-dialog">
+    <ODrawer bleed v-model:open="showListSchemaDialog" size="md" data-test="list-schema-dialog">
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
     </ODrawer>
   </template>
@@ -124,7 +126,11 @@ import { getDuration, durationFormatter } from "@/utils/zincutils";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { ForbiddenState } from "@/utils/featureGate";
 
@@ -298,13 +304,6 @@ export default defineComponent({
         minSize: 118,
         meta: { align: "left", flex: true },
       },
-      {
-        id: "actions",
-        header: t("common.actions"),
-        isAction: true,
-        pinned: "right",
-        size: 100,
-      },
     ];
 
     const rowActions: OTableRowAction[] = [
@@ -312,16 +311,18 @@ export default defineComponent({
         id: "query-list",
         label: t("queries.queryList"),
         icon: "format-list-bulleted",
-        onSelect: (row) => listSchema(row),
-        dataTest: () => "queryList-btn",
+        onClick: (row) => listSchema(row),
+        dataTest: "queryList-btn",
       },
+    ];
+    const rowMenu: OTableRowMenuItem[] = [
       {
         id: "cancel",
         label: t("queries.cancelQuery"),
         icon: "close",
-        tone: "destructive",
+        destructive: true,
         onSelect: (row) => confirmDeleteAction(row),
-        dataTest: () => "cancelQuery-btn",
+        dataTest: "cancelQuery-btn",
       },
     ];
 
@@ -354,6 +355,7 @@ export default defineComponent({
       store,
       columns,
       rowActions,
+      rowMenu,
       confirmDeleteAction,
       listSchema,
       showListSchemaDialog,

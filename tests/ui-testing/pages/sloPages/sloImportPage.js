@@ -43,7 +43,11 @@ export class SloImportPage {
       await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 2000 });
     }).toPass({ timeout: 20000 });
     // The option list is virtualized, so narrow it before looking for the row.
-    await this.page.locator(this.locators.folderSearch).fill(folderName);
+    // OSelect renders that search box only past eight options; a short list shows every row.
+    await this.page.locator('[data-test="alerts-index-dropdown-stream_type-popover"] [data-test-value]').first()
+      .waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const folderSearch = this.page.locator(this.locators.folderSearch);
+    if (await folderSearch.count()) await folderSearch.fill(folderName);
     await this.page.locator(this.folderOption(folderId)).click();
     await this.expectFolderSelected(folderId);
   }

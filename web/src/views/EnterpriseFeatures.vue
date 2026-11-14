@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('enterpriseFeature.featuresPageTitle')"
-    icon="workspace-premium"
     data-test="enterprise-features-page"
   >
     <div class="flex flex-col gap-8 pt-6 pb-4">
@@ -44,29 +43,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OButton
             v-if="dialogConfig.showPrimaryButton"
-            variant="on-dark-primary"
-            size="cta"
+            variant="secondary"
+            size="lg"
             data-test="enterprise-features-primary-btn"
             class="text-theme-accent! bg-white!"
             @click="trackCta('primary', handlePrimaryButtonClick)"
           >
             {{ dialogConfig.primaryButtonText }}
-            <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
+            <template v-if="dialogConfig.primaryButtonIcon" #icon-end>
               <OIcon :name="dialogConfig.primaryButtonIcon" size="sm" />
             </template>
           </OButton>
           <OButton
             v-if="dialogConfig.showContactSales"
-            variant="on-dark-ghost"
-            size="cta"
+            variant="secondary"
+            size="lg"
             @click="trackCta('contact_sales', contactSales)"
           >
             {{ t("about.enterprise_offer.buttons.contact_sales") }}
           </OButton>
           <OButton
             v-else
-            variant="on-dark-ghost"
-            size="cta"
+            variant="secondary"
+            size="lg"
             @click="trackCta('learn_more', openDocsLink)"
           >
             {{ t("about.enterprise_offer.buttons.learn_more") }}
@@ -128,8 +127,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag type="featureFlag" value="ha" />
                   <OTooltip
                     side="top"
-                    align="center"
-                    :sideOffset="8"
                     :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')"
                   />
                 </span>

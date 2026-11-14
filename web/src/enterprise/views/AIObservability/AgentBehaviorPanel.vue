@@ -18,7 +18,7 @@
   <div class="flex flex-col gap-2.5" data-test="agent-behavior-panel">
     <!-- Summary strip: behaviour signals at a glance (loops, failures, agents). -->
     <div class="shrink-0" data-test="agent-behavior-summary">
-      <OStatStrip :items="behaviorStats" :loading="tableLoading" inline />
+      <OStatStrip :items="behaviorStats" :loading="tableLoading" />
     </div>
     <div
       class="bg-card-glass-bg rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
@@ -33,9 +33,8 @@
         <!-- The ai-agents alert pack, in one screen. -->
         <template #actions>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="notifications-active"
+            variant="secondary"
+            icon="notifications-active"
             data-test="agent-behavior-install-ai-alerts"
             @click="packOpen = true"
           >
@@ -49,11 +48,8 @@
         :columns="loopColumns"
         :loading="tableLoading"
         :default-columns="false"
-        :frame="false"
-        :show-global-filter="false"
         :row-class="loopRowClass"
         class="min-h-0 flex-1"
-        show-index
         pagination="client"
         row-key="id"
         expansion="multiple"
@@ -67,9 +63,7 @@
             :data="row.variants"
             :columns="variantColumns"
             :default-columns="false"
-            :frame="false"
             :fill-height="false"
-            :show-global-filter="false"
             :row-class="loopRowClass"
             row-key="id"
             pagination="none"
@@ -108,11 +102,8 @@
         :columns="failureColumns"
         :loading="tableLoading"
         :default-columns="false"
-        :frame="false"
-        :show-global-filter="false"
         :row-class="failureRowClass"
         class="min-h-0 flex-1"
-        show-index
         pagination="client"
         row-key="id"
         expansion="multiple"
@@ -126,9 +117,7 @@
             :data="row.variants"
             :columns="failureVariantColumns"
             :default-columns="false"
-            :frame="false"
             :fill-height="false"
-            :show-global-filter="false"
             :row-class="failureRowClass"
             row-key="id"
             pagination="none"
@@ -137,7 +126,7 @@
           />
         </template>
         <template #cell-failClass="{ row }">
-          <OTag variant="warning-soft" size="sm">{{ row.failClass }}</OTag>
+          <OTag tone="warn" size="sm">{{ row.failClass }}</OTag>
         </template>
       </OTable>
     </div>
@@ -274,21 +263,20 @@ const failureRows = computed<FailureRow[]>(() =>
   buildFailureRows(scopedSignals.value, t("aiObservability.behavior.unknownAgent")),
 );
 
-// Summary strip — at-a-glance behaviour signals. Loops draw attention (warning),
-// failures are the exception (error), agents-affected is the scope (primary).
+// Summary strip: loops draw attention, failures are the exception, agents affected is the scope.
 const behaviorStats = computed<StatItem[]>(() => {
   const loops = loopRows.value;
   const failures = failureRows.value;
   const totalFailures = failures.reduce((sum, f) => sum + (f.count || 0), 0);
   const has = loops.length + failures.length > 0;
-  const v = (n: number): string | number => (has ? n : "—");
+  const v = (n: number): number | null => (has ? n : null);
   return [
     {
       key: "loops",
       label: t("aiObservability.behavior.summaryLoops"),
       value: v(countAgents(loops)),
       icon: "restart-alt",
-      tone: "warning",
+      tone: "warn",
       dataTest: "agent-behavior-summary-loops",
     },
     {
@@ -296,7 +284,7 @@ const behaviorStats = computed<StatItem[]>(() => {
       label: t("aiObservability.behavior.summaryFailures"),
       value: v(totalFailures),
       icon: "error-outline",
-      tone: "error",
+      tone: "err",
       dataTest: "agent-behavior-summary-failures",
     },
     {
@@ -304,7 +292,6 @@ const behaviorStats = computed<StatItem[]>(() => {
       label: t("aiObservability.behavior.summaryAgents"),
       value: v(countAgents([...loops, ...failures])),
       icon: "smart-toy",
-      tone: "primary",
       dataTest: "agent-behavior-summary-agents",
     },
   ];

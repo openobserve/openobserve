@@ -50,10 +50,10 @@ const rawRows = computed<KeyValueRow[]>(() =>
 </script>
 
 <template>
-  <OCollapsible :data-test="dataTest ?? 'security-evidence-event'" trigger-class="!px-3 !py-2">
+  <OCollapsible :data-test="dataTest ?? 'security-evidence-event'">
     <template #trigger>
       <div class="flex min-w-0 flex-1 items-start gap-3 text-start">
-        <OTag variant="primary-soft" size="xs" class="shrink-0">{{
+        <OTag tone="accent" size="sm" class="shrink-0">{{
           event.className || t("siem.drawer.eyebrow")
         }}</OTag>
         <div class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -75,7 +75,7 @@ const rawRows = computed<KeyValueRow[]>(() =>
         </div>
       </div>
     </template>
-    <div class="px-3 pb-2" data-test="security-evidence-event-raw">
+    <div class="pe-2 pb-2" data-test="security-evidence-event-raw">
       <SecurityKeyValues :rows="rawRows" data-test="security-evidence-event-raw-fields" />
     </div>
   </OCollapsible>

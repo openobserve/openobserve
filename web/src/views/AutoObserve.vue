@@ -18,10 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="autoobserve-page" class="flex h-full flex-col">
     <OPageLayout
       bleed
-      tabs-below
       :title="t('autoobserve.title')"
-      icon="navigation"
-      :subtitle="t('autoobserve.subtitle')"
+      :about="t('autoobserve.subtitle')"
       title-data-test="autoobserve-title"
     >
       <template #actions>
@@ -31,14 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #header-tabs>
-        <OTabs v-model="tab" align="left" data-test="autoobserve-tabs">
+        <OTabs v-model="tab" data-test="autoobserve-tabs">
           <OTab name="issues" data-test="autoobserve-tab-issues">
             <OIcon name="notifications-active" size="sm" />
             <span>{{ t("autoobserve.tabs.issues") }}</span>
             <OTag
               v-if="badge"
-              variant="error-soft"
-              size="xs"
+              tone="err"
+              size="sm"
               :label="badge"
               data-test="autoobserve-tab-issues-badge"
             />
@@ -52,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ t("autoobserve.tabs.activity") }}</span>
             <OTag
               v-if="approvals"
-              variant="warning-soft"
-              size="xs"
+              tone="warn"
+              size="sm"
               :label="raw(String(approvals))"
               data-test="autoobserve-tab-activity-badge"
             />

@@ -371,7 +371,7 @@ describe("AgentBehaviorPanel", () => {
     first.resolve({ data: { signals: [loop("research-agent")] } });
     await flushPromises();
 
-    expect(wrapper.find('[data-test="strip"]').text()).toBe("—,—,—");
+    expect(wrapper.find('[data-test="strip"]').text()).toBe("null,null,null");
     expect(wrapper.vm.loading).toBe(false);
   });
 });

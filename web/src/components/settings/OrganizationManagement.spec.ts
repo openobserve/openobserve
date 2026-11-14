@@ -127,24 +127,24 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       class="o-dialog-stub"
@@ -152,9 +152,9 @@ const ODialogStub = {
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-sub-title="subTitle"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-sub-title="subtitle"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
       v-if="open"
     >
       <slot name="header" />
@@ -163,11 +163,11 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -901,7 +901,7 @@ describe("OrganizationManagement.vue", () => {
         const btn = wrapper
           .findAllComponents({ name: "OButton" })
           .find((b) => b.attributes("data-test") === "org-management-storage-enable-btn")!;
-        expect(btn.props("iconLeft")).toBe(icon);
+        expect(btn.props("icon")).toBe(icon);
         expect(Boolean(btn.props("disabled"))).toBe(disabled);
         store.state.zoConfig.features = {};
       },
@@ -1608,7 +1608,7 @@ describe("OrganizationManagement.vue", () => {
         title: "Revoke External Contract",
         messageKeypath: "settings.organizationManagementPage.revokeConfirmMessage",
         messageName: "TestOrg",
-        confirmVariant: "destructive",
+        kind: "destructive",
       });
     });
 

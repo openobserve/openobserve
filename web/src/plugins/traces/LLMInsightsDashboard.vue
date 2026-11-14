@@ -86,10 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="inline-flex">
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               disabled
-              icon-left="lock"
+              icon="lock"
               data-test="llm-insights-compare-license-locked"
             >
               {{ t("traces.lLMInsightsDashboard.compareEntry") }}
@@ -101,9 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :content="t('traces.lLMInsightsDashboard.compareEntryHint')"
         >
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="compare-arrows"
+            variant="secondary"
+            icon="compare-arrows"
             data-test="llm-insights-compare-entry"
             @click="enterCompareMode()"
           >
@@ -116,13 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              toggle above. -->
         <template v-else-if="!genAiAgentMappingAccess.allowed && !compareMode">
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="compare-arrows"
+            variant="secondary"
+            icon="compare-arrows"
             data-test="llm-insights-compare-locked"
             @click="openUpgradeDialog"
           >
-            <template #icon-right><OIcon name="lock" size="sm" class="lock-chip" /></template>
+            <template #icon-end><OIcon name="lock" size="sm" class="lock-chip" /></template>
             {{ t("traces.lLMInsightsDashboard.compareEntry") }}
           </OButton>
         </template>
@@ -130,9 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              two toggle in place — the user leaves compare where they entered it. -->
         <OButton
           v-else-if="compareMode"
-          variant="outline"
-          size="sm"
-          icon-left="close"
+          variant="secondary"
+          icon="close"
           data-test="llm-insights-compare-exit"
           @click="exitCompareMode"
         >
@@ -141,8 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- A setup action, not a scope control, so it sits at the bar's far end. -->
         <OButton
           v-if="!compareMode"
-          variant="outline"
-          size="icon-md"
+          icon-only
+          variant="secondary"
           class="ms-auto"
           :aria-label="t('aiAlertPack.open')"
           data-test="llm-insights-install-ai-alerts"
@@ -201,15 +197,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- A failed request, even a filter on first load, is a different signal from "no data yet". -->
       <OEmptyState
         v-else-if="error && (hasLoadedOnce || hasActiveFilters)"
-        size="hero"
-        illustration="broken-panel"
-        variant="error"
+        kind="error"
         data-test="llm-insights-empty-error"
         :title="t('traces.lLMInsightsDashboard.failedToLoad')"
-        :description="raw(error || '')"
-        :action-label="t('traces.lLMInsightsDashboard.retry')"
-        action-id="retry"
-        action-icon="refresh"
+        :text="raw(error || '')"
         @action="loadInsights()"
       />
 
@@ -238,10 +229,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="llm-insights-empty"
       >
         <OEmptyState
-          size="hero"
-          preset="no-llm-insights"
-          :actions="emptyStateActions"
-          @action="onEmptyAction"
+          :title="t('emptyState.noLLMInsights.title')"
+          :text="t('emptyState.noLLMInsights.description')"
+          icon="insights"
+          :action-label="emptyStateActions[0].label"
+          :secondary-action-label="emptyStateActions[1].label"
+          @action="onEmptyAction(emptyStateActions[0].id)"
+          @secondary-action="onEmptyAction(emptyStateActions[1].id)"
         >
           <template #extra>
             <div
@@ -280,12 +274,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="llm-insights-agent-empty"
       >
         <OEmptyState
-          size="hero"
-          illustration="constellation"
+          icon="insights"
           :title="t('traces.lLMInsightsDashboard.noAgentsInRange')"
-          :description="t('traces.lLMInsightsDashboard.noAgentsDescription')"
+          :text="t('traces.lLMInsightsDashboard.noAgentsDescription')"
           :action-label="t('traces.lLMInsightsDashboard.viewByStream')"
-          action-id="view-by-stream"
           @action="onFilterModeChange('stream')"
         />
       </div>
@@ -335,10 +327,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                showing a chart before the number reads as ready, so we hold both. -->
             <template v-if="card.loading">
               <div class="mb-1 flex items-center justify-between gap-2">
-                <OSkeleton type="text" class="h-3 w-[60%]" />
-                <OSkeleton type="text" class="h-6 w-6 shrink-0" />
+                <OSkeleton class="h-3 w-[60%]" />
+                <OSkeleton class="h-6 w-6 shrink-0" />
               </div>
-              <OSkeleton type="text" class="h-6 w-[55%]" />
+              <OSkeleton class="h-6 w-[55%]" />
             </template>
             <template v-else>
               <!-- The label stays visible at every width; a compact tile
@@ -532,7 +524,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
-import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
 import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
 import { readPrefill } from "@/components/login/firstSourceOptions";
@@ -1296,32 +1287,25 @@ const suggestedIntegration = referredAiIntegration([readPrefill()?.referrer, doc
 const popularIntegrations = POPULAR_AI_INTEGRATION_ROUTES.map(aiIntegrationByRoute).filter(
   (i): i is NonNullable<typeof i> => !!i && i.routeName !== suggestedIntegration?.routeName,
 );
-const emptyStateActions: EmptyStateAction[] = [
+// Only the first two render as buttons; the chip row below reaches the popular guides.
+const emptyStateActions = computed<{ id: string; label: I18nText }[]>(() => [
   ...(suggestedIntegration
     ? [
         {
           id: `suggested-${suggestedIntegration.slug}`,
-          icon: "auto-awesome",
-          titleKey: "emptyState.noLLMInsights.suggested",
-          titleParams: { name: suggestedIntegration.name },
-          descriptionKey: "emptyState.noLLMInsights.suggestedDesc",
-          descriptionParams: { name: suggestedIntegration.name },
-        } satisfies EmptyStateAction,
+          label: t("emptyState.noLLMInsights.suggested", { name: suggestedIntegration.name }),
+        },
       ]
     : []),
   {
     id: "instrument-with-coding-agent",
-    icon: "smart-toy",
-    titleKey: "emptyState.noLLMInsights.codingAgent",
-    descriptionKey: "emptyState.noLLMInsights.codingAgentDesc",
+    label: t("emptyState.noLLMInsights.codingAgent"),
   },
   {
     id: "all-integrations",
-    icon: "widgets",
-    titleKey: "emptyState.noLLMInsights.action",
-    descriptionKey: "emptyState.noLLMInsights.actionDesc",
+    label: t("emptyState.noLLMInsights.action"),
   },
-];
+]);
 
 // Every empty-state action opens an in-app integration page. A guide's own
 // route (not `ai-integrations`, whose default child redirect lands on the

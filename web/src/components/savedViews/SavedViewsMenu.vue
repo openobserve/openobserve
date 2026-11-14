@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -112,7 +111,6 @@ onMounted(() => nextTick(focusSearch));
     <div class="px-1 pt-0.5 pb-0.5" @keydown="onSearchKeydown">
       <OSearchInput
         v-model="search"
-        size="sm"
         class="w-full"
         :placeholder="
           props.loading
@@ -127,7 +125,7 @@ onMounted(() => nextTick(focusSearch));
       class="text-text-secondary flex items-center gap-2 px-3 py-1.5 text-sm"
       :data-test="`${props.dataTestPrefix}-loading`"
     >
-      <OSpinner size="xs" />
+      <OSpinner />
       {{ t("confirmDialog.loading") }}
     </div>
     <div
@@ -184,15 +182,15 @@ onMounted(() => nextTick(focusSearch));
     </div>
     <ODropdownSeparator class="my-0.5!" />
     <ODropdownItem
+      icon="add"
       class="py-1!"
       :data-test="props.createTestId ?? `${props.dataTestPrefix}-create`"
       :disabled="!!props.saveReason"
-      focusable-unavailable
-      :description="props.saveReason || props.saveNote"
-      :shortcut-id="props.createShortcutId"
+      :disabled-reason="props.saveReason"
+      :description="props.saveNote"
+      :shortcut="props.createShortcutId"
       @select="emit('create')"
     >
-      <template #icon-left><OIcon name="add" size="sm" /></template>
       {{ t("search.createSavedView") }}
     </ODropdownItem>
   </div>

@@ -75,9 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @create="addTag"
         />
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="close"
+          icon="close"
           :aria-label="t('alerts.downtimes.form.removeBlock')"
           :data-test="`downtime-target-${module}-tags-remove`"
           @click="closeBlock('tags')"
@@ -100,13 +100,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="itemsQuery.isPending.value"
           multiple
           searchable
-          option-tooltip
           :data-test="`downtime-target-${module}-ids`"
         />
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="close"
+          icon="close"
           :aria-label="t('alerts.downtimes.form.removeBlock')"
           :data-test="`downtime-target-${module}-ids-remove`"
           @click="closeBlock('ids')"
@@ -122,8 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="module === 'synthetics' && !tagsOpen"
         variant="ghost"
-        size="sm"
-        icon-left="add"
+        icon="add"
         :data-test="`downtime-target-${module}-add-tags`"
         @click="openBlock('tags')"
       >
@@ -132,8 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="!idsOpen"
         variant="ghost"
-        size="sm"
-        icon-left="add"
+        icon="add"
         :data-test="`downtime-target-${module}-add-items`"
         @click="openBlock('ids')"
       >
@@ -158,7 +155,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="option in INCIDENT_MODE_OPTIONS"
           :key="option.value"
           :value="option.value"
-          size="sm"
           :data-test="`downtime-target-alerts-incident-mode-${option.value}`"
         >
           <template #label>
@@ -178,14 +174,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label-position="top"
         data-test="downtime-target-slos-mode"
       >
-        <OToggleGroupItem value="exclude" size="sm" data-test="downtime-target-slos-mode-exclude">
+        <OToggleGroupItem value="exclude" data-test="downtime-target-slos-mode-exclude">
           {{ t("alerts.downtimes.form.sloExclude") }}
         </OToggleGroupItem>
-        <OToggleGroupItem
-          value="count_as_good"
-          size="sm"
-          data-test="downtime-target-slos-mode-good"
-        >
+        <OToggleGroupItem value="count_as_good" data-test="downtime-target-slos-mode-good">
           {{ t("alerts.downtimes.form.sloCountAsGood") }}
         </OToggleGroupItem>
       </OFormToggleGroup>

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('pipeline.query')"
-    :width="isFullscreenMode ? 100 : 97"
+    size="xl"
     :show-close="true"
     bleed
     @keydown.stop
@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <OButton
         v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+        icon-only
         variant="ghost"
-        size="icon-toolbar"
         @click="scheduledPipelineRef?.toggleAIChat()"
         data-test="menu-link-ai-item"
         :aria-label="t('menu.aiAssistant')"
@@ -51,8 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:active-tab="scheduledPipelineRef?.updateTab()"
         />
       </div>
-      <DateTime
-        class="h-8.5"
+      <ODateTimeRange
         menu-align="end"
         @on:date-change="(d) => scheduledPipelineRef?.updateDateChange(d)"
       />
@@ -60,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-bar-refresh-btn"
         data-cy="search-bar-refresh-button"
         variant="primary"
-        size="sm-action"
         :disabled="!scheduledPipelineRef?.selectedStreamName"
         @click="onRunQuery"
       >
@@ -72,15 +70,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </OButton>
       <OButton
+        icon-only
         :aria-label="
           scheduledPipelineRef?.isFullscreen ? t('common.exitFullscreen') : t('common.fullscreen')
         "
         data-test="add-function-fullscreen-btn"
         variant="ghost"
-        size="icon-xs-sq"
+        size="sm"
         @click="scheduledPipelineRef?.handleFullScreen()"
       >
-        <template #icon-left>
+        <template #icon>
           <OIcon
             name="open-in-full"
             size="sm"
@@ -146,7 +145,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import config from "@/aws-exports";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";

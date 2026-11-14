@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- AI Icon Button -->
     <OButton
       v-if="showAiIcon && !disableAi"
-      variant="sidebar-toggle"
-      size="icon-toolbar"
+      icon-only
+      variant="secondary"
       class="bg-card-glass-bg border-card-glass-border hover:bg-button-outline-hover-bg hover:border-accent absolute! top-2 right-2 z-10 border transition-all duration-200"
       :class="nlpMode ? 'bg-surface-accent-active border-accent' : ''"
       @click="toggleNlpMode"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="" size="md">
         <img :src="aiIcon" :alt="t('search.aiIconAlt')" class="h-4.5 w-4.5" />
       </OIcon>
-      <OTooltip side="top" align="center">
+      <OTooltip side="top">
         <template #content>{{
           disableAiReason || t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
         }}</template>

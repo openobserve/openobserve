@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroupItem
               data-test="traces-search-mode-spans-btn"
               value="spans"
-              size="sm"
               :tooltip="toolbarToggleIconOnly ? t('traces.spansTab') : undefined"
             >
               <template #icon-left><OIcon name="layers" size="sm" class="shrink-0" /></template>
@@ -44,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroupItem
               data-test="traces-search-mode-traces-btn"
               value="traces"
-              size="sm"
               :tooltip="toolbarToggleIconOnly ? t('traces.tracesTab') : undefined"
             >
               <template #icon-left
@@ -56,7 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="serviceGraphAccess.visible"
               data-test="traces-service-graph-toggle"
               value="service-graph"
-              size="sm"
               :icon-right="!serviceGraphAccess.allowed ? 'lock' : undefined"
               :tooltip="
                 serviceGraphAccess.allowed && toolbarToggleIconOnly
@@ -70,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroupItem
               data-test="traces-search-mode-services-catalog-btn"
               value="services-catalog"
-              size="sm"
               :tooltip="toolbarToggleIconOnly ? t('traces.servicesCatalog.tabLabel') : undefined"
             >
               <template #icon-left><OIcon name="menu-book" size="sm" class="shrink-0" /></template>
@@ -81,17 +77,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="showDrillDown"
             data-test="insights-button"
-            variant="outline"
-            size="xs"
+            variant="secondary"
+            size="sm"
             :disabled="searchObj.loading"
-            focusable-unavailable
+            :disabled-reason="t('common.loading')"
             @click="$emit('drill-down')"
           >
-            <template #icon-left>
+            <template #icon>
               <OIcon name="timeline" size="sm" class="shrink-0" />
             </template>
             <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
-            <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
+            <OTooltip
+              v-if="!searchObj.loading"
+              :content="t('volumeInsights.analyzeTooltipTraces')"
+            />
           </OButton>
           <span
             v-else-if="drillDownSlot"
@@ -100,8 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             inert
             data-test="insights-button-placeholder"
           >
-            <OButton variant="outline" size="xs" tabindex="-1">
-              <template #icon-left>
+            <OButton variant="secondary" size="sm" tabindex="-1">
+              <template #icon>
                 <OIcon name="timeline" size="sm" class="shrink-0" />
               </template>
               <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
@@ -118,11 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="!toolbarMoveResetToMenu"
               data-test="traces-search-bar-reset-filters-btn"
-              variant="outline"
-              size="sm-toolbar"
+              variant="secondary"
               @click="resetFilters"
             >
-              <template #icon-left>
+              <template #icon>
                 <OIcon name="restart-alt" size="sm" class="shrink-0" />
               </template>
               <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
@@ -132,11 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="showPinnedMetrics"
             data-test="traces-search-bar-metrics-pinned-btn"
-            size="sm-toolbar"
-            variant="outline"
+            variant="secondary"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
-            <OSwitch v-model="searchObj.meta.showHistogram" size="md" @click.stop />
+            <OSwitch v-model="searchObj.meta.showHistogram" @click.stop />
             <OIcon name="bar-chart" size="sm" class="shrink-0" />
             <OTooltip :content="t('traces.redMetrics')" />
           </OButton>
@@ -144,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButtonGroup
             v-if="showPinnedSavedViews"
             data-test="traces-search-bar-saved-views"
-            class="border-button-outline-border h-8.5 shrink-0 border p-0"
+            class="shrink-0"
           >
             <ODropdown
               :open="savedViewsDropdownOpen"
@@ -153,15 +150,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:open="onSavedViewsDropdownOpenChange"
             >
               <template #trigger>
-                <OButton
-                  data-test="traces-search-bar-saved-views-btn"
-                  variant="ghost"
-                  size="xs-grouped"
-                  class="h-full!"
-                >
+                <OButton data-test="traces-search-bar-saved-views-btn" variant="secondary">
                   <OIcon name="saved-search" size="sm" />
                   <OIcon name="arrow-drop-down" size="sm" />
-                  <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
+                  <OTooltip :content="t('search.listSavedViews')" />
                 </OButton>
               </template>
               <SavedViewsMenu
@@ -177,16 +169,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @delete="deleteTracesSavedView"
               />
             </ODropdown>
-            <OSeparator vertical />
             <OButton
+              icon-only
               data-test="traces-search-bar-saved-views-create-btn"
-              variant="ghost"
-              size="icon-panel"
-              class="h-full!"
+              variant="secondary"
               @click="openSaveViewDialog"
             >
               <OIcon name="save" size="sm" />
-              <OTooltip :content="t('search.createSavedView')" :side-offset="6" />
+              <OTooltip :content="t('search.createSavedView')" />
             </OButton>
           </OButtonGroup>
         </div>
@@ -200,9 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="traces-search-bar-more-menu-btn"
-              variant="outline"
-              size="sm-toolbar"
-              icon-left="more-horiz"
+              variant="secondary"
+              icon="more-horiz"
               class="shrink-0 max-lg:ms-auto"
             >
               {{ t("search.menuMore") }}
@@ -214,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-search-bar-menu-reset-filters-btn"
             @select="resetFilters"
           >
-            <template #icon-left>
+            <template #icon>
               <span
                 class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
               >
@@ -229,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-search-bar-menu-metrics-btn"
             @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
-            <template #icon-left>
+            <template #icon>
               <span
                 class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
               >
@@ -237,18 +226,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </template>
             {{ t("traces.redMetrics") }}
-            <template #icon-right>
+            <template #end>
               <span class="ms-auto flex items-center gap-1">
                 <OSwitch
                   v-model="searchObj.meta.showHistogram"
-                  size="md"
                   data-test="traces-search-bar-show-metrics-toggle-btn"
                   @click.stop
                 />
                 <OButton
+                  icon-only
                   data-test="traces-search-bar-menu-pin-metrics-btn"
-                  variant="ghost-neutral"
-                  size="icon-sm"
+                  variant="ghost"
                   :title="
                     isPinned('histogram') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
                   "
@@ -279,9 +267,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #actions>
                 <OButton
+                  icon-only
                   data-test="traces-search-bar-menu-pin-saved-views-btn"
-                  variant="ghost-neutral"
-                  size="icon-sm"
+                  variant="ghost"
                   :title="
                     isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
                   "
@@ -314,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-center gap-2 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
         >
           <OPageHeaderStatus />
-          <DateTime
+          <ODateTimeRange
             ref="dateTimeRef"
             auto-apply
             menu-align="end"
@@ -328,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             calendar-presets
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            class="h-8.5! max-lg:me-auto max-md:[&_.date-time-label]:hidden"
+            class="max-lg:me-auto max-md:[&_.date-time-label]:hidden"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
@@ -343,7 +331,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 aria-busy="true"
                 data-test="traces-search-bar-cancel-btn"
-                size="sm-toolbar"
                 :title="t('search.cancel')"
                 class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
                 @click="cancelQueryData"
@@ -351,12 +338,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               <OButton
                 v-else
-                :variant="showRunQueryPending ? 'pending' : 'ghost'"
+                :stale="showRunQueryPending"
+                :variant="showRunQueryPending ? 'primary' : 'ghost'"
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 :data-run-pending="showRunQueryPending ? 'true' : undefined"
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
-                size="sm-toolbar"
                 :title="t('search.runQuery')"
                 class="min-w-[5.875rem] [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
                 :class="[
@@ -395,9 +382,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown v-if="store.state.zoConfig.auto_query_enabled" side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    icon-only
                     :aria-label="t('common.moreOptions')"
-                    :variant="showRunQueryPending && !isLoading ? 'pending' : 'ghost'"
-                    size="icon-toolbar"
+                    :variant="showRunQueryPending && !isLoading ? 'primary' : 'ghost'"
                     :disabled="isLoading"
                     :class="[
                       config.isEnterprise == 'true' && isLoading
@@ -415,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="traces-search-bar-live-mode-toggle-btn"
                   @select="toggleLiveMode"
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon
                       :name="searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'"
                       size="sm"
@@ -444,20 +431,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ShareButton
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
-            variant="outline"
-            size="icon-md"
+            variant="secondary"
             shortcut-id="tracesCopyUrl"
           />
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
+                icon-only
                 data-test="traces-search-bar-more-actions-btn"
-                class="hover:bg-interactive-hover-bg! size-[2.125rem]!"
-                variant="outline"
-                size="icon-toolbar"
+                class="hover:bg-interactive-hover-bg!"
+                variant="secondary"
               >
                 <OIcon name="menu" size="sm" />
-                <OTooltip max-width="7rem" :content="t('search.moreActions')" />
+                <OTooltip :content="t('search.moreActions')" />
               </OButton>
             </template>
 
@@ -467,7 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!searchObj.data.queryResults?.hits?.length"
                 @select="downloadLogs"
               >
-                <template #icon-left>
+                <template #icon>
                   <span
                     class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                   >
@@ -484,11 +470,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownItem
                 data-test="traces-create-alert-btn"
                 :disabled="!!createAlertDisabledReason"
-                focusable-unavailable
-                :description="createAlertDisabledReason || createAlertNote"
+                :disabled-reason="createAlertDisabledReason"
+                :description="createAlertNote"
                 @select="onCreateAlert"
               >
-                <template #icon-left>
+                <template #icon>
                   <span
                     class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                   >
@@ -505,11 +491,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownItem
                 data-test="traces-add-red-to-dashboard-btn"
                 :disabled="!!redDashboardDisabledReason"
-                focusable-unavailable
-                :description="redDashboardDisabledReason"
+                :disabled-reason="redDashboardDisabledReason"
                 @select="openRedDashboardDialog"
               >
-                <template #icon-left>
+                <template #icon>
                   <span
                     class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                   >
@@ -533,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ms-auto max-lg:ms-0">
           <div class="flex items-center gap-2 max-lg:w-full max-lg:justify-end max-lg:gap-1.5">
             <OPageHeaderStatus />
-            <DateTime
+            <ODateTimeRange
               ref="dateTimeRef"
               auto-apply
               :default-type="searchObj.data.datetime.type"
@@ -544,13 +529,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="service-graph-date-time-picker"
               calendar-presets
-              class="h-8.5!"
               @on:date-change="updateDateTime"
             />
             <OButton
+              icon-only
               data-test="service-graph-refresh-btn"
-              variant="outline"
-              size="icon-md"
+              variant="secondary"
               @click="$emit('service-graph-refresh')"
             >
               <OIcon name="refresh" size="sm" />
@@ -560,13 +544,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :model-value="searchObj.meta.serviceGraphVisualizationType"
               @update:model-value="onServiceGraphVisualizationChange($event)"
             >
-              <OToggleGroupItem data-test="service-graph-tree-view-btn" value="tree" size="sm">
+              <OToggleGroupItem data-test="service-graph-tree-view-btn" value="tree">
                 <template #icon-left>
                   <OIcon name="git-branch" size="sm" />
                 </template>
                 <span class="max-lg:hidden">{{ t("traces.treeView") }}</span>
               </OToggleGroupItem>
-              <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph" size="sm">
+              <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph">
                 <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
                 <span class="max-lg:hidden">{{ t("traces.graphView") }}</span>
               </OToggleGroupItem>
@@ -575,7 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.meta.serviceGraphLayoutType"
               :options="serviceGraphLayoutOptions"
               :searchable="false"
-              class="h-[2.125rem]! min-h-[2.125rem]! w-[7.5rem] max-lg:w-24!"
+              class="w-[7.5rem] max-lg:w-24!"
               :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
               @update:model-value="onServiceGraphLayoutChange"
             />
@@ -586,7 +570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ms-auto">
           <div class="flex items-center gap-2">
             <OPageHeaderStatus />
-            <DateTime
+            <ODateTimeRange
               ref="dateTimeRef"
               auto-apply
               menu-align="end"
@@ -598,7 +582,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="services-catalog-date-time-picker"
               calendar-presets
-              class="h-8.5!"
               @on:date-change="updateDateTime"
             />
           </div>
@@ -621,11 +604,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButton
           v-if="!searchObj.meta.sqlMode && !nlpMode"
-          :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
+          icon-only
+          :icon="filterBuilderOn ? 'code' : 'filter-list'"
           data-test="traces-search-bar-filter-builder-toggle"
           :aria-pressed="filterBuilderOn"
           variant="ghost"
-          size="icon-xs-sq"
+          size="sm"
           class="absolute! top-0.75 z-51"
           :style="{ right: filterBuilderToggleRight }"
           @click="toggleFilterBuilder"
@@ -657,10 +641,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OButton
           v-if="showFilterBuilder && isAiEnabled"
+          icon-only
           data-test="traces-search-bar-filter-builder-ai-btn"
           variant="ghost"
-          size="icon-toolbar"
-          class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 right-1 z-51 h-7! min-h-7! w-7! min-w-7! hover:shadow-md"
+          class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 right-1 z-51 hover:shadow-md"
           @click="openAiFromBuilder"
         >
           <img
@@ -727,11 +711,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ODialog
       v-model:open="saveViewDialogOpen"
-      size="xs"
+      size="sm"
       :title="t('search.createSavedView')"
-      :primary-button-label="t('common.save')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-loading="isSavingView"
+      :primary="{ label: t('common.save'), loading: isSavingView }"
+      :secondary="{ label: t('common.cancel') }"
       @click:primary="saveAsNewView"
       @click:secondary="saveViewDialogOpen = false"
     >
@@ -769,7 +752,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -855,7 +838,7 @@ export default defineComponent({
   components: {
     OPageHeaderStatus,
     OSeparator,
-    DateTime,
+    ODateTimeRange,
     ShareButton,
     OToggleGroup,
     OToggleGroupItem,
@@ -1277,7 +1260,7 @@ export default defineComponent({
       }
 
       // Live mode: auto-trigger search ONLY on a genuine user-driven time-range
-      // change. `userChangedValue` (stamped by DateTime.vue) is the authoritative
+      // change. `userChangedValue` (stamped by ODateTimeRange) is the authoritative
       // signal — programmatic sets (redirect, metrics brush, mount replay) emit
       // `false` and must never auto-run, since they are owned by an explicit
       // trigger elsewhere. `datetimeChanged` additionally filters a user toggling
@@ -1620,8 +1603,8 @@ export default defineComponent({
         title: t("search.overwriteSavedView"),
         messageKeypath: "search.overwriteSavedViewConfirm",
         messageName: view.view_name,
+        kind: "destructive",
         confirmLabel: t("search.overwriteSavedViewOk"),
-        focusCancel: true,
       });
       if (!confirmed) return;
       await updateSavedViewFromCurrent(view);
@@ -1634,7 +1617,7 @@ export default defineComponent({
         title: t("search.deleteSavedView"),
         messageKeypath: "search.deleteSavedViewConfirm",
         messageName: view.view_name,
-        confirmVariant: "destructive",
+        kind: "destructive",
       });
       if (!confirmed) return;
       try {

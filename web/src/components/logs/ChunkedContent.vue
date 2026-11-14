@@ -46,12 +46,7 @@ Usage:
       v-if="shouldShowLoadMore"
       class="border-card-glass-border mt-2 flex items-center gap-3 border-t pt-2"
     >
-      <OButton
-        :data-test="`load-more-btn-${fieldKey}`"
-        variant="outline"
-        size="sm-action"
-        @click="handleLoadMore"
-      >
+      <OButton :data-test="`load-more-btn-${fieldKey}`" variant="secondary" @click="handleLoadMore">
         <OIcon name="expand-more" size="xs" class="me-1" />
         {{
           t("logs.chunkedContent.loadMore", {

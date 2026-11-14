@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPopover
+    size="md"
     :open="!!actionNotice"
     :anchor="actionNotice?.el ?? null"
     side="bottom"

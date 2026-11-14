@@ -1,40 +1,54 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-//
-// ODescriptionList — the house label/value detail block. See the .types.ts for
-// why this is a real <dl> and how it differs from OFieldList.
 
 import { computed, provide } from "vue";
+import { raw } from "@/types/i18n";
+import ODescriptionItem from "./ODescriptionItem.vue";
 import {
-  DESCRIPTION_LABEL_WIDTH,
+  DESCRIPTION_CONTEXT,
   type DescriptionListProps,
   type DescriptionListSlots,
 } from "./ODescriptionList.types";
 
 const props = withDefaults(defineProps<DescriptionListProps>(), {
-  columns: 1,
-  dense: false,
-  labelWidth: "default",
+  items: undefined,
+  labels: "text",
+  layout: "auto",
+  emptyLabel: () => raw("—"),
 });
-
-provide(
-  DESCRIPTION_LABEL_WIDTH,
-  computed(() => props.labelWidth),
-);
 
 defineSlots<DescriptionListSlots>();
 
-// One column below md regardless of `columns`: a two-column label/value block on
-// a narrow viewport wraps into a pile where no value is next to its own label.
-const classes = computed(() => [
-  "m-0 grid grid-cols-1",
-  props.columns === 2 ? "md:grid-cols-2" : "",
-  props.dense ? "gap-x-6 gap-y-1.5" : "gap-x-8 gap-y-3",
-]);
+provide(
+  DESCRIPTION_CONTEXT,
+  computed(() => ({ labels: props.labels, emptyLabel: props.emptyLabel })),
+);
+
+const LAYOUT_CLASSES: Record<NonNullable<DescriptionListProps["layout"]>, string> = {
+  columns: "grid-cols-[10rem_minmax(0,1fr)] gap-y-1.5",
+  stacked: "grid-cols-1 gap-y-2",
+  auto: "grid-cols-[10rem_minmax(0,1fr)] gap-y-1.5 @max-[30rem]/dl:grid-cols-1 @max-[30rem]/dl:gap-y-2",
+};
 </script>
 
 <template>
-  <dl :class="classes" data-test="o2-description-list">
-    <slot />
-  </dl>
+  <div class="@container/dl min-w-0">
+    <dl
+      :class="['m-0 grid gap-x-4', LAYOUT_CLASSES[layout]]"
+      :data-layout="layout"
+      data-test="o2-description-list"
+    >
+      <template v-if="items">
+        <ODescriptionItem
+          v-for="(item, i) in items"
+          :key="i"
+          :label="item.label"
+          :value="item.value"
+          :mono="item.mono"
+          :copy="item.copy"
+        />
+      </template>
+      <slot v-else />
+    </dl>
+  </div>
 </template>

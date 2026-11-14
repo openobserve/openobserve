@@ -5,7 +5,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { CasePriority } from "@/services/securityCases";
@@ -37,18 +36,16 @@ const { t } = useI18nTyped();
 
 <template>
   <OButton
-    variant="outline"
-    size="sm"
-    icon-left="task-alt"
+    variant="secondary"
+    icon="task-alt"
     :disabled="busy"
     data-test="security-cases-bulk-close"
     @click="emit('close')"
     >{{ t("siem.cases.bulk.close") }}</OButton
   >
   <OButton
-    variant="outline"
-    size="sm"
-    icon-left="volume-off"
+    variant="secondary"
+    icon="volume-off"
     :disabled="busy"
     data-test="security-cases-bulk-close-suppress"
     @click="emit('closeSuppress')"
@@ -57,9 +54,8 @@ const { t } = useI18nTyped();
   <ODropdown side="top">
     <template #trigger>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="person"
+        variant="secondary"
+        icon="person"
         :disabled="busy"
         data-test="security-cases-bulk-assign"
         >{{ t("siem.cases.bulk.assign") }}</OButton
@@ -78,9 +74,8 @@ const { t } = useI18nTyped();
   <ODropdown side="top">
     <template #trigger>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="tune"
+        variant="secondary"
+        icon="tune"
         :disabled="busy"
         data-test="security-cases-bulk-priority"
         >{{ t("siem.cases.bulk.priority") }}</OButton
@@ -95,18 +90,17 @@ const { t } = useI18nTyped();
     >
   </ODropdown>
   <OButton
-    variant="outline"
-    size="sm"
-    icon-left="call-merge"
+    variant="secondary"
+    icon="call-merge"
     :disabled="busy || !!mergeBlocked"
+    :disabled-reason="mergeBlocked ?? undefined"
     data-test="security-cases-bulk-merge"
     @click="emit('merge')"
-    >{{ t("siem.cases.bulk.merge") }}<OTooltip v-if="mergeBlocked" :content="mergeBlocked"
-  /></OButton>
+    >{{ t("siem.cases.bulk.merge") }}</OButton
+  >
   <OButton
     variant="ghost"
-    size="sm"
-    icon-left="close"
+    icon="close"
     data-test="security-cases-bulk-clear"
     @click="emit('clear')"
     >{{ t("siem.cases.selection.clear") }}</OButton

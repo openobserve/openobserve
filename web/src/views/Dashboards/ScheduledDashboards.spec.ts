@@ -145,8 +145,8 @@ describe("ScheduledDashboards", () => {
               <div data-test="o-drawer-header-right" class="o-drawer-header-right"><slot name="header-right" /></div>
               <div data-test="o-drawer-body" class="o-drawer-body"><slot /></div>
             </div>`,
-            props: ["open", "width", "title", "subTitle", "showClose", "persistent", "size"],
-            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+            props: ["open", "width", "title", "subtitle", "showClose", "persistent", "size"],
+            emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
           },
           OTable: {
             name: "OTable",
@@ -224,10 +224,10 @@ describe("ScheduledDashboards", () => {
       expect(drawer.props("title")).toBe("Scheduled Dashboards");
     });
 
-    it("should pass width prop to ODrawer", () => {
+    it("should pass the fixed lg size to ODrawer", () => {
       const wrapper = createWrapper();
       const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("width")).toBe(60);
+      expect(drawer.props("size")).toBe("lg");
     });
 
     it("should emit update:open when ODrawer emits update:open", async () => {

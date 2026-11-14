@@ -17,9 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton
-    variant="ghost-muted"
-    size="icon-xs-sq"
-    icon-left="info-outline"
+    icon-only
+    variant="ghost"
+    size="sm"
+    icon="info-outline"
     class="shrink-0"
     :aria-label="content"
     :data-test="dataTest"

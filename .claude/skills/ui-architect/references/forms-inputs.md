@@ -40,10 +40,10 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ### OInput
 
 **Import:** `@/lib/forms/Input/OInput.vue`
-**Use when:** A single-line (or, via `type="textarea"`, multi-line) free-text field — text, password, email, number, url, tel, search — with optional prefix/suffix, icons, clear button, mask, debounce, and character counter.
-**Don't use for:** Choosing from a fixed option list (use `OSelect`); typeahead over a suggestion list where free text is also allowed (use `OCombobox`); a pure filter/search box in a toolbar (use `OSearchInput`, which wraps this with a search icon).
-**Key props:** `modelValue` (`string | number`), `type` (`"text"` default | `"password"` | `"email"` | `"number"` | `"search"` | `"url"` | `"tel"` | `"textarea"`), `label`, `placeholder`, `helpText`, `errorMessage`, `error` (boolean — error styling only shows when `error` is true; a bare `errorMessage` alone will not surface), `prefix`, `suffix`, `clearable` (default `false`), `readonly` (default `false`), `disabled` (default `false`), `required` (renders `*` after label — do not append ` *` manually), `autofocus` (default `false`), `debounce` (ms; flushed on blur), `autogrow` (default `false`, textarea only), `mask` (`"time"` | `"fulltime"` | `"DD-MM-YYYY"` — digit-extracting), `maxlength` (shows counter), `rows` (default `3`, textarea), `size` (`"sm"` | `"md"` default), `width` (`"xs"` | `"sm"` | `"md"` | `"lg"` | `"full"` default), `labelPosition` (`"inside"` | `"outside"` default), `modelModifiers` (`{ number?, trim? }`), `id`, `name`, `autocomplete`.
-**Slots:** `icon-left`, `icon-right`, `prefix`, `suffix`, `tooltip` (put a tooltip element inside — renders an info icon in the label). (`append` is also consumed in template.)
+**Use when:** A single-line free-text field — text, password, email, number, url, tel — with an optional icon, prefix/suffix, clear button, copy button, mask, debounce, and character counter.
+**Don't use for:** Multi-line text (use `OTextarea`; `type="textarea"` is gone); choosing from a fixed option list (use `OSelect`); typeahead where free text is also allowed (use `OCombobox`); a toolbar or list search (use `OSearchInput` — never `OInput` plus a search icon, F2).
+**Key props:** `modelValue` (`string | number`), `type` (`"text"` default | `"password"` | `"email"` | `"number"` | `"search"` | `"url"` | `"tel"` | `"date"` | `"datetime-local"`; a password always gets the show/hide toggle), `label` (always above the field — there is no inside label, S3), `placeholder`, `helpText`, `errorMessage`, `error` (boolean — error styling only shows when `error` is true; a bare `errorMessage` alone will not surface), `icon` (`IconName`, leading), `prefix`, `suffix` (units go here with the value spaced by the field: `suffix="ms"`, T4), `clearable` (default `false`; on for filters, off for required fields, S6), `readonly`, `copyable` (copy button inside the box, for read-only values), `mono` (IDs, regex, paths, T4), `disabled`, `required` (renders `*` after the label), `autofocus`, `debounce` (ms; flushed on blur), `mask` (`"time"` | `"fulltime"` | `"DD-MM-YYYY"`), `maxlength` (shows counter), `size` (`"xs"` 24 inside table rows only | `"sm"` 28 | `"md"` 32 default | `"lg"` 36 sign-in only — S1, never an `h-*` class), `width` (`"s"` 160 | `"m"` 240 | `"l"` 360 | `"full"` default — S7), `modelModifiers` (`{ number?, trim? }`), `id`, `name`, `autocomplete`.
+**Slots:** `icon` (custom leading content when `icon` cannot express it), `icon-end` (trailing content before clear/reveal), `tooltip` (info icon beside the label). `local/o2-controls-api` rejects the removed `label-position`, `revealable`, `field-width`, `disable`, `hint`, `flat`, `color`, `rows`/`autogrow`, and the `#icon-left`/`#icon-right`/`#prefix`/`#suffix`/`#append` slots.
 **Emits:** `update:modelValue`, `clear`, `blur`, `focus`, `keydown`, `keyup`, `keypress`
 **Example:**
 
@@ -65,8 +65,8 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 
 **Import:** `@/lib/forms/Input/OTextarea.vue`
 **Use when:** A dedicated multi-line text field where you want first-class textarea props like `rows`, `autogrow`, or `fill` (stretch to parent height in a bounded flex container).
-**Don't use for:** Single-line input (use `OInput`). Note `OInput` can also render a textarea via `type="textarea"`; prefer `OTextarea` when you need `fill` or a textarea-only API surface.
-**Key props:** `modelValue` (`string`), `label`, `placeholder`, `helpText`, `errorMessage`, `error` (boolean — same "error only shows when true" rule as OInput), `rows` (default `3`), `autogrow` (default `false`), `readonly` (default `false`), `disabled` (default `false`), `required`, `autofocus` (default `false`), `maxlength` (shows counter), `size` (`"sm"` | `"md"` default), `width` (`"xs"`|`"sm"`|`"md"`|`"lg"`|`"full"` default), `fill` (default `false` — stretch to parent height), `id`, `name`, `autocomplete`.
+**Don't use for:** Single-line input (use `OInput`). It is the only multi-line field: `OInput type="textarea"` was removed. Never put one in a control row — it breaks the shared height (S2).
+**Key props:** `modelValue` (`string`), `label`, `placeholder`, `helpText`, `errorMessage`, `error` (boolean — same "error only shows when true" rule as OInput), `rows` (default `3`), `autogrow` (default `false`), `maxRows`, `readonly`, `disabled`, `required`, `autofocus`, `maxlength` (shows counter), `mono` (JSON, VRL, regex, SQL snippets, T4), `width` (`"s"` | `"m"` | `"l"` | `"full"` default, S7), `fill` (stretch to parent height), `id`, `name`, `autocomplete`. One size: `rows` sets the height, so there is no `size` prop; the text is 13 px.
 **Slots:** `append` (block below the border), `tooltip` (info icon in label)
 **Emits:** `update:modelValue`, `blur`, `focus`, `keydown`
 **Example:**
@@ -82,8 +82,8 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Import:** `@/lib/forms/Input/OFormInput.vue`
 **Use when:** An `OInput` field inside `<OForm>` — value and validation errors bind automatically from the form field named by `name`.
 **Don't use for:** Standalone inputs with no `<OForm>` ancestor (use `OInput` + your own `v-model`).
-**Key props:** `name` (**required** — must match a key in `OForm` `defaultValues`), plus everything `OInput` accepts **except** `modelValue`, `error`, `errorMessage` (auto-bound). So: `type`, `label`, `placeholder`, `helpText`, `clearable`, `disabled`, `readonly`, `required`, `debounce`, `mask`, `maxlength`, `size`, `width`, `labelPosition`, `id`, `autocomplete`, etc.
-**Slots:** forwards `icon-left`, `icon-right`, `prefix`, `suffix`, `tooltip`, `append` to `OInput`.
+**Key props:** `name` (**required** — must match a key in `OForm` `defaultValues`), plus everything `OInput` accepts **except** `modelValue`, `error`, `errorMessage` (auto-bound). So: `type`, `label`, `placeholder`, `helpText`, `icon`, `prefix`, `suffix`, `clearable`, `copyable`, `mono`, `disabled`, `readonly`, `required`, `debounce`, `mask`, `maxlength`, `size`, `width`, `id`, `autocomplete`, etc. (`min`/`max`/`step` are not forwarded, so native constraint validation never fights the Zod schema.)
+**Slots:** forwards `icon`, `icon-end`, `tooltip` to `OInput`, plus its own `error` slot.
 **Emits:** none you wire yourself — internally emits `update:modelValue`/`blur` into the form field.
 **Example:**
 
@@ -100,7 +100,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Import:** `@/lib/forms/Input/OFormTextarea.vue`
 **Use when:** An `OTextarea` field inside `<OForm>` with auto-bound value and validation.
 **Don't use for:** Standalone multi-line input (use `OTextarea`).
-**Key props:** `name` (**required**), plus everything `OTextarea` accepts **except** `modelValue`, `error`, `errorMessage`: `label`, `placeholder`, `helpText`, `rows`, `autogrow`, `maxlength`, `disabled`, `readonly`, `required`, `size`, `width`, `id`, `autocomplete`.
+**Key props:** `name` (**required**), plus everything `OTextarea` accepts **except** `modelValue`, `error`, `errorMessage`: `label`, `placeholder`, `helpText`, `rows`, `autogrow`, `maxlength`, `mono`, `disabled`, `readonly`, `required`, `width`, `id`, `autocomplete`.
 **Slots:** none forwarded (wraps `OTextarea` directly).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
@@ -118,10 +118,17 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ### OSelect
 
 **Import:** `@/lib/forms/Select/OSelect.vue`
-**Use when:** Choosing one or many values from a **known option list** — single or `multiple`, optionally `searchable` (built-in filter), `creatable`, grouped, virtualized, with chips, "Select All", and per-option icons.
+**Use when:** Choosing one or many values from a **known option list** (S5: more than five options, or a list that comes from data) — single or `multiple`, searchable past eight options, `creatable`, grouped, virtualized, with chips, "Select all", per-option icons, descriptions and counts. As a toolbar filter use `variant="filter"` (below).
 **Don't use for:** Free-text entry with suggestions where the typed text itself is the value (use `OCombobox`); a plain text field (use `OInput`); a small set of always-visible mutually-exclusive/multi options laid out inline (use `OOptionGroup` / `ORadioGroup` / `OCheckboxGroup`).
-**Key props:** `modelValue` (`SelectValue | SelectValue[]`, where `SelectValue = string | number | boolean | null`), `options` (`SelectOption[]` — `{ label, value?, disabled?, header? }`; or use the default slot for custom/grouped items), `multiple` (default `false`), `maxVisibleChips` (default computed from trigger width), `searchable` (default `true`), `searchDebounce` (default `0`), `hideSelected` (default `false`), `selectAll` (default off — multi listbox only), `creatable` (default `false` — emits `create`), `searchPlaceholder` (default `"Search..."`), `labelKey`/`valueKey`/`iconKey`, `label`, `required`, `placeholder`, `errorMessage`, `error` (default `false`), `clearable` (default `false`), `disabled` (default `false`), `size` (`"sm"` | `"md"` default), `width` (`"xs"`|`"sm"`|`"md"`|`"lg"`|`"full"` default), `labelPosition` (`"inside"` | `"outside"` default), `loading` (default off — spinner replaces chevron), `rowClickSingleSelect` (default `false`), `optionTooltip` (default `false`), `helpText`, `id`, `name`, `dropdownStyle`.
-**Slots:** `default` (render `OSelectItem`/`OSelectGroup`), `trigger` (`{ value }`), `chip` (`{ label, value }`), `empty`, `before-options`, `after-options`, `icon-left`, `tooltip` (OSelect has `icon-left` only — no `icon-right`)
+**Key props:** `modelValue` (`SelectValue | SelectValue[]`, where `SelectValue = string | number | boolean | null`), `options` (`SelectOption[]` — `{ label, value?, disabled?, header?, headerCount?, subLabel? (the 2-line description), suffix?, count? (tabular, right-aligned) }`; or the default slot for custom items), `multiple` (default `false`), `maxChips` (default `2`, then "+N", S5), `searchable` (`"auto"` default = search box past eight options | `true` | `false`), `searchDebounce`, `hideSelected`, `selectAll` (multi listbox only), `creatable` (an `Add "x"` row for an unlisted typed value — emits `create`), `searchPlaceholder`, `labelKey`/`valueKey`/`iconKey`, `label`, `required`, `placeholder`, `errorMessage`, `error`, `clearable` (field default `false`; filter default `true`, S6), `disabled`, `size` (`"sm"` 28 | `"md"` 32 default | `"lg"` 36 sign-in only, S1), `variant` (`"field"` default | `"filter"`), `anyLabel` / `summary` (filter only), `width` (`"s"` | `"m"` | `"l"` | `"full"`, S7; a field defaults to full, a filter sizes to its text from 160), `loading` (spinner replaces the chevron; a loading row while there are no options), `helpText`, `id`, `name`.
+**Menu (O4):** as wide as the trigger (200–360) and frozen at the size it opened with, so filtering never shrinks or moves it; the list is at most 232 px with 32 px rows and 28 px group labels; "No matches for …" with Clear search shows in place. Rows are `text-compact`, the menu `rounded-menu`, the trigger `rounded-default`.
+**Slots:** `default` (render `OSelectItem`/`OSelectGroup`), `trigger` (`{ value }`), `chip` (`{ label, value }`), `option` (`{ option }`), `empty`, `before-options`, `after-options`, `icon` (leading icon in the trigger), `tooltip`. Removed and rejected by `local/o2-controls-api`: `label-position` and `appearance` (→ `variant="filter"`), `max-visible-chips` (→ `max-chips`), `dropdown-style`, `row-click-single-select`, `pin-selected-in-groups`, `option-tooltip`, the `#icon-left` and `#selected-item` slots, and `disable`/`hint`/`color` on `OFormSelect`.
+
+**Filter select (F3, S6).** `variant="filter"` puts the label inside — "Status: Any" — and never gets a label row. Picking narrows it: the trigger shows the value ("Status: Firing") or, past one pick or with `summary="count"`, the count ("Status: 3") on the accent tint with ✕ to clear. A required config select that always holds a value passes `:clearable="false"` and stays untinted. Up to four filters in a toolbar; the rest go behind "More filters" (F10).
+
+```vue
+<OSelect v-model="status" variant="filter" :label="t('alerts.status')" :options="statusOptions" />
+```
 **Emits:** `update:modelValue`, `clear`, `search`, `create`, `open`, `close`, `blur`, `change`, `keydown`
 **Example:**
 
@@ -129,10 +136,8 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 <OSelect
   v-model="stream"
   :options="streamOptions"
-  label="Stream"
-  placeholder="Select a stream"
-  searchable
-  clearable
+  :label="t('logs.stream')"
+  :placeholder="t('logs.selectStream')"
 />
 ```
 
@@ -182,8 +187,8 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Import:** `@/lib/forms/Select/OFormSelect.vue`
 **Use when:** An `OSelect` inside `<OForm>` — value and validation bind automatically.
 **Don't use for:** Standalone selects (use `OSelect`).
-**Key props:** `name` (**required**), plus everything `OSelect` accepts **except** `modelValue`, `error`, `errorMessage`. Note: the wrapper re-defaults `searchable` to `true` to stay transparent (an omitted boolean would otherwise cast to `false`). Common: `options`, `label`, `placeholder`, `multiple`, `searchable`, `clearable`, `disabled`, `required`, `size`, `width`, `labelKey`, `valueKey`, `selectAll`, `creatable`, `hideSelected`.
-**Slots:** forwards `default`, `empty`, `tooltip` to `OSelect`.
+**Key props:** `name` (**required**), plus everything `OSelect` accepts **except** `modelValue`, `error`, `errorMessage`. Note: the wrapper mirrors OSelect's `searchable: "auto"` and `clearable: undefined` defaults, because an omitted boolean would otherwise be cast to `false` and forwarded. Common: `options`, `label`, `placeholder`, `multiple`, `searchable`, `clearable`, `disabled`, `required`, `size`, `width`, `labelKey`, `valueKey`, `selectAll`, `creatable`, `hideSelected`.
+**Slots:** forwards `default`, `empty`, `before-options`, `after-options`, `tooltip`, `icon`, `trigger` to `OSelect`.
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
 
@@ -202,7 +207,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Import:** `@/lib/forms/Combobox/OCombobox.vue`
 **Use when:** A **typeahead text input with a suggestion dropdown** where the bound value is the **typed string** (free entry allowed) and picking a suggestion fills/transforms the text. Supports a `searchRegex` to extract a needle from the input and a `valueReplaceFn` to transform the chosen option before emit. This is the O2 replacement for `CommonAutoComplete`.
 **Don't use for:** Selecting from a fixed set where only listed values are valid (use `OSelect` — it emits the option's value, not free text, and supports multiple/groups/chips); a text field that stays a plain field until the user types `{{`, where the pick splices a `{{NAME}}` token at the caret instead of replacing the text (use `OTemplateInput` / `OTemplateTextarea`). Difference from `OSelect`: **OCombobox's model is the input string and free text is allowed**; **OSelect's model is a chosen option value from the list** and there is no free-text value (its `searchable`/`creatable` still commit list values or explicit created entries).
-**Key props:** `modelValue` (`string` — the text in the input), `items` (`ComboboxOption[]` = `{ label, value }`, default `[]`), `placeholder`, `label`, `searchRegex` (regex string; first non-undefined capture group becomes the search needle; whole input if omitted), `valueReplaceFn` (`(option) => string`, default `option => option.value`), `disabled` (default `false`), `required`, `size` (`"sm"` | `"md"` default), `error` (default `false`), `errorMessage`, `helpText`, `debounce` (ms, default `0`), `labelPosition` (`"inside"` | `"outside"` default), `id`, `name`.
+**Key props:** `modelValue` (`string` — the text in the input), `items` (`ComboboxOption[]` = `{ label, value }`, default `[]`), `placeholder`, `label`, `searchRegex` (regex string; first non-undefined capture group becomes the search needle; whole input if omitted), `valueReplaceFn` (`(option) => string`, default `option => option.value`), `disabled` (default `false`), `required`, `size` (`"sm"` 28 | `"md"` 32 default, S1), `error` (default `false`), `errorMessage`, `helpText`, `debounce` (ms, default `0`), `id`, `name`. The label sits above the field; the 40 px inside-label mode is gone (S1, S3).
 **Slots:** `label` (replaces `label` prop), `tooltip` (info icon next to label)
 **Emits:** `update:modelValue` (`string`), `select` (`string` — fired when an option is chosen)
 **Example:**
@@ -223,7 +228,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Import:** `@/lib/forms/Combobox/OFormCombobox.vue`
 **Use when:** An `OCombobox` inside `<OForm>` with auto-bound value and validation.
 **Don't use for:** Standalone typeahead (use `OCombobox`); fixed-list form selection (use `OFormSelect`).
-**Key props:** `name` (**required**), plus everything `OCombobox` accepts **except** `modelValue`, `error`, `errorMessage`: `items`, `label`, `placeholder`, `searchRegex`, `valueReplaceFn`, `disabled`, `required`, `size`, `debounce`, `helpText`, `labelPosition`, `id`.
+**Key props:** `name` (**required**), plus everything `OCombobox` accepts **except** `modelValue`, `error`, `errorMessage`: `items`, `label`, `placeholder`, `searchRegex`, `valueReplaceFn`, `disabled`, `required`, `size`, `debounce`, `helpText`, `id`.
 **Slots:** `label`, `tooltip` (forwarded).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
@@ -242,9 +247,9 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 
 **Import:** `@/lib/forms/TemplateInput/OTemplateInput.vue`
 **Use when:** A single-line text or URL field whose value may hold `{{NAME}}` template tokens that are substituted later (a Synthetics starting URL or step value, an alert template). Wraps `OInput` unchanged; typing `{{` opens a portalled, virtualised list of `suggestions` filtered case-insensitively by what follows the braces, and Enter / Tab / a row click splice `{{NAME}}` (stored spelling) over the open token at the caret. ArrowUp/ArrowDown move with wrap, Escape and blur close, moving the caret away closes. With `values` set, the value of the closed token under the caret peeks above the field after 300 ms. Without `suggestions` it behaves as a plain `OInput`.
-**Don't use for:** Typeahead where the pick replaces the whole text and the list opens on focus (use `OCombobox`); a plain field with no template tokens (use `OInput`); multi-line prompt text (use `OTemplateTextarea`); `debounce`, `mask`, `modelModifiers`, `revealable`, or any `type` other than `"text"` / `"url"` — those desynchronise the caret from the emitted text and are omitted from the props type.
-**Key props:** `modelValue` (`string`), `suggestions` (`TemplateSuggestion[]` = `{ name }` plus any caller fields, display order preserved; absent or empty = plain field), `values` (`Record<string, string>`; present turns the peek on), `type` (`"text"` default | `"url"`), plus every other `OInput` prop re-bound by name (`label`, `placeholder`, `helpText`, `errorMessage`, `error`, `prefix`, `suffix`, `clearable`, `readonly`, `disabled`, `required`, `autofocus`, `maxlength`, `size`, `width`, `labelPosition`, `id`, `name`, `autocomplete`). `$attrs` (`data-test`, `class`, undeclared listeners such as `@clear` / `@paste`) land on the field root, never on the wrapper.
-**Slots:** `icon-left`, `icon-right`, `prefix`, `suffix`, `tooltip`, `append` (forwarded to `OInput`); `suggestion` (scoped, `{ suggestion, active }`, generic over the suggestion type — default renders `{{name}}` in mono).
+**Don't use for:** Typeahead where the pick replaces the whole text and the list opens on focus (use `OCombobox`); a plain field with no template tokens (use `OInput`); multi-line prompt text (use `OTemplateTextarea`); `debounce`, `mask`, `modelModifiers`, or any `type` other than `"text"` / `"url"` — those desynchronise the caret from the emitted text and are omitted from the props type.
+**Key props:** `modelValue` (`string`), `suggestions` (`TemplateSuggestion[]` = `{ name }` plus any caller fields, display order preserved; absent or empty = plain field), `values` (`Record<string, string>`; present turns the peek on), `type` (`"text"` default | `"url"`), plus every other `OInput` prop re-bound by name (`label`, `placeholder`, `helpText`, `errorMessage`, `error`, `icon`, `prefix`, `suffix`, `clearable`, `readonly`, `disabled`, `required`, `autofocus`, `maxlength`, `mono`, `size`, `width`, `id`, `name`, `autocomplete`). `$attrs` (`data-test`, `class`, undeclared listeners such as `@clear` / `@paste`) land on the field root, never on the wrapper.
+**Slots:** `icon`, `icon-end`, `tooltip` (forwarded to `OInput`); `suggestion` (scoped, `{ suggestion, active }`, generic over the suggestion type — default renders `{{name}}` in mono).
 **Emits:** `update:modelValue` (`string`), `select` (`string` — the inserted name), `focus`, `blur`, `keydown`
 **data-test:** the consumer's id on the field root, `-field` on the native input, `-suggest` on the popover content, `-suggest-item-{name}` per row (name as stored), `-peek` on the peek. Rows render in a portal — query `document.body`.
 **Example:**
@@ -253,12 +258,12 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 <OTemplateInput
   v-model="url"
   type="url"
-  label="Starting URL"
+  icon="link"
+  :label="t('synthetics.startingUrl')"
   data-test="synthetics-create-url-input"
   :suggestions="variableSuggestions"
   @blur="validateUrl"
 >
-  <template #prefix><OIcon name="link" size="sm" /></template>
   <template #suggestion="{ suggestion, active }">
     <VariableSuggestionRow :suggestion="suggestion" :active="active" />
   </template>
@@ -272,7 +277,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Import:** `@/lib/forms/TemplateInput/OTemplateTextarea.vue`
 **Use when:** A multi-line field with the same `{{` suggestion list and optional peek as `OTemplateInput` — an LLM prompt message with declared variables. Wraps `OTextarea` unchanged (`autogrow`, `maxRows`, `fill` all work).
 **Don't use for:** Single-line values (use `OTemplateInput`); free text with no template tokens (use `OTextarea`); JSON or code where an unrelated `{{` would open the list.
-**Key props:** `modelValue` (`string`), `suggestions`, `values` (as `OTemplateInput`), plus every `OTextarea` prop re-bound by name (`label`, `placeholder`, `helpText`, `errorMessage`, `error`, `rows`, `autogrow`, `maxRows`, `readonly`, `disabled`, `required`, `autofocus`, `maxlength`, `size`, `width`, `fill`, `id`, `name`, `autocomplete`).
+**Key props:** `modelValue` (`string`), `suggestions`, `values` (as `OTemplateInput`), plus every `OTextarea` prop re-bound by name (`label`, `placeholder`, `helpText`, `errorMessage`, `error`, `rows`, `autogrow`, `maxRows`, `readonly`, `disabled`, `required`, `autofocus`, `maxlength`, `mono`, `width`, `fill`, `id`, `name`, `autocomplete`).
 **Slots:** `tooltip`, `append` (forwarded to `OTextarea`); `suggestion` (scoped, `{ suggestion, active }`).
 **Emits:** `update:modelValue` (`string`), `select` (`string`), `focus`, `blur`, `keydown`
 **Example:**
@@ -298,15 +303,23 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ### OSearchInput
 
 **Import:** `@/lib/forms/SearchInput/OSearchInput.vue`
-**Use when:** A compact filter/search box (list filters, toolbar search) — an `OInput` preset with a search icon, clearable by default, and an extra `xs` size. Value is a plain string, no label/error surface.
-**Don't use for:** A general text field with label/validation (use `OInput`); selecting from options (use `OSelect`); typeahead suggestions (use `OCombobox`).
-**Key props:** `modelValue` (`string`, default `""`), `placeholder` (default `"Search..."`), `size` (`"xs"` | `"sm"` default `"sm"` | `"md"` — `xs` maps to OInput `sm` height), `clearable` (default `true`), `debounce` (ms, default `0`), `disabled` (default `false`).
-**Slots:** none
-**Emits:** `update:modelValue`, `clear`
+**Use when:** The one search field of a list, toolbar, panel or menu (F1, F2): the first control on the left of a list toolbar, the search pinned at the top of a menu. Never `OInput` plus a search icon, and never two search boxes for one list.
+**Don't use for:** A general text field with label/validation (use `OInput`); selecting from options (use `OSelect`); typeahead suggestions (use `OCombobox`); explorers, which use the query bar.
+**Key props:** `modelValue` (`string`, default `""`; the page mirrors it to the URL, F11), `placeholder` ("Search <objects>", sentence case; default "Search..."), `size` (`"md"` 32 default in toolbars | `"sm"` 28 in panels and menus — S1, S2; never an `h-*` class), `width` (`"full"` default | `"list"` caps at 280 | `"scope"` caps at 360 — F2), `scope` + `scopeOptions` (`{ value, label, icon?, tooltip?, dataTest? }[]`; two segments inside the box such as "This folder | All folders", emits `update:scope`), `shortcut` ("/" focuses the field and the box shows the key while empty — KB1; defaults on at md, off at sm; one per page), `debounce` (ms, default `0` — a client-side filter answers at once; a search that asks the server passes `:debounce="200"`), `loading` (a spinner replaces the glyph), `disabled`. Always clearable; Escape clears the text first and only an empty field lets Escape reach the overlay behind.
+**Slots:** none. The old `#icon-right` scope slot is replaced by `scope-options`; `clearable` and `autofocus` are rejected by `local/o2-controls-api`.
+**Emits:** `update:modelValue`, `update:scope`, `clear`
 **Example:**
 
 ```vue
-<OSearchInput v-model="filter" placeholder="Filter streams..." />
+<OSearchInput
+  v-model="search"
+  width="scope"
+  :placeholder="t('dashboard.search')"
+  :scope="acrossFolders ? 'all' : 'this'"
+  :scope-options="scopeOptions"
+  data-test="dashboard-search"
+  @update:scope="(v) => (acrossFolders = v === 'all')"
+/>
 ```
 
 **Family:** No form wrapper — it wraps `OInput` internally. Standalone/headless only.
@@ -318,9 +331,9 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ### OCheckbox
 
 **Import:** `@/lib/forms/Checkbox/OCheckbox.vue`
-**Use when:** A single boolean (or tri-state `indeterminate`) checkbox, or a member of an `OCheckboxGroup` (set `value`/`val` and it reads the group's checked array). Supports custom `trueValue`/`falseValue`/`indeterminateValue`.
+**Use when:** On/off saved with the form (S5), multi-choice lists such as facets, row selection — a single boolean (or tri-state `indeterminate`) checkbox, or a member of an `OCheckboxGroup` (set `value` and it reads the group's checked array). Supports custom `trueValue`/`falseValue`/`indeterminateValue`. On/off that applies at once is an `OSwitch`.
 **Don't use for:** A set of related checkboxes with a shared array model (wrap them in `OCheckboxGroup`, or use `OOptionGroup type="checkbox"` for a list-driven layout); an on/off toggle switch (use `OSwitch`).
-**Key props:** `modelValue` (`boolean | "indeterminate" | string | number | (string|number)[]`), `value` (member value in a group; excludes boolean by design), `val` (compatibility alias for `value`), `label`, `size` (`"xs"` | `"sm"` | `"md"` default), `trueValue`/`falseValue`/`indeterminateValue` (custom-value mode), `color` (`"primary"` default | `"negative"`), `disabled` (default `false`), `required`, `id`, `name`.
+**Key props:** `modelValue` (`boolean | "indeterminate" | string | number | (string|number)[]`), `value` (member value in a group; excludes boolean by design), `label` (13 px), `description` (12 px tertiary line under the label), `indeterminate` (mixed select-all state), `trueValue`/`falseValue`/`indeterminateValue` (custom-value mode), `disabled` (default `false`), `required`, `id`, `name`. One 16 px box with `rounded-chip` (S9): there is no `size`, no `color` and no `val` — `local/o2-controls-api` rejects them.
 **Slots:** `label` (custom label content — overrides `label` prop)
 **Emits:** `update:modelValue`, `change` (emits the item value when inside a group)
 **Example:**
@@ -355,7 +368,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Import:** `@/lib/forms/Checkbox/OFormCheckbox.vue`
 **Use when:** A single boolean checkbox bound to one `<OForm>` field.
 **Don't use for:** A multi-value checkbox set in a form (use `OFormCheckboxGroup`); standalone (use `OCheckbox`).
-**Key props:** `name` (**required**), plus everything `OCheckbox` accepts **except** `modelValue`: `value`, `val`, `label`, `size`, `trueValue`, `falseValue`, `indeterminateValue`, `color`, `disabled`, `required`, `id`, `name`.
+**Key props:** `name` (**required**), plus everything `OCheckbox` accepts **except** `modelValue`: `value`, `label`, `description`, `indeterminate`, `trueValue`, `falseValue`, `indeterminateValue`, `disabled`, `required`, `id`, `name`.
 **Slots:** `label` (per `OCheckbox`).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
@@ -394,7 +407,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Import:** `@/lib/forms/Radio/ORadio.vue`
 **Use when:** A single radio button representing one `value` — **must** be used inside `ORadioGroup` (the group provides the RadioGroupRoot context and value map).
 **Don't use for:** Standalone use outside a group (it has no own model); a multi-select (use checkboxes); a compact options-array layout (use `OOptionGroup type="radio"`).
-**Key props:** `value` (`string | number | boolean` — this radio's value, compared against the group's `modelValue`), `val` (compatibility alias for `value`), `label`, `size` (`"xs"` | `"sm"` | `"md"` default), `disabled` (default `false`), `id`
+**Key props:** `value` (`string | number | boolean` — this radio's value, compared against the group's `modelValue`), `label`, `description` (12 px line under the label), `variant` (`"default"` | `"card"` for choices that carry an explanation), `disabled` (default `false`), `id`. One 16 px circle (S9): `size` and `val` are rejected by `local/o2-controls-api`. Content that depends on the choice reserves the tallest option's height (O4).
 **Slots:** `label` (custom label content)
 **Emits:** none (selection flows through the parent `ORadioGroup`)
 **Example:**
@@ -453,9 +466,9 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ### OSwitch
 
 **Import:** `@/lib/forms/Switch/OSwitch.vue`
-**Use when:** An on/off toggle — instant enable/disable of a setting. Supports custom `checkedValue`/`uncheckedValue` and label placement.
+**Use when:** On/off that applies at once and confirms with a toast (S5, V3) — setting rows, instant enable/disable. Inside a form saved with a button, use a checkbox; never as a filter (F6).
 **Don't use for:** A checkbox in a list/form validation context (use `OCheckbox`); choosing among 3+ options (use `ORadioGroup`/`OOptionGroup`).
-**Key props:** `modelValue` (`boolean | string | number`), `label`, `labelPosition` (`"left"` | `"right"` default), `size` (`"sm"` | `"md"` default | `"lg"` | `"xl"`), `checkedValue` (custom on-value — string/number only), `uncheckedValue` (custom off-value), `disabled` (default `false`), `required`, `id`, `name`, `offTone` (`"brand"` default | `"neutral"`: Off drawn in grey, for settings rows where a brand-coloured Off reads as On), `stateText` (default `false`: prints On / Off beside the track)
+**Key props:** `modelValue` (`boolean`), `label` (says what is on, not "Enable"), `description`, `labelPosition` (`"end"` default in forms | `"start"` for setting rows with the switch at the row end), `disabled` (default `false`), `required`, `id`, `name`, `offTone` (`"brand"` default | `"neutral"`: Off drawn in grey, for setting rows where a brand-coloured Off reads as On), `stateText` (default `false`: prints On / Off after the track). One 28 × 16 track with a 12 px thumb (S9): `size`, `checkedValue` and `uncheckedValue` are gone and rejected by `local/o2-controls-api`.
 **Slots:** `label` (custom label content — overrides prop), `tooltip` (info icon inline in label)
 **Emits:** `update:modelValue`, `change`
 **Example:**
@@ -472,7 +485,7 @@ In an `OSettingRow`, pass `off-tone="neutral" state-text` and no `label`; the ro
 **Import:** `@/lib/forms/Switch/OFormSwitch.vue`
 **Use when:** An on/off toggle bound to one `<OForm>` field.
 **Don't use for:** Standalone toggles (use `OSwitch`).
-**Key props:** `name` (**required**), plus everything `OSwitch` accepts **except** `modelValue`: `label`, `labelPosition`, `size`, `checkedValue`, `uncheckedValue`, `disabled`, `required`, `id`, `name`, `offTone`, `stateText`.
+**Key props:** `name` (**required**), plus everything `OSwitch` accepts **except** `modelValue`: `label`, `description`, `labelPosition`, `disabled`, `required`, `id`, `name`, `offTone`, `stateText`.
 **Slots:** `label`, `tooltip` (per `OSwitch`).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
@@ -494,7 +507,7 @@ In an `OSettingRow`, pass `off-tone="neutral" state-text` and no `label`; the ro
 **Import:** `@/lib/forms/OptionGroup/OOptionGroup.vue`
 **Use when:** Rendering a set of mutually-exclusive (`type="radio"`) or multi-select (`type="checkbox"`) choices from an options array, inline (horizontal/vertical), with label + help text + error styling.
 **Don't use for:** Choices needing custom child markup (use `ORadioGroup`/`OCheckboxGroup` with slot children); a dropdown of many options (use `OSelect`); a single toggle (use `OSwitch`/`OCheckbox`).
-**Key props:** `options` (`OptionGroupOption[]` = `{ label, value, disabled? }`, **required**), `modelValue` (single `string|number|boolean` for radio, array for checkbox), `type` (`"radio"` default | `"checkbox"`), `orientation` (`"horizontal"` | `"vertical"` default), `label`, `helpText`, `errorMessage`, `error` (default `false`), `disabled` (default `false`), `required`, `size` (`"xs"` | `"sm"` | `"md"` default), `name`
+**Key props:** `options` (`OptionGroupOption[]` = `{ label, value, disabled? }`, **required**), `modelValue` (single `string|number|boolean` for radio, array for checkbox), `type` (`"radio"` default | `"checkbox"`), `orientation` (`"horizontal"` | `"vertical"` default), `label`, `helpText`, `errorMessage`, `error` (default `false`), `disabled` (default `false`), `required`, `name` (one size: the 16 px box or circle, S9)
 **Slots:** `label` (custom label content), `tooltip` (info icon in label row)
 **Emits:** `update:modelValue`, `change`
 **Example:**
@@ -518,7 +531,7 @@ In an `OSettingRow`, pass `off-tone="neutral" state-text` and no `label`; the ro
 **Import:** `@/lib/forms/OptionGroup/OFormOptionGroup.vue`
 **Use when:** An option group (radio or checkbox) bound to one `<OForm>` field.
 **Don't use for:** Standalone option groups (use `OOptionGroup`).
-**Key props:** `name` (**required**), plus everything `OOptionGroup` accepts **except** `modelValue`: `options`, `type`, `orientation`, `label`, `helpText`, `disabled`, `required`, `size`, `name`. (`error`/`errorMessage` come from the form field.)
+**Key props:** `name` (**required**), plus everything `OOptionGroup` accepts **except** `modelValue`: `options`, `type`, `orientation`, `label`, `helpText`, `disabled`, `required`, `name`. (`error`/`errorMessage` come from the form field.)
 **Slots:** `label`, `tooltip` (per `OOptionGroup`).
 **Emits:** none consumer-facing (binds into the form field).
 **Example:**
@@ -563,19 +576,18 @@ Say you need a field that accepts a secret token with reveal/copy controls and n
     <div class="flex gap-1">
       <OButton
         variant="ghost"
-        size="sm"
-        :icon-left="revealed ? 'visibility-off' : 'visibility'"
+        icon-only
+        :icon="revealed ? 'visibility-off' : 'visibility'"
+        :pressed="revealed"
+        :label="t(revealed ? 'common.hide' : 'common.show')"
+        :disabled="!modelValue || disabled"
         @click="revealed = !revealed"
-        :disabled="!modelValue || disabled"
-        :title="t(revealed ? 'common.hide' : 'common.show')"
       />
-      <OButton
-        variant="ghost"
-        size="sm"
-        icon-left="content-copy"
-        @click="copyToClipboard"
+      <!-- Every copy action is OCopyButton: inline check, no toast; copying never needs a reveal. -->
+      <OCopyButton
+        size="md"
+        :value="modelValue ?? ''"
         :disabled="!modelValue || disabled"
-        :title="t('common.copy')"
       />
     </div>
   </div>
@@ -584,9 +596,9 @@ Say you need a field that accepts a secret token with reveal/copy controls and n
 <script setup lang="ts">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useToast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 
 interface Props {
   modelValue?: string;
@@ -604,17 +616,7 @@ defineEmits<{
 }>();
 
 const { t } = useI18n();
-const toast = useToast();
 const revealed = ref(false);
-
-const copyToClipboard = async () => {
-  try {
-    await navigator.clipboard.writeText(modelValue || "");
-    toast.success(t("common.copiedToClipboard"));
-  } catch {
-    toast.error(t("common.copyFailed"));
-  }
-};
 </script>
 ```
 

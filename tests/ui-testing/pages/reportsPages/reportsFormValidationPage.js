@@ -202,7 +202,13 @@ export class ReportsFormValidationPage {
     async #pickOption(selectDataTest, value, search) {
         await this.page.locator(`[data-test="${selectDataTest}-trigger"]`).click();
         await expect(this.page.locator(`[data-test="${selectDataTest}-popover"]`)).toBeVisible();
-        if (search) await this.page.locator(`[data-test="${selectDataTest}-search"]`).fill(search);
+        // OSelect renders its search box only past eight options; a short list shows every row.
+        const searchBox = this.page.locator(`[data-test="${selectDataTest}-search"]`);
+        if (search) {
+            await this.page.locator(`[data-test="${selectDataTest}-popover"] [data-test-value]`).first()
+                .waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+            if (await searchBox.count()) await searchBox.fill(search);
+        }
         const option = this.page.locator(`[data-test="${selectDataTest}-option"][data-test-value="${value}"]`);
         await expect(option).toBeVisible({ timeout: 15000 });
         await option.click();

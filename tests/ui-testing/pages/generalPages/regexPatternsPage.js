@@ -132,8 +132,12 @@ export class RegexPatternsPage {
     await this.addPatternTitle.waitFor({ state: 'visible' });
   }
 
+  // Delete renders in the row's ⋯ menu (a portal), so open the menu before clicking it.
   async clickDeletePattern(patternId) {
     testLogger.info(`Clicking delete button for pattern ID: ${patternId}`);
+    const row = this.page.locator('tr').filter({ has: await this.getPatternUpdateButton(patternId) });
+    await row.hover();
+    await row.locator('[data-test="regex-pattern-list-row-more-actions"]').click();
     const deleteButton = await this.getPatternDeleteButton(patternId);
     await deleteButton.click();
   }
@@ -282,13 +286,14 @@ export class RegexPatternsPage {
   async getPatternIdByName(patternName) {
     testLogger.info(`Getting pattern ID for: ${patternName}`);
 
+    // The inline edit button carries the id; Delete exists only inside an open ⋯ menu.
     const patternId = await this.page.evaluate((name) => {
-      const deleteButtons = Array.from(document.querySelectorAll('[data-test*="delete-regex-pattern"]'));
-      for (const btn of deleteButtons) {
+      const editButtons = Array.from(document.querySelectorAll('[data-test$="-update-regex-pattern"]'));
+      for (const btn of editButtons) {
         const row = btn.closest('tr');
         if (row && row.textContent.includes(name)) {
           const testAttr = btn.getAttribute('data-test');
-          return testAttr.match(/regex-pattern-list-(\d+)-delete/)?.[1];
+          return testAttr.match(/regex-pattern-list-(.+)-update-regex-pattern/)?.[1];
         }
       }
       return null;

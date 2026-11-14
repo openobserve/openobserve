@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onShowAs"
     >
       <template v-if="isStacked" #tooltip>
-        <OTooltip :content="t('dashboard.thresholdStackedHint')" max-width="15.625rem" />
+        <OTooltip :content="t('dashboard.thresholdStackedHint')" />
       </template>
     </OSelect>
 
@@ -41,15 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-config-thresholds-mode"
       @update:model-value="onMode"
     >
-      <OToggleGroupItem
-        value="absolute"
-        size="sm"
-        data-test="dashboard-config-thresholds-mode-absolute"
-        >{{ t("dashboard.thresholdModeAbsolute") }}</OToggleGroupItem
-      >
+      <OToggleGroupItem value="absolute" data-test="dashboard-config-thresholds-mode-absolute">{{
+        t("dashboard.thresholdModeAbsolute")
+      }}</OToggleGroupItem>
       <OToggleGroupItem
         value="percentage"
-        size="sm"
         :disabled="isMetric"
         :tooltip="isMetric ? t('dashboard.thresholdPercentageNoRange') : undefined"
         data-test="dashboard-config-thresholds-mode-percentage"
@@ -90,9 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("dashboard.thresholdStep", { n: row.index + 1 }) }}</label
           >
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs"
-            icon-left="close"
+            icon="close"
             :title="t('dashboard.thresholdRemoveStep')"
             :aria-label="t('dashboard.thresholdRemoveStep')"
             :data-test="`dashboard-config-thresholds-step-${row.index}-remove`"
@@ -132,9 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="self-start">
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="add"
+          variant="secondary"
+          icon="add"
           data-test="dashboard-config-thresholds-add-step"
           @click="addStep"
           >{{ t("dashboard.thresholdAddStep") }}</OButton

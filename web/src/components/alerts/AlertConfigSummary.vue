@@ -21,64 +21,60 @@
   every change.
 -->
 <template>
-  <div class="flex flex-col gap-4" data-test="alerts-alertconfigsummary">
-    <OCard v-for="section in sections" :key="section.key">
-      <OCardSection role="body">
-        <h3 class="text-text-heading mb-3 text-lg">{{ section.title }}</h3>
-        <div class="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          <div
-            v-for="field in section.fields"
-            :key="field.key"
-            class="flex min-w-0 flex-col gap-1"
-            :class="fieldSpan(field)"
-            :data-test="`alerts-alertconfigsummary-${field.key}`"
-          >
-            <template v-if="field.code || field.badge">
-              <span
-                :id="labelId(field.key)"
-                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
-                >{{ field.label }}</span
-              >
-              <OCodeBlock
-                v-if="field.code"
-                :code="field.value"
-                :lang="field.code"
-                :max-lines="12"
-                inset
-                role="group"
-                :aria-labelledby="labelId(field.key)"
-                class="my-0!"
-                :data-test="`alerts-alertconfigsummary-${field.key}-code`"
-              />
-              <div v-else class="flex h-7 items-center">
-                <OTag :type="field.badge" :value="field.value" size="sm" />
-              </div>
-            </template>
-            <OInput
-              v-else
-              :model-value="shownValue(field.value)"
-              :label="field.label"
-              :placeholder="t('alerts.configNotSet')"
-              readonly
-              size="xs"
-              :data-test="`alerts-alertconfigsummary-${field.key}-input`"
+  <div class="flex flex-col gap-3" data-test="alerts-alertconfigsummary">
+    <OCard v-for="section in sections" :key="section.key" :title="section.title">
+      <div class="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div
+          v-for="field in section.fields"
+          :key="field.key"
+          class="flex min-w-0 flex-col gap-1"
+          :class="fieldSpan(field)"
+          :data-test="`alerts-alertconfigsummary-${field.key}`"
+        >
+          <template v-if="field.code || field.badge">
+            <span
+              :id="labelId(field.key)"
+              class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+              >{{ field.label }}</span
             >
-              <template v-if="field.link" #icon-right>
-                <!-- Unstyled: base-elements.css owns the link colour and its hover shade. -->
-                <router-link
-                  :to="field.link"
-                  :aria-label="t('alerts.openSlo')"
-                  :title="t('alerts.openSlo')"
-                  class="flex items-center"
-                  :data-test="`alerts-alertconfigsummary-${field.key}-link`"
-                >
-                  <OIcon name="open-in-new" size="sm" />
-                </router-link>
-              </template>
-            </OInput>
-          </div>
+            <OCodeBlock
+              v-if="field.code"
+              :code="field.value"
+              :lang="field.code"
+              :max-lines="12"
+              role="group"
+              :aria-labelledby="labelId(field.key)"
+              class="my-0!"
+              :data-test="`alerts-alertconfigsummary-${field.key}-code`"
+            />
+            <div v-else class="flex h-7 items-center">
+              <OTag :type="field.badge" :value="field.value" size="sm" />
+            </div>
+          </template>
+          <OInput
+            v-else
+            :model-value="shownValue(field.value)"
+            :label="field.label"
+            :placeholder="t('alerts.configNotSet')"
+            readonly
+            size="sm"
+            :data-test="`alerts-alertconfigsummary-${field.key}-input`"
+          >
+            <template v-if="field.link" #icon-end>
+              <!-- Unstyled: base-elements.css owns the link colour and its hover shade. -->
+              <router-link
+                :to="field.link"
+                :aria-label="t('alerts.openSlo')"
+                :title="t('alerts.openSlo')"
+                class="flex items-center"
+                :data-test="`alerts-alertconfigsummary-${field.key}-link`"
+              >
+                <OIcon name="open-in-new" size="sm" />
+              </router-link>
+            </template>
+          </OInput>
         </div>
-      </OCardSection>
+      </div>
     </OCard>
   </div>
 </template>
@@ -90,7 +86,6 @@ import { useStore } from "vuex";
 
 import OCard from "@/lib/core/Card/OCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";

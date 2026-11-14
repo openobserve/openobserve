@@ -73,7 +73,7 @@ export default function aerospikeCard(subs: CardSubstitutions, t: TranslateFn): 
             labelKey: "ingestion.setupCard.portLabel",
             default: "3000",
             placeholder: raw("3000"),
-            width: "sm",
+            width: "s",
           },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),

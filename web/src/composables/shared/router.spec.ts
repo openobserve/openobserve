@@ -1651,10 +1651,10 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("rum");
     });
 
-    it("should have meta title 'Real User Monitoring' for RUM route", () => {
+    it("should have meta title 'RUM' for RUM route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "RUM");
-      expect(enTitle(route.meta.titleKey)).toBe("Real User Monitoring");
+      expect(enTitle(route.meta.titleKey)).toBe("RUM");
     });
 
     it("should have beforeEnter guard for RUM route", () => {
@@ -2039,11 +2039,11 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("/reports/create");
     });
 
-    it("should have meta title 'Create Report' for createReport route", () => {
+    it("should have meta title 'New report' for createReport route", () => {
       config.isCloud = "false";
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "createReport");
-      expect(enTitle(route.meta.titleKey)).toBe("Create Report");
+      expect(enTitle(route.meta.titleKey)).toBe("New report");
     });
 
     it("should splice reports routes at index 13", () => {

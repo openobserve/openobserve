@@ -2,24 +2,22 @@
   <OPageLayout
     v-if="store.state.zoConfig.usage_enabled"
     :title="t('search_history.title')"
-    icon="history"
-    :back="{ onClick: closeSearchHistory }"
+    :back="{ label: t('menu.search'), to: logsRoute }"
     bleed
   >
-    <template #subtitle>
-      <div class="flex min-w-0 items-center gap-2">
-        <OTag type="streamType" :value="activeStreamType" />
-        <OTruncatedText v-if="activeStreamName" class="leading-normal">{{
-          activeStreamName
-        }}</OTruncatedText>
-      </div>
+    <template #status>
+      <OTag type="streamType" :value="activeStreamType" />
+      <OTruncatedText v-if="activeStreamName" class="max-w-60 text-xs leading-normal">{{
+        activeStreamName
+      }}</OTruncatedText>
     </template>
     <template #actions>
       <OButton
+        icon-only
         data-test="search-history-wrap-content-btn"
         variant="ghost"
-        size="icon"
-        class="border-card-glass-border! rounded-default! m-0 flex! h-6! min-h-6! w-[1.45rem]! items-center! justify-center! border-[0.0626rem]! border-solid! p-0! backdrop-blur-[0.625rem]! [transition:all_0.2s_ease]"
+        size="xs"
+        class="border-card-glass-border! rounded-default! m-0 flex! items-center! justify-center! border-[0.0626rem]! border-solid! backdrop-blur-[0.625rem]! [transition:all_0.2s_ease]"
         :class="
           wrapText
             ? 'bg-theme-accent! text-white hover:opacity-85'
@@ -38,9 +36,9 @@
           {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
         </div>
       </div>
-      <div class="[&_#date-time-button]:h-9!">
+      <div>
         <!-- Without its shift arrows on phones the picker fits beside the title. -->
-        <DateTime
+        <ODateTimeRange
           data-test-name="search-history-date-time"
           ref="searchDateTimeRef"
           auto-apply
@@ -55,10 +53,9 @@
 
       <div>
         <OButton
-          variant="outline"
-          size="icon-sm"
-          class="h-9! w-9!"
-          icon-left="refresh"
+          icon-only
+          variant="secondary"
+          icon="refresh"
           :loading="isLoading"
           data-test="search-history-get-history-btn"
           @click="fetchSearchHistory"
@@ -66,7 +63,7 @@
           <OTooltip
             side="bottom"
             :content="t('search_history.get_history')"
-            shortcut-id="searchHistoryRefresh"
+            shortcut="searchHistoryRefresh"
           />
         </OButton>
       </div>
@@ -82,7 +79,6 @@
     <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
       <OTable
         ref="oTableRef"
-        :frame="false"
         :data="dataToBeLoaded"
         :columns="columnsToBeRendered"
         row-key="uuid"
@@ -102,11 +98,9 @@
         expansion="single"
         :expand-on-row-click="true"
         v-model:expanded-ids="expandedIds"
-        :show-global-filter="false"
         :default-columns="false"
         :wrap="wrapText"
         :horizontal-scroll="!wrapText"
-        width="100%"
         @update:expanded-ids="onExpandedIdsChange"
       >
         <template #cell-executed_time="{ row }">
@@ -126,13 +120,17 @@
           <!-- px-4 matches the SQL/Function/More-Details blocks below so the
                    tabs line up with the query content instead of sitting flush
                    to the cell edge (same inset the scheduler list uses). -->
-          <div class="app-tabs-container my-1 w-fit px-4">
-            <AppTabs
-              data-test="expanded-list-tabs"
-              class="tabs-selection-container"
-              :tabs="tabs"
-              v-model:active-tab="activeTab"
-            />
+          <div class="my-1 w-fit px-4">
+            <OTabs v-model="activeTab" size="compact" data-test="expanded-list-tabs">
+              <OTab
+                v-for="tab in tabs"
+                :key="tab.value"
+                :name="tab.value"
+                :label="tab.label"
+                :icon="tab.icon"
+                :data-test="`tab-${tab.value}`"
+              />
+            </OTabs>
           </div>
           <div v-show="activeTab === 'query'">
             <div
@@ -145,20 +143,13 @@
                     <!-- Copy is a neutral action in both sections; the SQL/VRL
                              accent lives on the block's left border, which marks
                              which language you're looking at. -->
-                    <OButton
-                      :aria-label="t('common.copyToClipboard')"
+                    <OCopyButton
                       data-test="search-history-copy-sql-btn"
-                      variant="outline"
-                      size="icon-chip"
+                      size="xs"
                       class="ms-2"
-                      @click.stop="
-                        copyToClipboard(row.sql, t, {
-                          successMessage: t('logs.searchHistory.sqlQueryCopied'),
-                          timeout: 5000,
-                        })
-                      "
-                    >
-                      <OIcon name="content-copy" size="xs" /> </OButton></span
+                      variant="secondary"
+                      :label="t('common.copyToClipboard')"
+                      :value="row.sql" /></span
                 ></strong>
                 <!-- Logs and Inspect are both navigations, so they share one
                          variant and size. -->
@@ -166,11 +157,11 @@
                          stacked on top of it and doubled the spacing to 16px. -->
                 <OButton
                   data-test="search-history-go-to-logs-btn"
-                  variant="outline"
-                  size="chip"
+                  variant="secondary"
+                  size="xs"
                   @click.stop="goToLogs(row)"
                 >
-                  <template #icon-left><OIcon name="search" size="xs" /></template>
+                  <template #icon><OIcon name="search" size="xs" /></template>
                   {{ goToLogsLabel(row) }}
                 </OButton>
                 <OButton
@@ -180,11 +171,11 @@
                     store.state.zoConfig.search_inspector_enabled
                   "
                   data-test="search-history-inspect-btn"
-                  variant="outline"
-                  size="chip"
+                  variant="secondary"
+                  size="xs"
                   @click.stop="goToInspector(row)"
                 >
-                  <template #icon-left><OIcon name="analytics" size="xs" /></template>
+                  <template #icon><OIcon name="analytics" size="xs" /></template>
                   {{ t("logs.searchHistory.inspect") }}
                 </OButton>
               </div>
@@ -218,20 +209,13 @@
                   >{{ t("logs.searchHistory.functionDefinitionLabel") }}
                   <span>
                     <!-- Same neutral copy affordance as the SQL block above. -->
-                    <OButton
-                      :aria-label="t('common.copyToClipboard')"
+                    <OCopyButton
                       data-test="search-history-copy-function-btn"
-                      variant="outline"
-                      size="icon-chip"
+                      size="xs"
                       class="ms-2"
-                      @click.stop="
-                        copyToClipboard(row.function, t, {
-                          successMessage: t('logs.searchHistory.functionDefinitionCopied'),
-                          timeout: 5000,
-                        })
-                      "
-                    >
-                      <OIcon name="content-copy" size="xs" /> </OButton></span
+                      variant="secondary"
+                      :label="t('common.copyToClipboard')"
+                      :value="row.function" /></span
                 ></strong>
               </div>
 
@@ -270,7 +254,11 @@
 
         <template #empty>
           <div v-if="!isLoading" class="flex w-full">
-            <OEmptyState size="hero" preset="no-search-history" />
+            <OEmptyState
+              :title="t('emptyState.noSearchHistory.title')"
+              :text="t('emptyState.noSearchHistory.description')"
+              icon="history"
+            />
           </div>
         </template>
 
@@ -298,7 +286,7 @@
             {{ t("logs.index.enableUsageReporting") }}</span
           >
         </div>
-        <OButton class="mt-6" variant="outline" size="sm-action" @click="closeSearchHistory">{{
+        <OButton class="mt-6" variant="secondary" @click="closeSearchHistory">{{
           t("search.redirect_to_logs_page")
         }}</OButton>
       </div>
@@ -317,6 +305,7 @@ import {
   watch,
 } from "vue";
 import { useListViewState } from "@/composables/useListViewState";
+import useSmartBack from "@/composables/useSmartBack";
 import { timestampToTimezoneDate, b64EncodeUnicode, getUUID } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -326,13 +315,15 @@ import analytics from "@/services/product_analytics";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
@@ -357,10 +348,12 @@ export default defineComponent({
   name: "SearchHistoryComponent",
   components: {
     OEmptyState,
-    DateTime,
-    AppTabs,
+    ODateTimeRange,
+    OTabs,
+    OTab,
     QueryEditor,
     OButton,
+    OCopyButton,
     OIcon,
     OTag,
     OTooltip,
@@ -369,23 +362,16 @@ export default defineComponent({
     OTimeCell,
     OPageLayout,
   },
-  methods: {
-    closeSearchHistory() {
-      // Go back to wherever the user came from (preserving that page's URL/state)
-      // instead of resetting to a bare /logs. Fall back to the Logs route when this
-      // page was the entry point (deep link / refresh) and there's no history to pop.
-      if (window.history.state?.back) {
-        this.$router.back();
-      } else {
-        this.$router.push({ name: "logs" });
-      }
-    },
-  },
   setup() {
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
     const { t } = useI18nTyped();
+    const logsRoute = computed(() => ({
+      name: "logs",
+      query: { org_identifier: store.state.selectedOrganization?.identifier },
+    }));
+    const { goBack: closeSearchHistory } = useSmartBack(() => logsRoute.value);
     const { isMobile } = useBreakpoint();
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
@@ -812,6 +798,8 @@ export default defineComponent({
     return {
       isMobile,
       searchObj,
+      logsRoute,
+      closeSearchHistory,
       activeStreamType,
       activeStreamName,
       store,

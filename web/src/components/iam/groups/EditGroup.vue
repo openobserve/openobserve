@@ -18,19 +18,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="edit-group-section"
     :title="raw(groupDetails.group_name)"
-    :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
+    :back="{ label: t('iam.groups'), to: groupsRoute }"
     bleed
   >
-    <div data-test="edit-group-section-title" class="px-page-edge flex-shrink-0 pt-2.5 pb-2.5">
-      <div class="bg-card-glass-bg py-3">
-        <AppTabs
-          data-test="edit-group-tabs"
-          :tabs="tabs"
-          :active-tab="activeTab"
-          :dirty-title="t('iam.editGroup.unsavedDot.title')"
-          @update:active-tab="updateActiveTab"
+    <div data-test="edit-group-section-title" class="shrink-0">
+      <OTabs
+        :model-value="activeTab"
+        bordered
+        data-test="edit-group-tabs"
+        @update:model-value="(v) => updateActiveTab(String(v))"
+      >
+        <OTab
+          v-for="tab in tabs"
+          :key="tab.value"
+          :name="tab.value"
+          :label="tab.label"
+          :icon="tab.icon"
+          :dirty="tab.dirty"
+          :data-test="`tab-${tab.value}`"
         />
-      </div>
+      </OTabs>
     </div>
     <div class="min-h-0 flex-1 overflow-hidden">
       <GroupUsers
@@ -61,20 +68,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="bg-card-glass-bg px-page-edge border-border-default flex w-full justify-end gap-2 border-t py-2"
       >
-        <OButton
-          data-test="edit-group-cancel-btn"
-          variant="outline"
-          size="sm-action"
-          @click="cancelEditGroup"
-        >
+        <OButton data-test="edit-group-cancel-btn" variant="secondary" @click="cancelEditGroup">
           {{ t("alerts.cancel") }}
         </OButton>
-        <OButton
-          data-test="edit-group-submit-btn"
-          variant="primary"
-          size="sm-action"
-          @click="saveGroupChanges"
-        >
+        <OButton data-test="edit-group-submit-btn" variant="primary" @click="saveGroupChanges">
           {{ t("alerts.save") }}
         </OButton>
       </div>
@@ -97,7 +94,8 @@ import { ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
@@ -329,12 +327,12 @@ const saveGroupChanges = () => {
     });
 };
 
+const groupsRoute = computed(() => ({
+  name: "groups",
+  query: { org_identifier: store.state.selectedOrganization.identifier },
+}));
+
 const cancelEditGroup = () => {
-  router.push({
-    name: "groups",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
+  router.push(groupsRoute.value);
 };
 </script>

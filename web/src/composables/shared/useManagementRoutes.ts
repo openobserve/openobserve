@@ -26,7 +26,7 @@ const useManagementRoutes = () => {
           path: "general",
           name: "general",
           meta: {
-            titleKey: "settings.groupGeneral",
+            titleKey: "settings.generalLabel",
             allowOnEmptyData: true,
           },
           component: () => import("@/components/settings/General.vue"),
@@ -129,7 +129,7 @@ const useManagementRoutes = () => {
     // Locations are set up before the first check can run, so an empty org must reach this.
     meta: {
       keepAlive: true,
-      titleKey: "routeTitles.syntheticsLocations",
+      titleKey: "synthetics.locations.title",
       allowOnEmptyData: true,
       licenseFeature: "synthetics",
     },
@@ -144,7 +144,7 @@ const useManagementRoutes = () => {
     name: "slack",
     component: () => import("@/components/settings/Slack.vue"),
     meta: {
-      titleKey: "routeTitles.slackApp",
+      titleKey: "settings.slackApp",
     },
     beforeEnter: slackRouteGuard,
   });
@@ -217,7 +217,7 @@ const useManagementRoutes = () => {
           name: "storageSettings",
           component: () => import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
-            titleKey: "routeTitles.storageSettings",
+            titleKey: "storage_settings.tabLabel",
             licenseFeature: "byob",
           },
           beforeEnter: withFeatureGate("storageSettings", routeGuard),
@@ -238,7 +238,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/DomainManagement.vue"),
           meta: {
             keepAlive: true,
-            titleKey: "routeTitles.domainManagement",
+            titleKey: "settings.ssoDomainRestrictions",
           },
           beforeEnter: withFeatureGate("domainManagement", routeGuard),
         },
@@ -248,7 +248,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/RegexPatternList.vue"),
           meta: {
             keepAlive: true,
-            titleKey: "routeTitles.regexPatterns",
+            titleKey: "regex_patterns.title",
           },
           beforeEnter: withFeatureGate("regexPatterns", routeGuard),
         },
@@ -258,7 +258,7 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/PasswordPolicy.vue"),
           meta: {
             keepAlive: true,
-            titleKey: "routeTitles.passwordPolicy",
+            titleKey: "settings.passwordPolicy",
           },
           beforeEnter: withFeatureGate("passwordPolicy", routeGuard),
         },
@@ -275,6 +275,7 @@ const useManagementRoutes = () => {
         {
           path: "license",
           name: "license",
+          meta: { titleKey: "settings.license" },
           component: () => import("@/components/settings/License.vue"),
           beforeEnter: withFeatureGate("license", routeGuard),
         },
@@ -331,7 +332,7 @@ const useManagementRoutes = () => {
           name: "orgDomainMapping",
           component: () => import("@/components/settings/OrgDomainManagement.vue"),
           meta: {
-            titleKey: "routeTitles.orgDomainMapping",
+            titleKey: "settings.orgDomainMapping.tabLabel",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);

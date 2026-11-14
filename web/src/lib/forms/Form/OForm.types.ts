@@ -21,6 +21,9 @@ export const FORM_CONTEXT_KEY: InjectionKey<FormContextValue> = Symbol("OFormCon
  */
 export const FORM_SUBMIT_STATE_KEY: InjectionKey<Ref<boolean>> = Symbol("OFormSubmitState");
 
+/** An overlay provides this so a nested OForm can report unsaved edits to its discard guard (guideline V5). */
+export const FORM_DIRTY_STATE_KEY: InjectionKey<Ref<boolean>> = Symbol("OFormDirtyState");
+
 /** What an enclosing row tells the field wrappers inside it: which field's message the row prints, and that message's element id. */
 export interface SettingRowErrorContext {
   readonly name: string | undefined;

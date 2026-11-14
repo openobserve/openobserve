@@ -146,9 +146,9 @@ test.describe('Enterprise consumers of the destination delete guard testcases', 
     await pm.pipelinesPage.openPipelineDestinationsAt(destinationName);
 
     testLogger.info('Asserting the delete is refused and names the pipeline');
-    await pm.alertDestinationsPage.attemptDeleteDestination(destinationName);
+    await pm.pipelinesPage.attemptDeletePipelineDestination(destinationName);
     await pm.alertDestinationsPage.expectInUseErrorToastContaining(['pipeline', pipelineName]);
-    await pm.alertDestinationsPage.expectDestinationRowStillVisible(destinationName);
+    await pm.pipelinesPage.expectPipelineDestinationRowVisible(destinationName);
     testLogger.info('Test completed');
   });
 
@@ -259,9 +259,9 @@ test.describe('Enterprise consumers of the destination delete guard testcases', 
     await pm.pipelinesPage.openPipelineDestinationsAt(destinationName);
 
     testLogger.info('Asserting the delete is refused and names the workflow');
-    await pm.alertDestinationsPage.attemptDeleteDestination(destinationName);
+    await pm.pipelinesPage.attemptDeletePipelineDestination(destinationName);
     await pm.alertDestinationsPage.expectInUseErrorToastContaining(['workflow', workflowName]);
-    await pm.alertDestinationsPage.expectDestinationRowStillVisible(destinationName);
+    await pm.pipelinesPage.expectPipelineDestinationRowVisible(destinationName);
     testLogger.info('Test completed');
   });
 });

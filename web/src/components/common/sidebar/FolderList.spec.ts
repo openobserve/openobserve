@@ -51,8 +51,7 @@ const ConfirmDialogStub = {
     messageName: { type: String },
     confirmText: { type: String },
     okLabel: { type: String },
-    okVariant: { type: String },
-    focusCancel: { type: Boolean, default: false },
+    kind: { type: String },
   },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: `
@@ -586,8 +585,7 @@ describe("FolderList.vue", () => {
       expect(fleets.findComponent(ConfirmDialogStub).props()).toMatchObject({
         confirmText: "test1",
         okLabel: "Delete",
-        okVariant: "destructive",
-        focusCancel: true,
+        kind: "typeToConfirm",
       });
       fleets.unmount();
       (wrapper.vm as any).showDeleteFolderDialogFn("folder1");
@@ -595,8 +593,7 @@ describe("FolderList.vue", () => {
       expect(wrapper.findComponent(ConfirmDialogStub).props()).toMatchObject({
         confirmText: undefined,
         okLabel: undefined,
-        okVariant: "destructive",
-        focusCancel: false,
+        kind: "typeToConfirm",
       });
     });
 
@@ -807,7 +804,7 @@ describe("FolderList.vue", () => {
         messageKeypath: "dashboard.deleteFolderMessage",
         messageName: "Test Folder 1",
         message: undefined,
-        okVariant: "destructive",
+        kind: "typeToConfirm",
       });
     });
 

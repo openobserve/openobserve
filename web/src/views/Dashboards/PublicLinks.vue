@@ -17,20 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('dashboard.publicLinks.pageTitle')"
-    :subtitle="t('dashboard.publicLinks.pageSubtitle')"
-    icon="public"
     :back="{
-      label: t('common.back'),
+      label: t('dashboard.header'),
       to: dashboardsRoute,
       dataTest: 'dashboards-public-links-page-back',
     }"
     bleed
   >
-    <template #title>
-      <span class="inline-flex items-center gap-2">
-        {{ t("dashboard.publicLinks.pageTitle") }}
-        <BetaBadge />
-      </span>
+    <template #status>
+      <BetaBadge />
     </template>
     <PublicLinksTable class="min-h-0 w-full flex-1" />
   </OPageLayout>

@@ -557,7 +557,6 @@ async function saveCheck() {
         <span class="flex-1" aria-hidden="true" />
         <OButton
           variant="ghost"
-          size="sm"
           data-test="synthetics-create-cancel-btn"
           @click="router.push(backTo)"
         >
@@ -565,7 +564,6 @@ async function saveCheck() {
         </OButton>
         <OButton
           variant="primary"
-          size="sm"
           :loading="isSaving"
           data-test="synthetics-create-save-btn"
           @click="saveCheck"

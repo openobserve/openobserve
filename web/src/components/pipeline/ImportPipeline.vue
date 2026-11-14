@@ -22,8 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     hide-header
     container-class=""
     :is-importing="isPipelineImporting"
-    @back="router.back()"
-    @cancel="router.back()"
+    @cancel="goBack"
     @import="importJson"
   >
     <!-- Output Section with Pipeline-specific Error Display -->
@@ -99,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ errorMessage.message }}
                     <div style="width: 18.75rem">
                       <OSelect
+                        searchable
                         data-test="pipeline-import-source-stream-name-input"
                         :model-value="userSelectedStreamName[index] || ''"
                         :options="streamList"
@@ -385,8 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        and must exist before this child mounts. See PipelineHistory.vue for the same pattern. -->
   <Teleport to="#o2-page-actions" defer>
     <OButton
-      variant="outline"
-      size="sm-action"
+      variant="secondary"
       data-test="pipeline-import-cancel-btn"
       @click="baseImportRef?.handleCancel()"
     >
@@ -394,7 +393,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
     <OButton
       variant="primary"
-      size="sm-action"
       type="submit"
       data-test="pipeline-import-json-btn"
       :loading="isPipelineImporting"
@@ -416,6 +414,7 @@ import { defineComponent, ref, onMounted, computed, defineAsyncComponent } from 
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import pipelinesService from "../../services/pipelines";
 import analytics from "@/services/product_analytics";
 import useStreams from "@/composables/useStreams";
@@ -477,6 +476,10 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
+    const { goBack } = useSmartBack(() => ({
+      name: "pipelines",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    }));
 
     const { getStreams } = useStreams(t);
     const { getPipelineDestinations } = usePipelines(t);
@@ -1689,6 +1692,7 @@ export default defineComponent({
       raw,
       importJson,
       router,
+      goBack,
       baseImportRef,
       pipelineErrorsToDisplay,
       pipelineCreators,

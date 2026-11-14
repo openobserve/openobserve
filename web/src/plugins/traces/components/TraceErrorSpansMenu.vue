@@ -42,16 +42,15 @@ const spanLabel = useErrorSpanLabel();
     v-if="errors.length"
     side="bottom"
     align="start"
-    content-class="max-h-[60vh] w-[min(24rem,calc(100vw-1.5rem))] overflow-y-auto"
+    content-class="max-h-[60vh] overflow-y-auto"
   >
     <template #trigger>
-      <OButton variant="cell" class="w-auto!">
+      <OButton variant="link" class="w-auto!">
         <OTag
           type="logsResultChip"
           value="error"
           :size="compact ? 'sm' : undefined"
           data-test="trace-details-error-spans-count"
-          :class="compact ? 'py-1!' : ''"
         >
           <span class="inline-flex items-center gap-0.5"
             >{{ formatLargeNumber(errors.length) }} {{ t("traces.errorsLabel") }}

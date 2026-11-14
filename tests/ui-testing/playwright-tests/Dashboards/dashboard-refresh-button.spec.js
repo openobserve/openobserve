@@ -67,7 +67,7 @@ test.describe('Dashboard Refresh Button (primary variant & label)', { tag: ['@da
     testLogger.info('TC-RB-001 completed');
   });
 
-  test('TC-RB-002: Refresh demotes to outline in layout edit mode while Save is primary, then restores primary on exit', { tag: ['@P0'] }, async () => {
+  test('TC-RB-002: Refresh demotes to secondary in layout edit mode while Save is primary, then restores primary on exit', { tag: ['@P0'] }, async () => {
     const autoRun = pm.dashboardAutoRun;
     const actions = pm.dashboardPanelActions;
     const id = await createDashboard(`refreshbtn_edit_${Date.now()}_${Math.floor(Math.random() * 1e4)}`, {
@@ -80,7 +80,7 @@ test.describe('Dashboard Refresh Button (primary variant & label)', { tag: ['@da
 
     await actions.enterLayoutEdit();
     await expect(actions.layoutEditBadge).toBeVisible();
-    await autoRun.expectRefreshVariant('outline');
+    await autoRun.expectRefreshVariant('secondary');
     await expect(actions.layoutEditSaveBtn).toHaveAttribute('data-o2-variant', 'primary');
 
     await actions.discardLayoutEdit();
@@ -90,7 +90,7 @@ test.describe('Dashboard Refresh Button (primary variant & label)', { tag: ['@da
     testLogger.info('TC-RB-002 completed');
   });
 
-  test('TC-RB-003: a pending refresh turns both the Refresh button and its options trigger pending, then primary after Refresh', { tag: ['@P1'] }, async () => {
+  test('TC-RB-003: a pending refresh marks the Refresh button stale while its options trigger stays primary, then clears after Refresh', { tag: ['@P1'] }, async () => {
     const autoRun = pm.dashboardAutoRun;
     await autoRun.pinAutoQuery(false);
     await autoRun.setStoredAutoRun('false');
@@ -104,7 +104,7 @@ test.describe('Dashboard Refresh Button (primary variant & label)', { tag: ['@da
 
     await autoRun.selectVariableValue('ns', first);
     await autoRun.expectRefreshVariant('pending');
-    await autoRun.expectRefreshOptionsVariant('pending');
+    await autoRun.expectRefreshOptionsVariant('primary');
 
     await autoRun.clickRefresh();
     await autoRun.waitForRuns('var', base + 1);

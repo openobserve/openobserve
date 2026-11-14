@@ -25,40 +25,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="(envKeyActive && revHwmWarning?.source !== 'env') || revHwmWarning"
       class="border-border-default flex flex-col gap-3 border-b px-4 py-3"
     >
-      <OBanner
+      <OInlineNotice
         v-if="envKeyActive && revHwmWarning?.source !== 'env'"
-        :variant="envKeyInUse ? 'warning' : 'info'"
-        :icon="envKeyInUse ? 'warning' : 'info'"
-        :content="
+        :tone="envKeyInUse ? 'warn' : 'info'"
+        :message="
           envKeyInUse
             ? t('about.license_status_env_key')
             : t('about.license_status_env_key_superseded')
         "
         data-test="license-status-env-key"
       />
-      <OBanner
+      <OInlineNotice
         v-if="revHwmWarning"
-        variant="warning"
-        icon="warning"
-        inline-actions
-        :content="revWarningText"
+        tone="warn"
+        :message="revWarningText"
         data-test="license-status-rev-hwm"
       >
         <template #actions>
           <OButton
             v-if="revHwmWarning.source === 'db' && canUpdateLicense"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="license-status-rev-hwm-add-key"
             @click="emit('add-license-key')"
             >{{ t("about.add_new_license_key") }}</OButton
           >
         </template>
-      </OBanner>
+      </OInlineNotice>
     </div>
     <OSettingRow control-at="end" :label="t('about.license_status_search')">
       <div data-test="license-status-search">
-        <OBadge :variant="decision.search_allowed ? 'success' : 'error'">
+        <OBadge :tone="decision.search_allowed ? 'ok' : 'err'">
           {{
             decision.search_allowed
               ? t("about.license_status_on")
@@ -112,7 +108,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import {

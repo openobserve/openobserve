@@ -240,7 +240,6 @@ describe("StepPickerDialog", () => {
       const expected = i18n.global.t("common.search") as string;
       expect(search.props("placeholder")).toBe(expected);
       expect(expected).not.toBe("common.search");
-      expect(search.props("clearable")).toBe(true);
       expect(wrapper.find('[data-test="flow-step-search"]').exists()).toBe(true);
     });
 

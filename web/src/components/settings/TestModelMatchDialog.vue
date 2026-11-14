@@ -1,15 +1,16 @@
 <template>
   <ODialog
+    size="lg"
     v-model:open="internalValue"
-    persistent
-    :width="50"
     data-test="test-model-match-dialog"
     :title="t('modelPricing.testMatchTitle')"
-    :sub-title="t('modelPricing.testMatchSubtitle')"
-    :secondary-button-label="t('modelPricing.close')"
-    :primary-button-label="t('modelPricing.testMatch')"
-    :primary-button-disabled="!testModelName || testAtTimeRefused"
-    :primary-button-loading="testing"
+    :subtitle="t('modelPricing.testMatchSubtitle')"
+    :secondary="{ label: t('modelPricing.close') }"
+    :primary="{
+      label: t('modelPricing.testMatch'),
+      disabled: !testModelName || testAtTimeRefused,
+      loading: testing,
+    }"
     @click:secondary="internalValue = false"
     @click:primary="runTest"
   >
@@ -33,7 +34,7 @@
           data-test="test-match-model-input"
           @keydown.enter="onModelNameEnter"
         >
-          <template #icon-left>
+          <template #icon>
             <OIcon name="smart-toy" size="sm" class="shrink-0 opacity-[0.35]" />
           </template>
         </OInput>
@@ -71,7 +72,6 @@
                   example: raw('openai.response.service_tier'),
                 })
               "
-              size="sm"
               class="min-w-0 flex-1"
               :data-test="`test-match-attribute-key-${aIdx}`"
             />
@@ -79,25 +79,24 @@
               v-model="attr.value"
               :label="t('modelPricing.testAttributeValue')"
               :placeholder="t('modelPricing.ruleValuesPlaceholder', { example: raw('flex') })"
-              size="sm"
               class="min-w-0 flex-1"
               :data-test="`test-match-attribute-value-${aIdx}`"
             />
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs-sq"
+              size="sm"
               type="button"
               :aria-label="t('modelPricing.testRemoveAttribute')"
               :data-test="`test-match-attribute-remove-${aIdx}`"
               @click="removeAttribute(aIdx)"
             >
               <OIcon name="close" size="xs" />
-              <OTooltip :side-offset="4" :content="t('modelPricing.testRemoveAttribute')" />
+              <OTooltip :content="t('modelPricing.testRemoveAttribute')" />
             </OButton>
           </div>
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             type="button"
             class="self-start"
             data-test="test-match-attribute-add"
@@ -124,7 +123,6 @@
             <OEmptyState
               size="inline"
               icon="manage-search"
-              hide-action
               :title="t('modelPricing.enterModelName')"
             />
           </div>
@@ -136,12 +134,7 @@
             class="flex h-full min-h-50 items-center justify-center"
             data-test="test-match-waiting"
           >
-            <OEmptyState
-              size="inline"
-              icon="ads-click"
-              hide-action
-              :title="t('modelPricing.clickToTest')"
-            />
+            <OEmptyState size="inline" icon="ads-click" :title="t('modelPricing.clickToTest')" />
           </div>
 
           <!-- No Match -->
@@ -151,7 +144,7 @@
             class="flex flex-col gap-3"
             data-test="test-match-no-result"
           >
-            <OBanner variant="error-soft" icon="error-outline" inline-actions>
+            <OInlineNotice tone="err">
               <div class="text-compact font-bold">
                 {{ t("modelPricing.noMatchFound") }}
               </div>
@@ -162,7 +155,7 @@
                   })
                 }}
               </div>
-            </OBanner>
+            </OInlineNotice>
             <div
               class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
             >
@@ -180,11 +173,7 @@
           <!-- Match Found -->
           <div v-else key="match" class="flex flex-col gap-3" data-test="test-match-result">
             <!-- Match status -->
-            <OBanner
-              :variant="isApproximateMatch ? 'warning' : 'success'"
-              :icon="isApproximateMatch ? 'warning' : 'check-circle'"
-              inline-actions
-            >
+            <OInlineNotice :tone="isApproximateMatch ? 'warn' : 'ok'">
               <div class="text-compact font-bold">
                 {{
                   isApproximateMatch
@@ -206,12 +195,12 @@
                 <OTag
                   type="modelSource"
                   :value="testResult.matched.source || 'org'"
-                  class="text-2xs shrink-0 font-semibold"
+                  class="shrink-0"
                 >
                   {{ sourceLabel(testResult.matched) }}
                 </OTag>
               </template>
-            </OBanner>
+            </OInlineNotice>
 
             <!-- Priority flow -->
             <div
@@ -319,7 +308,6 @@
                 v-else
                 size="inline"
                 icon="info-outline"
-                hide-action
                 :title="t('modelPricing.noPricingForTier')"
               />
             </div>
@@ -337,7 +325,7 @@ import { useStore } from "vuex";
 import modelPricingService from "@/services/model_pricing";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCode from "@/lib/core/Code/OCode.vue";

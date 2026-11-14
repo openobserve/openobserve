@@ -17,12 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="open"
-    persistent
     size="sm"
     :title="t('statusPages.createTitle')"
     :form-id="FORM_ID"
-    :primary-button-label="t('common.create')"
-    :secondary-button-label="t('common.cancel')"
+    :primary="{ label: t('common.create') }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="status-pages-create-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
@@ -41,9 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         required
         data-test="status-pages-create-name-input"
       />
-      <OFormInput
+      <OFormTextarea
         name="description"
-        type="textarea"
         :rows="3"
         :label="t('statusPages.fields.description')"
         :placeholder="t('statusPages.fields.descriptionPlaceholder')"
@@ -59,6 +57,7 @@ import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import statusPagesService, { type StatusPageListItem } from "@/services/status_pages";
 import {

@@ -24,6 +24,13 @@
 
 ## Frontend (web/)
 
+- Every change under `web/` follows the `ui-architect` skill and the rule ids in
+  its `references/guidelines.md`, which are binding. The PR description lists
+  the guideline ids the change applies.
+- The component API rules `local/o2-*-api` in `web/eslint.config.js` run in
+  `lint:ci` and stay at zero violations.
+- No new component, variant, size, height or radius outside the design system
+  (`web/src/lib` and the token files in `web/src/lib/styles/tokens/`).
 - After every change under `web/`, run `npm run format:check` from `web/`
   before considering the task done. If it flags a file, fix it with
   `npx prettier --write <file>` (not a full-repo `--write`) and re-run

@@ -25,7 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="opt in platformOptions"
         :key="opt.value"
         :value="opt.value"
-        size="sm"
         :data-test="`fleet-install-command-os-${opt.value}`"
       >
         {{ opt.label }}
@@ -41,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="opt in roleOptions"
         :key="opt.value"
         :value="opt.value"
-        size="sm"
         :data-test="`fleet-install-command-role-${opt.value}`"
       >
         {{ opt.label }}
@@ -50,8 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OInput
       v-if="platform === 'kubernetes'"
       v-model="clusterName"
-      size="sm"
-      width="md"
+      width="m"
       class="max-md:w-full"
       :label="t('fleet.install.clusterName')"
       :placeholder="raw('prod-us-east')"
@@ -72,13 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :code="command"
       :code-masked="commandMasked"
       :lang="platform === 'windows' ? 'powershell' : 'bash'"
-      chrome="terminal"
-      :reveal-tooltip="t('fleet.install.revealToken')"
-      :hide-tooltip="t('fleet.install.hideToken')"
       data-test="fleet-install-command-code"
     />
     <OText variant="meta" data-test="fleet-install-command-note">{{ note }}</OText>
-    <OCollapsible :label="t('fleet.uninstall.howTo')" data-test="fleet-install-command-uninstall">
+    <OCollapsible :title="t('fleet.uninstall.howTo')" data-test="fleet-install-command-uninstall">
       <FleetUninstallCommand :platform="platform" :role="role" />
     </OCollapsible>
   </div>

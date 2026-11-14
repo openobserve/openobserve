@@ -29,8 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OButton
         data-test="add-cipher-key-openobserve-secret-input-cancel"
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         class="mt-2"
         v-if="isUpdate && localValue != ''"
         @click="showSecretEdit = false"
@@ -50,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         data-test="add-cipher-key-openobserve-secret-input-update"
         variant="primary"
-        size="sm-action"
         @click="showSecretEdit = true"
       >
         {{ t("common.update") }}

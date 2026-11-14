@@ -27,12 +27,12 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 // emits directly. Mirrors the same shape used by other migrated specs.
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  props: ["open", "width", "showClose", "persistent", "size", "title", "subtitle"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div data-test-stub="o-drawer" :data-open="open">
       <div data-test-stub="o-drawer-title">{{ title }}</div>
-      <div data-test-stub="o-drawer-subtitle">{{ subTitle }}</div>
+      <div data-test-stub="o-drawer-subtitle">{{ subtitle }}</div>
       <template v-if="open">
         <div data-test-stub="o-drawer-header"><slot name="header" /></div>
         <div data-test-stub="o-drawer-body"><slot /></div>
@@ -58,7 +58,7 @@ const OButtonStub = {
       :data-test="$attrs['data-test']"
       :disabled="disabled || null"
       @click="$emit('click', $event)"
-    ><slot name="icon-left" /><slot /><slot name="icon-right" /></button>
+    ><slot name="icon" /><slot /><slot name="icon-end" /></button>
   `,
 };
 
@@ -224,9 +224,9 @@ describe("PatternDetailsDialog", () => {
       expect(drawer.props("open")).toBe(true);
     });
 
-    it("should pass width=90 to ODrawer", () => {
+    it("should pass the fixed xl size to ODrawer", () => {
       const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("width")).toBe(90);
+      expect(drawer.props("size")).toBe("xl");
     });
 
     it("should pass the localized title to ODrawer", () => {
@@ -236,7 +236,7 @@ describe("PatternDetailsDialog", () => {
 
     it("should pass the localized subTitle to ODrawer", () => {
       const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("subTitle")).toBe("Pattern 1 of 10");
+      expect(drawer.props("subtitle")).toBe("Pattern 1 of 10");
     });
 
     it("should pass undefined subTitle when selectedPattern is null", () => {
@@ -251,7 +251,7 @@ describe("PatternDetailsDialog", () => {
         global: globalConfig,
       });
       const drawer = w.findComponent({ name: "ODrawer" });
-      expect(drawer.props("subTitle")).toBeUndefined();
+      expect(drawer.props("subtitle")).toBeUndefined();
     });
 
     it("shows the pattern position once with the real drawer", async () => {
@@ -611,7 +611,7 @@ describe("PatternDetailsDialog", () => {
         selectedPattern: { ...mockSelectedPattern, index: 5 },
       });
       const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("subTitle")).toBe("Pattern 6 of 10");
+      expect(drawer.props("subtitle")).toBe("Pattern 6 of 10");
     });
 
     it("should show '6 of 10' counter in footer when index is 5", async () => {

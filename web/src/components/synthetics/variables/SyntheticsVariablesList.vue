@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col">
     <OTable
-      :frame="false"
       data-test="synthetics-variables-table"
       :data="visibleRows"
       :columns="columns"
@@ -32,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="synthetics-variables"
-      :show-global-filter="false"
       :loading="loading"
       :forbidden="forbidden"
     >
@@ -42,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-heading min-w-0 truncate text-sm font-semibold">{{
               scopeLabel
             }}</span>
-            <OBadge v-if="environment" variant="default" size="sm" class="shrink-0">{{
+            <OBadge v-if="environment" tone="neutral" size="sm" class="shrink-0">{{
               scopeSummary
             }}</OBadge>
             <span v-else class="text-text-secondary shrink-0 text-sm">{{ scopeSummary }}</span>
@@ -56,9 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #toolbar-trailing>
         <OButton
-          variant="outline"
-          size="icon-toolbar"
-          icon-left="refresh"
+          icon-only
+          variant="secondary"
+          icon="refresh"
           :loading="loading"
           data-test="synthetics-variables-refresh-btn"
           @click="$emit('refresh')"
@@ -79,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-kind="{ row }">
-        <OBadge :variant="row.kind === 'secret' ? 'warning' : 'default'">
+        <OBadge :tone="row.kind === 'secret' ? 'warn' : 'neutral'">
           {{
             row.kind === "secret"
               ? t("synthetics.variables.kindSecret")
@@ -91,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-value="{ row }">
         <OBadge
           v-if="row.kind === 'secret' && !row.has_value"
-          variant="warning"
+          tone="warn"
           data-test="synthetics-variable-value-empty"
           >{{ t("synthetics.variables.notSet") }}</OBadge
         >
@@ -103,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OBadge
           v-else-if="row.value === ''"
-          variant="warning"
+          tone="warn"
           data-test="synthetics-variable-value-empty"
           >{{ t("synthetics.variables.valueEmpty") }}</OBadge
         >
@@ -126,17 +124,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #cell-actions="{ row }">
         <OButton
+          icon-only
           :aria-label="t('common.edit')"
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="edit"
+          size="sm"
+          icon="edit"
           data-test="synthetics-variable-edit-btn"
           @click="openEdit(row)"
         />
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="content-copy"
+          size="sm"
+          icon="content-copy"
           data-test="synthetics-variable-duplicate-btn"
           @click="openDuplicate(row)"
         >
@@ -153,10 +153,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="inline-flex">
             <OButton
+              icon-only
               :aria-label="t('synthetics.promote.toGlobal')"
               variant="ghost"
-              size="icon-xs-sq"
-              icon-left="drive-file-move"
+              size="sm"
+              icon="drive-file-move"
               :disabled="row.kind === 'secret'"
               data-test="synthetics-variable-promote-btn"
               @click="promote(row)"
@@ -165,19 +166,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTooltip>
         <OButton
           v-if="!environment && environments.length > 0"
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="drive-file-move"
+          size="sm"
+          icon="drive-file-move"
           data-test="synthetics-variable-split-btn"
           @click="openSplit(row)"
         >
           <OTooltip side="bottom" :content="t('synthetics.split.action')" />
         </OButton>
         <OButton
+          icon-only
           :aria-label="t('common.delete')"
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="delete"
+          size="sm"
+          icon="delete"
           data-test="synthetics-variable-delete-btn"
           @click="removeVariable(row)"
         />
@@ -185,13 +188,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #empty>
         <OEmptyState
+          :kind="filterQuery ? 'filtered' : 'first-run'"
           :title="t('synthetics.variables.emptyTitle')"
-          :description="
+          :text="
             filterQuery
               ? t('synthetics.variables.emptyFiltered')
               : t('synthetics.variables.emptyBody')
           "
-          :filtered="Boolean(filterQuery)"
         />
       </template>
     </OTable>
@@ -222,11 +225,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       :open="pendingDelete !== null"
       size="sm"
-      persistent
       :title="t('synthetics.variables.deleteTitle')"
-      :primary-button-label="t('common.ok')"
-      primary-button-variant="destructive"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{ label: t('common.ok'), variant: 'danger' }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="synthetics-variable-delete-dialog"
       @update:open="(open: boolean) => !open && (pendingDelete = null)"
       @click:primary="confirmRemoveVariable"

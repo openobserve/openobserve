@@ -77,7 +77,7 @@ import LibraryInstallDialog from "./LibraryInstallDialog.vue";
 // assertion below it.
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "title", "subTitle", "size", "persistent"],
+  props: ["open", "title", "subtitle", "size", "persistent"],
   emits: ["update:open"],
   template: '<div data-test="o-dialog"><slot /><slot name="footer" /></div>',
 };

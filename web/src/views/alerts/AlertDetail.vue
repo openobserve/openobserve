@@ -29,17 +29,27 @@
 <template>
   <OPageLayout
     :title="notFound ? t('alerts.groups.notFoundTitle') : raw(alert?.name || '')"
-    icon="notifications"
-    :subtitle="notFound ? raw('') : subtitle"
     :back="backTarget"
     title-data-test="alerts-alertdetail-title"
     bleed
   >
-    <template #title-trail>
+    <!-- M-6 forbids silent truncation: a capped evaluation says so instead of showing a partial table. -->
+    <template v-if="!notFound && !isCompositeAlert && groupData?.capped" #banner>
+      <OBanner tone="warn" data-test="alerts-alertdetail-cap-banner">
+        {{
+          t("alerts.groups.capBanner", {
+            observed: groupData?.groups_observed,
+            cap: groupData?.group_cap,
+          })
+        }}
+      </OBanner>
+    </template>
+
+    <template #status>
       <div v-if="!notFound" class="flex items-center gap-2">
         <OTag
           v-if="isMultiAlert"
-          variant="purple-soft"
+          tone="neutral"
           icon="layers"
           size="sm"
           :label="t('alerts.multiAlert.badge')"
@@ -78,9 +88,9 @@
         <ODropdown v-if="isAnomalyAlert && headerDowntime && downtimesEnabled" align="start">
           <template #trigger>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="more-vert"
+              icon="more-vert"
               :aria-label="t('alerts.downtimes.mute.rowActions')"
               data-test="alerts-alertdetail-anomaly-mute-menu"
             />
@@ -123,8 +133,8 @@
       />
       <OTooltip v-if="!notFound && editAnomalyLocked" :content="anomalyLockedReason">
         <span class="inline-flex">
-          <OButton variant="outline" size="sm-action" disabled data-test="alerts-alertdetail-edit">
-            <template #icon-left>
+          <OButton variant="secondary" disabled data-test="alerts-alertdetail-edit">
+            <template #icon>
               <OIcon
                 name="lock"
                 class="lock-chip"
@@ -138,9 +148,8 @@
       </OTooltip>
       <OButton
         v-else-if="!notFound"
-        variant="outline"
-        size="sm-action"
-        icon-left="edit"
+        variant="secondary"
+        icon="edit"
         data-test="alerts-alertdetail-edit"
         @click="editAlert"
       >
@@ -150,9 +159,8 @@
 
     <OContent v-if="notFound" class="py-6">
       <OEmptyState
-        size="hero"
         :title="t('alerts.groups.notFoundTitle')"
-        :description="t('alerts.groups.notFoundDescription')"
+        :text="t('alerts.groups.notFoundDescription')"
         data-test="alerts-alertdetail-not-found"
       />
     </OContent>
@@ -165,7 +173,7 @@
 
         <OTabs
           v-model="activeTab"
-          dense
+          size="compact"
           bordered
           class="shrink-0"
           data-test="alerts-alertdetail-tabs"
@@ -186,23 +194,6 @@
       </template>
 
       <template v-else>
-        <!-- M-6 forbids silent truncation: when the last evaluation observed more
-           groups than the cap tracks, say so rather than quietly showing a
-           partial table. -->
-        <OBanner
-          v-if="groupData?.capped"
-          variant="warning"
-          class="shrink-0"
-          data-test="alerts-alertdetail-cap-banner"
-        >
-          {{
-            t("alerts.groups.capBanner", {
-              observed: groupData.groups_observed,
-              cap: groupData.group_cap,
-            })
-          }}
-        </OBanner>
-
         <OContent v-if="isMultiAlert" class="shrink-0 pt-3">
           <OStatStrip :items="groupStats" data-test="alerts-alertdetail-group-stats" />
         </OContent>
@@ -210,7 +201,6 @@
           <OStatStrip
             :items="firingTiles"
             selectable
-            :tray="false"
             data-test="alerts-alertdetail-tiles"
             @select="openIncident"
           />
@@ -242,7 +232,7 @@
         <OTabs
           v-if="alert"
           v-model="activeTab"
-          dense
+          size="compact"
           bordered
           class="shrink-0"
           data-test="alerts-alertdetail-tabs"
@@ -255,7 +245,7 @@
             <span class="o-tab__label truncate">{{ t("alerts.groups.tab") }}</span>
             <OTag
               v-if="firingBadge"
-              variant="error-soft"
+              tone="err"
               size="sm"
               :label="firingBadge"
               data-test="alerts-alertdetail-tab-groups-count"
@@ -270,7 +260,7 @@
             name="charts"
             :label="t('alerts.anomaly.chartsTab')"
             icon="bar-chart"
-            :suffix-icon="anomalyLocked ? 'lock' : undefined"
+            :locked="anomalyLocked"
             :tooltip="anomalyLocked ? anomalyLockedReason : undefined"
             data-test="alerts-alertdetail-tab-charts"
           />
@@ -280,7 +270,7 @@
 
         <!-- Without a Groups tab a line per group reads as a bug (M-9); it lands with the alert, so nothing painted moves. -->
         <OContent v-if="isGroupedButSimple" class="shrink-0 pt-3">
-          <OBanner variant="info" data-test="alerts-alertdetail-simple-grouped-banner">
+          <OInlineNotice tone="info" data-test="alerts-alertdetail-simple-grouped-banner">
             {{
               t("alerts.multiAlert.groupedButSimple", {
                 columns: (aggregation?.group_by || []).join(", "),
@@ -288,15 +278,14 @@
             }}
             <template #actions>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 data-test="alerts-alertdetail-enable-multi"
                 @click="editAlert"
               >
                 {{ t("alerts.multiAlert.enableCta") }}
               </OButton>
             </template>
-          </OBanner>
+          </OInlineNotice>
         </OContent>
 
         <!-- Every panel waits for the alert, so an empty box placed early would only be pushed down by the banner. -->
@@ -362,14 +351,12 @@
                 >
                   <OToggleGroupItem
                     value="evaluations"
-                    size="sm"
                     data-test="alerts-alertdetail-history-view-evaluations"
                   >
                     {{ t("alerts.groups.evaluationsView") }}
                   </OToggleGroupItem>
                   <OToggleGroupItem
                     value="transitions"
-                    size="sm"
                     data-test="alerts-alertdetail-history-view-transitions"
                   >
                     {{ t("alerts.groups.levelChangesView") }}
@@ -434,6 +421,7 @@ import CompositeAlertDetail from "@/components/alerts/composite/CompositeAlertDe
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -613,21 +601,6 @@ const fetchSloName = async () => {
   }
 };
 
-const subtitle = computed(() => {
-  if (!alert.value) return raw("");
-  // An SLO alert's stream_name is empty and its group_by does not exist, so the
-  // generic subtitle renders as nothing at all. Say what it actually watches.
-  if (isSloAlertView.value) {
-    return raw(sloName.value || sloId.value || "");
-  }
-  const groupBy = aggregation.value?.group_by || [];
-  const parts = [alert.value.stream_name].filter(Boolean);
-  if (groupBy.length) {
-    parts.push(t("alerts.groups.groupedBy", { columns: groupBy.join(", ") }));
-  }
-  return raw(parts.join(" · "));
-});
-
 /** Render a count that may be a lower bound with the `≥` the marker demands. */
 const withBound = (value?: number, isLowerBound?: boolean) => {
   if (value === undefined || value === null) return raw("—");
@@ -667,7 +640,7 @@ const groupStats = computed<StatItem[]>(() => {
       label: t("alerts.groups.critical"),
       value: countOf("critical"),
       icon: "error",
-      tone: "error",
+      tone: "err",
       dataTest: "alerts-alertdetail-stat-critical",
     },
     {
@@ -675,7 +648,7 @@ const groupStats = computed<StatItem[]>(() => {
       label: t("alerts.groups.warning"),
       value: countOf("warning"),
       icon: "warning",
-      tone: "warning",
+      tone: "warn",
       dataTest: "alerts-alertdetail-stat-warning",
     },
     {
@@ -683,7 +656,7 @@ const groupStats = computed<StatItem[]>(() => {
       label: t("alerts.groups.ok"),
       value: countOf("ok"),
       icon: "check-circle",
-      tone: "success",
+      tone: "ok",
       dataTest: "alerts-alertdetail-stat-ok",
     },
     {
@@ -691,7 +664,6 @@ const groupStats = computed<StatItem[]>(() => {
       label: t("alerts.groups.firingTotal"),
       value: withBound(d?.groups_firing, d?.groups_firing_is_lower_bound),
       icon: "notifications-active",
-      tone: "orange",
       dataTest: "alerts-alertdetail-stat-firing",
     },
     {
@@ -792,9 +764,9 @@ const firingFor = computed(() => {
 });
 
 const LEVEL_TILES: Record<string, { label: I18nKey; tone: StatItem["tone"] }> = {
-  critical: { label: "alerts.groups.critical", tone: "error" },
-  warning: { label: "alerts.groups.warning", tone: "warning" },
-  ok: { label: "alerts.groups.ok", tone: "success" },
+  critical: { label: "alerts.groups.critical", tone: "err" },
+  warning: { label: "alerts.groups.warning", tone: "warn" },
+  ok: { label: "alerts.groups.ok", tone: "ok" },
 };
 
 const firingTiles = computed<StatItem[]>(() => {
@@ -830,7 +802,7 @@ const firingTiles = computed<StatItem[]>(() => {
   return tiles;
 });
 
-const openIncident = (key: string) => {
+const openIncident = (key: string | null) => {
   const incident = listRow.value?.incident;
   if (key !== "incident" || !incident) return;
   router.push({

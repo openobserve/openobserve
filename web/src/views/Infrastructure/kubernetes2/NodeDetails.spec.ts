@@ -136,10 +136,10 @@ describe("NodeDetails", () => {
     const tags = mountNode(false)
       .find('[data-test="k8s2-node-conditions"]')
       .findAllComponents(OTag)
-      .map((tag) => [tag.text(), tag.props("variant")]);
+      .map((tag) => [tag.text(), tag.props("tone")]);
     expect(tags).toEqual([
-      ["Ready", "success"],
-      ["DiskPressure", "warning"],
+      ["Ready", "ok"],
+      ["DiskPressure", "warn"],
     ]);
   });
 

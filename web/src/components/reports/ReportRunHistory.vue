@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-test="reports-reportrunhistory">
-    <OBanner
+    <OInlineNotice
       v-if="linkedRunMessage"
-      variant="warning"
-      :content="linkedRunMessage"
+      tone="warn"
+      :message="linkedRunMessage"
       data-test="reports-reportrunhistory-linked-run-message"
     />
     <OTable
@@ -36,8 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="history.isLoading.value"
       :forbidden="forbidden"
       :error="loadError"
-      :frame="false"
-      :show-global-filter="false"
       :persist-columns="true"
       :column-visibility="hiddenByDefault"
       :table-id="showReportColumn ? 'reports-history-org' : 'reports-history-report'"
@@ -50,8 +48,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @sort-change="onSortChange"
       @row-click="openRun"
     >
+      <template #subheader>
+        <div
+          class="px-page-edge border-table-row-divider border-b py-1.5"
+          data-test="reports-reportrunhistory-summary"
+        >
+          <OStatStrip
+            :items="tiles"
+            :loading="history.isLoading.value"
+            selectable
+            :selected-key="tile"
+            @select="onTileSelect"
+          />
+        </div>
+      </template>
+
       <template #toolbar>
-        <div class="contents">
+        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-md:contents">
           <slot name="toolbar-start" />
           <OToggleGroup
             :model-value="range"
@@ -63,20 +76,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="option in REPORT_HISTORY_RANGES"
               :key="option.value"
               :value="option.value"
-              size="sm"
               :data-test="`reports-reportrunhistory-range-${option.value}`"
             >
               {{ t(option.labelKey) }}
             </OToggleGroupItem>
-            <OToggleGroupItem
-              value="custom"
-              size="sm"
-              data-test="reports-reportrunhistory-range-custom"
-            >
+            <OToggleGroupItem value="custom" data-test="reports-reportrunhistory-range-custom">
               {{ t("reports.history.rangeCustom") }}
             </OToggleGroupItem>
           </OToggleGroup>
-          <DateTime
+          <ODateTimeRange
             v-if="range === 'custom'"
             auto-apply
             default-type="absolute"
@@ -90,35 +98,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="reports-reportrunhistory-trigger"
             @update:model-value="onTriggerChange"
           >
-            <OToggleGroupItem value="all" size="sm">
+            <OToggleGroupItem value="all">
               {{ t("reports.history.triggerAll") }}
             </OToggleGroupItem>
-            <OToggleGroupItem value="scheduled" size="sm">
+            <OToggleGroupItem value="scheduled">
               {{ t("reports.history.triggerScheduled") }}
             </OToggleGroupItem>
-            <OToggleGroupItem value="manual" size="sm">
+            <OToggleGroupItem value="manual">
               {{ t("reports.history.triggerManual") }}
             </OToggleGroupItem>
           </OToggleGroup>
-          <OStatStrip
-            :items="tiles"
-            :loading="history.isLoading.value"
-            selectable
-            compact
-            :row="false"
-            default-key="all"
-            :selected-key="tile"
-            class="max-md:order-last"
-            data-test="reports-reportrunhistory-summary"
-            @select="onTileSelect"
-          />
         </div>
       </template>
 
       <template #toolbar-trailing>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="history.dataUpdatedAt.value"
           :loading="history.isFetching.value"
           data-test="reports-reportrunhistory-refresh"
@@ -196,28 +190,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <OEmptyState
           v-if="history.data.value?.disabled_reason"
-          size="hero"
           :title="disabledTitle"
-          :description="disabledDescription"
-          hide-action
+          :text="disabledDescription"
           data-test="reports-reportrunhistory-disabled"
         />
         <OEmptyState
           v-else-if="isFiltered"
-          size="hero"
+          kind="filtered"
           :title="t('reports.history.emptyRangeTitle')"
-          :description="t('reports.history.emptyRangeDescription')"
+          :text="t('reports.history.emptyRangeDescription')"
           :action-label="t('reports.history.widenRange')"
           data-test="reports-reportrunhistory-empty-range"
           @action="widenRange"
         />
         <OEmptyState
           v-else
-          size="hero"
           :title="t('reports.history.emptyNoRunsTitle')"
-          :description="noRunsDescription"
+          :text="noRunsDescription"
           :action-label="canTrigger && reportId ? t('reports.history.runNow') : undefined"
-          :hide-action="!(canTrigger && reportId)"
           data-test="reports-reportrunhistory-empty"
           @action="emit('run-now')"
         />
@@ -242,9 +232,9 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useQuery, useQueries } from "@tanstack/vue-query";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import ReportRunDrawer from "@/components/reports/ReportRunDrawer.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -457,25 +447,25 @@ const tiles = computed<StatItem[]>(() => {
     {
       key: "error",
       label: t("reports.history.tileFailed"),
-      value: c?.error ?? 0,
+      value: c ? c.error : null,
       icon: "error",
-      tone: "error",
+      tone: "err",
       dataTest: "reports-reportrunhistory-tile-error",
     },
     {
       key: "skipped",
       label: t("reports.history.tileSkipped"),
-      value: c?.skipped ?? 0,
+      value: c ? c.skipped : null,
       icon: "block",
-      tone: "warning",
+      tone: "warn",
       dataTest: "reports-reportrunhistory-tile-skipped",
     },
     {
       key: "succeeded",
       label: t("reports.history.tileSent"),
-      value: props.showCachedTile ? (c?.succeeded ?? 0) : (c?.succeeded ?? 0) + (c?.cached ?? 0),
+      value: c ? (props.showCachedTile ? c.succeeded : c.succeeded + c.cached) : null,
       icon: "send",
-      tone: "success",
+      tone: "ok",
       dataTest: "reports-reportrunhistory-tile-sent",
     },
   ];
@@ -483,25 +473,23 @@ const tiles = computed<StatItem[]>(() => {
     items.push({
       key: "cached",
       label: t("reports.history.tileCached"),
-      value: c?.cached ?? 0,
+      value: c ? c.cached : null,
       icon: "database",
-      tone: "blue",
       dataTest: "reports-reportrunhistory-tile-cached",
     });
   }
   items.push({
     key: "all",
     label: t("reports.history.tileAll"),
-    value: c?.total ?? 0,
+    value: c ? c.total : null,
     icon: "history",
-    tone: "neutral",
     dataTest: "reports-reportrunhistory-tile-all",
   });
   return items;
 });
 
-const onTileSelect = (key: string) => {
-  tile.value = key === "all" || key === tile.value ? null : (key as Tile);
+const onTileSelect = (key: string | null) => {
+  tile.value = key as Tile | null;
   currentPage.value = 1;
 };
 

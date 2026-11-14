@@ -131,7 +131,7 @@ describe("AWSQuickSetup.vue", () => {
           },
           OButton: {
             template:
-              '<button :disabled="disabled" @click="$emit(\'click\')"><slot name="icon-left" /><slot /></button>',
+              '<button :disabled="disabled" @click="$emit(\'click\')"><slot name="icon" /><slot /></button>',
             props: [
               "variant",
               "size",

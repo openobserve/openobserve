@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :current-page="currentPage"
       :sort-by="sortBy"
       :sort-order="sortOrder"
-      :show-global-filter="false"
       :persist-columns="true"
       table-id="synthetics-private-locations-table"
       :enable-column-resize="true"
@@ -55,10 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #toolbar-trailing>
         <OButton
-          variant="outline"
-          size="icon-sm"
-          class="w-8!"
-          icon-left="refresh"
+          icon-only
+          variant="secondary"
+          icon="refresh"
           :loading="loading"
           :title="t('common.refresh')"
           data-test="synthetics-private-locations-refresh-btn"
@@ -73,11 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="liveStatus(row as SyntheticLocation) === 'unknown'"
           :content="t('synthetics.privateLocations.status.unknownHint')"
         >
-          <OBadge variant="default-outline" :dot="true" size="sm">
+          <OBadge tone="outline" :dot="true" size="sm">
             {{ t("synthetics.privateLocations.status.unknown") }}
           </OBadge>
         </OTooltip>
-        <OBadge v-else :variant="statusVariant((row as any).status)" :dot="true" size="sm">
+        <OBadge v-else :tone="statusVariant((row as any).status)" :dot="true" size="sm">
           {{ t(`synthetics.privateLocations.status.${(row as any).status}`) }}
         </OBadge>
       </template>
@@ -121,13 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Capability type chips -->
       <template #cell-types="{ row }">
         <div class="flex flex-wrap gap-1">
-          <OTag
-            v-for="ty in (row as any).types"
-            :key="ty"
-            size="xs"
-            shape="rounded"
-            variant="default-soft"
-          >
+          <OTag v-for="ty in (row as any).types" :key="ty" size="sm" tone="neutral">
             {{ String(ty).toUpperCase() }}
           </OTag>
           <span v-if="!(row as any).types?.length" class="text-text-muted">—</span>
@@ -146,18 +138,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <div class="flex items-center gap-1" @click.stop>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="content-copy"
+            icon="content-copy"
             class="max-md:hidden"
             :title="t('synthetics.privateLocations.copySetupCmd')"
             :data-test="`synthetics-private-locations-copy-btn-${(row as any).id}`"
             @click="emit('copy-setup', row as any)"
           />
           <OButton
-            variant="ghost-destructive"
-            size="icon-sm"
-            icon-left="delete"
+            icon-only
+            variant="danger-ghost"
+            icon="delete"
             class="max-md:hidden"
             :disabled="checksUsing(row) > 0"
             :title="
@@ -173,17 +165,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
+                icon-only
                 :aria-label="t('common.moreActions')"
-                icon-left="more-vert"
+                icon="more-vert"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="md:hidden"
                 data-test="synthetics-private-locations-row-more-actions"
                 @click.stop
               />
             </template>
             <ODropdownItem
-              icon-left="content-copy"
+              icon="content-copy"
               class="md:hidden"
               :data-test="`synthetics-private-locations-copy-btn-${(row as any).id}-menu`"
               @select="emit('copy-setup', row as any)"
@@ -191,8 +184,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("synthetics.privateLocations.copySetupCmd") }}</span>
             </ODropdownItem>
             <ODropdownItem
-              icon-left="delete"
-              variant="destructive"
+              icon="delete"
+              tone="danger"
               class="md:hidden"
               :disabled="checksUsing(row) > 0"
               :data-test="`synthetics-private-locations-delete-btn-${(row as any).id}-menu`"
@@ -213,11 +206,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <OEmptyState
           v-if="!loading"
-          size="hero"
-          illustration="browser-check"
-          :filtered="!!search"
+          :kind="search ? 'filtered' : 'first-run'"
+          :icon="search ? undefined : 'web'"
           :title="t('synthetics.privateLocations.empty.title')"
-          :description="t('synthetics.privateLocations.empty.description')"
+          :text="t('synthetics.privateLocations.empty.description')"
           data-test="synthetics-private-locations-empty-state"
         />
       </template>
@@ -328,7 +320,7 @@ const checksUsing = (row: unknown): number => {
 };
 
 const statusVariant = (status: string) =>
-  status === "online" ? "success" : status === "offline" ? "error" : "default";
+  status === "online" ? "ok" : status === "offline" ? "err" : "neutral";
 
 /** Live agent name(s), shown on hover over the agent-count cell. Full agent
  *  detail (incl. offline agents) lives on the location detail page. */

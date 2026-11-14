@@ -85,7 +85,7 @@ const pod = (name: string, node: string, memoryPctOfLimit: number | null): PodRo
     warnings: [],
     phase: "Running",
     ready: "true",
-    status: { text: "Running", variant: "success-soft" },
+    status: { text: "Running", variant: "ok" },
     workload: null,
     node,
     restarts: 0,

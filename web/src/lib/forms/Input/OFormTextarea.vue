@@ -37,7 +37,6 @@ if (import.meta.env.DEV && !form) {
         :autocomplete="props.autocomplete"
         :name="props.name"
         :id="props.id"
-        :size="props.size"
         :width="props.width"
         :model-value="field.state.value"
         :error="shown(field).invalid"

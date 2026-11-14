@@ -49,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="tab.value"
               :value="tab.value"
               :data-test="`query-mode-${tab.value}`"
-              size="sm"
             >
               <template #icon-left>
                 <OIcon v-if="tab.value === 'custom'" name="build" size="sm" />
@@ -65,8 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="localTab !== 'custom'"
             data-test="step2-view-editor-btn"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             @click="viewSqlEditor = true"
           >
             {{ t("alerts.queryConfig.openFullEditor") }}
@@ -107,7 +105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             logFunctionOptions.find((o: any) => o.value === selectedFunction)
                               ?.tooltip || raw('')
                           "
-                          :delay="400"
                         />
                       </div>
                       <!-- "of [field]" shown for measure modes -->
@@ -148,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :aria-label="t('common.operator')"
                           name="trigger_condition.operator"
                           :options="numericOperators"
-                          width="xs"
+                          width="s"
                           data-test="alert-trigger-operator-select"
                           :searchable="false"
                           @update:model-value="onTriggerOperatorChange"
@@ -159,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :aria-label="t('alerts.alertIfNoOfEvents')"
                             name="trigger_condition.threshold"
                             type="number"
-                            width="xs"
+                            width="s"
                             data-test="alert-trigger-threshold-input"
                             @blur="restoreDefaultThreshold"
                             min="1"
@@ -185,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
-                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                          class="text-text-secondary text-compact w-30 shrink-0 text-center leading-8 font-semibold"
                           >{{ triggerOperator }}</span
                         >
                         <div class="flex flex-col gap-1">
@@ -193,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :aria-label="t('alerts.warningIf')"
                             name="trigger_condition.warning_threshold"
                             type="number"
-                            width="xs"
+                            width="s"
                             data-test="alert-warning-threshold-input-136"
                             :placeholder="t('alerts.optional')"
                           >
@@ -209,8 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                         <OButton
+                          icon-only
                           variant="ghost"
-                          size="icon-circle-sm"
+                          size="sm"
                           class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
@@ -221,8 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div v-else>
                         <OButton
-                          variant="ghost-primary"
-                          size="sm"
+                          variant="accent-ghost"
                           data-test="alert-add-warning-button"
                           @click="addCountWarning"
                         >
@@ -244,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="query_condition.aggregation.having.operator"
                           :options="numericOperators"
                           :searchable="false"
-                          width="xs"
+                          width="s"
                           data-test="alert-condition-operator-select"
                           @update:model-value="onConditionOperatorChange"
                         />
@@ -254,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :aria-label="t('common.value')"
                             name="query_condition.aggregation.having.value"
                             type="number"
-                            width="xs"
+                            width="s"
                             :placeholder="t('alerts.placeholders.value')"
                             @update:model-value="onConditionValueChange($event)"
                           >
@@ -278,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
-                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                          class="text-text-secondary text-compact w-30 shrink-0 text-center leading-8 font-semibold"
                           >{{ conditionOperator }}</span
                         >
                         <div class="flex flex-col gap-1">
@@ -286,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :aria-label="t('alerts.warningIf')"
                             name="query_condition.aggregation.warning_value"
                             type="number"
-                            width="xs"
+                            width="s"
                             data-test="alert-aggregation-warning-value-input-182"
                             :placeholder="t('alerts.optional')"
                           >
@@ -302,8 +299,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                         <OButton
+                          icon-only
                           variant="ghost"
-                          size="icon-circle-sm"
+                          size="sm"
                           class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
@@ -314,8 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div v-else>
                         <OButton
-                          variant="ghost-primary"
-                          size="sm"
+                          variant="accent-ghost"
                           data-test="alert-add-warning-button"
                           @click="addAggWarning"
                         >
@@ -352,9 +349,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @update:model-value="onLogGroupByChange"
                         />
                         <OButton
+                          icon-only
                           :aria-label="t('common.remove')"
                           variant="ghost"
-                          size="icon-circle-sm"
+                          size="sm"
                           class="text-icon-color hover:text-status-error-text"
                           @click="deleteLogGroupByColumn(index)"
                         >
@@ -363,8 +361,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </template>
                     <OButton
-                      variant="ghost-primary"
-                      size="icon-circle-sm"
+                      icon-only
+                      variant="accent-ghost"
+                      size="sm"
                       data-test="alert-group-by-add-btn"
                       @click="addLogGroupByColumn"
                     >
@@ -411,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
-                        width="xs"
+                        width="s"
                         min="1"
                         @update:model-value="onTriggerThresholdChange($event)"
                         @blur="restoreDefaultThreshold"
@@ -459,7 +458,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             logFunctionOptions.find((o: any) => o.value === selectedFunction)
                               ?.tooltip || raw('')
                           "
-                          :delay="400"
                         />
                       </div>
 
@@ -482,7 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
                               )
                             "
-                            :disable="
+                            :disabled="
                               inputData.aggregation?.having?.column === 'value' &&
                               columns.some(
                                 (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
@@ -522,7 +520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="trigger_condition.operator"
                           :options="numericOperators"
                           :searchable="false"
-                          width="xs"
+                          width="s"
                           @update:model-value="onTriggerOperatorChange"
                         />
                         <!-- Message hangs under the threshold field it describes. -->
@@ -531,7 +529,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :aria-label="t('alerts.alertIfNoOfEvents')"
                             name="trigger_condition.threshold"
                             type="number"
-                            width="xs"
+                            width="s"
                             @update:model-value="onTriggerThresholdChange($event)"
                           >
                             <template #error />
@@ -554,7 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
-                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                          class="text-text-secondary text-compact w-30 shrink-0 text-center leading-8 font-semibold"
                           >{{ triggerOperator }}</span
                         >
                         <div class="flex flex-col gap-1">
@@ -562,7 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :aria-label="t('alerts.warningIf')"
                             name="trigger_condition.warning_threshold"
                             type="number"
-                            width="xs"
+                            width="s"
                             data-test="alert-warning-threshold-input-381"
                             :placeholder="t('alerts.optional')"
                           >
@@ -578,8 +576,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                         <OButton
+                          icon-only
                           variant="ghost"
-                          size="icon-circle-sm"
+                          size="sm"
                           class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
@@ -590,8 +589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div v-else>
                         <OButton
-                          variant="ghost-primary"
-                          size="sm"
+                          variant="accent-ghost"
                           data-test="alert-add-warning-button"
                           @click="addCountWarning"
                         >
@@ -613,7 +611,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="query_condition.aggregation.having.operator"
                           :options="numericOperators"
                           :searchable="false"
-                          width="xs"
+                          width="s"
                           @update:model-value="onConditionOperatorChange"
                         />
                         <!-- Message hangs under the value field it describes. -->
@@ -622,7 +620,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :aria-label="t('common.value')"
                             name="query_condition.aggregation.having.value"
                             type="number"
-                            width="xs"
+                            width="s"
                             :placeholder="t('alerts.placeholders.value')"
                             @update:model-value="onConditionValueChange($event)"
                           >
@@ -646,7 +644,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >{{ t("alerts.warningIf") }}</span
                         >
                         <span
-                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                          class="text-text-secondary text-compact w-30 shrink-0 text-center leading-8 font-semibold"
                           >{{ conditionOperator }}</span
                         >
                         <div class="flex flex-col gap-1">
@@ -654,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :aria-label="t('alerts.warningIf')"
                             name="query_condition.aggregation.warning_value"
                             type="number"
-                            width="xs"
+                            width="s"
                             data-test="alert-aggregation-warning-value-input-413"
                             :placeholder="t('alerts.optional')"
                           >
@@ -670,8 +668,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </div>
                         <OButton
+                          icon-only
                           variant="ghost"
-                          size="icon-circle-sm"
+                          size="sm"
                           class="text-icon-color hover:text-status-error-text self-center"
                           :aria-label="t('alerts.removeWarning')"
                           data-test="alert-remove-warning-button"
@@ -682,8 +681,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div v-else>
                         <OButton
-                          variant="ghost-primary"
-                          size="sm"
+                          variant="accent-ghost"
                           data-test="alert-add-warning-button"
                           @click="addAggWarning"
                         >
@@ -719,9 +717,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @update:model-value="syncMetricGroupByToProps"
                         />
                         <OButton
+                          icon-only
                           :aria-label="t('common.remove')"
                           variant="ghost"
-                          size="icon-circle-sm"
+                          size="sm"
                           class="text-icon-color hover:text-status-error-text"
                           @click="deleteGroupByColumn(index)"
                         >
@@ -729,11 +728,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OButton>
                       </div>
                     </template>
-                    <OButton
-                      variant="ghost-primary"
-                      size="icon-circle-sm"
-                      @click="addGroupByColumn"
-                    >
+                    <OButton icon-only variant="accent-ghost" size="sm" @click="addGroupByColumn">
                       <OIcon name="add" size="sm" />
                       <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
                     </OButton>
@@ -776,7 +771,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
-                        width="xs"
+                        width="s"
                         min="1"
                         @update:model-value="onTriggerThresholdChange($event)"
                         @blur="restoreDefaultThreshold"
@@ -903,7 +898,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="'text-text-secondary'"
                       >
                         {{ t("alerts.queryConfig.viewAlertQuery") }}
-                        <OTooltip :delay="200" side="bottom">
+                        <OTooltip side="bottom">
                           <template #content>
                             <AlertQueryPreview :query="generatedSqlQuery" />
                           </template>
@@ -999,7 +994,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="'text-text-secondary'"
                   >
                     {{ t("alerts.queryConfig.viewAlertQuery") }}
-                    <OTooltip :delay="200" side="bottom">
+                    <OTooltip side="bottom">
                       <template #content>
                         <AlertQueryPreview :query="generatedSqlQuery" />
                       </template>
@@ -1065,24 +1060,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" />
                     </OSwitch>
                     <OToggleGroup
+                      size="sm"
                       v-if="localTab === 'promql'"
                       :model-value="isForecastMode ? 'forecast' : 'threshold'"
                       type="single"
                       data-test="alert-promql-mode"
                       @update:model-value="onPromqlModeChange"
                     >
-                      <OToggleGroupItem
-                        value="threshold"
-                        size="xs"
-                        data-test="alert-promql-mode-threshold"
-                      >
+                      <OToggleGroupItem value="threshold" data-test="alert-promql-mode-threshold">
                         {{ t("alerts.forecast.modeThreshold") }}
                       </OToggleGroupItem>
-                      <OToggleGroupItem
-                        value="forecast"
-                        size="xs"
-                        data-test="alert-promql-mode-forecast"
-                      >
+                      <OToggleGroupItem value="forecast" data-test="alert-promql-mode-forecast">
                         {{ t("alerts.forecast.modeForecast") }}
                       </OToggleGroupItem>
                     </OToggleGroup>
@@ -1251,12 +1239,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <OBanner
+            <OInlineNotice
               v-if="localTab === 'sql' && isMultiAlert && sqlQueryHasHaving"
-              dense
-              variant="warning"
+              tone="warn"
               class="mt-2"
-              :content="t('alerts.queryConfig.sqlHavingClauseWarning')"
+              :message="t('alerts.queryConfig.sqlHavingClauseWarning')"
               data-test="alert-sql-having-clause-warning"
             />
 
@@ -1378,7 +1365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="trigger_condition.operator"
                       :options="numericOperators"
                       :searchable="false"
-                      width="xs"
+                      width="s"
                       data-test="alert-trigger-operator-select"
                       @update:model-value="onTriggerOperatorChange"
                     />
@@ -1391,7 +1378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
-                        width="xs"
+                        width="s"
                         data-test="alert-trigger-threshold-input"
                         min="1"
                         @update:model-value="onTriggerThresholdChange($event)"
@@ -1417,7 +1404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ t("alerts.warningIf") }}</span
                     >
                     <span
-                      class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                      class="text-text-secondary text-compact w-30 shrink-0 text-center leading-8 font-semibold"
                       >{{ triggerOperator }}</span
                     >
                     <div class="flex flex-col gap-1">
@@ -1425,7 +1412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :aria-label="t('alerts.warningIf')"
                         name="trigger_condition.warning_threshold"
                         type="number"
-                        width="xs"
+                        width="s"
                         data-test="alert-warning-threshold-input-1020"
                         :placeholder="t('alerts.optional')"
                       >
@@ -1441,8 +1428,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon-circle-sm"
+                      size="sm"
                       class="text-icon-color hover:text-status-error-text self-center"
                       :aria-label="t('alerts.removeWarning')"
                       data-test="alert-remove-warning-button"
@@ -1453,8 +1441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div v-else>
                     <OButton
-                      variant="ghost-primary"
-                      size="sm"
+                      variant="accent-ghost"
                       data-test="alert-add-warning-button"
                       @click="addCountWarning"
                     >
@@ -1496,7 +1483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="query_condition.aggregation.having.column"
                       :options="sqlAggColumnOptions"
                       searchable
-                      width="xs"
+                      width="s"
                       data-test="alert-sql-agg-column-select"
                       :placeholder="t('alerts.placeholders.selectColumn')"
                       @update:model-value="onLogMeasureColumnChange($event)"
@@ -1512,7 +1499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="query_condition.aggregation.having.operator"
                       :options="numericOperators"
                       :searchable="false"
-                      width="xs"
+                      width="s"
                       data-test="alert-sql-agg-operator-select"
                       @update:model-value="onConditionOperatorChange"
                     />
@@ -1522,7 +1509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :aria-label="t('common.value')"
                         name="query_condition.aggregation.having.value"
                         type="number"
-                        width="xs"
+                        width="s"
                         data-test="alert-sql-agg-value-input"
                         :placeholder="t('alerts.placeholders.value')"
                         @update:model-value="onConditionValueChange($event)"
@@ -1548,7 +1535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ t("alerts.warningIf") }}</span
                     >
                     <span
-                      class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                      class="text-text-secondary text-compact w-30 shrink-0 text-center leading-8 font-semibold"
                       >{{ conditionOperator }}</span
                     >
                     <div class="flex flex-col gap-1">
@@ -1556,7 +1543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :aria-label="t('alerts.warningIf')"
                         name="query_condition.aggregation.warning_value"
                         type="number"
-                        width="xs"
+                        width="s"
                         data-test="alert-sql-agg-warning-value-input"
                         :placeholder="t('alerts.optional')"
                       >
@@ -1572,8 +1559,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon-circle-sm"
+                      size="sm"
                       class="text-icon-color hover:text-status-error-text self-center"
                       :aria-label="t('alerts.removeWarning')"
                       data-test="alert-remove-warning-button"
@@ -1584,8 +1572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div v-else>
                     <OButton
-                      variant="ghost-primary"
-                      size="sm"
+                      variant="accent-ghost"
                       data-test="alert-add-warning-button"
                       @click="addAggWarning"
                     >
@@ -1633,7 +1620,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="numericOperators"
                         :searchable="false"
                         data-test="alert-threshold-operator-select"
-                        width="xs"
+                        width="s"
                         @update:model-value="onPromqlOperatorChange"
                       />
                       <!-- Message hangs under the value field it describes. -->
@@ -1642,7 +1629,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :aria-label="t('alerts.alertIfValueIs')"
                           name="query_condition.promql_condition.value"
                           type="number"
-                          width="xs"
+                          width="s"
                           data-test="alert-threshold-value-input"
                           :debounce="300"
                           @update:model-value="onPromqlValueChange"
@@ -1669,7 +1656,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >{{ t("alerts.warningIf") }}</span
                       >
                       <span
-                        class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                        class="text-text-secondary text-compact w-30 shrink-0 text-center leading-8 font-semibold"
                         >{{ promqlOperatorEcho }}</span
                       >
                       <div class="flex flex-col gap-1">
@@ -1677,7 +1664,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :aria-label="t('alerts.warningIf')"
                           name="query_condition.promql_warning_value"
                           type="number"
-                          width="xs"
+                          width="s"
                           data-test="alert-promql-warning-value-input"
                           :placeholder="t('alerts.optional')"
                           :debounce="300"
@@ -1694,8 +1681,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                       <OButton
+                        icon-only
                         variant="ghost"
-                        size="icon-circle-sm"
+                        size="sm"
                         class="text-icon-color hover:text-status-error-text self-center"
                         :aria-label="t('alerts.removeWarning')"
                         data-test="alert-remove-warning-button"
@@ -1706,8 +1694,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div v-else>
                       <OButton
-                        variant="ghost-primary"
-                        size="sm"
+                        variant="accent-ghost"
                         data-test="alert-add-warning-button"
                         @click="addPromqlWarning"
                       >
@@ -1753,7 +1740,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :aria-label="t('alerts.alertIfNoOfEvents')"
                         name="trigger_condition.threshold"
                         type="number"
-                        width="xs"
+                        width="s"
                         min="1"
                         @update:model-value="onTriggerThresholdChange($event)"
                         @blur="restoreDefaultThreshold"
@@ -1799,16 +1786,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Multi-Window Confirmation Dialog -->
-    <CustomConfirmDialog
+    <ConfirmDialog
       v-model="showMultiWindowDialog"
+      kind="destructive"
+      data-test="custom-confirm-dialog"
       :title="t('alerts.clearMultiWindowsTitle')"
       :message="
         t('alerts.queryConfig.clearMultiWindowsMessage', {
           mode: pendingTab === 'custom' ? t('alerts.queryConfig.customMode') : 'PromQL',
         })
       "
-      @confirm="handleConfirmClearMultiWindows"
-      @cancel="handleCancelClearMultiWindows"
+      :ok-label="t('confirmDialog.clearAndContinue')"
+      @update:ok="handleConfirmClearMultiWindows"
+      @update:cancel="handleCancelClearMultiWindows"
     />
   </div>
 </template>
@@ -1850,7 +1840,7 @@ import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import { streamValuesLoader } from "@/components/filterBar/streamValues";
 import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
-import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -1872,7 +1862,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { type QueryConfigMeta } from "./QueryConfig.schema";
@@ -1889,7 +1879,7 @@ export default defineComponent({
     AlertQueryPreview,
     FilterBuilder,
     QueryEditorDialog,
-    CustomConfirmDialog,
+    ConfirmDialog,
     UnifiedQueryEditor,
     OButton,
     OToggleGroup,
@@ -1901,7 +1891,7 @@ export default defineComponent({
     OIcon,
     OFormInput,
     OFormSelect,
-    OBanner,
+    OInlineNotice,
   },
   props: {
     tab: {

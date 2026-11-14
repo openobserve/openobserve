@@ -19,6 +19,11 @@ import { h, nextTick, ref } from "vue";
 import { TooltipProvider } from "reka-ui";
 import OTooltip from "./OTooltip.vue";
 
+vi.mock("@/lib/styles/motion", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/styles/motion")>()),
+  TOOLTIP_DELAY_MS: 300,
+}));
+
 const DELAY_MS = 300;
 
 let wrapper: VueWrapper<any> | undefined;
@@ -116,13 +121,11 @@ describe("OTooltip keeps its behaviour under the shared app provider, with a rea
 
   it("opens a wrapper neighbour on the first move out of a hoverable child-mode bubble", async () => {
     mountUnderAppProvider(() => [
-      h("span", { "data-testid": "a" }, [
-        h(OTooltip, { content: "Alpha", hoverable: true, delay: 0 }),
-      ]),
+      h("span", { "data-testid": "a" }, [h(OTooltip, { content: "Alpha", hoverable: true })]),
       wrapperTooltip("b", "Beta"),
     ]);
     el("a").dispatchEvent(new MouseEvent("mouseenter"));
-    await settle();
+    await settle(DELAY_MS);
     const bubble = document.querySelector('[data-test="o-tooltip-content"]')!;
     bubble.dispatchEvent(new MouseEvent("pointerleave", { bubbles: true }));
     await settle();

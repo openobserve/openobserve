@@ -1,29 +1,21 @@
 <template>
-  <OBanner
-    v-if="showBanner"
-    variant="warning"
-    icon="warning"
-    inline-actions
-    data-test="license-period-container"
-  >
+  <OInlineNotice v-if="showBanner" tone="warn" data-test="license-period-container">
     <div data-test="license-period-message">{{ getLicenseExpiryMessage() }}</div>
     <div v-if="licenseData && !licenseData.can_update_license" data-test="license-period-ask-admin">
       {{ t("billing.licenseAskAdminToRenew") }}
     </div>
 
-    <!-- OBanner reads its slots once, so this slot stays and only the button comes and goes -->
     <template #actions>
       <OButton
         v-if="licenseData?.can_update_license"
         variant="primary"
-        size="sm"
         data-test="license-period-renew-btn"
         @click="$emit('renew')"
       >
         {{ t("billing.renewLicense") }}
       </OButton>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script lang="ts">
@@ -33,13 +25,13 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { licenseQuery } from "@/services/license_server.queries";
 import { formatLicenseDay, type LicenseWaiverFields } from "@/utils/licenseWaivers";
 
 export default defineComponent({
   name: "LicensePeriod",
-  components: { OBanner, OButton },
+  components: { OInlineNotice, OButton },
   emits: ["renew"],
   setup() {
     const store = useStore();

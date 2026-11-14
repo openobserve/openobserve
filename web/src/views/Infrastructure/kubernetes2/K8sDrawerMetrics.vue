@@ -393,8 +393,8 @@ const chartKey = (id: string) => `${encodeDetails(props.details)}|${id}|${props.
     </div>
     <OCollapsible
       v-if="split.more.length"
-      v-model="moreOpen"
-      :label="t('infra.k8s2.drawerMoreMetrics')"
+      v-model:open="moreOpen"
+      :title="t('infra.k8s2.drawerMoreMetrics')"
       data-test="k8s2-drawer-more-metrics"
     >
       <div v-if="moreOpen" class="flex flex-col gap-2">

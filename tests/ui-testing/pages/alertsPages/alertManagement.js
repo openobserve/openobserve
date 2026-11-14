@@ -626,7 +626,7 @@ export class AlertManagement {
         const alertRow = this.page.locator(`tr:has-text("${alertName}")`).first();
         await alertRow.waitFor({ state: 'visible', timeout: 10000 });
 
-        const alertNameCell = alertRow.locator('td').nth(1);
+        const alertNameCell = alertRow.locator('[data-test="o2-table-cell-name"]');
         await alertNameCell.click();
         await this.page.waitForTimeout(1500);
 

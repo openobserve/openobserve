@@ -15,12 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    :title="t('iam.invitations')"
-    :subtitle="t('iam.invitationList.subtitle')"
-    icon="mail"
-    bleed
-  >
+  <OPageLayout :title="t('iam.invitations')" bleed>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
@@ -30,19 +25,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           :forbidden="forbidden"
           v-model:global-filter="filterQuery"
-          :show-global-filter="false"
           pagination="client"
           :page-size="20"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
-          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-invitations-list"
         >
           <template #toolbar>
-            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('invitation.search')"
@@ -53,9 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <OButton
-              variant="outline"
-              size="icon-toolbar"
-              icon-left="refresh"
+              icon-only
+              variant="secondary"
+              icon="refresh"
               :loading="loading"
               data-test="invitation-list-refresh-btn"
               @click="fetchPendingInvitations"
@@ -63,17 +56,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip
                 side="bottom"
                 :content="t('common.refresh')"
-                shortcut-id="iamInvitationsRefresh"
+                shortcut="iamInvitationsRefresh"
               />
             </OButton>
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-invitations"
-              :filtered="!!filterQuery"
-              :hide-action="!filterQuery"
-              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.invitations') })
+                  : t('emptyState.noInvitations.title')
+              "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.nouns.invitations'),
+                    })
+                  : t('emptyState.noInvitations.description')
+              "
+              :icon="filterQuery ? undefined : 'group'"
+              @action="filterQuery = ''"
             />
           </template>
           <template #cell-role="{ row }">
@@ -95,7 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-2">
               <OButton
                 variant="primary"
-                size="sm"
                 class="max-md:hidden"
                 @click="acceptInvitation(row)"
                 :data-test="`accept-invitation-${row.token}`"
@@ -104,7 +106,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="secondary"
-                size="sm"
                 class="max-md:hidden"
                 @click="rejectInvitation(row)"
                 :data-test="`reject-invitation-${row.token}`"
@@ -114,10 +115,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    icon-only
                     :aria-label="t('common.moreActions')"
-                    icon-left="more-vert"
+                    icon="more-vert"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="sm"
                     class="md:hidden"
                     data-test="invitation-list-row-more-actions"
                     @click.stop
@@ -144,27 +146,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <ODialog
+    <ConfirmDialog
+      v-model="confirmAccept"
       data-test="invitation-list-accept-dialog"
-      v-model:open="confirmAccept"
-      size="xs"
       :title="t('invitation.confirmAcceptHead')"
-      :secondary-button-label="t('invitation.cancel')"
-      :primary-button-label="t('invitation.accept')"
-      @click:secondary="confirmAccept = false"
-      @click:primary="confirmAcceptInvitation"
-    >
-      <p>{{ t("invitation.confirmAcceptMsg", { org: selectedInvitation?.org_name }) }}</p>
-    </ODialog>
+      :message="t('invitation.confirmAcceptMsg', { org: selectedInvitation?.org_name })"
+      :ok-label="t('invitation.accept')"
+      :cancel-label="t('invitation.cancel')"
+      @update:ok="confirmAcceptInvitation"
+      @update:cancel="confirmAccept = false"
+    />
 
     <ODialog
       data-test="invitation-list-reject-dialog"
       v-model:open="confirmReject"
-      size="xs"
+      size="sm"
       :title="t('invitation.confirmRejectHead')"
-      :secondary-button-label="t('invitation.cancel')"
-      :primary-button-label="t('invitation.reject')"
-      primary-button-variant="destructive"
+      :secondary="{ label: t('invitation.cancel') }"
+      :primary="{ label: t('invitation.reject'), variant: 'danger' }"
       @click:secondary="confirmReject = false"
       @click:primary="confirmRejectInvitation"
     >
@@ -193,6 +192,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -235,6 +235,7 @@ export default defineComponent({
     OTimeCell,
     OUserCell,
     ODialog,
+    ConfirmDialog,
     OTable,
     OSearchInput,
   },

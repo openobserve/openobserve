@@ -296,9 +296,9 @@ describe("OTable kept rows while refetching", () => {
     expect(next.attributes("aria-disabled")).toBe("true");
     await next.trigger("click");
     expect(wrapper.vm.table.getState().pagination.pageIndex).toBe(0);
-    expect(wrapper.find('[data-test="o2-table-page-size"]').attributes("aria-disabled")).toBe(
-      "true",
-    );
+    expect(
+      wrapper.find('[data-test="o2-table-page-size-select-group"]').attributes("aria-disabled"),
+    ).toBe("true");
   });
 
   it.each([
@@ -311,7 +311,7 @@ describe("OTable kept rows while refetching", () => {
       const serverProps = { pagination: "server", currentPage: 1, pageSize: 25, totalCount: 60 };
       mountTable({ ...serverProps, data: makeRows(25) });
       const settled = wrapper.find(PAGER_INFO).text();
-      expect(settled).toMatch(/1 - 25 .*60/);
+      expect(settled).toBe("1–25 of 60");
       await wrapper.setProps({ ...next, loading: true });
       expect(wrapper.find(PAGER_INFO).text()).toBe(settled);
       await advance(STALE_DIM_DELAY_MS);
@@ -320,9 +320,7 @@ describe("OTable kept rows while refetching", () => {
       const live = { ...serverProps, ...next };
       const from = (live.currentPage - 1) * live.pageSize + 1;
       const to = Math.min(live.currentPage * live.pageSize, live.totalCount);
-      expect(wrapper.find(PAGER_INFO).text()).toMatch(
-        new RegExp(`${from} - ${to} .*${live.totalCount}`),
-      );
+      expect(wrapper.find(PAGER_INFO).text()).toBe(`${from}–${to} of ${live.totalCount}`);
     },
   );
 

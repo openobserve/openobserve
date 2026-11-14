@@ -2,8 +2,6 @@
 
 import type { I18nText } from "@/types/i18n";
 
-export type RangeSize = "sm" | "md" | "lg";
-
 export interface RangeValue {
   min: number;
   max: number;
@@ -34,8 +32,6 @@ export interface RangeProps {
   disabled?: boolean;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
-  /** Control size */
-  size?: RangeSize;
   /** HTML id used as a prefix for both inputs */
   id?: string;
   /** HTML name used as a prefix for both inputs */

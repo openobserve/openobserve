@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OAccessLock
         :denials="lockDenials"
         :requests="pageRequests"
-        size="hero"
         data-test="access-boundary-empty-state"
       />
     </div>
@@ -95,7 +94,7 @@ providePageHeaderStatus(
 
 // A refused table list shows the same lock and wording as a refused page; the chip keeps listing it beside a create button that may still work.
 const TableAccessLock: FunctionalComponent<{ resource?: string }> = ({ resource }) =>
-  h(OAccessLock, { denials: tableDenials(sectionEntries.value, resource), size: "hero" });
+  h(OAccessLock, { denials: tableDenials(sectionEntries.value, resource) });
 TableAccessLock.props = ["resource"];
 provideTableForbiddenState(TableAccessLock);
 

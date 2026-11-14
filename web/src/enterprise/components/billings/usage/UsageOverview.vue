@@ -16,24 +16,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full min-h-0 flex-col gap-2.5" data-test="billings-usageoverview-root">
-    <OBanner
+    <OInlineNotice
       v-if="missingMeterNames"
-      variant="warning"
-      :content="t('billing.usageV2.missingMeters', { meters: missingMeterNames })"
+      tone="warn"
+      :message="t('billing.usageV2.missingMeters', { meters: missingMeterNames })"
       data-test="billings-usageoverview-missing-banner"
     />
 
     <!-- An org with no bill shows usage from its own stream, which only exists once reporting is on. -->
     <OEmptyState
       v-if="!details && volumeOnly"
-      size="hero"
-      illustration="wave-bars"
+      icon="bar-chart"
       :title="
         usageStreamEnabled
           ? t('billing.usageTrends.waitingTitle')
           : t('billing.usageTrends.enableTitle')
       "
-      :description="
+      :text="
         usageStreamEnabled
           ? t('billing.usageTrends.waitingForData')
           : t('billing.usageV2.enableVolumeSubtitle')
@@ -45,9 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-else-if="!details"
-      size="block"
       :title="t('billing.usageV2.noPricingTitle')"
-      :description="t('billing.usageV2.noPricingSubtitle')"
+      :text="t('billing.usageV2.noPricingSubtitle')"
       data-test="billings-usageoverview-no-pricing"
     />
 
@@ -70,24 +68,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <KpiCardRow
-        :columns="kpiCards.length"
+      <OStatStrip
+        :items="kpiStats"
+        size="lg"
+        stacked
         class="shrink-0"
         data-test="billings-usageoverview-kpis"
-      >
-        <UsageKpiCard
-          v-for="card in kpiCards"
-          :key="card.key"
-          :label="card.label"
-          :value="card.value"
-          :icon="card.icon"
-          :value-suffix="card.valueSuffix"
-          :hint="card.hint"
-          :struck="card.struck"
-          :positive="card.positive"
-          :data-test="`billings-usageoverview-kpi-${card.key}`"
-        />
-      </KpiCardRow>
+      />
 
       <section
         class="bg-card-glass-bg rounded-default border-border-default @container/usage-breakdown flex min-h-0 flex-1 flex-col overflow-hidden border"
@@ -100,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-border-default border-b px-4 py-2.5"
           data-test="billings-usageoverview-strip-loading"
         >
-          <OSkeleton class="h-7 w-full" />
+          <OSkeleton shape="block" class="h-7 w-full" />
         </div>
         <UsageBillStrip
           v-else-if="isSuperOrg && !volumeOnly"
@@ -128,9 +115,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <UsagePaneHeader v-if="selectedMeter" :title="meterTitle" :subtitle="meterSummary">
               <template #leading>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs"
-                  icon-left="chevron-left"
+                  icon="chevron-left"
                   :aria-label="t('billing.usageV2.allMeters')"
                   data-test="billings-usageoverview-all-meters"
                   @click="selectMeter(null)"
@@ -159,7 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? t('billing.usageV2.groupNotRecorded', { group: t(item.columnKey) })
                         : undefined
                     "
-                    size="sm"
                   >
                     {{ t(item.columnKey) }}
                   </OToggleGroupItem>
@@ -173,9 +159,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #leading>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs"
-                  icon-left="chevron-left"
+                  icon="chevron-left"
                   :aria-label="t('billing.usageV2.allOrgs')"
                   data-test="billings-usageoverview-all-orgs"
                   @click="selectOrg(null)"
@@ -219,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OEmptyState
                 v-if="isSuperOrg && !selectedOrg && orgCostsFailed"
                 size="inline"
+                kind="error"
                 :title="t('billing.usageV2.orgCostsFailed')"
                 data-test="billings-usageoverview-org-error"
               />
@@ -313,18 +300,18 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { formatSizeFromMB } from "@/utils/formatters";
 import useBreakpoint from "@/composables/useBreakpoint";
-import UsageKpiCard from "./UsageKpiCard.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import { usageKpiStats } from "./usageKpiStats";
 import UsageBillStrip from "./UsageBillStrip.vue";
 import UsageMeterTable from "./UsageMeterTable.vue";
 import UsageMeterBreakdown from "./UsageMeterBreakdown.vue";
@@ -756,6 +743,8 @@ const kpiCards = computed<KpiCard[]>(() => {
     });
   return cards;
 });
+
+const kpiStats = computed(() => usageKpiStats(kpiCards.value, "billings-usageoverview-kpi"));
 
 const missingMeterNames = computed(() => {
   const missing = rows.value.filter((row) => row.missing);

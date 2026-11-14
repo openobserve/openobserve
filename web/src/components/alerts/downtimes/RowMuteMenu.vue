@@ -26,15 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @until="emit('until')"
     />
     <ODropdownItem
-      variant="destructive"
-      icon-left="notifications-active"
+      tone="danger"
+      icon="notifications-active"
       :data-test="endTest"
       @select="emit('end')"
     >
       {{ endLabel }}
     </ODropdownItem>
   </template>
-  <ODropdownItem v-else icon-left="open-in-new" :data-test="mutedByTest" @select="openDowntime">
+  <ODropdownItem v-else icon="open-in-new" :data-test="mutedByTest" @select="openDowntime">
     {{ t("alerts.downtimes.mute.mutedBy", { name: downtime.name }) }}
   </ODropdownItem>
 </template>

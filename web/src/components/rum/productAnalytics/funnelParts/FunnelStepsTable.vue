@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </span>
           <span class="flex min-w-0 flex-wrap items-center gap-1.5 max-md:basis-full">
-            <OTag :label="kindLabel(step)" :variant="kindVariant(step)" size="xs" />
+            <OTag :label="kindLabel(step)" :tone="kindVariant(step)" size="sm" />
             <span class="text-text-body min-w-0 font-mono text-xs break-all">{{
               labelOf(step)
             }}</span>
@@ -92,23 +92,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 step.kind === 'e' && (eventsStatus === 'failed' || eventsStatus === 'forbidden')
               "
               :label="t('rum.analytics.funnel.eventNotLoaded')"
-              variant="default-soft"
-              size="xs"
+              tone="neutral"
+              size="sm"
               :data-test="`rum-analytics-funnel-step-${i}-unavailable`"
             />
             <OTag
               v-else-if="eventsStatus === 'ready' && isDeleted(step)"
               :label="t('rum.analytics.funnel.deletedEvent')"
-              variant="warning-soft"
-              size="xs"
+              tone="warn"
+              size="sm"
               :data-test="`rum-analytics-funnel-step-${i}-deleted`"
             />
             <OTag
               v-else-if="result && result.steps[i] && result.steps[i].seen === 0"
               :label="t('rum.analytics.funnel.notSeen')"
-              variant="warning-soft"
+              tone="warn"
               icon="warning"
-              size="xs"
+              size="sm"
               :data-test="`rum-analytics-funnel-step-${i}-not-seen`"
             />
             <span
@@ -121,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="chip in filterChips(step)"
                 :key="chip"
                 :label="chip"
-                variant="primary-outline"
-                size="xs"
+                tone="outline"
+                size="sm"
               />
             </span>
           </span>
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </template>
           <template v-else>
-            <OSkeleton v-for="n in numberCols" :key="n" type="text" class="h-5 w-full" />
+            <OSkeleton v-for="n in numberCols" :key="n" class="h-5 w-full" />
           </template>
           <span class="md:bg-surface-base flex items-center justify-end gap-0.5 md:sticky md:end-0">
             <StepConditionPopover
@@ -234,32 +234,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown align="end">
               <template #trigger>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-sm"
-                  icon-left="more-vert"
+                  icon="more-vert"
                   :aria-label="t('rum.analytics.funnel.stepMenu')"
                   :data-test="`rum-analytics-funnel-step-${i}-menu`"
                   ><OTooltip :content="t('rum.analytics.funnel.stepMenu')"
                 /></OButton>
               </template>
               <ODropdownItem
-                icon-left="alt-route"
+                icon="alt-route"
                 :data-test="`rum-analytics-funnel-step-${i}-break-down`"
                 @select="emit('break-down-step', i + 1)"
                 >{{ t("rum.analytics.funnel.breakDownByStep") }}</ODropdownItem
               >
               <ODropdownItem
                 v-if="i < def.steps.length - 1"
-                icon-left="show-chart"
+                icon="show-chart"
                 :data-test="`rum-analytics-funnel-step-${i}-trend-from`"
                 @select="emit('trend-from-step', i + 1)"
                 >{{ t("rum.analytics.funnel.trendFromHere") }}</ODropdownItem
               >
             </ODropdown>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="close"
+              icon="close"
               :aria-label="t('rum.analytics.funnel.remove')"
               :data-test="`rum-analytics-funnel-step-${i}-remove`"
               @click="remove(i)"
@@ -274,9 +274,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="result.steps[i].dropoff > 0 && dropCompare(i)"
             :variant="dropVariant(i)"
-            size="xs"
-            icon-left="arrow-downward"
-            icon-right="chevron-right"
+            size="sm"
+            icon="arrow-downward"
+            icon-end="chevron-right"
             aria-haspopup="dialog"
             :aria-label="
               t('rum.analytics.funnel.droppedCompareAria', { ...dropParams(i), step: i + 1 })
@@ -298,10 +298,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           /></OButton>
           <OButton
             v-else-if="result.steps[i].dropoff > 0"
-            variant="ghost-primary"
-            size="xs"
-            icon-left="arrow-downward"
-            icon-right="chevron-right"
+            variant="accent-ghost"
+            size="sm"
+            icon="arrow-downward"
+            icon-end="chevron-right"
             aria-haspopup="dialog"
             :aria-label="
               t('rum.analytics.funnel.droppedAria', {
@@ -504,8 +504,8 @@ const dropParams = (i: number) => {
 // Red is the same event as a red change on the next row; grey wins under the low-volume rule.
 const dropVariant = (i: number) => {
   const d = dropCompare(i);
-  if (d?.lowVolume) return "ghost-muted";
-  return d?.rose ? "ghost-destructive" : "ghost-primary";
+  if (d?.lowVolume) return "ghost";
+  return d?.rose ? "danger-ghost" : "accent-ghost";
 };
 
 const isDeleted = (s: StepRef) => s.kind === "e" && !props.events.some((e) => e.id === s.key);

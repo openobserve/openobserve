@@ -635,7 +635,7 @@ describe("useKubernetesInventory", () => {
       expect(inv.results.value.get("P14")).toEqual([]);
       expect(inv.results.value.has("P3")).toBe(false);
       expect(inv.inventory.value.pods[0].memoryLimit).toBe("missing");
-      expect(inv.banners.value.filter((b) => b.variant === "warning")).toEqual([]);
+      expect(inv.banners.value.filter((b) => b.tone === "warn")).toEqual([]);
     });
   });
 

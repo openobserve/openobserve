@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="xl"
+    size="lg"
     :title="collector ? raw(collector.name) : undefined"
-    :sub-title="collector?.hostname ? raw(collector.hostname) : undefined"
+    :subtitle="collector?.hostname ? raw(collector.hostname) : undefined"
     bleed
     data-test="fleet-collector-drawer"
     @update:open="emit('update:open', $event)"
@@ -31,32 +31,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OEmptyState
         v-if="forbidden"
-        preset="no-access"
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('emptyState.noAccess.description')"
         data-test="fleet-collector-drawer-forbidden"
       />
-      <OEmptyState v-else preset="load-error" @action="refetch" />
+      <OEmptyState
+        v-else
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
+        @action="refetch"
+      />
     </div>
     <div
       v-else-if="!collector"
       class="flex h-full items-center justify-center"
       data-test="fleet-collector-drawer-loading"
     >
-      <OSpinner />
+      <OSpinner size="lg" />
     </div>
     <div v-else class="flex h-full min-h-0 flex-col">
       <div class="flex shrink-0 flex-wrap items-center gap-2 px-4 pt-3">
         <OTag type="serviceStatus" :value="collector.status" />
-        <OTag
-          v-if="collector.outdated"
-          variant="warning-soft"
-          :label="t('fleet.collectors.outdated')"
-        />
+        <OTag v-if="collector.outdated" tone="warn" :label="t('fleet.collectors.outdated')" />
         <div class="ms-auto flex flex-wrap items-center gap-2">
           <span class="inline-flex">
             <OButton
-              variant="outline"
-              size="sm"
-              icon-left="restart-alt"
+              variant="secondary"
+              icon="restart-alt"
               :disabled="!!restartBlocked"
               :loading="actions.restarting.value"
               data-test="fleet-collector-drawer-restart"
@@ -69,9 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <OButton
             v-if="collector.config"
-            variant="outline"
-            size="sm"
-            icon-left="sync"
+            variant="secondary"
+            icon="sync"
             :loading="actions.redelivering.value"
             data-test="fleet-collector-drawer-redeliver"
             @click="actions.redeliver(collector)"
@@ -79,9 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("fleet.collectors.redeliver") }}
           </OButton>
           <OButton
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
+            variant="danger-ghost"
+            icon="delete"
             :loading="actions.removing.value"
             data-test="fleet-collector-drawer-remove"
             @click="removeNow"
@@ -91,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <OTabs v-model="tab" class="border-border-default mt-2 shrink-0 border-b" dense>
+      <OTabs v-model="tab" class="border-border-default mt-2 shrink-0 border-b" size="compact">
         <OTab name="overview" :label="t('fleet.collectors.overview')" />
         <OTab name="metrics" :label="t('fleet.collectorMetrics.tab')" />
         <OTab name="health" :label="t('fleet.collectors.health')" />
@@ -101,12 +102,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="min-h-0 flex-1 overflow-auto p-4">
         <div v-if="tab === 'overview'" class="flex flex-col gap-5">
-          <OBanner
+          <OInlineNotice
+            class="wrap-anywhere whitespace-pre-line"
             v-if="collector.delivery === 'rejected' && collector.deliveryError"
-            variant="error"
-            dense
-            preserve-whitespace
-            :content="raw(collector.deliveryError)"
+            tone="err"
+            :message="raw(collector.deliveryError)"
             data-test="fleet-collector-drawer-delivery-error"
           />
           <ODescriptionList>
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   type="fleetDelivery"
                   :value="collector.delivery"
-                  :variant="collector.status === 'offline' ? 'default-outline' : undefined"
+                  :tone="collector.status === 'offline' ? 'outline' : undefined"
                 />
                 <OText
                   v-if="collector.status === 'offline'"
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t("fleet.collectors.noMarker")
               }}</span>
             </ODescriptionItem>
-            <ODescriptionItem :label="t('fleet.collectors.capabilities')" stacked>
+            <ODescriptionItem :label="t('fleet.collectors.capabilities')">
               <div
                 v-if="collector.capabilities.length"
                 class="flex flex-wrap gap-1"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   v-for="cap in collector.capabilities"
                   :key="cap"
-                  variant="default-soft"
+                  tone="neutral"
                   :label="raw(cap)"
                 />
               </div>
@@ -275,31 +275,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("fleet.collectors.lastReported") }}</OText
             >
           </div>
-          <OBanner
+          <OInlineNotice
+            class="wrap-anywhere whitespace-pre-line"
             v-if="collector.healthError"
-            variant="error"
-            dense
-            preserve-whitespace
-            :content="raw(collector.healthError)"
+            tone="err"
+            :message="raw(collector.healthError)"
             data-test="fleet-collector-drawer-errors"
           />
-          <OBanner
+          <OInlineNotice
             v-else-if="!collector.healthReported"
-            dense
-            :content="t('fleet.collectors.noHealth')"
+            :message="t('fleet.collectors.noHealth')"
             data-test="fleet-collector-drawer-no-health"
           />
-          <OBanner
+          <OInlineNotice
             v-else
-            :variant="collector.status === 'offline' ? 'default' : 'success'"
-            dense
-            :content="t('fleet.collectors.noErrors')"
+            :tone="collector.status === 'offline' ? 'neutral' : 'ok'"
+            :message="t('fleet.collectors.noErrors')"
             data-test="fleet-collector-drawer-no-errors"
           />
           <OText variant="meta">{{ t("fleet.collectors.healthMeaning") }}</OText>
 
-          <ODescriptionList dense>
-            <ODescriptionItem :label="t('fleet.collectors.componentHealth')" stacked>
+          <ODescriptionList layout="stacked">
+            <ODescriptionItem :label="t('fleet.collectors.componentHealth')">
               <div
                 v-if="collector.components.length"
                 class="flex flex-col gap-1.5"
@@ -337,8 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OCollapsible
               v-if="split.system"
-              :label="t('fleet.collectors.systemSections')"
-              :caption="t('fleet.collectors.systemSectionsCaption')"
+              :title="t('fleet.collectors.systemSections')"
+              :summary="t('fleet.collectors.systemSectionsCaption')"
               data-test="fleet-collector-drawer-system-yaml"
             >
               <FleetCodeEditor
@@ -383,7 +380,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";

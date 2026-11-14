@@ -19,17 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Each card routes to a distinct, real tracing ingestion path.
 -->
 <template>
-  <OEmptyState v-bind="shell" :hide-action="true">
-    <template #title>
-      <span
-        v-if="alternativesOnly"
-        class="text-text-secondary text-sm font-normal"
-        data-test="traces-no-data-another-way"
-        >{{ t("ingestion.firstDataPanel.anotherWay") }}</span
-      >
-      <template v-else>{{ t("traces.noData.title", { product: raw("OpenObserve") }) }}</template>
-    </template>
-    <template v-if="!alternativesOnly" #description><span v-html="description" /></template>
+  <OEmptyState v-bind="shell">
+    <template v-if="!alternativesOnly" #text><span v-html="description" /></template>
 
     <template #actions>
       <div v-if="$slots.status" class="flex basis-full justify-center">
@@ -141,11 +132,14 @@ const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,
 }));
 
-// v-bind keeps the hero's own defaults untouched; the caption form drops the illustration and backdrop.
+// Under FirstDataPanel the caption names the alternatives instead of the first-run title.
 const shell = computed(() =>
   props.alternativesOnly
-    ? { size: "block" as const, backdrop: false }
-    : { size: "hero" as const, illustration: "trace" as const },
+    ? { size: "inline" as const, title: t("ingestion.firstDataPanel.anotherWay") }
+    : {
+        icon: "timeline" as const,
+        title: t("traces.noData.title", { product: raw("OpenObserve") }),
+      },
 );
 
 const description = computed(() => t("traces.noData.description"));

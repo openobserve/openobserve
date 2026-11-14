@@ -21,7 +21,7 @@ import i18n from "@/locales";
 import type { DeliveryRecord, EscalationProgress, ResponseState } from "@/ts/interfaces/oncall";
 
 const stubs = {
-  OBanner: { name: "OBanner", template: "<div><slot /><slot name='actions' /></div>" },
+  OInlineNotice: { name: "OInlineNotice", template: "<div><slot /><slot name='actions' /></div>" },
   OButton: {
     name: "OButton",
     emits: ["click"],

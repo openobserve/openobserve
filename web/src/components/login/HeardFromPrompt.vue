@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       v-for="o in options"
       :key="o.value"
-      variant="outline"
-      size="xs"
+      variant="secondary"
+      size="sm"
       :disabled="sending"
       :data-test="`heard-from-prompt-option-${o.value}`"
       @click="answer(o.value)"
@@ -34,8 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ o.label }}
     </OButton>
     <OButton
-      variant="ghost-muted"
-      size="xs"
+      variant="ghost"
+      size="sm"
       :disabled="sending"
       data-test="heard-from-prompt-dismiss-btn"
       @click="dismiss"

@@ -487,7 +487,7 @@ const useEnterpriseRoutes = () => {
         path: "groups",
         name: "groups",
         meta: {
-          titleKey: "routeTitles.groups",
+          titleKey: "iam.groups",
         },
         component: AppGroups,
         beforeEnter: withFeatureGate("rbac", routeGuard),
@@ -523,6 +523,7 @@ const useEnterpriseRoutes = () => {
     withLicenseFeature("ratelimit", {
       path: "quota",
       name: "quota",
+      meta: { titleKey: "iam.quota" },
       component: Quota,
       beforeEnter: withFeatureGate("rbac", routeGuard),
     }),
@@ -532,6 +533,7 @@ const useEnterpriseRoutes = () => {
     routes[0].children.push({
       path: "invitations",
       name: "invitations",
+      meta: { titleKey: "iam.invitations" },
       component: Invitations,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

@@ -28,7 +28,7 @@ import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCode from "@/lib/core/Code/OCode.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -121,7 +121,7 @@ function copyValue() {
       </span>
       <OButton
         variant="ghost"
-        size="xs"
+        size="sm"
         class="shrink-0"
         data-test="synthetics-evidence-event-detail-copy-value"
         @click="copyValue"
@@ -141,18 +141,11 @@ function copyValue() {
       </template>
     </dl>
 
-    <div v-if="event.stack" class="flex flex-col gap-1">
-      <span class="text-2xs text-text-label font-medium">
-        {{ t("synthetics.evidence.detailStackTrace") }}
-      </span>
-      <OCode
-        block
-        copyable
-        class="max-h-50 overflow-y-auto"
-        data-test="synthetics-evidence-event-detail-stack"
-      >
-        {{ event.stack }}
-      </OCode>
-    </div>
+    <OCodeBlock
+      v-if="event.stack"
+      :code="event.stack"
+      :filename="t('synthetics.evidence.detailStackTrace')"
+      data-test="synthetics-evidence-event-detail-stack"
+    />
   </div>
 </template>

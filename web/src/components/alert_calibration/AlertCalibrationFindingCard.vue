@@ -15,243 +15,238 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard variant="glass" :data-test="`alert-calibration-finding-${finding.rule_id}`">
-    <OCardSection role="header" class="items-start gap-3 py-3">
-      <span
-        class="rounded-default inline-flex size-7 shrink-0 items-center justify-center"
-        :class="SEVERITY_TILE[finding.severity]"
-        data-test="alert-calibration-finding-tile"
-      >
-        <OIcon :name="meta.icon" size="sm" />
-      </span>
-      <div class="flex min-w-0 flex-1 flex-col gap-1">
-        <OText variant="body-strong" as="div">{{ finding.title }}</OText>
-        <div class="flex flex-wrap items-center gap-1.5">
-          <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="sm" shape="rounded">
-            {{ t(SEVERITY_LABEL[finding.severity]) }}
-          </OBadge>
-          <OBadge variant="default-soft" size="sm" shape="rounded">
-            {{ t(CONFIDENCE_LABEL[finding.confidence]) }}
-          </OBadge>
-          <OBadge
-            v-if="tier"
-            variant="primary-soft"
-            size="sm"
-            shape="rounded"
-            data-test="alert-calibration-finding-tier"
-          >
-            {{ t(TIER_LABEL[tier]) }}
-            <OTooltip :content="t(TIER_HINT[tier])" />
-          </OBadge>
-          <OBadge
-            v-if="quality"
-            variant="warning-soft"
-            size="sm"
-            shape="rounded"
-            data-test="alert-calibration-finding-quality"
-          >
-            {{ t(QUALITY_LABEL[quality]) }}
-          </OBadge>
-          <OBadge
-            variant="default-outline"
-            size="sm"
-            shape="rounded"
-            data-test="alert-calibration-finding-rule"
-            >{{ t(ruleLabelKey(finding.rule_id, schemaVersion(finding))) }}</OBadge
-          >
-          <OBadge
-            v-if="folded"
-            variant="default-soft"
-            size="sm"
-            shape="rounded"
-            data-test="alert-calibration-finding-dismissed"
-          >
-            {{ dismissal ? dismissCopy.badge(dismissal) : t("alertCalibration.dismiss.badge") }}
-          </OBadge>
-        </div>
-        <OText
-          v-if="qualityReasons"
-          variant="meta"
-          as="div"
-          data-test="alert-calibration-finding-quality-reasons"
+  <OCard :data-test="`alert-calibration-finding-${finding.rule_id}`">
+    <div class="flex flex-col gap-3">
+      <div class="flex items-start gap-3">
+        <span
+          class="rounded-default inline-flex size-7 shrink-0 items-center justify-center"
+          :class="SEVERITY_TILE[finding.severity]"
+          data-test="alert-calibration-finding-tile"
         >
-          {{ qualityReasons }}
-        </OText>
+          <OIcon :name="meta.icon" size="sm" />
+        </span>
+        <div class="flex min-w-0 flex-1 flex-col gap-1">
+          <OText variant="body-strong" as="div">{{ finding.title }}</OText>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <OBadge :tone="SEVERITY_BADGE[finding.severity]" size="sm">
+              {{ t(SEVERITY_LABEL[finding.severity]) }}
+            </OBadge>
+            <OBadge tone="neutral" size="sm">
+              {{ t(CONFIDENCE_LABEL[finding.confidence]) }}
+            </OBadge>
+            <OBadge v-if="tier" tone="accent" size="sm" data-test="alert-calibration-finding-tier">
+              {{ t(TIER_LABEL[tier]) }}
+              <OTooltip :content="t(TIER_HINT[tier])" />
+            </OBadge>
+            <OBadge
+              v-if="quality"
+              tone="warn"
+              size="sm"
+              data-test="alert-calibration-finding-quality"
+            >
+              {{ t(QUALITY_LABEL[quality]) }}
+            </OBadge>
+            <OBadge tone="outline" size="sm" data-test="alert-calibration-finding-rule">{{
+              t(ruleLabelKey(finding.rule_id, schemaVersion(finding)))
+            }}</OBadge>
+            <OBadge
+              v-if="folded"
+              tone="neutral"
+              size="sm"
+              data-test="alert-calibration-finding-dismissed"
+            >
+              {{ dismissal ? dismissCopy.badge(dismissal) : t("alertCalibration.dismiss.badge") }}
+            </OBadge>
+          </div>
+          <OText
+            v-if="qualityReasons"
+            variant="meta"
+            as="div"
+            data-test="alert-calibration-finding-quality-reasons"
+          >
+            {{ qualityReasons }}
+          </OText>
+        </div>
+        <OButton
+          v-if="finding.alert_id"
+          variant="accent-ghost"
+          size="sm"
+          class="shrink-0"
+          data-test="alert-calibration-finding-open-alert"
+          @click="openAlert"
+        >
+          {{ t("alertCalibration.detail.openAlert") }}
+        </OButton>
       </div>
-      <OButton
-        v-if="finding.alert_id"
-        variant="ghost-primary"
-        size="xs"
-        class="shrink-0"
-        data-test="alert-calibration-finding-open-alert"
-        @click="openAlert"
-      >
-        {{ t("alertCalibration.detail.openAlert") }}
-      </OButton>
-    </OCardSection>
 
-    <OSeparator />
-
-    <OCardSection
-      v-if="folded && dismissal"
-      role="body"
-      class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3"
-      data-test="alert-calibration-finding-fold"
-    >
-      <OText variant="meta" as="p" class="flex min-w-0 flex-wrap gap-x-1.5">
-        <template v-for="(part, index) in dismissCopy.foldParts(dismissal)" :key="index">
-          <span v-if="index > 0" aria-hidden="true">·</span>
-          <span>{{ part }}</span>
-        </template>
-      </OText>
-      <OButton
-        variant="outline"
-        size="xs"
-        class="shrink-0"
-        :loading="isPending(dismissal.id)"
-        data-test="alert-calibration-finding-reopen"
-        @click="reopen(dismissal)"
-      >
-        {{ t("alertCalibration.dismiss.reopen") }}
-      </OButton>
-    </OCardSection>
-
-    <OCardSection v-else role="body" class="flex flex-col gap-3 pt-3">
-      <dl class="flex flex-wrap gap-x-8 gap-y-2">
-        <div
-          v-for="row in evidence"
-          :key="row.column"
-          class="flex min-w-0 flex-col"
-          :class="row.wide ? 'basis-full' : ''"
-        >
-          <dt class="text-text-secondary text-xs">{{ row.label }}</dt>
-          <OTruncatedText as="dd" class="text-text-body min-w-0 text-sm font-medium tabular-nums">
-            {{ row.value }}
-          </OTruncatedText>
-        </div>
-      </dl>
+      <OSeparator />
 
       <div
-        v-if="limitations.length"
-        class="flex flex-col gap-0.5"
-        data-test="alert-calibration-finding-limitations"
+        v-if="folded && dismissal"
+        class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
+        data-test="alert-calibration-finding-fold"
       >
-        <OText variant="label" as="div">{{ t("alertCalibration.detail.limitations") }}</OText>
-        <OText v-for="(line, index) in limitations" :key="index" variant="meta" as="div">{{
-          line
-        }}</OText>
+        <OText variant="meta" as="p" class="flex min-w-0 flex-wrap gap-x-1.5">
+          <template v-for="(part, index) in dismissCopy.foldParts(dismissal)" :key="index">
+            <span v-if="index > 0" aria-hidden="true">·</span>
+            <span>{{ part }}</span>
+          </template>
+        </OText>
+        <OButton
+          variant="secondary"
+          size="sm"
+          class="shrink-0"
+          :loading="isPending(dismissal.id)"
+          data-test="alert-calibration-finding-reopen"
+          @click="reopen(dismissal)"
+        >
+          {{ t("alertCalibration.dismiss.reopen") }}
+        </OButton>
       </div>
 
-      <div v-if="advice" class="flex flex-col gap-0.5" data-test="alert-calibration-finding-advice">
-        <OText variant="label" as="div">{{ t("alertCalibration.detail.advice") }}</OText>
-        <OText variant="meta" as="div">{{ advice }}</OText>
-        <ul
-          v-if="options.length"
-          class="text-text-secondary flex list-disc flex-col gap-0.5 ps-4 text-xs"
-          data-test="alert-calibration-finding-options"
-        >
-          <li
-            v-for="option in options"
-            :key="option.key"
-            :data-test="`alert-calibration-finding-option-${option.key}`"
-          >
-            <i18n-t keypath="alertCalibration.resourceOption.line" tag="span">
-              <template #option>
-                <span class="text-text-body font-medium">{{ option.label }}</span>
-              </template>
-              <template #cost>{{ option.cost }}</template>
-            </i18n-t>
-          </li>
-        </ul>
-      </div>
-
-      <div v-if="lagLists.length" class="grid gap-3 lg:grid-cols-2">
-        <div
-          v-for="list in lagLists"
-          :key="list.column"
-          class="border-border-default rounded-default grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 gap-y-1.5 border px-3 py-2"
-          :data-test="`alert-calibration-finding-${list.key}-list`"
-        >
-          <OText variant="label" as="div" class="min-w-0">{{ list.label }}</OText>
-          <OText
-            v-for="column in LAG_COLUMNS"
-            :key="column.field"
-            variant="label"
-            as="div"
-            class="text-end"
-          >
-            {{ t(column.labelKey) }}
-          </OText>
+      <div v-else class="flex flex-col gap-3">
+        <dl class="flex flex-wrap gap-x-8 gap-y-2">
           <div
-            v-for="row in list.rows"
-            :key="row.key"
-            class="contents"
-            data-test="alert-calibration-finding-lag-row"
+            v-for="row in evidence"
+            :key="row.column"
+            class="flex min-w-0 flex-col"
+            :class="row.wide ? 'basis-full' : ''"
           >
-            <OTruncatedText
-              class="text-text-body min-w-0 text-xs font-medium"
-              data-test="alert-calibration-finding-lag-cell"
-            >
-              {{ row.label }}
+            <dt class="text-text-secondary text-xs">{{ row.label }}</dt>
+            <OTruncatedText as="dd" class="text-text-body min-w-0 text-sm font-medium tabular-nums">
+              {{ row.value }}
             </OTruncatedText>
-            <span
+          </div>
+        </dl>
+
+        <div
+          v-if="limitations.length"
+          class="flex flex-col gap-0.5"
+          data-test="alert-calibration-finding-limitations"
+        >
+          <OText variant="label" as="div">{{ t("alertCalibration.detail.limitations") }}</OText>
+          <OText v-for="(line, index) in limitations" :key="index" variant="meta" as="div">{{
+            line
+          }}</OText>
+        </div>
+
+        <div
+          v-if="advice"
+          class="flex flex-col gap-0.5"
+          data-test="alert-calibration-finding-advice"
+        >
+          <OText variant="label" as="div">{{ t("alertCalibration.detail.advice") }}</OText>
+          <OText variant="meta" as="div">{{ advice }}</OText>
+          <ul
+            v-if="options.length"
+            class="text-text-secondary flex list-disc flex-col gap-0.5 ps-4 text-xs"
+            data-test="alert-calibration-finding-options"
+          >
+            <li
+              v-for="option in options"
+              :key="option.key"
+              :data-test="`alert-calibration-finding-option-${option.key}`"
+            >
+              <i18n-t keypath="alertCalibration.resourceOption.line" tag="span">
+                <template #option>
+                  <span class="text-text-body font-medium">{{ option.label }}</span>
+                </template>
+                <template #cost>{{ option.cost }}</template>
+              </i18n-t>
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="lagLists.length" class="grid gap-3 lg:grid-cols-2">
+          <div
+            v-for="list in lagLists"
+            :key="list.column"
+            class="border-border-default rounded-default grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 gap-y-1.5 border px-3 py-2"
+            :data-test="`alert-calibration-finding-${list.key}-list`"
+          >
+            <OText variant="label" as="div" class="min-w-0">{{ list.label }}</OText>
+            <OText
               v-for="column in LAG_COLUMNS"
               :key="column.field"
-              class="text-text-body text-end text-xs tabular-nums"
-              data-test="alert-calibration-finding-lag-cell"
+              variant="label"
+              as="div"
+              class="text-end"
             >
-              {{ formatEvidence(t, row[column.field], "count", locale) }}
-            </span>
+              {{ t(column.labelKey) }}
+            </OText>
+            <div
+              v-for="row in list.rows"
+              :key="row.key"
+              class="contents"
+              data-test="alert-calibration-finding-lag-row"
+            >
+              <OTruncatedText
+                class="text-text-body min-w-0 text-xs font-medium"
+                data-test="alert-calibration-finding-lag-cell"
+              >
+                {{ row.label }}
+              </OTruncatedText>
+              <span
+                v-for="column in LAG_COLUMNS"
+                :key="column.field"
+                class="text-text-body text-end text-xs tabular-nums"
+                data-test="alert-calibration-finding-lag-cell"
+              >
+                {{ formatEvidence(t, row[column.field], "count", locale) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="actions.length || dismissable"
+          class="rounded-default bg-surface-subtle border-s-border-strong flex flex-col gap-1 border-s-4 px-3 py-2"
+          data-test="alert-calibration-finding-actions"
+        >
+          <OText variant="label" as="div">{{ t("alertCalibration.detail.proposedActions") }}</OText>
+          <div
+            v-for="action in actions"
+            :key="action.key"
+            class="flex min-w-0 flex-wrap items-baseline gap-x-2"
+            :data-test="`alert-calibration-finding-action-${action.type}`"
+          >
+            <OButton
+              v-if="action.run"
+              :variant="action.type === 'apply_suggestion' ? 'primary' : 'secondary'"
+              size="sm"
+              :loading="action.pending"
+              :data-test="`alert-calibration-finding-action-${action.type}-button`"
+              @click="action.run"
+            >
+              {{ action.label }}
+            </OButton>
+            <span v-else class="text-text-body text-xs font-medium">{{ action.label }}</span>
+            <OText v-if="action.description" variant="meta" as="span">{{
+              action.description
+            }}</OText>
+          </div>
+          <div v-if="dismissable" class="flex min-w-0 flex-wrap items-baseline gap-x-2">
+            <OButton
+              variant="secondary"
+              size="sm"
+              data-test="alert-calibration-finding-dismiss"
+              @click="openDismiss"
+            >
+              {{ dismissCopy.button() }}
+            </OButton>
+            <OButton
+              v-if="markable"
+              variant="secondary"
+              size="sm"
+              data-test="alert-calibration-finding-mark-report"
+              @click="openMark"
+            >
+              {{ t("insight.decisions.mark.action") }}
+            </OButton>
           </div>
         </div>
       </div>
-
-      <div
-        v-if="actions.length || dismissable"
-        class="rounded-default bg-surface-subtle border-s-border-strong flex flex-col gap-1 border-s-4 px-3 py-2"
-        data-test="alert-calibration-finding-actions"
-      >
-        <OText variant="label" as="div">{{ t("alertCalibration.detail.proposedActions") }}</OText>
-        <div
-          v-for="action in actions"
-          :key="action.key"
-          class="flex min-w-0 flex-wrap items-baseline gap-x-2"
-          :data-test="`alert-calibration-finding-action-${action.type}`"
-        >
-          <OButton
-            v-if="action.run"
-            :variant="action.type === 'apply_suggestion' ? 'primary' : 'outline'"
-            size="xs"
-            :loading="action.pending"
-            :data-test="`alert-calibration-finding-action-${action.type}-button`"
-            @click="action.run"
-          >
-            {{ action.label }}
-          </OButton>
-          <span v-else class="text-text-body text-xs font-medium">{{ action.label }}</span>
-          <OText v-if="action.description" variant="meta" as="span">{{ action.description }}</OText>
-        </div>
-        <div v-if="dismissable" class="flex min-w-0 flex-wrap items-baseline gap-x-2">
-          <OButton
-            variant="outline"
-            size="xs"
-            data-test="alert-calibration-finding-dismiss"
-            @click="openDismiss"
-          >
-            {{ dismissCopy.button() }}
-          </OButton>
-          <OButton
-            v-if="markable"
-            variant="outline"
-            size="xs"
-            data-test="alert-calibration-finding-mark-report"
-            @click="openMark"
-          >
-            {{ t("insight.decisions.mark.action") }}
-          </OButton>
-        </div>
-      </div>
-    </OCardSection>
+    </div>
 
     <ReviewChangeDialog v-if="changeTarget" v-model:open="changeOpen" :target="changeTarget" />
     <AlertCalibrationApplyDialog
@@ -281,7 +276,6 @@ import { useRouter } from "vue-router";
 import { format } from "date-fns";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

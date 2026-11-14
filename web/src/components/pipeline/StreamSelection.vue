@@ -90,15 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mt-4 flex gap-2 px-3">
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="isSubmitting"
             data-test="add-pipeline-cancel-btn"
             >{{ t("alerts.cancel") }}</OButton
           >
           <OButton
             variant="primary"
-            size="sm-action"
             type="submit"
             :loading="isSubmitting"
             data-test="add-pipeline-submit-btn"

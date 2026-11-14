@@ -56,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <div class="flex flex-wrap items-center gap-1">
         <OButton
-          variant="ghost-primary"
-          size="xs"
-          icon-left="content-copy"
+          variant="accent-ghost"
+          size="sm"
+          icon="content-copy"
           data-test="access-denied-copy"
           @click="copyDetails"
         >
@@ -66,8 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="expanded && folds"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           data-test="access-denied-show-less"
           @click="expanded = false"
         >

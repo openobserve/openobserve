@@ -12,43 +12,43 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { I18nKey } from "@/types/i18n";
 import type { StatusPageHealth, StatusPageVisibility } from "@/services/status_pages";
 
 // Same health vocabulary as the rest of the app: green = operational,
 // red = outage, amber = degraded, blue = maintenance, neutral = unknown.
 export function healthBadge(health: StatusPageHealth): {
-  variant: BadgeVariant;
+  variant: ChipTone;
   labelKey: I18nKey;
 } {
   switch (health) {
     case "operational":
-      return { variant: "success-soft", labelKey: "statusPages.health.operational" };
+      return { variant: "ok", labelKey: "statusPages.health.operational" };
     case "degraded":
-      return { variant: "warning-soft", labelKey: "statusPages.health.degraded" };
+      return { variant: "warn", labelKey: "statusPages.health.degraded" };
     case "partial_outage":
-      return { variant: "error-soft", labelKey: "statusPages.health.partialOutage" };
+      return { variant: "err", labelKey: "statusPages.health.partialOutage" };
     case "major_outage":
-      return { variant: "error-soft", labelKey: "statusPages.health.majorOutage" };
+      return { variant: "err", labelKey: "statusPages.health.majorOutage" };
     case "maintenance":
-      return { variant: "blue-soft", labelKey: "statusPages.health.maintenance" };
+      return { variant: "info", labelKey: "statusPages.health.maintenance" };
     default:
-      return { variant: "default-soft", labelKey: "statusPages.health.noData" };
+      return { variant: "neutral", labelKey: "statusPages.health.noData" };
   }
 }
 
 export function visibilityBadge(visibility: StatusPageVisibility): {
-  variant: BadgeVariant;
+  variant: ChipTone;
   labelKey: I18nKey;
 } {
   switch (visibility) {
     case 1:
-      return { variant: "success-outline", labelKey: "statusPages.visibility.public" };
+      return { variant: "outline", labelKey: "statusPages.visibility.public" };
     case 2:
-      return { variant: "warning-outline", labelKey: "statusPages.visibility.password" };
+      return { variant: "outline", labelKey: "statusPages.visibility.password" };
     default:
-      return { variant: "default-outline", labelKey: "statusPages.visibility.draft" };
+      return { variant: "outline", labelKey: "statusPages.visibility.draft" };
   }
 }
 
@@ -60,48 +60,48 @@ export function publicStatusPageUrl(slug: string): string {
 
 // impact: 0 none, 1 degraded, 2 partial_outage, 3 major_outage.
 export function impactBadge(impact: number): {
-  variant: BadgeVariant;
+  variant: ChipTone;
   labelKey: I18nKey;
 } {
   switch (impact) {
     case 1:
-      return { variant: "warning-soft", labelKey: "statusPages.postUpdate.impactDegraded" };
+      return { variant: "warn", labelKey: "statusPages.postUpdate.impactDegraded" };
     case 2:
-      return { variant: "error-soft", labelKey: "statusPages.postUpdate.impactPartial" };
+      return { variant: "err", labelKey: "statusPages.postUpdate.impactPartial" };
     case 3:
-      return { variant: "error-soft", labelKey: "statusPages.postUpdate.impactMajor" };
+      return { variant: "err", labelKey: "statusPages.postUpdate.impactMajor" };
     default:
-      return { variant: "default-soft", labelKey: "statusPages.health.operational" };
+      return { variant: "neutral", labelKey: "statusPages.health.operational" };
   }
 }
 
 // state: 0 scheduled, 1 active, 2 resolved.
 export function noticeStateBadge(state: number): {
-  variant: BadgeVariant;
+  variant: ChipTone;
   labelKey: I18nKey;
 } {
   switch (state) {
     case 0:
-      return { variant: "default-outline", labelKey: "statusPages.notices.state.scheduled" };
+      return { variant: "outline", labelKey: "statusPages.notices.state.scheduled" };
     case 1:
-      return { variant: "error-outline", labelKey: "statusPages.notices.state.active" };
+      return { variant: "err", labelKey: "statusPages.notices.state.active" };
     default:
-      return { variant: "success-outline", labelKey: "statusPages.notices.state.resolved" };
+      return { variant: "outline", labelKey: "statusPages.notices.state.resolved" };
   }
 }
 
 // verification_state: 0 pending, 1 verified, 2 failed.
 export function domainStateBadge(state: number): {
-  variant: BadgeVariant;
+  variant: ChipTone;
   labelKey: I18nKey;
 } {
   switch (state) {
     case 1:
-      return { variant: "success-outline", labelKey: "statusPages.domains.state.verified" };
+      return { variant: "outline", labelKey: "statusPages.domains.state.verified" };
     case 2:
-      return { variant: "error-outline", labelKey: "statusPages.domains.state.failed" };
+      return { variant: "err", labelKey: "statusPages.domains.state.failed" };
     default:
-      return { variant: "default-outline", labelKey: "statusPages.domains.state.pending" };
+      return { variant: "outline", labelKey: "statusPages.domains.state.pending" };
   }
 }
 

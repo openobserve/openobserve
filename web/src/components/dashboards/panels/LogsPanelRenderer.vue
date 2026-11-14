@@ -25,12 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :wrap="wrap"
       :cell-overflow-tooltip="false"
       :row-key="rowKey"
-      :row-height="20"
+      density="compact"
       virtual-scroll
       measure-expanded-rows
       :default-columns="false"
-      :show-global-filter="false"
-      :frame="false"
       pagination="none"
       sorting="none"
       :pinned-first-column="timeColumnId"

@@ -52,9 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OProgressBar
             v-if="hasLimit"
-            :value="percentToFraction(percent)"
-            :variant="limitBarVariant(percent)"
-            :aria-label="t('overview.limit.used')"
+            :value="percentToFraction(percent) * 100"
+            :tone="limitBarVariant(percent)"
+            :label="t('overview.limit.used')"
             data-test="overview-limit-bar"
           />
           <p
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <OEmptyState
           v-else
-          size="slim"
+          size="inline"
           :title="t('overview.storage.emptyTitle')"
           data-test="overview-storage-empty"
         />

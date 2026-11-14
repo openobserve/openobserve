@@ -83,9 +83,9 @@ describe("limit helpers", () => {
   });
 
   it("picks the bar colour from the same thresholds", () => {
-    expect(limitBarVariant(10)).toBe("default");
-    expect(limitBarVariant(75)).toBe("warning");
-    expect(limitBarVariant(100)).toBe("danger");
+    expect(limitBarVariant(10)).toBe("accent");
+    expect(limitBarVariant(75)).toBe("warn");
+    expect(limitBarVariant(100)).toBe("err");
   });
 
   it("clamps the bar fraction", () => {

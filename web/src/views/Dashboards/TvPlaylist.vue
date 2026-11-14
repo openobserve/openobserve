@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         icon="tv"
         :title="t('dashboard.playlist.invalidTitle')"
-        :description="t('dashboard.playlist.invalidDescription')"
+        :text="t('dashboard.playlist.invalidDescription')"
         :action-label="t('dashboard.playlist.backToDashboards')"
         @action="exit"
       />

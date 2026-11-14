@@ -32,9 +32,9 @@ const mountState = (status: string, busy = false) =>
       stubs: {
         OButton: { template: "<button><slot /></button>" },
         OEmptyState: {
-          props: ["preset"],
+          props: ["kind", "title", "text"],
           template:
-            '<div :data-preset="preset"><slot name="title" /><slot name="description" /><slot name="actions" /></div>',
+            '<div :data-kind="kind">{{ title }}{{ text }}<slot name="text" /><slot name="actions" /></div>',
         },
         OSpinner: true,
       },
@@ -51,9 +51,7 @@ describe("OverviewPanelState", () => {
   it("renders an alert with Retry on error and emits retry", async () => {
     const w = mountState("error");
     expect(w.find('[data-test="panel-error"]').attributes("role")).toBe("alert");
-    expect(w.find('[data-test="panel-error"] [data-preset]').attributes("data-preset")).toBe(
-      "load-error",
-    );
+    expect(w.find('[data-test="panel-error"] [data-kind]').attributes("data-kind")).toBe("error");
     await w.find('[data-test="panel-retry"]').trigger("click");
     expect(w.emitted("retry")).toHaveLength(1);
     expect(w.find('[data-test="content"]').exists()).toBe(false);
@@ -90,7 +88,7 @@ describe("OverviewPanelState", () => {
 
   it("shows a no-permission message without Retry when forbidden", () => {
     const w = mountState("forbidden");
-    expect(w.find('[data-test="panel-forbidden"]').attributes("data-preset")).toBe("no-access");
+    expect(w.find('[data-test="panel-forbidden"]').attributes("data-kind")).toBe("denied");
     expect(w.find('[data-test="panel-retry"]').exists()).toBe(false);
   });
 

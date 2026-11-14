@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="_ui.forecast.direction"
           :options="directionOptions"
           :searchable="false"
-          width="xs"
+          width="s"
           data-test="alert-forecast-direction"
         />
         <label :for="thresholdId" class="sr-only">{{ t("alerts.forecast.threshold") }}</label>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :id="thresholdId"
           name="_ui.forecast.T"
           type="number"
-          width="xs"
+          width="s"
           :placeholder="t('alerts.forecast.threshold')"
           :debounce="300"
           data-test="alert-forecast-threshold"
@@ -52,12 +52,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :id="horizonId"
               name="_ui.forecast.H"
               type="number"
-              width="xs"
+              width="s"
               :debounce="300"
+              :suffix="t('alerts.forecast.days')"
               data-test="alert-forecast-horizon"
               @blur="horizonBlurred = true"
             >
-              <template #suffix>{{ t("alerts.forecast.days") }}</template>
               <template #error />
             </OFormInput>
             <div
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="_ui.forecast.W"
           :options="windowOptions"
           :searchable="false"
-          width="sm"
+          width="s"
           data-test="alert-forecast-window"
         />
         <span class="text-text-secondary text-xs" data-test="alert-forecast-help">{{

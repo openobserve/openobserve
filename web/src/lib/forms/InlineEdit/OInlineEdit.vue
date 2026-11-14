@@ -386,7 +386,7 @@ defineExpose({ focus: startEdit });
              than a native `title`: this hint is the ONLY place a generated name
              explains itself, so it can't sit behind the browser's ~1s delay in
              unstyled system chrome. -->
-        <OTooltip v-if="editHint && !isDisabled" :content="editHint" max-width="18rem" />
+        <OTooltip v-if="editHint && !isDisabled" :content="editHint" />
       </button>
 
       <!-- Trailing content beside the name — display mode only, so it never

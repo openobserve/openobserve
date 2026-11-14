@@ -15,12 +15,7 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip
-              side="right"
-              align="center"
-              :side-offset="10"
-              :content="raw(sqlQueryErrorMsg)"
-            />
+            <OTooltip side="right" :content="raw(sqlQueryErrorMsg)" />
           </OIcon>
         </template>
         <template #right>
@@ -73,7 +68,7 @@
           </div>
 
           <div class="flex items-center gap-3">
-            <DateTime
+            <ODateTimeRange
               :label="t('alerts.startTime')"
               auto-apply
               :default-type="dateTime.type"
@@ -88,7 +83,6 @@
             <OButton
               data-test="test-function-run-query-btn"
               variant="primary"
-              size="sm-action"
               :disabled="!selectedStream.name || !inputQuery || loading.events"
               @click="getResults"
             >
@@ -146,7 +140,7 @@
             v-if="loading.events"
             class="text-text-secondary text-compact ms-2 flex items-center font-bold"
           >
-            <OSpinner size="xs" />
+            <OSpinner />
             <div class="relative top-0.5">
               {{ t("confirmDialog.loading") }}
             </div>
@@ -157,12 +151,7 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip
-              side="right"
-              align="center"
-              :side-offset="10"
-              :content="raw(eventsErrorMsg)"
-            />
+            <OTooltip side="right" :content="raw(eventsErrorMsg)" />
           </OIcon>
         </template>
         <template #right>
@@ -207,7 +196,7 @@
             v-if="loading.output"
             class="text-text-secondary text-compact ms-2 flex items-center text-sm font-bold font-medium"
           >
-            <OSpinner size="xs" />
+            <OSpinner />
             <div class="relative top-0.5">
               {{ t("confirmDialog.loading") }}
             </div>
@@ -219,12 +208,7 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip
-              side="right"
-              align="center"
-              :side-offset="10"
-              :content="raw(outputEventsErrorMsg)"
-            />
+            <OTooltip side="right" :content="raw(outputEventsErrorMsg)" />
           </OIcon>
         </template>
       </FullViewContainer>
@@ -272,7 +256,7 @@ import {
 } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { isJsFunction } from "@/utils/functionLanguage";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
 import useSqlSuggestions from "@/composables/useSuggestions";

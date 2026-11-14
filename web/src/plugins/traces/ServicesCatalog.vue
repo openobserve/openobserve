@@ -61,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             v-model="filterText"
             :placeholder="t('traces.servicesCatalog.filterPlaceholder')"
-            clearable
             :debounce="300"
             class="w-full!"
             data-test="services-catalog-filter-input"
@@ -122,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTag type="countChip" value="neutral" class="whitespace-nowrap">
               {{ t("serviceVersions.catalog.moreChips", { count: moreCount }, moreCount) }}
-              <OTooltip :delay="300" max-width="28rem">
+              <OTooltip>
                 <template #content>
                   <div class="space-y-1" data-test="services-catalog-chips-more-list">
                     <div v-for="chip in foldedList" :key="chip.key">{{ chip.label }}</div>
@@ -215,9 +214,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:column-visibility="setColumnVisibility"
         />
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          icon-only
+          variant="secondary"
+          icon="refresh"
           :loading="isLoading"
           data-test="services-catalog-refresh-btn"
           @click="refreshCatalog"
@@ -264,8 +263,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           })
         }}</span>
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :data-test="`services-catalog-insight-traces-${i}`"
           @click="openInsightTraces(entry)"
         >
@@ -274,10 +273,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip v-if="entry.folder && alertsLocked" :content="alertsLockedReason">
           <span class="inline-flex">
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               disabled
-              icon-left="lock"
+              icon="lock"
               :data-test="`services-catalog-insight-charts-${i}`"
             >
               {{ t("traces.servicesCatalog.insights.viewCharts") }}
@@ -286,8 +285,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTooltip>
         <OButton
           v-else-if="entry.folder"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :data-test="`services-catalog-insight-charts-${i}`"
           @click="openInsightCharts(entry)"
         >
@@ -317,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTabs
             :orientation="isMobile ? 'horizontal' : 'vertical'"
-            dense
+            size="compact"
             :model-value="typeFilter"
             data-test="services-catalog-type-filter"
             @update:model-value="(v) => onTypeFilterChange(v as string)"
@@ -326,7 +325,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="cat in visibleTypeFilters"
               :key="cat"
               :name="cat"
-              class="min-h-7"
               :data-test="`services-catalog-type-${cat}`"
             >
               <div class="flex w-full flex-nowrap items-center justify-between gap-2">
@@ -367,9 +365,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="services-catalog-error"
       >
         <OEmptyState
-          size="hero"
-          preset="load-error"
-          :description="loadError"
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="loadError"
           @action="loadServicesCatalog"
         />
       </div>
@@ -404,10 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :column-visibility="columnVisibility"
             row-key="id"
             :loading="isLoading"
-            :row-height="versionsEnabled ? CATALOG_ROW_HEIGHT : undefined"
-            :frame="false"
             :default-columns="false"
-            :show-global-filter="false"
             :sort-by="sortBy"
             :sort-order="sortOrder"
             sorting="server"
@@ -541,9 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="row.error_rate"
                 :max="columnMaxes.error_rate"
                 :label="raw(formatPercent(row.error_rate))"
-                :variant="
-                  row.error_rate > 10 ? 'danger' : row.error_rate > 5 ? 'warning' : 'default'
-                "
+                :tone="row.error_rate > 10 ? 'err' : row.error_rate > 5 ? 'warn' : 'accent'"
                 :data-test="`services-catalog-error-rate-${row.service_name}`"
               />
             </template>
@@ -594,7 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :max="columnMaxes.p99_latency_ns"
                 :label="raw(formatLat(row.p99_latency_ns))"
                 :tooltip="raw(row.p99_latency_ns.toLocaleString() + ' µs')"
-                :variant="row.p99_latency_ns > P99_WARN_US ? 'warning' : 'default'"
+                :tone="row.p99_latency_ns > P99_WARN_US ? 'warn' : 'accent'"
               />
             </template>
 
@@ -684,7 +677,6 @@ import {
   catalogEnvColumn,
   catalogRangeQuery,
   CATALOG_COLUMN_SIZES,
-  CATALOG_ROW_HEIGHT,
   CATALOG_SERVICE_MIN_SIZE,
   type VersionTraffic,
 } from "./servicesCatalogVersions";

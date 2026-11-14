@@ -17,9 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('alertCalibration.title')"
-    :subtitle="t('alertCalibration.subtitle')"
-    icon="tune"
-    tabs-below
+    :about="t('alertCalibration.subtitle')"
     scroll
     pad-y
     data-test="alert-calibration-dashboard-page"
@@ -28,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #actions>
       <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
+        icon-only
+        variant="secondary"
+        icon="refresh"
         :aria-label="t('alertCalibration.refresh')"
         :loading="data.loading.value"
         data-test="alert-calibration-dashboard-refresh"
@@ -46,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div v-if="loading" class="flex flex-col gap-4">
-      <OSkeleton class="rounded-surface h-40 w-full" />
-      <OSkeleton class="rounded-surface h-56 w-full" />
+      <OSkeleton shape="block" class="h-40 w-full" />
+      <OSkeleton shape="block" class="h-56 w-full" />
     </div>
 
     <!-- Dismissals outlive runs and the config, so they stay reachable when there is no board. -->
@@ -74,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <header class="flex items-center gap-2">
             <OText variant="label" as="h2">{{ t("insight.decisions.applied.title") }}</OText>
-            <OBadge variant="default-soft" data-test="alert-calibration-applied-total">
+            <OBadge tone="neutral" data-test="alert-calibration-applied-total">
               {{ countOrDash(appliedEntries.length, locale) }}
             </OBadge>
           </header>
@@ -84,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <LiveNoticeState
         v-else-if="forbidden || data.error.value"
-        size="block"
+        size="page"
         :notice="boardNotice"
         :detail="readFailedDetail(data.error.value)"
         :busy="data.loading.value"
@@ -97,23 +95,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OEmptyState
         v-else-if="!config?.enabled"
-        size="hero"
-        illustration="schedule"
+        icon="schedule"
         :title="t('alertCalibration.dashboard.notEnabledTitle')"
-        :description="t('alertCalibration.dashboard.notEnabledDescription')"
+        :text="t('alertCalibration.dashboard.notEnabledDescription')"
         :action-label="t('alertCalibration.configure')"
-        action-icon="settings"
         data-test="alert-calibration-dashboard-not-enabled"
         @action="configure"
       />
 
       <OEmptyState
         v-else
-        size="hero"
-        illustration="history"
+        icon="history"
         :title="t('alertCalibration.dashboard.emptyTitle', { days: RUNS_LOOKBACK_DAYS })"
-        :description="t('alertCalibration.dashboard.emptyDescription')"
-        hide-action
+        :text="t('alertCalibration.dashboard.emptyDescription')"
         data-test="alert-calibration-dashboard-empty"
       />
     </div>
@@ -179,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <header class="flex items-center gap-2">
               <OText variant="label" as="h2">{{ t("insight.decisions.applied.title") }}</OText>
-              <OBadge variant="default-soft" data-test="alert-calibration-applied-total">
+              <OBadge tone="neutral" data-test="alert-calibration-applied-total">
                 {{ countOrDash(appliedEntries.length, locale) }}
               </OBadge>
             </header>
@@ -187,86 +181,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </section>
         </template>
 
-        <OBanner
+        <OInlineNotice
           v-if="view === 'open' && dismissals.unknown.value"
-          variant="error"
-          icon="error"
-          inline-actions
+          tone="err"
           data-test="alert-calibration-dashboard-states-unknown"
         >
           {{ t("alertCalibration.dismiss.statesUnknown") }}
           <template #actions>
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               data-test="alert-calibration-dashboard-states-retry"
               @click="dismissals.query.refetch()"
             >
               {{ t("alertCalibration.retry") }}
             </OButton>
           </template>
-        </OBanner>
+        </OInlineNotice>
 
-        <OBanner
+        <OInlineNotice
           v-if="view === 'open' && countsPending"
-          variant="warning"
+          tone="warn"
           data-test="alert-calibration-dashboard-counts-pending"
         >
           {{ visibilityCopy(t, latest).pending.banner }}
-        </OBanner>
-        <OBanner
+        </OInlineNotice>
+        <OInlineNotice
           v-else-if="view === 'open' && allDismissed"
-          variant="default"
-          icon="info"
+          tone="neutral"
           data-test="alert-calibration-dashboard-all-dismissed"
         >
           {{ copy.allOpenDismissed(hiddenTotal) }}
-        </OBanner>
-        <OBanner
+        </OInlineNotice>
+        <OInlineNotice
           v-else-if="view === 'open' && latest.finding_count === 0"
-          :variant="isScoped(latest) ? 'info' : 'success'"
-          :icon="isScoped(latest) ? 'info' : 'check-circle'"
+          :tone="isScoped(latest) ? 'info' : 'ok'"
         >
           {{ visibilityCopy(t, latest).allClear }}
-        </OBanner>
+        </OInlineNotice>
 
         <OCard
           v-for="group in shownGroups"
           :key="group.rule_id"
-          variant="glass"
+          flush
           :data-test="`alert-calibration-dashboard-rule-${group.rule_id}`"
         >
-          <OCollapsible
-            :icon="RULE_META[group.rule_id].icon"
-            trigger-class="px-4 py-3"
-            :default-open="group.findings.some((f) => isFocused(f))"
-          >
+          <OCollapsible :default-open="group.findings.some((f) => isFocused(f))">
             <template #trigger>
               <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">
                 {{ t(ruleLabelKey(group.rule_id, version)) }}
               </span>
-              <OBadge
-                v-if="group.severity"
-                :variant="SEVERITY_BADGE[group.severity]"
-                size="sm"
-                shape="rounded"
-              >
+              <OBadge v-if="group.severity" :tone="SEVERITY_BADGE[group.severity]" size="sm">
                 {{ t(SEVERITY_LABEL[group.severity]) }}
               </OBadge>
               <OBadge
                 v-if="group.pending"
-                variant="warning-soft"
+                tone="warn"
                 size="sm"
-                shape="rounded"
                 data-test="alert-calibration-dashboard-group-pending"
               >
                 {{ visibilityCopy(t, latest).pending.badge }}
               </OBadge>
               <OBadge
                 v-else-if="!RULE_META[group.rule_id].clusterWide"
-                :variant="group.findings.length ? 'default-soft' : 'default-outline'"
+                :tone="group.findings.length ? 'neutral' : 'outline'"
                 size="sm"
-                shape="rounded"
               >
                 {{
                   t(
@@ -309,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-focused="isFocused(finding) || undefined"
                   :data-test="`alert-calibration-dashboard-alert-${finding.alert_id}`"
                 >
-                  <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="sm" shape="rounded">
+                  <OBadge :tone="SEVERITY_BADGE[finding.severity]" size="sm">
                     {{ t(SEVERITY_LABEL[finding.severity]) }}
                   </OBadge>
                   <div class="flex min-w-0 flex-1 basis-56 flex-wrap items-baseline gap-x-2">
@@ -324,16 +302,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <template v-if="appliedOf(finding)">
                     <OBadge
-                      variant="default-soft"
+                      tone="neutral"
                       size="sm"
-                      shape="rounded"
                       data-test="alert-calibration-dashboard-applied"
                     >
                       {{ t("alertCalibration.dashboard.applied") }}
                     </OBadge>
                     <OButton
-                      variant="outline"
-                      size="xs"
+                      variant="secondary"
+                      size="sm"
                       :loading="decisionRoute.isUndoing(appliedOf(finding)!.decision_id)"
                       data-test="alert-calibration-dashboard-undo-apply"
                       @click="undoApply(finding)"
@@ -343,8 +320,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <OButton
                     v-else-if="changeOf(finding)"
-                    variant="outline"
-                    size="xs"
+                    variant="secondary"
+                    size="sm"
                     data-test="alert-calibration-dashboard-review-change"
                     @click="reviewChange(finding)"
                   >
@@ -352,8 +329,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="ctasOf(finding).review"
-                    variant="outline"
-                    size="xs"
+                    variant="secondary"
+                    size="sm"
                     :loading="reviewing === finding.finding_id"
                     data-test="alert-calibration-dashboard-review-alert"
                     @click="review(finding)"
@@ -362,8 +339,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="finding.alert_id"
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     data-test="alert-calibration-dashboard-open-alert"
                     @click="openAlert(finding)"
                   >
@@ -371,8 +348,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="ctasOf(finding).logs"
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     data-test="alert-calibration-dashboard-logs"
                     @click="openLogs(finding)"
                   >
@@ -380,8 +357,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="canAsk && ctasOf(finding).ai"
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     data-test="alert-calibration-dashboard-ask-ai"
                     @click="ask(finding)"
                   >
@@ -389,8 +366,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-if="isDismissable(finding)"
-                    variant="ghost-muted"
-                    size="xs"
+                    variant="ghost"
+                    size="sm"
                     data-test="alert-calibration-dashboard-dismiss"
                     @click="openDismiss(finding)"
                   >
@@ -400,8 +377,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ul>
               <div class="border-border-default flex justify-end border-t px-3 py-1.5">
                 <OButton
-                  variant="ghost-primary"
-                  size="xs"
+                  variant="accent-ghost"
+                  size="sm"
                   data-test="alert-calibration-dashboard-view-evidence"
                   @click="viewEvidence(group.rule_id)"
                 >
@@ -439,7 +416,7 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -484,6 +461,7 @@ import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
 import {
   countOrDash,
   countTile,
+  coverageStatTone,
   coverageNoteRows,
   findingsByRule,
   isScoped,
@@ -755,15 +733,15 @@ const latestStats = computed<StatItem[]>(() => {
     {
       key: "findings",
       label: t("alertCalibration.dashboard.openFindings"),
-      ...(countsPending.value ? { value: raw("—") } : countTile(openTotal.value, locale.value)),
+      ...(countsPending.value ? { value: null } : countTile(openTotal.value, locale.value)),
       icon: "fact-check",
       tone: countsPending.value
         ? "neutral"
         : (openTotal.value ?? 0) > 0
-          ? "warning"
+          ? "warn"
           : isScoped(run) || allDismissed.value
             ? "neutral"
-            : "success",
+            : "ok",
     },
     {
       key: "scope",
@@ -778,7 +756,7 @@ const latestStats = computed<StatItem[]>(() => {
       label: t("alertCalibration.dashboard.coverage"),
       value: t(verdict.shortKey),
       icon: "verified-user",
-      tone: verdict.tone,
+      tone: coverageStatTone(verdict.tone),
     },
   ];
 });

@@ -30,12 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          header above a centered reading column. -->
     <div v-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
       <OPageHeader
-        :title="raw(activeSectionItem?.label || '')"
+        :title="activeSectionItem?.label ?? raw('')"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
-        :subtitle="raw(pageSubtitles[activeSection] || activeSectionItem?.description || '')"
-        :icon="activeSectionItem?.icon as any"
+        :about="pageSubtitles[activeSection] ?? activeSectionItem?.description"
         content-size="lg"
-        class="border-border-default shrink-0 border-b"
       >
         <template v-if="HEADER_ACTION_SECTIONS.has(activeSection)" #actions>
           <div :id="PAGE_ACTIONS_SLOT_ID" class="flex items-center gap-2"></div>
@@ -504,7 +502,7 @@ export default defineComponent({
     );
 
     // The header describes the page for this organization; the rail keeps its shorter description.
-    const pageSubtitles = computed<Record<string, string>>(() => {
+    const pageSubtitles = computed<Record<string, I18nText>>(() => {
       const org = store.state.selectedOrganization?.label ?? "";
       return {
         general: t("settings.generalSubtitle", { org }),

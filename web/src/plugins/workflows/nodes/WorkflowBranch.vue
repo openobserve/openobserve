@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="workflow-branch-guidelines-info"
       >
         <OIcon name="info" size="sm" />
-        <OTooltip side="right" align="start" :side-offset="8" max-width="22rem">
+        <OTooltip side="right">
           <template #content>
             <div class="flex flex-col gap-1.5 p-1 text-left">
               <div class="text-xs font-semibold">{{ t("workflow.node.branchNoteTitle") }}</div>
@@ -56,12 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default rounded-surface flex w-full flex-col gap-2 border p-3"
       >
         <div class="flex items-center gap-2">
-          <OBadge variant="warning-soft" size="sm" :data-test="`workflow-branch-order-${index}`">
+          <OBadge tone="warn" size="sm" :data-test="`workflow-branch-order-${index}`">
             {{ index + 1 }}
           </OBadge>
           <OInput
             :model-value="row.label"
-            size="sm"
             :placeholder="t('workflow.node.branchCaseLabelPlaceholder')"
             :aria-label="raw(t('workflow.node.branchCaseLabel'))"
             :data-test="`workflow-branch-label-${row.handle}`"
@@ -69,8 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v: string | number) => (row.label = String(v ?? ''))"
           />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs"
             :disabled="index === 0"
             :aria-label="raw(t('workflow.node.branchMoveUp'))"
             :data-test="`workflow-branch-move-up-${row.handle}`"
@@ -79,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="arrow-upward" size="xs" />
           </OButton>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs"
             :disabled="index === cases.length - 1"
             :aria-label="raw(t('workflow.node.branchMoveDown'))"
             :data-test="`workflow-branch-move-down-${row.handle}`"
@@ -90,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             v-if="cases.length > 1"
-            variant="ghost-destructive"
-            size="icon-xs"
+            icon-only
+            variant="danger-ghost"
             :aria-label="raw(t('workflow.node.branchRemoveCase'))"
             :data-test="`workflow-branch-remove-case-${row.handle}`"
             @click="removeCase(index)"
@@ -111,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <WorkflowHttpFieldHint v-if="httpOn" />
 
-      <OButton variant="dashed" size="sm" data-test="workflow-branch-add-case" @click="addCase">
+      <OButton variant="ghost" data-test="workflow-branch-add-case" @click="addCase">
         <OIcon name="add" size="xs" />
         {{ t("workflow.node.branchAddCase") }}
       </OButton>
@@ -122,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="workflow-branch-else"
         class="border-border-default bg-surface-subtle rounded-surface flex w-full items-center gap-2 border border-dashed p-3"
       >
-        <OBadge variant="default-soft" size="sm">{{ cases.length + 1 }}</OBadge>
+        <OBadge tone="neutral" size="sm">{{ cases.length + 1 }}</OBadge>
         <span class="text-text-body text-sm font-bold">
           {{ t("workflow.node.branchElseTitle") }}
         </span>

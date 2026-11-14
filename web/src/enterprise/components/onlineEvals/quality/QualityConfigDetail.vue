@@ -27,21 +27,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OEmptyState
         v-if="errorStatus === 403"
-        size="hero"
-        preset="no-access"
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('emptyState.noAccess.description')"
         :action-label="t('onlineEvals.quality.detail.backToAll')"
         @action="emit('back')"
       />
       <OEmptyState
         v-else-if="errorStatus === 404"
-        size="hero"
-        illustration="no-results"
+        kind="error"
+        icon="search-off"
         :title="t('onlineEvals.quality.detail.notFound')"
-        :description="t('onlineEvals.quality.detail.notFoundDescription')"
+        :text="t('onlineEvals.quality.detail.notFoundDescription')"
         :action-label="t('onlineEvals.quality.detail.backToAll')"
         @action="emit('back')"
       />
-      <OEmptyState v-else size="hero" preset="load-error" @action="retry" />
+      <OEmptyState
+        v-else
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
+        @action="retry"
+      />
     </div>
 
     <!-- First load keeps the detail's shape: chart, review toolbar, score list, and the pane with its own skeletons. -->
@@ -53,16 +60,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="px-page-edge border-border-default grid shrink-0 grid-cols-2 gap-2.5 border-b py-2 max-lg:grid-cols-1"
       >
-        <OSkeleton v-for="card in 2" :key="card" type="rect" class="h-62 w-full" />
+        <OSkeleton v-for="card in 2" :key="card" shape="block" class="h-62 w-full" />
       </div>
       <div class="px-page-edge border-border-default shrink-0 border-b py-1.5">
-        <OSkeleton type="text" class="h-7 w-64" />
+        <OSkeleton class="h-7 w-64" />
       </div>
       <div class="flex min-h-0 flex-1 max-md:flex-col">
         <div
           class="border-border-default flex w-96 shrink-0 flex-col gap-3 border-e p-3 max-lg:w-80 max-md:w-auto max-md:border-e-0 max-md:border-b"
         >
-          <OSkeleton v-for="row in 5" :key="row" type="text" class="h-8 w-full" />
+          <OSkeleton v-for="row in 5" :key="row" class="h-8 w-full" />
         </div>
         <QualityScorePane
           :score="null"
@@ -80,8 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="quality-detail-empty"
     >
       <OEmptyState
-        size="hero"
-        illustration="hourglass"
+        icon="hourglass-empty"
         :title="
           scope === 'all'
             ? t('onlineEvals.quality.detail.emptyTitle')
@@ -89,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 scope: t(`onlineEvals.quality.scopeNouns.${scope}`),
               })
         "
-        :description="t('onlineEvals.quality.detail.emptyDescription')"
+        :text="t('onlineEvals.quality.detail.emptyDescription')"
       />
     </div>
 
@@ -128,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="h-55 w-full">
             <OSkeleton
               v-if="timelineQuery.isPending.value"
-              type="rect"
+              shape="block"
               class="h-full w-full"
               data-test="quality-detail-trend-loading"
             />
@@ -136,9 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else-if="timelineQuery.error.value"
               class="h-full"
               size="inline"
-              preset="load-error"
-              :action-label="t('emptyState.loadError.action')"
-              action-icon="refresh"
+              kind="error"
+              :title="t('emptyState.loadError.title')"
+              :text="t('emptyState.loadError.description')"
               data-test="quality-detail-trend-error"
               @action="retryTimeline"
             />
@@ -165,13 +171,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="quality-detail-only"
             @update:model-value="(value) => emit('update:only', value as QualityOnly)"
           >
-            <OToggleGroupItem value="all" size="sm" data-test="quality-detail-only-all">
+            <OToggleGroupItem value="all" data-test="quality-detail-only-all">
               {{ t("onlineEvals.quality.review.all") }}
               <span class="font-semibold tabular-nums">{{ formatCount(summary.total) }}</span>
             </OToggleGroupItem>
             <OToggleGroupItem
               value="unhealthy"
-              size="sm"
               :disabled="summary.unhealthy == null"
               :tooltip="
                 summary.unhealthy == null
@@ -188,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
           <OTag
             v-if="filter"
-            variant="primary-soft"
+            tone="accent"
             :label="chartFilterLabel(filter, distribution, t)"
             removable
             :remove-label="t('onlineEvals.quality.detail.clearFilter')"
@@ -207,7 +212,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :columns="scoreColumns"
               row-key="id"
               :show-header="false"
-              :show-global-filter="false"
               :default-columns="false"
               pagination="server"
               sorting="none"
@@ -247,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OTag
                     class="shrink-0"
-                    :variant="pillVariant(score)"
+                    :tone="pillVariant(score)"
                     :label="raw(formatScoreValue(score.value, dataType))"
                   />
                 </div>
@@ -281,7 +285,7 @@ import { computed, nextTick, ref, toRef, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -415,9 +419,9 @@ const scoreColumns: OTableColumnDef<QualityScore>[] = [
   { id: "score", header: raw(""), accessorKey: "id", meta: { flex: true } },
 ];
 
-function pillVariant(score: QualityScore): BadgeVariant {
-  if (score.unhealthy == null) return "default-soft";
-  return score.unhealthy ? "error-soft" : "success-soft";
+function pillVariant(score: QualityScore): ChipTone {
+  if (score.unhealthy == null) return "neutral";
+  return score.unhealthy ? "err" : "ok";
 }
 
 function onBarSelect(bucket: QualityDistributionBucket, shift: boolean) {

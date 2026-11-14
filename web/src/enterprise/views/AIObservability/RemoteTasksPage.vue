@@ -27,17 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="ai-remote-tasks-page"
     :title="header?.title ?? t('aiObservability.nav.remoteTasks')"
-    :subtitle="header?.subtitle ?? t('aiObservability.subtitle.remoteTasks')"
-    :icon="header?.icon ?? 'cloud-upload'"
+    :about="header?.about ?? t('aiObservability.subtitle.remoteTasks')"
     bleed
     :scroll="false"
-    :tabs-below="hasTabs"
   >
     <template v-if="hasTabs" #header-tabs><AiSectionTabs /></template>
     <template #actions>
       <OButton
         variant="primary"
-        size="sm"
         data-test="ai-remote-tasks-new-btn"
         :aria-label="
           taskDrafts.hasNew
@@ -59,13 +56,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="bg-card-glass-bg flex h-full min-h-0 flex-col" data-test="ai-remote-tasks-list">
       <OTable
         data-test="ai-remote-tasks-list-table"
-        :data="numberedRows"
+        :data="tasks"
         :columns="columns"
         row-key="entityId"
         :loading="loading"
         :forbidden="forbidden"
         :global-filter="search"
-        :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
@@ -73,7 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="ai-remote-tasks-list"
-        width="100%"
         class="h-full w-full"
         @row-click="openDetail"
       >
@@ -83,14 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="min-w-0 flex-1"
             :placeholder="t('aiObservability.remoteTasks.searchPlaceholder')"
             data-test="ai-remote-tasks-search-input"
-            clearable
           />
         </template>
 
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastUpdatedAt"
             :loading="loading"
             data-test="ai-remote-tasks-refresh-btn"
@@ -101,11 +93,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <div class="flex items-center justify-center py-8">
             <OEmptyState
-              size="hero"
-              preset="no-remote-tasks"
-              :filtered="Boolean(search)"
+              :kind="search ? 'filtered' : 'first-run'"
+              :title="
+                search
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+                  : t('emptyState.noRemoteTasks.title')
+              "
+              :text="
+                search
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.filtered.fallbackNoun'),
+                    })
+                  : t('emptyState.noRemoteTasks.description')
+              "
+              :icon="search ? undefined : 'link'"
               data-test="ai-remote-tasks-empty-state"
-              @action="onEmptyAction"
+              :action-label="search ? undefined : t('emptyState.noRemoteTasks.action')"
+              @action="onEmptyAction(search ? 'clear-filters' : 'create')"
             />
           </div>
         </template>
@@ -144,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-signing="{ row }">
-          <OTag v-if="row.signing.enabled" variant="success-soft" icon="lock">
+          <OTag v-if="row.signing.enabled" tone="ok" icon="lock">
             {{ t("aiObservability.remoteTasks.signingOn") }}
           </OTag>
           <span v-else class="text-text-secondary">{{ DASH }}</span>
@@ -174,9 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <div class="actions-container flex items-center">
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="edit"
+              icon="edit"
               :disabled="!canEdit(row)"
               class="max-md:hidden"
               :data-test="`ai-remote-tasks-edit-${row.entityId}`"
@@ -192,9 +196,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
             <OButton
-              variant="ghost-destructive"
-              size="icon-sm"
-              icon-left="delete"
+              icon-only
+              variant="danger-ghost"
+              icon="delete"
               class="max-md:hidden"
               :data-test="`ai-remote-tasks-delete-${row.entityId}`"
               @click.stop="removeTask(row)"
@@ -204,17 +208,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  icon-only
                   :aria-label="t('common.moreActions')"
-                  icon-left="more-vert"
+                  icon="more-vert"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   data-test="ai-remote-tasks-row-more-actions"
                   @click.stop
                 />
               </template>
               <ODropdownItem
-                icon-left="edit"
+                icon="edit"
                 class="md:hidden"
                 :disabled="!canEdit(row)"
                 :data-test="`ai-remote-tasks-edit-${row.entityId}-menu`"
@@ -223,8 +228,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{ t("aiObservability.remoteTasks.edit") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
+                icon="delete"
+                tone="danger"
                 class="md:hidden"
                 :data-test="`ai-remote-tasks-delete-${row.entityId}-menu`"
                 @select="removeTask(row)"
@@ -265,7 +270,6 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import remoteTasksService, { type RemoteTask } from "@/services/remote-tasks.service";
 import { remoteTasksListQuery, experimentsListQuery } from "@/services/llm-experiments.queries";
 import { remoteTaskKeys } from "@/services/llm-experiments.querykeys";
@@ -314,8 +318,6 @@ const taskDrafts = useEditorDraftIds("remote_task");
  */
 const referenceCounts = ref<Record<string, number>>({});
 
-const numberedRows = useNumberedRows(tasks);
-
 const state = (row: RemoteTask) => remoteTaskState(row);
 const versionLabel = (row: RemoteTask) => remoteTaskVersionLabel(row);
 const canEdit = (row: RemoteTask) => canEditRemoteTask(row);
@@ -336,14 +338,6 @@ const referenceLabel = (row: RemoteTask) => {
 };
 
 const columns = computed<OTableColumnDef[]>(() => [
-  {
-    id: "#",
-    header: raw("#"),
-    accessorKey: "#",
-    sortable: false,
-    size: 56,
-    meta: { align: "left" },
-  },
   {
     id: "name",
     header: t("aiObservability.remoteTasks.columns.name"),
@@ -513,7 +507,7 @@ async function removeTask(row: RemoteTask) {
     messageName: row.name,
     confirmLabel: t("common.delete"),
     cancelLabel: t("common.cancel"),
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (!ok) return;
   try {

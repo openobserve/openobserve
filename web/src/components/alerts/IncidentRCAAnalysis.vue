@@ -56,8 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="trigger-rca-btn"
               variant="primary"
-              size="sm"
-              :icon-left="canStart ? 'auto-awesome' : 'lock'"
+              :icon="canStart ? 'auto-awesome' : 'lock'"
               :disabled="!canStart"
               :loading="triggering"
               @click="$emit('trigger-rca', { buildOnPrevious: false })"
@@ -105,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       role="status"
       class="text-text-secondary m-0 flex items-center gap-2 text-sm"
     >
-      <OSpinner variant="dots" size="xs" />
+      <OSpinner />
       {{ t("alerts.incidents.rcaRun.loadingReport") }}
     </p>
     <RcaReportLoadError v-else-if="ownReportFailed && !ownReport" @retry="$emit('retry-report')" />
@@ -158,9 +157,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <OButton
         data-test="rca-report-follow-thread"
-        variant="outline"
-        size="sm"
-        icon-left="forum"
+        variant="secondary"
+        icon="forum"
         @click="$emit('open-analysis')"
       >
         {{
@@ -316,9 +314,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OButton
             data-test="rca-open-report-tab"
-            variant="ghost-primary"
-            size="sm"
-            icon-right="arrow-forward"
+            variant="accent-ghost"
+            icon-end="arrow-forward"
             @click="$emit('open-report')"
           >
             {{ t("alerts.incidents.rcaRun.readFullReport") }}
@@ -330,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rca-summary-loading"
         class="text-text-secondary m-0 flex items-center gap-2 text-sm"
       >
-        <OSpinner variant="dots" size="xs" />
+        <OSpinner />
         {{ t("alerts.incidents.rcaSummary.loading") }}
       </p>
 
@@ -340,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rca-report-loading"
           class="text-text-secondary m-0 flex items-center gap-2 text-sm"
         >
-          <OSpinner variant="dots" size="xs" />
+          <OSpinner />
           {{ t("alerts.incidents.rcaRun.loadingReport") }}
         </p>
         <RcaReportLoadError

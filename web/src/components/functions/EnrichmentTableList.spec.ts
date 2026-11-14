@@ -111,7 +111,7 @@ const globalStubs = {
   ConfirmDialog: {
     name: "ConfirmDialog",
     template: '<div data-test="confirm-dialog-stub" />',
-    props: ["modelValue", "title", "okVariant"],
+    props: ["modelValue", "title", "kind"],
     emits: ["update:modelValue", "update:ok", "update:cancel"],
   },
   EnrichmentSchema: {
@@ -476,7 +476,7 @@ describe("EnrichmentTableList", () => {
       const dialog = wrapper
         .findAllComponents(ConfirmDialog)
         .find((c) => c.props("messageKeypath") === "function.deleteEnrichmentTableConfirm");
-      expect(dialog?.props("okVariant")).toBe("destructive");
+      expect(dialog?.props("kind")).toBe("destructive");
       const name = dialog!.find('[data-test="confirm-dialog-name"]');
       expect(name.text()).toBe("geo_ip");
       expect(name.classes()).toContain("font-semibold");
@@ -531,7 +531,7 @@ describe("EnrichmentTableList", () => {
           (c: any) =>
             c.props("title") === i18n.global.t("function.bulkDeleteEnrichmentTablesTitle"),
         );
-      expect(dialog!.props("okVariant")).toBe("destructive");
+      expect(dialog!.props("kind")).toBe("destructive");
     });
 
     it("selectedEnrichmentTableIds computed returns array of names from selectedEnrichmentTables", async () => {

@@ -110,7 +110,7 @@ describe("Alert List", async () => {
     expect(vm.activeTab).toBe("custom");
     expect(vm.appliesToFilter).toBe("all_kinds");
 
-    await wrapper.find('[data-test="template-list-all-kinds-dismiss"]').trigger("click");
+    await wrapper.find('[data-test="template-list-all-kinds-notice-dismiss"]').trigger("click");
     expect(wrapper.find('[data-test="template-list-all-kinds-notice"]').exists()).toBe(false);
     expect(localStorage.getItem(vm.allKindsNoticeKey)).toBe("1");
     localStorage.removeItem(vm.allKindsNoticeKey);
@@ -149,11 +149,10 @@ describe("Alert List", async () => {
       .find("thead")
       .find("tr")
       .findAll("th");
-    // Index 0 is the checkbox column, so actual columns start at index 1
-    expect(tableData[1].text()).toBe("#");
-    expect(tableData[2].text()).toContain("Name");
+    // Index 0 is the checkbox column; no row-number column follows it (D2).
+    expect(tableData[1].text()).toContain("Name");
     // Action column headers are rendered empty by OTable for isAction columns
-    expect(tableData[3].exists()).toBe(true);
+    expect(tableData[2].exists()).toBe(true);
   });
 
   it("Should display table row data", async () => {
@@ -164,10 +163,9 @@ describe("Alert List", async () => {
       .find("tr")
       .findAll("td");
     // Index 0 is the checkbox cell; actual data cells start at index 1.
-    expect(tableData[1].text()).toBe("01");
     // The Name cell now includes a Prebuilt/Custom badge next to the name,
     // so concat'd text() ends with the badge label (e.g. "Template2Custom").
-    expect(tableData[2].text()).toContain("Template2");
+    expect(tableData[1].text()).toContain("Template2");
   });
 
   it("names the template and uses a destructive confirm", async () => {
@@ -180,12 +178,12 @@ describe("Alert List", async () => {
       .findAllComponents({ name: "ConfirmDialog" })
       .find((c: any) => c.props("messageKeypath") === "alert_templates.deleteTemplateMessage");
     expect(dialog.props("messageName")).toBe("Template2");
-    expect(dialog.props("okVariant")).toBe("destructive");
+    expect(dialog.props("kind")).toBe("destructive");
   });
 
   it("keeps the Applies to filter at field width, so the search box has room", () => {
     const filter = wrapper.find('[data-test="template-list-applies-to-filter"]');
-    expect(filter.classes()).toContain("w-field-width-sm");
+    expect(filter.classes()).toContain("w-field-width-s");
     expect(filter.classes()).toContain("shrink-0");
     expect(filter.classes()).not.toContain("w-full");
   });
@@ -286,14 +284,14 @@ describe("Alert List", async () => {
         await flushPromises();
 
         const pager = wrapper.findComponent({ name: "OTablePagination" });
-        pager.vm.$emit("next-page");
+        pager.vm.$emit("go-to-page", 2);
         vi.advanceTimersByTime(10);
         await flushPromises();
         expect(body().text()).toContain("row_24");
         expect(body().text()).not.toContain("row_00");
         expect(vm.selectedTemplateIds).toEqual(["row_00", "row_24"]);
 
-        pager.vm.$emit("prev-page");
+        pager.vm.$emit("go-to-page", 1);
         vi.advanceTimersByTime(10);
         await flushPromises();
         expect(body().text()).toContain("row_00");
@@ -341,7 +339,7 @@ describe("Alert List", async () => {
     const dialog = wrapper
       .findAllComponents({ name: "ConfirmDialog" })
       .find((c: any) => c.props("title") === i18n.global.t("alert_templates.deleteTemplatesTitle"));
-    expect(dialog.props("okVariant")).toBe("destructive");
+    expect(dialog.props("kind")).toBe("destructive");
   });
 
   describe("When user clicks on delete alert", () => {
@@ -663,10 +661,10 @@ describe("alertTemplates view state restore", () => {
         expect(viewWrapper.findComponent({ name: "OEmptyState" }).exists()).toBe(true),
       );
       const empty = viewWrapper.findComponent({ name: "OEmptyState" });
-      expect(empty.props("filtered")).toBe(true);
+      expect(empty.props("kind")).toBe("filtered");
 
       vm.filterQuery = "x";
-      empty.vm.$emit("action", "clear-filters");
+      empty.vm.$emit("action");
       await flushPromises();
       expect(vm.appliesToFilter).toBe("any");
       expect(vm.filterQuery).toBe("");

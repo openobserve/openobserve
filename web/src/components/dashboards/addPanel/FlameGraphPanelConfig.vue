@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="(value: string) => setTextConfig(field.key, value)"
     >
       <template #tooltip>
-        <OTooltip :content="field.tooltip" max-width="15.625rem" />
+        <OTooltip :content="field.tooltip" />
       </template>
     </OCombobox>
   </div>

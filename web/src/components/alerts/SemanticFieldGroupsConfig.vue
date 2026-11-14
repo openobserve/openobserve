@@ -25,23 +25,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <OButton
           data-test="correlation-semanticfieldgroup-export-json-btn"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="localGroups.length === 0"
           @click="exportGroups"
           >{{ t("correlation.exportToJson") }}</OButton
         >
         <OButton
           data-test="correlation-semanticfieldgroup-import-json-btn"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           @click="navigateToImport"
           >{{ t("correlation.importFromJson") }}</OButton
         >
         <OButton
           data-test="correlation-semanticfieldgroup-add-custom-group-btn"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           @click="addGroup"
           >{{ t("correlation.addCustomGroup") }}</OButton
         >
@@ -55,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTabs
             :model-value="searchActive ? '' : (selectedCategory ?? '')"
-            dense
+            size="compact"
             class="min-w-0 flex-1"
             @update:model-value="onCategoryTabChange"
           >
@@ -65,23 +62,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="opt.value"
               :data-test="`semantic-group-category-tab-${opt.value}`"
               :class="searchActive && opt.count === 0 ? 'opacity-50' : ''"
+              :count="opt.count"
             >
               <span>{{ opt.label }}</span>
-              <OBadge size="xs" variant="default-soft">{{ opt.count }}</OBadge>
             </OTab>
           </OTabs>
-          <OInput
+          <OSearchInput
             data-test="semantic-group-search-input"
             v-model="searchQuery"
-            type="search"
-            size="sm"
-            width="md"
-            clearable
             :placeholder="t('correlation.searchGroupsPlaceholder')"
+            width="list"
             class="shrink-0"
-          >
-            <template #icon-left><OIcon name="search" size="sm" /></template>
-          </OInput>
+          />
         </div>
 
         <!-- Groups list: active category, or cross-category search results -->
@@ -107,9 +99,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OEmptyState
           v-else
+          :kind="searchActive ? 'filtered' : 'first-run'"
           size="inline"
           icon="search"
-          :backdrop="false"
           :title="
             searchActive
               ? t('correlation.noSearchResults', { query: searchQuery.trim() })
@@ -182,16 +174,14 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const { t } = useI18nTyped();

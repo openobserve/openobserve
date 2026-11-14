@@ -1,70 +1,27 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// OCodeBlock.types.ts — public types for OCodeBlock, a syntax-highlighted block
-// code component with copy, optional secret-masking, and window chrome.
-//
-// For inline/simple code chips (no highlighting), use OCode instead.
-
-import type { I18nText } from "@/types/i18n";
-
-export type CodeBlockChrome = "terminal" | "editor";
+// A read-only, highlighted snippet with one 36 px head; inline code is OCode.
 
 export interface CodeBlockProps {
-  /** Raw code to display and copy; the Copy button always copies this. */
+  /** Raw code; Copy always copies this, even while `codeMasked` is shown. */
   code: string;
+  /** Skips the highlight cache, so a secret never outlives the block. */
   sensitive?: boolean;
-  /** Fence language (e.g. "bash", "python"). Auto-detected when omitted. */
+  /** Fence language ("bash", "sql"); auto-detected when omitted. */
   lang?: string;
-  /**
-   * Masked variant of `code` (e.g. a command with a secret hidden). When set,
-   * the block shows it by default and exposes a Reveal/Hide toggle; the Copy
-   * button still copies the real `code`, a text selection copies what is shown.
-   */
+  /** Masked variant of `code`, shown by default behind a Reveal toggle. */
   codeMasked?: string;
-  /**
-   * Window chrome. "terminal" → macOS traffic-light dots + a "Terminal" label.
-   * "editor" → a filename tab. Omitted → a plain language label.
-   */
-  chrome?: CodeBlockChrome;
-  /** Filename shown in the "editor" chrome tab (falls back to the language). */
+  /** File name in the head; the language shows beside it. */
   filename?: string;
-  /** Show the copy button. Default: true. */
   copyable?: boolean;
-  /** Toast shown on a successful copy. */
-  copyMessage?: I18nText;
-  /** Tooltips for the reveal/hide toggle (when `codeMasked` is set). */
-  revealTooltip?: I18nText;
-  hideTooltip?: I18nText;
-  /**
-   * Wrap long lines instead of scrolling horizontally. Use when the code is
-   * meant to be READ in place (a query shown for confirmation) rather than
-   * scanned — a horizontal scrollbar hides the end of the statement, which is
-   * usually the part that matters.
-   */
+  /** Initial wrap state; the head's wrap toggle changes it. */
   wrap?: boolean;
-  /**
-   * Cap the visible height at roughly this many lines and scroll vertically past
-   * it. Keeps a long query from pushing the rest of a dialog off-screen while
-   * still showing enough to read at a glance.
-   */
+  /** Collapses longer code behind "Show all N lines". */
   maxLines?: number;
-  /**
-   * Show a line-number gutter, for code the reader needs to talk about or scan
-   * by position — a config file, a diff, an error pointing at a line.
-   *
-   * Ignored when `wrap` is set: a wrapped line occupies more rows than its
-   * number accounts for, so the two columns would drift apart.
-   */
+  /** Ignored while wrapped: a wrapped line spans more rows than its number. */
   lineNumbers?: boolean;
-  /** Inset the code from the block's edge, for a block with no toolbar above it. */
-  padded?: boolean;
-  inset?: boolean;
-  /**
-   * data-test prefix for the toolbar buttons, e.g. "ai-code" yields
-   * "ai-code-copy-btn" / "ai-code-reveal-btn". Default: "code-block".
-   */
+  /** data-test prefix for the head controls ("<prefix>-copy-btn"). */
   dataTest?: string;
-  /** Name of the credential inside `code`, shown as a toolbar link and in the copy toast. */
+  /** Name of the credential inside `code`, shown as a head link that opens a token picker. */
   tokenName?: string;
 }
 
@@ -74,13 +31,11 @@ export interface CodeBlockCopyPayload {
 }
 
 export interface CodeBlockEmits {
-  /** Fired only after the code was copied to the clipboard successfully. */
   (e: "copy", payload: CodeBlockCopyPayload): void;
-  /** The toolbar token link was clicked (only rendered when `tokenName` is set). */
   (e: "token-click"): void;
 }
 
 export interface CodeBlockSlots {
-  /** Extra toolbar actions, rendered left of the copy button. */
+  /** Extra head actions (sm), before Copy. */
   actions?: () => unknown;
 }

@@ -72,32 +72,32 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <slot name="header" />
       <slot />
@@ -105,11 +105,11 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -155,7 +155,7 @@ describe("InvitationList - rendering", () => {
 
   it("titles the page with its menu label", async () => {
     const wrapper = await mountInvitationList();
-    expect(wrapper.text()).toContain(i18n.global.t("iam.invitations"));
+    expect(wrapper.find(".app-page-header h1").text()).toBe(i18n.global.t("iam.invitations"));
   });
 
   it("renders both ODialog instances (accept + reject confirmations)", async () => {
@@ -171,11 +171,11 @@ describe("InvitationList - rendering", () => {
     expect(dialogs[1].props("open")).toBe(false);
   });
 
-  it('forwards size="xs" to both confirmation dialogs', async () => {
+  it('forwards size="sm" to both confirmation dialogs', async () => {
     const wrapper = await mountInvitationList();
     const dialogs = wrapper.findAllComponents(ODialogStub);
-    expect(dialogs[0].props("size")).toBe("xs");
-    expect(dialogs[1].props("size")).toBe("xs");
+    expect(dialogs[0].props("size")).toBe("sm");
+    expect(dialogs[1].props("size")).toBe("sm");
   });
 });
 
@@ -304,7 +304,7 @@ describe("InvitationList - rejectInvitation", () => {
     (wrapper.vm as any).rejectInvitation({ token: "tok-2", org_name: "Org Two", org_id: "org-2" });
     await flushPromises();
     const dialog = wrapper.findAllComponents(ODialogStub)[1];
-    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog.props("primary")?.variant).toBe("danger");
     const message = dialog.find('[data-test="invitation-list-reject-message"]');
     expect(message.find("span.font-semibold").text()).toBe("Org Two");
     expect(message.text()).toContain("reject the invitation to join Org Two?");

@@ -3,7 +3,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -93,9 +93,9 @@ describe("DataSourceSidebarLayout.vue", () => {
       expect(bordered).toBeTruthy();
     });
 
-    it("renders one ORouteTab per tab", () => {
+    it("renders one OTab per tab", () => {
       wrapper = createWrapper();
-      const routeTabs = wrapper.findAllComponents(ORouteTab);
+      const routeTabs = wrapper.findAllComponents(OTab);
       expect(routeTabs.length).toBe(sampleTabs.length);
     });
 
@@ -139,13 +139,13 @@ describe("DataSourceSidebarLayout.vue", () => {
     it("renders all tabs with empty filter", async () => {
       wrapper = createWrapper({ searchable: true });
       await setFilter("");
-      expect(wrapper.findAllComponents(ORouteTab).length).toBe(3);
+      expect(wrapper.findAllComponents(OTab).length).toBe(3);
     });
 
     it("renders only matching tabs for a substring", async () => {
       wrapper = createWrapper({ searchable: true });
       await setFilter("redis");
-      const tabs = wrapper.findAllComponents(ORouteTab);
+      const tabs = wrapper.findAllComponents(OTab);
       expect(tabs.length).toBe(1);
       expect(tabs[0].props("name")).toBe("redis");
     });
@@ -153,7 +153,7 @@ describe("DataSourceSidebarLayout.vue", () => {
     it("is case-insensitive", async () => {
       wrapper = createWrapper({ searchable: true });
       await setFilter("REDIS");
-      const tabs = wrapper.findAllComponents(ORouteTab);
+      const tabs = wrapper.findAllComponents(OTab);
       expect(tabs.length).toBe(1);
       expect(tabs[0].props("name")).toBe("redis");
     });
@@ -161,13 +161,13 @@ describe("DataSourceSidebarLayout.vue", () => {
     it("renders no tabs when nothing matches", async () => {
       wrapper = createWrapper({ searchable: true });
       await setFilter("nonexistent");
-      expect(wrapper.findAllComponents(ORouteTab).length).toBe(0);
+      expect(wrapper.findAllComponents(OTab).length).toBe(0);
     });
 
     it("does not filter when searchable is false even if filter set", async () => {
       // With searchable false there is no search input; all tabs always render.
       wrapper = createWrapper({ searchable: false });
-      expect(wrapper.findAllComponents(ORouteTab).length).toBe(3);
+      expect(wrapper.findAllComponents(OTab).length).toBe(3);
     });
   });
 
@@ -221,7 +221,7 @@ describe("DataSourceSidebarLayout.vue", () => {
   });
 
   describe("#tabs slot override", () => {
-    it("renders slot content and not the default ORouteTabs", () => {
+    it("renders slot content and not the default OTabs", () => {
       wrapper = createWrapper(
         {},
         {
@@ -231,7 +231,7 @@ describe("DataSourceSidebarLayout.vue", () => {
         },
       );
       expect(wrapper.find('[data-test="custom-tabs"]').exists()).toBe(true);
-      expect(wrapper.findAllComponents(ORouteTab).length).toBe(0);
+      expect(wrapper.findAllComponents(OTab).length).toBe(0);
     });
 
     it("passes filtered tabs and filter to the #tabs slot", () => {

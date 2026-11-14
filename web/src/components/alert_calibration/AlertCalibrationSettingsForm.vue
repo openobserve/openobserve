@@ -33,8 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-col gap-1">
           <OFormSwitch
             name="enabled"
-            size="md"
-            label-position="left"
+            label-position="start"
             :label="t('alertCalibration.settings.enabled')"
             class="w-full justify-between"
             :disabled="readOnly"
@@ -66,21 +65,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <OBanner
+        <OInlineNotice
           v-for="warning in warnings"
           :key="warning"
-          variant="warning"
-          dense
+          tone="warn"
           data-test="alert-calibration-settings-warning"
         >
           {{ warning }}
-        </OBanner>
+        </OInlineNotice>
 
         <div class="flex flex-wrap items-center gap-2">
           <template v-if="!readOnly">
             <OButton
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               :disabled="!dirty || isSubmitting"
               data-test="alert-calibration-settings-discard"
               @click="discard"
@@ -89,7 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="primary"
-              size="sm-action"
               type="submit"
               :loading="isSubmitting"
               :disabled="!dirty"
@@ -119,7 +115,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query";

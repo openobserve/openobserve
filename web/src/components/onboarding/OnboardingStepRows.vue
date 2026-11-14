@@ -24,9 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mx-auto flex w-full max-w-176 flex-col">
         <div class="mb-2 flex min-h-8.5 items-center gap-3">
           <OButton
-            variant="ghost-muted"
-            size="sm"
-            icon-left="arrow-back"
+            variant="ghost"
+            icon="arrow-back"
             data-test="onboarding-step-rows-back"
             @click="emit('back')"
           >
@@ -53,9 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Lines up with the row's text: the row's padding and icon, less the link's own padding. -->
             <OButton
               v-if="row.agent"
-              variant="ghost-primary"
-              size="xs"
-              icon-left="terminal"
+              variant="accent-ghost"
+              size="sm"
+              icon="terminal"
               class="ms-14 mt-0.5"
               :data-test="`onboarding-step-rows-agent-${row.id}`"
               @click="emit('agent')"

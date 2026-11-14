@@ -22,17 +22,8 @@ import store from "@/test/unit/helpers/store";
 
 const ODialogStub = {
   name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "width",
-    "title",
-    "subTitle",
-    "neutralButtonLabel",
-    "neutralButtonVariant",
-    "primaryButtonLabel",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  props: ["open", "size", "width", "title", "subtitle", "extra", "extra", "primary"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div data-test-stub="o-dialog" :data-open="open" :data-title="title">
       <slot name="header" />
@@ -52,7 +43,7 @@ const OButtonStub = {
     :data-test="$attrs['data-test']"
     :disabled="disabled"
     @click="$emit('click', $event)"
-  ><slot name="icon-left" /><slot /></button>`,
+  ><slot name="icon" /><slot /></button>`,
 };
 
 describe("OverrideConfigPopup", () => {

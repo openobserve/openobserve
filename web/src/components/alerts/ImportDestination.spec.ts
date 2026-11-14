@@ -232,14 +232,13 @@ describe("ImportDestination", () => {
     });
   });
 
-  // ─── arrowBackFn ─────────────────────────────────────────────────────────
-  describe("arrowBackFn", () => {
-    it("pushes to alertDestinations route with org_identifier", () => {
-      wrapper.vm.arrowBackFn();
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "alertDestinations",
-        query: { org_identifier: "test-org" },
-      });
+  // ─── back ─────────────────────────────────────────────────────────────────
+  describe("back", () => {
+    it("goes to alertDestinations with org_identifier from a deep link", () => {
+      const target = { name: "alertDestinations", query: { org_identifier: "test-org" } };
+      expect(wrapper.vm.listRoute).toEqual(target);
+      wrapper.vm.goBack();
+      expect(mockRouterPush).toHaveBeenCalledWith(target);
     });
   });
 

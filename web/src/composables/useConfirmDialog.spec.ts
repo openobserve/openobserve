@@ -14,13 +14,13 @@ describe("useConfirmDialog", () => {
       title: raw("Delete panel"),
       messageKeypath: "panel.deletePanelMessage",
       messageName: "cpu-high",
-      confirmVariant: "destructive",
+      confirmVariant: "danger",
     });
     expect(dialog.currentDialog.value).toMatchObject({
       open: true,
       messageKeypath: "panel.deletePanelMessage",
       messageName: "cpu-high",
-      confirmVariant: "destructive",
+      confirmVariant: "danger",
     });
     expect(dialog.currentDialog.value?.message).toBeUndefined();
   });

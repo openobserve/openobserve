@@ -174,7 +174,7 @@ describe("LicenseSearchBanner", () => {
     vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({} as never);
     const w = await mountBanner(PAUSED);
     const banner = w.find('[data-test="license-search-banner"]');
-    expect(w.findComponent(OBanner).props("variant")).toBe("error");
+    expect(w.findComponent(OBanner).props("tone")).toBe("err");
     expect(banner.text()).toContain("4 days");
     expect(banner.text()).toContain("2HbQ7f3aZk");
     await w.find('[data-test="license-banner-copy"]').trigger("click");
@@ -225,7 +225,7 @@ describe("LicenseSearchBanner", () => {
     expect(w.get('[data-test="license-banner-outcome"]').text()).toContain(
       "It now expires on Nov 2, 2027",
     );
-    expect(w.findComponent(OBanner).props("variant")).toBe("success");
+    expect(w.findComponent(OBanner).props("tone")).toBe("info");
   });
   it("an unchanged refresh preserves the paused warning until config confirms recovery", async () => {
     vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
@@ -236,7 +236,7 @@ describe("LicenseSearchBanner", () => {
     await flushPromises();
     expect(w.text()).toContain("Search is paused.");
     expect(w.text()).toContain("License is up to date");
-    expect(w.findComponent(OBanner).props("variant")).toBe("error");
+    expect(w.findComponent(OBanner).props("tone")).toBe("err");
   });
   it("unreachable outcome keeps the paused banner and shows the error line", async () => {
     vi.mocked(licenseServer.refresh_license_limits).mockResolvedValue({
@@ -276,7 +276,7 @@ describe("LicenseSearchBanner", () => {
     await flushPromises();
     expect(w.find('[data-test="license-banner-outcome"]').exists()).toBe(false);
     expect(w.text()).toContain("Search is paused.");
-    expect(w.findComponent(OBanner).props("variant")).toBe("error");
+    expect(w.findComponent(OBanner).props("tone")).toBe("err");
   });
   it("does not send overlapping refresh clicks", async () => {
     vi.mocked(licenseServer.refresh_license_limits).mockImplementation(
@@ -334,7 +334,7 @@ describe("LicenseSearchBanner", () => {
     } as never);
     const w = await mountBanner(restoredConfig(Date.UTC(2026, 9, 27)));
     const text = w.find('[data-test="license-search-banner"]').text();
-    expect(w.findComponent(OBanner).props("variant")).toBe("success");
+    expect(w.findComponent(OBanner).props("tone")).toBe("info");
     expect(text).toContain("Oct 27, 00:00 UTC");
     expect(text).toContain("Approved by support");
     expect(w.find('[data-test="license-banner-details"]').exists()).toBe(true);
@@ -346,7 +346,7 @@ describe("LicenseSearchBanner", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(NOW);
     const w = await mountBanner(restoredConfig(NOW + 3600_000));
-    expect(w.findComponent(OBanner).props("variant")).toBe("warning");
+    expect(w.findComponent(OBanner).props("tone")).toBe("warn");
     expect(w.text()).toContain("Search restoration ends");
     expect(w.text()).toContain("The normal limit rules apply again after that.");
   });
@@ -355,7 +355,7 @@ describe("LicenseSearchBanner", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(NOW);
     const w = await mountBanner(PAUSED);
-    await w.find('[data-test="license-banner-dismiss"]').trigger("click");
+    await w.find('[data-test="license-search-banner-dismiss"]').trigger("click");
     expect(w.find('[data-test="license-search-banner"]').exists()).toBe(false);
     expect(sessionStorage.getItem(DISMISS_KEY)).toBe("paused");
     store.commit("setConfig", restoredConfig(Date.UTC(2026, 9, 27)));
@@ -384,9 +384,9 @@ describe("LicenseSearchBanner", () => {
     vi.setSystemTime(NOW);
     const until = NOW + 2 * 86_400_000;
     const w = await mountBanner(restoredConfig(until));
-    expect(w.findComponent(OBanner).props("variant")).toBe("success");
+    expect(w.findComponent(OBanner).props("tone")).toBe("info");
     await vi.advanceTimersByTimeAsync(until - DAY_US / 1000 - NOW + 1);
-    expect(w.findComponent(OBanner).props("variant")).toBe("warning");
+    expect(w.findComponent(OBanner).props("tone")).toBe("warn");
     expect(w.text()).toContain("Search restoration ends");
   });
 
@@ -423,7 +423,7 @@ describe("LicenseSearchBanner", () => {
     const w = await mountBanner(PAUSED);
     expect(w.find('[data-test="license-search-banner"]').exists()).toBe(true);
     await expect(
-      w.find('[data-test="license-banner-dismiss"]').trigger("click"),
+      w.find('[data-test="license-search-banner-dismiss"]').trigger("click"),
     ).resolves.not.toThrow();
   });
 

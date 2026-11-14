@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon-key="icon"
     searchable
     :search-debounce="300"
-    size="sm"
     :data-test="dataTest"
     @open="load"
     @search="onSearch"

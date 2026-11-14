@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <li data-test="rca-thread-step" class="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-2.5">
     <span class="flex h-5 items-center justify-center" data-test="rca-thread-step-status">
-      <OSpinner v-if="status === 'running'" size="xs" />
+      <OSpinner v-if="status === 'running'" />
       <OIcon v-else :name="statusIcon" size="sm" :class="statusClass" :label="statusLabel" />
     </span>
 
@@ -57,9 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="step.tool_calls.length > 0"
           data-test="rca-thread-step-calls-toggle"
-          variant="ghost-muted"
-          size="xs"
-          :icon-right="callsOpen ? 'expand-less' : 'expand-more'"
+          variant="ghost"
+          size="sm"
+          :icon-end="callsOpen ? 'expand-less' : 'expand-more'"
           :aria-expanded="callsOpen"
           :aria-controls="callsListId"
           @click="callsOpen = !callsOpen"
@@ -72,9 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="step.note && !conclusion"
           data-test="rca-thread-step-note-toggle"
-          variant="ghost-muted"
-          size="xs"
-          :icon-right="noteOpen ? 'expand-less' : 'expand-more'"
+          variant="ghost"
+          size="sm"
+          :icon-end="noteOpen ? 'expand-less' : 'expand-more'"
           :aria-expanded="noteOpen"
           @click="toggleNote"
         >
@@ -117,9 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <OButton
               v-else-if="evidenceNumbers?.has(segment.id)"
+              icon-only
               data-test="rca-citation-chip"
-              variant="outline"
-              size="icon-xs-sq"
+              variant="secondary"
+              size="sm"
               class="mx-0.5 align-baseline font-mono"
               :aria-label="
                 t('alerts.incidents.rcaSummary.openEvidence', {
@@ -150,8 +151,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="conclusion && (noteClamped || conclusionOpen)"
           data-test="rca-thread-conclusion-toggle"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :aria-expanded="conclusionOpen"
           @click="conclusionOpen = !conclusionOpen"
         >

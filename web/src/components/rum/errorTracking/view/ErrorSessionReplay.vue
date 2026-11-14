@@ -31,9 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OButton
         variant="primary"
-        size="sm-action"
         class="shrink-0"
-        icon-left="play-circle"
+        icon="play-circle"
         :disabled="!error.session_id"
         :title="t('rum.viewSessionReplay')"
         data-test="error-session-replay-play-btn"

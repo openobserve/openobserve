@@ -19,10 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTabs
       class="max-w-[calc(100%_-_2.5rem)]"
       v-model="selectedTabId"
-      :align="'left'"
       :reorderable="canReorder"
-      dense
-      mobile-arrows
+      size="compact"
       @click.stop
       @reorder="onReorder"
       data-test="dashboard-tab-list"
@@ -84,9 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Panel-count badge: conveys how dense each tab is without opening it.
                Section headers are layout labels, not panels, so they're excluded. -->
           <OBadge
-            variant="default"
-            size="xs"
-            shape="rounded"
+            tone="neutral"
+            size="sm"
             class="ms-1 shrink-0"
             :aria-label="t('dashboard.tabPanelCount', { count: panelCount(tab) }, panelCount(tab))"
             :data-test="`dashboard-tab-${tab.tabId}-panel-count`"
@@ -128,8 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          persistent, not hover-revealed). -->
     <OButton
       v-if="!viewOnly && layoutMode !== 'edit'"
+      icon-only
       variant="ghost"
-      size="icon"
+      size="xs"
       class="ms-1"
       @click="
         () => {
@@ -137,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       data-test="dashboard-tab-add-btn"
-      icon-left="add"
+      icon="add"
     >
       <OTooltip :content="t('dashboard.newTab')" />
     </OButton>

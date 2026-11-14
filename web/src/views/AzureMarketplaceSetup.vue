@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="text-text-secondary">
           {{ t("billing.azureMarketplace.noTokenDescription") }}
         </p>
-        <OButton variant="primary" size="sm-action" class="mt-4" @click="goToDashboard">{{
+        <OButton variant="primary" class="mt-4" @click="goToDashboard">{{
           t("billing.azureMarketplace.goToDashboard")
         }}</OButton>
       </div>
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'error'" class="text-center">
         <OIcon name="error" style="width: 5rem; height: 5rem" />
         <h5 class="mt-3">{{ errorMessage }}</h5>
-        <OButton variant="primary" size="sm-action" class="mt-4" @click="resetAndRetry">{{
+        <OButton variant="primary" class="mt-4" @click="resetAndRetry">{{
           t("billing.azureMarketplace.tryAgain")
         }}</OButton>
       </div>
@@ -62,87 +62,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mx-auto max-w-100">
           <!-- Create New Org -->
-          <OCard class="rounded-default mb-4 transition-all duration-200 hover:shadow-md">
-            <OCardSection role="body">
-              <div class="text-xl font-semibold">
-                {{ t("billing.azureMarketplace.createNewOrg") }}
-              </div>
-              <p class="text-text-secondary">
-                {{ t("billing.azureMarketplace.createNewOrgDescription") }}
-              </p>
-              <OForm
-                id="azure-create-org-form"
-                :schema="azureCreateOrgSchema"
-                :default-values="azureCreateOrgDefaults()"
-                @submit="createNewOrgForAzure"
-                v-slot="{ isSubmitting }"
+          <OCard class="mb-3" :title="t('billing.azureMarketplace.createNewOrg')">
+            <p class="text-text-secondary">
+              {{ t("billing.azureMarketplace.createNewOrgDescription") }}
+            </p>
+            <OForm
+              id="azure-create-org-form"
+              :schema="azureCreateOrgSchema"
+              :default-values="azureCreateOrgDefaults()"
+              @submit="createNewOrgForAzure"
+              v-slot="{ isSubmitting }"
+            >
+              <OFormInput
+                name="newOrgName"
+                data-test="azure-marketplace-org-name"
+                :label="t('billing.azureMarketplace.orgName')"
+                required
+                class="mb-3"
+              />
+              <OButton
+                data-test="azure-marketplace-create-link-btn"
+                type="submit"
+                variant="primary"
+                block
+                :loading="isSubmitting"
+                >{{ t("billing.azureMarketplace.createAndLink") }}</OButton
               >
-                <OFormInput
-                  name="newOrgName"
-                  data-test="azure-marketplace-org-name"
-                  :label="t('billing.azureMarketplace.orgName')"
-                  required
-                  class="mb-3"
-                />
-                <OButton
-                  data-test="azure-marketplace-create-link-btn"
-                  type="submit"
-                  variant="primary"
-                  size="sm-action"
-                  block
-                  :loading="isSubmitting"
-                  >{{ t("billing.azureMarketplace.createAndLink") }}</OButton
-                >
-              </OForm>
-            </OCardSection>
+            </OForm>
           </OCard>
 
           <!-- Link to Existing Org (only show orgs without billing) -->
           <OCard
             v-if="eligibleOrganizations.length > 0"
-            class="rounded-default transition-all duration-200 hover:shadow-md"
+            :title="t('billing.azureMarketplace.linkToExisting')"
           >
-            <OCardSection role="body">
-              <div class="text-xl font-semibold">
-                {{ t("billing.azureMarketplace.linkToExisting") }}
-              </div>
-              <p class="text-text-secondary">
-                {{ t("billing.azureMarketplace.linkBillingDescription") }}
-              </p>
-              <OForm
-                id="azure-link-org-form"
-                :schema="azureLinkOrgSchema"
-                :default-values="azureLinkOrgDefaults()"
-                @submit="linkToExistingOrg"
-                v-slot="{ isSubmitting }"
-              >
-                <!-- label-key/value-key map the fields; SelectOptionInput's required `label` doesn't apply -->
-                <OFormSelect
-                  name="selectedOrg"
-                  :options="eligibleOrganizations as any[]"
-                  label-key="name"
-                  value-key="identifier"
-                  :label="t('billing.azureMarketplace.selectOrganization')"
-                  required
-                  class="mb-3"
-                />
-                <OButton
-                  type="submit"
-                  variant="primary"
-                  size="sm-action"
-                  block
-                  :loading="isSubmitting"
-                  >{{ t("billing.azureMarketplace.linkAzureBilling") }}</OButton
-                >
-              </OForm>
-            </OCardSection>
+            <p class="text-text-secondary">
+              {{ t("billing.azureMarketplace.linkBillingDescription") }}
+            </p>
+            <OForm
+              id="azure-link-org-form"
+              :schema="azureLinkOrgSchema"
+              :default-values="azureLinkOrgDefaults()"
+              @submit="linkToExistingOrg"
+              v-slot="{ isSubmitting }"
+            >
+              <!-- label-key/value-key map the fields; SelectOptionInput's required `label` doesn't apply -->
+              <OFormSelect
+                name="selectedOrg"
+                :options="eligibleOrganizations as any[]"
+                label-key="name"
+                value-key="identifier"
+                :label="t('billing.azureMarketplace.selectOrganization')"
+                required
+                class="mb-3"
+              />
+              <OButton type="submit" variant="primary" block :loading="isSubmitting">{{
+                t("billing.azureMarketplace.linkAzureBilling")
+              }}</OButton>
+            </OForm>
           </OCard>
         </div>
       </div>
 
       <!-- Processing State -->
       <div v-else-if="state === 'processing'" class="text-center">
-        <OSpinner variant="dots" size="xl" />
+        <OSpinner size="lg" />
         <h5 class="mt-3">{{ t("billing.azureMarketplace.settingUp") }}</h5>
         <p class="text-text-secondary">{{ t("billing.azureMarketplace.pleaseWait") }}</p>
       </div>
@@ -158,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             })
           }}
         </p>
-        <OButton variant="primary" size="sm-action" class="mt-4" @click="goToDashboard">{{
+        <OButton variant="primary" class="mt-4" @click="goToDashboard">{{
           t("billing.azureMarketplace.goToDashboard")
         }}</OButton>
       </div>
@@ -174,14 +158,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             })
           }}
         </p>
-        <OButton
-          as="a"
-          href="mailto:support@openobserve.ai"
-          variant="primary"
-          size="sm-action"
-          class="mt-4"
-          >{{ t("billing.azureMarketplace.contactSupport") }}</OButton
-        >
+        <OButton href="mailto:support@openobserve.ai" variant="primary" class="mt-4">{{
+          t("billing.azureMarketplace.contactSupport")
+        }}</OButton>
       </div>
     </div>
   </div>
@@ -190,7 +169,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -220,7 +198,7 @@ type SetupState = "select_org" | "no_token" | "processing" | "success" | "paymen
 
 export default defineComponent({
   name: "AzureMarketplaceSetup",
-  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect, OIcon, OCard, OCardSection },
+  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect, OIcon, OCard },
   setup() {
     const store = useStore();
     const { isDark } = useTheme();

@@ -142,39 +142,20 @@ const fork = async () => {
     :class="isPublic ? 'bg-surface-base h-screen' : 'h-full'"
     data-test="shared-chat-view"
   >
-    <OPageLayout :title="title" icon="share" scroll pad-y title-data-test="shared-chat-view-title">
-      <template v-if="chat" #title-trail>
+    <OPageLayout :title="title" scroll pad-y title-data-test="shared-chat-view-title">
+      <template v-if="chat" #status>
         <OBadge
           size="sm"
-          :variant="chat.mode === 'live' ? 'success-soft' : 'primary-soft'"
+          :tone="chat.mode === 'live' ? 'ok' : 'accent'"
           data-test="shared-chat-view-mode"
         >
           {{ chat.mode === "live" ? t("aiChatShare.modeLive") : t("aiChatShare.modeSnapshot") }}
         </OBadge>
       </template>
-      <template v-if="chat" #subtitle>
-        <span
-          v-if="chat.owner_name"
-          class="text-text-secondary me-2 text-xs"
-          data-test="shared-chat-view-shared-by"
-        >
-          {{ t("aiChatShare.sharedBy", { name: chat.owner_name }) }}
-        </span>
-        <span class="text-text-secondary text-xs">
-          {{ t("aiChatShare.sharedOn", { time: formatMicros(chat.shared_at) }) }}
-        </span>
-        <span
-          v-if="following && updatedAt"
-          class="text-text-secondary ms-2 text-xs"
-          data-test="shared-chat-view-updated"
-        >
-          {{ t("aiChatShare.updatedAt", { time: updatedAt }) }}
-        </span>
-      </template>
       <template v-if="chat" #actions>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
           :loading="fetching"
           data-test="shared-chat-view-refresh"
           :aria-label="t('common.refresh')"
@@ -186,51 +167,58 @@ const fork = async () => {
         <OButton
           v-if="ownShare"
           variant="primary"
-          size="sm-action"
           data-test="shared-chat-view-open-mine"
           @click="openOwnChat"
         >
-          <template #icon-left><OIcon name="open-in-new" size="sm" /></template>
+          <template #icon><OIcon name="open-in-new" size="sm" /></template>
           {{ t("aiChatShare.openInMyChats") }}
         </OButton>
         <OButton
           v-else-if="!isPublic"
           variant="primary"
-          size="sm-action"
           :loading="forking"
           data-test="shared-chat-view-fork"
           @click="fork"
         >
-          <template #icon-left><OIcon name="fork-right" size="sm" /></template>
+          <template #icon><OIcon name="fork-right" size="sm" /></template>
           {{ t("aiChatShare.forkIntoMyChats") }}
         </OButton>
       </template>
 
       <div class="mx-auto flex w-full max-w-225 flex-col">
+        <p
+          v-if="chat"
+          class="text-text-secondary mb-4 flex flex-wrap gap-x-2 text-xs"
+          data-test="shared-chat-view-meta"
+        >
+          <span v-if="chat.owner_name" data-test="shared-chat-view-shared-by">
+            {{ t("aiChatShare.sharedBy", { name: chat.owner_name }) }}
+          </span>
+          <span>{{ t("aiChatShare.sharedOn", { time: formatMicros(chat.shared_at) }) }}</span>
+          <span v-if="following && updatedAt" data-test="shared-chat-view-updated">
+            {{ t("aiChatShare.updatedAt", { time: updatedAt }) }}
+          </span>
+        </p>
         <div v-if="loading" class="flex justify-center py-10" data-test="shared-chat-view-loading">
-          <OSpinner size="md" />
+          <OSpinner size="lg" />
         </div>
         <OEmptyState
           v-else-if="notFound"
-          size="hero"
           icon="link-off"
           :title="t('aiChatShare.notFoundTitle')"
-          :description="t('aiChatShare.notFoundDescription')"
+          :text="t('aiChatShare.notFoundDescription')"
           data-test="shared-chat-view-not-found"
         />
         <OEmptyState
           v-else-if="failed"
-          size="hero"
-          icon="error"
+          kind="error"
           :title="t('aiChatShare.unavailableTitle')"
-          :description="t('aiChatShare.unavailableDescription')"
-          :action-label="t('common.retry')"
+          :text="t('aiChatShare.unavailableDescription')"
           data-test="shared-chat-view-error"
           @action="reload"
         />
         <OEmptyState
           v-else-if="messages.length === 0"
-          size="block"
           icon="chat"
           :title="t('aiChatShare.emptyChat')"
           data-test="shared-chat-view-empty"

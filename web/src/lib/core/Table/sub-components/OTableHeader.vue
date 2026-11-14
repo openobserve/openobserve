@@ -10,13 +10,17 @@ import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isElementTruncated, readElementText } from "@/lib/overlay/Tooltip/useIsTruncated";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
-import type { OTableColumnMeta } from "../OTable.types";
+import {
+  OTableNumericColumnsKey,
+  type OTableColumnMeta,
+  type OTableDensity,
+} from "../OTable.types";
 import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
 
 const { t } = useI18nTyped();
@@ -48,12 +52,10 @@ const props = defineProps<{
   sortDisabled?: boolean;
   sortDisabledReason?: I18nText;
   stickyHeader?: boolean;
-  bordered?: boolean;
   pivotHeaderLevels?: any[];
   pivotRowColumns?: any[];
   stickyColTotals?: boolean;
-  dense?: boolean;
-  compact?: boolean;
+  density?: OTableDensity;
   /** Show the per-column value-filter dropdown on filterable columns. */
   enableColumnFilter?: boolean;
   /** Show the per-column "format this column" icon on formattable columns. */
@@ -245,8 +247,16 @@ function autoWidthHeaderStyle(header: any): Record<string, string> {
   return style;
 }
 
-function headerAlignClass(header: any): string {
+const numericColumns = inject(OTableNumericColumnsKey, null);
+// A column of plain numbers right-aligns with its cells unless it names an alignment (D3).
+function columnAlign(header: any): string | undefined {
   const align = (header.column.columnDef.meta as any)?.align;
+  if (align && align !== "left") return align;
+  return numericColumns?.value.has(header.column.id) ? "right" : align;
+}
+
+function headerAlignClass(header: any): string {
+  const align = columnAlign(header);
   if (align === "center") return "text-center justify-center";
   if (align === "right") return "text-right justify-end";
   return "";
@@ -277,7 +287,12 @@ function headerAriaSort(header: any): "ascending" | "descending" | "none" | unde
 function headerPaddingClass(header: any): string {
   const m = header.column.columnDef.meta as any;
   if (m?.spacer) return "px-0"; // the invisible spacer must be able to reach 0 width
-  return m?.compactPadding ? "px-1" : "px-2";
+  return m?.compactPadding ? "px-1" : "px-3";
+}
+
+// The sticky actions header is empty and see-through, so a label scrolled under it stays readable (D7).
+function isActionHeader(header: any): boolean {
+  return !!(header.column.columnDef.meta as any)?.isAction;
 }
 
 function headerSizeVar(header: any): string {
@@ -327,7 +342,7 @@ function noteCutHeaderName(header: any, event: MouseEvent) {
 // `justify-*` has to be restated on the cross axis as `items-*`, or a
 // right-aligned numeric header would stack flush left.
 function headerStackAlignClass(header: any): string {
-  const align = (header.column.columnDef.meta as any)?.align;
+  const align = columnAlign(header);
   if (align === "center") return "text-center items-center";
   if (align === "right") return "text-right items-end";
   return "items-start";
@@ -580,13 +595,13 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           'table-head',
-          compact ? 'h-6' : dense ? 'h-8' : 'h-9',
+          density === 'compact' ? 'h-control-sm' : 'h-control-md',
           'border-table-header-border border-b',
           'group',
           // Sortable's `filter` selector — this header can't start a drag, so it
           // must not advertise the move cursor the draggable <tr> sets either.
           header.id === pinnedFirstColumn ? 'o2-table-th-pinned-first cursor-default' : '',
-          headerPin(header) ? 'bg-table-header-bg' : '',
+          headerPin(header) && !isActionHeader(header) ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -622,7 +637,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: 'var(--shadow-sticky-right)',
+                boxShadow: isActionHeader(header) ? 'none' : 'var(--shadow-sticky-right)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).
@@ -821,6 +836,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-else
             :class="[
               'flex min-w-0 flex-col justify-center',
+              isActionHeader(header) ? 'sr-only' : '',
               isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerSubLabel(header)
                 ? ['gap-px', headerStackAlignClass(header)]
@@ -891,18 +907,13 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               @click.stop
             >
               <div class="border-table-row-divider border-b px-2 pb-1">
-                <OInput
+                <OSearchInput
                   v-model="colFilterSearch[header.column.id]"
-                  size="sm"
-                  clearable
                   :placeholder="t('common.search')"
                   @click.stop
                   @keydown.stop
                 >
-                  <template #icon-left>
-                    <OIcon name="search" size="xs" />
-                  </template>
-                </OInput>
+                </OSearchInput>
               </div>
               <ul role="listbox" aria-multiselectable="true" class="max-h-60 overflow-y-auto">
                 <li
@@ -913,7 +924,6 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 >
                   <OCheckbox
                     :model-value="colFilterValues(header.column.id).includes(rawVal)"
-                    size="sm"
                     :aria-label="raw(filterDisplayValue(header.column.id, rawVal))"
                     @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
                     @click.stop
@@ -1032,9 +1042,9 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         :aria-sort="headerAriaSort(header)"
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
-          compact ? 'group h-6' : dense ? 'group h-8' : 'group h-9',
+          density === 'compact' ? 'group h-control-sm' : 'group h-control-md',
           'border-table-header-border border-b',
-          headerPin(header) ? 'bg-table-header-bg' : '',
+          headerPin(header) && !isActionHeader(header) ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -1070,7 +1080,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: 'var(--shadow-sticky-right)',
+                boxShadow: isActionHeader(header) ? 'none' : 'var(--shadow-sticky-right)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).
@@ -1246,6 +1256,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-else
             as="div"
             :class="[
+              isActionHeader(header) ? 'sr-only' : '',
               isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerAlignClass(header),
             ]"
@@ -1305,18 +1316,13 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               @click.stop
             >
               <div class="border-table-row-divider border-b px-2 pb-1">
-                <OInput
+                <OSearchInput
                   v-model="colFilterSearch[header.column.id]"
-                  size="sm"
-                  clearable
                   :placeholder="t('common.search')"
                   @click.stop
                   @keydown.stop
                 >
-                  <template #icon-left>
-                    <OIcon name="search" size="xs" />
-                  </template>
-                </OInput>
+                </OSearchInput>
               </div>
               <ul role="listbox" aria-multiselectable="true" class="max-h-60 overflow-y-auto">
                 <li
@@ -1327,7 +1333,6 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 >
                   <OCheckbox
                     :model-value="colFilterValues(header.column.id).includes(rawVal)"
-                    size="sm"
                     :aria-label="raw(filterDisplayValue(header.column.id, rawVal))"
                     @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
                     @click.stop

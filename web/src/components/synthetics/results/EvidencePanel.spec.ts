@@ -21,7 +21,7 @@ import EvidencePanel from "./EvidencePanel.vue";
 import EvidenceEvents from "./EvidenceEvents.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import {
   foldEvidenceBundle,
@@ -301,10 +301,10 @@ describe("EvidencePanel", () => {
   it("renders a step-filter select instead of a dismissible banner", () => {
     const unfiltered = mountPanel();
     expect(unfiltered.find('[data-test="synthetics-evidence-step-filter"]').exists()).toBe(true);
-    expect(unfiltered.findComponent(OBanner).exists()).toBe(false);
+    expect(unfiltered.findComponent(OInlineNotice).exists()).toBe(false);
 
     const scoped = mountPanel({ stepFilter: "s19" });
-    expect(scoped.findComponent(OBanner).exists()).toBe(false);
+    expect(scoped.findComponent(OInlineNotice).exists()).toBe(false);
   });
 
   it("lists only steps that own at least one event, in stepOptions order", () => {

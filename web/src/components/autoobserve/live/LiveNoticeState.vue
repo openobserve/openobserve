@@ -22,27 +22,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OEmptyState
       :size="size"
-      :variant="notice.severity === 'error' ? 'error' : 'neutral'"
+      :kind="kind"
       :icon="notice.icon"
       :title="notice.title"
-      :description="notice.description"
-      tone-icon
+      :text="notice.description"
       class="flex-1"
     >
-      <template v-if="size !== 'inline'" #illustration>
-        <span class="flex size-22 items-center justify-center rounded-full" :class="tone.circle">
-          <OIcon :name="notice.icon" size="xl" />
-        </span>
-      </template>
-      <template #title>
-        <span :class="tone.title">{{ notice.title }}</span>
-      </template>
       <template v-if="notice.retry || (notice.details && detail) || action" #actions>
         <OButton
           v-if="notice.retry"
-          variant="outline"
-          :size="size === 'inline' ? 'sm' : 'md'"
-          icon-left="refresh"
+          variant="secondary"
+          icon="refresh"
           :loading="busy"
           :data-test="retryTest"
           @click="emit('retry')"
@@ -52,8 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="notice.details && detail"
           variant="ghost"
-          :size="size === 'inline' ? 'sm' : 'md'"
-          :icon-right="showDetail ? 'expand-less' : 'expand-more'"
+          :icon-end="showDetail ? 'expand-less' : 'expand-more'"
           :aria-expanded="showDetail"
           :data-test="`${dataTest}-details`"
           @click="showDetail = !showDetail"
@@ -62,9 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="action"
-          variant="ghost-primary"
-          :size="size === 'inline' ? 'sm' : 'md'"
-          icon-right="arrow-forward"
+          variant="accent-ghost"
+          icon-end="arrow-forward"
           :data-test="`${dataTest}-action`"
           @click="emit('action')"
         >
@@ -85,13 +73,13 @@ import { computed, ref } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import type { EmptyStateKind, EmptyStateSize } from "@/lib/core/EmptyState/OEmptyState.types";
 import type { LiveNoticeView } from "./liveCopy";
 
 const props = defineProps<{
   notice: LiveNoticeView;
-  size: "inline" | "block";
+  size: EmptyStateSize;
   dataTest: string;
   retryTest?: string;
   detail?: I18nText;
@@ -105,9 +93,9 @@ const { t } = useI18nTyped();
 
 const showDetail = ref(false);
 
-const tone = computed(() =>
-  props.notice.severity === "error"
-    ? { circle: "bg-status-error-bg text-status-error-text", title: "text-status-error-text" }
-    : { circle: "bg-surface-subtle text-text-secondary", title: "" },
-);
+// A denial is the only error notice drawn with the lock, and it is not a failed load (K5).
+const kind = computed<EmptyStateKind>(() => {
+  if (props.notice.severity !== "error") return "first-run";
+  return props.notice.icon === "lock" ? "denied" : "error";
+});
 </script>

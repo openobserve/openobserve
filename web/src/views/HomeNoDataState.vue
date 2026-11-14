@@ -20,21 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   covering logs, traces, metrics, and AI integrations.
 -->
 <template>
-  <OEmptyState v-bind="{ ...shell, ...rootTestAttrs }" :hide-action="true">
-    <template #title>
-      <span
-        v-if="alternativesOnly"
-        class="text-text-secondary text-sm font-normal"
-        data-test="home-no-data-another-way"
-        >{{ t("ingestion.firstDataPanel.anotherWay") }}</span
-      >
-      <template v-else-if="tab">{{
-        t("logs.noData.title", { product: raw("OpenObserve") })
-      }}</template>
-      <template v-else>{{ t("home.noDataState.title") }}</template>
-    </template>
-
-    <template v-if="!alternativesOnly" #description>
+  <OEmptyState v-bind="{ ...shell, ...rootTestAttrs }">
+    <template v-if="!alternativesOnly" #text>
       <span v-if="tab" data-test="home-no-data-description">{{ tabDescription }}</span>
       <span v-else v-html="description" />
     </template>
@@ -167,8 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-if="tab" class="mt-2 flex justify-center">
         <OButton
-          variant="ghost-primary"
-          size="sm-action"
+          variant="accent-ghost"
           data-test="home-no-data-all-sources-link"
           @click="go('recommended')"
         >
@@ -219,8 +205,14 @@ const { locked: profilesLocked, lockedReason: profilesLockedReason } =
   useLicenseLock("continuous_profiling");
 
 const shell = computed(() => {
-  if (props.alternativesOnly) return { size: "block" as const, backdrop: false };
-  return { size: "hero" as const, illustration: props.tab ? "connect" : "wave-bars" } as const;
+  if (props.alternativesOnly)
+    return { size: "inline" as const, title: t("ingestion.firstDataPanel.anotherWay") };
+  if (props.tab)
+    return {
+      icon: "link" as const,
+      title: t("logs.noData.title", { product: raw("OpenObserve") }),
+    };
+  return { icon: "bar-chart" as const, title: t("home.noDataState.title") };
 });
 // an unset data-test would also erase OEmptyState's own id on the flag-off page
 const rootTestAttrs = computed((): Record<string, string> => {

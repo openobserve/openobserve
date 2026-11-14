@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="argExpanded = !argExpanded"
     >
       <span :id="argId">{{ call.key_arg }}</span>
-      <OTooltip v-if="!argExpanded" :content="keyArgText" max-width="32rem" overflow-only />
+      <OTooltip v-if="!argExpanded" :content="keyArgText" overflow-only />
     </button>
 
     <p

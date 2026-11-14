@@ -34,8 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="true"
     @update:open="onOpenChange"
     :title="raw(title)"
-    :size="containerSize"
-    :width="containerWidth"
+    size="full"
     :show-close="!isFunctionNode"
     :persistent="isFunctionNode"
     data-test="workflow-node-drawer"
@@ -45,12 +44,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          destination "Create New" form is open (the node just saves as a dummy if the
          form isn't completed); hidden only for the function's full-width editor
          (dialog.expand), which owns its own controls. -->
-    <template v-if="!hideFooter" #footer>
-      <div class="flex items-center justify-between gap-2">
+    <template v-if="!hideFooter || exitPromptOpen" #footer>
+      <!-- The unsaved-function question replaces the footer, so no dialog opens over this one (O8). -->
+      <div
+        v-if="exitPromptOpen"
+        role="alert"
+        class="flex items-center gap-2"
+        data-test="workflow-ndv-unsaved-fn"
+      >
+        <span class="text-banner-warning-text text-compact min-w-0 flex-1 font-medium">
+          {{ t("workflow.node.unsavedFnMessage") }}
+        </span>
+        <OButton data-test="workflow-ndv-unsaved-fn-keep" @click="onExitKeepEditing">
+          {{ t("workflow.node.unsavedFnKeep") }}
+        </OButton>
+        <OButton
+          variant="danger-ghost"
+          data-test="workflow-ndv-unsaved-fn-discard"
+          @click="onExitDiscard"
+        >
+          {{ t("workflow.node.unsavedFnDiscard") }}
+        </OButton>
+        <OButton variant="primary" data-test="workflow-ndv-unsaved-fn-save" @click="onExitSave">
+          {{ t("workflow.node.unsavedFnSave") }}
+        </OButton>
+      </div>
+      <div v-else class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           <OButton
-            variant="outline-destructive"
-            size="sm-action"
+            variant="danger-ghost"
             data-test="workflow-node-delete"
             :disabled="readonlyBody || canvasReadOnly"
             @click="onDelete"
@@ -60,8 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex items-center gap-2">
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="workflow-ndv-prev-step"
             :disabled="!prevStepId"
             @click="navigateTo(prevStepId)"
@@ -73,8 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </OButton>
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="workflow-ndv-next-step"
             :disabled="!nextStepId"
             @click="navigateTo(nextStepId)"
@@ -91,8 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                upstream step that passed while emitting the wrong records. -->
           <OButton
             v-if="canvasReadOnly && historyRunId"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="workflow-node-edit-step"
             @click="editThisStep"
           >
@@ -100,9 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             v-if="canUseRunAsTestInput"
-            variant="outline"
-            size="sm-action"
-            icon-left="science"
+            variant="secondary"
+            icon="science"
             data-test="workflow-run-use-as-test-input"
             @click="useRunAsTestInput"
           >
@@ -112,8 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                backend stored input for — a Test/Retry run shows nothing here. -->
           <OButton
             v-if="canRetryFromHere"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :loading="retryingFromHere"
             data-test="workflow-node-retry-from"
             @click="retryFromHere"
@@ -126,8 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                advertises an action the surface refuses. -->
           <OButton
             v-if="showIo && !canvasReadOnly"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="workflow-node-execute"
             :loading="executing"
             :disabled="inputInvalid || readonlyBody || canvasReadOnly"
@@ -148,8 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              the close through requestClose(). Other node types keep the built-in X. -->
         <OButton
           v-if="isFunctionNode"
+          icon-only
           variant="ghost"
-          size="icon-sm"
           class="order-last shrink-0"
           data-test="workflow-ndv-close"
           :aria-label="t('common.close')"
@@ -220,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </WorkflowRunSwitcher>
               <OTag
                 v-if="loadedRunIsHttp"
-                variant="blue-soft"
+                tone="neutral"
                 icon="webhook"
                 size="sm"
                 :label="t('workflow.history.sourceHttp')"
@@ -236,8 +252,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          only while the function's full-width inline editor is open (dialog.expand). -->
     <div
       data-test="workflow-ndv-body"
-      class="relative flex h-[calc(90vh-10rem)] min-h-0 gap-4"
-      :class="workflowObj.dialog.expand || isIoNode ? '' : 'p-4'"
+      class="relative flex h-full min-h-0 gap-4"
+      :class="workflowObj.dialog.expand || isIoNode ? 'p-3' : 'p-4'"
     >
       <!-- STEPS — the workflow's nodes as a top-down TREE (traces-waterfall guides),
            the same navigator the results dock had. Click a step to walk the panel to
@@ -264,8 +280,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Same toggle style as the Logs field-panel collapse button
                (SearchResult.vue): outline icon button + double-arrow + tooltip. -->
           <OButton
-            variant="outline"
-            size="icon-xs-sq"
+            icon-only
+            variant="secondary"
+            size="sm"
             class="shrink-0"
             data-test="workflow-ndv-steps-collapse"
             @click="toggleStepsCollapsed"
@@ -315,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   aria-hidden="true"
                 />
               </span>
-              <OTooltip side="right" align="center" :side-offset="8" max-width="18rem">
+              <OTooltip side="right">
                 <template #content>
                   <div class="flex flex-col gap-0.5 p-1 text-left">
                     <div class="text-xs font-semibold">
@@ -368,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ row.detail }}
                 </span>
               </span>
-              <OTooltip side="right" align="center" :side-offset="8" max-width="18rem">
+              <OTooltip side="right">
                 <template #content>
                   <div class="flex flex-col gap-0.5 p-1 text-left">
                     <div class="text-xs font-semibold">
@@ -448,8 +465,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span>{{ t("workflow.ndv.eventPager", { n: inputPage + 1, total: inputCount }) }}</span>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
               data-test="workflow-ndv-input-prev"
               :title="t('workflow.ndv.prevEvent')"
               @click="stepInput(-1)"
@@ -457,8 +474,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="chevron-left" size="xs" />
             </OButton>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
               data-test="workflow-ndv-input-next"
               :title="t('workflow.ndv.nextEvent')"
               @click="stepInput(1)"
@@ -469,7 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="!canvasReadOnly"
             variant="ghost"
-            size="xs"
+            size="sm"
             class="ms-auto"
             data-test="workflow-ndv-input-reset"
             @click="resetEditableInput"
@@ -598,7 +615,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="workflows-node-comment-input"
               :placeholder="t('workflow.node.commentPlaceholder')"
               :rows="2"
-              size="sm"
               @update:model-value="onCommentLive"
               @blur="onCommentBlur"
             />
@@ -643,7 +659,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                badge and the results dock. -->
           <OBadge
             v-if="hasResult"
-            :variant="outputStatusVariant"
+            :tone="outputStatusVariant"
             size="sm"
             data-test="workflow-ndv-output-status"
           >
@@ -661,8 +677,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               t("workflow.ndv.eventPager", { n: outputPage + 1, total: outputCount })
             }}</span>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
               data-test="workflow-ndv-output-prev"
               :title="t('workflow.ndv.prevEvent')"
               @click="stepOutput(-1)"
@@ -670,8 +686,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="chevron-left" size="xs" />
             </OButton>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
               data-test="workflow-ndv-output-next"
               :title="t('workflow.ndv.nextEvent')"
               @click="stepOutput(1)"
@@ -793,29 +809,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :ok-label="t('common.delete')"
       @update:ok="onConfirmDelete"
     />
-
-    <!-- Unsaved-function prompt (Function nodes only) — nested so it stacks above the
-         NDV. Forces a choice (persistent, no dismiss): never auto-save the library
-         function, never silently drop edits. Save opens the picker's save dialog and
-         keeps you here; Discard leaves without committing; Keep editing stays. -->
-    <ODialog
-      :open="exitPromptOpen"
-      persistent
-      :show-close="false"
-      size="sm"
-      data-test="workflow-ndv-unsaved-fn"
-      :title="t('workflow.node.unsavedFnTitle')"
-      :neutral-button-label="t('workflow.node.unsavedFnKeep')"
-      :secondary-button-label="t('workflow.node.unsavedFnDiscard')"
-      :primary-button-label="t('workflow.node.unsavedFnSave')"
-      neutral-button-variant="outline"
-      secondary-button-variant="outline-destructive"
-      @click:neutral="onExitKeepEditing"
-      @click:secondary="onExitDiscard"
-      @click:primary="onExitSave"
-    >
-      <p class="text-text-secondary text-sm">{{ t("workflow.node.unsavedFnMessage") }}</p>
-    </ODialog>
   </ODialog>
 </template>
 
@@ -1419,16 +1412,14 @@ const outputStatus = computed<"ok" | "error" | "skipped" | "noMatch">(() => {
   if (r.blockedNodeIds?.includes(nodeId.value)) return "skipped";
   return "ok";
 });
-const outputStatusVariant = computed<
-  "error-soft" | "success-soft" | "warning-soft" | "default-soft"
->(() =>
+const outputStatusVariant = computed<"err" | "ok" | "warn" | "neutral">(() =>
   outputStatus.value === "error"
-    ? "error-soft"
+    ? "err"
     : outputStatus.value === "noMatch"
-      ? "warning-soft"
+      ? "warn"
       : outputStatus.value === "ok"
-        ? "success-soft"
-        : "default-soft",
+        ? "ok"
+        : "neutral",
 );
 
 // The node types that open the NDV, each showing the full Input · Config · Output
@@ -1442,13 +1433,6 @@ const isIoNode = computed(() => IO_NODE_TYPES.includes(workflowObj.dialog.name))
 // the Config pane (in the dropdown's place) with Input/Output/Steps/comment and the
 // footer (Prev/Next/Delete/Execute) intact — an unfinished form just saves a dummy node.
 const showIo = computed(() => !workflowObj.dialog.expand);
-
-// Sizing: a centered popup at NDV_WIDTH vw. `size` stays non-`full` so `width`
-// applies and the dialog centers (ODialog caps height at max-h-90vh) with margin
-// around it, like the reference popup. Tune NDV_WIDTH to taste.
-const NDV_WIDTH = 95; // vw
-const containerSize = computed(() => "xl" as const);
-const containerWidth = computed(() => NDV_WIDTH);
 
 // prev/next navigation — the connected nodes, shown as floating edge buttons in the
 // NDV. Prev is the single upstream node (source of the incoming edge); next is one

@@ -34,15 +34,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   (asked-for beside applied, including the clamped and refused cases).
 -->
 <template>
-  <OCard v-if="verdict" variant="glass" data-test="oncall-verdict-card">
-    <OCardSection role="header" dense class="flex-wrap">
-      <OText variant="card-title">{{ t("oncall.verdictTitle") }}</OText>
-      <span class="text-text-secondary text-xs">
+  <OCard v-if="verdict" data-test="oncall-verdict-card">
+    <template #header>
+      <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+        {{ t("oncall.verdictTitle") }}
+      </h3>
+      <span class="text-text-muted shrink-0 text-xs whitespace-nowrap">
         {{ raw(verdict.actor) }} · <OTimeCell :value="verdict.at" unit="us" />
       </span>
-    </OCardSection>
+    </template>
 
-    <OCardSection role="body" dense class="flex flex-col gap-2">
+    <div class="flex flex-col gap-2">
       <p class="text-text-body text-sm" data-test="oncall-verdict-body">
         {{ raw(verdict.body) }}
       </p>
@@ -56,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ raw(promotion.body) }}
       </p>
-    </OCardSection>
+    </div>
   </OCard>
 </template>
 
@@ -64,9 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import type { OnCallResponseEvent } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 

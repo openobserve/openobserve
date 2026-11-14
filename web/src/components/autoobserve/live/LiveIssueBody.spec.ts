@@ -267,9 +267,9 @@ describe("LiveIssueBody", () => {
       const blast = w
         .findAllComponents(OTag)
         .filter((c) => c.find(sel("autoobserve-live-issue-blast-stream")).exists());
-      expect(blast.map((b) => [b.text(), b.props("variant")])).toEqual([
-        ["pay_api", "error-soft"],
-        ["b", "default-soft"],
+      expect(blast.map((b) => [b.text(), b.props("tone")])).toEqual([
+        ["pay_api", "err"],
+        ["b", "neutral"],
       ]);
       expect(w.find('[role="meter"]').exists()).toBe(false);
       expect(w.get(sel("autoobserve-issue-chart-note")).text()).toBe(

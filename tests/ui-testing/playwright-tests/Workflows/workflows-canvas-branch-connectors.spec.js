@@ -6,8 +6,8 @@
  *     appendPointsFor — `handleDx` mirrors FlowNodeCard's handleOffset), not a shared centre point.
  *  2. Node status-badge strip wraps (flex-wrap) and caps its width (max-w-[calc(100%-2.25rem)]) so
  *     multiple glyphs stay inside the card (WorkflowNode.vue).
- *  3. Resume control on a paused workflow is ghost-success (green/positive); pause stays
- *     ghost-destructive (WorkflowsList.vue `:variant`).
+ *  3. Resume control on a paused workflow is a plain ghost button; pause stays
+ *     danger-ghost (WorkflowsList.vue `:variant`).
  *
  * Enterprise-only feature: these specs run ONLY in the ENT playwright matrix (never wired into OSS),
  * where Workflows is enabled by default (O2_WORKFLOWS_ENABLED=true). No runtime availability skip —
@@ -42,8 +42,8 @@ test.describe(
     });
 
     // P0 + P2 — the pause/resume control carries the right variant in BOTH states: an enabled
-    // workflow shows a destructive pause action, and once paused the same control becomes the
-    // positive green resume action (the headline control-polish change, WorkflowsList.vue:153).
+    // workflow shows a destructive pause action, and once paused the same control becomes a
+    // neutral ghost resume action (WorkflowsList.vue).
     test(
       'should style the pause/resume control with the correct variant in both states',
       { tag: ['@workflowCanvasBranchConnectors'] },
@@ -60,9 +60,7 @@ test.describe(
 
         // Enabled -> the control is a destructive pause action (P2, symmetric guard).
         expect(await pm.workflowsPage.listActionRowState(name)).toBe('pause');
-        expect(await pm.workflowsPage.listActionClasses(name)).toContain(
-          'text-button-ghost-destructive-text'
-        );
+        expect(await pm.workflowsPage.listActionVariant(name)).toBe('danger-ghost');
 
         // Pause the workflow, then assert the state flip actually landed before checking the variant.
         await pm.workflowsPage.toggleEnable(name);
@@ -70,10 +68,8 @@ test.describe(
           .poll(() => pm.workflowsPage.listActionRowState(name), { timeout: 30000 })
           .toBe('resume');
 
-        // Paused -> the control is the positive green resume action (P0, the headline change).
-        expect(await pm.workflowsPage.listActionClasses(name)).toContain(
-          'text-button-ghost-success-text'
-        );
+        // Paused -> the same control becomes a neutral ghost resume action (UI v2 has no green ghost).
+        expect(await pm.workflowsPage.listActionVariant(name)).toBe('ghost');
         testLogger.info('pause/resume variant verified in both states');
       }
     );

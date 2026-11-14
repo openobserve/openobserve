@@ -35,10 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
       <OProgressBar
-        :value="done ? 1 : session.fraction.value"
-        :variant="done ? 'success' : 'default'"
-        size="xs"
-        :aria-label="done ? t('sampleData.progress.done') : t('sampleData.progress.loading')"
+        :value="(done ? 1 : session.fraction.value) * 100"
+        :tone="done ? 'ok' : 'accent'"
+        :label="done ? t('sampleData.progress.done') : t('sampleData.progress.loading')"
       />
     </div>
 
@@ -49,11 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OStatCard
         v-for="tile in tiles"
         :key="tile.key"
-        class="tabular-nums"
         :label="tile.label"
         :value="shown[tile.key].toLocaleString()"
         :icon="tile.icon"
-        :tone="tile.tone"
         :data-test="`sample-data-progress-${tile.key}`"
       />
     </div>
@@ -94,7 +91,6 @@ import { computed, onBeforeUnmount, reactive, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
-import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
@@ -117,12 +113,10 @@ const percent = computed(() =>
   raw(`${props.done ? 100 : Math.round(session.fraction.value * 100)}%`),
 );
 
-const tiles = computed<
-  { key: keyof SampleCounts; label: I18nText; icon: IconName; tone: StatTone }[]
->(() => [
-  { key: "logs", label: t("sampleData.progress.logs"), icon: "search", tone: "blue" },
-  { key: "spans", label: t("sampleData.progress.spans"), icon: "account-tree", tone: "purple" },
-  { key: "metrics", label: t("sampleData.progress.metrics"), icon: "bar-chart", tone: "teal" },
+const tiles = computed<{ key: keyof SampleCounts; label: I18nText; icon: IconName }[]>(() => [
+  { key: "logs", label: t("sampleData.progress.logs"), icon: "search" },
+  { key: "spans", label: t("sampleData.progress.spans"), icon: "account-tree" },
+  { key: "metrics", label: t("sampleData.progress.metrics"), icon: "bar-chart" },
 ]);
 
 // counts arrive in batches; easing toward each new total makes them read as a live stream

@@ -51,9 +51,9 @@ vi.mock("vuex", () => ({
 vi.mock("@/lib/overlay/Drawer/ODrawer.vue", () => ({
   default: {
     name: "ODrawer",
-    props: ["open", "primaryButtonDisabled"],
+    props: ["open", "primary"],
     emits: ["update:open", "click:primary", "click:secondary"],
-    template: `<div class="o-drawer" :data-primary-disabled="primaryButtonDisabled"><slot /></div>`,
+    template: `<div class="o-drawer" :data-primary-disabled="primary?.disabled"><slot /></div>`,
   },
 }));
 

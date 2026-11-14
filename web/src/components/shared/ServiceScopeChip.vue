@@ -4,7 +4,6 @@
       :dim-key="facet"
       :key-label="keyLabel"
       :value="shown"
-      variant="default-soft"
       muted
       :value-tooltip="false"
       data-test="svcver-where-none" /><OTooltip v-if="reasonTooltip" :content="reason"

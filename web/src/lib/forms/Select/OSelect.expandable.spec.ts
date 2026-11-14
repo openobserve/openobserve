@@ -49,7 +49,7 @@ describe("OSelect expandable rows", () => {
     wrapper = mount(OSelect, {
       attachTo: document.body,
       attrs: { "data-test": "unit" },
-      props: { options: OPTIONS, ...props },
+      props: { options: OPTIONS, searchable: true, ...props },
     });
   };
   const openDropdown = async () => {
@@ -88,7 +88,7 @@ describe("OSelect expandable rows", () => {
   it("styles the row like an option with the arrow on the right", async () => {
     await open({ modelValue: "bytes" });
     const row = expandRow()!;
-    expect(row.classList.contains("text-sm")).toBe(true);
+    expect(row.classList.contains("text-select-item-text")).toBe(true);
     expect(row.classList.contains("font-bold")).toBe(false);
     expect(row.classList.contains("bg-surface-subtle")).toBe(false);
     expect(row.firstElementChild?.textContent?.trim()).toBe("Other Locale");
@@ -199,7 +199,7 @@ describe("OSelect group headers while searching", () => {
     wrapper = mount(OSelect, {
       attachTo: document.body,
       attrs: { "data-test": "unit" },
-      props: { options, modelValue: "bytes" } as Record<string, unknown>,
+      props: { options, modelValue: "bytes", searchable: true } as Record<string, unknown>,
     });
     await wrapper.find("button").trigger("click");
     await flushPromises();
@@ -239,7 +239,7 @@ describe("OSelect group headers while searching", () => {
     await search("other");
     expect(listText()).not.toContain("Number group");
     expect(optionValues()).toEqual([]);
-    expect(listText()).toContain("No options found");
+    expect(listText()).toContain("No matches");
   });
 
   const headerRow = (label: string) =>
@@ -247,13 +247,13 @@ describe("OSelect group headers while searching", () => {
       (el) => el.textContent?.trim() === label,
     )!;
 
-  it("styles every header like the option text, bold, with no border", async () => {
+  it("styles every header as a quiet 12 px label with no border", async () => {
     await open(GROUPED);
     for (const label of ["Number group", "Data group"]) {
       const el = headerRow(label);
-      expect(el.classList.contains("text-select-item-text")).toBe(true);
+      expect(el.classList.contains("text-text-secondary")).toBe(true);
       expect(el.classList.contains("text-xs")).toBe(true);
-      expect(el.classList.contains("font-bold")).toBe(true);
+      expect(el.classList.contains("font-medium")).toBe(true);
       expect([...el.classList].some((c) => c.includes("border"))).toBe(false);
     }
   });

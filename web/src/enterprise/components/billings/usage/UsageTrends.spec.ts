@@ -42,7 +42,7 @@ vi.mock("./useUsageSearch", () => ({ useUsageSearch: () => ({ search }) }));
 // The picker as Trends sees it: its ‹ switch, and the setter the page keeps its label in step with.
 const setAbsoluteTime = vi.fn();
 const DateTimeStub = defineComponent({
-  name: "DateTime",
+  name: "ODateTimeRange",
   props: { disablePrevShift: Boolean },
   emits: ["on:date-change"],
   setup: (_, { expose }) => {
@@ -145,7 +145,7 @@ describe("UsageTrends cost and volume", () => {
       props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: null },
       global: {
         plugins: [i18n, store],
-        stubs: { DateTime: DateTimeStub, AsyncComponentWrapper: true },
+        stubs: { ODateTimeRange: DateTimeStub, AsyncComponentWrapper: true },
       },
     });
     await flushPromises();
@@ -181,7 +181,7 @@ describe("UsageTrends range in the URL", () => {
       props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: null },
       global: {
         plugins: [i18n, store],
-        stubs: { DateTime: DateTimeStub, AsyncComponentWrapper: true },
+        stubs: { ODateTimeRange: DateTimeStub, AsyncComponentWrapper: true },
       },
     });
 
@@ -213,7 +213,7 @@ describe("UsageTrends range in the URL", () => {
     await flushPromises();
 
     wrapper
-      .findComponent({ name: "DateTime" })
+      .findComponent({ name: "ODateTimeRange" })
       .vm.$emit("on:date-change", { startTime: from, endTime: to, userChangedValue: true });
     await flushPromises();
     expect(nav.route.query).toEqual({ tab: "trends", from: String(from), to: String(to) });
@@ -234,7 +234,7 @@ describe("UsageTrends range in the URL", () => {
     setAbsoluteTime.mockClear();
     const wrapper = mountTrends();
     await flushPromises();
-    const picker = wrapper.findComponent({ name: "DateTime" });
+    const picker = wrapper.findComponent({ name: "ODateTimeRange" });
     expect(picker.props("disablePrevShift")).toBe(false);
 
     const first = upcoming.cycle_start * 1_000_000;
@@ -298,7 +298,7 @@ describe("UsageTrends projected total", () => {
       props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: 5000 },
       global: {
         plugins: [i18n, store],
-        stubs: { DateTime: DateTimeStub, AsyncComponentWrapper: true },
+        stubs: { ODateTimeRange: DateTimeStub, AsyncComponentWrapper: true },
       },
     });
     await flushPromises();
@@ -322,7 +322,7 @@ describe("UsageTrends projected total", () => {
       props: { details: upcoming, cycles: [upcoming], billingOrgs: [], projected: 5000 },
       global: {
         plugins: [i18n, store],
-        stubs: { DateTime: DateTimeStub, AsyncComponentWrapper: true },
+        stubs: { ODateTimeRange: DateTimeStub, AsyncComponentWrapper: true },
       },
     });
     await flushPromises();

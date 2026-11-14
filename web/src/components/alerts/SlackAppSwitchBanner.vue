@@ -19,7 +19,7 @@ import { computed } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { useOncallRoomNames, useSlackAppSwitch } from "@/composables/slack/useSlackAppSwitch";
 import { slackInstallationsQuery } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -64,7 +64,7 @@ const run = async () => {
 </script>
 
 <template>
-  <OBanner v-if="installationId" variant="info" icon="sync" data-test="slack-app-switch-banner">
+  <OInlineNotice v-if="installationId" tone="info" icon="sync" data-test="slack-app-switch-banner">
     <div class="flex flex-col gap-0.5">
       <span class="font-medium">
         {{ t("slackApp.destination.switchToApp", { product: raw("Slack") }) }}
@@ -76,7 +76,6 @@ const run = async () => {
     <template #actions>
       <OButton
         variant="primary"
-        size="sm-action"
         :loading="pending.has(destination.name)"
         data-test="slack-app-switch-this"
         @click="run"
@@ -84,5 +83,5 @@ const run = async () => {
         {{ t("slackApp.destination.switchThis") }}
       </OButton>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>

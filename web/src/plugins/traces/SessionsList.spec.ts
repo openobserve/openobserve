@@ -893,7 +893,7 @@ describe("SessionsList — agents list fails to load", () => {
 
     // Retry: the list loads (empty), so the mode is decided now — Stream.
     mockListAgents.mockResolvedValue({ agents: [] });
-    await wrapper.find("[data-test='o2-empty-state-action-retry']").trigger("click");
+    await wrapper.find("[data-test='o2-empty-state-action']").trigger("click");
     await flushPromises();
 
     expect((wrapper.vm as any).filterMode).toBe("stream");

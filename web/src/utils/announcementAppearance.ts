@@ -17,7 +17,7 @@
 
 import { BANNER_COLOR_PRESETS } from "@/constants/themes";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { Props as OBannerProps } from "@/lib/feedback/Banner/OBanner.vue";
+import type { BannerTone } from "@/lib/feedback/Banner/OBanner.types";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 import { pickReadableForeground } from "@/utils/theme";
 
@@ -98,17 +98,17 @@ export function colorChoiceFor(light: string, dark: string): string {
   return presetKeyFor(light, dark) ?? CUSTOM_CHOICE;
 }
 
-/** Our severities are operator-facing; OBanner's variants are visual. */
-export function bannerVariant(variant?: BannerVariantName | string): OBannerProps["variant"] {
+/** Our severities are operator-facing; OBanner's tones are visual. */
+export function bannerTone(variant?: BannerVariantName | string): BannerTone {
   switch (variant) {
     case "critical":
-      return "error";
+      return "err";
     case "warning":
-      return "warning";
+      return "warn";
     case "info":
       return "info";
     default:
-      return "default";
+      return "neutral";
   }
 }
 

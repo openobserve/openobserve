@@ -53,36 +53,26 @@ describe("OSwitch", () => {
     expect(wrapper.find("button").attributes("disabled")).toBeDefined();
   });
 
-  it("renders correctly with sm size and still toggles", async () => {
-    // Size affects visual track width (CSS-only). Verify the component mounts
-    // without error and toggle behavior is unaffected.
-    wrapper = mount(OSwitch, { props: { size: "sm", modelValue: false } });
-    expect(wrapper.find("button").exists()).toBe(true);
-    await wrapper.find("button").trigger("click");
-    expect(wrapper.emitted("update:modelValue")![0][0]).toBe(true);
+  it("has one 28 x 16 track with a 12 px thumb", () => {
+    wrapper = mount(OSwitch, { props: { modelValue: false } });
+    const track = wrapper.find('[role="switch"]');
+    expect(track.classes()).toEqual(expect.arrayContaining(["w-7", "h-4"]));
+    expect(track.find("span").classes()).toContain("size-3");
   });
 
-  it("renders correctly with md size by default and still toggles", async () => {
+  it("toggles", async () => {
     wrapper = mount(OSwitch, { props: { modelValue: false } });
     expect(wrapper.find("button").attributes("role")).toBe("switch");
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted("update:modelValue")![0][0]).toBe(true);
   });
 
-  it("mirrors the checked-thumb offset for RTL at every size", () => {
-    for (const [size, offset] of [
-      ["sm", "2"],
-      ["md", "2.5"],
-      ["lg", "3"],
-      ["xl", "5"],
-    ] as const) {
-      const sized = mount(OSwitch, { props: { size, modelValue: true } });
-      const thumb = sized.find('[role="switch"]').find("span");
+  it("mirrors the checked-thumb offset for RTL", () => {
+    wrapper = mount(OSwitch, { props: { modelValue: true } });
+    const thumb = wrapper.find('[role="switch"]').find("span");
 
-      expect(thumb.classes()).toContain(`translate-x-${offset}`);
-      expect(thumb.classes()).toContain(`rtl:-translate-x-${offset}`);
-      sized.unmount();
-    }
+    expect(thumb.classes()).toContain("translate-x-3");
+    expect(thumb.classes()).toContain("rtl:-translate-x-3");
   });
 
   it("parks the thumb at the reading edge while unchecked", () => {
@@ -93,34 +83,24 @@ describe("OSwitch", () => {
     expect(thumb.classes().some((className) => className.startsWith("rtl:"))).toBe(false);
   });
 
-  it("renders correctly with lg size and still toggles", async () => {
-    wrapper = mount(OSwitch, { props: { size: "lg", modelValue: false } });
-    expect(wrapper.find("button").exists()).toBe(true);
-    await wrapper.find("button").trigger("click");
-    expect(wrapper.emitted("update:modelValue")![0][0]).toBe(true);
-  });
-
-  it("renders label before switch when labelPosition is left", () => {
+  it('renders the label before the switch when labelPosition is "start"', () => {
     wrapper = mount(OSwitch, {
-      props: { label: "My label", labelPosition: "left" },
+      props: { label: "My label", labelPosition: "start" },
     });
     expect(wrapper.element.classList.contains("flex-row-reverse")).toBe(true);
   });
 
-  it("emits checkedValue when toggled on with custom values", async () => {
-    wrapper = mount(OSwitch, {
-      props: { modelValue: "no", checkedValue: "yes", uncheckedValue: "no" },
-    });
+  it("emits a boolean when the model is a truthy non-boolean", async () => {
+    wrapper = mount(OSwitch, { props: { modelValue: "yes" } });
     await wrapper.find("button").trigger("click");
-    expect(wrapper.emitted("update:modelValue")![0][0]).toBe("yes");
+    expect(wrapper.emitted("update:modelValue")![0][0]).toBe(false);
   });
 
-  it("emits uncheckedValue when toggled off with custom values", async () => {
+  it("renders a description under the label", () => {
     wrapper = mount(OSwitch, {
-      props: { modelValue: "yes", checkedValue: "yes", uncheckedValue: "no" },
+      props: { label: "Ingest app_logs", description: "Pausing drops new events" },
     });
-    await wrapper.find("button").trigger("click");
-    expect(wrapper.emitted("update:modelValue")![0][0]).toBe("no");
+    expect(wrapper.text()).toContain("Pausing drops new events");
   });
 
   it("sets aria-labelledby on the button when a label is provided", () => {
@@ -141,8 +121,8 @@ describe("OSwitch", () => {
       { props: { modelValue: true }, text: undefined },
       { props: { modelValue: true, stateText: true }, text: "On" },
       { props: { modelValue: false, stateText: true }, text: "Off" },
-      { props: { modelValue: "no", checkedValue: "yes", stateText: true }, text: "Off" },
-      { props: { modelValue: "yes", checkedValue: "yes", stateText: true }, text: "On" },
+      { props: { modelValue: 0, stateText: true }, text: "Off" },
+      { props: { modelValue: "yes", stateText: true }, text: "On" },
     ];
     for (const row of rows) {
       const sw = mount(OSwitch, {

@@ -21,36 +21,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   `reviewed` only; there is no in-review state.
 -->
 <template>
-  <OTag
-    v-if="!queues.length"
-    variant="default-outline"
-    shape="rounded"
-    data-test="enqueue-chip-none"
-  >
+  <OTag v-if="!queues.length" tone="outline" data-test="enqueue-chip-none">
     {{ t("aiObservability.discovery.inQueue.none") }}
   </OTag>
 
-  <OTag
-    v-else-if="reviewed"
-    variant="success-soft"
-    shape="rounded"
-    data-test="enqueue-chip-reviewed"
-  >
+  <OTag v-else-if="reviewed" tone="ok" data-test="enqueue-chip-reviewed">
     {{ t("aiObservability.discovery.inQueue.reviewed") }}
     <OTooltip side="bottom" :content="queueNames" />
   </OTag>
 
-  <OTag
-    v-else-if="queues.length > 1"
-    variant="default-soft"
-    shape="rounded"
-    data-test="enqueue-chip-multi"
-  >
+  <OTag v-else-if="queues.length > 1" tone="neutral" data-test="enqueue-chip-multi">
     {{ t("aiObservability.discovery.inQueue.multiple", { count: queues.length }) }}
     <OTooltip side="bottom" :content="queueNames" />
   </OTag>
 
-  <OTag v-else variant="default-soft" shape="rounded" data-test="enqueue-chip-single">
+  <OTag v-else tone="neutral" data-test="enqueue-chip-single">
     <OTruncatedText class="max-w-40">{{ singleLabel }}</OTruncatedText>
   </OTag>
 </template>

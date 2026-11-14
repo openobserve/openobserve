@@ -67,9 +67,8 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
     <template #trigger>
       <OButton
         variant="ghost"
-        size="sm"
-        :icon-left="current.icon"
-        icon-right="expand-more"
+        :icon="current.icon"
+        icon-end="expand-more"
         class="font-semibold tracking-tight md:max-xl:max-w-full md:max-xl:min-w-0"
         data-test="solution-switcher"
       >

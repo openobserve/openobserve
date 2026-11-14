@@ -23,10 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`trace-issue-${issue.rule}-${issue.tool}`"
     >
       <div class="flex items-center gap-2">
-        <OBadge
-          :variant="issue.rule === 'repeated_tool_calls' ? 'error-soft' : 'warning-soft'"
-          size="sm"
-        >
+        <OBadge :tone="issue.rule === 'repeated_tool_calls' ? 'err' : 'warn'" size="sm">
           {{ t(`traceIssues.severity.${issue.rule}`) }}
         </OBadge>
         <span class="text-compact text-text-heading font-semibold">{{

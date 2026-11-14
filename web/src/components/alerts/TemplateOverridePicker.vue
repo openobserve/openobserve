@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-w-0 flex-col gap-1" :data-test="`template-override-${kind}`">
     <OButton
-      variant="ghost-primary"
-      size="xs"
+      variant="accent-ghost"
+      size="sm"
       class="gap-1 self-start font-medium"
       data-test="template-override-help-btn"
       @click="helpOpen = true"
@@ -31,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-text-secondary text-sm" data-test="template-override-empty">
         {{ t("alerts.templateOverride.empty", { kind: kindLabel }) }}
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           class="ms-1"
           data-test="template-override-create"
           @click="openCreate"
@@ -44,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-input-error-text text-sm" data-test="template-override-error">
         {{ t("alerts.templateOverride.loadFailed") }}
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           class="ms-1"
           data-test="template-override-retry"
           @click="load"
@@ -62,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         modelValue
       }}</span>
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :disabled="disabled"
         data-test="template-override-clear"
         @click="onSelect(null)"

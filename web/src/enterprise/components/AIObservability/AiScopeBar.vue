@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              (see `agentToggleLockedMessage`) instead of just disappearing. -->
         <OToggleGroupItem
           value="agent"
-          size="sm"
           :icon-right="!showAgentToggle || aiObsLock.locked.value ? 'lock' : undefined"
           :disabled="aiObsLock.locked.value"
           :focusable-unavailable="aiObsLock.locked.value"
@@ -63,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ labels.agent }}
         </OToggleGroupItem>
-        <OToggleGroupItem value="stream" size="sm">{{ labels.stream }}</OToggleGroupItem>
+        <OToggleGroupItem value="stream">{{ labels.stream }}</OToggleGroupItem>
       </OToggleGroup>
     </template>
 
@@ -74,16 +73,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          silently fall through to rendering the agent cascade. -->
     <template v-if="isStreamMode">
       <div :data-test="`${dataTest}-stream-selector`" class="w-64 flex-shrink-0">
-        <OSkeleton type="text" v-if="showStreamSkeleton && !streamsLoaded" class="h-8.5 w-full" />
+        <OSkeleton v-if="showStreamSkeleton && !streamsLoaded" class="h-8.5 w-full" />
         <OSelect
+          width="full"
           v-else
           v-model="activeStreamModel"
           :label="raw(labels.streamLabel)"
-          label-position="inside"
+          variant="filter"
           :options="streamSelectOptions"
           labelKey="label"
           valueKey="value"
-          :option-tooltip="streamOptionTooltip"
           class="rounded-default w-full"
           @update:model-value="onStreamChange"
         />
@@ -105,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          reachable when `showAgentToggle` is false — there's no control to
          switch into it and the parent never sets filterMode to "agent". -->
     <template v-else>
-      <OSkeleton type="text" v-if="agentSkeleton && !agentsLoaded" class="h-8.5 w-44" />
+      <OSkeleton v-if="agentSkeleton && !agentsLoaded" class="h-8.5 w-44" />
       <AgentScopeCascade
         v-else
         :prefix="dataTest"

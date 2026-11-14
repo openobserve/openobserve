@@ -22,12 +22,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="border-border-default rounded-surface bg-surface-panel overflow-hidden border border-[0.0625em]"
     >
-      <OEmptyState size="inline" preset="load-error">
+      <OEmptyState
+        size="inline"
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
+      >
         <template #actions>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="refresh"
+            variant="secondary"
+            icon="refresh"
             :data-test="`overview-${testSection}-load-error-retry-btn`"
             @click="emit('retry')"
           >

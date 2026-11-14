@@ -41,7 +41,7 @@ const stubs = {
   },
   ODialog: {
     name: "ODialog",
-    props: ["open", "primaryButtonVariant"],
+    props: ["open", "primary"],
     emits: ["click:primary", "click:secondary", "update:open"],
     template: `<div v-if="open">
       <slot />
@@ -321,7 +321,7 @@ describe("OnCallCoverList", () => {
       const dialog = wrapper
         .findAllComponents({ name: "ODialog" })
         .find((c) => c.attributes("data-test") === "oncall-cover-remove-dialog");
-      expect(dialog!.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog!.props("primary")?.variant).toBe("danger");
     });
 
     it("keeps the sentence while the dialog fades out after the remove", async () => {

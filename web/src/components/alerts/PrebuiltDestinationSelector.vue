@@ -82,7 +82,7 @@ limitations under the License. -->
             <OTag
               v-if="tile.disabled"
               data-test="destination-type-off"
-              variant="default-soft"
+              tone="neutral"
               size="sm"
               class="absolute top-1 right-1"
               :label="t('slackApp.destination.off')"

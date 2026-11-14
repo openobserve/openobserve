@@ -21,7 +21,6 @@ const props = withDefaults(defineProps<RangeProps>(), {
   min: 0,
   max: 100,
   step: 1,
-  size: "md",
   disabled: false,
   showValue: false,
   vertical: false,
@@ -81,32 +80,6 @@ const maxPercent = computed(() => {
   return Math.max(0, Math.min(100, ((renderMax.value - props.min) / range.value) * 100));
 });
 
-const trackHeight: Record<NonNullable<RangeProps["size"]>, string> = {
-  sm: "h-1",
-  md: "h-1.5",
-  lg: "h-2",
-};
-
-const thumbSize: Record<NonNullable<RangeProps["size"]>, string> = {
-  sm: "size-3",
-  md: "size-4",
-  lg: "size-5",
-};
-
-const thumbHalf: Record<NonNullable<RangeProps["size"]>, string> = {
-  sm: "0.375rem",
-  md: "0.5rem",
-  lg: "0.625rem",
-};
-
-const labelSize: Record<NonNullable<RangeProps["size"]>, string> = {
-  sm: "text-xs",
-  md: "text-xs",
-  lg: "text-sm",
-};
-
-const resolvedSize = computed(() => props.size ?? "md");
-
 /**
  * Dynamic z-index for the two thumbs.
  *
@@ -155,18 +128,6 @@ const displayValue = computed(() => {
 });
 
 // ── Vertical mode ──────────────────────────────────────────────────────────
-
-const trackWidthV: Record<NonNullable<RangeProps["size"]>, string> = {
-  sm: "w-1",
-  md: "w-1.5",
-  lg: "w-2",
-};
-
-const thumbSizePx: Record<NonNullable<RangeProps["size"]>, string> = {
-  sm: "0.75rem",
-  md: "1rem",
-  lg: "1.25rem",
-};
 
 function valueToTop(value: number): number {
   if (range.value <= 0) return 0;
@@ -388,7 +349,7 @@ const { t } = useI18nTyped();
       <!-- Track column -->
       <div
         ref="vertTrackRef"
-        class="relative flex h-full shrink-0 justify-center"
+        class="relative flex h-full w-4 shrink-0 justify-center"
         :class="
           isDisabled
             ? 'cursor-not-allowed opacity-60'
@@ -396,7 +357,6 @@ const { t } = useI18nTyped();
               ? 'cursor-pointer'
               : 'cursor-default'
         "
-        :style="{ width: thumbSizePx[resolvedSize] }"
         @pointerdown="onVertDown"
         @pointermove="onVertMove"
         @pointerup="onVertUp"
@@ -405,19 +365,13 @@ const { t } = useI18nTyped();
         <!-- Background track strip -->
         <div
           class="absolute top-0 bottom-0 rounded-full"
-          :class="[
-            trackWidthV[resolvedSize],
-            isDisabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
-          ]"
+          :class="['w-1.5', isDisabled ? 'bg-slider-disabled-track' : 'bg-slider-track']"
           aria-hidden="true"
         />
         <!-- Filled segment -->
         <div
           class="absolute rounded-full"
-          :class="[
-            trackWidthV[resolvedSize],
-            isDisabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
-          ]"
+          :class="['w-1.5', isDisabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill']"
           :style="{ top: vertFilledTop + '%', height: vertFilledHeight + '%' }"
           aria-hidden="true"
         />
@@ -438,7 +392,7 @@ const { t } = useI18nTyped();
           :class="[
             'border-slider-thumb-border absolute rounded-full border-2',
             'left-1/2 -translate-x-1/2 touch-none select-none',
-            thumbSize[resolvedSize],
+            'size-4',
             vertMinZClass,
             isDisabled
               ? 'bg-slider-disabled-thumb cursor-not-allowed'
@@ -446,7 +400,7 @@ const { t } = useI18nTyped();
                 ? 'bg-slider-thumb cursor-grab'
                 : 'bg-slider-thumb cursor-default',
           ]"
-          :style="{ top: `calc(${vertMinTop}% - ${thumbHalf[resolvedSize]})` }"
+          :style="{ top: `calc(${vertMinTop}% - 0.5rem)` }"
           role="slider"
           :aria-valuenow="current.min"
           :aria-valuemin="min"
@@ -460,7 +414,7 @@ const { t } = useI18nTyped();
           :class="[
             'border-slider-thumb-border absolute rounded-full border-2',
             'left-1/2 -translate-x-1/2 touch-none select-none',
-            thumbSize[resolvedSize],
+            'size-4',
             vertMaxZClass,
             isDisabled
               ? 'bg-slider-disabled-thumb cursor-not-allowed'
@@ -468,7 +422,7 @@ const { t } = useI18nTyped();
                 ? 'bg-slider-thumb cursor-grab'
                 : 'bg-slider-thumb cursor-default',
           ]"
-          :style="{ top: `calc(${vertMaxTop}% - ${thumbHalf[resolvedSize]})` }"
+          :style="{ top: `calc(${vertMaxTop}% - 0.5rem)` }"
           role="slider"
           :aria-valuenow="current.max"
           :aria-valuemin="min"
@@ -499,7 +453,7 @@ const { t } = useI18nTyped();
         <label
           v-if="$slots.label || label || $slots.tooltip"
           :class="[
-            labelSize[resolvedSize],
+            'text-compact',
             'text-slider-label flex items-center gap-1 leading-none font-medium',
           ]"
         >
@@ -514,10 +468,7 @@ const { t } = useI18nTyped();
             ><slot name="tooltip"
           /></OIcon>
         </label>
-        <span
-          v-if="showValue"
-          :class="[labelSize[resolvedSize], 'text-slider-value leading-none tabular-nums']"
-        >
+        <span v-if="showValue" :class="['text-xs', 'text-slider-value leading-none tabular-nums']">
           {{ displayValue }}
         </span>
       </div>
@@ -541,7 +492,7 @@ const { t } = useI18nTyped();
         <div
           :class="[
             'absolute right-0 left-0 rounded-full',
-            trackHeight[resolvedSize],
+            'h-1.5',
             isDisabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
           ]"
           aria-hidden="true"
@@ -550,7 +501,7 @@ const { t } = useI18nTyped();
         <div
           :class="[
             'absolute rounded-full',
-            trackHeight[resolvedSize],
+            'h-1.5',
             isDisabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
           ]"
           :style="{
@@ -576,7 +527,7 @@ const { t } = useI18nTyped();
             'pointer-events-none absolute right-0 left-0 m-0 w-full appearance-none bg-transparent',
             minZClass,
             'focus-visible:ring-slider-focus-ring rounded-full outline-none focus-visible:ring-2',
-            trackHeight[resolvedSize],
+            'h-1.5',
             isDisabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
           ]"
           @input="handleMin"
@@ -600,7 +551,7 @@ const { t } = useI18nTyped();
             'pointer-events-none absolute right-0 left-0 m-0 w-full appearance-none bg-transparent',
             maxZClass,
             'focus-visible:ring-slider-focus-ring rounded-full outline-none focus-visible:ring-2',
-            trackHeight[resolvedSize],
+            'h-1.5',
             isDisabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
           ]"
           @input="handleMax"
@@ -618,11 +569,11 @@ const { t } = useI18nTyped();
         <span
           :class="[
             'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
-            thumbSize[resolvedSize],
+            'size-4',
             isDisabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
           ]"
           :style="{
-            left: `clamp(0px, calc(${minPercent}% - ${thumbHalf[resolvedSize]}), calc(100% - ${thumbSizePx[resolvedSize]}))`,
+            left: `clamp(0px, calc(${minPercent}% - 0.5rem), calc(100% - 1rem))`,
           }"
           aria-hidden="true"
         />
@@ -631,18 +582,18 @@ const { t } = useI18nTyped();
         <span
           :class="[
             'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
-            thumbSize[resolvedSize],
+            'size-4',
             isDisabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
           ]"
           :style="{
-            left: `clamp(0px, calc(${maxPercent}% - ${thumbHalf[resolvedSize]}), calc(100% - ${thumbSizePx[resolvedSize]}))`,
+            left: `clamp(0px, calc(${maxPercent}% - 0.5rem), calc(100% - 1rem))`,
           }"
           aria-hidden="true"
         />
         <!-- eslint-enable local/no-hardcoded-px -->
 
         <!-- Spacer so the row has height -->
-        <span :class="['invisible', thumbSize[resolvedSize]]" aria-hidden="true" />
+        <span :class="['invisible', 'size-4']" aria-hidden="true" />
       </div>
 
       <div v-if="effectiveError || helpText" class="flex items-center justify-between gap-2">

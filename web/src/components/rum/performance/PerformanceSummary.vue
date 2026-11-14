@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
     >
       <div>
-        <OSpinner size="md" class="mx-auto block" />
+        <OSpinner size="lg" class="mx-auto block" />
         <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
       </div>
     </div>
@@ -33,25 +33,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The schema read was refused, which a retry cannot change -->
     <div v-else-if="schemaForbidden" class="p-4">
       <OEmptyState
-        size="compact"
-        preset="no-access"
+        kind="denied"
         data-test="performance-summary-schema-forbidden"
-      >
-        <template #title>{{ t("rum.overviewPage.pageForbiddenTitle") }}</template>
-        <template #description>{{ t("rum.overviewPage.forbiddenBody") }}</template>
-      </OEmptyState>
+        :title="t('rum.overviewPage.pageForbiddenTitle')"
+        :text="t('rum.overviewPage.forbiddenBody')"
+      />
     </div>
 
     <!-- The schema read failed, so which panels apply is unknown -->
     <div v-else-if="schemaError" class="p-4">
-      <OEmptyState size="compact" preset="load-error" data-test="performance-summary-schema-error">
-        <template #title>{{ t("rum.overviewPage.schemaErrorTitle") }}</template>
-        <template #description>{{ t("rum.overviewPage.schemaErrorBody") }}</template>
+      <OEmptyState
+        kind="error"
+        data-test="performance-summary-schema-error"
+        :title="t('rum.overviewPage.schemaErrorTitle')"
+        :text="t('rum.overviewPage.schemaErrorBody')"
+      >
         <template #actions>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="refresh"
+            variant="secondary"
+            icon="refresh"
             data-test="performance-summary-schema-retry"
             @click="retrySchema"
           >
@@ -64,14 +64,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Stream has no metrics this view can render (e.g. no recognised RUM fields) -->
     <OEmptyState
       v-else-if="showEmptyState && !showBrowserOverview"
+      icon="monitor-heart"
       data-test="performance-summary-empty"
-      size="block"
-      illustration="pulse"
-      :hide-action="true"
-    >
-      <template #title>{{ t("rum.performanceEmptyTitle") }}</template>
-      <template #description>{{ t("rum.performanceEmptyDescription") }}</template>
-    </OEmptyState>
+      :title="t('rum.performanceEmptyTitle')"
+      :text="t('rum.performanceEmptyDescription')"
+    />
 
     <template v-else>
       <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
@@ -114,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div>
           <OSpinner
-            size="md"
+            size="lg"
             class="mx-auto block"
             data-test="performance-summary-loading-indicator"
           />

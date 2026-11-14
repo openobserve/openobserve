@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OIcon name="warning" size="sm" class="text-status-warning-text shrink-0" />
     <OText as="span" class="min-w-0">{{ lineText }}</OText>
     <OButton
-      variant="ghost-primary"
-      size="xs"
+      variant="accent-ghost"
+      size="sm"
       data-test="workflow-http-rejections-show"
       @click="open = true"
     >
@@ -38,8 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex items-center gap-2 px-3 py-2">
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-xs-sq"
+        size="sm"
         :aria-label="t('workflow.http.rejectionsHide')"
         data-test="workflow-http-rejections-hide"
         @click="open = false"
@@ -51,8 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("workflow.http.rejectionsCaption", { count: total }, total) }}
       </OText>
       <ORefreshButton
-        layout="inline"
-        variant="ghost"
         :loading="loading"
         data-test="workflow-http-rejections-refresh"
         @click="emit('refresh')"
@@ -63,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton
         v-for="n in 3"
         :key="n"
+        shape="block"
         class="h-10 w-full"
         data-test="workflow-http-rejections-skeleton"
       />
@@ -72,8 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("workflow.http.rejectionsLoadError") }}
       </OText>
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         data-test="workflow-http-rejections-retry"
         @click="emit('refresh')"
       >
@@ -104,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OButton
           v-if="canRaise && row.reason === 'rate_limited' && triggerLimit < orgBudget"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           class="shrink-0"
           data-test="workflow-http-rejection-raise-limit"
           @click="emit('raise-limit')"
@@ -114,8 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-else-if="canRotate && row.reason === 'credential_in_url'"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           class="shrink-0"
           data-test="workflow-http-rejection-rotate"
           @click="emit('rotate')"

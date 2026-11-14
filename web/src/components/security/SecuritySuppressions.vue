@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { computed } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -71,28 +71,25 @@ async function onEnd(s: Suppression) {
     <div v-if="query.isLoading.value" class="flex items-center justify-center py-6">
       <OSpinner size="sm" />
     </div>
-    <OBanner
+    <OInlineNotice
       v-else-if="query.isError.value && isForbiddenError(query.error.value)"
-      variant="warning"
+      tone="warn"
       icon="lock"
-      dense
       data-test="security-suppressions-forbidden"
-      >{{ t("siem.tuning.suppressions.forbidden") }}</OBanner
+      >{{ t("siem.tuning.suppressions.forbidden") }}</OInlineNotice
     >
-    <OBanner
+    <OInlineNotice
       v-else-if="query.isError.value"
-      variant="error-soft"
-      icon="error-outline"
-      dense
+      tone="err"
       data-test="security-suppressions-error"
-      >{{ t("siem.tuning.suppressions.loadError") }}</OBanner
+      >{{ t("siem.tuning.suppressions.loadError") }}</OInlineNotice
     >
     <OEmptyState
       v-else-if="!suppressions.length"
       size="inline"
       icon="notifications-paused"
       :title="t('siem.tuning.suppressions.empty')"
-      :description="t('siem.tuning.suppressions.emptyHint')"
+      :text="t('siem.tuning.suppressions.emptyHint')"
       data-test="security-suppressions-empty"
     />
     <ul
@@ -108,7 +105,7 @@ async function onEnd(s: Suppression) {
       >
         <div class="flex min-w-0 flex-1 flex-col gap-1">
           <div class="flex flex-wrap items-center gap-1.5 text-xs">
-            <OTag variant="default-soft" size="xs">{{
+            <OTag tone="neutral" size="sm">{{
               t(`siem.tuning.suppressions.kind.${s.entity_kind}`)
             }}</OTag>
             <span class="text-text-heading font-mono">{{ s.entity_value }}</span>
@@ -133,8 +130,7 @@ async function onEnd(s: Suppression) {
         </div>
         <OButton
           v-if="canAdmin"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :data-test="`security-suppression-end-${s.id}`"
           @click="onEnd(s)"
           >{{ t("siem.tuning.suppressions.end") }}</OButton

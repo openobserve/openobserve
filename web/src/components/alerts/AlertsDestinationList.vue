@@ -17,14 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col p-0">
     <OPageLayout
-      overflow-first
       bleed
       v-if="!showDestinationEditor && !showImportDestination"
       :title="t('alerts.header')"
       title-data-test="alert-destinations-list-title"
-      icon="shield-alert-outline"
-      :subtitle="t('alerts.subtitle')"
-      tabs-below
     >
       <template #header-tabs>
         <AlertSectionTabs />
@@ -34,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="alert-destination-list-add-alert-btn"
           variant="primary"
-          size="sm"
           :disabled="!templates.length"
           :aria-label="
             destinationDrafts.hasNew
@@ -51,13 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         /></OButton>
       </template>
       <template #actions-overflow>
-        <OButton
-          variant="outline"
-          size="sm"
-          @click="importDestination"
-          data-test="destination-import"
-          >{{ t(`dashboard.import`) }}</OButton
-        >
+        <OButton variant="secondary" @click="importDestination" data-test="destination-import">{{
+          t(`dashboard.import`)
+        }}</OButton>
       </template>
 
       <div class="bg-card-glass-bg min-h-0 flex-1">
@@ -85,13 +76,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-alert-destinations"
-          show-index
-          :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
           @update:current-page="onPageChange"
         >
           <template #toolbar>
-            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
               <OToggleGroup
                 mobile-dropdown
                 :model-value="activeTab"
@@ -102,15 +91,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 data-test="destination-list-tabs"
               >
-                <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
+                <OToggleGroupItem value="all" data-test="destination-tab-all">
                   <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
                   {{ t("alert_destinations.filterAll") }}
                 </OToggleGroupItem>
-                <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
+                <OToggleGroupItem value="prebuilt" data-test="destination-tab-prebuilt">
                   <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
                   {{ t("alert_destinations.filterPrebuilt") }}
                 </OToggleGroupItem>
-                <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
+                <OToggleGroupItem value="custom" data-test="destination-tab-custom">
                   <template #icon-left><OIcon name="settings" size="sm" /></template>
                   {{ t("alert_destinations.filterCustom") }}
                 </OToggleGroupItem>
@@ -125,11 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="alertDestinationsRefresh"
+              shortcut="alertDestinationsRefresh"
               data-test="alert-destinations-list-refresh-btn"
               @click="refreshDestinations"
             />
@@ -138,12 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #selection-actions>
             <OButton
               data-test="destination-list-delete-destinations-btn"
-              variant="outline-destructive"
-              size="sm"
+              variant="danger-ghost"
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
-              <template #icon-left>
+              <template #icon>
                 <OIcon name="delete" size="sm" />
               </template>
               {{ t("common.delete") }}
@@ -152,31 +138,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-alert-destinations"
-              :filtered="!!filterQuery"
-              :actions="[
-                {
-                  id: 'create',
-                  icon: 'add',
-                  titleKey: 'emptyState.noAlertDestinations.action',
-                  descriptionKey: 'emptyState.noAlertDestinations.actionDesc',
-                },
-                {
-                  id: 'import',
-                  icon: 'upload-file',
-                  titleKey: 'emptyState.noAlertDestinations.import',
-                  descriptionKey: 'emptyState.noAlertDestinations.importDesc',
-                },
-              ]"
-              @action="
-                (id) =>
-                  id === 'clear-filters'
-                    ? (filterQuery = '')
-                    : id === 'import'
-                      ? importDestination()
-                      : templates.length && editDestination(null)
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', {
+                      noun: t('emptyState.nouns.alertDestinations'),
+                    })
+                  : t('emptyState.noAlertDestinations.title')
               "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.nouns.alertDestinations'),
+                    })
+                  : t('emptyState.noAlertDestinations.description')
+              "
+              :icon="filterQuery ? undefined : 'notifications'"
+              :action-label="filterQuery ? undefined : t('emptyState.noAlertDestinations.action')"
+              :secondary-action-label="
+                filterQuery ? undefined : t('emptyState.noAlertDestinations.import')
+              "
+              @action="filterQuery ? (filterQuery = '') : templates.length && editDestination(null)"
+              @secondary-action="importDestination()"
             />
           </template>
 
@@ -227,16 +210,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 <OTag
                   :data-test="`destination-type-two-way-${row.name}`"
-                  variant="success-soft"
+                  tone="ok"
                   size="sm"
                   :label="t('slackApp.destination.twoWay')"
                 />
               </div>
               <OButton
                 v-if="row.previous_webhook"
-                variant="ghost-primary"
-                size="xs"
-                icon-left="undo"
+                variant="accent-ghost"
+                size="sm"
+                icon="undo"
                 :loading="switchPending.has(row.name)"
                 :data-test="`destination-switch-back-${row.name}`"
                 @click="switchBack(row)"
@@ -259,9 +242,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OButton
                 v-if="switchInstallation(row)"
-                variant="ghost-primary"
-                size="xs"
-                icon-left="sync"
+                variant="accent-ghost"
+                size="sm"
+                icon="sync"
                 :loading="switchPending.has(row.name)"
                 :data-test="`destination-switch-to-app-${row.name}`"
                 @click="switchToApp(row)"
@@ -297,10 +280,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center gap-1">
               <OButton
+                icon-only
                 data-test="destination-export"
                 data-row-action="export"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="max-md:hidden"
                 :title="t('alert_destinations.exportDestination')"
                 @click.stop="exportDestination(row)"
@@ -308,10 +292,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="download" size="sm" />
               </OButton>
               <OButton
+                icon-only
                 :data-test="`alert-destination-list-${row.name}-update-destination`"
                 data-row-action="edit"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="max-md:hidden"
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(row)"
@@ -319,10 +304,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="edit" size="sm" />
               </OButton>
               <OButton
+                icon-only
                 :data-test="`alert-destination-list-${row.name}-delete-destination`"
                 data-row-action="delete"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="max-md:hidden"
                 :title="t('alert_destinations.delete')"
                 :loading="deletingDestinations.has(row.name)"
@@ -333,17 +319,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    icon-only
                     :aria-label="t('common.moreActions')"
-                    icon-left="more-vert"
+                    icon="more-vert"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="sm"
                     class="md:hidden"
                     data-test="alert-destination-list-row-more-actions"
                     @click.stop
                   />
                 </template>
                 <ODropdownItem
-                  icon-left="download"
+                  icon="download"
                   class="md:hidden"
                   data-test="destination-export-menu"
                   @select="exportDestination(row)"
@@ -351,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("alert_destinations.exportDestination") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="edit"
+                  icon="edit"
                   class="md:hidden"
                   :data-test="`alert-destination-list-${row.name}-update-destination-menu`"
                   @select="editDestination(row)"
@@ -359,8 +346,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("alert_destinations.edit") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="delete"
-                  variant="destructive"
+                  icon="delete"
+                  tone="danger"
                   class="md:hidden"
                   :data-test="`alert-destination-list-${row.name}-delete-destination-menu`"
                   @select="conformDeleteDestination(row)"
@@ -402,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alert_destinations.deleteDestinationTitle')"
       message-keypath="alert_destinations.deleteDestinationMessage"
       :message-name="confirmDelete.data?.name"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
@@ -411,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('alert_destinations.deleteDestinationsTitle')"
       :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"

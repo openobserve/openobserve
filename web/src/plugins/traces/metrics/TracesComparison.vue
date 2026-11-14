@@ -39,18 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           mobile-dropdown
           data-test="traces-comparison-baseline-toggle"
         >
-          <OToggleGroupItem
-            value="outside"
-            size="sm"
-            data-test="traces-comparison-baseline-toggle-outside"
-          >
+          <OToggleGroupItem value="outside" data-test="traces-comparison-baseline-toggle-outside">
             {{ t("traces.comparison.baselineOutside") }}
           </OToggleGroupItem>
-          <OToggleGroupItem
-            value="before"
-            size="sm"
-            data-test="traces-comparison-baseline-toggle-before"
-          >
+          <OToggleGroupItem value="before" data-test="traces-comparison-baseline-toggle-before">
             {{ t("traces.comparison.baselineBefore") }}
           </OToggleGroupItem>
         </OToggleGroup>
@@ -58,19 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OEmptyState
         v-if="status === 'noSelection'"
-        size="compact"
         :title="t('traces.comparison.noSelectionTitle')"
-        :description="t('traces.comparison.noSelectionBody')"
+        :text="t('traces.comparison.noSelectionBody')"
         class="my-auto shrink-0"
+        icon="filter-list"
         data-test="traces-comparison-no-selection"
       >
-        <template #illustration>
-          <span
-            class="bg-tabs-active-bg text-tabs-active-text inline-flex size-12 items-center justify-center rounded-full"
-          >
-            <OIcon name="filter-list" size="lg" />
-          </span>
-        </template>
         <template #actions>
           <div
             class="flex w-full flex-col items-center gap-2 pt-3"
@@ -103,18 +88,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-1 flex-col items-center justify-center gap-2 py-12"
         data-test="traces-comparison-loading"
       >
-        <OSpinner />
+        <OSpinner size="lg" />
         <span class="text-text-secondary text-sm">{{ t("traces.comparison.loading") }}</span>
       </div>
       <OEmptyState
         v-else-if="status === 'error'"
-        icon="error"
+        kind="error"
         :title="errorTitle"
-        :action-label="t('traces.comparison.retry')"
         data-test="traces-comparison-error"
         @action="retry"
       >
-        <template v-if="errorLines.length" #description>
+        <template v-if="errorLines.length" #text>
           <span
             v-for="(line, i) in errorLines"
             :key="i"
@@ -127,17 +111,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OEmptyState>
       <OEmptyState
         v-else-if="status === 'emptySelection'"
+        kind="filtered"
         icon="filter-list"
         :title="t('traces.comparison.emptySelection')"
         data-test="traces-comparison-empty-selection"
       />
       <OEmptyState
         v-else-if="status === 'emptyBaseline'"
+        kind="filtered"
         icon="filter-list"
         :title="t('traces.comparison.emptyBaseline')"
         data-test="traces-comparison-empty-baseline"
       >
-        <template #description>
+        <template #text>
           <span class="block">{{
             t("traces.comparison.emptyBaselineHint", { mode: otherModeLabel })
           }}</span>
@@ -171,8 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div v-if="remaining > 0">
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             data-test="traces-comparison-show-more"
             @click="shown += CARDS_PAGE"
           >
@@ -181,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OCollapsible
           v-if="result.mostlyEmpty.length"
-          :label="t('traces.comparison.mostlyEmpty', { count: result.mostlyEmpty.length })"
+          :title="t('traces.comparison.mostlyEmpty', { count: result.mostlyEmpty.length })"
           data-test="traces-comparison-mostly-empty"
         >
           <div class="grid grid-cols-1 gap-3 pt-2 md:grid-cols-2 xl:grid-cols-3">
@@ -196,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OCollapsible>
         <OCollapsible
           v-if="result.highCardinality.length"
-          :label="t('traces.comparison.highCardinality', { count: result.highCardinality.length })"
+          :title="t('traces.comparison.highCardinality', { count: result.highCardinality.length })"
           data-test="traces-comparison-high-cardinality"
         >
           <ul class="flex flex-col gap-1 pt-2">
@@ -252,7 +237,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

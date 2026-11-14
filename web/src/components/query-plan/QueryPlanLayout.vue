@@ -32,9 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div v-if="isDesktop" class="absolute end-1.5 top-1.5">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="left-panel-close"
+            icon="left-panel-close"
             :aria-label="t('search.queryProfile.hideSummary')"
             data-test="query-plan-hide-summary"
             @click="panels.summary = false"
@@ -46,9 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </aside>
       <div v-if="!summaryOpen" class="bg-surface-base rounded-default absolute start-3 top-3 z-20">
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="left-panel-open"
+          icon-only
+          variant="secondary"
+          icon="left-panel-open"
           :aria-label="t('search.queryProfile.showSummary')"
           data-test="query-plan-show-summary"
           @click="panels.summary = true"
@@ -61,9 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-surface-base rounded-default absolute end-3 top-3 z-20 -scale-x-100"
       >
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="left-panel-open"
+          icon-only
+          variant="secondary"
+          icon="left-panel-open"
           :aria-label="t('search.queryProfile.showDetails')"
           data-test="query-plan-show-detail"
           @click="panels.detail = true"
@@ -82,9 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div v-if="isDesktop" class="absolute end-1.5 top-1.5 z-10 -scale-x-100">
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="left-panel-close"
+          icon="left-panel-close"
           :aria-label="t('search.queryProfile.hideDetails')"
           data-test="query-plan-hide-detail"
           @click="panels.detail = false"

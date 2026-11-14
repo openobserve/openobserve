@@ -30,13 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OTooltip v-if="aiLock.locked.value" :content="aiLock.lockedReason.value">
     <span class="inline-flex shrink-0">
-      <OButton
-        variant="ghost"
-        :size="size"
-        disabled
-        icon-left="lock"
-        :data-test="`${dataTest}-locked`"
-      >
+      <OButton variant="ghost" :size="size" disabled icon="lock" :data-test="`${dataTest}-locked`">
         {{ label }}
       </OButton>
     </span>
@@ -49,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="dataTest"
     @click.stop="emit('click')"
   >
-    <template #icon-left>
+    <template #icon>
       <img
         :src="aiIconSrc"
         class="h-4 w-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
@@ -81,7 +75,7 @@ withDefaults(
     size?: ButtonSize;
     dataTest?: string;
   }>(),
-  { tooltip: null, size: "sm", dataTest: "dbm-suggest-fix" },
+  { tooltip: null, size: "md", dataTest: "dbm-suggest-fix" },
 );
 
 const emit = defineEmits<{ (e: "click"): void }>();

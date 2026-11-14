@@ -15,50 +15,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, provide, ref } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { BUTTON_GROUP_SIZE, type ButtonSize } from "@/lib/core/Button/OButton.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import type { InlineNoticeEmits, InlineNoticeProps } from "./OInlineNotice.types";
+import { NOTICE_TONE_CLASS, NOTICE_TONE_ICON, noticeRole } from "./noticeTone";
+import type {
+  InlineNoticeEmits,
+  InlineNoticeProps,
+  InlineNoticeSlots,
+} from "./OInlineNotice.types";
 
 const props = withDefaults(defineProps<InlineNoticeProps>(), {
-  variant: "warning",
+  tone: "info",
+  message: undefined,
+  icon: undefined,
   actionLabel: undefined,
-  dataTest: "inline-notice",
+  actionVariant: "secondary",
   actionDataTest: undefined,
 });
 
 const emit = defineEmits<InlineNoticeEmits>();
+const slots = defineSlots<InlineNoticeSlots>();
 
-const isError = computed(() => props.variant === "error");
+// One small action keeps the notice's rhythm; a 32-high button would stretch a one-line notice.
+provide(BUTTON_GROUP_SIZE, ref<ButtonSize>("sm"));
+
+const glyph = computed(() => props.icon ?? NOTICE_TONE_ICON[props.tone]);
 </script>
 
 <template>
-  <span
-    :role="isError ? 'alert' : 'status'"
+  <div
+    :role="noticeRole(tone)"
+    :data-tone="tone"
     :class="[
-      'rounded-default inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 px-2 text-xs',
-      isError
-        ? 'bg-status-error-bg text-status-error-text'
-        : 'bg-status-warning-bg text-status-warning-text',
+      'rounded-default text-compact flex gap-2 border px-3 py-2 leading-5',
+      NOTICE_TONE_CLASS[tone],
     ]"
-    :data-test="dataTest"
-    :data-variant="variant"
   >
-    <OIcon
-      :name="isError ? 'error-outline' : 'warning-amber'"
-      size="xs"
-      class="shrink-0"
-      aria-hidden="true"
-    />
-    <OTruncatedText class="min-w-0">{{ text }}</OTruncatedText>
-    <button
-      v-if="actionLabel"
-      type="button"
-      class="focus-visible:outline-focus-ring-accent rounded-default shrink-0 cursor-pointer font-medium whitespace-nowrap underline underline-offset-2 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
-      :data-test="actionDataTest"
-      @click="emit('action', $event)"
-    >
-      {{ actionLabel }}
-    </button>
-  </span>
+    <!-- Top-aligned with the first line of text, which may wrap. -->
+    <OIcon :name="glyph" size="sm" class="mt-0.5 shrink-0" aria-hidden="true" />
+    <!-- The base `p` rule sets its own colour, which would beat the tone's text colour. -->
+    <div class="min-w-0 flex-1 [&_p]:text-inherit" data-test="o-inline-notice-message">
+      <slot>{{ message }}</slot>
+    </div>
+    <div v-if="slots.actions || actionLabel" class="ms-auto flex shrink-0 items-center self-center">
+      <slot name="actions">
+        <OButton
+          :variant="actionVariant"
+          :data-test="actionDataTest ?? 'o-inline-notice-action'"
+          @click="emit('action', $event)"
+        >
+          {{ actionLabel }}
+        </OButton>
+      </slot>
+    </div>
+  </div>
 </template>

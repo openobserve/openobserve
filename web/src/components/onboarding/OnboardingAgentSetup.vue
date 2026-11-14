@@ -25,9 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mx-auto flex w-full max-w-176 flex-col">
         <div class="mb-2 flex min-h-8.5 min-w-0 items-center gap-3">
           <OButton
-            variant="ghost-muted"
-            size="sm"
-            icon-left="arrow-back"
+            variant="ghost"
+            icon="arrow-back"
             data-test="onboarding-agent-setup-back"
             @click="emit('back')"
           >
@@ -55,12 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <p class="text-text-secondary text-compact mb-2.5">
               {{ t("onboarding.agent.tokenText") }}
             </p>
-            <CredentialCodeBlock
-              :content="EXPORT_LINE"
-              slug="onboarding-agent-token"
-              lang="bash"
-              chrome="terminal"
-            />
+            <CredentialCodeBlock :content="EXPORT_LINE" slug="onboarding-agent-token" lang="bash" />
             <p
               v-if="!powerShell.forbidden.value"
               class="text-text-secondary mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs"
@@ -74,9 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</OCode>
               <OButton
                 v-if="!powerShell.needsPasscode.value || powerShell.hasCredential.value"
-                variant="ghost-muted"
-                size="icon-xs"
-                icon-left="content-copy"
+                icon-only
+                variant="ghost"
+                icon="content-copy"
                 :aria-label="
                   t('onboarding.agent.copyPowerShell', { powerShell: raw('PowerShell') })
                 "
@@ -98,15 +92,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="focus"
                 :options="focusOptions"
                 :label="t('onboarding.agent.focusLabel')"
-                size="sm"
                 class="min-w-0 flex-1 basis-60"
                 data-test="onboarding-agent-setup-focus"
               />
               <div class="flex gap-2 max-md:w-full">
                 <OButton
                   variant="primary"
-                  size="sm"
-                  icon-left="content-copy"
+                  icon="content-copy"
                   class="max-md:flex-1"
                   data-test="onboarding-agent-setup-copy"
                   @click="copyPrompt"
@@ -114,9 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("onboarding.agent.copyPrompt") }}
                 </OButton>
                 <OButton
-                  variant="outline"
-                  size="sm"
-                  icon-left="download"
+                  variant="secondary"
+                  icon="download"
                   class="max-md:flex-1"
                   data-test="onboarding-agent-setup-download"
                   @click="download"
@@ -127,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="border-border-default rounded-default mt-3 border">
               <OCollapsible
-                :label="t('onboarding.agent.preview')"
-                :caption="t('onboarding.agent.previewLines', { count: lineCount }, lineCount)"
+                :title="t('onboarding.agent.preview')"
+                :summary="t('onboarding.agent.previewLines', { count: lineCount }, lineCount)"
                 data-test="onboarding-agent-setup-preview"
               >
                 <div class="px-2 pb-2">
@@ -156,7 +147,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="a in agentTabs"
                 :key="a.id"
                 :value="a.id"
-                size="sm"
                 :data-test="`onboarding-agent-setup-agent-${a.id}`"
               >
                 {{ a.label }}
@@ -177,14 +167,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </i18n-t>
             <OButton
-              as="a"
               :href="mcpHref"
               target="_blank"
               rel="noopener noreferrer"
-              variant="ghost-primary"
-              size="sm"
-              icon-left="mcp"
-              icon-right="open-in-new"
+              variant="accent-ghost"
+              icon="mcp"
+              icon-end="open-in-new"
               class="-ms-3 mt-2"
               data-test="onboarding-agent-setup-mcp"
             >

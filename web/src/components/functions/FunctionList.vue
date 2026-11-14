@@ -21,9 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       v-if="!showAddJSTransformDialog"
       :title="t('function.header')"
-      icon="function"
-      :subtitle="t('function.subtitle')"
-      tabs-below
+      :about="t('function.subtitle')"
       bleed
     >
       <template #header-tabs>
@@ -31,9 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #actions>
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="upload-file"
+          variant="secondary"
+          icon="upload-file"
           data-test="function-list-import-function-btn"
           @click="goToImportFunction"
         >
@@ -41,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           variant="primary"
-          size="sm"
           data-test="function-list-add-function-btn"
           :aria-label="
             functionDrafts.hasNew
@@ -63,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="h-full">
           <OTable
             ref="oTableRef"
-            :frame="false"
             :data="visibleRows"
             :columns="columns"
             row-key="name"
@@ -82,14 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:sort-order="sortOrder = $event"
             selection="multiple"
             v-model:selected-ids="selectedFunctionIds"
-            show-index
-            :show-global-filter="false"
             :default-columns="false"
-            width="100%"
             class="h-full w-full"
           >
             <template #toolbar>
-              <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+              <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
                 <OSearchInput
                   data-test="functions-list-search-input"
                   v-model="filterQuery"
@@ -100,23 +92,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #toolbar-trailing>
               <ORefreshButton
-                layout="inline"
-                variant="outline"
                 :last-run-at="lastUpdatedAt"
                 :loading="fetching"
-                shortcut-id="functionsRefresh"
+                shortcut="functionsRefresh"
                 data-test="functions-list-refresh-btn"
                 @click="refreshJSTransforms"
               />
             </template>
             <template #empty>
               <OEmptyState
-                size="hero"
-                preset="no-functions"
-                :filtered="!!filterQuery"
-                @action="
-                  (id) => (id === 'clear-filters' ? (filterQuery = '') : showAddUpdateFn({}))
+                :kind="filterQuery ? 'filtered' : 'first-run'"
+                :title="
+                  filterQuery
+                    ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.functions') })
+                    : t('emptyState.noFunctions.title')
                 "
+                :text="
+                  filterQuery
+                    ? t('emptyState.filtered.description', {
+                        noun: t('emptyState.nouns.functions'),
+                      })
+                    : t('emptyState.noFunctions.description')
+                "
+                :icon="filterQuery ? undefined : 'functions'"
+                :action-label="filterQuery ? undefined : t('emptyState.noFunctions.action')"
+                @action="filterQuery ? (filterQuery = '') : showAddUpdateFn({})"
               />
             </template>
 
@@ -139,8 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    rather than a glyph on the name, so JS vs VRL reads at a glance. -->
             <template #cell-transType="{ row }">
               <OBadge
-                size="xs"
-                :variant="row?.transType === '1' ? 'amber-soft' : 'blue-soft'"
+                size="sm"
+                :tone="row?.transType === '1' ? 'warn' : 'neutral'"
                 :data-test="`function-list-type-badge-${row?.transType === '1' ? 'js' : 'vrl'}`"
               >
                 {{ row?.transType === "1" ? raw("JavaScript") : t("function.vrl") }}
@@ -150,28 +150,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-actions="{ row }">
               <div class="actions-container flex items-center">
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   :title="t('function.updateTitle')"
                   data-test="function-list-edit-function-btn"
                   data-row-action="edit"
                   class="max-md:hidden"
                   @click="showAddUpdateFn({ row })"
-                  icon-left="edit"
+                  icon="edit"
                 />
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs-sq"
-                  icon-left="account-tree"
+                  size="sm"
+                  icon="account-tree"
                   :title="t('function.associatedPipelines')"
                   data-row-action="view"
                   class="max-md:hidden"
                   @click="getAssociatedPipelines({ row })"
                 />
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs-sq"
-                  icon-left="download"
+                  size="sm"
+                  icon="download"
                   :title="t('common.export')"
                   data-test="function-list-export-function-btn"
                   data-row-action="export"
@@ -179,29 +182,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="exportFunction(row)"
                 />
                 <OButton
-                  variant="ghost-destructive"
-                  size="icon-xs-sq"
+                  icon-only
+                  variant="danger-ghost"
+                  size="sm"
                   :title="t('function.delete')"
                   data-test="function-list-delete-function-btn"
                   data-row-action="delete"
                   class="max-md:hidden"
                   @click="showDeleteDialogFn({ row })"
-                  icon-left="delete"
+                  icon="delete"
                 />
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
+                      icon-only
                       :aria-label="t('common.moreActions')"
-                      icon-left="more-vert"
+                      icon="more-vert"
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="sm"
                       class="md:hidden"
                       data-test="function-list-row-more-actions"
                       @click.stop
                     />
                   </template>
                   <ODropdownItem
-                    icon-left="edit"
+                    icon="edit"
                     class="md:hidden"
                     data-test="function-list-edit-function-btn-menu"
                     @select="showAddUpdateFn({ row })"
@@ -209,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("function.updateTitle") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="account-tree"
+                    icon="account-tree"
                     class="md:hidden"
                     data-test="function-list-associated-pipelines-menu"
                     @select="getAssociatedPipelines({ row })"
@@ -217,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("function.associatedPipelines") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="download"
+                    icon="download"
                     class="md:hidden"
                     data-test="function-list-export-function-btn-menu"
                     @select="exportFunction(row)"
@@ -225,8 +230,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("common.export") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
+                    icon="delete"
+                    tone="danger"
                     class="md:hidden"
                     data-test="function-list-delete-function-btn-menu"
                     @select="showDeleteDialogFn({ row })"
@@ -240,21 +245,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #selection-actions>
               <OButton
                 data-test="function-list-export-functions-btn"
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 :loading="exportLoading"
                 @click="exportSelectedFunctions"
-                icon-left="download"
+                icon="download"
               >
                 {{ t("common.export") }}
               </OButton>
               <OButton
                 data-test="function-list-delete-functions-btn"
-                variant="outline-destructive"
-                size="sm"
+                variant="danger-ghost"
                 :loading="bulkDeleteLoading"
                 @click="openBulkDeleteDialog"
-                icon-left="delete"
+                icon="delete"
               >
                 {{ t("common.delete") }}
               </OButton>
@@ -267,7 +270,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AddFunction
         v-model="formData"
         :isUpdated="isUpdated"
-        class="p-2"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
         @sendToAiChat="sendToAiChat"
@@ -277,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('function.deleteTransformDialogTitle')"
       message-keypath="function.deleteTransformConfirmMessage"
       :message-name="selectedDelete?.name"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="deleteFn"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -286,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('function.deleteFunctionsDialogTitle')"
       :message="t('functions.confirmDeleteFunctions', { count: selectedFunctions.length })"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="bulkDeleteFunctions"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -295,7 +297,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       data-test="function-list-force-delete-dialog"
       v-model:open="confirmForceDelete"
-      persistent
       size="md"
       :title="t('common.pipelinesAssociatedWith', { name: selectedDelete?.name })"
     >

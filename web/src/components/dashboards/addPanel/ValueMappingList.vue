@@ -19,7 +19,7 @@
     size="inline"
     icon="swap-horiz"
     :title="t('dashboard.valueMappingEmptyTitle')"
-    :description="t('dashboard.valueMappingEmptyDescription')"
+    :text="t('dashboard.valueMappingEmptyDescription')"
     :data-test="`${dataTestPrefix}-empty`"
   />
   <draggable
@@ -146,9 +146,9 @@
         </div>
       </div>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-xs"
-        icon-left="close"
+        icon="close"
         :title="t('common.remove')"
         class="shrink-0"
         :data-test="`${dataTestPrefix}-delete-btn-${index}`"

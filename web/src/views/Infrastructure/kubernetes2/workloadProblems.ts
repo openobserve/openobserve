@@ -117,5 +117,5 @@ function problem(
 
 function jobReason(row: ControllerRow | JobRow): StatusChip | null {
   const text = row.kind === "job" ? row.failedReasons[0] : undefined;
-  return text ? { text, variant: "error-soft" } : null;
+  return text ? { text, variant: "err" } : null;
 }

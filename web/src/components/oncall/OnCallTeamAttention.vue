@@ -33,13 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          it: with no findings this whole template renders nothing, and a
          caller-side wrapper would still add blank padding around it. -->
     <OContent y data-test="oncall-team-attention-content">
-      <OBanner
-        variant="warning"
-        icon="warning-amber"
-        inline-actions
-        dense
-        data-test="oncall-team-attention"
-      >
+      <OInlineNotice tone="warn" data-test="oncall-team-attention">
         <span class="flex min-w-0 items-center gap-x-3">
           <span class="text-text-secondary shrink-0 text-xs font-medium max-md:hidden">
             {{ t("oncall.attentionHeading") }}
@@ -65,18 +59,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex shrink-0 items-center gap-2">
             <OButton
               v-if="worst.fix"
-              variant="outline"
-              size="xs"
-              icon-left="build"
+              variant="secondary"
+              size="sm"
+              icon="build"
               data-test="oncall-attention-fix-now"
               @click="emit('act', worst.fix, worst.rotation)"
             >
               {{ t(worst.cta) }}
             </OButton>
             <OButton
-              variant="outline"
-              size="xs"
-              icon-left="unfold-more"
+              variant="secondary"
+              size="sm"
+              icon="unfold-more"
               data-test="oncall-attention-expand"
               @click="expanded = true"
             >
@@ -84,13 +78,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </span>
         </template>
-      </OBanner>
+      </OInlineNotice>
     </OContent>
 
     <ODrawer
       v-model:open="expanded"
       side="right"
-      size="lg"
+      size="md"
       :title="t('oncall.attentionHeading')"
       data-test="oncall-team-attention-drawer"
     >
@@ -110,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-for="group in groups"
           :key="`count-${group.id}`"
-          :variant="group.countVariant"
+          :tone="group.countVariant"
           size="sm"
           :data-test="`oncall-attention-count-${group.id}`"
         >
@@ -167,10 +161,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                buttons that land in the same place is a choice nobody has. -->
           <OButton
             v-if="row.fix"
-            :variant="row.bucket === 'blocking' ? 'primary' : 'outline'"
-            size="xs"
+            :variant="row.bucket === 'blocking' ? 'primary' : 'secondary'"
+            size="sm"
             class="shrink-0"
-            icon-left="arrow-forward"
+            icon="arrow-forward"
             :data-test="`oncall-attention-cta-${row.kind}`"
             @click="emit('act', row.fix, row.rotation)"
           >
@@ -192,9 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("oncall.attentionHidden", { count: hidden }, hidden) }}
           </span>
           <OButton
-            variant="outline"
-            size="xs"
-            icon-left="refresh"
+            variant="secondary"
+            size="sm"
+            icon="refresh"
             class="ms-auto shrink-0"
             data-test="oncall-attention-recheck"
             @click="emit('recheck')"
@@ -216,7 +210,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OnCallPeopleText from "./OnCallPeopleText.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import type {
@@ -550,10 +544,10 @@ const HEADING_KEY: Record<Bucket, I18nKey> = {
   inert: "oncall.attentionGroupInert",
 };
 
-const COUNT_VARIANT: Record<Bucket, "error-soft" | "amber-soft" | "default-soft"> = {
-  blocking: "error-soft",
-  gaps: "amber-soft",
-  inert: "default-soft",
+const COUNT_VARIANT: Record<Bucket, "err" | "warn" | "neutral"> = {
+  blocking: "err",
+  gaps: "warn",
+  inert: "neutral",
 };
 
 const groups = computed(() =>

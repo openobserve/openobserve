@@ -118,7 +118,7 @@ function makeWrapper() {
           `,
           props: ["title", "subtitle", "back"],
         },
-        DateTime: {
+        ODateTimeRange: {
           template: '<div data-test="date-time-picker" />',
           props: [
             "autoApply",
@@ -130,7 +130,7 @@ function makeWrapper() {
         },
         OButton: {
           template: '<button class="obutton-stub" @click="$emit(\'click\')"><slot /></button>',
-          props: ["variant", "size", "iconLeft", "loading"],
+          props: ["variant", "size", "icon", "loading"],
         },
         OIcon: {
           template: '<span class="oicon-stub" />',
@@ -151,7 +151,7 @@ function makeWrapper() {
               <slot />
             </div>
           `,
-          props: ["open", "side", "width", "title", "subTitle"],
+          props: ["open", "side", "width", "title", "subtitle"],
         },
         MonitorRuns: {
           template: `

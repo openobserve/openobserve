@@ -29,11 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OEmptyState
-    size="hero"
-    :illustration="illustration"
+    :icon="icon"
     :data-test="dataTest"
     :title="title"
-    :description="description"
+    :text="description"
     :action-label="actionLabel"
     @action="$emit('view-by-stream')"
   />
@@ -42,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import type { I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import type { IllustrationName } from "@/lib/core/EmptyState/illustrations";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 withDefaults(
   defineProps<{
@@ -54,12 +53,11 @@ withDefaults(
     description: I18nText;
     /** Resolved action-label string. Omit for pages with no action (Graph). */
     actionLabel?: I18nText;
-    /** Empty-state illustration. Defaults to `constellation` (Sessions);
-        Agent Graph passes `service-graph`. */
-    illustration?: IllustrationName;
+    /** Agent Graph passes `hub`. */
+    icon?: IconName;
   }>(),
   {
-    illustration: "constellation",
+    icon: "insights",
   },
 );
 

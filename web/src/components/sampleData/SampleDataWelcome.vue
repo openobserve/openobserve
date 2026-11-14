@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="session.welcomeOpen.value"
-    size="xl"
+    size="lg"
     :aria-title="headerTitle"
     :show-close="false"
     data-test="sample-welcome-dialog"
@@ -54,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="heardOptions"
                 :aria-label="t('login.getStarted.heard.label')"
                 :placeholder="t('login.getStarted.heard.placeholder')"
-                size="xs"
-                width="sm"
+                size="sm"
+                width="s"
                 data-test="onboarding-hear-about-us-select"
               />
               <span
@@ -75,8 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</span>
         </div>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
           class="-me-1 shrink-0"
           :aria-label="t('common.close')"
           data-test="sample-welcome-close"
@@ -100,23 +100,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mt-auto flex flex-wrap items-center justify-end gap-2">
           <OButton
             v-if="view === 'progress'"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             data-test="sample-welcome-background"
             @click="close"
           >
             {{ t("sampleData.welcome.continueInBackground") }}
           </OButton>
           <template v-else>
-            <OButton variant="outline" size="sm" data-test="sample-welcome-own-way" @click="close">
+            <OButton variant="secondary" data-test="sample-welcome-own-way" @click="close">
               {{ t("sampleData.welcome.ready.ownWay") }}
             </OButton>
-            <OButton
-              variant="primary"
-              size="sm"
-              data-test="sample-welcome-start-tour"
-              @click="startTour"
-            >
+            <OButton variant="primary" data-test="sample-welcome-start-tour" @click="startTour">
               {{ t("sampleData.welcome.ready.startTour") }}
             </OButton>
           </template>
@@ -148,10 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </p>
         </div>
         <div class="mt-auto flex justify-end gap-2">
-          <OButton variant="ghost" size="sm" @click="close">{{ t("common.cancel") }}</OButton>
+          <OButton variant="ghost" @click="close">{{ t("common.cancel") }}</OButton>
           <OButton
             variant="primary"
-            size="sm"
             :disabled="session.removing.value"
             data-test="sample-welcome-retry"
             @click="load"

@@ -44,8 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Apply Button -->
       <OButton
         v-if="showApplyButton"
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         :disabled="!hasPendingChanges"
         @click="handleApply"
         class="ms-2"

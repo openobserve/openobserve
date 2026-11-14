@@ -15,7 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OBanner v-if="visible" bar :variant="variant" :icon="icon" data-test="license-search-banner">
+  <OBanner
+    v-if="visible"
+    :tone="tone"
+    :icon="icon"
+    dismissible
+    data-test="license-search-banner"
+    @dismiss="dismiss"
+  >
     <div>
       <div v-if="isPaused || !outcome || outcome.variant !== 'success'">{{ message }}</div>
       <div v-if="outcome" data-test="license-banner-outcome" aria-live="polite">
@@ -28,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-wrap items-center gap-3">
         <OButton
           v-if="isPaused && licenseId"
-          variant="banner-dismiss"
-          size="sm"
+          variant="link"
           data-test="license-banner-copy"
           @click="copyLicenseId"
         >
@@ -37,8 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="isPaused && canUpdateLicense"
-          variant="banner-dismiss"
-          size="sm"
+          variant="link"
           data-test="license-banner-refresh"
           :loading="refreshing"
           @click="refreshNow"
@@ -47,20 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="!isPaused || outcome?.variant === 'success'"
-          variant="banner-dismiss"
-          size="sm"
+          variant="link"
           data-test="license-banner-details"
           @click="openDetails"
         >
           {{ t("about.banner_details") }}
-        </OButton>
-        <OButton
-          variant="banner-dismiss"
-          size="sm"
-          data-test="license-banner-dismiss"
-          @click="dismiss"
-        >
-          {{ t("about.banner_dismiss") }}
         </OButton>
       </div>
     </template>
@@ -152,19 +148,16 @@ const licenseData = computed(
 const licenseId = computed(() => licenseData.value?.license?.license_id ?? "");
 const canUpdateLicense = computed(() => licenseData.value?.can_update_license === true);
 
-const variant = computed(() => {
-  if (state.value.kind === "paused") return "error";
-  if (outcome.value) return outcome.value.variant;
-  return state.value.kind === "restored" && state.value.endsSoon ? "warning" : "success";
+// A page condition has no success tone, so restored search reads as info with a check.
+const OUTCOME_TONE = { success: "info", info: "info", warning: "warn", error: "err" } as const;
+const tone = computed(() => {
+  if (state.value.kind === "paused") return "err";
+  if (outcome.value) return OUTCOME_TONE[outcome.value.variant];
+  return state.value.kind === "restored" && state.value.endsSoon ? "warn" : "info";
 });
 const icon = computed(() => {
-  if (state.value.kind === "paused") return "error";
-  if (outcome.value)
-    return outcome.value.variant === "success"
-      ? "check-circle"
-      : outcome.value.variant === "info"
-        ? "info"
-        : "warning";
+  if (state.value.kind === "paused") return undefined;
+  if (outcome.value) return outcome.value.variant === "success" ? "check-circle" : undefined;
   return state.value.kind === "restored" && state.value.endsSoon ? "schedule" : "check-circle";
 });
 

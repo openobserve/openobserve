@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="pattern-list-severity-filter"
       >
         <OToggleGroup
+          size="sm"
           type="multiple"
           :model-value="activeSeverities"
           @update:model-value="onSeverityFilterChange"
@@ -32,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="sev in severityChips"
             :key="sev.key"
             :value="sev.key"
-            size="xs"
             :data-test="`pattern-severity-chip-${sev.key}`"
           >
             <span :class="sev.colorClass">{{ sev.label }}</span>
@@ -165,7 +165,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Empty State -->
     <div v-else class="flex flex-1 items-center justify-center">
-      <OEmptyState size="hero" preset="no-patterns" data-test="log-patterns-empty-state">
+      <OEmptyState
+        kind="filtered"
+        :title="t('emptyState.noPatterns.title')"
+        :text="t('emptyState.noPatterns.description')"
+        data-test="log-patterns-empty-state"
+      >
         <!-- When the selected time range has no logs but the stream has data
              elsewhere, offer a precise jump to the latest data — same as the
              logs search empty state. -->

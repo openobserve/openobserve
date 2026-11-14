@@ -18,17 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full min-h-0 w-full flex-col" data-test="dashboard-alert-list-panel">
     <OEmptyState
       v-if="query.data.value?.forbidden"
-      preset="no-access"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
       size="inline"
-      :backdrop="false"
       data-test="dashboard-alert-list-panel-forbidden"
     />
     <OEmptyState
       v-else-if="query.isError.value"
       size="inline"
-      icon="warning"
+      kind="error"
       :title="t('common.errorLoadingData')"
-      :backdrop="false"
       data-test="dashboard-alert-list-panel-error"
     />
     <OTable
@@ -39,9 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       pagination="none"
       sorting="none"
-      :frame="false"
-      :show-global-filter="false"
-      dense
       fill-height
       :loading="query.isPending.value"
       :row-class="alertRowClass"
@@ -58,12 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AckChip v-if="row.ack" :ack="row.ack" />
           <MutedChip v-if="row.activeDowntime" :downtime="row.activeDowntime" />
           <template v-if="row.alertType === 'Composite'">
-            <OTag variant="warning-soft" size="sm" :label="t('alerts.compositeAlert')" />
+            <OTag tone="warn" size="sm" :label="t('alerts.compositeAlert')" />
             <span class="text-text-secondary text-xs whitespace-nowrap">
               {{ t("alerts.composite.childrenCount", { count: row.childCount }) }}
             </span>
           </template>
-          <OTag v-if="row.isSlo" variant="indigo-soft" size="sm" :label="t('alerts.sloBadge')" />
+          <OTag v-if="row.isSlo" tone="neutral" size="sm" :label="t('alerts.sloBadge')" />
         </div>
         <OTruncatedText
           v-if="row.alertType === 'Composite' && row.expression"
@@ -80,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OTag
-            variant="default-soft"
+            tone="neutral"
             icon="notifications-paused"
             size="sm"
             :label="t('alerts.downtimes.mute.firingMuted')"
@@ -89,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTooltip>
         <OTooltip v-else-if="isAckedFiring(row)" :content="runOutcomeTooltip(row)">
           <OTag
-            variant="default-soft"
+            tone="neutral"
             icon="person"
             size="sm"
             :label="t('alerts.ack.firingAcknowledged')"
@@ -153,7 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="inline"
           icon="notifications"
           :title="t('dashboard.alertListEmpty')"
-          :backdrop="false"
           data-test="dashboard-alert-list-panel-empty"
         />
       </template>

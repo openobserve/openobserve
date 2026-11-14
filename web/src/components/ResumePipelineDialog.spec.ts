@@ -16,13 +16,13 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
+    "primary",
+    "secondary",
+    "extra",
     "primaryVariant",
     "secondaryVariant",
     "neutralVariant",
@@ -33,7 +33,7 @@ const ODialogStub = {
     "secondaryLoading",
     "neutralLoading",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 const buildWrapper = (overrideProps: Record<string, any> = {}) =>
@@ -83,16 +83,16 @@ describe("ResumePipelineDialog", () => {
     expect(dialog.exists()).toBe(true);
     expect(dialog.props("size")).toBe("sm");
     expect(dialog.props("title")).toBe("Resume Pipeline Ingestion");
-    expect(dialog.props("subTitle")).toBe("Last paused: 2023-01-01 10:00:00");
-    expect(dialog.props("primaryButtonLabel")).toBeTruthy();
-    expect(dialog.props("secondaryButtonLabel")).toBeTruthy();
+    expect(dialog.props("subtitle")).toBe("Last paused: 2023-01-01 10:00:00");
+    expect(dialog.props("primary")?.label).toBeTruthy();
+    expect(dialog.props("secondary")?.label).toBeTruthy();
     expect(dialog.props("open")).toBe(true);
   });
 
   it("should pass undefined subTitle when lastPausedAt is missing", () => {
     const localWrapper = buildWrapper({ lastPausedAt: undefined });
     const dialog = localWrapper.findComponent(ODialogStub);
-    expect(dialog.props("subTitle")).toBeUndefined();
+    expect(dialog.props("subtitle")).toBeUndefined();
     localWrapper.unmount();
   });
 

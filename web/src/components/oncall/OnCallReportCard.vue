@@ -31,9 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div>
       <div v-if="loading" class="flex flex-col gap-2" data-test="oncall-report-loading">
-        <OSkeleton type="text" class="h-4 w-1/2" />
-        <OSkeleton type="text" class="h-4 w-5/6" />
-        <OSkeleton type="text" class="h-4 w-2/3" />
+        <OSkeleton class="h-4 w-1/2" />
+        <OSkeleton class="h-4 w-5/6" />
+        <OSkeleton class="h-4 w-2/3" />
       </div>
 
       <!-- eslint-disable-next-line vue/no-v-html -- sanitized by renderRcaReport -->

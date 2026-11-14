@@ -114,7 +114,7 @@ describe("O2AIChatToolCallBlock", () => {
     );
     expect(w.text()).toContain(new Date(1700000000000).toLocaleString());
     await w.find(".copy-btn").trigger("click");
-    expect(mockCopy).toHaveBeenCalledWith("SELECT 2", expect.any(Function));
+    expect(mockCopy).toHaveBeenCalledWith("SELECT 2", expect.any(Function), { silent: true });
     expect(w.emitted("toggle")).toBeUndefined();
   });
 });

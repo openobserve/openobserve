@@ -1,159 +1,76 @@
 /**
- * OBadge.types.ts — single source of truth for all OBadge public types.
+ * OBadge.types.ts — single source of truth for the chip types shared by OBadge and OTag.
  * No types should be defined inline in OBadge.vue.
  */
 
 import type { I18nText } from "@/types/i18n";
 
-/**
- * Semantic colour variant — design is baked in, no style override props.
- *
- * Solid variants (filled background, contrasting foreground):
- *   default | primary | success | warning | error
- *
- * Outline variants (transparent background, coloured ring + text):
- *   default-outline | primary-outline | success-outline | warning-outline | error-outline |
- *   info-outline | purple-outline
- *
- * Soft variants (light tinted background, dark text — no ring):
- *   default-soft | primary-soft | success-soft | warning-soft | error-soft
- */
-export type BadgeVariant =
-  | "default"
-  | "primary"
-  | "success"
-  | "warning"
-  | "error"
-  | "default-outline"
-  | "primary-outline"
-  | "success-outline"
-  | "warning-outline"
-  | "error-outline"
-  | "info-outline"
-  | "purple-outline"
-  | "default-soft"
-  | "primary-soft"
-  | "success-soft"
-  | "warning-soft"
-  /**
-   * Attention that is COMMON. Reads as amber in light, where the warning
-   * ramp is pale-on-deep and stays tasteful at a dozen per screen; goes
-   * neutral in dark, where the same ramp is full-chroma against near-black
-   * and a dozen of them become the page background. Tint the icon separately
-   * when the state still needs a colour in both themes.
-   */
-  | "warning-quiet"
-  | "error-soft"
-  // Extended color families for correlation dimensions.
-  | "teal"
-  | "teal-outline"
-  | "teal-soft"
-  | "orange"
-  | "orange-outline"
-  | "orange-soft"
-  | "lime"
-  | "lime-outline"
-  | "lime-soft"
-  | "amber"
-  | "amber-outline"
-  | "amber-soft"
-  | "cyan"
-  | "cyan-outline"
-  | "cyan-soft"
-  | "blue"
-  | "blue-outline"
-  | "blue-soft"
-  | "purple"
-  | "purple-outline"
-  | "purple-soft"
-  | "indigo"
-  | "indigo-outline"
-  | "indigo-soft";
+/** Chip tone. Status tones (ok · warn · err · crit · info) render the soft triplet. */
+export type ChipTone = "neutral" | "outline" | "accent" | "ok" | "warn" | "err" | "crit" | "info";
 
-/** Size controls padding and font-size only. */
-/** `lg` is for read-at-a-distance status, such as the dashboard TV-mode strip. */
-export type BadgeSize = "xs" | "sm" | "md" | "lg";
+/** Chip height: sm 20, md 24 (a chip sitting in a 24 px row). */
+export type ChipSize = "sm" | "md";
 
-/**
- * Corner shape:
- *   pill    — fully rounded (rounded-full). The default; classic status pill.
- *   rounded — small radius (rounded-default). For code/identifier-style chips.
- *   square  — no radius (rounded-none).
- */
-export type BadgeShape = "pill" | "rounded" | "square";
+export const CHIP_TONES = [
+  "neutral",
+  "outline",
+  "accent",
+  "ok",
+  "warn",
+  "err",
+  "crit",
+  "info",
+] as const satisfies readonly ChipTone[];
+
+export const CHIP_SIZES = ["sm", "md"] as const satisfies readonly ChipSize[];
+
+/** Tones that state a status; they get a leading dot unless an icon already carries it. */
+export const CHIP_STATUS_TONES = [
+  "ok",
+  "warn",
+  "err",
+  "crit",
+  "info",
+] as const satisfies readonly ChipTone[];
 
 export interface BadgeProps {
-  /** Semantic colour variant. Default: `"default"` */
-  variant?: BadgeVariant;
-  /** Size. Default: `"md"` */
-  size?: BadgeSize;
-  /** Corner shape. Default: `"pill"` (rounded-full). */
-  shape?: BadgeShape;
-  /**
-   * Material icon name rendered on the left side of the label.
-   * Overridden by the `#icon` slot when provided.
-   */
+  /** Colour role. Default `"neutral"`. */
+  tone?: ChipTone;
+  /** Height. Default `"sm"`; a toggle chip is always 24. */
+  size?: ChipSize;
+  /** Leading 12 px icon (OIcon name). Overridden by the `#icon` slot. */
   icon?: string;
   /**
-   * Numeric count rendered in a trailing segment on the right.
-   * Overridden by the `#trailing` slot when provided.
-   * NOTE: `count: 0` still renders the `0` chip (different from the previous badge
-   * which hid empty counts). To hide an empty count, pass `count: undefined` or use
-   * `hideZeroCount`.
-   */
-  count?: number;
-  /**
-   * When true and `count` is 0, the trailing segment is suppressed
-   * (matches the previous badge behavior).
-   */
-  hideZeroCount?: boolean;
-  /**
-   * Renders a 7px solid status dot before the label. The dot
-   * inherits the badge's foreground colour (`currentColor`), so a `success`
-   * badge gets a green dot, an `error` badge a red dot, etc. Use for live
-   * status pills like "active" / "suspended".
+   * Leading 6 px dot. Unset means automatic: status tones without an icon get one,
+   * so status never reads by colour alone.
    */
   dot?: boolean;
-  /**
-   * Makes the badge interactive — adds keyboard handling, hover feedback,
-   * and a visible focus ring. Emits `click` on activation.
-   */
-  clickable?: boolean;
-  /** Mutes the badge visually and suppresses interaction. */
+  /** Monospace text, for identifiers and values. */
+  mono?: boolean;
+  /** Renders a selectable chip: a 24 px `<button>` with `aria-pressed`. */
+  toggle?: boolean;
+  /** Pressed state of a `toggle` chip. */
+  pressed?: boolean;
+  /** Mutes the chip and blocks its toggle and remove controls. */
   disabled?: boolean;
-  /**
-   * Renders a trailing ✕ that emits `remove`. This is the O2 delete affordance
-   * for a chip — a token in a multi-select, an escalation target, a filter pill.
-   * Without it, call sites nest a bare `<button>` inside the badge, which is
-   * neither focus-styled nor sized and gives a keyboard user an unstyled tab
-   * stop inside a pill.
-   */
+  /** Renders a trailing ✕ that emits `remove`. */
   removable?: boolean;
   /** Accessible name for the remove button. Defaults to `common.remove`. */
   removeLabel?: I18nText;
 }
 
 export interface BadgeEmits {
-  /**
-   * Fired when `clickable` is `true` and the badge is clicked or activated
-   * via the keyboard (Enter or Space).
-   */
-  click: [e: MouseEvent | KeyboardEvent];
-  /** Fired when the `removable` ✕ is activated. */
+  /** A `toggle` chip was activated. */
+  click: [e: MouseEvent];
+  /** The `removable` ✕ was activated. */
   remove: [e: MouseEvent];
 }
 
 export interface BadgeSlots {
-  /** Badge label content (text, icons, tooltip, etc.). */
+  /** Chip text. */
   default(): unknown;
-  /**
-   * Custom left-side content — image, SVG, avatar, or any element.
-   * When provided, overrides the `icon` prop.
-   */
+  /** Custom leading content; replaces the `icon` prop. */
   icon?(): unknown;
-  /**
-   * Custom right-side trailing content — text sublabel, icon, or anything.
-   * Rendered after a thin visual divider. When provided, overrides the `count` prop.
-   */
+  /** Trailing segment after a thin divider, e.g. a count. */
   trailing?(): unknown;
 }

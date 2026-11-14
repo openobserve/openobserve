@@ -38,21 +38,12 @@ function mountToggle(type: "single" | "multiple") {
   });
 }
 
-describe("active label tab weight (item 2)", () => {
-  it("sets only the active label tab at the 550 weight", () => {
-    const [active, inactive] = mountTabs().findAll('[role="tab"]');
-    expect(active.classes()).toContain("font-semibold");
-    expect(inactive.classes()).toContain("font-normal");
-    expect(inactive.classes()).not.toContain("font-semibold");
-  });
-
-  it("reserves the bold label width on every tab so switching tabs shifts nothing", () => {
-    const wrapper = mountTabs();
-    for (const tab of wrapper.findAll('[role="tab"]')) {
-      const reserve = tab.find("[data-otab-label]");
-      expect(reserve.exists()).toBe(true);
-      expect(reserve.attributes("data-otab-label")).toBe(tab.text());
-      expect(reserve.classes()).toContain("after:font-semibold");
+describe("tab label weight", () => {
+  it("keeps one weight on every tab, so selecting a tab never moves its neighbours", () => {
+    for (const tab of mountTabs().findAll('[role="tab"]')) {
+      expect(tab.classes()).toContain("font-medium");
+      expect(tab.classes()).not.toContain("font-semibold");
+      expect(tab.classes()).not.toContain("font-normal");
     }
   });
 });
@@ -62,7 +53,7 @@ describe("segmented control (item 3)", () => {
   const ON = "data-[state=on]:not-focus-visible:";
   // A border, padding, margin or size class would change the box the indicator is measured from.
   const BOX = /(^|:)(border|p[xyse]?|m[xyse]?|w|h|size)(-|$)/;
-  const BOX_CLASSES = ["h-7", "px-2.5"];
+  const BOX_CLASSES = ["h-control-xs", "px-2"];
 
   it("edges the sliding indicator with an inset brand ring and main's shadow", () => {
     const indicator = mountToggle("single").find('[aria-hidden="true"].absolute');
@@ -105,13 +96,5 @@ describe("segmented control (item 3)", () => {
     expect(item.classes()).toEqual(
       expect.arrayContaining(["duration-(--duration-control)", "ease-(--ease-control)"]),
     );
-  });
-});
-
-describe("tab label alignment", () => {
-  it("starts every label at the tab's start edge, so the reserved bold width never centres it", () => {
-    for (const tab of mountTabs().findAll('[role="tab"]')) {
-      expect(tab.find("[data-otab-label]").classes()).toContain("text-start");
-    }
   });
 });

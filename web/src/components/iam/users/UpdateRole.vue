@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="sm"
     :title="t('user.editUser')"
-    persistent
     @update:open="$emit('update:open', $event)"
   >
     <div>
@@ -50,8 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mt-4 flex justify-center gap-2">
           <OButton
             @click="$emit('update:open', false)"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="isSubmitting"
             data-test="iam-update-role-cancel-btn"
           >
@@ -59,7 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             type="submit"
             :loading="isSubmitting"
             data-test="iam-update-role-save-btn"

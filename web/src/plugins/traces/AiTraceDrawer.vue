@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- Opens a trace in place so the AI page keeps its agent, version and time range. -->
 <template>
   <ODrawer
+    size="xl"
     :open="open"
     side="right"
-    :width="70"
     bleed
     :title="title"
     data-test="ai-trace-drawer"
@@ -33,17 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="ai-trace-drawer-view"
           @update:model-value="(v) => (view = v === 'evaluator' ? 'evaluator' : 'trace')"
         >
-          <OToggleGroupItem value="trace" size="sm" data-test="ai-trace-drawer-view-trace">
+          <OToggleGroupItem value="trace" data-test="ai-trace-drawer-view-trace">
             {{ t("aiTraceDrawer.trace") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="evaluator" size="sm" data-test="ai-trace-drawer-view-evaluator">
+          <OToggleGroupItem value="evaluator" data-test="ai-trace-drawer-view-evaluator">
             {{ t("aiTraceDrawer.evaluatorTrace") }}
           </OToggleGroupItem>
         </OToggleGroup>
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="open-in-new"
+          variant="secondary"
+          icon="open-in-new"
           data-test="ai-trace-drawer-open-in-traces"
           @click="traceRef?.handleExpandToFullView()"
         >

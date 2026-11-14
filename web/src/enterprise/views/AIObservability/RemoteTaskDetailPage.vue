@@ -16,34 +16,30 @@
   <OPageLayout
     data-test="ai-remote-task-detail-page"
     :back="{
-      label: t('aiObservability.remoteTasks.detail.backTo'),
-      onClick: goBack,
+      label: t('aiObservability.nav.experiments'),
+      to: aiRemoteTasksRoute(orgId),
       dataTest: 'ai-remote-task-detail-back-btn',
     }"
+    :title="title"
+    title-data-test="ai-remote-task-detail-title"
     bleed
     :scroll="false"
   >
-    <template #title>
-      <span class="flex flex-wrap items-center gap-2">
-        <span class="font-mono" data-test="ai-remote-task-detail-title">{{ title }}</span>
-        <template v-if="task">
-          <OTag v-if="versionLabel(task)" variant="default-soft" shape="rounded">
-            {{ versionLabel(task) }}
-          </OTag>
-          <OTag type="remoteTaskAuth" :value="task.auth.type" />
-          <OTag v-if="task.signing.enabled" variant="success-soft" icon="lock">
-            {{ t("aiObservability.remoteTasks.signingOn") }}
-          </OTag>
-          <OTag type="remoteTaskStatus" :value="state" data-test="ai-remote-task-detail-state" />
-        </template>
-      </span>
+    <template v-if="task" #status>
+      <OTag v-if="versionLabel(task)" tone="neutral">
+        {{ versionLabel(task) }}
+      </OTag>
+      <OTag type="remoteTaskAuth" :value="task.auth.type" />
+      <OTag v-if="task.signing.enabled" tone="ok" icon="lock">
+        {{ t("aiObservability.remoteTasks.signingOn") }}
+      </OTag>
+      <OTag type="remoteTaskStatus" :value="state" data-test="ai-remote-task-detail-state" />
     </template>
 
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="edit"
+        variant="secondary"
+        icon="edit"
         :disabled="!canEdit"
         data-test="ai-remote-task-detail-edit-btn"
         @click="openEdit"
@@ -56,9 +52,9 @@
         />
       </OButton>
       <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
+        icon-only
+        variant="secondary"
+        icon="refresh"
         :loading="loading"
         data-test="ai-remote-task-detail-refresh-btn"
         @click="refresh(true)"
@@ -113,7 +109,9 @@
         </span>
       </div>
 
-      <OStatStrip :items="stats" :loading="loading" row data-test="ai-remote-task-detail-stats" />
+      <div class="border-border-default px-page-edge border-b py-2.5">
+        <OStatStrip :items="stats" :loading="loading" data-test="ai-remote-task-detail-stats" />
+      </div>
 
       <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
         <template v-if="currentTab === 'configuration'">
@@ -163,9 +161,8 @@
             </dl>
             <OButton
               v-if="hasAuthSecret"
-              variant="outline"
-              size="sm"
-              icon-left="key"
+              variant="secondary"
+              icon="key"
               class="mt-3"
               :disabled="!canEdit"
               data-test="ai-remote-task-detail-replace-credentials"
@@ -201,7 +198,7 @@
                   {{ header.key }}
                 </code>
                 <!-- A Secret-backed header reports that it is, never what. -->
-                <OTag v-if="header.usesSecret" variant="purple-soft" icon="lock">
+                <OTag v-if="header.usesSecret" tone="neutral" icon="lock">
                   {{ t("aiObservability.remoteTasks.detail.headerSecret") }}
                 </OTag>
                 <span v-else class="text-text-secondary font-mono">{{ header.value }}</span>
@@ -254,9 +251,9 @@
                 {{ task.taskRef }}
               </code>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                :icon-left="refCopied ? 'check' : 'content-copy'"
+                :icon="refCopied ? 'check' : 'content-copy'"
                 :aria-label="t('aiObservability.remoteTasks.detail.copyRef')"
                 data-test="ai-remote-task-detail-copy-ref"
                 @click="copyRef"
@@ -294,9 +291,8 @@
         <template v-else-if="currentTab === 'versions'">
           <div v-if="hasDraft" class="flex items-center justify-end">
             <OButton
-              variant="outline"
-              size="sm-action"
-              icon-left="delete"
+              variant="secondary"
+              icon="delete"
               data-test="ai-remote-task-detail-discard-draft"
               @click="discardDraft"
             >
@@ -309,10 +305,7 @@
               :columns="versionColumns"
               row-key="id"
               :loading="loading"
-              :frame="false"
-              :show-global-filter="false"
               :page-size="20"
-              width="100%"
               class="h-full w-full"
               data-test="ai-remote-task-detail-versions-table"
             >
@@ -360,10 +353,7 @@
               :columns="usedByColumns"
               row-key="id"
               :loading="loadingUsedBy"
-              :frame="false"
-              :show-global-filter="false"
               :page-size="20"
-              width="100%"
               class="h-full w-full"
               data-test="ai-remote-task-detail-used-by-table"
               @row-click="openExperiment"
@@ -401,7 +391,6 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -506,7 +495,7 @@ const stats = computed<StatItem[]>(() => [
     sub: t("aiObservability.remoteTasks.detail.stats.lastVerifiedSub"),
     value: lastVerifiedLabel.value,
     icon: "check",
-    tone: task.value?.verifiedAt ? "success" : "neutral",
+    tone: task.value?.verifiedAt ? "ok" : "neutral",
     dataTest: "ai-remote-task-detail-stat-verified",
   },
 ]);
@@ -645,9 +634,6 @@ const versionColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
-// Real browser back when there's history to pop.
-const { goBack } = useSmartBack(() => aiRemoteTasksRoute(orgId.value));
-
 function openEdit() {
   if (!canEdit.value) return;
   void router.push(aiRemoteTaskEditRoute(orgId.value, entityId.value));
@@ -696,7 +682,7 @@ async function discardDraft() {
     messageName: task.value?.name ?? "",
     confirmLabel: t("aiObservability.remoteTasks.detail.discardDraft"),
     cancelLabel: t("common.cancel"),
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (!ok) return;
   try {

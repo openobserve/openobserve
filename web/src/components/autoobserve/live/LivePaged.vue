@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="selectRange(option)"
           >
             <span class="flex-1">{{ t(RANGE_LABEL[option]) }}</span>
-            <template #icon-right>
+            <template #end>
               <OIcon
                 name="check"
                 size="sm"
@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-if="settled && view.ranged.length" #actions>
       <OToggleGroup
+        size="sm"
         :model-value="priority"
         :aria-label="t('autoobserve2.recent.priorityLabel')"
         data-test="autoobserve2-paged-priority"
@@ -64,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="option in HOME_PRIORITIES"
           :key="option"
           :value="option"
-          size="xs"
           :disabled="!view.counts[option]"
           :data-test="`autoobserve2-paged-priority-${option}`"
         >
@@ -100,8 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-body min-w-0 truncate">{{ newText }}</span>
         <span aria-hidden="true">·</span>
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           class="-my-1 shrink-0"
           data-test="autoobserve2-paged-show-new"
           @click="paged.showNew()"
@@ -131,8 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         aria-hidden="true"
         data-test="autoobserve2-paged-subtitle-skeleton"
       >
-        <OSkeleton animation="none" class="h-3 w-full" />
-        <OSkeleton animation="none" class="h-3 w-[70%]" />
+        <OSkeleton shape="block" class="h-3 w-full" />
+        <OSkeleton shape="block" class="h-3 w-[70%]" />
       </div>
       <OTruncatedText
         v-else-if="slotKind === 'subtitle'"
@@ -156,17 +156,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="autoobserve2-paged-skeleton"
       >
         <li v-for="n in skeletonRows(cap)" :key="n" class="flex gap-4 px-5 py-4 sm:px-6">
-          <OSkeleton animation="none" class="w-1 rounded-full" />
+          <OSkeleton shape="block" class="w-1" />
           <div class="flex flex-1 flex-col gap-2">
-            <OSkeleton animation="none" class="h-4 w-[70%]" />
+            <OSkeleton shape="block" class="h-4 w-[70%]" />
             <div class="flex items-center gap-1.5">
-              <OSkeleton animation="none" class="h-3 w-24" />
-              <OSkeleton animation="none" class="h-4 w-8" />
-              <OSkeleton animation="none" class="h-4 w-14" />
+              <OSkeleton shape="block" class="h-3 w-24" />
+              <OSkeleton shape="block" class="h-4 w-8" />
+              <OSkeleton shape="block" class="h-4 w-14" />
             </div>
-            <OSkeleton animation="none" class="h-3 w-[85%]" />
+            <OSkeleton shape="block" class="h-3 w-[85%]" />
           </div>
-          <OSkeleton animation="none" class="hidden h-9 w-40 self-center sm:block" />
+          <OSkeleton shape="block" class="hidden h-9 w-40 self-center sm:block" />
         </li>
       </ul>
       <div v-else-if="notice" class="px-3 pb-3 sm:px-4">
@@ -183,19 +183,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-else-if="settled && !rows.length && waiting"
         size="inline"
-        variant="neutral"
         icon="hourglass-empty"
         :title="waiting.title"
-        :description="waiting.desc"
+        :text="waiting.desc"
         data-test="autoobserve2-paged-empty-learning"
       />
       <OEmptyState
         v-else-if="settled && !rows.length && !paging"
         size="inline"
-        variant="neutral"
         icon="toggle-off"
         :title="copy.offTitle"
-        :description="copy.offDesc"
+        :text="copy.offDesc"
         data-test="autoobserve2-paged-empty-off"
       />
       <OEmptyState
@@ -203,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="inline"
         icon="task-alt"
         :title="allClear.title"
-        :description="allClear.desc"
+        :text="allClear.desc"
         data-test="autoobserve2-paged-empty"
       />
       <ul
@@ -227,8 +225,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #actions>
               <OButton
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 data-test="autoobserve2-paged-open"
                 @click="router.push(incidentLink(org, entry.item.incident.id))"
               >
@@ -236,8 +234,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="entry.row.analysis.hasRun"
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 data-test="autoobserve2-paged-view-analysis"
                 @click="router.push(analysisLink(org, entry.item.incident.id))"
               >
@@ -245,8 +243,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="entry.logs"
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 data-test="autoobserve2-paged-logs"
                 @click="router.push(entry.logs)"
               >
@@ -254,8 +252,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="entry.row.copy.page?.routing"
-                variant="outline"
-                size="xs"
+                variant="secondary"
+                size="sm"
                 data-test="autoobserve2-paged-routing"
                 @click="router.push({ name: 'onCallRouting', query: { org_identifier: org } })"
               >
@@ -263,9 +261,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="canAsk && entry.ai"
-                variant="ghost-primary"
-                size="xs"
-                icon-left="auto-awesome"
+                variant="accent-ghost"
+                size="sm"
+                icon="auto-awesome"
                 data-test="autoobserve2-paged-ask-ai"
                 @click="ask(entry.ai)"
               >
@@ -283,9 +281,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="visibility-off" size="sm" class="shrink-0" />
         <span class="min-w-0">{{ cantSee }}</span>
         <OButton
-          variant="ghost-primary"
-          size="xs"
-          icon-right="arrow-forward"
+          variant="accent-ghost"
+          size="sm"
+          icon-end="arrow-forward"
           data-test="autoobserve2-paged-cantsee-open"
           @click="emit('open-coverage', 'attention')"
         >
@@ -297,9 +295,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div ref="footerEl" class="flex min-w-0 flex-wrap items-center gap-2">
         <OButton
           v-if="view.remaining"
-          variant="ghost-primary"
-          size="sm"
-          icon-right="expand-more"
+          variant="accent-ghost"
+          icon-end="expand-more"
           data-test="autoobserve2-paged-show-more"
           @click="expand(view.visible.length + Math.min(view.remaining, HOME_STEP))"
         >
@@ -307,9 +304,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-else-if="view.filtered.length > view.base"
-          variant="ghost-primary"
-          size="sm"
-          icon-right="expand-less"
+          variant="accent-ghost"
+          icon-end="expand-less"
           data-test="autoobserve2-paged-show-fewer"
           @click="expand(0)"
         >
@@ -330,9 +326,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ shared.text }}</OTruncatedText
         >
         <OButton
-          variant="ghost-primary"
-          size="sm"
-          icon-right="arrow-forward"
+          variant="accent-ghost"
+          icon-end="arrow-forward"
           class="ms-auto shrink-0"
           data-test="autoobserve2-paged-see-all"
           @click="router.push({ query: { ...route.query, org_identifier: org, page: 'issues' } })"

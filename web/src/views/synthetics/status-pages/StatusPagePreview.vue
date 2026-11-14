@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <h3 class="text-sm font-semibold">{{ t("statusPages.preview.title") }}</h3>
         <p class="text-text-secondary text-xs">{{ t("statusPages.preview.subtitle") }}</p>
       </div>
-      <OBadge variant="default-soft" size="sm">{{ t("statusPages.preview.sampleBadge") }}</OBadge>
+      <OBadge tone="neutral" size="sm">{{ t("statusPages.preview.sampleBadge") }}</OBadge>
     </div>
 
     <!-- The "browser" frame around the rendered page -->
@@ -72,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="status-page-preview-logo"
               class="max-h-9 max-w-37.5 shrink-0 object-contain"
             />
+            <!-- eslint-disable-next-line local/o2-page-header-api -- the previewed public status page's own heading, not the app page title -->
             <h1 class="text-text-heading text-xl font-semibold">{{ headingName }}</h1>
           </div>
           <div class="text-text-secondary text-2xs flex min-w-0 flex-col items-end gap-1 text-end">

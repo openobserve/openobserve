@@ -58,13 +58,12 @@ function createWrapper(props: Record<string, any> = {}) {
         OSwitch: OSwitchStub,
         OButton: {
           name: "OButton",
-          props: ["iconLeft", "variant", "size"],
+          props: ["icon", "variant", "size"],
           emits: ["click"],
           template: '<button class="o-btn" @click="$emit(\'click\')"><slot /></button>',
         },
         OSpinner: true,
         OCard: { template: "<div><slot /></div>" },
-        OCardSection: { template: "<div><slot /></div>" },
         OSeparator: true,
         OIcon: true,
         AddFunction: {

@@ -45,7 +45,7 @@ const stubs = {
   },
   ODialog: {
     name: "ODialog",
-    props: ["open", "title", "primaryButtonLabel", "primaryButtonDisabled"],
+    props: ["open", "title", "primary", "primary"],
     emits: ["click:primary", "update:open"],
     template: "<div><slot /></div>",
   },
@@ -109,7 +109,7 @@ describe("OnCallDefaultTeamCard", () => {
     resolveRead({ data: { default_team_id: null } });
     await flushPromises();
     expect(trigger.props("loading")).toBe(false);
-    expect(trigger.props("variant")).toBe("warning");
+    expect(trigger.props("variant")).toBe("primary");
   });
 
   it("saves the nomination from the modal and closes it", async () => {
@@ -118,11 +118,11 @@ describe("OnCallDefaultTeamCard", () => {
     await wrapper.find('[data-test="oncall-default-team-open"]').trigger("click");
     expect(dialog(wrapper).props("open")).toBe(true);
     // Nothing chosen yet — there is nothing to save.
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(true);
+    expect(dialog(wrapper).props("primary")?.disabled).toBe(true);
 
     wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", "team_1");
     await flushPromises();
-    expect(dialog(wrapper).props("primaryButtonDisabled")).toBe(false);
+    expect(dialog(wrapper).props("primary")?.disabled).toBeFalsy();
 
     dialog(wrapper).vm.$emit("click:primary");
     await flushPromises();

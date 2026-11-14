@@ -43,8 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="key"
         pagination="none"
         sorting="none"
-        :show-global-filter="false"
-        :frame="false"
         data-test="rum-overview-release-table"
       >
         <template #cell-cur="{ row }">

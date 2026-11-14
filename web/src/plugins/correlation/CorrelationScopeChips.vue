@@ -42,12 +42,7 @@
       <OIcon name="arrow-forward" size="xs" />
     </button>
     <span class="flex-1" />
-    <OButton
-      variant="outline"
-      size="sm-action"
-      data-test="svcver-correlation-open-service"
-      @click="openService"
-    >
+    <OButton variant="secondary" data-test="svcver-correlation-open-service" @click="openService">
       <OIcon name="account-tree" size="xs" class="me-1" />
       {{ t("serviceVersions.correlation.openService") }}
     </OButton>

@@ -25,13 +25,14 @@
         >
       </i18n-t>
       <template #actions>
-        <OButton variant="outline" size="xs" data-test="svcver-retry" @click="$emit('refresh')">{{
+        <OButton variant="secondary" size="sm" data-test="svcver-retry" @click="$emit('refresh')">{{
           t("serviceVersions.actions.retry")
         }}</OButton>
       </template>
     </ErrorPanel>
     <OSkeleton
       v-else-if="state === 'loading'"
+      shape="block"
       class="h-8 w-full"
       data-test="svcver-catalog-loading"
     />
@@ -73,8 +74,8 @@
         </i18n-t>
         <template #actions
           ><OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             data-test="svcver-how-to-version"
             @click="setupOpen = true"
             >{{ t("serviceVersions.catalog.howToAddVersion") }}</OButton
@@ -100,8 +101,8 @@
         </i18n-t>
         <template #actions
           ><OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             data-test="svcver-show-no-version"
             @click="$emit('verdict', 'no_version')"
             >{{ t("serviceVersions.actions.showThem", {}, summary.noVersion) }}</OButton

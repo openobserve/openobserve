@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="border-border-default flex shrink-0 items-center gap-3 border-b pe-4 max-md:flex-wrap max-md:ps-4 max-md:pb-2"
     >
-      <OTabs v-model="tab" dense class="min-w-0 flex-1 max-md:basis-full">
+      <OTabs v-model="tab" size="compact" class="min-w-0 flex-1 max-md:basis-full">
         <OTab
           name="physical"
           :label="t('search.queryProfile.textPhysical')"
@@ -39,14 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
       <OSwitch
         v-model="wrap"
-        size="sm"
         :label="t('search.queryProfile.wrapLines')"
         data-test="query-plan-text-wrap"
       />
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="content-copy"
+        variant="secondary"
+        icon="content-copy"
         :disabled="!text"
         data-test="query-plan-text-copy"
         @click="copy"
@@ -64,10 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="analyzeColumns"
         row-key="id"
         pagination="none"
-        :show-global-filter="false"
         :fill-height="false"
         :horizontal-scroll="!wrap"
-        dense
         class="-mt-3"
         data-test="query-plan-text-analyze-table"
       >

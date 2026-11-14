@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="sm"
     :title="title ?? t('common.editorDraft.restoreTitle')"
-    :primary-button-label="
-      serverDraftItem
+    :primary="{
+      label: serverDraftItem
         ? t('common.editorDraft.continueEditing')
-        : t('common.editorDraft.continueDraft')
-    "
-    primary-button-data-test="editor-draft-continue"
-    :secondary-button-label="t('common.editorDraft.startFresh')"
+        : t('common.editorDraft.continueDraft'),
+      dataTest: 'editor-draft-continue',
+    }"
+    :secondary="{ label: t('common.editorDraft.startFresh') }"
     data-test="editor-draft-restore-dialog"
     @update:open="onOpenChange"
     @click:primary="emit('continue')"
@@ -36,10 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p class="text-text-body text-sm" data-test="editor-draft-restore-message">
         {{ t("common.editorDraft.restoreMessage", { entity: entityLabel, date: savedAtText }) }}
       </p>
-      <OBanner
+      <OInlineNotice
         v-if="notices.length"
-        :variant="changedOnServer ? 'warning' : 'info'"
-        :icon="changedOnServer ? 'warning' : 'info'"
+        :tone="changedOnServer ? 'warn' : 'info'"
         data-test="editor-draft-restore-notices"
       >
         <ul class="flex flex-col gap-1">
@@ -47,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ notice.text }}
           </li>
         </ul>
-      </OBanner>
+      </OInlineNotice>
     </div>
   </ODialog>
 </template>
@@ -57,7 +56,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { formatEditorDraftTime } from "@/utils/drafts/editorDraftStore";
 
 const props = defineProps<{

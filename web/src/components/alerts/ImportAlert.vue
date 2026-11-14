@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="alert"
     class="min-h-0 flex-1"
     :is-importing="isAlertImporting"
-    @back="router.back()"
-    @cancel="router.back()"
+    :back="{ label: t('alerts.header'), to: listRoute }"
+    @cancel="goBack"
     @import="importJson"
   >
     <!-- Custom URL Input Section with Folder Dropdown -->
@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             data-test="alert-import-url-input"
             :model-value="url"
-            size="md"
             @update:model-value="updateUrl"
             :label="t('dashboard.addURL')"
           />
@@ -56,12 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
             @update:model-value="updateFiles"
-            :label="t('dashboard.dropFileMsg')"
             accept=".json"
             multiple
-            drop-zone
-            :help-text="t('alerts.jsonFilesOnlyHint')"
-            size="md"
+            :validate="validateJsonFile"
           />
         </div>
         <div class="w-[30%] max-md:w-full">
@@ -279,6 +275,7 @@ import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import alertsService from "../../services/alerts";
 import { saveAnomalyConfigMutation } from "@/services/anomaly_detection.queries";
 import { useMutation } from "@tanstack/vue-query";
@@ -290,6 +287,7 @@ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { createJsonFileValidator } from "@/lib/forms/File/validateJsonFile";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import {
@@ -342,8 +340,14 @@ export default defineComponent({
 
     type AlertErrors = (ErrorMessage | string)[][];
     const { t } = useI18nTyped();
+    const validateJsonFile = createJsonFileValidator(t);
     const store = useStore();
     const router = useRouter();
+    const listRoute = computed(() => ({
+      name: "alertList",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    }));
+    const { goBack } = useSmartBack(() => listRoute.value);
 
     const { getStreams } = useStreams(t);
 
@@ -1133,8 +1137,10 @@ export default defineComponent({
     return {
       t,
       raw,
+      validateJsonFile,
       importJson,
-      router,
+      listRoute,
+      goBack,
       baseImportRef,
       alertErrorsToDisplay,
       alertErrorItems,

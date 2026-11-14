@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           :model-value="enforceValue"
           :disabled="savingEnforce"
-          label-position="left"
+          label-position="start"
           data-test="settings-org-domain-mappings-enforce-switch"
           @update:model-value="setEnforce(!!$event)"
         >
@@ -57,14 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
       <OTable
-        :frame="false"
         data-test="settings-org-domain-mappings-table"
         :data="visibleRows"
         :columns="columns"
         row-key="id"
         pagination="client"
         sorting="client"
-        :show-global-filter="false"
         :loading="domains.isPending.value"
       >
         <template #toolbar>
@@ -77,8 +75,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="domains.dataUpdatedAt.value || null"
             :loading="domains.isFetching.value || members.isFetching.value"
             data-test="settings-org-domain-mappings-refresh-btn"
@@ -88,16 +84,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <OEmptyState
             v-if="!domains.isPending.value"
-            size="hero"
-            preset="no-domain-mappings"
-            :filtered="filterQuery !== ''"
-            :description="
+            :kind="filterQuery !== '' ? 'filtered' : 'first-run'"
+            :title="
+              filterQuery !== ''
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.domainMappings') })
+                : t('emptyState.noDomainMappings.title')
+            "
+            :icon="filterQuery !== '' ? undefined : 'group'"
+            :text="
               verifiedDomains.length === 0
                 ? t('settings.orgDomainMapping.noVerifiedDomains')
                 : undefined
             "
-            :actions="verifiedDomains.length === 0 ? GO_TO_LINKED_ACTIONS : undefined"
-            @action="onEmptyAction"
+            :action-label="
+              filterQuery !== ''
+                ? undefined
+                : verifiedDomains.length === 0
+                  ? t('settings.orgDomainMapping.goToLinked')
+                  : t('emptyState.noDomainMappings.action')
+            "
+            @action="
+              onEmptyAction(
+                filterQuery !== ''
+                  ? 'clear-filters'
+                  : verifiedDomains.length === 0
+                    ? 'go-to-linked'
+                    : 'create',
+              )
+            "
           />
         </template>
 
@@ -106,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText>{{ atSign }}{{ row.mapping.domain }}</OTruncatedText>
             <OBadge
               v-if="!row.verified"
-              variant="warning-outline"
+              tone="outline"
               size="sm"
               class="shrink-0"
               :data-test="`settings-org-domain-mappings-unverified-${row.mapping.domain}`"
@@ -134,18 +148,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <div class="flex items-center justify-center gap-1">
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="edit"
+              icon="edit"
               class="max-md:hidden"
               :title="t('common.edit')"
               :data-test="`settings-org-domain-mappings-edit-${row.id}`"
               @click.stop="openEdit(row)"
             />
             <OButton
-              variant="ghost-destructive"
-              size="icon-sm"
-              icon-left="delete"
+              icon-only
+              variant="danger-ghost"
+              icon="delete"
               class="max-md:hidden"
               :title="t('common.delete')"
               :data-test="`settings-org-domain-mappings-delete-${row.id}`"
@@ -154,16 +168,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
-                  icon-left="more-vert"
+                  icon-only
+                  icon="more-vert"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   :data-test="`settings-org-domain-mappings-more-${row.id}`"
                   @click.stop
                 />
               </template>
               <ODropdownItem
-                icon-left="edit"
+                icon="edit"
                 class="md:hidden"
                 :data-test="`settings-org-domain-mappings-edit-${row.id}-menu`"
                 @select="openEdit(row)"
@@ -171,8 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{ t("common.edit") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
+                icon="delete"
+                tone="danger"
                 class="md:hidden"
                 :data-test="`settings-org-domain-mappings-delete-${row.id}-menu`"
                 @select="remove(row)"
@@ -208,7 +223,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
@@ -253,15 +267,6 @@ const { confirm } = useConfirmDialog();
 
 const atSign = raw("@");
 const dash = raw("—");
-
-const GO_TO_LINKED_ACTIONS: EmptyStateAction[] = [
-  {
-    id: "go-to-linked",
-    icon: "link",
-    titleKey: "settings.orgDomainMapping.goToLinked",
-    descriptionKey: "settings.orgDomainMapping.goToLinkedDesc",
-  },
-];
 
 const domains = useQuery(() => orgDomainsQuery(props.orgId));
 const members = useQuery(() => billingGroupMembersQuery(props.orgId));
@@ -402,7 +407,7 @@ function openEdit(row: MappingRow) {
   dialogOpen.value = true;
 }
 
-function onEmptyAction(id?: string) {
+function onEmptyAction(id: "clear-filters" | "go-to-linked" | "create") {
   if (id === "clear-filters") filterQuery.value = "";
   else if (id === "go-to-linked") emit("go-to-linked");
   else openAdd();

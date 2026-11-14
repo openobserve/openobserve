@@ -98,15 +98,14 @@ function mountView(
         // DateTime is the app-standard picker (same as the page header). Its stub
         // emits `on:date-change` with the epoch-µs { startTime, endTime } payload
         // the real component produces.
-        DateTime: {
-          name: "DateTime",
+        ODateTimeRange: {
+          name: "ODateTimeRange",
           props: ["autoApply", "disableRelative", "defaultType", "defaultAbsoluteTime", "dataTest"],
           emits: ["on:date-change"],
           template: `<div :data-test="dataTest"></div>`,
         },
         OContent: { template: "<div><slot /></div>" },
         OCard: { template: "<div><slot /></div>" },
-        OCardSection: { template: "<div><slot /></div>" },
         // Align toggle now lives in the view's chart header. Stub renders its slot
         // (so the DateTime pickers appear in manual mode) and re-emits selection.
         OToggleGroup: {
@@ -184,7 +183,7 @@ describe("VersionCompareView — manual override wiring (the app-standard DateTi
     // Both pickers are the shared DateTime component (not a native input or the
     // O2-lib ODateTimeRange).
     const pickers = w
-      .findAllComponents({ name: "DateTime" })
+      .findAllComponents({ name: "ODateTimeRange" })
       .filter((c) => String(c.attributes("data-test") ?? "").includes("version-compare-manual"));
     expect(pickers.length).toBe(2);
     expect(w.html()).not.toContain("datetime-local");
@@ -197,10 +196,10 @@ describe("VersionCompareView — manual override wiring (the app-standard DateTi
       await enterManual(w);
 
       const aPicker = w
-        .findAllComponents({ name: "DateTime" })
+        .findAllComponents({ name: "ODateTimeRange" })
         .find((c) => c.attributes("data-test") === "version-compare-manual-a-window")!;
       const bPicker = w
-        .findAllComponents({ name: "DateTime" })
+        .findAllComponents({ name: "ODateTimeRange" })
         .find((c) => c.attributes("data-test") === "version-compare-manual-b-window")!;
 
       const runsBefore = (w.emitted("run") ?? []).length;

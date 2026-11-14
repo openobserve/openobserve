@@ -16,8 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="border-card-glass-border bg-card-glass-bg rounded-default dark:bg-surface-base dark:border-border-default row-span-7 grid! h-full w-full grid-rows-subgrid gap-0 border shadow-none max-lg:row-span-1 max-lg:flex!"
+    flush
+    class="row-span-7 grid! h-full w-full grid-rows-subgrid gap-0 max-lg:row-span-1 max-lg:flex! [&>[data-test=o-card-body]]:contents"
   >
+    <!-- The body is display:contents so its sections stay rows of the shared subgrid across plans. -->
     <div class="flex items-start justify-between gap-3 px-4 py-3">
       <div>
         <h3 class="text-text-heading m-0 text-base leading-6 font-semibold">
@@ -49,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-secondary text-xs">{{ raw(option.label) }}</span>
             <OTag
               v-if="option.badge"
-              variant="success-soft"
-              size="xs"
+              tone="ok"
+              size="sm"
               :label="raw(option.badge)"
               data-test="billing-plans-pro-price-option-badge"
             />
@@ -65,8 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-secondary text-xs leading-4">{{ raw(option.note) }}</span>
             <OButton
               v-if="index !== 0"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               class="ms-auto"
               data-test="billing-plans-pro-contact-sales-btn"
               @click="$emit('contact-sales')"
@@ -89,7 +91,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-body text-sm leading-5">{{ t("billing.pricingErrorMessage") }}</span>
         <OButton
           variant="ghost"
-          size="sm"
           class="ms-2"
           data-test="billing-pricing-retry"
           @click="$emit('retry-pricing')"
@@ -173,8 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Stripe billing - show subscribe/manage buttons -->
       <OButton
         v-else-if="planType == planName"
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         block
         data-test="billing-plans-pro-cancel-btn"
         @click="cancelSubscription"
@@ -184,7 +184,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else
         variant="primary"
-        size="sm-action"
         block
         data-test="billing-plans-pro-subscribe-btn"
         @click="onSubscribe"

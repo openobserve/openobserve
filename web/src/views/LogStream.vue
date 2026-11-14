@@ -18,19 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="alert-list-page" class="h-full">
-    <OPageLayout
-      bleed
-      :title="t('logStream.header')"
-      title-data-test="log-stream-title-text"
-      :subtitle="t('logStream.subtitle')"
-      icon="window"
-    >
+    <OPageLayout bleed :title="t('menu.index')" title-data-test="log-stream-title-text">
       <template #actions>
         <OButton
           v-if="isSchemaUDSEnabled"
           data-test="log-stream-add-stream-btn"
           variant="primary"
-          size="sm-action"
           @click="addStream"
         >
           {{ t(`logStream.add`) }}
@@ -40,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Outside the table: these totals cover every stream type, not the paginated rows. -->
       <template #subnav>
         <div class="px-page-edge py-1.5" data-test="log-stream-summary">
-          <OStatStrip :items="summaryStats" :loading="summaryLoading" inline />
+          <OStatStrip :items="summaryStats" :loading="summaryLoading" />
         </div>
       </template>
 
@@ -49,9 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="log-stream-table"
           :data="logStream"
           :columns="columns"
-          show-index
           row-key="_rowKey"
-          :frame="false"
           selection="multiple"
           v-model:selected-ids="selectedIds"
           pagination="server"
@@ -62,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="server"
           v-model:sort-by="sortBy"
           v-model:sort-order="sortOrder"
-          :show-global-filter="false"
           :default-columns="false"
           :loading="loadingState"
           :forbidden="forbidden"
@@ -75,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
           <template #toolbar>
             <div
-              class="flex w-full min-w-0 flex-wrap items-center justify-between gap-2 gap-y-1.5 max-md:contents"
+              class="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2 gap-y-1.5 max-md:contents"
             >
               <OToggleGroup
                 mobile-dropdown
@@ -83,17 +73,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="log-stream-type-filter"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
               >
-                <OToggleGroupItem value="logs" size="sm">
+                <OToggleGroupItem value="logs">
                   <template #icon-left><OIcon name="search" size="xs" class="shrink-0" /></template>
                   {{ t("logStream.labelLogs") }}
                 </OToggleGroupItem>
-                <OToggleGroupItem value="metrics" size="sm">
+                <OToggleGroupItem value="metrics">
                   <template #icon-left
                     ><OIcon name="bar-chart" size="xs" class="shrink-0"
                   /></template>
                   {{ t("logStream.labelMetrics") }}
                 </OToggleGroupItem>
-                <OToggleGroupItem value="traces" size="sm">
+                <OToggleGroupItem value="traces">
                   <template #icon-left
                     ><OIcon name="account-tree" size="xs" class="shrink-0"
                   /></template>
@@ -102,7 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OToggleGroupItem
                   v-if="store.state.zoConfig?.profiling_enabled"
                   value="profiles"
-                  size="sm"
                   :disabled="profilesLocked"
                   :tooltip="profilesLocked ? profilesLockedReason : undefined"
                   data-test="log-stream-profiles-toggle"
@@ -116,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   /></template>
                   {{ t("logStream.labelProfiles") }}
                 </OToggleGroupItem>
-                <OToggleGroupItem value="metadata" size="sm">
+                <OToggleGroupItem value="metadata">
                   <template #icon-left><OIcon name="info" size="xs" class="shrink-0" /></template>
                   {{ t("logStream.labelMetadata") }}
                 </OToggleGroupItem>
@@ -132,11 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="isRefreshing"
-              shortcut-id="streamsRefresh"
+              shortcut="streamsRefresh"
               data-test="log-stream-refresh-stats-btn"
               @click="refreshStreams"
             />
@@ -188,49 +175,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <div class="actions-container flex items-center">
               <OButton
-                icon-left="search"
+                icon-only
+                icon="search"
                 :title="t('logStream.explore')"
                 data-test="log-stream-explore-btn"
                 data-row-action="view"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="max-md:hidden"
                 @click="exploreStream({ row })"
               />
               <OButton
-                icon-left="description"
+                icon-only
+                icon="description"
                 :title="t('logStream.schemaHeader')"
                 data-test="log-stream-schema-btn"
                 data-row-action="view"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="max-md:hidden"
                 @click="listSchema({ row })"
               />
               <OButton
-                icon-left="delete"
+                icon-only
+                icon="delete"
                 :title="t('logStream.delete')"
                 data-test="log-stream-delete-btn"
                 data-row-action="delete"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
+                variant="danger-ghost"
+                size="sm"
                 class="max-md:hidden"
                 @click="confirmDeleteAction({ row })"
               />
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    icon-only
                     :aria-label="t('common.moreActions')"
-                    icon-left="more-vert"
+                    icon="more-vert"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="sm"
                     class="md:hidden"
                     data-test="log-stream-row-more-actions"
                     @click.stop
                   />
                 </template>
                 <ODropdownItem
-                  icon-left="search"
+                  icon="search"
                   class="md:hidden"
                   data-test="log-stream-explore-btn-menu"
                   @select="exploreStream({ row })"
@@ -238,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("logStream.explore") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="description"
+                  icon="description"
                   class="md:hidden"
                   data-test="log-stream-schema-btn-menu"
                   @select="listSchema({ row })"
@@ -246,8 +237,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("logStream.schemaHeader") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="delete"
-                  variant="destructive"
+                  icon="delete"
+                  tone="danger"
                   class="md:hidden"
                   data-test="log-stream-delete-btn-menu"
                   @select="confirmDeleteAction({ row })"
@@ -260,11 +251,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #empty>
             <div v-if="!loadingState">
               <OEmptyState
-                size="hero"
-                preset="no-streams"
-                :actions="streamsEmptyActions"
-                :filtered="!!filterQuery"
-                @action="onStreamsEmptyStateAction"
+                :kind="filterQuery ? 'filtered' : 'first-run'"
+                :title="
+                  filterQuery
+                    ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.streams') })
+                    : t('emptyState.noStreams.title')
+                "
+                :text="
+                  filterQuery
+                    ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.streams') })
+                    : t('emptyState.noStreams.description')
+                "
+                :icon="filterQuery ? undefined : 'link'"
+                :action-label="filterQuery ? undefined : t('emptyState.noStreams.action')"
+                :secondary-action-label="
+                  filterQuery || !isSchemaUDSEnabled
+                    ? undefined
+                    : t('emptyState.noStreams.createAction')
+                "
+                @action="
+                  onStreamsEmptyStateAction(filterQuery ? 'clear-filters' : 'setup-ingestion')
+                "
+                @secondary-action="onStreamsEmptyStateAction('create')"
               >
                 <template v-if="!filterQuery" #extra>
                   <div class="flex flex-wrap items-center justify-center gap-2">
@@ -342,9 +350,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #selection-actions>
             <OButton
-              icon-left="delete"
-              variant="outline-destructive"
-              size="sm"
+              icon="delete"
+              variant="danger-ghost"
               :disabled="isDeleting"
               @click="confirmBatchDeleteAction"
             >
@@ -374,9 +381,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="confirmDelete"
       size="sm"
       :title="t('logStream.confirmDeleteHead')"
-      :secondary-button-label="t('logStream.cancel')"
-      :primary-button-label="t('logStream.ok')"
-      primary-button-variant="destructive"
+      :secondary="{ label: t('logStream.cancel') }"
+      :primary="{ label: t('logStream.ok'), variant: 'danger' }"
       @click:secondary="cancelDelete"
       @click:primary="
         () => {
@@ -412,9 +418,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="confirmBatchDelete"
       size="sm"
       :title="t('logStream.confirmBatchDeleteHead')"
-      :secondary-button-label="t('logStream.cancel')"
-      :primary-button-label="t('logStream.ok')"
-      primary-button-variant="destructive"
+      :secondary="{ label: t('logStream.cancel') }"
+      :primary="{ label: t('logStream.ok'), variant: 'danger' }"
       @click:secondary="cancelBatchDelete"
       @click:primary="
         () => {
@@ -451,10 +456,9 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import type { StatItem, StatTrend } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { StatDelta, StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import streamService from "../services/stream";
 import { addCommasToNumber, formatEventCount } from "@/utils/formatters";
@@ -954,19 +958,20 @@ export default defineComponent({
     // Same five figures as the Home → Usage tiles, and deliberately the SAME
     // labels (the `home.*` keys), the same icons and the same formatters — the org
     // footprint must not read as "2,900,000,000 Records" here and "2.9B Events"
-    // there. Tones stay in the decorative families (no green/amber/red) because
-    // none of these numbers is a health signal.
+    // there. No tones: none of these numbers is a health signal.
     const summaryStats = computed<StatItem[]>(() => {
       const s = streamSummary.value;
-      const count = (n: unknown): string => (Number(n) > 0 ? formatEventCount(Number(n)) : "—");
-      const size = (n: unknown): string => (Number(n) > 0 ? formatSizeFromMB(Number(n)) : "—");
-      // How much smaller the data is on disk than as ingested — shown as a trend
+      const count = (n: unknown): string | null =>
+        Number(n) > 0 ? formatEventCount(Number(n)) : null;
+      const size = (n: unknown): string | null =>
+        Number(n) > 0 ? formatSizeFromMB(Number(n)) : null;
+      // How much smaller the data is on disk than as ingested — shown as a delta
       // beside the compressed size, so the tile keeps Home's number AND answers
       // "how good is that?" without a second size to divide.
-      const compressionTrend = (): StatTrend | undefined => {
+      const compressionDelta = (): StatDelta | undefined => {
         const ratio = compressionRatio(s?.total_storage_size, s?.total_compressed_size);
         if (!ratio) return undefined;
-        return { direction: "down", label: raw(ratio), tone: "success" };
+        return { direction: "down", label: raw(ratio), tone: "ok" };
       };
       return [
         {
@@ -974,7 +979,6 @@ export default defineComponent({
           label: t("home.streams"),
           value: count(s?.num_streams),
           icon: "window",
-          tone: "primary",
           dataTest: "log-stream-summary-streams",
         },
         {
@@ -982,7 +986,6 @@ export default defineComponent({
           label: t("home.docsCountLbl"),
           value: count(s?.total_records),
           icon: "bar-chart",
-          tone: "info",
           dataTest: "log-stream-summary-events",
         },
         {
@@ -990,7 +993,6 @@ export default defineComponent({
           label: t("home.totalDataIngested"),
           value: size(s?.total_storage_size),
           icon: "download",
-          tone: "teal",
           dataTest: "log-stream-summary-storage",
         },
         // Cloud does not report compressed size (its column and its Home tile are
@@ -1002,8 +1004,7 @@ export default defineComponent({
                 label: t("home.totalDataCompressed"),
                 value: size(s?.total_compressed_size),
                 icon: "compress",
-                tone: "purple",
-                trend: compressionTrend(),
+                delta: compressionDelta(),
                 dataTest: "log-stream-summary-compressed",
               } as StatItem,
               {
@@ -1011,7 +1012,6 @@ export default defineComponent({
                 label: t("home.indexSizeLbl"),
                 value: size(s?.total_index_size),
                 icon: "save",
-                tone: "neutral",
                 dataTest: "log-stream-summary-index",
               } as StatItem,
             ]
@@ -1326,26 +1326,6 @@ export default defineComponent({
       // });
     };
 
-    const streamsEmptyActions = computed(() => {
-      const actions: EmptyStateAction[] = [
-        {
-          id: "setup-ingestion",
-          icon: "cloud-upload",
-          titleKey: "emptyState.noStreams.action",
-          descriptionKey: "emptyState.noStreams.actionDesc",
-        },
-      ];
-      if (isSchemaUDSEnabled.value) {
-        actions.push({
-          id: "create",
-          icon: "add",
-          titleKey: "emptyState.noStreams.createAction",
-          descriptionKey: "emptyState.noStreams.createActionDesc",
-        });
-      }
-      return actions;
-    });
-
     const onStreamsEmptyStateAction = (id?: string) => {
       if (id === "clear-filters") {
         filterQuery.value = "";
@@ -1459,7 +1439,6 @@ export default defineComponent({
       onChangeStreamFilter,
       addStreamDialog,
       addStream,
-      streamsEmptyActions,
       onStreamsEmptyStateAction,
       loadingState,
       isRefreshing,

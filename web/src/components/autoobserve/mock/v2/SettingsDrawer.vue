@@ -17,15 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="md"
+    size="sm"
     :title="t('autoobserve2.settingsDrawer.title')"
     data-test="autoobserve2-settings-drawer"
     @update:open="(v) => emit('update:open', v)"
   >
     <template #header-right>
       <OTag
-        variant="purple-soft"
-        size="xs"
+        tone="neutral"
+        size="sm"
         :label="t('autoobserve2.demoTag')"
         data-test="autoobserve-sample-tag-drawer"
       />
@@ -92,10 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex flex-col gap-6" data-test="autoobserve2-settings-advanced">
         <OButton
-          variant="ghost-primary"
-          size="sm"
+          variant="accent-ghost"
           class="self-start"
-          :icon-right="advancedOpen ? 'expand-less' : 'expand-more'"
+          :icon-end="advancedOpen ? 'expand-less' : 'expand-more'"
           :aria-expanded="advancedOpen"
           data-test="autoobserve2-settings-advanced-toggle"
           @click="advancedOpen = !advancedOpen"
@@ -118,12 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ say(t, kind.record) }}
                 </span>
               </div>
-              <OSelect
-                v-model="autonomyModes[kind.id]"
-                :options="kindOptions(kind)"
-                size="sm"
-                width="sm"
-              />
+              <OSelect v-model="autonomyModes[kind.id]" :options="kindOptions(kind)" width="s" />
             </label>
           </DrawerSection>
 

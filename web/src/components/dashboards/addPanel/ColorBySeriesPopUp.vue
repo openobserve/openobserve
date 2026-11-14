@@ -36,11 +36,10 @@
     "
     :title="t('dashboard.colorBySeriesPopUp.title')"
     size="lg"
-    :neutral-button-label="t('dashboard.colorBySeriesPopUp.addNewColor')"
-    neutral-button-variant="outline"
-    :primary-button-label="t('dashboard.colorBySeriesPopUp.save')"
+    :extra="{ label: t('dashboard.colorBySeriesPopUp.addNewColor'), variant: 'secondary' }"
+    :primary="{ label: t('dashboard.colorBySeriesPopUp.save') }"
     form-id="color-by-series-form"
-    @click:neutral="addcolorBySeries"
+    @click:extra="addcolorBySeries"
   >
     <OForm id="color-by-series-form" :form="form">
       <div data-test="dashboard-color-by-series-popup">
@@ -71,7 +70,6 @@
                   :items="seriesDataItems"
                   search-regex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
                   :label="t('dashboard.colorBySeriesPopUp.selectSeries')"
-                  label-position="inside"
                   required
                   :value-replace-fn="selectColorBySeriesOption"
                   :data-test="`dashboard-addpanel-config-color-by-series-series-select-${index}`"
@@ -93,8 +91,7 @@
                 </div>
                 <div v-else class="w-full">
                   <OButton
-                    variant="ghost-primary"
-                    size="sm"
+                    variant="accent-ghost"
                     class="w-full"
                     :data-test="`dashboard-addpanel-config-color-by-series-set-color-btn-${index}`"
                     @click="setColorByIndex(index)"
@@ -105,13 +102,14 @@
 
               <!-- Delete series -->
               <OButton
+                icon-only
                 :aria-label="t('common.remove')"
                 variant="ghost"
-                size="icon"
+                size="xs"
                 @click="removecolorBySeriesByIndex(index)"
                 :data-test="`dashboard-addpanel-config-color-by-series-delete-btn-${index}`"
               >
-                <template #icon-left><OIcon name="close" size="sm" /></template>
+                <template #icon><OIcon name="close" size="sm" /></template>
               </OButton>
             </div>
           </div>

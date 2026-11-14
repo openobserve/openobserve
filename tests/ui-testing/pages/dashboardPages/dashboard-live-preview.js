@@ -129,13 +129,20 @@ export default class DashboardLivePreview {
     await expect(this.applyBtn).toBeEnabled({ timeout: 30000 });
   }
 
+  // UI v2 has no "pending" variant: a waiting Apply stays primary and carries data-o2-stale.
   async expectApplyVariant(variant) {
-    await expect(this.applyBtn).toHaveAttribute("data-o2-variant", variant, { timeout: 15000 });
+    const opts = { timeout: 15000 };
+    if (variant === "pending") {
+      await expect(this.applyBtn).toHaveAttribute("data-o2-stale", "true", opts);
+      return;
+    }
+    await expect(this.applyBtn).toHaveAttribute("data-o2-variant", variant, opts);
+    await expect(this.applyBtn).not.toHaveAttribute("data-o2-stale", "true", opts);
   }
 
   // While a run is in flight enterprise swaps Apply for Cancel, so either button is checked.
   async expectApplyNotPending() {
-    await expect(this.applyBtn.or(this.cancelBtn).first()).not.toHaveAttribute("data-o2-variant", "pending");
+    await expect(this.applyBtn.or(this.cancelBtn).first()).not.toHaveAttribute("data-o2-stale", "true");
   }
 
   // A hover that lands while the query editor still holds focus can miss the tooltip, so it is re-hovered.

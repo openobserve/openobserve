@@ -25,8 +25,8 @@ import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsCo
 // observe and drive open/close state without rendering teleported content.
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  props: ["open", "width", "showClose", "persistent", "size", "title", "subtitle"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div data-test-stub="o-drawer" :data-open="open">
       <div data-test-stub="o-drawer-header"><slot name="header" /></div>

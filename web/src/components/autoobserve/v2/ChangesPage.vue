@@ -26,13 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       aria-hidden="true"
       data-test="autoobserve2-activity-skeleton"
     >
-      <OSkeleton animation="none" class="rounded-surface h-24 w-full" />
-      <OSkeleton v-for="n in 3" :key="n" animation="none" class="rounded-surface h-28 w-full" />
+      <OSkeleton shape="block" class="h-24 w-full" />
+      <OSkeleton v-for="n in 3" :key="n" shape="block" class="h-28 w-full" />
     </div>
     <LiveNoticeState
       v-else-if="live.notice.value"
       :notice="live.notice.value"
-      size="block"
+      size="page"
       :busy="live.busy.value"
       data-test="autoobserve2-activity-error"
       retry-test="autoobserve2-activity-retry"
@@ -73,7 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="f in CHANGE_FILTERS"
           :key="f"
           :value="f"
-          size="sm"
           class="rounded-full! px-3!"
           :disabled="f !== 'all' && !counts[f]"
           :data-test="`autoobserve2-activity-filter-${f}`"
@@ -116,9 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </section>
         <OButton
           v-if="capped.more"
-          variant="ghost-primary"
-          size="sm"
-          icon-right="expand-more"
+          variant="accent-ghost"
+          icon-end="expand-more"
           class="ms-10 self-start sm:ms-12"
           data-test="autoobserve2-activity-more"
           @click="showAll = true"

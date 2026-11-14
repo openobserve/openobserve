@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="info" size="sm" class="text-text-secondary" />
       <span>{{ t("serviceVersions.settings.intro") }}</span>
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="svcver-overrides-how-detection"
         @click="showDetection = !showDetection"
         >{{ t("serviceVersions.settings.howDetection") }}</OButton
@@ -45,14 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col gap-2"
       data-test="svcver-overrides-loading"
     >
-      <OSkeleton class="h-6 w-48" />
-      <OSkeleton class="h-40 w-full" />
+      <OSkeleton shape="block" class="h-6 w-48" />
+      <OSkeleton shape="block" class="h-40 w-full" />
     </div>
     <OEmptyState
       v-else-if="denied"
-      size="hero"
-      preset="no-access"
-      :description="t('serviceVersions.settings.denied')"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('serviceVersions.settings.denied')"
       data-test="svcver-overrides-denied"
     />
     <div
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OIcon name="error-outline" size="sm" class="text-status-error-text" />
       <span>{{ loadError }}</span>
-      <OButton variant="ghost-primary" size="xs" @click="overrides.refetch()">{{
+      <OButton variant="accent-ghost" size="sm" @click="overrides.refetch()">{{
         t("serviceVersions.actions.retry")
       }}</OButton>
     </div>
@@ -107,8 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :page-size-options="[PAGE_SIZE]"
         :total-count="total"
         :default-columns="false"
-        dense
-        bordered
         data-test="svcver-overrides-table"
       >
         <template #cell-matches="{ row }">
@@ -131,7 +129,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dim-key="env"
                 :key-label="t('serviceVersions.compare.envChip')"
                 :value="row.inferred_value"
-                variant="success-soft"
                 :value-tooltip="false"
               />
               <span class="text-text-secondary text-[0.6875rem]">{{
@@ -143,7 +140,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dim-key="env"
               :key-label="t('serviceVersions.compare.envChip')"
               :value="row.value"
-              variant="success-soft"
               :value-tooltip="false"
             />
           </span>
@@ -161,8 +157,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-remove="{ row }">
           <OButton
-            variant="ghost-destructive"
-            size="xs"
+            variant="danger-ghost"
+            size="sm"
             :loading="removing === row.rule_key"
             :disabled="Boolean(removing)"
             :data-test="`svcver-override-remove-${row.rule_key}`"
@@ -207,8 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span>{{ undo.error || t("serviceVersions.settings.removed") }}</span>
         <OButton
           v-if="!undo.error"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :loading="undo.busy"
           data-test="svcver-overrides-undo"
           @click="runUndo"

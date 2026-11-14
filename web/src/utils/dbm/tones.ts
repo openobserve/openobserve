@@ -27,7 +27,7 @@
  * components, which is how a fifth caller invents a fifth teal.
  */
 
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 /** Severity shared by insights, recommendations and row chips. */
@@ -49,11 +49,11 @@ export const DBM_SOFT_TONES: Record<DbmRowChipTone, string> = {
 };
 
 /** The soft palette as OTag variants, for chips rendered through the shared badge (same tokens). */
-export const DBM_SOFT_VARIANTS: Record<DbmRowChipTone, BadgeVariant> = {
-  error: "error-soft",
-  warning: "warning-soft",
-  info: "blue-soft",
-  new: "primary-soft",
+export const DBM_SOFT_VARIANTS: Record<DbmRowChipTone, ChipTone> = {
+  error: "err",
+  warning: "warn",
+  info: "info",
+  new: "accent",
 };
 
 /**

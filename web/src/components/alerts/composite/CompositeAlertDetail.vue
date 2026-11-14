@@ -5,7 +5,7 @@ import { computed } from "vue";
 
 import CompositeExpressionPills from "./CompositeExpressionPills.vue";
 import CompositeStatusTimeline from "./CompositeStatusTimeline.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type {
@@ -56,11 +56,11 @@ const childReason = (
 
 <template>
   <section class="flex flex-col gap-4" data-test="alerts-composite-detail">
-    <OBanner
+    <OInlineNotice
       v-if="showMissingJob"
-      variant="warning"
+      tone="warn"
       data-test="alerts-composite-detail-missing-job"
-      :content="t('alerts.composite.missingJobWarning')"
+      :message="t('alerts.composite.missingJobWarning')"
     />
 
     <!-- Current evaluation -->
@@ -78,7 +78,7 @@ const childReason = (
         />
         <OTag
           v-else-if="value.evaluation"
-          :variant="value.evaluation.result ? 'error-soft' : 'default-soft'"
+          :tone="value.evaluation.result ? 'err' : 'neutral'"
           size="sm"
           :label="detailResult"
           data-test="alerts-composite-detail-result"
@@ -117,18 +117,18 @@ const childReason = (
               >
                 {{ raw(child.name) }}
               </OTruncatedText>
-              <OTag type="alertLevel" :value="child.level ?? 'nodata'" size="xs" />
-              <OTag v-if="child.alert_type" type="alertType" :value="child.alert_type" size="xs" />
+              <OTag type="alertLevel" :value="child.level ?? 'nodata'" size="sm" />
+              <OTag v-if="child.alert_type" type="alertType" :value="child.alert_type" size="sm" />
               <OTag
                 v-if="child.last_outcome"
                 type="alertState"
                 :value="child.last_outcome"
-                size="xs"
+                size="sm"
               />
               <OTag
                 v-if="!child.enabled"
-                variant="default-soft"
-                size="xs"
+                tone="neutral"
+                size="sm"
                 :label="t('alerts.composite.disabledChild')"
               />
             </div>

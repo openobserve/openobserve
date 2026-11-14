@@ -42,6 +42,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
@@ -208,10 +209,14 @@ export default defineComponent({
       });
     };
 
-    const handleCancel = () => {
-      // Navigate back on cancel
-      router.back();
-    };
+    const { goBack: handleCancel } = useSmartBack(() => ({
+      name: "alertList",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+        folder: route.query.folder || "default",
+        tab: route.query.tab || "all",
+      },
+    }));
 
     onBeforeMount(() => {
       // In parallel: the form needs destinations and templates either way, and edit mode

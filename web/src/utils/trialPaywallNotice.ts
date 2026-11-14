@@ -30,9 +30,5 @@ export function notifyTrialBlocked(route: BlockedRoute): void {
   // One trial toast at a time: a different page replaces the visible one instead of stacking.
   if (activeDismiss && activeMessage !== message) activeDismiss();
   activeMessage = message;
-  activeDismiss = toast({
-    variant: "info",
-    title: raw(translate("menu.trialEndedTitle")),
-    message: raw(message),
-  });
+  activeDismiss = toast({ variant: "info", message: raw(message) });
 }

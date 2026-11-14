@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="event-detail-drawer"
     bleed
     :open="open"
-    size="xl"
+    size="lg"
     @update:open="emit('update:open', $event)"
   >
     <template #header>
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tabs Navigation -->
     <div class="px-page-edge flex pt-2">
       <div class="w-full">
-        <OTabs v-model="activeTab" align="left" dense>
+        <OTabs v-model="activeTab" size="compact">
           <OTab
             data-test="event-detail-overview-tab"
             name="overview"
@@ -264,8 +264,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div v-if="failedRequestTraceId" class="flex px-1.5 py-1 text-xs">
                 <OButton
-                  variant="outline"
-                  size="xs"
+                  variant="secondary"
+                  size="sm"
                   :title="t('common.viewTraceDetails')"
                   data-test="failed-request-view-trace-btn"
                   :loading="isResolvingTraceNav"
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="event.type === 'action'" class="mb-3">
             <template v-if="isLoadingRelatedResources">
               <div class="mt-2 p-2 text-center">
-                <OSpinner size="xs" />
+                <OSpinner />
                 <div class="text-text-secondary mt-1 text-xs">
                   {{ t("common.loadingRelatedEvents") }}
                 </div>
@@ -374,10 +374,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span class="ms-2 inline-flex">
                         <OButton
-                          variant="outline"
-                          size="xs"
+                          variant="secondary"
+                          size="sm"
                           data-test="view-trace-btn"
-                          class="h-5! px-1.5"
+                          class="px-1.5"
                           disabled
                         >
                           <OIcon
@@ -392,11 +392,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTooltip>
                     <OButton
                       v-else-if="rumField(item, 'trace_id')"
-                      variant="outline"
-                      size="xs"
+                      variant="secondary"
+                      size="sm"
                       :title="t('common.viewTraceDetails')"
                       data-test="view-trace-btn"
-                      class="ms-2 h-5! px-1.5"
+                      class="ms-2 px-1.5"
                       :loading="isResolvingTraceNav"
                       @click.stop="navigateToSpecificTrace(rumField(item, 'trace_id'))"
                     >
@@ -484,9 +484,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabPanel name="attributes" padding="sm" data-test="attributes-tab">
         <div class="flex justify-start">
           <OButton
-            icon-left="content-copy"
-            variant="outline"
-            size="xs"
+            icon="content-copy"
+            variant="secondary"
+            size="sm"
             data-test="attributes-copy-btn"
             @click="copyAttributesToClipboard"
           >

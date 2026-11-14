@@ -19,19 +19,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('pipeline.streamTitle')"
-    size="lg"
+    size="md"
     :show-close="true"
     @keydown.stop
     :form-id="createNewStream ? 'add-stream-node-form' : 'stream-node-form'"
-    :primaryButtonLabel="t('alerts.save')"
-    :secondaryButtonLabel="t('alerts.cancel')"
-    :neutralButtonLabel="
-      !createNewStream && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined
-    "
-    neutralButtonVariant="outline-destructive"
+    :primary="{ label: t('alerts.save') }"
+    :secondary="{ label: t('alerts.cancel') }"
+    :extra="{
+      label: !createNewStream && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined,
+      variant: 'danger-ghost',
+    }"
     data-test="input-node-stream-drawer"
     @click:secondary="handleSecondaryClick"
-    @click:neutral="openDeleteDialog"
+    @click:extra="openDeleteDialog"
   >
     <div data-test="add-stream-input-stream-routing-section" :class="'bg-surface-base'">
       <div class="stream-routing-container w-full">

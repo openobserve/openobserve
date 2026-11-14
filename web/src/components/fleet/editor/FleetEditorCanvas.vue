@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="pointer-events-auto flex flex-1 justify-center">
         <OTag
           v-if="dirty"
-          variant="warning-soft"
+          tone="warn"
           dot
           :label="t('fleet.editor.unsaved')"
           data-test="fleet-editor-canvas-unsaved"
@@ -38,36 +38,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="pointer-events-auto flex flex-1 items-center justify-end gap-1">
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="add"
+          variant="secondary"
+          icon="add"
           data-test="fleet-editor-canvas-add-pipeline"
           @click="emit('add-pipeline')"
         >
           <span class="max-md:sr-only">{{ t("fleet.editor.addPipeline") }}</span>
         </OButton>
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="account-tree"
+          icon-only
+          variant="secondary"
+          icon="account-tree"
           data-test="fleet-editor-canvas-auto-layout"
           @click="autoLayout"
         >
           <OTooltip side="bottom" :content="t('fleet.editor.autoLayout')" />
         </OButton>
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="fullscreen"
+          icon-only
+          variant="secondary"
+          icon="fullscreen"
           data-test="fleet-editor-canvas-fit"
           @click="fit"
         >
           <OTooltip side="bottom" :content="t('fleet.editor.fitView')" />
         </OButton>
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="delete-sweep"
+          icon-only
+          variant="secondary"
+          icon="delete-sweep"
           :aria-label="t('fleet.editor.clear')"
           data-test="fleet-editor-canvas-clear"
           @click="emit('clear')"

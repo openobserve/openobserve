@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="open ?? !!summary"
     side="right"
-    size="md"
+    size="sm"
     seamless
     :modal="false"
     :show-close="false"
@@ -44,9 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></OTruncatedText
           >
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="close"
+            icon="close"
             class="ms-auto shrink-0"
             :aria-label="t('components.drawer.closeDrawer')"
             data-test="incident-alert-panel-close"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OText v-if="place" variant="meta">{{ place }}</OText>
           <OTag
             v-if="summary.tag"
-            :variant="summary.tone === 'danger' ? 'error-soft' : 'primary-soft'"
+            :tone="summary.tone === 'danger' ? 'err' : 'accent'"
             size="sm"
             icon="flag"
             :label="t(summary.tag)"
@@ -79,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </p>
           <OSkeleton
             v-if="nativeAlert && rowsState === 'loading'"
-            animation="none"
-            class="h-5 w-24 shrink-0 rounded-full"
+            shape="block"
+            class="h-5 w-24 shrink-0"
             :aria-label="t('common.loading')"
           />
           <span
@@ -88,10 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="inline-flex shrink-0 items-center gap-1"
             data-test="incident-alert-panel-state-error"
           >
-            <OTag variant="error-soft" size="sm" :label="t('alerts.incidents.panel.stateError')" />
+            <OTag tone="err" size="sm" :label="t('alerts.incidents.panel.stateError')" />
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="incident-alert-panel-state-retry"
               @click="emit('retry-state')"
               >{{ t("common.retry") }}</OButton
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="inline-flex shrink-0 cursor-default"
             data-test="incident-alert-panel-state"
           >
-            <OTag :variant="stateChip.variant" :dot="stateChip.dot" size="sm"
+            <OTag :tone="stateChip.variant" :dot="stateChip.dot" size="sm"
               >{{ stateChip.label }}<OIcon name="info-outline" size="xs" aria-hidden="true"
             /></OTag>
             <OTooltip :content="stateChip.tooltip" />
@@ -151,38 +151,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OSkeleton
           v-if="weekQuery.isPending.value"
-          animation="none"
+          shape="block"
           class="h-16 w-full"
           :aria-label="t('common.loading')"
           data-test="incident-alert-panel-week-loading"
         />
-        <OBanner
+        <OInlineNotice
           v-else-if="weekQuery.isError.value"
-          variant="error-soft"
-          icon="error-outline"
-          dense
-          inline-actions
-          class="h-16"
-          :content="weekError"
+          tone="err"
+          class="min-h-16"
+          :message="weekError"
           data-test="incident-alert-panel-week-error"
         >
           <template #actions>
             <OButton
-              variant="outline"
-              size="xs"
-              icon-left="refresh"
+              variant="secondary"
+              size="sm"
+              icon="refresh"
               data-test="incident-alert-panel-week-retry"
               @click="weekQuery.refetch()"
               >{{ t("alerts.incidents.panel.tryAgain") }}</OButton
             >
           </template>
-        </OBanner>
-        <OBanner
+        </OInlineNotice>
+        <OInlineNotice
           v-else-if="week && !week.complete"
-          variant="error-soft"
-          icon="error-outline"
-          dense
-          class="h-16"
+          tone="err"
+          class="min-h-16"
           data-test="incident-alert-panel-week-incomplete"
         >
           <span>{{ t("alerts.incidents.panel.weekIncomplete") }}</span>
@@ -192,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="dayTooltip(day)" />
             </span>
           </div>
-        </OBanner>
+        </OInlineNotice>
         <div
           v-else-if="week"
           class="flex h-16 flex-col gap-1"
@@ -228,31 +223,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <h4 class="text-text-heading m-0 text-sm font-semibold">
           {{ t("alerts.incidents.panel.whyFired") }}
         </h4>
-        <OSkeleton
-          v-if="!info && definition.isPending.value"
-          animation="none"
-          class="h-16 w-full"
-        />
-        <OBanner
+        <OSkeleton v-if="!info && definition.isPending.value" shape="block" class="h-16 w-full" />
+        <OInlineNotice
           v-else-if="!info"
-          variant="error-soft"
-          icon="error-outline"
-          dense
-          inline-actions
-          class="h-16"
-          :content="t('alerts.incidents.panel.definitionError')"
+          tone="err"
+          class="min-h-16"
+          :message="t('alerts.incidents.panel.definitionError')"
         >
           <template #actions>
             <OButton
-              variant="outline"
-              size="xs"
-              icon-left="refresh"
+              variant="secondary"
+              size="sm"
+              icon="refresh"
               data-test="incident-alert-panel-why-retry"
               @click="definition.refetch()"
               >{{ t("alerts.incidents.panel.tryAgain") }}</OButton
             >
           </template>
-        </OBanner>
+        </OInlineNotice>
         <template v-else>
           <div v-if="info.description" class="flex flex-col items-start gap-0.5">
             <p
@@ -265,8 +253,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
             <OButton
               v-if="descriptionClamped || descriptionOpen"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :aria-expanded="descriptionOpen"
               data-test="incident-alert-panel-description-toggle"
               @click="descriptionOpen = !descriptionOpen"
@@ -280,14 +268,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex min-h-6 items-center gap-1.5">
             <OSkeleton
               v-if="valueLine === 'loading'"
-              animation="none"
+              shape="block"
               class="h-5 w-48"
               data-test="incident-alert-panel-value-loading"
             />
             <OInlineNotice
               v-else-if="lastHit.isError.value"
-              variant="error"
-              :text="t('alerts.incidents.panel.valueError')"
+              tone="err"
+              :message="t('alerts.incidents.panel.valueError')"
               :action-label="t('alerts.incidents.panel.tryAgain')"
               data-test="incident-alert-panel-value-error"
               action-data-test="incident-alert-panel-value-retry"
@@ -318,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-if="query" class="flex min-w-0 items-start gap-1.5">
             <OCollapsible
-              v-model="queryOpen"
+              v-model:open="queryOpen"
               class="border-border-default rounded-default min-w-0 flex-1 border"
               data-test="incident-alert-panel-query"
             >
@@ -333,17 +321,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OCodeBlock
                 :code="query.code"
                 lang="plaintext"
-                chrome="editor"
                 :filename="query.label"
                 wrap
-                inset
                 data-test="incident-alert-panel-query-code"
               />
             </OCollapsible>
             <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="content-copy"
+              icon-only
+              variant="secondary"
+              icon="content-copy"
               :aria-label="t('alerts.incidents.panel.copyQuery')"
               data-test="incident-alert-panel-query-copy"
               @click="copyQuery"
@@ -354,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </section>
 
       <section v-if="nativeAlert" data-test="incident-alert-panel-notifies">
-        <OSkeleton v-if="definition.isPending.value" animation="none" class="h-4 w-48" />
+        <OSkeleton v-if="definition.isPending.value" shape="block" class="h-4 w-48" />
         <p
           v-else-if="definitionData"
           class="text-text-body m-0 inline-flex cursor-default items-center gap-1.5 text-sm"
@@ -370,10 +356,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="summary" class="flex w-full justify-end gap-2">
         <OButton
           v-if="!nativeAlert && summary.sourceUrl"
-          as="a"
-          variant="outline"
-          size="sm"
-          icon-left="open-in-new"
+          variant="secondary"
+          icon="open-in-new"
           :href="summary.sourceUrl"
           target="_blank"
           rel="noopener noreferrer"
@@ -382,10 +366,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OButton
           v-if="logsHref"
-          as="a"
-          variant="outline"
-          size="sm"
-          icon-left="open-in-new"
+          variant="secondary"
+          icon="open-in-new"
           :href="logsHref"
           target="_blank"
           rel="noopener"
@@ -393,9 +375,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("alerts.incidents.panel.viewLogs") }}<OTooltip :content="logsTooltip"
         /></OButton>
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="open-in-new"
+          variant="secondary"
+          icon="open-in-new"
           v-if="nativeAlert"
           data-test="incident-alert-panel-open-alert"
           @click="openAlert"
@@ -420,7 +401,6 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import { isElementTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
@@ -514,13 +494,13 @@ const SPARK_TONE: Record<UnfoldTone, SparklineTone> = {
   neutral: "neutral",
   team: "neutral",
 };
-const STATE_VARIANT: Record<UnfoldTone, "warning-soft" | "error-soft" | "default-outline"> = {
-  danger: "error-soft",
-  warning: "warning-soft",
-  info: "default-outline",
-  success: "default-outline",
-  neutral: "default-outline",
-  team: "default-outline",
+const STATE_VARIANT: Record<UnfoldTone, "warn" | "err" | "outline"> = {
+  danger: "err",
+  warning: "warn",
+  info: "outline",
+  success: "outline",
+  neutral: "outline",
+  team: "outline",
 };
 const KIND: Record<string, I18nKey> = {
   logs: "alerts.incidents.panel.kind.logs",
@@ -619,7 +599,7 @@ const countTooltip = computed(() => {
 const stateChip = computed(() => {
   if (!props.row) {
     return {
-      variant: "default-outline" as const,
+      variant: "outline" as const,
       dot: false,
       label: t("alerts.incidents.panel.stateUnknown"),
       tooltip: t("alerts.incidents.panel.notListed"),

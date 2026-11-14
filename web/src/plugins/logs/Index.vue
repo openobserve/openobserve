@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="logPage"
     data-test="logs-page-container"
   >
+    <OPageHeader :title="t('menu.search')" title-data-test="logs-page-title" />
     <FirstDataPanel
       v-if="firstDataArrival"
       signal="logs"
@@ -291,9 +292,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @go-to-page="onSharedPageGo"
                       />
                       <OEmptyState
-                        preset="search-cancelled"
-                        size="hero"
+                        kind="filtered"
+                        :title="t('emptyState.searchCancelled.title')"
+                        :text="t('emptyState.searchCancelled.description')"
                         class="min-h-0 flex-1"
+                        :action-label="t('emptyState.searchCancelled.action')"
                         @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
@@ -365,9 +368,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @go-to-page="onSharedPageGo"
                       />
                       <OEmptyState
-                        preset="no-query-applied"
-                        size="hero"
+                        kind="filtered"
+                        :title="t('emptyState.noQueryApplied.title')"
+                        :text="t('emptyState.noQueryApplied.description')"
                         data-test="logs-search-apply-search-text"
+                        :action-label="t('emptyState.noQueryApplied.action')"
                         @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
@@ -380,9 +385,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       <OEmptyState
-                        preset="no-query-applied"
-                        size="hero"
+                        kind="filtered"
+                        :title="t('emptyState.noQueryApplied.title')"
+                        :text="t('emptyState.noQueryApplied.description')"
                         data-test="logs-search-patterns-apply-search-text"
+                        :action-label="t('emptyState.noQueryApplied.action')"
                         @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
@@ -404,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <div v-if="showSearchCancelledNotice" class="flex items-center px-2.5 pt-2">
                         <OBadge
-                          variant="default-soft"
+                          tone="neutral"
                           size="sm"
                           icon="cancel"
                           data-test="logs-search-cancelled-notice"
@@ -503,7 +510,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Same no-stream / error / no-events states as the results pane. -->
               <OEmptyState
                 v-if="searchObj.meta.sqlMode"
-                size="hero"
                 :title="t('search.drillDownUnavailableInSqlMode')"
                 data-test="logs-drill-down-sql-mode-text"
               />
@@ -614,9 +620,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OEmptyState
                 v-else
-                preset="no-query-applied"
-                size="hero"
+                kind="filtered"
+                :title="t('emptyState.noQueryApplied.title')"
+                :text="t('emptyState.noQueryApplied.description')"
                 data-test="logs-drill-down-apply-search-text"
+                :action-label="t('emptyState.noQueryApplied.action')"
                 @action="() => searchBarRef?.handleRunQueryFn?.()"
               />
             </div>
@@ -756,6 +764,7 @@ import { logsReapplyRequest } from "@/utils/queryHistory/logs";
 import { takeRecentLanding } from "@/utils/queryHistory/routes";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
 import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
@@ -856,6 +865,7 @@ export default defineComponent({
     LogsNoEventsState,
     LogsNoDataState,
     FirstDataPanel,
+    OPageHeader,
     LogsNoStreamState,
     LogsDrillDownStreamSelect,
     LogsErrorState,
@@ -2205,7 +2215,7 @@ export default defineComponent({
     const onJumpToStreamData = (fromUs: number, toUs: number) => {
       // We fire the search directly via runQuery below. setAbsoluteTime is only
       // needed to sync the picker UI, but it also mutates the picker's selectedDate/
-      // selectedTime, which fires DateTime.vue's deep auto-apply watcher → on:date-change
+      // selectedTime, which fires ODateTimeRange's deep auto-apply watcher → on:date-change
       // → updateDateTime. In live mode that path schedules a SECOND search via a 2.5s
       // debounce. The programmatic-change flag that would normally mark that emit as
       // userChangedValue=false is defeated here because runQuery kicks off an async

@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="lg"
     data-test="scheduled-dashboards-drawer"
     bleed
     :open="open"
-    :width="60"
     :title="t('dashboard.scheduledDashboards')"
     @update:open="emit('update:open', $event)"
   >
@@ -41,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           variant="primary"
-          size="sm"
           data-test="alert-list-add-alert-btn"
           @click="createScheduledReport"
           >{{ t("dashboard.newReport") }}</OButton
@@ -67,9 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:current-page="currentPage = $event"
         @update:sort-by="sortBy = $event"
         @update:sort-order="sortOrder = $event"
-        :show-global-filter="false"
         :default-columns="false"
-        show-index
         :loading="loading"
       >
         <template #cell-name="{ row }">
@@ -113,13 +110,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #empty>
           <OEmptyState
-            size="hero"
-            preset="no-reports"
-            :filtered="!!scheduledFilterQuery"
-            @action="
-              (id) =>
-                id === 'clear-filters' ? (scheduledFilterQuery = '') : createScheduledReport()
+            :kind="scheduledFilterQuery ? 'filtered' : 'first-run'"
+            :title="
+              scheduledFilterQuery
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.reports') })
+                : t('emptyState.noReports.title')
             "
+            :text="
+              scheduledFilterQuery
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.reports') })
+                : t('emptyState.noReports.description')
+            "
+            :icon="scheduledFilterQuery ? undefined : 'assessment'"
+            :action-label="scheduledFilterQuery ? undefined : t('emptyState.noReports.action')"
+            @action="scheduledFilterQuery ? (scheduledFilterQuery = '') : createScheduledReport()"
           />
         </template>
       </OTable>

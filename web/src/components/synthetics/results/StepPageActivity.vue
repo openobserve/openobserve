@@ -38,7 +38,7 @@ import { useI18nTyped } from "@/types/i18n";
 
 import EvidenceEvents from "./EvidenceEvents.vue";
 import EvidenceFilters from "./EvidenceFilters.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -174,8 +174,8 @@ function reloadPage() {
            nothing here is capped. -->
       <OButton
         variant="ghost"
-        size="xs"
-        icon-right="arrow-forward"
+        size="sm"
+        icon-end="arrow-forward"
         class="ms-auto shrink-0"
         data-test="synthetics-step-page-activity-view-all-btn"
         @click="emit('view-all', stepId)"
@@ -190,15 +190,13 @@ function reloadPage() {
         class="flex flex-col gap-1"
         data-test="synthetics-step-page-activity-loading"
       >
-        <OSkeleton v-for="i in 3" :key="i" type="text" class="h-4 w-full" />
+        <OSkeleton v-for="i in 3" :key="i" class="h-4 w-full" />
       </div>
 
       <!-- A failed fetch is reported, never rendered as an empty step. -->
-      <OBanner
+      <OInlineNotice
         v-else-if="status === 'error'"
-        variant="error-soft"
-        dense
-        inline-actions
+        tone="err"
         data-test="synthetics-step-page-activity-error"
       >
         <div class="flex min-w-0 flex-col gap-0.5">
@@ -218,7 +216,7 @@ function reloadPage() {
           <OButton
             v-if="needsReload"
             variant="ghost"
-            size="xs"
+            size="sm"
             data-test="synthetics-step-page-activity-reload-btn"
             @click="reloadPage"
           >
@@ -227,14 +225,14 @@ function reloadPage() {
           <OButton
             v-else-if="canRetry"
             variant="ghost"
-            size="xs"
+            size="sm"
             data-test="synthetics-step-page-activity-retry-btn"
             @click="emit('retry')"
           >
             {{ t("synthetics.evidence.retry") }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
 
       <!-- Empty is a finding, and a lonely one: attribution is sparse, so naming
            the unattributed remainder is what stops this reading as "the run was

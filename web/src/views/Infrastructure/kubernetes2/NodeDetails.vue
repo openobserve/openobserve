@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -43,12 +42,6 @@ const props = defineProps<{ row: NodeRow; inventory: Inventory; end: number }>()
 const emit = defineEmits<{ open: [ref: DetailsRef] }>();
 
 const { t } = useI18nTyped();
-
-const FILLED: Partial<Record<BadgeVariant, BadgeVariant>> = {
-  "success-soft": "success",
-  "warning-soft": "warning",
-  "error-soft": "error",
-};
 
 const ALLOCATABLE_FORMAT: Record<string, (v: number) => string> = {
   cpu: formatCores,
@@ -88,7 +81,7 @@ const taints = computed(() =>
 const conditions = computed(() =>
   nodeConditionWords(props.row).map((w) => ({
     text: w.text,
-    variant: FILLED[w.variant] ?? ("default" as BadgeVariant),
+    variant: w.variant,
   })),
 );
 
@@ -184,7 +177,7 @@ const capacityBars = computed(() =>
 
 <template>
   <div class="flex flex-col gap-4">
-    <ODescriptionList dense>
+    <ODescriptionList>
       <ODescriptionItem :label="t('infra.k8s2.drawerAddresses')" data-test="k8s2-node-addresses">
         <template v-if="addresses.length">
           <div v-for="a in addresses" :key="a">{{ raw(a) }}</div>
@@ -203,9 +196,7 @@ const capacityBars = computed(() =>
       </ODescriptionItem>
       <ODescriptionItem :label="t('infra.k8s2.drawerTaints')" data-test="k8s2-node-taints">
         <div v-if="taints.length" class="flex flex-col items-start gap-1">
-          <OTag v-for="(s, i) in taints" :key="i" size="sm" variant="default-soft">{{
-            raw(s)
-          }}</OTag>
+          <OTag v-for="(s, i) in taints" :key="i" size="sm" tone="neutral">{{ raw(s) }}</OTag>
         </div>
       </ODescriptionItem>
       <ODescriptionItem :label="t('infra.k8s2.drawerConditions')" data-test="k8s2-node-conditions">
@@ -214,8 +205,8 @@ const capacityBars = computed(() =>
             v-for="c in conditions"
             :key="c.text"
             size="sm"
-            :variant="c.variant"
-            :icon="c.variant === 'error' || c.variant === 'warning' ? 'warning' : 'check'"
+            :tone="c.variant"
+            :icon="c.variant === 'err' || c.variant === 'warn' ? 'warning' : 'check'"
             >{{ raw(c.text) }}</OTag
           >
           <OTooltip>
@@ -251,11 +242,7 @@ const capacityBars = computed(() =>
           <span class="text-text-secondary">{{ b.label }}</span>
           <span class="tabular-nums" :data-test="`k8s2-node-capacity-${b.id}`">{{ b.text }}</span>
         </div>
-        <OProgressBar
-          size="xs"
-          :value="Math.min(b.pct, 100) / 100"
-          :variant="usageBarVariant(b.pct)"
-        />
+        <OProgressBar :value="Math.min(b.pct, 100)" :tone="usageBarVariant(b.pct)" />
       </div>
     </section>
     <section class="flex flex-col gap-2">

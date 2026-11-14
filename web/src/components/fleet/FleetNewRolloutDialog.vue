@@ -20,23 +20,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="md"
     :title="t('fleet.fleets.deployVersion')"
     :form-id="FORM_ID"
-    :primary-button-label="t('fleet.fleets.changeVersion')"
-    :primary-button-disabled="!seeded || listsForbidden || listsFailed"
-    :secondary-button-label="t('common.cancel')"
+    :primary="{
+      label: t('fleet.fleets.changeVersion'),
+      disabled: !seeded || listsForbidden || listsFailed,
+    }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="fleet-new-rollout-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
     <OEmptyState
       v-if="open && listsForbidden"
-      size="block"
-      preset="no-access"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
       data-test="fleet-new-rollout-dialog-forbidden"
     />
     <OEmptyState
       v-else-if="open && listsFailed"
-      size="block"
-      preset="load-error"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="t('emptyState.loadError.description')"
       data-test="fleet-new-rollout-dialog-error"
       @action="retryLists"
     />
@@ -45,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex justify-center py-6"
       data-test="fleet-new-rollout-dialog-loading"
     >
-      <OSpinner />
+      <OSpinner size="lg" />
     </div>
     <OForm v-else-if="open" :id="FORM_ID" class="flex flex-col gap-5" :form="form">
       <OFormSelect
@@ -84,12 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-labelledby="startLabelId"
           data-test="fleet-new-rollout-dialog-start"
         >
-          <OToggleGroupItem value="now" size="sm">{{
-            t("fleet.rollouts.startNow")
-          }}</OToggleGroupItem>
-          <OToggleGroupItem value="at" size="sm">{{
-            t("fleet.rollouts.startAt")
-          }}</OToggleGroupItem>
+          <OToggleGroupItem value="now">{{ t("fleet.rollouts.startNow") }}</OToggleGroupItem>
+          <OToggleGroupItem value="at">{{ t("fleet.rollouts.startAt") }}</OToggleGroupItem>
         </OFormToggleGroup>
         <OFormInput
           v-if="start === 'at'"
@@ -108,13 +108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-labelledby="batchLabelId"
           data-test="fleet-new-rollout-dialog-batching"
         >
-          <OToggleGroupItem value="one" size="sm">{{
-            t("fleet.rollouts.oneBatch")
-          }}</OToggleGroupItem>
-          <OToggleGroupItem value="canary" size="sm">{{
-            t("fleet.badge.canary")
-          }}</OToggleGroupItem>
-          <OToggleGroupItem value="progressive" size="sm">{{
+          <OToggleGroupItem value="one">{{ t("fleet.rollouts.oneBatch") }}</OToggleGroupItem>
+          <OToggleGroupItem value="canary">{{ t("fleet.badge.canary") }}</OToggleGroupItem>
+          <OToggleGroupItem value="progressive">{{
             t("fleet.badge.progressive")
           }}</OToggleGroupItem>
         </OFormToggleGroup>

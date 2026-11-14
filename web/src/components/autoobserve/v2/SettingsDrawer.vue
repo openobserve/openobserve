@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="md"
+    size="sm"
     :title="t('autoobserve2.settingsDrawer.title')"
     data-test="autoobserve2-settings-drawer"
     @update:open="(v) => emit('update:open', v)"

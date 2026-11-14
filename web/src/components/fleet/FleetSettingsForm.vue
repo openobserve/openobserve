@@ -44,7 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         type="submit"
         variant="primary"
-        size="sm-action"
         :loading="isSubmitting"
         :disabled="disabled"
         :data-test="`${dataTest}-save`"

@@ -3,8 +3,7 @@
     <OPageLayout
       v-if="!showSearchResults"
       :title="t('search_scheduler_job.title')"
-      icon="schedule"
-      :back="{ onClick: closeSearchHistory }"
+      :back="{ label: t('menu.search'), to: logsRoute }"
       bleed
     >
       <template #actions>
@@ -15,9 +14,9 @@
             @update:column-visibility="setColumnVisibility"
           />
           <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+            icon-only
+            variant="secondary"
+            icon="refresh"
             class=""
             :loading="isLoading"
             data-test="search-scheduler-get-jobs-btn"
@@ -26,7 +25,7 @@
             <OTooltip
               side="bottom"
               :content="t('search_scheduler_job.get_jobs')"
-              shortcut-id="searchSchedulersRefresh"
+              shortcut="searchSchedulersRefresh"
             />
           </OButton>
         </div>
@@ -35,7 +34,6 @@
         <OTable
           ref="oTableRef"
           :forbidden="forbidden"
-          :frame="false"
           class="search-scheduler-otable"
           data-test="search-scheduler-table"
           :data="dataToBeLoaded"
@@ -57,7 +55,6 @@
           :expand-on-row-click="true"
           v-model:expanded-ids="expandedIds"
           @update:expanded-ids="onExpandedIdsChange"
-          :show-global-filter="false"
           :default-columns="false"
         >
           <template #cell-user_id="{ row }">
@@ -78,11 +75,11 @@
           </template>
           <template #cell-actions="{ row }">
             <OButton
+              icon-only
               data-test="search-scheduler-cancel-btn"
               data-row-action="pause"
               variant="ghost"
-              size="icon-sm"
-              icon-left="cancel"
+              icon="cancel"
               class="max-md:hidden"
               :title="t('search_scheduler_job.cancel')"
               :disabled="row.status_code !== 0 && row.status_code !== 1"
@@ -90,32 +87,32 @@
             />
 
             <OButton
+              icon-only
               data-test="search-scheduler-delete-btn"
               data-row-action="delete"
-              variant="ghost-destructive"
-              size="icon-sm"
-              icon-left="delete"
+              variant="danger-ghost"
+              icon="delete"
               class="max-md:hidden"
               :title="t('search_scheduler_job.delete')"
               @click="confirmDeleteJob(row)"
             />
             <OButton
+              icon-only
               data-test="search-scheduler-restart-btn"
               data-row-action="resume"
               variant="ghost"
-              size="icon-sm"
-              icon-left="refresh"
+              icon="refresh"
               class="max-md:hidden"
               :title="t('search_scheduler_job.restart')"
               :disabled="row.status_code !== 2 && row.status_code !== 3"
               @click="retrySearchJob(row)"
             />
             <OButton
+              icon-only
               data-test="search-scheduler-explore-btn"
               data-row-action="view"
               variant="ghost"
-              size="icon-sm"
-              icon-left="search"
+              icon="search"
               class="max-md:hidden"
               :title="t('search_scheduler_job.explore')"
               :disabled="row.status_code == 0 || row.status_code == 3"
@@ -124,17 +121,18 @@
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  icon-only
                   :aria-label="t('search.moreActions')"
-                  icon-left="more-vert"
+                  icon="more-vert"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   data-test="search-scheduler-row-more-actions"
                   @click.stop
                 />
               </template>
               <ODropdownItem
-                icon-left="cancel"
+                icon="cancel"
                 class="md:hidden"
                 :disabled="row.status_code !== 0 && row.status_code !== 1"
                 data-test="search-scheduler-cancel-btn-menu"
@@ -143,16 +141,7 @@
                 <span>{{ t("search_scheduler_job.cancel") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
-                class="md:hidden"
-                data-test="search-scheduler-delete-btn-menu"
-                @select="confirmDeleteJob(row)"
-              >
-                <span>{{ t("search_scheduler_job.delete") }}</span>
-              </ODropdownItem>
-              <ODropdownItem
-                icon-left="refresh"
+                icon="refresh"
                 class="md:hidden"
                 :disabled="row.status_code !== 2 && row.status_code !== 3"
                 data-test="search-scheduler-restart-btn-menu"
@@ -161,7 +150,7 @@
                 <span>{{ t("search_scheduler_job.restart") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="search"
+                icon="search"
                 class="md:hidden"
                 :disabled="row.status_code == 0 || row.status_code == 3"
                 data-test="search-scheduler-explore-btn-menu"
@@ -169,16 +158,30 @@
               >
                 <span>{{ t("search_scheduler_job.explore") }}</span>
               </ODropdownItem>
+              <ODropdownSeparator class="md:hidden" />
+              <ODropdownItem
+                icon="delete"
+                tone="danger"
+                class="md:hidden"
+                data-test="search-scheduler-delete-btn-menu"
+                @select="confirmDeleteJob(row)"
+              >
+                <span>{{ t("search_scheduler_job.delete") }}</span>
+              </ODropdownItem>
             </ODropdown>
           </template>
           <template #expansion="{ row }">
-            <div class="app-tabs-schedule-list h-fit w-fit px-4 py-2">
-              <AppTabs
-                data-test="expanded-list-tabs"
-                class="me-3"
-                :tabs="tabs"
-                v-model:active-tab="activeTab"
-              />
+            <div class="h-fit w-fit px-4 py-2">
+              <OTabs v-model="activeTab" size="compact" data-test="expanded-list-tabs">
+                <OTab
+                  v-for="tab in tabs"
+                  :key="tab.value"
+                  :name="tab.value"
+                  :label="tab.label"
+                  :icon="tab.icon"
+                  :data-test="`tab-${tab.value}`"
+                />
+              </OTabs>
             </div>
             <div v-if="activeTab == 'query'">
               <div
@@ -188,28 +191,21 @@
                   <strong
                     >{{ t("search_scheduler_job.sql_query") }} :
                     <span>
-                      <OButton
-                        :aria-label="t('common.copyToClipboard')"
-                        variant="outline"
-                        size="icon-chip"
+                      <OCopyButton
+                        size="xs"
                         class="ms-2"
                         data-test="search-scheduler-copy-sql-btn"
-                        @click.stop="
-                          copyToClipboard(row.sql, t, {
-                            successMessage: t('logs.searchSchedulersList.sqlQueryCopied'),
-                            timeout: 5000,
-                          })
-                        "
-                      >
-                        <OIcon name="content-copy" size="xs" /> </OButton></span
+                        variant="secondary"
+                        :label="t('common.copyToClipboard')"
+                        :value="row.sql" /></span
                   ></strong>
                   <OButton
-                    variant="outline"
-                    size="chip"
+                    variant="secondary"
+                    size="xs"
                     data-test="search-scheduler-go-to-logs-btn"
                     :disabled="row.status_code == 0 || row.status_code == 3"
                     @click.stop="fetchSearchResults(row)"
-                    icon-left="search"
+                    icon="search"
                   >
                     {{ t("search_scheduler_job.logs") }}
                   </OButton>
@@ -241,20 +237,13 @@
                   <strong
                     >{{ t("search_scheduler_job.function_definition") }} :
                     <span>
-                      <OButton
-                        :aria-label="t('common.copyToClipboard')"
+                      <OCopyButton
                         data-test="search-scheduler-copy-function-btn"
-                        variant="outline"
-                        size="icon-chip"
+                        size="xs"
                         class="ms-2"
-                        @click.stop="
-                          copyToClipboard(row.function, t, {
-                            successMessage: t('logs.searchSchedulersList.functionDefinitionCopied'),
-                            timeout: 5000,
-                          })
-                        "
-                      >
-                        <OIcon name="content-copy" size="xs" /> </OButton></span
+                        variant="secondary"
+                        :label="t('common.copyToClipboard')"
+                        :value="row.function" /></span
                   ></strong>
                 </div>
 
@@ -301,14 +290,18 @@
           </template>
           <template #empty>
             <div v-if="!isLoading" class="flex w-full">
-              <OEmptyState size="hero" preset="no-search-jobs" />
+              <OEmptyState
+                :title="t('emptyState.noSearchJobs.title')"
+                :text="t('emptyState.noSearchJobs.description')"
+                icon="schedule"
+              />
             </div>
           </template>
         </OTable>
         <ConfirmDialog
           :title="t('search_scheduler_job.delete_job_title')"
           :message="t('search_scheduler_job.delete_job_message')"
-          ok-variant="destructive"
+          kind="destructive"
           @update:ok="deleteSearchJob"
           @update:cancel="confirmDelete = false"
           v-model="confirmDelete"
@@ -358,14 +351,16 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
@@ -383,32 +378,26 @@ export default defineComponent({
     OUserCell,
     OTag,
     ConfirmDialog,
-    AppTabs,
+    OTabs,
+    OTab,
     OButton,
+    OCopyButton,
     OTooltip,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
     QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
-    OIcon,
     OPageLayout,
-  },
-  methods: {
-    closeSearchHistory() {
-      // Go back to wherever the user came from (preserving that page's URL/state)
-      // instead of resetting to a bare /logs. Fall back to the Logs route when this
-      // page was the entry point (deep link / refresh) and there's no history to pop.
-      if (window.history.state?.back) {
-        this.$router.back();
-      } else {
-        this.$router.push({ name: "logs" });
-      }
-    },
   },
   setup() {
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
     const { t } = useI18nTyped();
+    const logsRoute = computed(() => ({
+      name: "logs",
+      query: { org_identifier: store.state.selectedOrganization?.identifier },
+    }));
     const confirmDelete = ref(false);
     const toBeDeletedJob = ref({});
 
@@ -922,6 +911,7 @@ export default defineComponent({
     return {
       searchObj,
       store,
+      logsRoute,
       generateColumns,
       fetchSearchHistory,
       dataToBeLoaded,

@@ -30,28 +30,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex shrink-0 flex-col gap-1.5 px-1 pt-1 pb-1">
       <OSearchInput
         v-model="query"
-        clearable
         class="w-full"
         :placeholder="t('iam.editRole.filterModulesTasks')"
         data-test="edit-role-module-rail-search"
       />
       <OToggleGroup v-model="scope" class="w-full">
-        <OToggleGroupItem
-          value="all"
-          size="sm"
-          class="flex-1"
-          data-test="edit-role-module-rail-scope-all"
-        >
+        <OToggleGroupItem value="all" class="flex-1" data-test="edit-role-module-rail-scope-all">
           {{ t("iam.editRole.moduleScopeAll") }}
         </OToggleGroupItem>
         <OToggleGroupItem
           value="granted"
-          size="sm"
           class="flex-1"
           data-test="edit-role-module-rail-scope-granted"
         >
           {{ t("iam.editRole.moduleScopeGranted") }}
-          <OBadge v-if="grantedCount" variant="default-soft" size="sm" class="ms-1">
+          <OBadge v-if="grantedCount" tone="neutral" size="sm" class="ms-1">
             {{ plain(grantedCount) }}
           </OBadge>
         </OToggleGroupItem>
@@ -88,8 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ group.label }} {{ countLabel(group.modules.length) }}
             </OTruncatedText>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
               class="shrink-0"
               :aria-label="
                 isExpanded(group.id)
@@ -119,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="bg-accent size-1.5 shrink-0 rounded-full"
               :data-test="`edit-role-module-rail-unsaved-${module.key}`"
             />
-            <OBadge v-if="module.granted" variant="primary-soft" size="sm" class="shrink-0">
+            <OBadge v-if="module.granted" tone="accent" size="sm" class="shrink-0">
               {{ compact(module.granted) }}
             </OBadge>
           </OTab>
@@ -130,14 +123,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-if="!visibleGroups.length && (term || scope === 'granted')"
         size="inline"
-        variant="no-results"
+        kind="filtered"
         class="px-1.5"
         :title="
           term
             ? t('iam.editRole.noModuleMatchQuery', { query: raw(term) })
             : t('iam.editRole.noGrantedModule')
         "
-        :description="term ? t('iam.editRole.noModuleMatchHint') : undefined"
+        :text="term ? t('iam.editRole.noModuleMatchHint') : undefined"
         data-test="edit-role-module-rail-no-match"
       />
     </div>

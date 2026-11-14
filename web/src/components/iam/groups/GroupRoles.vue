@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="visual in usersDisplayOptions"
               :key="visual.value"
               :value="visual.value"
-              size="sm"
               :data-test="`iam-roles-selection-show-${visual.value}-btn`"
             >
               {{ visual.label }}
@@ -41,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div data-test="iam-roles-selection-search-input" class="me-3">
         <OSearchInput
+          width="list"
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          class="h-9 w-50"
           :placeholder="t('iam.groupRoles.searchRoles')"
         />
       </div>
@@ -60,8 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
-        :show-global-filter="false"
-        dense
       >
         <template #cell-select="{ row }">
           <OCheckbox
@@ -73,11 +70,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #empty>
           <OEmptyState
-            size="hero"
-            preset="no-roles"
-            :filtered="!!userSearchKey"
-            :hide-action="!userSearchKey"
-            @action="(id) => id === 'clear-filters' && (userSearchKey = '')"
+            :kind="userSearchKey ? 'filtered' : 'first-run'"
+            :title="
+              userSearchKey
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.roles') })
+                : t('emptyState.noRoles.title')
+            "
+            :text="
+              userSearchKey
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.roles') })
+                : t('emptyState.noRoles.description')
+            "
+            :icon="userSearchKey ? undefined : 'group'"
+            @action="userSearchKey = ''"
           />
         </template>
       </OTable>

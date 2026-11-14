@@ -104,11 +104,11 @@ function mountDrawer(
       plugins: [createStore({ state: { zoConfig: { features } } })],
       stubs: {
         ODrawer: {
-          props: ["open", "title", "subTitle"],
+          props: ["open", "title", "subtitle"],
           template: '<section v-if="open"><slot /><slot name="footer" /></section>',
         },
         OButton: {
-          template: '<button @click="$emit(\'click\')"><slot name="icon-left" /><slot /></button>',
+          template: '<button @click="$emit(\'click\')"><slot name="icon" /><slot /></button>',
         },
         OTag: { template: "<span><slot /></span>" },
       },

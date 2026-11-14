@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rest-label="t('ingestion.firstSource.recommended')"
           :locked="lockedTabs.has(pickTab.name)"
         />
-        <ORouteTab
+        <OTab
           v-for="tab in tabs.filter((tab) => tab.name !== pickTab?.name)"
           :key="tab.name"
           :title="pickTab ? tab.title || tab.name : undefined"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :to="tab.to"
           :icon="tab.icon"
           :label="tab.label"
-          :suffix-icon="lockedTabs.has(tab.name) ? 'lock' : undefined"
+          :locked="lockedTabs.has(tab.name)"
           :data-test="`ingestion-recommended-tab-${tab.name}`"
         />
       </FeatureLockExempt>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import FirstSourcePickGroup from "@/components/ingestion/FirstSourcePickGroup.vue";
 // @ts-ignore
 import { defineComponent, ref, computed, onBeforeMount, onUpdated } from "vue";
@@ -77,7 +77,7 @@ import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 
 export default defineComponent({
   name: "RecommendedPage",
-  components: { DataSourceSidebarLayout, ORouteTab, FirstSourcePickGroup, FeatureLockExempt },
+  components: { DataSourceSidebarLayout, OTab, FirstSourcePickGroup, FeatureLockExempt },
   props: {
     currOrgIdentifier: {
       type: String,

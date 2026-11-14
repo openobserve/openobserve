@@ -71,47 +71,47 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-disabled="String(primaryButtonDisabled)"
-      :data-primary-loading="String(primaryButtonLoading)"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
+      :data-primary-disabled="String(primary?.disabled)"
+      :data-primary-loading="String(primary?.loading)"
     >
       <slot name="header" />
       <slot />
       <slot name="footer" />
       <button
         data-test="o-dialog-stub-primary"
-        :disabled="primaryButtonDisabled"
+        :disabled="primary?.disabled"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -254,13 +254,13 @@ describe("MoveDashboardToAnotherFolder", () => {
     it("should render i18n label on secondary (cancel) button", () => {
       wrapper = createWrapper();
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(drawer.props("secondary")?.label).toBe("Cancel");
     });
 
     it("should render i18n label on primary (move) button", () => {
       wrapper = createWrapper();
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("primaryButtonLabel")).toBe("Move");
+      expect(drawer.props("primary")?.label).toBe("Move");
     });
   });
 
@@ -287,7 +287,7 @@ describe("MoveDashboardToAnotherFolder", () => {
 
     it("should disable primary button when same folder is selected", () => {
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("primaryButtonDisabled")).toBe(true);
+      expect(drawer.props("primary")?.disabled).toBe(true);
     });
 
     it("should enable primary button when different folder is selected", async () => {
@@ -295,7 +295,7 @@ describe("MoveDashboardToAnotherFolder", () => {
       await wrapper.vm.$nextTick();
 
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("primaryButtonDisabled")).toBe(false);
+      expect(drawer.props("primary")?.disabled).toBeFalsy();
     });
   });
 
@@ -451,7 +451,7 @@ describe("MoveDashboardToAnotherFolder", () => {
   });
 
   describe("Loading State", () => {
-    it("should forward loading state to ODrawer primaryButtonLoading", async () => {
+    it("should forward loading state to ODrawer primary?.loading", async () => {
       const { useLoading } = await getMockUtils();
       useLoading.mockImplementation((fn) => ({
         execute: vi.fn().mockImplementation(fn),
@@ -462,7 +462,7 @@ describe("MoveDashboardToAnotherFolder", () => {
       await wrapper.vm.$nextTick();
       const drawer = wrapper.findComponent(ODialogStub);
 
-      expect(drawer.props("primaryButtonLoading")).toBe(true);
+      expect(drawer.props("primary")?.loading).toBe(true);
       expect(wrapper.vm.onSubmit.isLoading.value).toBe(true);
     });
 
@@ -477,7 +477,7 @@ describe("MoveDashboardToAnotherFolder", () => {
       await wrapper.vm.$nextTick();
       const drawer = wrapper.findComponent(ODialogStub);
 
-      expect(drawer.props("primaryButtonLoading")).toBe(false);
+      expect(drawer.props("primary")?.loading).toBeFalsy();
       expect(wrapper.vm.onSubmit.isLoading.value).toBe(false);
     });
   });
@@ -613,14 +613,14 @@ describe("MoveDashboardToAnotherFolder", () => {
       expect(wrapper.vm.dashboardIds).toEqual([]);
     });
 
-    it("should mark primaryButtonDisabled true when no folder is changed", () => {
+    it("should mark primary?.disabled true when no folder is changed", () => {
       wrapper = createWrapper();
 
       // Default state: selectedFolder.value === activeFolderId
       expect(wrapper.vm.selectedFolder).toBeTruthy();
       expect(wrapper.vm.selectedFolder.value).toBe("default");
       const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("primaryButtonDisabled")).toBe(true);
+      expect(drawer.props("primary")?.disabled).toBe(true);
     });
   });
 

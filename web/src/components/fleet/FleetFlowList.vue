@@ -19,8 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex shrink-0 items-center gap-2 px-3 pt-3">
       <OText variant="panel-title" class="flex-1">{{ title }}</OText>
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :data-test="`fleet-flow-list-${listId}-top3`"
         @click="showTop"
       >
@@ -30,8 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="shrink-0 px-3 py-2">
       <OSearchInput
         v-model="filter"
-        size="sm"
-        clearable
         :placeholder="filterPlaceholder"
         :data-test="`fleet-flow-list-${listId}-filter`"
       />
@@ -39,15 +37,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="border-border-default flex shrink-0 items-center gap-2 border-y px-3 py-1.5">
       <OCheckbox
         :model-value="allState"
-        size="sm"
         :aria-label="t('fleet.flow.selectAll')"
         :data-test="`fleet-flow-list-${listId}-all`"
         @update:model-value="toggleAll"
       />
       <OButton
         variant="ghost"
-        size="xs"
-        :icon-right="sortAsc ? 'arrow-upward' : 'arrow-downward'"
+        size="sm"
+        :icon-end="sortAsc ? 'arrow-upward' : 'arrow-downward'"
         :data-test="`fleet-flow-list-${listId}-sort`"
         @click="sortAsc = !sortAsc"
       >
@@ -63,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OCheckbox
           :model-value="isChecked(item.id)"
-          size="sm"
           :aria-label="item.label"
           :data-test="`fleet-flow-list-${listId}-item-${item.id}`"
           @update:model-value="toggle(item.id)"

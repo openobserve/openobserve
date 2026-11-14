@@ -45,7 +45,7 @@ const stubs = {
     emits: ["update:modelValue"],
     template: `<select :disabled="disabled" />`,
   },
-  OBanner: { name: "OBanner", props: ["variant"], template: "<div><slot /></div>" },
+  OInlineNotice: { name: "OInlineNotice", props: ["tone"], template: "<div><slot /></div>" },
 };
 
 const NOT_SET_UP = "Slack is not set up. An admin sets it up in Settings › Slack.";
@@ -116,15 +116,15 @@ describe("OnCallTeamSlackChannel", () => {
       "not set up",
       { slack_channel_set: false, slack_native: false, slack_connected: false },
       NOT_SET_UP,
-      "default",
+      "neutral",
     ],
-    ["another workspace", { slack_native: false }, OTHER_WORKSPACE, "warning"],
-  ])("unavailable (%s): shows the server's text", (_, over, text, variant) => {
+    ["another workspace", { slack_native: false }, OTHER_WORKSPACE, "warn"],
+  ])("unavailable (%s): shows the server's text", (_, over, text, tone) => {
     const wrapper = render(channel({ ...over, slack_unavailable_reason: text }));
 
     const banner = find(wrapper, "unavailable");
     expect(banner.text()).toBe(text);
-    expect(wrapper.findComponent({ name: "OBanner" }).props("variant")).toBe(variant);
+    expect(wrapper.findComponent({ name: "OInlineNotice" }).props("tone")).toBe(tone);
     expect(find(wrapper, "guidance").exists()).toBe(false);
     expect(find(wrapper, "test").exists()).toBe(false);
     expect(find(wrapper, "same-room").exists()).toBe(false);
@@ -141,7 +141,7 @@ describe("OnCallTeamSlackChannel", () => {
     const wrapper = render(channel({ slack_post_problem: POST_PROBLEM }));
 
     expect(find(wrapper, "post-problem").text()).toBe(POST_PROBLEM);
-    expect(wrapper.findComponent({ name: "OBanner" }).props("variant")).toBe("error");
+    expect(wrapper.findComponent({ name: "OInlineNotice" }).props("tone")).toBe("err");
   });
 
   it("offers the backup webhook only when the team has a webhook destination", () => {

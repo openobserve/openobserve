@@ -145,8 +145,8 @@ const mountOverview = async (props: Record<string, unknown> = {}) => {
         OCard: { template: "<div><slot /></div>" },
         OBanner: { template: "<div><slot /><slot name='actions' /></div>" },
         OEmptyState: {
-          template:
-            "<div><slot name='title' /><slot name='description' /><slot name='actions' /></div>",
+          props: ["title", "text"],
+          template: "<div>{{ title }}{{ text }}<slot name='text' /><slot name='actions' /></div>",
         },
         OButton: { template: "<button><slot /></button>" },
       },

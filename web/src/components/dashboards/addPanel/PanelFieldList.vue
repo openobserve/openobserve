@@ -8,10 +8,11 @@
     <div v-if="!frameless" class="px-page-edge my-3 flex shrink-0 items-center justify-between">
       <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
-        variant="outline"
-        size="icon-xs-sq"
+        icon-only
+        variant="secondary"
+        size="sm"
         class="rotate-90"
-        icon-left="unfold-less"
+        icon="unfold-less"
         :title="t('panel.collapseFields')"
         data-test="panel-field-list-collapse-btn"
         @click="emit('collapse')"
@@ -47,7 +48,7 @@
             :options="streamTypeOptions"
             data-test="index-dropdown-stream_type"
             class="mb-1"
-            label-position="inside"
+            variant="filter"
             :disabled="dashboardPanelDataPageKey === 'logs'"
             @update:model-value="onStreamTypeChange"
           />
@@ -62,9 +63,8 @@
             label-key="name"
             value-key="name"
             searchable
-            label-position="inside"
+            variant="filter"
             :disabled="dashboardPanelDataPageKey === 'logs'"
-            option-tooltip
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
           />
@@ -103,8 +103,8 @@
             <!-- Standard chart actions -->
             <div v-if="showStandardActions(row)" class="flex items-center gap-0.5">
               <OButton
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="isAddXAxisNotAllowed"
                 data-test="dashboard-add-x-data"
                 @click.stop="addXAxisItem(row)"
@@ -112,8 +112,8 @@
                 {{ dashboardPanelData.data.type != "h-bar" ? raw("+X") : raw("+Y") }}
               </OButton>
               <OButton
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="isAddYAxisNotAllowed"
                 data-test="dashboard-add-y-data"
                 @click.stop="addYAxisItem(row)"
@@ -122,8 +122,8 @@
               </OButton>
               <OButton
                 v-if="dashboardPanelData.data.type == 'table'"
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="isAddBreakdownNotAllowed"
                 data-test="dashboard-add-p-data"
                 @click.stop="addBreakDownAxisItem(row)"
@@ -146,8 +146,8 @@
                   dashboardPanelData.data.type == 'sunburst' ||
                   dashboardPanelData.data.type == 'hostmap'
                 "
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="isAddBreakdownNotAllowed"
                 data-test="dashboard-add-b-data"
                 @click.stop="addBreakDownAxisItem(row)"
@@ -156,8 +156,8 @@
               </OButton>
               <OButton
                 v-if="dashboardPanelData.data.type == 'heatmap'"
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="isAddZAxisNotAllowed"
                 data-test="dashboard-add-z-data"
                 @click.stop="addZAxisItem(row)"
@@ -169,8 +169,8 @@
                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                     .customQuery == false
                 "
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="
                   !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
                     (vrlField: any) => vrlField.name == row.name,
@@ -186,8 +186,8 @@
             <!-- Geomap actions -->
             <div v-if="showGeomapActions(row)" class="flex items-center gap-0.5">
               <OButton
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="
                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                     .fields?.latitude != null
@@ -198,8 +198,8 @@
                 {{ t("panel.addLatitudeShort") }}
               </OButton>
               <OButton
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="
                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                     .fields?.longitude != null
@@ -210,8 +210,8 @@
                 {{ t("panel.addLongitudeShort") }}
               </OButton>
               <OButton
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="
                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                     .fields?.weight != null
@@ -226,8 +226,8 @@
                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                     .customQuery == false
                 "
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="
                   !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
                     (vrlField: any) => vrlField.name == row.name,
@@ -243,8 +243,8 @@
             <!-- Maps actions -->
             <div v-if="showMapsActions(row)" class="flex items-center gap-0.5">
               <OButton
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="
                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                     .fields?.name != null
@@ -255,8 +255,8 @@
                 {{ t("panel.addNameShort") }}
               </OButton>
               <OButton
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="
                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                     .fields?.value_for_maps != null
@@ -267,8 +267,8 @@
                 {{ t("panel.addValueShort") }}
               </OButton>
               <OButton
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 data-test="dashboard-add-filter-data"
                 @click.stop="addFilteredItem(row as { name: string; stream: string })"
               >
@@ -279,8 +279,8 @@
             <!-- Sankey actions -->
             <div v-if="showSankeyActions(row)" class="flex items-center gap-0.5">
               <OButton
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="
                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                     .fields?.source != null
@@ -291,8 +291,8 @@
                 {{ t("panel.addSourceShort") }}
               </OButton>
               <OButton
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="
                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                     .fields?.target != null
@@ -303,8 +303,8 @@
                 {{ t("panel.addTargetShort") }}
               </OButton>
               <OButton
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="
                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                     .fields?.value != null
@@ -319,8 +319,8 @@
                   dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                     .customQuery == false
                 "
-                variant="ghost-neutral"
-                size="chip"
+                variant="ghost"
+                size="xs"
                 :disabled="
                   !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
                     (vrlField: any) => vrlField.name == row.name,
@@ -340,8 +340,8 @@
       <template #loading>
         <div class="flex flex-col">
           <div v-for="i in 6" :key="i" class="flex items-center gap-2 py-1">
-            <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 flex-shrink-0" />
-            <OSkeleton type="text" class="flex-1" />
+            <OSkeleton shape="block" class="h-3.5 w-3.5 flex-shrink-0" />
+            <OSkeleton class="flex-1" />
           </div>
         </div>
       </template>
@@ -363,14 +363,13 @@
         >
           <OTooltip
             side="left"
-            align="center"
-            max-width="18.75rem"
             :content="t('common.totalFields', { count: bottomProps.totalRows })"
           />
           <OButton
+            icon-only
             :aria-label="t('search.firstPage')"
-            variant="ghost-primary"
-            size="icon-panel"
+            variant="accent-ghost"
+            size="xs"
             :disabled="bottomProps.isFirstPage"
             data-test="field-list-pagination-first"
             @click="bottomProps.firstPage"
@@ -379,8 +378,9 @@
           </OButton>
           <template v-for="page in visiblePagesForTotal(bottomProps)" :key="page">
             <OButton
+              icon-only
               :variant="bottomProps.currentPage === page ? 'primary' : 'ghost'"
-              size="icon-panel"
+              size="xs"
               :data-test="`field-list-pagination-page-${page}`"
               @click="setPage(page)"
             >
@@ -388,9 +388,10 @@
             </OButton>
           </template>
           <OButton
+            icon-only
             :aria-label="t('search.lastPage')"
-            variant="ghost-primary"
-            size="icon-panel"
+            variant="accent-ghost"
+            size="xs"
             :disabled="bottomProps.isLastPage"
             data-test="field-list-pagination-last"
             @click="bottomProps.lastPage"

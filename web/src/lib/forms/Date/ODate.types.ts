@@ -33,11 +33,8 @@ export interface DateProps {
   required?: boolean;
   /** Control size */
   size?: DateSize;
-  /**
-   * Position of the label: 'outside' renders above the field (default),
-   * 'inside' renders as a compact floating mini-label inside the field border (size md).
-   */
-  labelPosition?: "inside" | "outside";
+  /** Text inside the box before the date, such as a toolbar label ("Day:") (S3) */
+  prefix?: string;
   /** HTML id */
   id?: string;
   /** HTML name */

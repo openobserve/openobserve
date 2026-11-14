@@ -72,7 +72,7 @@ describe("IngestLogs Index Component", () => {
         stubs: {
           OSplitter: true,
           OTabs: true,
-          ORouteTab: true,
+          OTab: true,
           RouterView: true,
         },
       },
@@ -537,7 +537,7 @@ describe("IngestLogs Index Component", () => {
           stubs: {
             OSplitter: true,
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             RouterView: true,
           },
         },
@@ -570,7 +570,7 @@ describe("IngestLogs Index Component", () => {
           stubs: {
             OSplitter: true,
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             RouterView: true,
           },
         },
@@ -599,7 +599,7 @@ describe("IngestLogs Index Component", () => {
           stubs: {
             OSplitter: true,
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
           },
         },
       });

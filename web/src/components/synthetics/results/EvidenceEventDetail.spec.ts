@@ -18,7 +18,7 @@ import { mount } from "@vue/test-utils";
 
 import i18n from "@/locales";
 import EvidenceEventDetail from "./EvidenceEventDetail.vue";
-import OCode from "@/lib/core/Code/OCode.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import type { EvidenceEvent } from "@/composables/synthetics/syntheticResultsSchema";
 
 const ev = (over: Partial<EvidenceEvent>): EvidenceEvent => ({
@@ -136,10 +136,10 @@ describe("EvidenceEventDetail", () => {
     expect(plain.find('[data-test="synthetics-evidence-event-detail-copy-value"]').exists()).toBe(
       true,
     );
-    expect(plain.findComponent(OCode).exists()).toBe(false);
+    expect(plain.findComponent(OCodeBlock).exists()).toBe(false);
 
     const withStack = mountDetail(ev({ kind: "pageerror", message: "x", stack: "at h" }));
-    const code = withStack.findComponent(OCode);
+    const code = withStack.findComponent(OCodeBlock);
     expect(code.exists()).toBe(true);
     expect(code.props("copyable")).toBe(true);
   });

@@ -19,8 +19,9 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -31,7 +32,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
-import { copyToClipboard } from "@/utils/clipboard";
 import K8sDrawerMetrics from "./K8sDrawerMetrics.vue";
 import PodDetails from "./PodDetails.vue";
 import NodeDetails from "./NodeDetails.vue";
@@ -200,9 +200,6 @@ watch(
   },
 );
 
-const copyName = () =>
-  copyToClipboard(props.details.name, t, { successMessage: t("infra.k8s2.drawerCopied") });
-
 const ageText = computed(() =>
   props.row?.createdAt == null
     ? null
@@ -213,7 +210,7 @@ const insight = computed(() => {
   const warnings = props.row?.warnings ?? [];
   if (!warnings.length) return null;
   return {
-    variant: severityOf(warnings) === "error" ? ("error" as const) : ("warning" as const),
+    tone: severityOf(warnings) === "error" ? ("err" as const) : ("warn" as const),
     content: raw(warnings.map((w) => String(warningLabel(w, t, end.value))).join("\n")),
   };
 });
@@ -251,12 +248,12 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
   <ODrawer
     :open="true"
     side="right"
-    size="lg"
+    size="md"
     seamless
     :modal="false"
     :anchor="anchor"
     :title="title"
-    :sub-title="subTitle"
+    :subtitle="subTitle"
     data-test="k8s2-details-drawer"
     @update:open="(open: boolean) => !open && emit('close')"
   >
@@ -267,20 +264,18 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
           <OTruncatedText class="text-base font-semibold" data-test="k8s2-drawer-name">{{
             raw(details.name)
           }}</OTruncatedText>
-          <OButton
-            variant="ghost"
-            size="icon-xs-sq"
-            icon-left="content-copy"
-            :aria-label="t('infra.k8s2.drawerCopyName')"
+          <OCopyButton
+            size="sm"
             data-test="k8s2-drawer-copy"
-            @click="copyName"
+            :label="t('infra.k8s2.drawerCopyName')"
+            :value="details.name"
           />
         </div>
         <div class="flex min-w-0 flex-wrap items-center gap-2">
           <OTag
             v-if="headerStatus"
-            size="xs"
-            :variant="TONE_PILL[headerStatus.tone].variant"
+            size="sm"
+            :tone="TONE_PILL[headerStatus.tone].variant"
             :icon="TONE_PILL[headerStatus.tone].icon"
             data-test="k8s2-drawer-status"
             >{{ headerStatus.text }}</OTag
@@ -293,7 +288,7 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
     </template>
     <div ref="body" class="flex flex-col gap-5">
       <div v-if="!row" class="flex justify-center py-6">
-        <OSpinner v-if="pending" size="md" data-test="k8s2-drawer-pending" />
+        <OSpinner v-if="pending" size="lg" data-test="k8s2-drawer-pending" />
         <OText v-else variant="meta" data-test="k8s2-drawer-not-found">{{
           t("infra.k8s2.drawerNotFound")
         }}</OText>
@@ -303,8 +298,7 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
           <OButton
             v-if="details.kind === 'node'"
             variant="primary"
-            size="sm-action"
-            icon-left="view-in-ar"
+            icon="view-in-ar"
             data-test="k8s2-drawer-action-pods"
             @click="showPods"
             >{{ t("infra.k8s2.drawerActionPods") }}</OButton
@@ -312,19 +306,16 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
           <OButton
             v-if="hasLogs"
             variant="primary"
-            size="sm-action"
-            icon-left="article"
+            icon="article"
             :disabled="noMember"
-            focusable-unavailable
+            :disabled-reason="t('infra.k8s2.drawerNoMemberPods')"
             data-test="k8s2-drawer-view-logs"
             @click="act('logs')"
-            >{{ t("infra.k8s2.drawerActionLogs") }}
-            <OTooltip v-if="noMember" :content="t('infra.k8s2.drawerNoMemberPods')"
-          /></OButton>
+            >{{ t("infra.k8s2.drawerActionLogs") }}</OButton
+          >
           <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="data-object"
+            variant="secondary"
+            icon="data-object"
             data-test="k8s2-drawer-action-yaml"
             @click="act('yaml')"
             >{{ t("infra.k8s2.drawerActionYaml") }}</OButton
@@ -334,13 +325,8 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
             :content="tracesLock.lockedReason.value"
           >
             <span class="inline-flex">
-              <OButton
-                variant="outline"
-                size="sm-action"
-                disabled
-                data-test="k8s2-drawer-action-traces"
-              >
-                <template #icon-left>
+              <OButton variant="secondary" disabled data-test="k8s2-drawer-action-traces">
+                <template #icon>
                   <OIcon
                     name="lock"
                     class="text-icon-locked"
@@ -354,25 +340,18 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
           </OTooltip>
           <OButton
             v-else-if="hasTraces"
-            variant="outline"
-            size="sm-action"
-            icon-left="account-tree"
+            variant="secondary"
+            icon="account-tree"
             :disabled="noMember"
-            focusable-unavailable
+            :disabled-reason="t('infra.k8s2.drawerNoMemberPods')"
             data-test="k8s2-drawer-action-traces"
             @click="act('traces')"
-            >{{ t("infra.k8s2.drawerActionTraces") }}
-            <OTooltip v-if="noMember" :content="t('infra.k8s2.drawerNoMemberPods')"
-          /></OButton>
+            >{{ t("infra.k8s2.drawerActionTraces") }}</OButton
+          >
           <OTooltip v-if="metricsLock.locked.value" :content="metricsLock.lockedReason.value">
             <span class="inline-flex">
-              <OButton
-                variant="outline"
-                size="sm-action"
-                disabled
-                data-test="k8s2-drawer-action-metrics"
-              >
-                <template #icon-left>
+              <OButton variant="secondary" disabled data-test="k8s2-drawer-action-metrics">
+                <template #icon>
                   <OIcon
                     name="lock"
                     class="text-icon-locked"
@@ -386,38 +365,33 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
           </OTooltip>
           <OButton
             v-else
-            variant="outline"
-            size="sm-action"
-            icon-left="show-chart"
+            variant="secondary"
+            icon="show-chart"
             data-test="k8s2-drawer-action-metrics"
             @click="act('metrics')"
             >{{ t("infra.k8s2.drawerActionMetrics") }}</OButton
           >
           <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="auto-awesome"
+            variant="secondary"
+            icon="auto-awesome"
             disabled
-            focusable-unavailable
+            :disabled-reason="t('infra.k8s2.drawerExplainUnavailable')"
             data-test="k8s2-drawer-action-explain"
             >{{ t("infra.k8s2.drawerActionExplain") }}
-            <OTooltip :content="t('infra.k8s2.drawerExplainUnavailable')" />
           </OButton>
         </div>
-        <OBanner
+        <OInlineNotice
           v-if="eventsScoped && !pending && !observed"
-          variant="info"
-          dense
-          :content="t('infra.k8s2.objectsNotObserved')"
+          tone="info"
+          :message="t('infra.k8s2.objectsNotObserved')"
           data-test="k8s2-drawer-not-observed"
         />
 
-        <OBanner
+        <OInlineNotice
+          class="wrap-anywhere whitespace-pre-line"
           v-if="insight"
-          :variant="insight.variant"
-          dense
-          preserve-whitespace
-          :content="insight.content"
+          :tone="insight.tone"
+          :message="insight.content"
           data-test="k8s2-drawer-insight"
         />
 
@@ -425,7 +399,7 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
           <OText variant="card-title" as="h3" class="border-border-default border-b pb-1">{{
             t("infra.k8s2.drawerProperties")
           }}</OText>
-          <ODescriptionList dense>
+          <ODescriptionList>
             <ODescriptionItem :label="t('infra.k8s2.drawerCreated')">
               <template v-if="row.createdAt != null">{{ agoAt(row.createdAt) }}</template>
             </ODescriptionItem>
@@ -438,8 +412,8 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
               data-test="k8s2-drawer-namespace"
             >
               <OButton
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 data-test="k8s2-drawer-namespace-link"
                 @click="openNamespace"
                 >{{ raw(details.namespace) }}</OButton
@@ -458,9 +432,7 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
               :data-test="`k8s2-drawer-${field.id}`"
             >
               <div v-if="field.items?.length" class="flex flex-col items-start gap-1">
-                <OTag v-for="s in field.items" :key="s" size="sm" variant="default-soft">{{
-                  raw(s)
-                }}</OTag>
+                <OTag v-for="s in field.items" :key="s" size="sm" tone="neutral">{{ raw(s) }}</OTag>
               </div>
               <span v-else-if="field.items === null" data-test="k8s2-drawer-not-observed-value"
                 >{{ raw("—") }}<OTooltip :content="t('infra.k8s2.drawerNotObserved')"
@@ -474,8 +446,8 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
                 {{ raw(controller.kind) }}
                 <OButton
                   v-if="controllerKind"
-                  variant="ghost-primary"
-                  size="xs"
+                  variant="accent-ghost"
+                  size="sm"
                   data-test="k8s2-drawer-owner-link"
                   @click="openController"
                   >{{ raw(controller.name) }}</OButton
@@ -523,7 +495,7 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
           <OText v-else-if="eventsFailed" variant="meta" data-test="k8s2-drawer-events-failed">{{
             t("infra.k8s2.drawerEventsFailed")
           }}</OText>
-          <OSpinner v-else-if="events === null" size="sm" data-test="k8s2-drawer-events-pending" />
+          <OSpinner v-else-if="events === null" size="lg" data-test="k8s2-drawer-events-pending" />
           <OText
             v-else-if="!shownEvents.length"
             variant="meta"
@@ -542,7 +514,7 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
                 :class="event.type === 'Warning' ? 'text-status-error-text' : ''"
                 >{{ raw(event.note) }}</OText
               >
-              <ODescriptionList dense>
+              <ODescriptionList>
                 <ODescriptionItem :label="t('infra.k8s2.drawerReason')">
                   <template v-if="event.reason">{{ raw(event.reason) }}</template>
                 </ODescriptionItem>

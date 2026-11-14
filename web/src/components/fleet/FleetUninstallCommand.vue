@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="opt in platformOptions"
         :key="opt.value"
         :value="opt.value"
-        size="sm"
         :data-test="`fleet-uninstall-command-os-${opt.value}`"
       >
         {{ opt.label }}
@@ -42,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="opt in roleOptions"
         :key="opt.value"
         :value="opt.value"
-        size="sm"
         :data-test="`fleet-uninstall-command-role-${opt.value}`"
       >
         {{ opt.label }}
@@ -51,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCodeBlock
       :code="command"
       :lang="platform === 'windows' ? 'powershell' : 'bash'"
-      chrome="terminal"
       data-test="fleet-uninstall-command-code"
     />
     <OText variant="meta" data-test="fleet-uninstall-command-note">{{ note }}</OText>

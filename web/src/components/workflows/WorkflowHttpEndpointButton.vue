@@ -18,16 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Wrapper mode: a child tooltip after icon-left anchors to the icon alone -->
   <OTooltip side="bottom" :content="tooltip" :disabled="!tooltip">
     <OButton
-      variant="outline"
+      variant="secondary"
       :size="size"
-      icon-left="webhook"
+      icon="webhook"
       :data-test="dataTest"
       @click="emit('click')"
     >
       {{ t("workflow.http.editorButton") }}
       <OTag
         v-if="chip"
-        :variant="chip.variant"
+        :tone="chip.variant"
         size="sm"
         :label="t(chip.labelKey)"
         :data-test="`${dataTest}-chip`"

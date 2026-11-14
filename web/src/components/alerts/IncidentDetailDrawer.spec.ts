@@ -1297,7 +1297,7 @@ describe("IncidentDetailDrawer.vue", () => {
       const logsTab = wrapper
         .findAllComponents({ name: "OTab" })
         .find((tab) => tab.props("name") === "logs");
-      expect(logsTab?.props("suffixIcon")).toBe("lock");
+      expect(logsTab?.props("locked")).toBe(true);
     });
 
     it("loads correlated streams when correlation is enabled", async () => {

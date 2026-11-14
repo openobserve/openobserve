@@ -3,7 +3,11 @@
 <script setup lang="ts">
 import { computed, inject } from "vue";
 import type { Column } from "@tanstack/vue-table";
-import { TABLE_CHECKBOX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
+import {
+  ROW_ACTIONS_COLUMN_ID,
+  TABLE_CHECKBOX_COL_SIZE,
+  type OTableColumnDef,
+} from "../OTable.types";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
@@ -19,8 +23,6 @@ const props = defineProps<{
   expansionEnabled?: boolean;
   /** Render placeholder for the drag-handle column */
   enableRowReorder?: boolean;
-  /** Mirror the loaded body's row divider so the skeleton is the same height. */
-  bordered?: boolean;
 }>();
 
 // Same injection OTableBodyCell uses — under horizontal scroll the real cells
@@ -60,7 +62,7 @@ const isSpacerCol = (col: Column<any, any>): boolean => !!(defOf(col).meta as an
 const cellPadClass = (col: Column<any, any>): string => {
   const meta = (defOf(col).meta as any) ?? {};
   if (meta.spacer) return "px-0";
-  return meta.compactPadding ? "px-1" : "px-2";
+  return meta.compactPadding ? "px-1" : "px-3";
 };
 
 // Mirror OTableBodyCell's width + sticky-pinning behaviour exactly.
@@ -182,7 +184,7 @@ const alignClassFor = (col: Column<any, any>): string => {
           'align-middle',
           alignClassFor(col),
           isActionCol(col) ? 'w-0 whitespace-nowrap' : '',
-          bordered ? 'border-table-row-divider border-b' : '',
+          'border-table-row-divider border-b',
         ]"
         :style="cellStyle(col)"
       >
@@ -192,7 +194,10 @@ const alignClassFor = (col: Column<any, any>): string => {
           <span
             v-for="a in actionCountFor(col)"
             :key="`a-${r}-${c}-${a}`"
-            class="inline-flex h-8 w-8 shrink-0 items-center justify-center"
+            :class="[
+              'inline-flex shrink-0 items-center justify-center',
+              col.id === ROW_ACTIONS_COLUMN_ID ? 'size-control-xs' : 'size-control-md',
+            ]"
             aria-hidden="true"
           >
             <span

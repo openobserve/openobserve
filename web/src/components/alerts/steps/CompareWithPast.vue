@@ -63,12 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="ms-1 cursor-pointer"
                   :class="'text-text-secondary'"
                 />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.cycleTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                />
+                <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" />
               </span>
             </div>
             <div class="flex items-start justify-between gap-4">
@@ -83,20 +78,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <span class="inline-block">
                   <OButton
+                    icon-only
                     aria-hidden="true"
                     tabindex="-1"
-                    class="pointer-events-none min-w-auto opacity-30"
+                    class="pointer-events-none opacity-30"
                     variant="ghost"
-                    size="icon-circle-sm"
-                    disable
+                    size="sm"
+                    disabled
                   >
                     <OIcon name="delete-outline" size="sm" />
                   </OButton>
                   <OTooltip
                     :content="t('alerts.compareWithPast.currentWindowCannotBeDeleted')"
                     side="top"
-                    align="center"
-                    :sideOffset="8"
                   />
                 </span>
               </div>
@@ -142,12 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="ms-1 cursor-pointer"
                   :class="'text-text-secondary'"
                 />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.timeFrameTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                />
+                <OTooltip :content="t('alerts.compareWithPast.timeFrameTooltip')" side="right" />
               </span>
             </div>
             <div class="datetime-picker-wrapper rounded-default !border-border-default mt-2 border">
@@ -174,12 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="ms-1 cursor-pointer"
                   :class="'text-text-secondary'"
                 />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.cycleTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                />
+                <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" />
               </span>
             </div>
             <div class="flex items-start justify-between gap-4">
@@ -192,10 +176,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div>
                 <OButton
+                  icon-only
                   :aria-label="t('common.delete')"
                   data-test="multi-time-range-alerts-delete-btn"
                   variant="ghost"
-                  size="icon-circle-sm"
+                  size="sm"
                   @click="removeTimeShift(index)"
                 >
                   <OIcon name="delete-outline" size="sm" />
@@ -209,8 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mt-2 flex w-full items-center justify-center gap-3">
           <OButton
             data-test="multi-time-range-alerts-add-btn"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :disabled="isComparisonDisabled"
             @click="addTimeShift"
           >
@@ -219,8 +203,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isComparisonDisabled"
               :content="raw(comparisonDisabledTooltip)"
               side="top"
-              align="center"
-              :sideOffset="8"
             />
           </OButton>
         </div>

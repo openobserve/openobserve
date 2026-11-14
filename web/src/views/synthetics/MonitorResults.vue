@@ -24,9 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :title="raw(monitorName)"
     data-test="synthetic-monitor-results-page"
-    :subtitle="raw(folderName)"
     :back="{
-      label: t('synthetics.results.monitors'),
+      label: t('synthetics.tabs.checks'),
       to: backTo,
     }"
     bleed
@@ -36,12 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="envNames.length >= 2"
         :model-value="envScope"
         :options="envScopeOptions"
-        size="sm"
         :aria-label="t('synthetics.results.environmentScope')"
         data-test="synthetic-monitor-results-env-scope"
         @update:model-value="onEnvScopeChange(String($event))"
       />
-      <DateTime
+      <ODateTimeRange
         ref="dateTimeRef"
         auto-apply
         menu-align="end"
@@ -56,34 +54,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @on:date-change="onDateChange"
       />
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="play-arrow"
+        variant="secondary"
+        icon="play-arrow"
         :loading="isTriggering"
         data-test="synthetic-monitor-results-trigger-run-btn"
-        class="h-7.5!"
         @click="triggerRun"
       >
         {{ t("synthetics.runs.triggerRun") }}
       </OButton>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="edit"
+        variant="secondary"
+        icon="edit"
         data-test="synthetic-monitor-results-edit-btn"
-        class="h-7.5!"
         @click="editMonitor"
       >
         {{ t("synthetics.results.editCheck") }}
       </OButton>
       <OButton
+        icon-only
         :aria-label="t('common.refresh')"
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
+        variant="secondary"
+        icon="refresh"
         :loading="isRefreshing"
         data-test="synthetic-monitor-results-refresh-btn"
-        class="h-7.5!"
         @click="refresh"
       />
     </template>
@@ -112,17 +105,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     v-model:open="drawerOpen"
     side="right"
-    size="xxl"
-    :width="checkType === 'browser' ? 85 : undefined"
+    size="xl"
     :title="raw(monitorName)"
-    :subTitle="raw(drawerTimestamp)"
+    :subtitle="raw(drawerTimestamp)"
     data-test="synthetics-run-detail-drawer"
     @update:open="onDrawerClose"
   >
     <template #header-left>
       <OBadge
         v-if="drawerRunStatus"
-        :variant="drawerRunStatus.variant"
+        :tone="drawerRunStatus.variant"
         size="sm"
         :icon="drawerRunStatus.icon"
         class="ms-3"
@@ -131,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBadge>
       <OBadge
         v-if="drawerEnvironment"
-        variant="default"
+        tone="neutral"
         size="sm"
         icon="layers"
         data-test="synthetics-run-drawer-env-badge"
@@ -142,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            on OBadge's inline-flex root, or the URL is cut with no ellipsis. -->
       <OBadge
         v-if="drawerUrl"
-        variant="default"
+        tone="neutral"
         size="sm"
         icon="link"
         class="max-w-xs min-w-0"
@@ -169,25 +161,20 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
 import RunDetail from "@/views/synthetics/RunDetail.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
-import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
-import {
-  syntheticsEditRoute,
-  syntheticsFolderName,
-  syntheticsListRoute,
-} from "@/utils/synthetics/routes";
+import { syntheticsEditRoute, syntheticsListRoute } from "@/utils/synthetics/routes";
 
 defineOptions({ name: "SyntheticMonitorResults" });
 
@@ -240,15 +227,8 @@ function onEnvScopeChange(value: string) {
     runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
   });
 }
-// `?folder=` carries the folder ID (the server gates RBAC on it); the header
-// wants the name, so resolve it against the folder list Vuex already holds.
+// `?folder=` carries the folder ID; the server gates RBAC on it.
 const folderId = computed(() => String(route.query.folder ?? ""));
-const folderName = computed(() =>
-  syntheticsFolderName(
-    store.state.organizationData?.foldersByType?.synthetics ?? [],
-    folderId.value,
-  ),
-);
 const monitorStatus = computed<"healthy" | "degraded" | "critical">(
   () => (route.query.status as any) || "degraded",
 );
@@ -287,7 +267,7 @@ const drawerErrorRecord = ref<{
   device: string;
 } | null>(null);
 const drawerRunStatus = ref<{
-  variant: BadgeVariant;
+  variant: ChipTone;
   icon: string;
   label: I18nText;
 } | null>(null);
@@ -296,7 +276,7 @@ const drawerTimestamp = ref("");
 const drawerEnvironment = ref("");
 
 function onRunStatusUpdate(status: {
-  variant: BadgeVariant;
+  variant: ChipTone;
   icon: string;
   label: I18nText;
   url: string;
@@ -492,10 +472,6 @@ onMounted(() => {
   const envQ = route.query.env;
   if (typeof envQ === "string" && envQ) envScope.value = envQ;
   writeToUrl();
-  // Without the folder list the header subtitle falls back to the raw folder ID.
-  getFoldersListByType(store, "synthetics").catch((err) =>
-    console.error("[synthetics] failed to load folders", err),
-  );
   fetchCheck();
   // Auto-open drawer if query params present
   const runQ = route.query.run;

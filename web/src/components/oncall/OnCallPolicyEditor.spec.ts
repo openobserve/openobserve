@@ -397,7 +397,7 @@ describe("OnCallPolicyEditor", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-team-channel-source"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-team-channel-clear"]').attributes("variant")).toBe(
-      "outline",
+      "secondary",
     );
   });
 

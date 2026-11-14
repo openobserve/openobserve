@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="md"
     v-model:open="show"
-    :width="47"
     :title="t('pipeline.createBackfillJobTitle')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="t('pipeline.createBackfillJob')"
+    :secondary="{ label: t('common.cancel') }"
+    :primary="{ label: t('pipeline.createBackfillJob') }"
     form-id="create-backfill-form"
     @click:secondary="onCancel"
     data-test="create-backfill-job-dialog"
@@ -75,10 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-sm font-semibold">{{ t("pipeline.advancedOptions") }}</span>
             </div>
             <OButton
-              variant="ghost-muted"
-              size="icon-xs-sq"
+              icon-only
+              variant="ghost"
+              size="sm"
               :title="showAdvanced ? t('common.collapse') : t('common.expand')"
-              :icon-left="showAdvanced ? 'unfold-less' : 'unfold-more'"
+              :icon="showAdvanced ? 'unfold-less' : 'unfold-more'"
               @click.stop="showAdvanced = !showAdvanced"
               class="opacity-50 transition-all duration-200 hover:opacity-100"
             />
@@ -102,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :placeholder="raw(String(scheduleFrequency || 60))"
                     data-test="chunk-period-input"
                   >
-                    <template #icon-right>
+                    <template #icon-end>
                       <OIcon name="info-outline" size="sm" />
                       <OTooltip
                         :content="
@@ -133,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :placeholder="t('pipeline.defaultDelaySecondsPlaceholder')"
                     data-test="delay-between-chunks-input"
                   >
-                    <template #icon-right>
+                    <template #icon-end>
                       <OIcon name="info-outline" size="sm" />
                       <OTooltip :content="t('pipeline.defaultDelayTooltip')" />
                     </template>
@@ -212,13 +213,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     data-test="create-backfill-job-delete-confirmation-dialog"
     v-model:open="showDeleteConfirmation"
-    persistent
     size="sm"
     :title="t('pipeline.confirmDataDeletion')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="t('pipeline.yesDeleteAndBackfill')"
-    primary-button-variant="destructive"
-    :primary-button-loading="loading"
+    :secondary="{ label: t('common.cancel') }"
+    :primary="{ label: t('pipeline.yesDeleteAndBackfill'), variant: 'danger', loading: loading }"
     @click:secondary="showDeleteConfirmation = false"
     @click:primary="confirmDelete"
   >

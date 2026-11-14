@@ -26,9 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="def.breakdown"
       ref="chip"
       :label="valueLabel"
-      variant="primary-outline"
-      size="sm"
-      clickable
+      toggle
       removable
       class="max-w-full min-w-0"
       :remove-label="t('rum.analytics.funnel.breakdownRemove')"
@@ -47,15 +45,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdown align="start">
         <template #trigger>
           <OButton
-            variant="outline"
-            size="xs"
-            icon-right="arrow-drop-down"
+            variant="secondary"
+            size="sm"
+            icon-end="arrow-drop-down"
             data-test="rum-analytics-funnel-breakdown-from-step"
             >{{ fromLabel }}</OButton
           >
         </template>
         <ODropdownItem
-          :icon-left="attribute.s === undefined ? 'check' : undefined"
+          :icon="attribute.s === undefined ? 'check' : undefined"
           data-test="rum-analytics-funnel-breakdown-from-auto"
           @select="setStep(null)"
           >{{
@@ -67,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdownItem
           v-for="(name, i) in stepNames"
           :key="i"
-          :icon-left="attribute.s === i + 1 ? 'check' : undefined"
+          :icon="attribute.s === i + 1 ? 'check' : undefined"
           :data-test="`rum-analytics-funnel-breakdown-from-${i + 1}`"
           @select="setStep(i + 1)"
           >{{
@@ -78,21 +76,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #action>
       <OPopover
+        size="lg"
         :open="open"
         side="right"
         align="start"
-        content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
+        content-class="p-3"
         :aria-label="t('rum.analytics.funnel.railBreakdown')"
         @update:open="setOpen"
       >
         <template #trigger>
           <span>
             <OButton
+              icon-only
               ref="add"
               variant="ghost"
-              size="icon-sm"
-              icon-left="add"
-              :active="open"
+              icon="add"
+              :pressed="open"
               :disabled="!!def.breakdown"
               :aria-label="t('rum.analytics.funnel.breakdownAdd')"
               data-test="rum-analytics-funnel-add-breakdown-btn"

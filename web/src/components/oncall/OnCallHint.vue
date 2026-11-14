@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- A hint that lives in a tooltip: a Tab stop that opens it on focus, so keyboard and screen-reader users reach the text too. -->
 <template>
-  <OTooltip :content="hint" :max-width="maxWidth">
+  <OTooltip :content="hint">
     <span
       v-bind="$attrs"
       tabindex="0"

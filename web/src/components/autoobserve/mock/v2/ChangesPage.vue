@@ -72,7 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="f in CHANGE_FILTERS"
           :key="f"
           :value="f"
-          size="sm"
           class="rounded-full! px-3!"
           :data-test="`autoobserve2-activity-filter-${f}`"
         >

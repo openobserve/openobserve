@@ -2,21 +2,18 @@
   <ODropdown v-model:open="picker.showMenu" side="bottom" :align="props.align">
     <template #trigger>
       <OButton
-        :style="{
-          width: changeStyle ? '10.625rem' : '11.25rem',
-          height: changeStyle ? '2.5rem' : '',
-        }"
+        :style="{ width: changeStyle ? '10.625rem' : '11.25rem' }"
         data-test="date-time-btn"
-        variant="outline"
-        class="rounded-default h-full min-w-auto bg-[rgba(89,96,178,0.2)]! px-1.25 py-0 text-xs"
-        :class="changeStyle ? computedClass : 'h-8!'"
+        variant="secondary"
+        class="rounded-default min-w-auto bg-[rgba(89,96,178,0.2)]! px-1.25 py-0 text-xs"
+        :class="changeStyle ? computedClass : ''"
         :disabled="isFirstEntry"
       >
-        <template v-if="!changeStyle" #icon-left>
+        <template v-if="!changeStyle" #icon>
           <OIcon name="schedule" size="sm" />
         </template>
         {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
-        <template #icon-right>
+        <template #icon-end>
           <OIcon
             name="arrow-drop-down"
             size="sm"
@@ -41,7 +38,7 @@
                   <OButton
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
                     variant="ghost"
-                    class="h-8! w-8! font-bold! disabled:opacity-35"
+                    class="w-8! font-bold! disabled:opacity-35"
                     :class="
                       isSelected(item, period.value)
                         ? 'bg-button-primary! text-button-primary-foreground!'
@@ -72,9 +69,6 @@
                       :aria-label="t('dashboard.unitLabel')"
                       @update:model-value="updateCustomPeriod"
                     >
-                      <template v-slot:selected-item>
-                        <div>{{ getPeriodLabel() }}</div>
-                      </template>
                     </OSelect>
                   </div>
                 </div>

@@ -15,11 +15,13 @@
 
 import { computed, ref } from "vue";
 
-// Must mirror Tailwind's default `md`/`lg` screens so JS-driven layout switches with the CSS variants.
+// Must mirror Tailwind's default `sm`/`md`/`lg` screens so JS-driven layout switches with the CSS variants.
+const SM_QUERY = "(min-width: 40rem)";
 const MD_QUERY = "(min-width: 48rem)";
 const LG_QUERY = "(min-width: 64rem)";
 
 // Module-level singletons: one pair of app-lifetime matchMedia listeners shared by every consumer.
+const smUp = ref(true);
 const mdUp = ref(true);
 const lgUp = ref(true);
 let initialized = false;
@@ -44,6 +46,7 @@ const ensureInit = () => {
   if (initialized || typeof window === "undefined" || typeof window.matchMedia !== "function")
     return;
   initialized = true;
+  track(SM_QUERY, smUp);
   track(MD_QUERY, mdUp);
   track(LG_QUERY, lgUp);
 };
@@ -55,6 +58,7 @@ const useBreakpoint = () => {
     isMobile: computed(() => !mdUp.value),
     isTablet: computed(() => mdUp.value && !lgUp.value),
     isDesktop: computed(() => lgUp.value),
+    smUp: computed(() => smUp.value),
     mdUp: computed(() => mdUp.value),
     lgUp: computed(() => lgUp.value),
   };

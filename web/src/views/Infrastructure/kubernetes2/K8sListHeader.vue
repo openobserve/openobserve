@@ -108,8 +108,8 @@ const onNamespaces = (value: unknown) =>
       <span class="text-text-secondary min-w-0 shrink truncate text-xs" data-test="k8s2-list-count">
         <template v-if="filtered">
           <OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             data-test="k8s2-list-filtered-clear"
             @click="emit('clear')"
             >{{ t("infra.k8s2.filtered") }}</OButton
@@ -127,14 +127,9 @@ const onNamespaces = (value: unknown) =>
         <template v-else>{{ countLabel ?? t("infra.k8s2.items", { count }, count) }}</template>
         <template v-if="countSuffix">{{ raw(" · ") }}{{ countSuffix }}</template>
       </span>
-      <OTag
-        v-if="chip"
-        size="xs"
-        variant="default-soft"
-        class="shrink-0"
-        data-test="k8s2-list-chip"
-        >{{ chip }}</OTag
-      >
+      <OTag v-if="chip" size="sm" tone="neutral" class="shrink-0" data-test="k8s2-list-chip">{{
+        chip
+      }}</OTag>
     </div>
     <OToggleGroup
       v-if="statusChips.length"
@@ -147,7 +142,6 @@ const onNamespaces = (value: unknown) =>
         v-for="chip in statusChips"
         :key="chip.id"
         :value="chip.id"
-        size="sm"
         :data-test="`k8s2-status-chip-${chip.id}`"
         >{{ t(chip.label) }}
         <span class="text-text-secondary ms-1 tabular-nums">{{ raw(String(chip.count)) }}</span>
@@ -157,11 +151,10 @@ const onNamespaces = (value: unknown) =>
       <OSelect
         v-if="namespaced"
         class="w-56 max-md:hidden"
-        size="sm"
         multiple
         searchable
         clearable
-        :max-visible-chips="1"
+        :max-chips="1"
         :model-value="namespaces"
         :options="options"
         :placeholder="t('infra.k8s2.allNamespaces')"
@@ -170,9 +163,9 @@ const onNamespaces = (value: unknown) =>
       />
       <OButton
         v-if="namespaced"
+        icon-only
         class="md:hidden"
-        variant="outline"
-        size="icon-sm"
+        variant="secondary"
         :aria-label="t('infra.k8s2.namespaceFilter')"
         data-test="k8s2-namespace-filter-btn"
         @click="filterOpen = true"
@@ -183,7 +176,6 @@ const onNamespaces = (value: unknown) =>
       <OSearchInput
         v-if="searchable"
         class="min-w-0 flex-1 max-md:min-w-40 md:w-56 md:flex-none"
-        size="sm"
         :model-value="search"
         :debounce="300"
         :placeholder="searchPlaceholder"

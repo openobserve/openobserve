@@ -49,13 +49,11 @@ afterEach(() => {
 });
 
 describe("LogsNoDataState", () => {
-  it("renders today's hero by default: connect illustration, title, description and cards", () => {
+  it("renders today's hero by default: link icon, title, description and cards", () => {
     mountState();
-    expect(shellProps()).toMatchObject({ size: "hero", illustration: "connect" });
-    expect(Object.keys(shellProps())).not.toContain("backdrop");
+    expect(shellProps()).toMatchObject({ icon: "link" });
     expect(wrapper.find("h2").text()).toBe("Start sending data to OpenObserve");
     expect(wrapper.text()).toContain("There's no data in this organization yet");
-    expect(wrapper.find('[data-test="logs-no-data-another-way"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="logs-no-data-curl-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="logs-no-data-kubernetes-btn"]').exists()).toBe(true);
   });
@@ -73,11 +71,8 @@ describe("LogsNoDataState", () => {
 
   it("keeps only the cards and chips under an Or start another way caption below the panel (e1)", () => {
     mountState({ alternativesOnly: true });
-    expect(shellProps()).toMatchObject({ size: "block", backdrop: false });
-    expect(shellProps().illustration).toBeUndefined();
-    expect(wrapper.find('[data-test="logs-no-data-another-way"]').text()).toBe(
-      "Or start another way",
-    );
+    expect(shellProps()).toMatchObject({ size: "inline" });
+    expect(wrapper.find('[data-test="o2-empty-state-title"]').text()).toBe("Or start another way");
     expect(wrapper.text()).not.toContain("Start sending data to OpenObserve");
     expect(wrapper.text()).not.toContain("There's no data in this organization yet");
     expect(wrapper.find('[data-test="logs-no-data-curl-card"]').exists()).toBe(true);
