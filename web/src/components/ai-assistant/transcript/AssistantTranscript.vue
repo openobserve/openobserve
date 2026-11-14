@@ -215,7 +215,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="icon"
         :aria-label="jumpName"
-        class="bg-surface-panel! text-text-heading! border-border-default! pointer-events-auto size-10! rounded-full! shadow-lg max-md:min-h-11 pointer-coarse:min-h-11"
+        :class="[
+          'bg-surface-panel! text-text-heading! border-border-default! pointer-events-auto size-10! rounded-full! shadow-lg',
+          TOUCH_TARGET_CLASS,
+        ]"
         data-test="assistant-transcript-jump-latest"
         @click="jumpToLatest"
       >
@@ -351,6 +354,7 @@ import {
 } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import { announceComposer, composerRowOf } from "@/components/ai-assistant/composer/composerUi";
 import { rangeText } from "@/components/ai-assistant/evidence/evidenceText";
 import AssistantTurnOutcome, {

@@ -31,6 +31,7 @@ import {
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import { raw } from "@/types/i18n";
 
+import { TOUCH_TARGET_CLASS } from "@/components/ai-assistant/common/touchTarget";
 import { composerUi } from "@/components/ai-assistant/composer/composerUi";
 
 import AssistantTranscript from "./AssistantTranscript.vue";
@@ -528,6 +529,15 @@ describe("AssistantTranscript", () => {
     expect(pill.attributes("aria-label")).toContain("2");
     await pill.trigger("click");
     expect(host.setFollow).toHaveBeenCalledWith("s1", true);
+  });
+
+  it("gives Jump to latest a 2.75 rem target both ways on touch and below md", async () => {
+    const session = liveSession([prompt("q", "t1"), reply("a")]);
+    const { wrapper } = mountLive(session);
+    session.ui.follow = false;
+    await flushPromises();
+    const classes = wrapper.get('[data-test="assistant-transcript-jump-latest"]').classes();
+    expect(classes).toEqual(expect.arrayContaining(TOUCH_TARGET_CLASS.split(" ")));
   });
 
   it("gives each answer the anchor its share link lands on", async () => {
