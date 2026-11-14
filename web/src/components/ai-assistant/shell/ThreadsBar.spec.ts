@@ -119,6 +119,19 @@ describe("ThreadsBar", () => {
     document.body.innerHTML = "";
   });
 
+  it("publishes the band the launcher covers for the page to reserve, and clears it when gone", async () => {
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ top: window.innerHeight - 72, height: 48 } as DOMRect);
+    const wrapper = mountBar();
+    await flushPromises();
+    const inset = () => document.documentElement.style.getPropertyValue("--o-threads-bar-inset");
+    expect(Number(inset())).toBe(4.5);
+    wrapper.unmount();
+    expect(inset()).toBe("");
+    rect.mockRestore();
+  });
+
   it("badges every listed chat and previews the waiting one first", async () => {
     const wrapper = mountBar();
     await flushPromises();
