@@ -849,9 +849,11 @@ async fn send_incident_notifications_inner(
         };
 
     let cfg = config::get_config();
-    let incident_url = format!(
-        "{}/web/alerts/incidents/{incident_id}?org_identifier={org_id}",
-        cfg.common.web_url
+    let incident_url = incident_page_url(
+        &cfg.common.web_url,
+        &cfg.common.base_uri,
+        org_id,
+        incident_id,
     );
     let subject = format!("[{event}] {title}");
 
@@ -861,6 +863,7 @@ async fn send_incident_notifications_inner(
     for mut send in sends {
         apply_incident_to_context(
             &mut send.ctx,
+            org_id,
             incident_id,
             event,
             &title,
@@ -945,10 +948,17 @@ fn retries_incident_notify(
     error.is_retryable() && attempt < attempts
 }
 
+/// The incident drawer; the app routes it at `/web/incidents/:id`.
+#[cfg(feature = "enterprise")]
+fn incident_page_url(web_url: &str, base_uri: &str, org_id: &str, incident_id: &str) -> String {
+    format!("{web_url}{base_uri}/web/incidents/{incident_id}?org_identifier={org_id}")
+}
+
 /// Point `ctx` at the incident: its link, and the `incident_*` template variables.
 #[cfg(feature = "enterprise")]
 fn apply_incident_to_context(
     ctx: &mut crate::alerts::notifications::NotificationContext,
+    org_id: &str,
     incident_id: &str,
     event: &str,
     title: &str,
@@ -956,8 +966,21 @@ fn apply_incident_to_context(
     service_name: &str,
     incident_url: &str,
 ) {
-    // The alert's own link points at its search; an incident notification must open the incident.
+    // The source alert's page is the object button; the incident page replaces its data link.
+    let cfg = config::get_config();
+    ctx.alert_detail_url = crate::alerts::notifications::context::alert_detail_url(
+        &cfg.common.web_url,
+        &cfg.common.base_uri,
+        org_id,
+        &ctx.alert_id,
+    );
+    ctx.alert_detail_label = if ctx.alert_detail_url.is_empty() {
+        String::new()
+    } else {
+        "Open alert".to_string()
+    };
     ctx.alert_url = incident_url.to_string();
+    ctx.alert_url_label = "Open incident".to_string();
     ctx.incident_id = incident_id.to_string();
     ctx.kind = config::meta::alerts::notification_kind::NotificationKind::Incident;
     ctx.event = config::meta::alerts::notification_kind::NotificationEvent::Firing;
@@ -8912,17 +8935,43 @@ mod tests {
         };
         apply_incident_to_context(
             &mut ctx,
+            "default",
             "inc_1",
             "severity_escalated",
             "High error rate",
             "P1",
             "checkout",
-            "https://o2/web/alerts/incidents/inc_1",
+            "https://o2/web/incidents/inc_1",
         );
         assert_eq!(ctx.kind, NotificationKind::Incident);
         assert_eq!(ctx.event, NotificationEvent::Firing);
         assert_eq!(ctx.episode_id.as_deref(), Some("inc_1"));
-        assert_eq!(ctx.alert_url, "https://o2/web/alerts/incidents/inc_1");
+        assert_eq!(ctx.alert_url, "https://o2/web/incidents/inc_1");
+        assert_eq!(ctx.alert_url_label, "Open incident");
+        assert!(
+            ctx.alert_detail_url.is_empty(),
+            "no source alert, no object link"
+        );
+        let mut sourced = crate::alerts::notifications::NotificationContext {
+            alert_id: "7Kx2".into(),
+            alert_url: "https://o2/web/short/ab".into(),
+            ..Default::default()
+        };
+        apply_incident_to_context(&mut sourced, "acme", "inc_1", "e", "t", "P1", "s", "u");
+        let cfg = config::get_config();
+        assert_eq!(
+            sourced.alert_detail_url,
+            crate::alerts::notifications::context::alert_detail_url(
+                &cfg.common.web_url,
+                &cfg.common.base_uri,
+                "acme",
+                "7Kx2"
+            )
+        );
+        assert_eq!(
+            incident_page_url("https://o2.acme.com", "/o2", "acme", "inc_1"),
+            "https://o2.acme.com/o2/web/incidents/inc_1?org_identifier=acme"
+        );
         let route =
             crate::alerts::notifications::notify::route(&pagerduty_resolved(), &ctx).unwrap();
         assert_eq!(route, crate::alerts::notifications::notify::Route::Render);
@@ -10837,7 +10886,7 @@ mod tests {
             default_template::compiled_default_content, render, resolve_content,
         };
 
-        let incident_url = "https://o2.example/web/alerts/incidents/inc-1?org_identifier=default";
+        let incident_url = "https://o2.example/web/incidents/inc-1?org_identifier=default";
         let mut ctx = NotificationContext {
             alert_name: "go_gc_rate_high".into(),
             stream_name: "go_gc_duration_seconds".into(),
@@ -10848,6 +10897,7 @@ mod tests {
         };
         super::apply_incident_to_context(
             &mut ctx,
+            "default",
             "inc-1",
             "new_incident_created",
             "go_gc_rate_high on coredns",
@@ -10872,7 +10922,9 @@ mod tests {
             ("", None),
         ] {
             let mut other = NotificationContext::default();
-            super::apply_incident_to_context(&mut other, "inc-2", "e", "t", severity, "s", "u");
+            super::apply_incident_to_context(
+                &mut other, "default", "inc-2", "e", "t", severity, "s", "u",
+            );
             assert_eq!(other.level, level, "{severity}");
         }
 

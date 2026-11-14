@@ -183,10 +183,7 @@ fn build_test_message_with_title(
     spec.validate().map_err(TestSendError::InvalidContent)?;
 
     let format = derive_channel_format(dest_type);
-    let ctx: NotificationContext = match kind {
-        NotificationKind::Alert => synthetic_context(Some(AlertLevel::Critical)),
-        kind => super::examples::example_context(kind, false),
-    };
+    let ctx = test_context(kind);
     // The live path (`notify::route`) skips this platform for this event, so a test must not send.
     if platform_of(dest_type).is_some() && kind.platform_action(ctx.event) == PlatformAction::Skip {
         return Err(TestSendError::PlatformSkipped(kind));
@@ -201,6 +198,14 @@ fn build_test_message_with_title(
     Ok((title, rendered))
 }
 
+/// The sample a test-send renders: the alert fixture, or the kind's own example.
+fn test_context(kind: NotificationKind) -> NotificationContext {
+    match kind {
+        NotificationKind::Alert => synthetic_context(Some(AlertLevel::Critical)),
+        kind => super::examples::example_context(kind, false),
+    }
+}
+
 /// Sends the `[TEST] `-marked message; tests call [`build_test_message`] to skip the network.
 /// Charges `user_id`'s rate limit only after validation and rendering pass.
 pub async fn test_send(
@@ -210,6 +215,16 @@ pub async fn test_send(
     spec: &ContentSpec,
     kind: NotificationKind,
 ) -> Result<String, TestSendError> {
+    if let DestinationType::SlackApp(target) = dest_type {
+        spec.validate().map_err(TestSendError::InvalidContent)?;
+        let ctx = test_context(kind);
+        let content = resolve_content(spec, &ctx, "slack");
+        let wire = crate::alerts::slack_publish::wire_from_content(&content, &ctx);
+        check_rate_limit(user_id)?;
+        return crate::alerts::slack_publish::send_test_wire(org_id, target, wire)
+            .await
+            .map_err(|e| TestSendError::DispatchFailed(e.to_string()));
+    }
     let (title, rendered) = build_test_message_with_title(dest_type, spec, kind)?;
     email_reaches_a_member(org_id, dest_type)
         .await

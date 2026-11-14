@@ -20,8 +20,11 @@
 //! background; every color set explicitly on the element that needs it so a
 //! dark client's inversion cannot produce black-on-black).
 
-use super::{DEFAULT_LINK_LABEL, markdown, safe_url};
-use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
+use super::{markdown, safe_url};
+use crate::alerts::notifications::{
+    NotificationContext,
+    resolve::{LinkRole, RenderedContent},
+};
 
 const TEXT_COLOR: &str = "#202124";
 const MUTED_COLOR: &str = "#5F6368";
@@ -137,18 +140,11 @@ fn html_part(c: &RenderedContent, has_chart: bool) -> String {
 
     if !c.links.is_empty() {
         h.push_str(r#"<div style="margin:16px 0;">"#);
-        for (label, url) in &c.links {
-            let is_default_link = label.is_empty();
-            let label = if is_default_link {
-                DEFAULT_LINK_LABEL
-            } else {
-                label.as_str()
-            };
-            // The default "View in OpenObserve" link is the email's primary
-            // CTA — mirrors the Slack/Teams fix (filled green button) rather
-            // than the outlined-blue-link style used for author-added links,
-            // which reads as low-contrast and easy to miss in email clients.
-            let style = if is_default_link {
+        for link in &c.links {
+            let (label, url) = (link.display_label(), &link.url);
+            // The data button is the filled primary CTA; the object button and authored links are
+            // outlined.
+            let style = if link.role == LinkRole::Primary {
                 "display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;".to_string()
             } else {
                 format!(
@@ -214,15 +210,10 @@ fn text_part(c: &RenderedContent) -> String {
         parts.push(
             c.links
                 .iter()
-                .map(|(label, url)| {
-                    let label = if label.is_empty() {
-                        DEFAULT_LINK_LABEL
-                    } else {
-                        label.as_str()
-                    };
+                .map(|link| {
                     // Same scheme filter as the HTML part — a mail client
                     // linkifies plaintext URLs too.
-                    format!("{label}: {}", safe_url(url))
+                    format!("{}: {}", link.display_label(), safe_url(&link.url))
                 })
                 .collect::<Vec<_>>()
                 .join("\n"),

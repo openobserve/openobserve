@@ -901,12 +901,8 @@ fn description(ctx: &NotificationContext) -> String {
         text_line("Current value", &ctx.alert_agg_value),
         line("Started", &started),
         text_line("Alert description", &ctx.alert_description),
-        line("View in OpenObserve", &ctx.alert_url),
     ];
-    let head = cut(
-        &head.into_iter().flatten().collect::<Vec<_>>().join("\n"),
-        DESCRIPTION_MAX_CHARS,
-    );
+    let head = with_links(head.into_iter().flatten().collect(), ctx);
 
     let footer = line("\nSee all rows in OpenObserve", &ctx.alert_url).unwrap_or_default();
     let reserved = format!("\n\nFirst {MAX_ROWS} rows:\n{{noformat}}\n\n{{noformat}}{footer}");
@@ -951,12 +947,52 @@ fn anomaly_description(ctx: &NotificationContext) -> String {
         line("Window start", &millis(&ctx.alert_start_time_millis)),
         line("Window end", &millis(&ctx.alert_end_time_millis)),
         text_line("Details", &ctx.alert_description),
-        line("View in OpenObserve", &ctx.alert_url),
     ];
-    cut(
-        &lines.into_iter().flatten().collect::<Vec<_>>().join("\n"),
-        DESCRIPTION_MAX_CHARS,
-    )
+    with_links(lines.into_iter().flatten().collect(), ctx)
+}
+
+/// The text lines cut to leave room for the link lines, which are never cut away.
+fn with_links(lines: Vec<String>, ctx: &NotificationContext) -> String {
+    let links: Vec<String> = [
+        (!ctx.alert_url.is_empty()).then(|| format!("{}: {}", primary_label(ctx), ctx.alert_url)),
+        detail_line(ctx),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    let links = links.join("\n");
+    let room = DESCRIPTION_MAX_CHARS.saturating_sub(links.chars().count() + 1);
+    let text = cut(&lines.join("\n"), room);
+    match (text.is_empty(), links.is_empty()) {
+        (_, true) => text,
+        (true, false) => cut(&links, DESCRIPTION_MAX_CHARS),
+        (false, false) => format!("{text}\n{links}"),
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn description_for_test(ctx: &NotificationContext) -> String {
+    description(ctx)
+}
+
+/// The data link label: the kind's own, else the label Jira issues always carried.
+fn primary_label(ctx: &NotificationContext) -> &str {
+    if ctx.alert_url_label.is_empty() {
+        super::render::DEFAULT_LINK_LABEL
+    } else {
+        &ctx.alert_url_label
+    }
+}
+
+/// `Open alert: <url>` when the message has an object link apart from the data link.
+fn detail_line(ctx: &NotificationContext) -> Option<String> {
+    let url = super::resolve::detail_url(ctx)?;
+    let label = if ctx.alert_detail_label.is_empty() {
+        "Open alert"
+    } else {
+        &ctx.alert_detail_label
+    };
+    Some(format!("{label}: {url}"))
 }
 
 fn stream_text(ctx: &NotificationContext) -> String {
@@ -989,11 +1025,19 @@ fn row_text(row: &Map<String, Value>) -> String {
 }
 
 fn comment(ctx: &NotificationContext) -> String {
-    let link = |label: &str| {
+    let link = |fallback: &str| {
+        let detail = detail_line(ctx)
+            .map(|l| format!(" {l}"))
+            .unwrap_or_default();
         if ctx.alert_url.is_empty() {
-            String::new()
+            detail
         } else {
-            format!(" {label}: {}", ctx.alert_url)
+            let label = if ctx.alert_url_label.is_empty() {
+                fallback
+            } else {
+                &ctx.alert_url_label
+            };
+            format!(" {label}: {}{detail}", ctx.alert_url)
         }
     };
     if !ctx.incident_id.is_empty() {
@@ -1098,6 +1142,7 @@ mod tests {
         let mut ctx = alert_ctx();
         ctx.alert_name = "Payment latency".into();
         ctx.incident_id = "inc-7".into();
+        ctx.alert_url_label = "Open incident".into();
         ctx.context_attributes = [
             ("incident_id", "inc-7"),
             ("incident_title", "Checkout degraded"),
@@ -1121,6 +1166,7 @@ mod tests {
             alert_trigger_time: 1_792_751_400_000_000,
             alert_description: "score 4.20 over threshold 3.00 [p95]\nsecond line".into(),
             alert_url: "https://o2.example.com/web/alerts/anomaly/edit/an-42".into(),
+            alert_url_label: "Open detector".into(),
             context_attributes: vec![
                 ("anomaly_id".into(), "an-42".into()),
                 ("anomaly_kind".into(), kind.into()),
@@ -1218,6 +1264,32 @@ mod tests {
     }
 
     #[test]
+    fn the_issue_names_the_data_link_and_adds_the_object_link() {
+        let mut ctx = alert_ctx();
+        ctx.alert_url_label = "View logs".into();
+        ctx.alert_detail_url = "https://o2.example.com/web/alerts/detail/7Kx2".into();
+        ctx.alert_detail_label = "Open alert".into();
+        let text = description(&ctx);
+        assert!(
+            text.ends_with(
+                "View logs: https://o2.example.com/s/abc\n\
+                 Open alert: https://o2.example.com/web/alerts/detail/7Kx2"
+            ),
+            "{text}"
+        );
+        assert!(
+            comment(&ctx).ends_with(
+                " View logs: https://o2.example.com/s/abc \
+                 Open alert: https://o2.example.com/web/alerts/detail/7Kx2"
+            ),
+            "{}",
+            comment(&ctx)
+        );
+        ctx.alert_detail_url = ctx.alert_url.clone();
+        assert!(!description(&ctx).contains("Open alert"));
+    }
+
+    #[test]
     fn aggregate_alert_shows_the_evaluated_threshold_not_the_group_gate() {
         let mut ctx = alert_ctx();
         ctx.alert_operator = ">=".into();
@@ -1269,7 +1341,7 @@ mod tests {
             comment(&recovered),
             "[OpenObserve] Recovered at 2026-10-23 10:30 UTC. View in OpenObserve: https://o2.example.com/s/abc"
         );
-        let link = " View incident: https://o2.example.com/s/abc";
+        let link = " Open incident: https://o2.example.com/s/abc";
         for (event, said) in [
             ("new_alert_correlated", "New alert joined: Payment latency."),
             ("severity_escalated", "Severity changed to P1."),
@@ -1281,6 +1353,12 @@ mod tests {
                 format!("[OpenObserve] {said}{link}")
             );
         }
+        let mut unlabelled = incident_ctx("new_incident_created");
+        unlabelled.alert_url_label.clear();
+        assert_eq!(
+            comment(&unlabelled),
+            "[OpenObserve] New incident created. View incident: https://o2.example.com/s/abc"
+        );
     }
 
     #[test]
@@ -1370,7 +1448,7 @@ mod tests {
                 "Window start: 2026-10-23 10:00 UTC",
                 "Window end: 2026-10-23 10:30 UTC",
                 "Details: score 4.20 over threshold 3.00 p95\nsecond line",
-                "View in OpenObserve: https://o2.example.com/web/alerts/anomaly/edit/an-42",
+                "Open detector: https://o2.example.com/web/alerts/anomaly/edit/an-42",
             ]
             .join("\n")
         );
@@ -1378,7 +1456,7 @@ mod tests {
 
     #[test]
     fn anomaly_comments_print_the_kind_and_first_line() {
-        let link = " View in OpenObserve: https://o2.example.com/web/alerts/anomaly/edit/an-42";
+        let link = " Open detector: https://o2.example.com/web/alerts/anomaly/edit/an-42";
         assert_eq!(
             comment(&anomaly_ctx("value", STATUS_FIRING)),
             format!(

@@ -106,6 +106,13 @@ pub fn on_call_context(n: &OnCallNotification) -> NotificationContext {
         alert_status: state_word(n).to_string(),
         episode_id: (!n.key.is_empty()).then(|| n.key.clone()),
         alert_url: n.url.clone(),
+        // A test page has no response, so its link opens the list of pages.
+        alert_url_label: if n.response_id.as_deref().is_some_and(|id| !id.is_empty()) {
+            "Open page"
+        } else {
+            "Open pages"
+        }
+        .to_string(),
         alert_trigger_time: now,
         alert_trigger_time_str: crate::anomaly_detection::fmt_local_us(now),
         alert_description: n.text.clone(),
@@ -208,6 +215,18 @@ mod tests {
                 skipped: vec![],
             },
         }
+    }
+
+    #[test]
+    fn a_page_opens_its_response_and_a_test_page_opens_the_list() {
+        assert_eq!(
+            on_call_context(&page(OnCallStage::Paged)).alert_url_label,
+            "Open page"
+        );
+        let mut test = page(OnCallStage::Test);
+        test.response_id = None;
+        assert_eq!(on_call_context(&test).alert_url_label, "Open pages");
+        assert!(on_call_context(&test).alert_detail_url.is_empty());
     }
 
     #[test]

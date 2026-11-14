@@ -3942,6 +3942,7 @@ fn anomaly_notification_context(
         alert_start_time_millis: (actx.window_start_us / 1000).to_string(),
         alert_end_time_millis: (actx.window_end_us / 1000).to_string(),
         alert_url: link.clone(),
+        alert_url_label: "Open detector".to_string(),
         alert_trigger_time: now,
         alert_trigger_time_str: fmt_local_us(now),
         alert_description: anomaly_alert_body(actx),

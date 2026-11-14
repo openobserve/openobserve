@@ -266,10 +266,11 @@ mod tests {
             resolve_content(&compiled_default_content(), ctx, "slack")
                 .links
                 .into_iter()
-                .filter(|(label, _)| !label.is_empty())
+                .filter(|l| l.role == crate::alerts::notifications::resolve::LinkRole::Authored)
+                .map(|l| (l.label, l.url))
                 .collect::<Vec<_>>()
         };
-        // The alert link the renderer appends has an empty label; nothing else may appear.
+        // Only system links are appended; no authored link may appear.
         assert!(explore(&synthetic_context(Some(AlertLevel::Critical))).is_empty());
         for kind in [
             NotificationKind::Incident,
@@ -310,6 +311,6 @@ mod tests {
             ..compiled_default_content()
         };
         let links = resolve_content(&spec, &ctx, "slack").links;
-        assert!(links.iter().any(|(label, _)| label == "Docs"));
+        assert!(links.iter().any(|l| l.label == "Docs"));
     }
 }

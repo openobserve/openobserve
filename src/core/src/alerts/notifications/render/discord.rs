@@ -25,10 +25,11 @@
 
 use serde_json::{Value, json};
 
-use super::{
-    DEFAULT_LINK_LABEL, clamp, dispatchable_url, markdown::escape_discord_markdown, safe_url,
+use super::{clamp, dispatchable_url, markdown::escape_discord_markdown, safe_url};
+use crate::alerts::notifications::{
+    NotificationContext,
+    resolve::{LinkRole, RenderedContent},
 };
-use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
 
 /// Discord embed hard caps (<https://discord.com/developers/docs/resources/message#embed-object-embed-limits>).
 const TITLE_MAX: usize = 256;
@@ -83,40 +84,58 @@ pub fn render_discord(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     // values below (see `escape_discord_markdown`'s doc comment).
     let mut description = clamp(&c.body_markdown, DESCRIPTION_MAX);
 
-    // The first link (design §4.1: `resolve` always appends the alert URL)
-    // becomes the embed's `url` — Discord embeds have one clickable title
-    // link, not a button list. Any further author-added links have no embed
-    // slot to render into and are appended to the description as markdown
-    // links instead.
+    // An embed has one title link: the Primary link takes it, and the others become markdown
+    // links in the description.
     // Discord validates `embed.url` and rejects the message when it is not an
     // absolute http(s) URL, so an undispatchable first link yields NO embed
     // url rather than an invalid one (#13742's failure class). The markdown
     // links appended to the description below are inert TEXT, so they keep
     // `safe_url`'s neutralize-in-place behaviour instead.
-    let embed_url = c
-        .links
-        .first()
-        .and_then(|(_, url)| dispatchable_url(url))
+    let primary = c.links.iter().position(|l| l.role == LinkRole::Primary);
+    let embed_url = primary
+        .and_then(|i| dispatchable_url(&c.links[i].url))
         .map(str::to_string);
-    let extra_links = if c.links.is_empty() {
-        &c.links[..]
-    } else {
-        &c.links[1..]
-    };
-    if !extra_links.is_empty() {
-        let extra_text = extra_links
+    let extra_links: Vec<_> = c
+        .links
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| Some(*i) != primary)
+        .map(|(_, l)| l)
+        .collect();
+    let mut parts: Vec<(bool, String)> = extra_links
+        .iter()
+        .map(|link| {
+            let text = format!(
+                "[{}]({})",
+                escape_discord_markdown(link.display_label()),
+                safe_url(&link.url)
+            );
+            (link.reserved, text)
+        })
+        .collect();
+    // Authored links drop from the end first, so the object link survives long authored URLs.
+    let width = |parts: &[(bool, String)]| {
+        parts
             .iter()
-            .map(|(label, url)| {
-                let label = if label.is_empty() {
-                    DEFAULT_LINK_LABEL
-                } else {
-                    label.as_str()
-                };
-                format!("[{}]({})", escape_discord_markdown(label), safe_url(url))
-            })
+            .map(|(_, t)| t.chars().count() + 3)
+            .sum::<usize>()
+    };
+    while width(&parts) > DESCRIPTION_MAX {
+        let Some(i) = parts.iter().rposition(|(reserved, _)| !reserved) else {
+            break;
+        };
+        parts.remove(i);
+    }
+    if !parts.is_empty() {
+        let extra_text = parts
+            .into_iter()
+            .map(|(_, t)| t)
             .collect::<Vec<_>>()
             .join(" · ");
-        description = clamp(&format!("{description}\n\n{extra_text}"), DESCRIPTION_MAX);
+        // The body yields room first, so a long body cannot push the object link out.
+        let room = DESCRIPTION_MAX.saturating_sub(extra_text.chars().count() + 2);
+        let body = clamp(&c.body_markdown, room.max(1));
+        description = clamp(&format!("{body}\n\n{extra_text}"), DESCRIPTION_MAX);
     }
 
     let mut fields: Vec<Value> = c
