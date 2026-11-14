@@ -276,6 +276,14 @@ export const toggleAlertStateMutation = (org: string) =>
     meta: { invalidates: [alertKeys.firing(org)] },
   });
 
+/** The reply lists ids under `successful`, so a partial failure is the caller's to report. */
+export const bulkToggleAlertsMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { ids: string[]; enabled: boolean; folderId?: string }) =>
+      alerts.bulkToggleState(org, vars.enabled, { ids: vars.ids }, vars.folderId),
+    meta: { invalidates: [alertKeys.all(org)], silentError: true },
+  });
+
 /** Same write for an anomaly row, which Overview also renders from its own scope. */
 export const toggleAnomalyAlertStateMutation = (org: string) =>
   mutationOptions({

@@ -71,7 +71,7 @@ const startSetup = async () => {
     await flow.land();
   }
 };
-const copyLink = () => copyToClipboard(window.location.href, t);
+const copyLink = () => copyToClipboard(flow.packLink(), t);
 </script>
 
 <template>

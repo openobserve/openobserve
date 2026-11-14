@@ -21,7 +21,7 @@ export type PackFolderType = "dashboards" | "alerts";
 export type PackItemKind = "folder" | "dashboard" | "alert" | "savedView";
 
 /** `existing` was there before this install, so undo never touches it. */
-export type PackItemStatus = "pending" | "created" | "existing" | "failed";
+export type PackItemStatus = "pending" | "created" | "existing" | "failed" | "skipped";
 
 export type PackInstallStatus = "installing" | "complete" | "incomplete" | "removed";
 
@@ -46,8 +46,15 @@ export interface PackBundledAlert {
   file: AlertLibraryFile;
 }
 
+/** A stream name the installer changed to fit this org's data. */
+export interface PackRepair {
+  from: string;
+  to: string;
+}
+
 export interface StarterPack {
   id: string;
+  version: string;
   titleKey: I18nKey;
   descriptionKey: I18nKey;
   /** Created in both the dashboards and the alerts module. */
@@ -79,6 +86,12 @@ export interface PackInstallRecord {
   /** Microseconds; starts the Undo window. */
   installedAt?: number;
   installedBy?: string;
+  version?: string;
+  repairs?: PackRepair[];
+  /** Set when the chosen folder is not the pack's own; a resumed install must reuse it. */
+  folderName?: string;
+  /** Someone chose Keep off, so Home stops reminding. */
+  keptOff?: boolean;
 }
 
 export interface PackKeptItem {
@@ -108,11 +121,15 @@ export interface PackPreview {
   panels: { kept: number; dropped: number };
   /** The Library was out of reach, so this came from the build's own copy. */
   offline: boolean;
+  repairs: PackRepair[];
 }
 
 export interface PackInstallOptions {
   /** Item ids the preview left out; a resumed install keeps its own list. */
   exclude?: string[];
+  repairs?: PackRepair[];
+  /** Admin's Set up in… choice; absent means the pack's own folder. */
+  folderName?: string;
   onProgress?: (record: PackInstallRecord) => void;
 }
 

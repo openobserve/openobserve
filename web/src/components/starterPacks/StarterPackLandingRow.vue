@@ -27,8 +27,8 @@ import { packScope } from "@/composables/starterPacks/packCopy";
 import { usePackDismissal } from "@/composables/starterPacks/packDismissal";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
-import StarterPackDrawer from "./StarterPackDrawer.vue";
 import StarterPackUndoDialog from "./StarterPackUndoDialog.vue";
+import TurnOnAlertsDrawer from "./TurnOnAlertsDrawer.vue";
 
 const props = defineProps<{ org: string }>();
 
@@ -39,7 +39,7 @@ const matcher = useStarterPackMatcher(props.org);
 const { dismissed, dismiss } = usePackDismissal("landing", props.org, KUBERNETES_PACK.id);
 
 const HOUR_US = 60 * 60 * 1_000_000;
-const drawerOpen = ref(false);
+const turnOnOpen = ref(false);
 const undoOpen = ref(false);
 
 onMounted(() => void flow.load());
@@ -64,8 +64,15 @@ const visible = computed(() => {
   return off.value > 0 || failedCount.value > 0 || flow.undoLeftUs.value > 0;
 });
 const readOnly = computed(() => !flow.canManage.value);
+const rowTest = computed(() => {
+  if (readOnly.value) return "kubernetes-pack-undo-row-readonly";
+  return flow.alertsOn.value > 0 ? "kubernetes-pack-watching-row" : "kubernetes-pack-undo-row";
+});
 const message = computed(() => {
   if (readOnly.value) return t("starterPacks.landing.readOnly", { count: off.value }, off.value);
+  if (flow.alertsOn.value > 0) {
+    return t("starterPacks.landing.watching", { on: flow.alertsOn.value, off: off.value });
+  }
   return t(
     "starterPacks.landing.installedBar",
     { pack: t(KUBERNETES_PACK.titleKey), count: madeCount.value },
@@ -84,7 +91,7 @@ const resultText = computed(() => {
     : t("starterPacks.landing.undoneAll", { removed }, removed);
 });
 const scope = computed(() => packScope(t, matcher.clusters.value));
-const openAlerts = () => router.push(flow.alertsRoute.value).catch(() => {});
+const viewPack = () => router.push(flow.packRoute.value).catch(() => {});
 </script>
 
 <template>
@@ -112,7 +119,7 @@ const openAlerts = () => router.push(flow.alertsRoute.value).catch(() => {});
     :variant="failedCount > 0 ? 'warning' : 'success'"
     dense
     inline-actions
-    :data-test="readOnly ? 'kubernetes-pack-undo-row-readonly' : 'kubernetes-pack-undo-row'"
+    :data-test="rowTest"
   >
     <span data-test="kubernetes-pack-installed-message">{{ message }}</span>
     <template v-if="failedCount > 0">
@@ -124,7 +131,7 @@ const openAlerts = () => router.push(flow.alertsRoute.value).catch(() => {});
         variant="ghost-primary"
         size="sm-action"
         data-test="kubernetes-pack-see-which-btn"
-        @click="drawerOpen = true"
+        @click="viewPack"
       >
         {{ t("starterPacks.landing.seeWhich") }}
       </OButton>
@@ -136,7 +143,7 @@ const openAlerts = () => router.push(flow.alertsRoute.value).catch(() => {});
           variant="outline"
           size="sm-action"
           data-test="kubernetes-pack-turn-on-btn"
-          @click="openAlerts"
+          @click="turnOnOpen = true"
         >
           {{ t("starterPacks.home.turnOn") }}
         </OButton>
@@ -144,7 +151,7 @@ const openAlerts = () => router.push(flow.alertsRoute.value).catch(() => {});
           variant="ghost"
           size="sm-action"
           data-test="kubernetes-pack-view-btn"
-          @click="drawerOpen = true"
+          @click="viewPack"
         >
           {{ t("starterPacks.home.viewPack") }}
         </OButton>
@@ -178,6 +185,6 @@ const openAlerts = () => router.push(flow.alertsRoute.value).catch(() => {});
     data-test="kubernetes-pack-scope"
     >{{ scope }}</OText
   >
-  <StarterPackDrawer v-model:open="drawerOpen" :flow="flow" :clusters="matcher.clusters.value" />
   <StarterPackUndoDialog v-model:open="undoOpen" :flow="flow" mode="undo" />
+  <TurnOnAlertsDrawer v-model:open="turnOnOpen" :flow="flow" :clusters="matcher.clusters.value" />
 </template>

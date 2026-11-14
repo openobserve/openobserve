@@ -40,7 +40,9 @@ export interface LibraryInstallOptions {
   /** Refuses anomaly alerts, for callers that manage alerts through the scheduled API alone. */
   scheduledOnly?: boolean;
   /** Last edit of a scheduled alert's body before it is created. */
-  decoratePayload?: (payload: Record<string, unknown>) => Record<string, unknown>;
+  decoratePayload?: (
+    payload: Record<string, unknown>,
+  ) => Record<string, unknown> | Promise<Record<string, unknown>>;
   /** Receives the id the create response carries for a scheduled alert. */
   onSaved?: (id: string) => void;
 }
@@ -94,7 +96,7 @@ export function useLibraryInstall(org: () => string) {
 
     const payload = buildInstallPayload({ entry, file, folderId, owner, timezone, overrides });
     const saved = await installAlert.mutateAsync({
-      payload: decoratePayload ? decoratePayload(payload) : payload,
+      payload: decoratePayload ? await decoratePayload(payload) : payload,
       folderId,
     });
     if (saved?.data?.id) onSaved?.(saved.data.id);

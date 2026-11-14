@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import { routeGuard, getPath } from "@/utils/zincutils";
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
@@ -209,6 +210,7 @@ const FiringAlerts = () => import("@/components/alerts/FiringAlerts.vue");
 const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
 const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
+const StarterPackPage = () => import("@/views/AlertLibrary/StarterPackPage.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
@@ -1080,6 +1082,19 @@ const useRoutes = () => {
         routeGuard(to, from, next);
       },
     },
+    ...(STARTER_PACKS_ENABLED
+      ? [
+          {
+            path: "alert-library/packs/:pack",
+            name: "starterPack",
+            component: StarterPackPage,
+            meta: { titleKey: "alert_library.header", licenseFeature: "alerts" },
+            beforeEnter(to: any, from: any, next: any) {
+              routeGuard(to, from, next);
+            },
+          },
+        ]
+      : []),
     {
       // Alert Sources feeds Incidents (correlation, resolve lifecycle) — same
       // Reliability workflow as Alerts/SLOs/Incidents/Destinations/Templates
