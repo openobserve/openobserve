@@ -3428,11 +3428,17 @@ describe("ServicesCatalog env column", () => {
     config.isEnterprise = "false";
   });
 
-  it("shows the env chip before Where only while Env is All envs", async () => {
+  it("puts the version columns after the latency columns, Env first only while Env is All envs", async () => {
     view = mountServicesCatalog({ stubs });
     await flushPromises();
     const ids = () => view!.get('[data-test="catalog-columns"]').text().split(",");
-    expect(ids().indexOf("version_env")).toBe(ids().indexOf("version_where") - 1);
+    expect(ids().slice(ids().indexOf("max_duration_ns") + 1)).toEqual([
+      "version_env",
+      "version_where",
+      "service_versions",
+      "version_verdict",
+      "version_deployed",
+    ]);
     expect(view.get('[data-test="env-cell"]').text()).toBe("prod/ingester");
     await view.get('[data-test="pick-env"]').trigger("click");
     await flushPromises();
@@ -3823,6 +3829,50 @@ describe("ServicesCatalog Env cells while version tracking is down", () => {
     const cell = view.get('[data-test="svcver-env-unavailable"]');
     expect(cell.text()).toContain("—");
     expect(cell.get(".tip").text()).toBe("unavailable");
+  });
+});
+
+describe("ServicesCatalog Env and Where of a row its spans do not place", () => {
+  let view: VueWrapper | undefined;
+  beforeEach(() => {
+    config.isEnterprise = "true";
+    queryClient.clear();
+    resetListViewState();
+    mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+    mockGetStreams.mockResolvedValue({ list: [{ name: "default" }] });
+    mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+      callbacks.data(null, {
+        type: "search_response_hits",
+        content: { results: { hits: [{ service_name: "querier", total_requests: 10 }] } },
+      });
+      callbacks.complete(null, {});
+    });
+    vi.spyOn(serviceVersionsService, "services").mockResolvedValue({
+      data: { services: [], envs: [] },
+    } as never);
+  });
+  afterEach(() => {
+    view?.unmount();
+    config.isEnterprise = "false";
+    vi.restoreAllMocks();
+    queryClient.clear();
+  });
+
+  it("shows the muted dash with its reason instead of an empty cell", async () => {
+    view = mountServicesCatalog({
+      stubs: {
+        OTable: {
+          template: `<div data-test="services-catalog-table"><slot name="cell-version_env" :row="{ service_name: 'querier', where_key: '' }" /><slot name="cell-version_where" :row="{ service_name: 'querier', where_key: '' }" /></div>`,
+        },
+        OTooltip: { props: ["content"], template: '<i class="tip">{{ content }}</i>' },
+      },
+    });
+    await flushPromises();
+    for (const id of ["svcver-env-none", "svcver-where-unreported"]) {
+      const cell = view.get(`[data-test="${id}"]`);
+      expect(cell.text()).toContain("—");
+      expect(cell.get(".tip").text()).toBe("Not reported by this service's spans");
+    }
   });
 });
 

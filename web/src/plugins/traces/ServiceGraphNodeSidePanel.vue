@@ -272,20 +272,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="capitalize"
               data-test="service-graph-node-panel-tab-operations"
             />
-            <OTab
-              v-if="!isInferred"
-              name="versions"
-              :suffix-icon="!versionsEnabled ? 'lock' : undefined"
-              data-test="svcver-versions-tab"
-              ><span>{{ t("serviceVersions.panel.versions") }}</span
-              ><OTag
-                v-if="versionsEnabled && versionCount"
-                type="countChip"
-                :value="activeTab === 'versions' ? 'primary' : 'neutral'"
-                data-test="svcver-versions-count"
-                >{{ versionCount }}</OTag
-              ></OTab
-            >
             <!-- Agent behavior (loops/failures) — only for agent nodes;
                    locked without an Enterprise/Cloud edition. See Agent
                    Signals design §4b. -->
@@ -315,6 +301,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="capitalize"
               data-test="service-graph-node-panel-tab-metrics"
             />
+            <OTab
+              v-if="!isInferred"
+              name="versions"
+              :suffix-icon="!versionsEnabled ? 'lock' : undefined"
+              data-test="svcver-versions-tab"
+              ><span>{{ t("serviceVersions.panel.versions") }}</span
+              ><OTag
+                v-if="versionsEnabled && versionCount"
+                type="countChip"
+                :value="activeTab === 'versions' ? 'primary' : 'neutral'"
+                data-test="svcver-versions-count"
+                >{{ versionCount }}</OTag
+              ></OTab
+            >
           </OTabs>
 
           <!-- Resource tabs dropdown — shows/hides individual OTEL resource tabs -->
@@ -1398,8 +1398,9 @@ export default defineComponent({
         Object.prototype.hasOwnProperty.call(props.selectedNode ?? {}, "service_system"),
     );
 
-    const selectedPanelWhere = computed(() =>
-      props.selectedNode?.service_type ? "" : versionPanel.state.value.where,
+    // Spans follow the clicked row; the route's where only picks the registry place, which unstamped spans never match.
+    const selectedPanelWhere = computed<string>(() =>
+      props.selectedNode?.service_type ? "" : props.selectedNode?.where_key || "",
     );
     // null holds source queries until the schema settles; an unread schema drops the where, since an absent column 400s.
     const panelWhereKey = computed<string | null>(() => {
@@ -2728,6 +2729,7 @@ export default defineComponent({
           props.streamFilter,
           activeTab.value,
           panelWhereKey.value,
+          activeResourceTabConfigs.value.map((c) => c.id).join(),
         ] as const,
       (next, prev) => {
         if (prev && next[4] !== prev[4]) {
@@ -2770,7 +2772,9 @@ export default defineComponent({
         metricsCorrelationData.value = null;
         metricsCorrelationError.value = null;
         metricsCorrelationLoaded.value = false;
-        activeTab.value = "operations";
+        activeTab.value = versionPanel.state.value.open
+          ? versionPanel.state.value.tab
+          : "operations";
         localRangeFilters.value.clear();
         rangeFiltersVersion.value++;
       },

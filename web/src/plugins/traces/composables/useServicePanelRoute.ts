@@ -13,7 +13,7 @@ export function useServicePanelRoute() {
     open: !route.query.cmp && Boolean(route.query.panel && route.query.panelSvc),
     service: queryText(route.query.panelSvc),
     where: queryText(route.query.panelWhere),
-    tab: queryText(route.query.panel) === "versions" ? "versions" : "operations",
+    tab: queryText(route.query.panel) || "operations",
   }));
   function open(service: string, where: string, tab = "operations") {
     return router.push({

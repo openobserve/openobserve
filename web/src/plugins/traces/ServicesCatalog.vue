@@ -434,6 +434,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="svcver-env-unavailable"
                 >{{ raw("—")
                 }}<OTooltip :content="t('serviceVersions.catalog.cellUnavailable')" /></span
+              ><OSkeleton
+                v-else-if="registryState === 'loading' && !row.infer_service_name"
+                class="h-5 w-16"
+                data-test="svcver-env-loading" /><span
+                v-else
+                class="text-xs"
+                data-test="svcver-env-none"
+                ><NotComparedMark :reason="t(catalogCellGap(row))" /></span
             ></template>
             <template #cell-version_where="{ row }"
               ><span v-if="row.place?.none" class="text-xs" data-test="svcver-where-none"
@@ -451,8 +459,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-secondary font-sans"
                   >{{ raw(" ") }}{{ t("serviceVersions.catalog.noCluster") }}</span
                 ></span
-              ></template
-            >
+              ><span v-else class="text-xs" data-test="svcver-where-unreported"
+                ><NotComparedMark :reason="t(catalogCellGap(row))" /></span
+            ></template>
             <template #cell-version_verdict="{ row }">
               <CatalogVersionsCell
                 :scope="row.versionScope"
@@ -460,6 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :unavailable="versionUnavailable"
                 :tracking="registry.data.value?.tracking"
                 :explained="versionSummary.launchDay"
+                :empty-reason="t(catalogCellGap(row))"
                 content="verdict"
               />
             </template>
@@ -468,6 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :scope="row.versionScope"
                 :state="!versionsEnabled || row.infer_service_name ? 'locked' : registryState"
                 :unavailable="versionUnavailable"
+                :empty-reason="t(catalogCellGap(row))"
                 content="deployed"
               />
             </template>
@@ -477,6 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :scope="row.versionScope"
                 :state="!versionsEnabled || row.infer_service_name ? 'locked' : registryState"
                 :unavailable="versionUnavailable"
+                :empty-reason="t(catalogCellGap(row))"
             /></template>
             <!-- A row with no requests has no health to report -->
             <template #cell-status="{ row }">
@@ -682,6 +694,8 @@ import {
   versionTrafficKey,
   catalogColumnVisibility,
   catalogEnvColumn,
+  catalogPanelRow,
+  catalogCellGap,
   catalogRangeQuery,
   CATALOG_COLUMN_SIZES,
   CATALOG_ROW_HEIGHT,
@@ -716,6 +730,7 @@ import {
 } from "@/utils/zincutils";
 import { getEffectiveTimeRange } from "@/utils/date";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -1020,6 +1035,7 @@ const selectedServiceNode = computed(() => {
     error_rate: selected.error_rate,
     health_status: current?.status ?? selected.status,
     health_withheld: healthWithheld(current ?? selected),
+    where_key: selected.where_key || "",
   };
 });
 
@@ -1069,35 +1085,6 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
     pinned: "left",
     meta: { align: "left", flex: true },
   },
-  ...(versionsEnabled && showsEnvColumn(versionScopes.value, versionEnv.value)
-    ? [
-        {
-          id: "version_env",
-          header: t("serviceVersions.catalog.env"),
-          size: catalogEnvColumn(versionEnv.value).size,
-        },
-      ]
-    : []),
-  ...(versionsEnabled
-    ? [
-        {
-          id: "version_where",
-          header: t("serviceVersions.catalog.where"),
-          size: CATALOG_COLUMN_SIZES.version_where,
-        },
-        {
-          id: "version_verdict",
-          header: t("serviceVersions.catalog.deployVerdict"),
-          size: CATALOG_COLUMN_SIZES.version_verdict,
-          sortable: true,
-        },
-        {
-          id: "service_versions",
-          header: t("serviceVersions.catalog.version"),
-          size: CATALOG_COLUMN_SIZES.service_versions,
-        },
-      ]
-    : []),
   {
     id: "status",
     hideable: true,
@@ -1110,15 +1097,6 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
     size: versionsEnabled ? CATALOG_COLUMN_SIZES.status : 110,
     meta: { align: "left" },
   },
-  ...(versionsEnabled
-    ? [
-        {
-          id: "version_deployed",
-          header: t("serviceVersions.catalog.deployedLabel"),
-          size: CATALOG_COLUMN_SIZES.version_deployed,
-        },
-      ]
-    : []),
   {
     id: "total_requests",
     hideable: true,
@@ -1199,6 +1177,40 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
     size: 130,
     meta: { align: "right" },
   },
+  ...(versionsEnabled && showsEnvColumn(versionScopes.value, versionEnv.value)
+    ? [
+        {
+          id: "version_env",
+          header: t("serviceVersions.catalog.env"),
+          size: catalogEnvColumn(versionEnv.value).size,
+        },
+      ]
+    : []),
+  ...(versionsEnabled
+    ? [
+        {
+          id: "version_where",
+          header: t("serviceVersions.catalog.where"),
+          size: CATALOG_COLUMN_SIZES.version_where,
+        },
+        {
+          id: "service_versions",
+          header: t("serviceVersions.catalog.version"),
+          size: CATALOG_COLUMN_SIZES.service_versions,
+        },
+        {
+          id: "version_verdict",
+          header: t("serviceVersions.catalog.deployVerdict"),
+          size: CATALOG_COLUMN_SIZES.version_verdict,
+          sortable: true,
+        },
+        {
+          id: "version_deployed",
+          header: t("serviceVersions.catalog.deployedLabel"),
+          size: CATALOG_COLUMN_SIZES.version_deployed,
+        },
+      ]
+    : []),
 ]);
 
 // Health pill counts are scoped to the active type tab so they reflect the
@@ -1472,9 +1484,7 @@ watch(
       }
       return;
     }
-    const row = rows.find(
-      (row) => row.service_name === state.service && (row.where_key || "") === state.where,
-    );
+    const row = catalogPanelRow(rows, state.service, state.where);
     if (row) {
       selectedServiceRow.value = row;
       showSidePanel.value = true;

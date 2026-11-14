@@ -24,6 +24,8 @@ import {
   catalogColumnVisibility,
   CATALOG_COLUMN_SIZES,
   catalogEnvColumn,
+  catalogPanelRow,
+  catalogCellGap,
 } from "./servicesCatalogVersions";
 import type { Scope, ServicesResponse } from "@/services/service_versions";
 import producer from "@/test/unit/fixtures/serviceVersions/producer.json";
@@ -191,7 +193,7 @@ describe("catalog columns at 1600 px", () => {
 });
 describe("catalog Env and Version cells at 1600 px", () => {
   it("drops the env word with Env = All envs and keeps it once one env is picked", () => {
-    expect(catalogEnvColumn("")).toEqual({ size: 130, hideKey: true });
+    expect(catalogEnvColumn("")).toEqual({ size: 100, hideKey: true });
     expect(catalogEnvColumn("prod")).toEqual({ size: 157, hideKey: false });
   });
   it("narrows Version so a rebuilt version cuts only its version text", () => {
@@ -530,5 +532,34 @@ describe("Health of one build beside another build of the same version text", ()
     expect(versionTrafficKey("orders", "east", "2.4.0", "")).toBe(
       versionTrafficKey("orders", "east", "2.4.0", null),
     );
+  });
+});
+describe("the catalog row a service panel route opens", () => {
+  const rows = [
+    { id: "a", service_name: "querier", where_key: "" },
+    { id: "b", service_name: "querier", where_key: "k8s:c1/o2" },
+    { id: "c", service_name: "querier", where_key: "", infer_service_name: "querier" },
+    { id: "d", service_name: "ingester", where_key: "k8s:c1/o2" },
+  ];
+  it.each([
+    { service: "querier", where: "k8s:c1/o2", id: "b" },
+    { service: "querier", where: "", id: "a" },
+    { service: "querier", where: "default", id: "a" },
+    { service: "ingester", where: "default", id: undefined },
+    { service: "router", where: "", id: undefined },
+  ])("opens $service at '$where' on row $id", ({ service, where, id }) => {
+    expect(catalogPanelRow(rows, service, where)?.id).toBe(id);
+  });
+});
+describe("the reason an empty version cell gives", () => {
+  it.each([
+    { row: { where_key: "" }, key: "serviceVersions.catalog.notReported" },
+    {
+      row: { where_key: "k8s:c1/o2", infer_service_name: "db" },
+      key: "serviceVersions.catalog.notReported",
+    },
+    { row: { where_key: "k8s:c1/o2" }, key: "serviceVersions.catalog.notTracked" },
+  ])("$key", ({ row, key }) => {
+    expect(catalogCellGap(row)).toBe(key);
   });
 });

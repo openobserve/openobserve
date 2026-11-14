@@ -331,7 +331,9 @@ describe("catalog version cells", () => {
     );
   });
   it("distinguishes unknown identity from a known no-version service", () => {
-    expect(mount(Cell, { global }).text()).toBe("—");
+    const unknown = mount(Cell, { props: { emptyReason: "Not reported" }, global });
+    expect(unknown.get('[data-test="svcver-cell-empty"] [aria-hidden="true"]').text()).toBe("—");
+    expect(unknown.get('[data-test="svcver-cell-empty"] .sr-only').text()).toBe("Not reported");
     expect(
       mount(Cell, {
         props: { scope: { ...scope, newest_version: "", active_versions: [""] } },

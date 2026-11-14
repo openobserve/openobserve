@@ -33579,7 +33579,9 @@
       "healthNoTraffic": "No traffic in the window",
       "moreChips": "+{count} more | +{count} more",
       "warmingUpNoEpoch": "Deploy tracking is warming up. Deploy verdicts start with your next deploy.",
-      "noDeployRecorded": "No deploy recorded"
+      "noDeployRecorded": "No deploy recorded",
+      "notReported": "Not reported by this service's spans",
+      "notTracked": "No version recorded for this place"
     },
     "panel": {
       "versions": "Versions",

@@ -43,21 +43,21 @@ const SORTED_VERDICT_LABELS: I18nKey[] = [
 ];
 
 export const CATALOG_COLUMN_SIZES = {
-  service_name: 132,
-  version_env: 130,
-  version_where: 134,
+  service_name: 258,
+  version_env: 100,
+  version_where: 104,
   version_verdict: 169,
   service_versions: 179,
   status: 98,
   version_deployed: 80,
   total_requests: 90,
   error_count: 72,
-  error_rate: 92,
-  p95_latency_ns: 72,
-  p99_latency_ns: 72,
+  error_rate: 100,
+  p95_latency_ns: 76,
+  p99_latency_ns: 76,
 } as const;
 const CATALOG_ENV_PICKED_SIZE = 157;
-export const CATALOG_SERVICE_MIN_SIZE = 112;
+export const CATALOG_SERVICE_MIN_SIZE = 160;
 export const CATALOG_ROW_HEIGHT = 54;
 const CATALOG_DEFAULT_HIDDEN = [
   "p50_latency_ns",
@@ -120,6 +120,20 @@ export function mergeCatalogVersions<
       place: row.where_key ? catalogPlace(row.where_key, versionScope) : undefined,
     };
   });
+}
+/** The row a panel route opens; a registry place no span carries falls back to the service's unplaced row. */
+export function catalogPanelRow<
+  T extends { service_name: string; where_key?: string; infer_service_name?: string },
+>(rows: T[], service: string, where: string) {
+  const own = rows.filter((row) => row.service_name === service && !row.infer_service_name);
+  return own.find((row) => (row.where_key || "") === where) ?? own.find((row) => !row.where_key);
+}
+
+/** Why a version cell of a row with no registry scope is empty. */
+export function catalogCellGap(row: { where_key?: string; infer_service_name?: string }): I18nKey {
+  return row.infer_service_name || !row.where_key
+    ? "serviceVersions.catalog.notReported"
+    : "serviceVersions.catalog.notTracked";
 }
 const literal = (value: string) => `'${value.replace(/'/g, "''")}'`;
 export function environmentPredicate(response: ServicesResponse, env: string) {

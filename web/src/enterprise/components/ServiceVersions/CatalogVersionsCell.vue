@@ -143,9 +143,11 @@
     /></span>
   </div>
   <span v-else-if="content === 'deployed'" class="text-xs" data-test="svcver-deployed"
-    ><NotComparedMark :reason="t('serviceVersions.catalog.noDeployRecorded')"
+    ><NotComparedMark :reason="emptyReason || t('serviceVersions.catalog.noDeployRecorded')"
   /></span>
-  <span v-else class="text-text-secondary text-xs" data-test="svcver-cell-empty">—</span>
+  <span v-else class="text-xs" data-test="svcver-cell-empty"
+    ><NotComparedMark :reason="emptyReason"
+  /></span>
 </template>
 <script setup lang="ts">
 import { computed, unref } from "vue";
@@ -185,6 +187,8 @@ const props = withDefaults(
     tracking?: Tracking;
     /** The banner above the table already gives the no-verdict sentence, so the chip does not repeat it. */
     explained?: boolean;
+    /** Why the row has no registry scope, for the dash shown in its place. */
+    emptyReason?: string;
   }>(),
   { state: "ready", unavailable: false, content: "versions" },
 );

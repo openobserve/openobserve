@@ -1679,7 +1679,7 @@ describe("ServiceGraphNodeSidePanel", () => {
   });
 
   describe("versions tab placement and identity header", () => {
-    it("orders Operations, Versions with its count, then Metrics and shows the current identity", async () => {
+    it("orders Operations, then Metrics, then Versions last with its count, and shows the current identity", async () => {
       const previous = config.isEnterprise;
       config.isEnterprise = "true";
       Object.assign(routeQuery, { panel: "operations", panelSvc: "svc", panelWhere: "k8s:c1/web" });
@@ -1711,8 +1711,8 @@ describe("ServiceGraphNodeSidePanel", () => {
           .filter((id) => /tab-operations|svcver-versions-tab|tab-metrics/.test(id || ""));
         expect(tabs).toEqual([
           "service-graph-node-panel-tab-operations",
-          "svcver-versions-tab",
           "service-graph-node-panel-tab-metrics",
+          "svcver-versions-tab",
         ]);
         expect(wrapper.find('[data-test="svcver-versions-count"]').text()).toBe("2");
         const identity = wrapper.find('[data-test="svcver-panel-identity"]').text();
@@ -1725,7 +1725,30 @@ describe("ServiceGraphNodeSidePanel", () => {
       }
     });
 
-    it("keeps the Versions tab when the same service's row refreshes, and resets it for another service", async () => {
+    it.each(["service-version", "metrics", "k8s-deployment"])(
+      "opens on the %s tab the route names and keeps it when the route moves there",
+      async (tab) => {
+        const previous = config.isEnterprise;
+        config.isEnterprise = "true";
+        Object.assign(routeQuery, { panel: tab, panelSvc: "frontend", panelWhere: "" });
+        try {
+          wrapper = mountPanel();
+          await flushPromises();
+          expect((wrapper.vm as any).activeTab).toBe(tab);
+          reactive(routeQuery).panel = "versions";
+          await flushPromises();
+          (wrapper.vm as any).onTabChange(tab);
+          reactive(routeQuery).panel = tab;
+          await flushPromises();
+          expect((wrapper.vm as any).activeTab).toBe(tab);
+        } finally {
+          config.isEnterprise = previous;
+          for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+        }
+      },
+    );
+
+    it("keeps the tab the route names when the row refreshes or changes place, and resets it off the route", async () => {
       const previous = config.isEnterprise;
       config.isEnterprise = "true";
       Object.assign(routeQuery, {
@@ -1740,6 +1763,10 @@ describe("ServiceGraphNodeSidePanel", () => {
         await wrapper.setProps({ selectedNode: { ...baseNode, health_status: "healthy" } });
         await flushPromises();
         expect((wrapper.vm as any).activeTab).toBe("versions");
+        await wrapper.setProps({ selectedNode: { ...baseNode, id: "frontend@k8s:c2/web" } });
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("versions");
+        for (const key of Object.keys(routeQuery)) delete reactive(routeQuery)[key];
         await wrapper.setProps({ selectedNode: { ...baseNode, id: "cart", name: "cart" } });
         await flushPromises();
         expect((wrapper.vm as any).activeTab).toBe("operations");
@@ -1774,12 +1801,22 @@ describe("ServiceGraphNodeSidePanel", () => {
         },
       } as never);
     };
-    const openAt = (where: string) =>
+    let rowNode: Record<string, unknown> = baseNode;
+    const rowAt = (where: string, node: Record<string, unknown> = baseNode) => ({
+      ...node,
+      id: JSON.stringify([where, node.name]),
+      where_key: where,
+    });
+    const openAt = (where: string) => {
+      rowNode = rowAt(where);
       Object.assign(reactive(routeQuery), {
         panel: "versions",
         panelSvc: "frontend",
         panelWhere: where,
       });
+    };
+    const mountAt = (props: Record<string, unknown> = {}) =>
+      mountPanel({ selectedNode: rowNode, ...props });
 
     afterEach(() => {
       for (const key of Object.keys(routeQuery)) delete routeQuery[key];
@@ -1788,7 +1825,7 @@ describe("ServiceGraphNodeSidePanel", () => {
     it("filters RED charts, Operations, recent spans and resource tables by the escaped where", async () => {
       givenSchema(["service_name", "o2_service_where", "o2_service_version"]);
       openAt(WHERE_A);
-      wrapper = mountPanel();
+      wrapper = mountAt();
       await flushPromises();
       await flushPromises();
       const predicate = "o2_service_where = 'k8s:c1/o''shop'";
@@ -1813,16 +1850,19 @@ describe("ServiceGraphNodeSidePanel", () => {
     it("reloads every source query when the where picker moves to a second where", async () => {
       givenSchema(["service_name", "o2_service_where", "o2_service_version"]);
       openAt(WHERE_A);
-      wrapper = mountPanel();
+      wrapper = mountAt();
       await flushPromises();
       await flushPromises();
       const tabId = (wrapper.vm as any).activeResourceTabConfigs[0].id;
       (wrapper.vm as any).onTabChange(tabId);
+      reactive(routeQuery).panel = tabId;
       await flushPromises();
       expect((wrapper.vm as any).resourceTabData[tabId]).toEqual([]);
       vi.mocked(searchService.search).mockClear();
 
-      reactive(routeQuery).panelWhere = WHERE_B;
+      givenSchema(["service_name", "o2_service_where", "o2_service_version"]);
+      await wrapper.setProps({ selectedNode: rowAt(WHERE_B) });
+      await flushPromises();
       await flushPromises();
 
       const predicate = `o2_service_where = '${WHERE_B}'`;
@@ -1833,6 +1873,24 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(sqls().find((sql) => sql.includes("GROUP BY operation_name"))).toContain(predicate);
       expect(sqls().find((sql) => sql.includes("o2_service_version as"))).toContain(predicate);
       expect(sqls().join("\n")).not.toContain("k8s:c1/");
+    });
+
+    it.each([
+      { row: "", scoped: "" },
+      { row: WHERE_B, scoped: `o2_service_where = '${WHERE_B}'` },
+    ])("scopes span queries by the clicked row's where ($row), never the route's", async (c) => {
+      givenSchema(["service_name", "o2_service_where"]);
+      openAt("default");
+      wrapper = mountAt({ selectedNode: rowAt(c.row) });
+      await flushPromises();
+      await flushPromises();
+      const ops = sqls().find((sql) => sql.includes("GROUP BY operation_name")) || "";
+      expect(ops).toContain("service_name = 'frontend'");
+      expect(ops).not.toContain("'default'");
+      if (c.scoped) expect(ops).toContain(c.scoped);
+      else expect(ops).not.toContain("o2_service_where");
+      expect(redQueries(wrapper).length).toBe(3);
+      for (const query of redQueries(wrapper)) expect(query).not.toContain("'default'");
     });
 
     it("drops a response that lands after the where changed", async () => {
@@ -1846,10 +1904,10 @@ describe("ServiceGraphNodeSidePanel", () => {
               data: { hits: [{ operation_name: "b-op", request_count: 2 }] },
             })) as never);
       try {
-        wrapper = mountPanel();
+        wrapper = mountAt();
         await flushPromises();
         await flushPromises();
-        reactive(routeQuery).panelWhere = WHERE_B;
+        await wrapper.setProps({ selectedNode: rowAt(WHERE_B) });
         await flushPromises();
         expect(
           sqls().some((sql) => sql.includes("k8s:c1/") && sql.includes("GROUP BY operation_name")),
@@ -1867,7 +1925,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       let settle: (value: unknown) => void = () => {};
       getStreamMock.mockImplementationOnce(() => new Promise((resolve) => (settle = resolve)));
       openAt(WHERE_B);
-      wrapper = mountPanel();
+      wrapper = mountAt();
       await flushPromises();
       expect(sqls().filter((sql) => sql.includes("service_name = 'frontend'"))).toEqual([]);
       expect(redQueries(wrapper)).toEqual([]);
@@ -1884,7 +1942,7 @@ describe("ServiceGraphNodeSidePanel", () => {
     it("skips the predicate on a stream without o2_service_where", async () => {
       givenSchema(["service_name"]);
       openAt(WHERE_B);
-      wrapper = mountPanel();
+      wrapper = mountAt();
       await flushPromises();
       await flushPromises();
       const ops = sqls().find((sql) => sql.includes("GROUP BY operation_name"));
@@ -1896,7 +1954,7 @@ describe("ServiceGraphNodeSidePanel", () => {
     it("drops the where on a failed schema read and says the view is not scoped", async () => {
       getStreamMock.mockRejectedValueOnce(new Error("schema down"));
       openAt(WHERE_B);
-      wrapper = mountPanel();
+      wrapper = mountAt();
       await flushPromises();
       await flushPromises();
       const ops = sqls().find((sql) => sql.includes("GROUP BY operation_name"));
@@ -1913,12 +1971,12 @@ describe("ServiceGraphNodeSidePanel", () => {
       getStreamMock.mockResolvedValue({ schema: [{ name: "o2_service_where", type: "keyword" }] });
       openAt(WHERE_B);
       try {
-        wrapper = mountPanel();
+        wrapper = mountAt();
         await flushPromises();
         await flushPromises();
         vi.mocked(searchService.search).mockClear();
         await wrapper.setProps({
-          selectedNode: { ...baseNode, id: "cart", name: "cart", label: "cart" },
+          selectedNode: rowAt(WHERE_B, { ...baseNode, name: "cart", label: "cart" }),
         });
         await flushPromises();
         await flushPromises();
@@ -1941,7 +1999,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       );
       openAt(WHERE_B);
       try {
-        wrapper = mountPanel({ streamFilter: "stream_a" });
+        wrapper = mountAt({ streamFilter: "stream_a" });
         await flushPromises();
         await wrapper.setProps({ streamFilter: "stream_b" });
         await flushPromises();
@@ -1972,7 +2030,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       );
       openAt(WHERE_B);
       try {
-        wrapper = mountPanel({ streamFilter: "stream_a" });
+        wrapper = mountAt({ streamFilter: "stream_a" });
         await flushPromises();
         await wrapper.setProps({ streamFilter: "stream_b" });
         await flushPromises();
@@ -2000,7 +2058,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       );
       openAt(WHERE_B);
       try {
-        wrapper = mountPanel();
+        wrapper = mountAt();
         await flushPromises();
         orgState.identifier = `${firstOrg}-other`;
         await flushPromises();
@@ -2019,8 +2077,12 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("leaves inferred nodes unscoped", async () => {
       openAt(WHERE_B);
-      wrapper = mountPanel({
-        selectedNode: { ...baseNode, service_type: "database", service_system: "mysql" },
+      wrapper = mountAt({
+        selectedNode: rowAt(WHERE_B, {
+          ...baseNode,
+          service_type: "database",
+          service_system: "mysql",
+        }),
       });
       await flushPromises();
       await flushPromises();
