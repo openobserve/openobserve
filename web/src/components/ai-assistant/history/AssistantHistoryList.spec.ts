@@ -154,7 +154,7 @@ describe("AssistantHistoryList", () => {
       "Pinned",
       "Today",
       "Yesterday",
-      "Previous 7 days",
+      "Previous 7 Days",
       "Older",
     ]);
     expect(groups[2].text()).toContain("Beta late last night");
