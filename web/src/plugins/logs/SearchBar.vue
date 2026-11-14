@@ -1925,7 +1925,8 @@ import type {
   PersistSurface,
   PersistReasonCode,
 } from "@/composables/useLogs/useAutoRun";
-import { applySearchSnapshot, prepareSearchForSave } from "@/utils/logs/transientSearchKeys";
+import { applySearchSnapshot } from "@/utils/logs/transientSearchKeys";
+import { buildSavedViewPayload } from "@/utils/logs/savedViewPayload";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -4266,56 +4267,16 @@ export default defineComponent({
       try {
         delete searchObj.meta.scrollInfo;
         delete searchObj?.value;
-        let savedSearchObj = toRaw(searchObj);
-        savedSearchObj = JSON.parse(JSON.stringify(savedSearchObj));
-
-        delete savedSearchObj.data.queryResults;
-        delete savedSearchObj.data.histogram;
-        delete savedSearchObj.data.sortedQueryResults;
-        delete savedSearchObj.data.stream.streamLists;
-        delete savedSearchObj.data.stream.functions;
-        delete savedSearchObj.data.streamResults;
-        delete savedSearchObj.data.savedViews;
-        delete savedSearchObj.data.transforms;
-
-        // Turn off all loaders before saving view
-        savedSearchObj.loading = false;
-        savedSearchObj.loadingHistogram = false;
-        savedSearchObj.loadingCounter = false;
-        savedSearchObj.loadingStream = false;
-        savedSearchObj.loadingSavedView = false;
-
-        savedSearchObj.data.timezone = store.state.timezone;
-
-        if (savedSearchObj.data.parsedQuery) {
-          delete savedSearchObj.data.parsedQuery;
-        }
-
-        // Include visualization data if in visualization mode
-        if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
-          const visualizationData = getVisualizationConfig(dashboardPanelData);
-          if (visualizationData) {
-            savedSearchObj.data.visualizationData = visualizationData;
-          }
-        }
-
-        // Include the builder chart (stream, fields, joins, chart type, config) when
-        // in build mode — without it the builder is re-derived from the logs query on
-        // restore and loses everything the user configured.
-        if (searchObj.meta.logsVisualizeToggle === "build") {
-          const buildData = getBuildConfig(getPanelDataForPageKey("build"));
-          if (buildData) {
-            savedSearchObj.data.buildData = buildData;
-          }
-        }
-
-        // Transient hand-off to BuildQueryPage, never part of a saved view.
-        delete savedSearchObj.meta.savedBuildConfig;
-
-        return prepareSearchForSave(
-          savedSearchObj,
-          searchObj as unknown as Record<string, unknown>,
-        );
+        const toggle = searchObj.meta.logsVisualizeToggle;
+        return buildSavedViewPayload(toRaw(searchObj), {
+          timezone: store.state.timezone,
+          visualizationData:
+            toggle === "visualize" && dashboardPanelData
+              ? getVisualizationConfig(dashboardPanelData)
+              : undefined,
+          buildData:
+            toggle === "build" ? getBuildConfig(getPanelDataForPageKey("build")) : undefined,
+        });
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
       } catch (e) {
         console.log("Error while encoding search obj", e);

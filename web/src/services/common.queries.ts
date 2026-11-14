@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import common from "./common";
 import type { Folder } from "./common";
 import { folderKeys, nodeKeys } from "./common.querykeys";
@@ -75,4 +75,19 @@ export const nodesQuery = (org: string) =>
     queryKey: nodeKeys.list(org),
     queryFn: async () => (await common.list_nodes(org)).data,
     staleTime: NORMAL_STALE_TIME,
+  });
+
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+export const createFolderMutation = (org: string, type: string) =>
+  mutationOptions({
+    mutationFn: (folder: { name: string; description: string }) =>
+      common.new_Folder(org, type, folder),
+    meta: { invalidates: [folderKeys.all(org)], silentError: true },
+  });
+
+export const deleteFolderMutation = (org: string, type: string) =>
+  mutationOptions({
+    mutationFn: (folderId: string) => common.delete_Folder(org, type, folderId),
+    meta: { invalidates: [folderKeys.all(org)], silentError: true },
   });

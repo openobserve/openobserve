@@ -15003,6 +15003,12 @@
     "sectionOtherConsumers": "Also used by",
     "countDowntime": "{count} downtime | {count} downtimes"
   },
+  "starterPacks": {
+    "kubernetes": {
+      "title": "Kubernetes",
+      "description": "Dashboards, alerts and saved views for Kubernetes clusters."
+    }
+  },
   "alert_library": {
     "header": "Alert Library",
     "subtitle": "Curated, ready-to-use alerts, matched against the data you already ingest",
