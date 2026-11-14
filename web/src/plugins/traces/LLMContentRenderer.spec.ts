@@ -30,11 +30,16 @@ vi.mock("dompurify", () => ({
 }));
 
 // Mock marked
-vi.mock("marked", () => ({
-  marked: {
-    parse: vi.fn((md) => `<p>${md}</p>`),
-  },
-}));
+vi.mock("marked", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("marked")>();
+  return {
+    ...actual,
+    marked: {
+      ...actual.marked,
+      parse: vi.fn((md) => `<p>${md}</p>`),
+    },
+  };
+});
 
 // Mock CodeQueryEditor (Monaco wrapper, not needed in unit tests)
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
