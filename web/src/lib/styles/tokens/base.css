@@ -100,6 +100,8 @@
   --color-grey-200: #e5e5e5;
   --color-grey-300: #d4d4d4;
   --color-grey-400: #a3a3a3;
+  /* The lightest grey that clears 3:1 on white and on grey-100. */
+  --color-grey-450: #8a8a8a;
   --color-grey-500: #737373;
   --color-grey-600: #525252;
   --color-grey-700: #404040;

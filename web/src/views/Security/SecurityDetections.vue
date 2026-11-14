@@ -65,6 +65,7 @@ import {
 import { b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
 import { displayOrder, positionOf, stepRow, type NavTable } from "@/utils/security/recordNav";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { matchesAnyKey } from "@/utils/filterKeys";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -151,7 +152,7 @@ async function refresh() {
 const search = ref("");
 const severity = ref<string | null>(null);
 type Facet = "fired" | DetectionState;
-const facet = ref<Facet | null>(null);
+const facets = ref<Facet[]>([]);
 
 interface Row {
   id: string;
@@ -216,8 +217,8 @@ const counts = computed(() => ({
 const filtered = computed(() => {
   const needle = search.value.trim().toLowerCase();
   return scoped.value.filter((r) => {
-    if (facet.value === "fired" && !r.fired) return false;
-    if (facet.value && facet.value !== "fired" && r.state !== facet.value) return false;
+    const inFacet = (row: Row, key: Facet) => (key === "fired" ? row.fired : row.state === key);
+    if (!matchesAnyKey(facets.value, r, inFacet)) return false;
     if (severity.value && r.tone !== severity.value) return false;
     if (!needle) return true;
     return (
@@ -229,11 +230,11 @@ const filtered = computed(() => {
   });
 });
 
-const filtersActive = computed(() => !!search.value || !!severity.value || !!facet.value);
+const filtersActive = computed(() => !!search.value || !!severity.value || facets.value.length > 0);
 function clearFilters() {
   search.value = "";
   severity.value = null;
-  facet.value = null;
+  facets.value = [];
 }
 
 const stats = computed<StatItem[]>(() => [
@@ -294,10 +295,6 @@ const stats = computed<StatItem[]>(() => [
     dataTest: "security-detections-stat-all",
   },
 ]);
-
-function onStat(key: string) {
-  facet.value = key === "all" || facet.value === key ? null : (key as Facet);
-}
 
 const severityOptions = computed(() =>
   SEVERITY_TONES.map((tone) => ({ label: t(toneLabelKey(tone)), value: tone })),
@@ -884,22 +881,8 @@ watch(orgId, () => void refresh());
         @row-click="openDrawer"
         @sort-change="() => nextTick(syncIndex)"
       >
-        <template #subheader>
-          <div class="px-page-edge border-table-row-divider border-b py-1.5">
-            <OStatStrip
-              compact-values
-              :items="stats"
-              :loading="loading && !rows.length"
-              selectable
-              :selected-key="facet"
-              data-test="security-detections-stats"
-              @select="onStat"
-            />
-          </div>
-        </template>
-
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="contents">
             <div class="w-40 shrink-0">
               <OSelect
                 :aria-label="t('siem.aria.severityFilter')"
@@ -913,9 +896,22 @@ watch(orgId, () => void refresh());
             </div>
             <OSearchInput
               v-model="search"
-              class="flex-1"
+              class="min-w-0 flex-1 md:min-w-48"
               :placeholder="t('siem.detections.search')"
               data-test="security-detections-search"
+            />
+            <OStatStrip
+              compact-values
+              :items="stats"
+              :loading="loading && !rows.length"
+              selectable
+              :row="false"
+              class="max-md:order-last"
+              multiple
+              :selected-keys="facets"
+              default-key="all"
+              data-test="security-detections-stats"
+              @update:selected-keys="facets = $event as Facet[]"
             />
           </div>
         </template>

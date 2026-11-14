@@ -167,10 +167,11 @@ const stubs = {
           </select>`,
       },
       OStatStrip: {
-        props: ["items", "selectedKey"],
-        emits: ["select"],
-        template: `<div data-test="stat-strip" :data-selected="selectedKey ?? ''" :data-order="items.map((i) => i.key).join(',')">
-            <button v-for="i in items" :key="i.key" :data-test="i.dataTest" :data-icon="i.icon" :data-bar="i.max ?? ''" @click="$emit('select', i.key)">{{ i.value }}</button>
+        props: ["items", "selectedKeys", "defaultKey"],
+        emits: ["update:selectedKeys"],
+        template: `<div data-test="stat-strip" :data-selected="(selectedKeys || []).join(',')" :data-default="defaultKey" :data-order="items.map((i) => i.key).join(',')">
+            <button v-for="i in items" :key="i.key" :data-test="i.dataTest" :data-icon="i.icon" :data-bar="i.max ?? ''" @click="$emit('update:selectedKeys', i.key === defaultKey ? [] : selectedKeys.includes(i.key) ? selectedKeys.filter((k) => k !== i.key) : [...selectedKeys, i.key])">{{ i.value }}</button>
+            <slot />
           </div>`,
       },
       OTable: {
@@ -249,8 +250,9 @@ describe("ExperimentComparisonPanel", () => {
     expect(wrapper.get('[data-test="ai-experiment-count-improved"]').attributes("data-icon")).toBe(
       "trending-up",
     );
-    // Total summarises rather than filters: no share bar, and it never rings.
+    // Total is the strip's default chip, so it reads as active while nothing is filtered.
     expect(wrapper.get('[data-test="ai-experiment-count-total"]').attributes("data-bar")).toBe("");
+    expect(strip.attributes("data-default")).toBe("total");
   });
 
   it("clears the filter from Total without selecting it", async () => {
@@ -267,6 +269,25 @@ describe("ExperimentComparisonPanel", () => {
     expect(wrapper.findAll('[data-test="row"]')).toHaveLength(2);
   });
 
+  it("renders the buckets as filter chips whose All chip resets the rows", async () => {
+    const wrapper = mount(ExperimentComparisonPanel, {
+      props: { comparison },
+      global: {
+        ...stubs.global,
+        stubs: { ...stubs.global.stubs, OStatStrip: false },
+      },
+    });
+    const group = wrapper.get('[data-test="ai-experiment-counts"] [role="group"]');
+    expect(group.get('[data-test="ai-experiment-count-total"]').attributes("aria-pressed")).toBe(
+      "true",
+    );
+    await group.get('[data-test="ai-experiment-count-regressed"]').trigger("click");
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
+    await group.get('[data-test="ai-experiment-count-total"]').trigger("click");
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(2);
+    expect(wrapper.find('[data-test="ai-experiment-comparison-threshold"]').exists()).toBe(true);
+  });
+
   it("filters rows to the picked bucket and back", async () => {
     const wrapper = mountPanel();
     expect(wrapper.findAll('[data-test="row"]')).toHaveLength(2);
@@ -277,6 +298,18 @@ describe("ExperimentComparisonPanel", () => {
     // Re-picking the active tile clears the filter rather than trapping the user.
     await wrapper.get('[data-test="ai-experiment-count-regressed"]').trigger("click");
     expect(wrapper.findAll('[data-test="row"]')).toHaveLength(2);
+  });
+
+  it("ORs two picked buckets", async () => {
+    const wrapper = mountPanel();
+    await wrapper.get('[data-test="ai-experiment-count-regressed"]').trigger("click");
+    await wrapper.get('[data-test="ai-experiment-count-uncompared"]').trigger("click");
+    expect(wrapper.get('[data-test="stat-strip"]').attributes("data-selected")).toBe(
+      "regressed,uncompared",
+    );
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(2);
+    await wrapper.get('[data-test="ai-experiment-count-uncompared"]').trigger("click");
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
   });
 
   it("counts how each row moved on the scorer, in its own column header", () => {

@@ -160,6 +160,18 @@ describe("SecurityDetections", () => {
     expect(rowOf(w, RULE_ACCESS_KEY.title)).toBeUndefined();
   });
 
+  it("ORs two picked stat chips", async () => {
+    const w = await mountView();
+    await w.get('[data-test="security-detections-stat-fired"]').trigger("click");
+    await flushPromises();
+    expect(rowOf(w, RULE_STOP_LOGGING.title)).toBeDefined();
+    expect(rowOf(w, RULE_ACCESS_KEY.title)).toBeUndefined();
+    await w.get('[data-test="security-detections-stat-enabled"]').trigger("click");
+    await flushPromises();
+    expect(rowOf(w, RULE_STOP_LOGGING.title)).toBeDefined();
+    expect(rowOf(w, RULE_ACCESS_KEY.title)).toBeDefined();
+  });
+
   it("disables and deletes the selected detections in bulk, per folder", async () => {
     confirmMock.mockResolvedValue(true);
     vi.mocked(alertsService.bulkToggleState).mockResolvedValue(

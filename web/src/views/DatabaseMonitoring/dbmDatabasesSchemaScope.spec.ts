@@ -233,7 +233,6 @@ const stubs = {
   DbmInstanceHealthCell: true,
   DbmRowChips: true,
   DbmServiceList: true,
-  DbmSubheaderBand: true,
   DbmOverlapValue: true,
   DateTime: true,
   ORefreshButton: true,

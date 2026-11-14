@@ -1532,12 +1532,15 @@ defineExpose({
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
         :class="[
-          'px-page-edge flex items-center gap-2 py-2 max-md:flex-wrap max-md:gap-y-2',
+          'px-page-edge flex flex-wrap items-center gap-2 py-2',
           props.toolbarBordered ? 'border-table-row-divider border-b' : '',
         ]"
         data-test="o2-table-toolbar"
       >
-        <slot name="toolbar" />
+        <!-- One wrapping row: a chip strip that does not fit takes a full-width line under everything. -->
+        <div v-if="slots.toolbar" class="contents" data-test="o2-table-toolbar-content">
+          <slot name="toolbar" />
+        </div>
         <!-- Rendered only with content: an empty flex item still costs the toolbar a gap. -->
         <div
           v-if="showColumnToggle || slots['toolbar-trailing']"

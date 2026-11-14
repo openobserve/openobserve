@@ -970,6 +970,7 @@ async function onSaved() {
           :items="stats"
           :loading="loading && !indicators.length"
           selectable
+          :row="false"
           :selected-key="null"
           data-test="security-intel-stats"
           @select="onStat"

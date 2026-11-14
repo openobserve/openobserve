@@ -708,9 +708,13 @@ describe("AlertList - data fetching and columns", () => {
     expect(wrapper.vm.stateCounts.paused).toBe(1);
     expect(wrapper.vm.stateCounts.failed).toBe(1);
 
-    // Summary strip renders (via OTable's #top slot) when rows are present.
-    const summary = wrapper.find('[data-test="alert-list-summary"]');
+    // The chips share the search row, after the search input and before refresh.
+    const toolbar = wrapper.get('[data-test="o2-table-toolbar"]');
+    const summary = toolbar.find('[data-test="alert-list-summary"]');
     expect(summary.exists()).toBe(true);
+    const search = toolbar.get('[data-test="alert-list-search-input"]').element;
+    expect(search.compareDocumentPosition(summary.element)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(summary.find('[data-test="o-stat-strip-chips"]').exists()).toBe(true);
     // The KpiCards inside must actually render their content — guards against
     // the components being imported but not registered (renders as empty
     // unknown elements, which the exists() check alone would not catch).
@@ -737,6 +741,23 @@ describe("AlertList - data fetching and columns", () => {
     wrapper.vm.onStatSelect("firing");
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["firing", "notify-failed"]);
+  });
+
+  it("ORs two picked state chips", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.filteredResults = [
+      { enabled: true, name: "firing", last_outcome: "firing" },
+      { enabled: false, name: "paused" },
+      { enabled: true, name: "normal", last_outcome: "normal" },
+    ];
+    wrapper.vm.onStatSelect("firing");
+    wrapper.vm.onStatSelect("paused");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.stateFilters).toEqual(["firing", "paused"]);
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["firing", "paused"]);
+    wrapper.vm.onStatSelect("total");
+    expect(wrapper.vm.stateFilters).toEqual([]);
   });
 
   it("dynamicQueryModel binds to filterQuery by default and to searchQuery when across-folders toggled", async () => {
@@ -1394,7 +1415,7 @@ describe("AlertList - row actions keep the view", () => {
     const wrapper = await mountOnPageTwo();
     await toggleBtn(wrapper, "Alert 6").trigger("click");
     await flushPromises();
-    wrapper.vm.onStatSelect("paused");
+    wrapper.vm.stateFilters = ["paused"];
     await flushPromises();
     vi.mocked(announcePolite).mockClear();
     alertsSvc.toggle_state_by_alert_id.mockResolvedValueOnce({ data: { enabled: true } });
@@ -1448,7 +1469,7 @@ describe("AlertList - row actions keep the view", () => {
     });
     await wrapper.vm.bulkToggleAlerts("pause");
     await flushPromises();
-    wrapper.vm.onStatSelect("paused");
+    wrapper.vm.stateFilters = ["paused"];
     await flushPromises();
     wrapper.vm.selectedAlertIds = ["alert-6", "alert-7"];
     await flushPromises();
@@ -2163,13 +2184,13 @@ describe("AlertList - filters from the Overview links", () => {
     "notify_failed",
   ])("reads ?state=%s into the state filter", async (state) => {
     const wrapper = await withQuery({ state });
-    expect(wrapper.vm.stateFilter).toBe(state);
+    expect(wrapper.vm.stateFilters).toEqual([state]);
   });
 
   it("lets ?state win over the saved state and ignores an invalid value", async () => {
-    Object.assign(useListViewState("alerts", {}), { stateFilter: "paused" });
-    expect((await withQuery({ state: "firing" })).vm.stateFilter).toBe("firing");
-    expect((await withQuery({ state: "bogus" })).vm.stateFilter).toBe("paused");
+    Object.assign(useListViewState("alerts", {}), { stateFilter: ["paused"] });
+    expect((await withQuery({ state: "firing" })).vm.stateFilters).toEqual(["firing"]);
+    expect((await withQuery({ state: "bogus" })).vm.stateFilters).toEqual(["paused"]);
   });
 
   it("starts without the saved search when the link carries a state or level", async () => {
@@ -2184,7 +2205,7 @@ describe("AlertList - filters from the Overview links", () => {
   it("clears the level filter with the Total tile", async () => {
     const wrapper = await withQuery({ state: "firing", level: "critical" });
     wrapper.vm.onStatSelect("total");
-    expect(wrapper.vm.stateFilter).toBeNull();
+    expect(wrapper.vm.stateFilters).toEqual([]);
     expect(wrapper.vm.levelFilter).toBeNull();
   });
 
@@ -2194,8 +2215,12 @@ describe("AlertList - filters from the Overview links", () => {
     expect(wrapper.vm.levelFilter).toBeNull();
     const again = await withQuery({ state: "firing", level: "critical" });
     again.vm.onStatSelect("firing");
-    expect(again.vm.stateFilter).toBeNull();
+    expect(again.vm.stateFilters).toEqual([]);
     expect(again.vm.levelFilter).toBeNull();
+    const viaStrip = await withQuery({ state: "firing", level: "critical" });
+    viaStrip.vm.onStateFiltersUpdate(["firing", "error"]);
+    expect(viaStrip.vm.stateFilters).toEqual(["firing", "error"]);
+    expect(viaStrip.vm.levelFilter).toBeNull();
   });
 
   it("reads ?level and ignores values other than critical and warning", async () => {
@@ -2240,6 +2265,7 @@ describe("AlertList - filters from the Overview links", () => {
     expect(wrapper.vm.stateCounts).toMatchObject({ error: 1, notify_failed: 1 });
     wrapper.vm.onStatSelect("error");
     expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["errored"]);
+    wrapper.vm.onStatSelect("error");
     wrapper.vm.onStatSelect("notify_failed");
     expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["undelivered"]);
   });
@@ -2301,7 +2327,8 @@ describe("AlertList - view state restoration", () => {
     const wrapper: any = await mountAlertList();
     await flushPromises();
 
-    expect(wrapper.vm.stateFilter).toBe("paused");
+    // A single key saved before chips went multi-select still restores.
+    expect(wrapper.vm.stateFilters).toEqual(["paused"]);
     expect(wrapper.vm.sortBy).toBe("name");
     expect(wrapper.vm.sortOrder).toBe("desc");
     expect(wrapper.vm.pageSize).toBe(50);
@@ -2311,14 +2338,14 @@ describe("AlertList - view state restoration", () => {
     const wrapper: any = await mountAlertList();
     await flushPromises();
 
-    wrapper.vm.stateFilter = "active";
+    wrapper.vm.stateFilters = ["active", "paused"];
     wrapper.vm.sortBy = "name";
     wrapper.vm.sortOrder = "asc";
     wrapper.vm.pageSize = 100;
     await flushPromises();
 
     expect(useListViewState("alerts", {})).toMatchObject({
-      stateFilter: "active",
+      stateFilter: ["active", "paused"],
       sortBy: "name",
       sortOrder: "asc",
       perPage: 100,

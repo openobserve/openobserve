@@ -83,7 +83,8 @@ const defaultTextClass = computed(() => ["text-inherit"]);
 
 const alignClass = computed(() => {
   if (align.value === "center") return "text-center";
-  if (align.value === "right") return "text-right";
+  // End-aligned columns hold numbers, so fixed-width digits keep a column's places lined up.
+  if (align.value === "right") return "text-right tabular-nums";
   return "text-left";
 });
 

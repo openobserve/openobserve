@@ -132,9 +132,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <DbmSubheaderBand data-test="dbm-blocked-summary">
-            <OStatStrip :items="summaryStats" :loading="loading" />
-          </DbmSubheaderBand>
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            row
+            data-test="dbm-blocked-summary"
+          />
 
           <DbmLockCoverageLine
             v-if="samples.length"
@@ -452,7 +455,6 @@ import DateTime from "@/components/DateTime.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
-import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";

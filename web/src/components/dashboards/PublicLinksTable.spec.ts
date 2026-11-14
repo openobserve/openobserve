@@ -251,9 +251,13 @@ describe("PublicLinksTable", () => {
     expect(find(w, "dashboards-public-links-l5-ranges").text()).toBe("1d");
     expect(find(w, "dashboards-public-links-l5-ranges").find(".font-semibold").text()).toBe("1d");
 
+    // A second tile adds to the first: the rows are attention OR paused.
     await selectTile(w, "paused");
-    expect(rows(w)).toHaveLength(1);
+    expect(rows(w)).toHaveLength(2);
     expect(find(w, "dashboards-public-links-l2-name").text()).toContain("Untitled link");
+
+    await selectTile(w, "attention");
+    expect(rows(w)).toHaveLength(1);
 
     await selectTile(w, "all");
     expect(rows(w)).toHaveLength(5);
@@ -262,21 +266,15 @@ describe("PublicLinksTable", () => {
   it("clears the status filter when the selected tile is clicked again", async () => {
     const w = build();
     await flushPromises();
-    const vm = w.vm as unknown as { statusFilter: string };
+    const vm = w.vm as unknown as { statusFilters: string[] };
 
     await selectTile(w, "paused");
-    expect(vm.statusFilter).toBe("paused");
+    expect(vm.statusFilters).toEqual(["paused"]);
     expect(rows(w)).toHaveLength(1);
 
     await selectTile(w, "paused");
-    expect(vm.statusFilter).toBe("all");
+    expect(vm.statusFilters).toEqual([]);
     expect(rows(w)).toHaveLength(5);
-
-    await selectTile(w, "expired");
-    await selectTile(w, "paused");
-    expect(vm.statusFilter).toBe("paused");
-    expect(rows(w)).toHaveLength(1);
-    expect(find(w, "dashboards-public-links-l2-status").text()).toBe("Paused");
   });
 
   it("tags a link of an org with public links off as disabled, says why, and leaves it out of Live", async () => {
@@ -352,6 +350,7 @@ describe("PublicLinksTable", () => {
     expect(rows(w)).toHaveLength(1);
     expect(find(w, "dashboards-public-links-l1-status").text()).toBe("Live");
 
+    await selectTile(w, "live");
     await selectTile(w, "not-viewed");
     expect(rows(w)).toHaveLength(2);
     expect(find(w, "dashboards-public-links-n1-status").text()).toBe("Never viewed");

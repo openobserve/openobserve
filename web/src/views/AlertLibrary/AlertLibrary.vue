@@ -114,9 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <template v-else>
-            <!-- Selection shares the search row, which has the slack for it. Its own
-                 row would push the grid down; the stat strip would re-flow its tiles.
-                 Here the only thing that resizes is an empty text field. -->
+            <!-- Selection shares the search row: its own row would push the grid down.
+                 Only the search field and the chips' scroll box give up width to it. -->
             <div
               class="border-border-default px-page-edge flex shrink-0 flex-wrap items-center gap-3 border-b py-2"
               data-test="alert-library-toolbar"
@@ -134,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 v-model="search"
                 size="sm"
-                class="min-w-0 flex-1"
+                class="min-w-0 flex-1 md:min-w-48"
                 :debounce="200"
                 :placeholder="t('alert_library.searchPlaceholder')"
                 data-test="alert-library-search"
@@ -160,6 +159,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ item.label }}
                 </OToggleGroupItem>
               </OToggleGroup>
+
+              <OStatStrip
+                :items="statItems"
+                selectable
+                :row="false"
+                :selected-key="facet"
+                default-key="all"
+                class="max-md:order-last"
+                data-test="alert-library-strip"
+                @select="onStatSelect"
+              />
 
               <!-- The tri-state is LAST and always present, so it never moves: the
                    selection controls grow leftward into the search field's width. -->
@@ -223,17 +233,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="toggleViewSelection"
                 />
               </div>
-            </div>
-
-            <div class="shrink-0">
-              <OStatStrip
-                :items="statItems"
-                selectable
-                :selected-key="facet"
-                default-key="all"
-                data-test="alert-library-strip"
-                @select="onStatSelect"
-              />
             </div>
 
             <div v-if="showCollectorBanner" class="px-page-edge shrink-0 pb-2">
