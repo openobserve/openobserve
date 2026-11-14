@@ -65,11 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
           tone="title"
           :readonly="!chatActions"
-          :disabled="renamePending"
           :aria-label="t('assistant.thread.renameLabel')"
           :edit-hint="t('assistant.thread.renameHint')"
           :maxlength="MAX_TITLE"
-          :aria-describedby="describedBy"
           :aria-busy="renamePending ? 'true' : undefined"
           data-test="assistant-thread-heading-edit"
           @commit="saveTitle"
@@ -134,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="xs"
                 :disabled="renamePending"
+                focusable-unavailable
                 :aria-label="titleName"
                 aria-haspopup="menu"
                 class="max-w-full min-w-0 justify-start! gap-1 text-sm! font-medium text-inherit! max-md:min-h-11 pointer-coarse:min-h-11"
@@ -520,8 +519,11 @@ function startRenameSoon(): void {
 
 function commitRename(value: string): void {
   if (!renaming.value) return;
+  // Still focused in the field means Enter; after a blur focus already moved on purpose.
+  const byKey = !!document.activeElement?.closest('[data-test="assistant-thread-rename"]');
   saveTitle(value);
-  void finishRename();
+  if (byKey) void finishRename();
+  else renaming.value = false;
 }
 
 function cancelRename(): void {
@@ -540,7 +542,8 @@ function focusTitle(): void {
 
 function saveTitle(value: string): void {
   const next = value.trim().slice(0, MAX_TITLE);
-  if (props.sid && next && next !== String(titleText.value)) void history.rename(props.sid, next);
+  if (props.sid && !renamePending.value && next && next !== String(titleText.value))
+    void history.rename(props.sid, next);
 }
 
 function togglePin(): void {

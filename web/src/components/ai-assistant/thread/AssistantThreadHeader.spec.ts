@@ -184,6 +184,37 @@ describe("AssistantThreadHeader", () => {
     expect(document.activeElement).toBe(wrapper.get(title).element);
   });
 
+  async function openRename(wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) {
+    vi.useFakeTimers();
+    await wrapper.get('[data-test="assistant-thread-menu-rename"]').trigger("click");
+    await vi.runAllTimersAsync();
+    vi.useRealTimers();
+    await flushPromises();
+    return wrapper.get('[data-test="assistant-thread-rename"] input');
+  }
+
+  it("leaves focus where the user moved it when the rename field blurs", async () => {
+    const { wrapper } = await setup();
+    const other = document.createElement("button");
+    document.body.appendChild(other);
+    const input = await openRename(wrapper);
+    (input.element as HTMLInputElement).focus();
+    other.focus();
+    await flushPromises();
+    expect(document.activeElement).toBe(other);
+  });
+
+  it("returns focus to the title after Enter even while the rename is saving", async () => {
+    const { wrapper, sid, history } = await setup();
+    const input = await openRename(wrapper);
+    (input.element as HTMLInputElement).focus();
+    history.pending[sid] = "rename";
+    await input.setValue("Payments p95");
+    await input.trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(document.activeElement).toBe(wrapper.get(title).element);
+  });
+
   it("starts a new chat at once even while an answer runs, and says the old one keeps going", async () => {
     const { wrapper, newChat, store, sid } = await setup();
     await wrapper.get('[data-test="assistant-thread-new"]').trigger("click");
@@ -392,6 +423,19 @@ describe("AssistantThreadHeader", () => {
       await flushPromises();
       expect(String(store.state.sessions[sid].title)).toBe("Payments p95");
       expect(wrapper.find('[data-test="assistant-thread-more"]').exists()).toBe(true);
+    });
+
+    it("keeps the heading focusable while a rename saves, so Enter returns focus to it", async () => {
+      const { wrapper, sid, history } = await setup(toolbar);
+      const edit = '[data-test="assistant-thread-heading-edit';
+      await wrapper.get(`${edit}-trigger"]`).trigger("click");
+      await flushPromises();
+      history.pending[sid] = "rename";
+      const input = wrapper.get(`${edit}-input"]`);
+      await input.setValue("Payments p95");
+      await input.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(document.activeElement).toBe(wrapper.get(`${edit}-trigger"]`).element);
     });
 
     it("shows the heading as plain text when the chat cannot be renamed", async () => {

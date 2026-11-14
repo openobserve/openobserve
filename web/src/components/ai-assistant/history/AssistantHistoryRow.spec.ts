@@ -230,6 +230,18 @@ describe("AssistantHistoryRow", () => {
     expect(wrapper.emitted("rename")).toHaveLength(1);
   });
 
+  it("does not pull focus back to the row when the rename field blurs", async () => {
+    const wrapper = await armed();
+    const other = document.createElement("button");
+    document.body.appendChild(other);
+    await rename(wrapper);
+    const input = wrapper.get('[data-test="assistant-history-rename"] input');
+    (input.element as HTMLInputElement).focus();
+    other.focus();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.activeElement).toBe(other);
+  });
+
   it("keeps an IME composition's Enter for the composition, not the save", async () => {
     const wrapper = await armed();
     await rename(wrapper);

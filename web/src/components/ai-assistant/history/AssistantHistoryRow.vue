@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="assistant-history-rename"
         @update:model-value="setDraft"
         @keydown="onRenameKey"
-        @blur="commitRename"
+        @blur="commitRename()"
       />
     </div>
     <OContextMenu v-else :disabled="readonly || !!pending || !actions.length">
@@ -519,7 +519,7 @@ function onRenameKey(event: KeyboardEvent): void {
   if (event.isComposing || event.keyCode === 229) return;
   if (event.key === "Enter") {
     event.preventDefault();
-    commitRename();
+    commitRename(true);
   } else if (event.key === "Escape") {
     event.preventDefault();
     event.stopPropagation();
@@ -528,11 +528,13 @@ function onRenameKey(event: KeyboardEvent): void {
   }
 }
 
-function commitRename(): void {
+// A blur means focus already moved on purpose, so only Enter hands it back to the row.
+function commitRename(byKey = false): void {
   if (!renaming.value) return;
   const next = draft.value.trim();
   if (!cancelled && next && next !== String(props.row.title)) emit("rename", props.row.sid, next);
-  void finishRename();
+  if (byKey) void finishRename();
+  else renaming.value = false;
 }
 
 async function finishRename(): Promise<void> {
