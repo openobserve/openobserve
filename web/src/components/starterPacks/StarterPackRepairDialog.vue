@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -149,7 +151,10 @@ const applyPrimary = () => {
       <div
         v-for="row in candidates"
         :key="row.stream"
-        class="border-border-default flex items-center justify-between gap-3 border-b py-2"
+        class="rounded-default bg-surface-base flex items-center justify-between gap-3 border p-3"
+        :class="
+          manyStreams && picked.includes(row.stream) ? 'border-primary' : 'border-border-default'
+        "
         data-test="starter-pack-repair-candidate"
       >
         <OCheckbox
@@ -201,6 +206,12 @@ const applyPrimary = () => {
     </div>
 
     <div v-else-if="kind === 'shared'" class="flex flex-col gap-2 text-sm">
+      <div class="flex items-center gap-2">
+        <OIcon name="filter-alt" size="sm" class="text-text-secondary" />
+        <OText class="text-text-heading font-medium">{{
+          t("starterPacks.adapted.filterTitle", { what: raw(what) })
+        }}</OText>
+      </div>
       <OSelect
         v-if="candidates.length > 1"
         v-model="stream"
@@ -239,6 +250,11 @@ const applyPrimary = () => {
         :options="pickerOptions"
         data-test="starter-pack-repair-stream-select"
       />
+      <div class="flex items-center gap-2">
+        <OSeparator class="flex-1" />
+        <OText variant="meta">{{ t("starterPacks.adapted.or") }}</OText>
+        <OSeparator class="flex-1" />
+      </div>
       <OText variant="meta">{{
         t("starterPacks.adapted.dialogSend", { stream: raw(question?.want ?? "") })
       }}</OText>

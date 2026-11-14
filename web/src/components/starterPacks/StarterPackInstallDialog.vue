@@ -22,6 +22,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import type { PackItemKind } from "@/composables/starterPacks/types";
 import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
@@ -38,25 +39,59 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-const TYPE_KEYS: Partial<Record<PackItemKind, I18nKey>> = {
-  dashboard: "starterPacks.installDialog.typeDashboard",
-  alert: "starterPacks.installDialog.typeAlert",
-  savedView: "starterPacks.installDialog.typeSavedView",
+const KIND_KEYS: Partial<Record<PackItemKind, I18nKey>> = {
+  dashboard: "starterPacks.installDialog.kindDashboards",
+  alert: "starterPacks.installDialog.kindAlerts",
+  savedView: "starterPacks.installDialog.kindSavedViews",
 };
 
 const flow = props.flow;
 const total = computed(() => flow.toCreate.value.length);
 const made = computed(() => flow.made.value.length);
 const failedCount = computed(() => flow.failed.value.length);
-const title = computed(() => {
-  const base = t("starterPacks.installDialog.title", { made: made.value, total: total.value });
-  return failedCount.value
-    ? t(
-        "starterPacks.installDialog.attention",
-        { title: base, count: failedCount.value },
-        failedCount.value,
-      )
-    : base;
+const packTitle = t(flow.pack.titleKey);
+const title = computed(() =>
+  !flow.running.value && total.value > 0 && made.value === total.value
+    ? t("starterPacks.installDialog.doneTitle", { title: packTitle })
+    : t("starterPacks.progress.title", { title: packTitle }),
+);
+const subTitle = computed(() => {
+  const counts = { made: made.value, total: total.value };
+  if (failedCount.value) {
+    return t("starterPacks.progress.summaryRetry", { ...counts, failed: failedCount.value });
+  }
+  if (flow.running.value) return t("starterPacks.installDialog.subtitleRunning", counts);
+  if (total.value > 0 && made.value === total.value) {
+    return t("starterPacks.installDialog.subtitleDone", counts);
+  }
+  return t("starterPacks.progress.summary", counts);
+});
+const kindRows = computed(() => {
+  const firstPending = flow.toCreate.value.find(({ status }) => status === "pending")?.kind;
+  return (["dashboard", "alert", "savedView"] as const).flatMap((kind) => {
+    const items = flow.toCreate.value.filter((item) => item.kind === kind);
+    if (!items.length) return [];
+    const kindName = t(KIND_KEYS[kind]!);
+    const created = items.filter(({ status }) => status === "created").length;
+    const counts = { kind: kindName, made: created, total: items.length };
+    if (!items.some(({ status }) => status === "pending")) {
+      return [
+        { kind, state: "created", label: t("starterPacks.installDialog.rowCreated", counts) },
+      ];
+    }
+    if (flow.running.value && kind === firstPending) {
+      return [
+        { kind, state: "creating", label: t("starterPacks.installDialog.rowCreating", counts) },
+      ];
+    }
+    return [
+      {
+        kind,
+        state: "waiting",
+        label: t("starterPacks.installDialog.rowWaiting", { kind: kindName }),
+      },
+    ];
+  });
 });
 const firstDashboard = computed(() => flow.made.value.find(({ kind }) => kind === "dashboard"));
 const openLabel = computed(() =>
@@ -66,10 +101,6 @@ const openLabel = computed(() =>
       })
     : t("starterPacks.drawer.openDashboard"),
 );
-const typeOf = (kind: PackItemKind) => {
-  const key = TYPE_KEYS[kind];
-  return key ? t(key) : raw(kind);
-};
 </script>
 
 <template>
@@ -79,6 +110,7 @@ const typeOf = (kind: PackItemKind) => {
     :persistent="flow.running.value"
     :show-close="!flow.running.value"
     :title="title"
+    :sub-title="subTitle"
     data-test="starter-pack-install-dialog"
   >
     <div class="flex flex-col gap-3 text-sm" data-test="starter-pack-progress">
@@ -100,18 +132,17 @@ const typeOf = (kind: PackItemKind) => {
         :content="t('starterPacks.progress.installError')"
       />
       <div v-if="failedCount" class="flex flex-col" data-test="starter-pack-progress-failed">
-        <OText variant="section" class="text-text-error">{{
-          t("starterPacks.installDialog.couldNot", { count: failedCount })
-        }}</OText>
         <div
           v-for="item in flow.failed.value"
           :key="item.itemId"
           class="border-border-default flex items-start gap-2 border-b py-2"
           data-test="starter-pack-progress-failed-row"
         >
-          <OIcon name="error" size="sm" class="text-text-error mt-0.5" />
+          <OIcon name="error" size="sm" class="text-status-error-text mt-0.5 shrink-0" />
           <div class="flex min-w-0 flex-1 flex-col">
-            <span>{{ raw(flow.nameOf(item.itemId)) }}</span>
+            <strong>{{
+              t("starterPacks.installDialog.rowFailed", { name: raw(flow.nameOf(item.itemId)) })
+            }}</strong>
             <OText variant="meta">{{
               flow.forbidden.value
                 ? t("starterPacks.noPermission")
@@ -129,21 +160,29 @@ const typeOf = (kind: PackItemKind) => {
           </OButton>
         </div>
       </div>
-      <div class="flex flex-col" data-test="starter-pack-progress-list">
-        <OText variant="section">{{
-          t("starterPacks.installDialog.created", { count: made })
-        }}</OText>
-        <div
-          v-for="item in flow.made.value"
-          :key="item.itemId"
+      <ul class="flex flex-col" data-test="starter-pack-progress-list">
+        <li
+          v-for="row in kindRows"
+          :key="row.kind"
           class="border-border-default flex items-center gap-2 border-b py-2"
-          data-test="starter-pack-progress-created-row"
+          :data-test="`starter-pack-progress-kind-${row.state}-row`"
         >
-          <OIcon name="check-circle" size="sm" class="text-text-success" />
-          <span class="min-w-0 flex-1 truncate">{{ raw(flow.nameOf(item.itemId)) }}</span>
-          <OText variant="meta">{{ typeOf(item.kind) }}</OText>
-        </div>
-      </div>
+          <OSpinner v-if="row.state === 'creating'" size="xs" class="shrink-0" />
+          <OIcon
+            v-else
+            :name="row.state === 'created' ? 'check-circle' : 'schedule'"
+            size="sm"
+            :class="[
+              'shrink-0',
+              row.state === 'created' ? 'text-status-positive' : 'text-text-muted',
+            ]"
+          />
+          <span class="min-w-0 flex-1">{{ row.label }}</span>
+          <OText v-if="row.kind === 'alert' && row.state === 'created'" variant="meta">{{
+            t("starterPacks.progress.alertsOff")
+          }}</OText>
+        </li>
+      </ul>
     </div>
 
     <template #footer>
@@ -155,14 +194,25 @@ const typeOf = (kind: PackItemKind) => {
           data-test="starter-pack-progress-undo-btn"
           @click="emit('undo')"
         >
-          {{ t("starterPacks.installDialog.undoAll", { count: made }) }}
+          {{ t("starterPacks.installDialog.undoSetup") }}
         </OButton>
         <span class="flex-1" />
-        <template v-if="!flow.running.value">
+        <OButton
+          v-if="flow.running.value"
+          variant="primary"
+          size="sm-action"
+          disabled
+          loading
+          data-test="starter-pack-progress-running-btn"
+        >
+          {{ t("starterPacks.installDialog.settingUp") }}
+        </OButton>
+        <template v-else>
           <OButton
             v-if="failedCount && !flow.forbidden.value"
             variant="outline"
             size="sm-action"
+            icon-left="refresh"
             data-test="starter-pack-progress-retry-btn"
             @click="emit('retry')"
           >

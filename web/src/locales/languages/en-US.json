@@ -12432,6 +12432,7 @@
     "lastTriggered": "Last Triggered At",
     "importedFromPanel": "Query imported from dashboard panel: \"{panelTitle}\"",
     "lastSatisfied": "Last Satisfied At",
+    "notifies": "Notifies",
     "owner": "Owner",
     "title": "Title",
     "newFunctionAssociationMsg": "Note: The function will be created, then you will be redirected to the previous form to associate the newly created function with the pipeline.",
@@ -15035,7 +15036,15 @@
       "rawLogs": "Looks like Nginx logs in {stream}, stored as plain text",
       "parse": "Parse these logs",
       "parsing": "Parsing new Nginx logs in {stream}",
-      "parsingIncomplete": "Parsing for {stream} was not fully set up"
+      "parsingIncomplete": "Parsing for {stream} was not fully set up",
+      "stateSettingUp": "Setting up",
+      "stateFailed": "{count} failed | {count} failed",
+      "openPack": "Open pack",
+      "setUpPack": "Set up {title} monitoring",
+      "whatGetsCreated": "What gets created",
+      "noMatchTitle": "No packs match \"{search}\"",
+      "noMatchBody": "Packs available: {packs}",
+      "clearSearch": "Clear search"
     },
     "parse": {
       "title": "Parse Nginx logs in {stream}?",
@@ -15057,11 +15066,15 @@
       "undo": "Undo",
       "undoTitle": "Stop parsing?",
       "undoRemoves": "Removes the parsing pipeline and its function.",
-      "undoFailed": "Couldn't remove the parsing pipeline or its function"
+      "undoFailed": "Couldn't remove the parsing pipeline or its function",
+      "confirmNew": "Parse new Nginx lines",
+      "notNow": "Not now"
     },
     "hosts": {
       "title": "Hosts",
-      "description": "The host metrics dashboard and alerts for servers and virtual machines."
+      "description": "The host metrics dashboard and alerts for servers and virtual machines.",
+      "tileDashboard": "CPU, memory and disk for each host",
+      "tileAlerts": "High CPU load, low memory and disks filling up."
     },
     "kubernetes": {
       "title": "Kubernetes",
@@ -15075,7 +15088,10 @@
       "fieldReason": "Event reason",
       "fieldMessage": "Event message",
       "roleEvents": "Kubernetes events",
-      "flavourOtel": "OpenTelemetry"
+      "flavourOtel": "OpenTelemetry",
+      "tileDashboard": "Nodes, pods and workloads across your clusters",
+      "tileAlerts": "API server latency and cluster capacity.",
+      "tileSavedView": "One click in Logs to see Kubernetes events"
     },
     "setUp": "Set up {title} monitoring",
     "checking": "Checking what fits…",
@@ -15130,11 +15146,22 @@
       "undoAll": "Undo — remove all {count}",
       "typeDashboard": "dashboard",
       "typeAlert": "alert",
-      "typeSavedView": "saved search"
+      "typeSavedView": "saved search",
+      "doneTitle": "{title} monitoring is set up",
+      "subtitleRunning": "{made} of {total} created · you can leave this page",
+      "subtitleDone": "{made} of {total} created · alerts are silent until you turn them on",
+      "kindDashboards": "Dashboards",
+      "kindAlerts": "Alerts",
+      "kindSavedViews": "Saved views",
+      "rowCreated": "Created · {kind} {made} of {total}",
+      "rowCreating": "Creating · {kind} {made} of {total}",
+      "rowWaiting": "{kind} waiting",
+      "rowFailed": "Failed · {name}",
+      "settingUp": "Setting up…",
+      "undoSetup": "Undo setup"
     },
     "home": {
       "title": "Your {title} data is ready to monitor",
-      "notNow": "Not now",
       "hideForMe": "Hide for me",
       "hideForEveryone": "Hide for everyone",
       "hidden": "{title} pack hidden for you",
@@ -15144,13 +15171,38 @@
       "showAgain": "Show again",
       "empty": "No starter pack matches your data yet",
       "error": "Couldn't check your data for packs",
-      "alertsOnLabel": "Alerts on",
-      "alertsOnValue": "{on} of {total}",
       "reminder": "{count} {title} alert is off | {count} {title} alerts are off",
       "turnOn": "Turn on alerts",
       "viewPack": "View pack",
       "keepOff": "Keep off",
-      "keepOffFailed": "Couldn't save that. Try again."
+      "keepOffFailed": "Couldn't save that. Try again.",
+      "offerTitle": "Your data is arriving. Turn it into monitoring.",
+      "offerSub": "Pick a starter pack below. It creates dashboards, alerts and saved views that fit your streams.",
+      "undoNote": "Undo any setup for 24 hours",
+      "bestPlace": "Best place to start",
+      "fromClusters": "from {clusters}",
+      "moreStreams": "+{count} stream | +{count} streams",
+      "moreStreamsLabel": "More matched streams",
+      "tileAlertsSilent": "{what} Silent until you turn them on.",
+      "setUp": "Set up {title}",
+      "setUpShort": "Set up",
+      "findOther": "Find packs for other data",
+      "interrupted": "{title} setup stopped partway · {made} of {total} done",
+      "menuFits": "{count} starter pack fits your data | {count} starter packs fit your data",
+      "menuIdle": "Starter packs",
+      "menuHeader": "Packs that fit data you already send · undo any setup for 24 h",
+      "menuOfferLine": "{count} dashboard · fits {streams} | {count} dashboards · fits {streams}",
+      "menuOfferFits": "Fits {streams}",
+      "menuStreamsMore": "{streams} +{count} more",
+      "setUpDone": "Set up",
+      "setUpToday": "Set up today {time}",
+      "setUpOn": "Set up {date}",
+      "setUpSilent": "{when} · {count} alert silent | {when} · {count} alerts silent",
+      "openLibrary": "Open Library",
+      "dontShow": "Don't show on Home",
+      "silentNoIncidents": "No incidents · {count} {title} alert is silent | No incidents · {count} {title} alerts are silent",
+      "silentTitle": "{count} {title} alert is silent | {count} {title} alerts are silent",
+      "silentSub": "They show what would fire but notify no one. Turn them on to get notified."
     },
     "drawer": {
       "title": "What gets created",
@@ -15170,6 +15222,8 @@
       "scopeNote": "Only after you turn the alerts on",
       "background": "Background queries",
       "backgroundValue": "None for now",
+      "reach": "Background queries: None for now",
+      "reachScoped": "Alert scope: {scope} · Background queries: None for now",
       "backgroundNote": "Alerts that are off run no queries. Scan size isn't shown yet. It can be estimated only where the data exists.",
       "notIncluded": "Not included",
       "reasonAlreadyHave": "{name}: you already have it",
@@ -15183,7 +15237,12 @@
       "openKubernetes": "Open Kubernetes",
       "openDashboard": "Open dashboard",
       "error": "Couldn't load what this pack creates",
-      "reasonNoFlavour": "{name}: not available for your metric names yet"
+      "reasonNoFlavour": "{name}: not available for your metric names yet",
+      "close": "Close",
+      "loadingFit": "Checking which items fit your data",
+      "groupAlerts": "{count} alert | {count} alerts",
+      "alertsSilentMeta": "Silent until you turn them on",
+      "groupSavedViews": "{count} saved view in Logs | {count} saved views in Logs"
     },
     "progress": {
       "title": "Setting up {title} monitoring",
@@ -15230,7 +15289,8 @@
       "allOff": "All alerts are off, so nothing stops and no alert loses cover.",
       "loseCover": "{count} live alert loses cover | {count} live alerts lose cover",
       "removes": "Removes {count} item | Removes {count} items",
-      "keeps": "Keeps any item you changed. The folder stays if it still holds one."
+      "keeps": "Keeps any item you changed. The folder stays if it still holds one.",
+      "untouched": "Your data and streams are not touched."
     },
     "severity": {
       "critical": "Critical",
@@ -15239,6 +15299,17 @@
     "health": {
       "line": "{title}: no data since {since}.",
       "checkCollector": "Check your collector"
+    },
+    "coverage": {
+      "turnOn": "Turn on {title} alerts",
+      "silent": "{count} alert fired this week and notified nobody. It is set to in-app only. | {count} alerts fired this week and notified nobody. They are set to in-app only.",
+      "route": "Route alerts",
+      "fit": "{count} fit your data",
+      "install": "Install {count} alert | Install {count} alerts"
+    },
+    "notifies": {
+      "nobody": "Nobody",
+      "more": "+{n}"
     },
     "turnOn": {
       "title": "Turn on {title} alerts",
@@ -15283,7 +15354,12 @@
       "cost": "About {queries} background queries a day. Checking history ran {checks} queries, once. Scan size isn't shown yet. It can be estimated only where the data exists.",
       "forbidden": "You can't turn on these alerts",
       "partial": "{names} didn't turn on.",
-      "submit": "Turn on {count} alerts | Turn on 1 alert | Turn on {count} alerts"
+      "submit": "Turn on {count} alerts | Turn on 1 alert | Turn on {count} alerts",
+      "criticalGoTo": "Critical alerts go to",
+      "warningsGoTo": "Warnings go to",
+      "noDestinations": "No destinations in this org",
+      "moreDetails": "More details",
+      "keepSilent": "Keep silent"
     },
     "page": {
       "title": "{title} pack",
@@ -15334,7 +15410,20 @@
       "addDashboard": "Your plan no longer includes the built-in Kubernetes view. Add the pack dashboard instead.",
       "addDashboardBtn": "Add dashboard",
       "readsInstead": "Reads {stream} · stream setting still says {name}",
-      "readsInsteadTip": "Repaired to read {stream}. The alert's stream setting still says {name}, which can't be changed after creation."
+      "readsInsteadTip": "Repaired to read {stream}. The alert's stream setting still says {name}, which can't be changed after creation.",
+      "subtitle": "Set up by {who} on {date} · version {version} · folder \"{folder}\"",
+      "subtitleUnknown": "Set up on {date} · version {version} · folder \"{folder}\"",
+      "viewOnly": "You can view this pack. Ask an admin to change alerts or remove it.",
+      "later": "Later",
+      "sectionAlerts": "Alerts",
+      "alertsMeta": "{on} on · {silent} silent",
+      "sectionViews": "Views",
+      "sectionWatches": "Watches",
+      "sectionAdapted": "Adapted to your data",
+      "sectionAccess": "Access",
+      "sectionCost": "Cost",
+      "statusOn": "On",
+      "statusSilent": "Silent"
     },
     "adapted": {
       "readsRole": "Reads {what} from {stream}",
@@ -15368,7 +15457,9 @@
       "dialogFieldTitle": "Choose the field for {what}",
       "dialogFieldLabel": "Field in {stream}",
       "values": "Seen: {values}",
-      "apply": "Use this"
+      "apply": "Use this",
+      "or": "or",
+      "filterTitle": "Add a filter so the pack only reads {what}"
     },
     "findMore": {
       "title": "Find more for my data",
@@ -15397,10 +15488,7 @@
       "error": "Couldn't check your data",
       "daily": "Check for new matches every day",
       "dailyHint": "Suggests matches once a day for everyone in this organization. Nothing is added until someone adds it.",
-      "dailyFailed": "Couldn't change that setting. Try again.",
-      "homeRow": "{count} source has new matches for your data | {count} sources have new matches for your data",
-      "homeRowIdle": "Data you started sending may fit more dashboards and alerts.",
-      "review": "Review"
+      "dailyFailed": "Couldn't change that setting. Try again."
     },
     "update": {
       "available": "An update to this pack is available",
@@ -15427,7 +15515,30 @@
       "undo": "Undo repair to {to}",
       "failed": "Couldn't finish the repair. Check the panels and try again.",
       "panels": "{count} panel | {count} panels",
-      "chipAlerts": "{count} alert has no data since {since} | {count} alerts have no data since {since}"
+      "chipAlerts": "{count} alert has no data since {since} | {count} alerts have no data since {since}",
+      "repointing": "Repointing panels…",
+      "readsFromUndo": "Reads from {to} · Undo"
+    },
+    "guide": {
+      "checkingTitle": "Checking what fits your data…",
+      "checkingSub": "Looking at the streams you are sending",
+      "checkingBtn": "Checking what fits…",
+      "readySub": "A starter pack sets up everything that fits the data you are sending. You can undo the setup for 24 hours.",
+      "stillWaitingTitle": "Still waiting for metrics",
+      "stillWaitingSub": "Set up what fits now; the rest is added if its data arrives within 24 h",
+      "settingUpTitle": "Setting up · {made} of {total}",
+      "settingUpSub": "You can leave this page. Setup keeps going.",
+      "settingUpBtn": "Setting up…",
+      "failedTitle": "{made} of {total} created · {failed} needs a retry",
+      "interruptedTitle": "Setup interrupted · {made} of {total} done",
+      "interruptedSub": "The tab closed during setup. Finish creates the remaining items; Undo removes the {made}.",
+      "forbiddenTitle": "You can't create alerts in this org",
+      "forbiddenSub": "Ask an admin to set up {title} monitoring",
+      "rowDashboardMeta": "In the folder {folder} (starter pack)",
+      "rowAlertsSilent": "Silent until you turn them on; they show what would have fired",
+      "rowSavedViews": "{count} saved view | {count} saved views",
+      "rowSavedViewsMeta": "In the Logs saved-views menu",
+      "whatGetsCreated": "What gets created"
     }
   },
   "alert_library": {

@@ -26,6 +26,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -233,7 +234,7 @@ watch(open, (isOpen) => {
 <template>
   <ODrawer
     v-model:open="open"
-    size="xl"
+    size="md"
     :title="t('starterPacks.turnOn.title', { title: t(flow.pack.titleKey) })"
     data-test="turn-on-alerts"
   >
@@ -288,29 +289,14 @@ watch(open, (isOpen) => {
           t("starterPacks.turnOn.leftOff", { names: leftOffNames, count: leftOff }, leftOff)
         }}</span>
       </template>
-      <OText variant="meta" data-test="turn-on-alerts-history-note">{{
-        t("starterPacks.turnOn.historyNote")
-      }}</OText>
-
       <div class="border-border-default rounded-default border" data-test="turn-on-alerts-table">
-        <div
-          class="text-text-secondary border-border-default grid grid-cols-[1.5rem_1.25rem_minmax(0,1fr)_7.5rem_9rem] gap-2 border-b px-2 py-1.5 text-xs"
-        >
-          <span />
-          <span />
-          <span>{{ t("starterPacks.turnOn.colAlert") }}</span>
-          <span>{{ t("starterPacks.turnOn.colWouldFire") }}</span>
-          <span>{{ t("starterPacks.turnOn.colChecked") }}</span>
-        </div>
         <div
           v-for="row in offRows"
           :key="row.id"
           class="border-border-default border-b last:border-b-0"
           :data-test="`turn-on-alerts-row-${row.id}`"
         >
-          <div
-            class="grid grid-cols-[1.5rem_1.25rem_minmax(0,1fr)_7.5rem_9rem] items-center gap-2 px-2 py-1.5"
-          >
+          <div class="flex items-center gap-2 px-2 py-1.5">
             <OCheckbox
               :model-value="row.chosen"
               :aria-label="row.name"
@@ -326,14 +312,14 @@ watch(open, (isOpen) => {
             >
               <OIcon :name="expanded === row.id ? 'expand-more' : 'chevron-right'" size="sm" />
             </OButton>
-            <span class="flex min-w-0 items-center gap-2">
-              <OTruncatedText class="font-semibold">{{ row.name }}</OTruncatedText>
-              <OBadge :variant="row.severity === 'critical' ? 'error-outline' : 'warning-outline'">
+            <span class="flex min-w-0 flex-1 items-center gap-2">
+              <OTruncatedText class="text-text-heading font-medium">{{ row.name }}</OTruncatedText>
+              <OBadge :variant="row.severity === 'critical' ? 'error-soft' : 'warning-soft'">
                 {{ t(`starterPacks.severity.${row.severity}`) }}
               </OBadge>
             </span>
-            <span v-if="row.state === 'loading'"><OSkeleton class="h-4 w-20" /></span>
-            <span v-else-if="row.state === 'error'" class="col-span-2 flex items-center gap-2">
+            <OSkeleton v-if="row.state === 'loading'" class="h-4 w-20" />
+            <span v-else-if="row.state === 'error'" class="flex items-center gap-2">
               {{ t("starterPacks.turnOn.rowFailed") }}
               <OButton
                 variant="outline"
@@ -344,47 +330,45 @@ watch(open, (isOpen) => {
                 {{ t("common.retry") }}
               </OButton>
             </span>
-            <template v-else-if="row.result?.noData">
-              <OBadge variant="default" data-test="turn-on-alerts-no-data-tag">
-                {{ t("starterPacks.turnOn.noData") }}
-              </OBadge>
-              <span />
-            </template>
-            <template v-else>
-              <span>
-                {{
-                  t(
-                    "starterPacks.turnOn.incidents",
-                    { count: row.result?.incidents ?? 0 },
-                    row.result?.incidents ?? 0,
-                  )
-                }}
-                <OText v-if="row.result?.runs" variant="meta">{{
+            <OBadge
+              v-else-if="row.result?.noData"
+              variant="default"
+              data-test="turn-on-alerts-no-data-tag"
+            >
+              {{ t("starterPacks.turnOn.noData") }}
+            </OBadge>
+            <span v-else class="flex flex-wrap items-center justify-end gap-1">
+              <OText>{{
+                t(
+                  "starterPacks.turnOn.incidents",
+                  { count: row.result?.incidents ?? 0 },
+                  row.result?.incidents ?? 0,
+                )
+              }}</OText>
+              <OText v-if="row.result?.runs" variant="meta"
+                >{{ raw("· ") }}{{ history(row) }}{{ raw(" · ")
+                }}{{
                   t("starterPacks.turnOn.runs", { count: row.result.runs }, row.result.runs)
-                }}</OText>
-              </span>
-              <span class="flex flex-wrap items-center gap-1">
-                {{ history(row) }}
-                <OBadge
-                  v-if="isPartlyChecked(row.result, longest)"
-                  variant="default"
-                  data-test="turn-on-alerts-partial-tag"
-                >
-                  {{ t("starterPacks.turnOn.partly") }}
-                </OBadge>
-                <OBadge
-                  v-if="isNoisy(row.result) && !row.chosen"
-                  variant="default"
-                  data-test="turn-on-alerts-noisy-tag"
-                >
-                  {{ t("starterPacks.turnOn.noisy") }}
-                </OBadge>
-              </span>
-            </template>
+                }}</OText
+              >
+              <OText
+                v-if="isNoisy(row.result) && !row.chosen"
+                variant="meta"
+                data-test="turn-on-alerts-noisy-tag"
+                >{{ raw("· ") }}{{ t("starterPacks.turnOn.noisy") }}</OText
+              >
+              <OBadge
+                v-if="isPartlyChecked(row.result, longest)"
+                variant="default"
+                data-test="turn-on-alerts-partial-tag"
+              >
+                {{ t("starterPacks.turnOn.partly") }}
+              </OBadge>
+            </span>
           </div>
           <div
             v-if="expanded === row.id"
-            class="bg-surface-sunken grid grid-cols-[6rem_minmax(0,1fr)] gap-1 px-10 py-2 text-xs"
+            class="bg-surface-subtle grid grid-cols-[6rem_minmax(0,1fr)] gap-1 px-10 py-2 text-xs"
             data-test="turn-on-alerts-row-detail"
           >
             <span>{{ t("starterPacks.turnOn.condition") }}</span>
@@ -427,55 +411,39 @@ watch(open, (isOpen) => {
           </div>
         </div>
       </div>
-      <OText variant="meta" data-test="turn-on-alerts-noise-rule">{{
-        t("starterPacks.turnOn.noiseRule")
-      }}</OText>
 
-      <div
-        class="border-border-default rounded-default flex flex-col gap-1 border p-2"
-        data-test="turn-on-alerts-scope"
-      >
-        <div class="flex items-center gap-2">
-          <div class="min-w-0 flex-1">
-            <strong>{{ t("starterPacks.turnOn.scopeTitle") }}</strong>
-            <p>{{ scope }}</p>
-          </div>
+      <div class="flex flex-col gap-3">
+        <div class="flex items-end gap-2">
+          <OFormSelect
+            name="critical"
+            class="min-w-0 flex-1"
+            :label="t('starterPacks.turnOn.criticalGoTo')"
+            :required="turn.needsCritical.value"
+            :options="destinationOptions"
+            label-key="label"
+            value-key="value"
+            searchable
+            data-test="turn-on-alerts-critical-destination"
+          />
           <OButton
-            v-if="clusters.length"
-            variant="outline"
+            variant="ghost-primary"
             size="sm-action"
-            data-test="turn-on-alerts-limit-clusters-btn"
-            @click="limitOpen = !limitOpen"
+            icon-left="add"
+            data-test="turn-on-alerts-new-destination-btn"
+            @click="addingDestination = !addingDestination"
           >
-            {{ t("starterPacks.turnOn.limit") }}
+            {{ t("starterPacks.turnOn.newDestination") }}
           </OButton>
         </div>
-        <template v-if="limitOpen">
-          <OCheckbox
-            v-for="cluster in clusters"
-            :key="cluster"
-            :model-value="limitTo.includes(cluster)"
-            :label="raw(cluster)"
-            @update:model-value="setLimit(cluster, !!$event)"
-          />
-          <OText variant="meta">{{ t("starterPacks.turnOn.limitNote") }}</OText>
-        </template>
-      </div>
-
-      <div class="grid grid-cols-2 gap-3">
-        <OFormSelect
-          name="critical"
-          :label="t('starterPacks.turnOn.critical')"
-          :required="turn.needsCritical.value"
-          :options="destinationOptions"
-          label-key="label"
-          value-key="value"
-          searchable
-          data-test="turn-on-alerts-critical-destination"
-        />
+        <OText
+          v-if="!destinationOptions.length"
+          variant="meta"
+          data-test="turn-on-alerts-no-destinations"
+          >{{ t("starterPacks.turnOn.noDestinations") }}</OText
+        >
         <OFormSelect
           name="warning"
-          :label="t('starterPacks.turnOn.warning')"
+          :label="t('starterPacks.turnOn.warningsGoTo')"
           :required="turn.needsWarning.value"
           :options="destinationOptions"
           label-key="label"
@@ -483,17 +451,6 @@ watch(open, (isOpen) => {
           searchable
           data-test="turn-on-alerts-warning-destination"
         />
-      </div>
-      <div>
-        <OButton
-          variant="ghost-primary"
-          size="sm-action"
-          icon-left="add"
-          data-test="turn-on-alerts-new-destination-btn"
-          @click="addingDestination = !addingDestination"
-        >
-          {{ t("starterPacks.turnOn.newDestination") }}
-        </OButton>
       </div>
       <div
         v-if="addingDestination"
@@ -508,28 +465,70 @@ watch(open, (isOpen) => {
         />
       </div>
 
-      <div
-        v-if="enterprise && oncallChecked"
-        class="border-border-default rounded-default flex flex-col gap-1 border p-2"
-        data-test="turn-on-alerts-oncall-preview"
+      <OCollapsible
+        :label="t('starterPacks.turnOn.moreDetails')"
+        data-test="turn-on-alerts-more-details"
       >
-        <strong>{{ t("starterPacks.turnOn.oncallTitle") }}</strong>
-        <template v-if="teamId">
-          <template v-for="row in oncallRows" :key="row.key">
-            <p v-if="row.preview" :data-test="`turn-on-alerts-oncall-${row.key}`">
-              <OBadge :variant="row.key === 'critical' ? 'error-outline' : 'warning-outline'">
-                {{ t(`starterPacks.severity.${row.key}`) }}
-              </OBadge>
-              {{ row.preview.team_name }}: {{ row.preview.ends_with }}
+        <div class="flex flex-col gap-3 pt-2">
+          <OText variant="meta" data-test="turn-on-alerts-history-note">{{
+            t("starterPacks.turnOn.historyNote")
+          }}</OText>
+          <OText variant="meta" data-test="turn-on-alerts-noise-rule">{{
+            t("starterPacks.turnOn.noiseRule")
+          }}</OText>
+          <div
+            class="border-border-default rounded-default flex flex-col gap-1 border p-2"
+            data-test="turn-on-alerts-scope"
+          >
+            <div class="flex items-center gap-2">
+              <div class="min-w-0 flex-1">
+                <strong>{{ t("starterPacks.turnOn.scopeTitle") }}</strong>
+                <p>{{ scope }}</p>
+              </div>
+              <OButton
+                v-if="clusters.length"
+                variant="outline"
+                size="sm-action"
+                data-test="turn-on-alerts-limit-clusters-btn"
+                @click="limitOpen = !limitOpen"
+              >
+                {{ t("starterPacks.turnOn.limit") }}
+              </OButton>
+            </div>
+            <template v-if="limitOpen">
+              <OCheckbox
+                v-for="cluster in clusters"
+                :key="cluster"
+                :model-value="limitTo.includes(cluster)"
+                :label="raw(cluster)"
+                @update:model-value="setLimit(cluster, !!$event)"
+              />
+              <OText variant="meta">{{ t("starterPacks.turnOn.limitNote") }}</OText>
+            </template>
+          </div>
+          <div
+            v-if="enterprise && oncallChecked"
+            class="border-border-default rounded-default flex flex-col gap-1 border p-2"
+            data-test="turn-on-alerts-oncall-preview"
+          >
+            <strong>{{ t("starterPacks.turnOn.oncallTitle") }}</strong>
+            <template v-if="teamId">
+              <template v-for="row in oncallRows" :key="row.key">
+                <p v-if="row.preview" :data-test="`turn-on-alerts-oncall-${row.key}`">
+                  <OBadge :variant="row.key === 'critical' ? 'error-outline' : 'warning-outline'">
+                    {{ t(`starterPacks.severity.${row.key}`) }}
+                  </OBadge>
+                  {{ row.preview.team_name }}: {{ row.preview.ends_with }}
+                </p>
+              </template>
+            </template>
+            <p data-test="turn-on-alerts-oncall-unknown">
+              {{ t("starterPacks.turnOn.oncallUnknown") }}
             </p>
-          </template>
-        </template>
-        <p data-test="turn-on-alerts-oncall-unknown">
-          {{ t("starterPacks.turnOn.oncallUnknown") }}
-        </p>
-      </div>
-
-      <OText variant="meta" data-test="turn-on-alerts-cost">{{ cost }}</OText>
+          </div>
+          <OText variant="meta" data-test="turn-on-alerts-cost">{{ cost }}</OText>
+        </div>
+      </OCollapsible>
 
       <OBanner v-if="turn.forbidden.value" variant="default" dense inline-actions icon="lock">
         {{ t("starterPacks.turnOn.forbidden") }}
@@ -574,7 +573,7 @@ watch(open, (isOpen) => {
           data-test="turn-on-alerts-cancel-btn"
           @click="open = false"
         >
-          {{ t("starterPacks.home.notNow") }}
+          {{ t("starterPacks.turnOn.keepSilent") }}
         </OButton>
         <OButton
           variant="primary"

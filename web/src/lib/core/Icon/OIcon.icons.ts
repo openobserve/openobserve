@@ -287,6 +287,8 @@ import SaveIcon from "~icons/material-symbols/save-outline";
 import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
 import SensorsOff from "~icons/material-symbols/sensors-off-outline";
+import Sensors from "~icons/material-symbols/sensors";
+import NotificationsOff from "~icons/material-symbols/notifications-off-outline";
 import NotificationsPaused from "~icons/material-symbols/notifications-paused-outline";
 import RepeatIcon from "~icons/material-symbols/repeat";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
@@ -749,6 +751,9 @@ export const iconRegistry = {
   // Batch 5: Downtimes (2026-09-24)
   "notifications-paused": NotificationsPaused,
   repeat: RepeatIcon,
+
+  sensors: Sensors,
+  "notifications-off": NotificationsOff,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

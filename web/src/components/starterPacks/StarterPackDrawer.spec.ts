@@ -16,9 +16,13 @@ const render = (flow = fakeFlow()) =>
       stubs: {
         ODrawer: SHELL,
         ODialog: {
-          props: ["title"],
+          props: ["title", "subTitle"],
           template:
-            '<div data-test="stub-dialog"><span data-test="stub-dialog-title">{{ title }}</span><slot /><slot name="footer" /></div>',
+            '<div data-test="stub-dialog"><span data-test="stub-dialog-title">{{ title }}</span><span data-test="stub-dialog-sub">{{ subTitle }}</span><slot /><slot name="footer" /></div>',
+        },
+        OCollapsible: {
+          props: ["label", "caption"],
+          template: "<div>{{ label }} {{ caption }}<slot /></div>",
         },
         OIcon: true,
         StarterPackAdaptedRows: true,
@@ -46,11 +50,11 @@ describe("StarterPackDrawer", () => {
       "name-overview",
     );
     expect(wrapper.get('[data-test="starter-pack-drawer-alerts"]').text()).toContain(
-      "1 alert · off until you turn them on",
+      "1 alert Silent until you turn them on",
     );
     expect(wrapper.get('[data-test="starter-pack-drawer-alert-row"]').text()).toContain("name-a1");
     expect(wrapper.get('[data-test="starter-pack-drawer-saved-searches"]').text()).toContain(
-      "saved search",
+      "1 saved view in Logs",
     );
     expect(wrapper.get('[data-test="starter-pack-drawer-submit-btn"]').text()).toBe(
       "Install 4 items",
@@ -58,7 +62,7 @@ describe("StarterPackDrawer", () => {
     expect(wrapper.get('[data-test="starter-pack-drawer-note"]').text()).toBe(
       "Removable in one click for 24 hours. No existing dashboard or alert is changed.",
     );
-    expect(wrapper.get('[data-test="starter-pack-drawer-reach"]').text()).toContain(
+    expect(wrapper.get('[data-test="starter-pack-drawer-reach-line"]').text()).toContain(
       "All clusters · 1 seen so far: staging-eu-1",
     );
     expect(wrapper.get('[data-test="starter-pack-drawer-not-included"]').text()).toContain(
@@ -125,20 +129,16 @@ describe("StarterPackDrawer", () => {
     });
     const wrapper = render(flow);
     expect(wrapper.get('[data-test="stub-dialog-title"]').text()).toBe(
-      "1 of 2 items created · 1 needs your attention",
+      "Setting up Kubernetes monitoring",
     );
-    expect(wrapper.get('[data-test="starter-pack-progress-failed"]').text()).toContain(
-      "Could not create · 1",
-    );
+    expect(wrapper.get('[data-test="stub-dialog-sub"]').text()).toBe("1 of 2 created · 1 to retry");
     expect(wrapper.get('[data-test="starter-pack-progress-failed-row"]').text()).toContain(
-      "name-a2",
+      "Failed · name-a2",
     );
-    expect(wrapper.get('[data-test="starter-pack-progress-created-row"]').text()).toContain(
-      "name-a1alert",
+    expect(wrapper.get('[data-test="starter-pack-progress-kind-created-row"]').text()).toContain(
+      "Created · Alerts 1 of 2",
     );
-    expect(wrapper.get('[data-test="starter-pack-progress-undo-btn"]').text()).toBe(
-      "Undo — remove all 1",
-    );
+    expect(wrapper.get('[data-test="starter-pack-progress-undo-btn"]').text()).toBe("Undo setup");
     expect(wrapper.get('[data-test="starter-pack-progress-retry-btn"]').text()).toBe(
       "Retry 1 item",
     );
@@ -169,7 +169,13 @@ describe("StarterPackDrawer", () => {
         toCreate: ref([{ kind: "alert", itemId: "a1", status: "pending" }]),
       }),
     );
-    expect(wrapper.get('[data-test="stub-dialog-title"]').text()).toBe("0 of 1 items created");
+    expect(wrapper.get('[data-test="stub-dialog-sub"]').text()).toBe(
+      "0 of 1 created · you can leave this page",
+    );
+    expect(wrapper.get('[data-test="starter-pack-progress-kind-creating-row"]').text()).toBe(
+      "Creating · Alerts 0 of 1",
+    );
+    expect(has(wrapper, "starter-pack-progress-running-btn")).toBe(true);
     expect(has(wrapper, "starter-pack-progress-finish-btn")).toBe(false);
     expect(has(wrapper, "starter-pack-progress-open-btn")).toBe(false);
     expect(has(wrapper, "starter-pack-progress-undo-btn")).toBe(false);

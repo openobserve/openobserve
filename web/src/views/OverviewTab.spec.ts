@@ -15,7 +15,8 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { computed, nextTick, ref, shallowRef } from "vue";
+import { HOME_PACKS, type HomePacks } from "@/composables/starterPacks/useHomePacks";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
@@ -2970,6 +2971,89 @@ describe("OverviewTab", () => {
       await mountWithProblems();
 
       expect(wrapper.find('[data-test^="overview-ask-ai-"]').exists()).toBe(false);
+    });
+  });
+
+  describe("starter packs handed down from Home", () => {
+    const mountWithPacks = (state: { showMenu: boolean; silent: unknown[] }) =>
+      mount(OverviewTab, {
+        global: {
+          plugins: [i18n, store, router],
+          provide: {
+            [HOME_PACKS as symbol]: shallowRef({
+              showMenu: ref(state.showMenu),
+              silent: computed(() => state.silent),
+            } as unknown as HomePacks),
+          },
+          stubs: { StarterPackHomeMenu: true, StarterPackSilentAlerts: true },
+        },
+      });
+
+    it("puts the packs button in the toolbar only once Home says a pack is set up", async () => {
+      wrapper = mountWithPacks({ showMenu: true, silent: [] });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "StarterPackHomeMenu" }).exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-pack-silent-alerts"]').exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = mountWithPacks({ showMenu: false, silent: [] });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "StarterPackHomeMenu" }).exists()).toBe(false);
+    });
+
+    const SILENT = '[data-test="overview-pack-silent-alerts"]';
+    const silentPack = [{ pack: { id: "kubernetes" } }];
+    const silentRow = () => wrapper.findComponent({ name: "StarterPackSilentAlerts" });
+    const givenIncidentsOn = () => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", { ...store.state.zoConfig, incidents_enabled: true });
+    };
+
+    it("shows the silent pack alerts without an incidents title where incidents are off", async () => {
+      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
+      await flushPromises();
+      expect(wrapper.find(SILENT).exists()).toBe(true);
+      expect(wrapper.find(SILENT).text()).not.toContain("Active incidents");
+      expect(silentRow().props("incidents")).toBe(false);
+    });
+
+    it("keeps the silent pack alerts under an active incident, without the no-incidents prefix", async () => {
+      givenIncidentsOn();
+      vi.mocked(incidentsService.list).mockResolvedValue({
+        data: mockOverview.buildIncidentList(),
+      } as never);
+      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
+      await flushPromises();
+      expect(wrapper.find(INCIDENTS).exists()).toBe(true);
+      expect(wrapper.findAll(SILENT)).toHaveLength(1);
+      expect(wrapper.find(SILENT).text()).not.toContain("Active incidents");
+      expect(silentRow().props("incidents")).toBe(false);
+    });
+
+    it("puts the silent pack alerts under Active incidents in place of the empty state", async () => {
+      givenIncidentsOn();
+      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
+      await flushPromises();
+      expect(wrapper.findAll(SILENT)).toHaveLength(1);
+      expect(wrapper.find(SILENT).text()).toContain("Active incidents");
+      expect(silentRow().props("incidents")).toBe(true);
+      expect(wrapper.find('[data-test="overview-incidents-empty"]').exists()).toBe(false);
+    });
+
+    it("shows no silent pack alerts when the whole page failed to load", async () => {
+      const boom = () => Object.assign(new Error("boom"), { response: { status: 500 } });
+      vi.mocked(alertsService.getHistory).mockRejectedValue(boom());
+      vi.mocked(overviewService.getOrgOverview).mockRejectedValue(boom());
+      wrapper = mountWithPacks({ showMenu: true, silent: silentPack });
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(true);
+      expect(wrapper.find(SILENT).exists()).toBe(false);
+    });
+
+    it("renders no pack UI when Home did not provide any", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-pack-silent-alerts"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "StarterPackHomeMenu" }).exists()).toBe(false);
     });
   });
 });

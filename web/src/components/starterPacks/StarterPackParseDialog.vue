@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -87,10 +88,10 @@ const confirm = async () => {
     v-model:open="open"
     size="md"
     :title="t('starterPacks.parse.title', { stream: raw(notice.stream) })"
-    :primary-button-label="t('starterPacks.parse.confirm')"
+    :primary-button-label="t('starterPacks.parse.confirmNew')"
     :primary-button-disabled="state !== 'ready' || blocked || saving"
     primary-button-data-test="starter-pack-parse-confirm-btn"
-    :secondary-button-label="t('common.cancel')"
+    :secondary-button-label="t('starterPacks.parse.notNow')"
     data-test="starter-pack-parse-dialog"
     @click:primary="confirm"
     @click:secondary="open = false"
@@ -112,14 +113,15 @@ const confirm = async () => {
         <div
           v-for="(row, index) in preview.rows"
           :key="index"
-          class="border-border-default flex flex-col gap-1 border-b pb-2"
+          class="border-border-default flex min-w-0 items-center gap-2 border-b pb-2"
           data-test="starter-pack-parse-preview-row"
         >
-          <OText variant="meta" class="truncate">{{ raw(row.line) }}</OText>
-          <OText v-if="Object.keys(row.added).length" class="wrap-break-word">{{
+          <OText variant="meta" class="min-w-0 flex-1 truncate">{{ raw(row.line) }}</OText>
+          <OIcon name="arrow-forward" size="sm" class="text-text-secondary shrink-0" />
+          <OText v-if="Object.keys(row.added).length" class="min-w-0 flex-1 wrap-break-word">{{
             t("starterPacks.parse.adds", { fields: fieldsLine(row.added) })
           }}</OText>
-          <OText v-else class="text-text-secondary">{{
+          <OText v-else class="text-text-secondary min-w-0 flex-1">{{
             t("starterPacks.parse.addsNothing")
           }}</OText>
         </div>

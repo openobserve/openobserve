@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OverviewStatusLine v-if="showStatusLine" :status="status" />
       <div class="ms-auto flex items-center gap-2">
+        <StarterPackHomeMenu v-if="homePacks?.showMenu.value" :home="homePacks" />
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading || overviewState.loading"
@@ -219,12 +220,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('overview.activeIncidents')"
     />
 
+    <section v-else-if="silentReplacesEmpty" data-test="overview-pack-silent-alerts">
+      <div class="mb-2 flex min-h-8 items-center gap-2 ps-1">
+        <OText variant="card-title">{{ t("overview.activeIncidents") }}</OText>
+      </div>
+      <StarterPackSilentAlerts :items="silentPacks" incidents />
+    </section>
     <OverviewSectionEmpty
       v-else-if="showSectionEmpty('incidents')"
       section="incidents"
       kind="empty"
       :title="t('overview.activeIncidents')"
     />
+    <section v-if="showSilentPacks && !silentReplacesEmpty" data-test="overview-pack-silent-alerts">
+      <StarterPackSilentAlerts :items="silentPacks" :incidents="false" />
+    </section>
 
     <!-- the upsell sits below the alerts grid so it never outranks live alert state -->
     <section
@@ -818,7 +828,16 @@ import { orgSummaryQuery } from "@/services/organizations.queries";
 import { STREAM_PROBE_PAGE, streamPageQuery, streamProbeQuery } from "@/services/stream.queries";
 import { readFirstDataRecord } from "@/composables/firstEvent/useFirstDataNotice";
 import { USER_DATA_STREAM_TYPES, userDataStreams } from "@/utils/internalStreams";
-import { ref, reactive, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
+import {
+  ref,
+  reactive,
+  computed,
+  defineAsyncComponent,
+  inject,
+  onMounted,
+  watch,
+  nextTick,
+} from "vue";
 
 import { raw, useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -854,6 +873,9 @@ import OverviewAskAiButton from "./overview/OverviewAskAiButton.vue";
 import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
 import { buildOverviewAskAi, type OverviewAskAiTarget } from "./overview/overviewAskAi";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import StarterPackHomeMenu from "@/components/starterPacks/StarterPackHomeMenu.vue";
+import StarterPackSilentAlerts from "@/components/starterPacks/StarterPackSilentAlerts.vue";
+import { HOME_PACKS } from "@/composables/starterPacks/useHomePacks";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
@@ -885,6 +907,8 @@ const AlertHistoryDrawer = defineAsyncComponent(
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const homePackState = inject(HOME_PACKS, null);
+const homePacks = computed(() => homePackState?.value ?? null);
 
 const emit = defineEmits<{ sendToAiChat: [payload: AiChatHandoff] }>();
 
@@ -1158,6 +1182,19 @@ const showSectionEmpty = (key: SectionKey) =>
   sectionState[key].loaded &&
   !isFailed(key) &&
   sectionApplies(key);
+
+const silentPacks = computed(() => homePacks.value?.silent.value ?? []);
+// Held back while incidents load, so the row does not move once they settle.
+const showSilentPacks = computed(
+  () =>
+    silentPacks.value.length > 0 &&
+    showOverviewCards.value &&
+    pageShowsSections.value &&
+    !isSectionPending("incidents"),
+);
+const silentReplacesEmpty = computed(
+  () => showSilentPacks.value && incidents.value.length === 0 && showSectionEmpty("incidents"),
+);
 
 // two one-line messages share a row instead of stacking as two full-width boxes
 const rendersSlim = (key: "anomalies" | "recentEvents") => {
