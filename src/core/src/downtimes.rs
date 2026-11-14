@@ -169,6 +169,7 @@ pub async fn list(
     query: &ListQuery,
 ) -> Result<ListResponse, DowntimeError> {
     ensure_enabled()?;
+    listing::check_query(query).map_err(DowntimeError::BadRequest)?;
     let folders = access::listable_downtime_folders(org, user_id).await?;
     let now = now_micros();
     let inventory = inventory::cached(org).await?;
@@ -261,8 +262,11 @@ pub async fn update(
     ensure_enabled()?;
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
+    require_version(req.version)?;
     check_version(req.version, &before)?;
+    check_editable(&before, now_micros())?;
     let req = checked_request(org, user_id, req, Some(&before), true).await?;
+    check_started_edit(&before, &req, now_micros())?;
     let continues = before
         .notifications
         .as_ref()
@@ -330,6 +334,9 @@ pub async fn cancel_on_clear(org: &str, id: &str, cleared_at: i64) -> Result<boo
         log::info!(
             "[downtimes] audit: {SYSTEM_ACTOR} cancelled {org}/{id} at {cleared_at}, reason end_on_clear"
         );
+        // After the successful write only, so a retry or an early return writes no event.
+        #[cfg(feature = "enterprise")]
+        audit::audit(cancel_on_clear_audit(org, id, cleared_at)).await;
         if let Some(window) = cancelled_window(&before, cleared_at) {
             notify::deliver_in_background(
                 after.clone(),
@@ -340,6 +347,36 @@ pub async fn cancel_on_clear(org: &str, id: &str, cleared_at: i64) -> Result<boo
         return Ok(true);
     }
     Err(changed_meanwhile())
+}
+
+/// The audit middleware records only HTTP calls, so a system auto-cancel writes its own event.
+#[cfg(feature = "enterprise")]
+fn cancel_on_clear_audit(
+    org: &str,
+    id: &str,
+    at: i64,
+) -> o2_enterprise::enterprise::common::auditor::AuditMessage {
+    use o2_enterprise::enterprise::common::auditor;
+    auditor::AuditMessage {
+        login_ip: None,
+        user_agent: None,
+        user_email: SYSTEM_ACTOR.to_string(),
+        org_id: org.to_string(),
+        _timestamp: at,
+        protocol: auditor::Protocol::Http,
+        delegated: None,
+        fleet_id: None,
+        target: None,
+        response_meta: auditor::ResponseMeta {
+            http_method: "POST".to_string(),
+            http_path: format!("/api/v2/{org}/downtimes/{id}/cancel"),
+            http_query_params: String::new(),
+            http_body: r#"{"reason":"cancel_on_clear"}"#.to_string(),
+            http_response_code: 200,
+            error_msg: None,
+            trace_id: None,
+        },
+    }
 }
 
 /// Moves the end of a quick mute; `end_on_clear` is what the row ends on from now.
@@ -453,7 +490,9 @@ pub async fn extend(
     }
     let follow_up = follow_up(&before, window.end, new_end, user_id, now);
     checked_request(org, user_id, request_of(&follow_up), Some(&before), false).await?;
-    check_room(org, now)?;
+    if extend_needs_room(&before) {
+        check_room(org, now)?;
+    }
     let plan = remeasure_plan(None, &follow_up).await?;
     if !db::downtimes::set_if_parent_unchanged(
         &follow_up,
@@ -1062,6 +1101,95 @@ fn check_version(requested: Option<i64>, row: &Downtime) -> Result<(), DowntimeE
     }
 }
 
+const FINISHED: &str = "This downtime is finished. Duplicate it to mute again.";
+const VERSION_REQUIRED: &str = "Send the version you loaded. Reload the downtime and try again.";
+const STARTED: &str =
+    "This downtime already started. Only its end can change. Duplicate it to change the schedule.";
+const END_BEFORE_NOW: &str = "The new end cannot be before now. Past windows already took effect.";
+const SLO_HISTORY: &str =
+    "This downtime corrected SLO data, so it stays for history and cannot be deleted.";
+
+/// An edit must name the version it loaded, so an old script cannot undo a newer edit.
+fn require_version(version: Option<i64>) -> Result<(), DowntimeError> {
+    if version.is_none() {
+        return Err(DowntimeError::BadRequest(VERSION_REQUIRED.to_string()));
+    }
+    Ok(())
+}
+
+/// A finished row stays as history; Duplicate is the path to reuse it (D3).
+fn check_editable(row: &Downtime, now: i64) -> Result<(), DowntimeError> {
+    match schedule::status(&row.schedule, row.cancelled_at, now) {
+        DowntimeStatus::Ended | DowntimeStatus::EndedEarly | DowntimeStatus::Cancelled => {
+            Err(DowntimeError::Conflict(FINISHED.to_string()))
+        }
+        DowntimeStatus::Active | DowntimeStatus::Scheduled => Ok(()),
+    }
+}
+
+/// The recurring follow-up of an extend takes no new place: its parent already holds one.
+fn extend_needs_room(before: &Downtime) -> bool {
+    before.schedule.repeat == Repeat::None
+}
+
+/// The SLO target with its default mode spelled out, so a stored `None` equals a sent `exclude`.
+fn slo_target_of(targets: &[DowntimeTarget]) -> Option<DowntimeTarget> {
+    let sorted = |v: &[String]| {
+        v.iter()
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    };
+    scope::target_for(targets, TargetModule::Slos).map(|t| DowntimeTarget {
+        slo_mode: Some(t.slo_mode.unwrap_or_default()),
+        tags: sorted(&t.tags),
+        ids: sorted(&t.ids),
+        ..t.clone()
+    })
+}
+
+/// After the first window started, past windows are history the SLO re-measure cannot rebuild,
+/// so only the end and the non-schedule fields change (D4).
+fn check_started_edit(
+    before: &Downtime,
+    req: &DowntimeRequest,
+    now: i64,
+) -> Result<(), DowntimeError> {
+    if !first_window_started(&before.schedule, now) {
+        return Ok(());
+    }
+    let (b, r) = (&before.schedule, &req.schedule);
+    let weekdays = |s: &DowntimeSchedule| s.weekdays.iter().copied().collect::<BTreeSet<u8>>();
+    let schedule_locked = b.starts_at != r.starts_at
+        || b.repeat != r.repeat
+        || b.start_time_local != r.start_time_local
+        || canonical_timezone(&b.timezone) != canonical_timezone(&r.timezone)
+        || weekdays(b) != weekdays(r)
+        || (b.repeat != Repeat::None && b.duration_secs != r.duration_secs);
+    let has_slo = |t: &[DowntimeTarget]| scope::target_for(t, TargetModule::Slos).is_some();
+    let slo_locked = (has_slo(&before.targets) || has_slo(&req.targets))
+        && (before.condition != req.condition
+            || slo_target_of(&before.targets) != slo_target_of(&req.targets));
+    if schedule_locked || slo_locked {
+        return Err(DowntimeError::Conflict(STARTED.to_string()));
+    }
+    let end_kept = match (r.repeat, r.ends_at) {
+        (_, None) => true,
+        (Repeat::None, Some(end)) => end >= now,
+        (_, Some(until)) => {
+            let day = |at| config::meta::downtimes::local_date(at, &r.timezone);
+            day(until)
+                .zip(day(now))
+                .is_none_or(|(until, today)| until >= today)
+        }
+    };
+    if !end_kept {
+        return Err(DowntimeError::Conflict(END_BEFORE_NOW.to_string()));
+    }
+    Ok(())
+}
+
 const END_IN_PAST: &str = "The end time is in the past. Pick an end time after now.";
 
 /// A new or changed schedule must still have a window ahead (D7: an SLO target may correct the
@@ -1571,10 +1699,7 @@ fn check_deletable(row: &Downtime, now: i64) -> Result<(), DowntimeError> {
     let corrected = scope::target_for(&row.targets, TargetModule::Slos).is_some()
         && !schedule::windows_between(&row.schedule, row.cancelled_at, 0, now).is_empty();
     if corrected {
-        return Err(DowntimeError::Conflict(
-            "This downtime corrected SLO slices. Cancel it instead. Retention removes it after the SLO window has passed."
-                .to_string(),
-        ));
+        return Err(DowntimeError::Conflict(SLO_HISTORY.to_string()));
     }
     Ok(())
 }
@@ -2076,6 +2201,206 @@ mod tests {
     }
 
     #[test]
+    fn a_finished_row_cannot_be_edited() {
+        let now = 20 * HOUR;
+        let ended = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        let mut early = row(vec![TargetModule::Alerts], 10 * HOUR, 22 * HOUR);
+        early.cancelled_at = Some(11 * HOUR);
+        let mut cancelled = row(vec![TargetModule::Alerts], 30 * HOUR, 32 * HOUR);
+        cancelled.cancelled_at = Some(11 * HOUR);
+        for finished in [&ended, &early, &cancelled] {
+            assert!(matches!(
+                check_editable(finished, now),
+                Err(DowntimeError::Conflict(m)) if m == FINISHED
+            ));
+        }
+        let active = row(vec![TargetModule::Alerts], 10 * HOUR, 22 * HOUR);
+        let scheduled = row(vec![TargetModule::Alerts], 30 * HOUR, 32 * HOUR);
+        assert!(check_editable(&active, now).is_ok());
+        assert!(check_editable(&scheduled, now).is_ok());
+    }
+
+    #[test]
+    fn an_update_must_send_its_version() {
+        assert!(matches!(
+            require_version(None),
+            Err(DowntimeError::BadRequest(m)) if m == VERSION_REQUIRED
+        ));
+        assert!(require_version(Some(3)).is_ok());
+    }
+
+    #[test]
+    fn the_recurring_extend_follow_up_takes_no_place() {
+        assert!(!extend_needs_room(&alerts_daily("02:00", 3_600, 0)));
+        assert!(extend_needs_room(&row(vec![TargetModule::Alerts], 0, HOUR)));
+    }
+
+    fn started_slo_daily() -> Downtime {
+        let mut d = alerts_daily("10:00", 2 * 3_600, 0);
+        d.targets = row(vec![TargetModule::Alerts, TargetModule::Slos], 0, 0).targets;
+        d
+    }
+
+    fn is_started_refusal(r: Result<(), DowntimeError>) -> bool {
+        matches!(r, Err(DowntimeError::Conflict(m)) if m == STARTED)
+    }
+
+    #[test]
+    fn every_locked_field_is_refused_after_the_first_window() {
+        let before = started_slo_daily();
+        let now = 24 * HOUR + 11 * HOUR;
+        let edit = |f: &dyn Fn(&mut DowntimeRequest)| {
+            let mut req = request_of(&before);
+            f(&mut req);
+            check_started_edit(&before, &req, now)
+        };
+        assert!(edit(&|_| {}).is_ok(), "an unchanged request passes");
+        assert!(is_started_refusal(edit(&|r| r.schedule.starts_at += HOUR)));
+        assert!(is_started_refusal(edit(
+            &|r| r.schedule.repeat = Repeat::Weekly
+        )));
+        assert!(is_started_refusal(edit(
+            &|r| r.schedule.start_time_local = Some("10:45".into())
+        )));
+        assert!(is_started_refusal(edit(
+            &|r| r.schedule.timezone = "Asia/Kolkata".into()
+        )));
+        assert!(is_started_refusal(edit(&|r| r.schedule.weekdays = vec![1])));
+        assert!(is_started_refusal(edit(
+            &|r| r.schedule.duration_secs = 3_600
+        )));
+        assert!(is_started_refusal(edit(
+            &|r| r.schedule.duration_secs = 3 * 3_600
+        )));
+        assert!(is_started_refusal(edit(&|r| {
+            r.condition = Some(serde_json::from_value(serde_json::json!({"type": "pair", "key": "service", "operator": "=", "value": "api"})).unwrap());
+        })));
+        assert!(is_started_refusal(edit(&|r| r
+            .targets
+            .retain(|t| t.module != TargetModule::Slos))));
+        assert!(is_started_refusal(edit(&|r| {
+            for t in &mut r.targets {
+                if t.module == TargetModule::Slos {
+                    t.slo_mode = Some(config::meta::downtimes::SloCorrectionMode::CountAsGood);
+                }
+            }
+        })));
+        assert!(edit(&|r| r.reason = Some("new reason".into())).is_ok());
+        assert!(edit(&|r| r.name = Some("renamed".into())).is_ok());
+    }
+
+    #[test]
+    fn adding_an_slo_target_after_the_first_window_is_refused() {
+        let before = alerts_daily("10:00", 2 * 3_600, 0);
+        let mut req = request_of(&before);
+        req.targets = row(vec![TargetModule::Alerts, TargetModule::Slos], 0, 0).targets;
+        assert!(is_started_refusal(check_started_edit(
+            &before,
+            &req,
+            11 * HOUR
+        )));
+        let mut condition = request_of(&before);
+        condition.condition = Some(serde_json::from_value(serde_json::json!({"type": "pair", "key": "service", "operator": "=", "value": "api"})).unwrap());
+        assert!(
+            check_started_edit(&before, &condition, 11 * HOUR).is_ok(),
+            "a row without an SLO target may change its condition"
+        );
+    }
+
+    #[test]
+    fn the_same_edits_pass_before_the_first_window() {
+        let before = started_slo_daily();
+        let start = 10 * HOUR;
+        let mut req = request_of(&before);
+        req.schedule.start_time_local = Some("10:45".into());
+        req.schedule.duration_secs = 3_600;
+        assert!(check_started_edit(&before, &req, start - 1).is_ok());
+        assert!(is_started_refusal(check_started_edit(&before, &req, start)));
+    }
+
+    #[test]
+    fn a_recurring_row_between_two_windows_is_locked() {
+        let before = started_slo_daily();
+        let mut req = request_of(&before);
+        req.schedule.duration_secs = 3_600;
+        assert!(is_started_refusal(check_started_edit(
+            &before,
+            &req,
+            12 * HOUR + HOUR
+        )));
+    }
+
+    #[test]
+    fn a_started_edit_keeps_the_end_at_or_after_now() {
+        let before = row(vec![TargetModule::Slos], 10 * HOUR, 12 * HOUR);
+        let now = 11 * HOUR;
+        let to = |end: i64| {
+            let mut req = request_of(&before);
+            req.schedule.ends_at = Some(end);
+            req.schedule.duration_secs = (end - before.schedule.starts_at) / 1_000_000;
+            check_started_edit(&before, &req, now)
+        };
+        assert!(
+            matches!(to(10 * HOUR + HOUR / 2), Err(DowntimeError::Conflict(m)) if m == END_BEFORE_NOW)
+        );
+        assert!(to(now).is_ok());
+        assert!(to(13 * HOUR).is_ok());
+        let day = 24 * HOUR;
+        let mut series = started_slo_daily();
+        series.schedule.ends_at = Some(5 * day + 23 * HOUR + 59 * 60_000_000);
+        let mut yesterday = request_of(&series);
+        yesterday.schedule.ends_at = Some(2 * day + 23 * HOUR + 59 * 60_000_000);
+        assert!(matches!(
+            check_started_edit(&series, &yesterday, 3 * day + 12 * HOUR),
+            Err(DowntimeError::Conflict(m)) if m == END_BEFORE_NOW
+        ));
+        let mut today = request_of(&series);
+        today.schedule.ends_at = Some(3 * day);
+        assert!(
+            check_started_edit(&series, &today, 3 * day + 12 * HOUR).is_ok(),
+            "until today, sent as midnight"
+        );
+    }
+
+    #[test]
+    fn reason_edits_of_started_rows_compare_semantically() {
+        let mut stored = started_slo_daily();
+        stored.schedule.timezone = "Asia/Calcutta".to_string();
+        stored.schedule.repeat = Repeat::Weekly;
+        stored.schedule.weekdays = vec![5, 1, 3];
+        for t in &mut stored.targets {
+            t.slo_mode = None;
+        }
+        let mut req = request_of(&stored);
+        req.schedule.timezone = "Asia/Kolkata".to_string();
+        req.schedule.weekdays = vec![1, 3, 5];
+        for t in &mut req.targets {
+            if t.module == TargetModule::Slos {
+                t.slo_mode = Some(config::meta::downtimes::SloCorrectionMode::Exclude);
+            }
+        }
+        req.reason = Some("only the reason".to_string());
+        assert!(check_started_edit(&stored, &req, 30 * 24 * HOUR).is_ok());
+    }
+
+    #[test]
+    fn the_cancel_on_clear_audit_event_names_the_system_cancel() {
+        let msg = cancel_on_clear_audit("acme", "d1", 42);
+        assert_eq!(msg.user_email, SYSTEM_ACTOR);
+        assert_eq!(msg.org_id, "acme");
+        assert_eq!(msg._timestamp, 42);
+        assert_eq!(msg.response_meta.http_method, "POST");
+        assert_eq!(
+            msg.response_meta.http_path,
+            "/api/v2/acme/downtimes/d1/cancel"
+        );
+        assert_eq!(
+            msg.response_meta.http_body,
+            r#"{"reason":"cancel_on_clear"}"#
+        );
+    }
+
+    #[test]
     fn banner_counts_come_from_the_cache_until_the_row_changes() {
         let mut d = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
         d.id = "banner-cache".to_string();
@@ -2153,7 +2478,7 @@ mod tests {
     fn a_row_that_corrected_slices_cannot_be_deleted_but_one_cancelled_before_its_window_can() {
         let ran = row(vec![TargetModule::Slos], 10 * HOUR, 12 * HOUR);
         let err = check_deletable(&ran, 13 * HOUR).unwrap_err();
-        assert!(err.to_string().contains("corrected SLO slices"));
+        assert!(err.to_string().contains(SLO_HISTORY));
 
         let mut never_ran = row(vec![TargetModule::Slos], 10 * HOUR, 12 * HOUR);
         never_ran.cancelled_at = Some(9 * HOUR);
@@ -3209,7 +3534,7 @@ mod tests {
         assert!(check_version(Some(3), &stored).is_ok());
         assert!(
             check_version(None, &stored).is_ok(),
-            "a request without it keeps today's rule"
+            "an extend without it keeps today's rule; update refuses it in require_version"
         );
         let body: DowntimeRequest = serde_json::from_value(serde_json::json!({
             "targets": [],

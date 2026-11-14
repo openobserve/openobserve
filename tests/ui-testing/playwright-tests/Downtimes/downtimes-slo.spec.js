@@ -88,7 +88,11 @@ test.describe('Downtimes correct SLOs', { tag: ['@downtimes', '@enterprise', '@a
     await dt.cancelDowntime(page, down.id, shared.parking);
     const del = await dt.deleteDowntime(page, down.id, shared.parking);
     expect(del.status()).toBe(409);
-    expect(await del.text()).toContain('This downtime corrected SLO slices. Cancel it instead');
+    expect(await del.text()).toContain('This downtime corrected SLO data, so it stays for history and cannot be deleted.');
+
+    await pm.downtimesPage.gotoList(shared.parking);
+    await pm.downtimesPage.openMore(down.id);
+    await pm.downtimesPage.expectMoreItemAbsent(down.id, 'delete');
   });
 
   test('DT-SLO-02 "count as good" makes good equal total on the slices that had errors', { tag: ['@P1'] }, async ({ page }) => {

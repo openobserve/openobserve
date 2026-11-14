@@ -485,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ t("alerts.downtimes.actions.moveToFolder") }}
                     </ODropdownItem>
-                    <template v-if="isFinished(row)">
+                    <template v-if="isDeletable(row)">
                       <ODropdownSeparator />
                       <ODropdownItem
                         variant="destructive"
@@ -529,7 +529,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline-destructive"
                   size="sm"
                   icon-left="cancel"
-                  :disabled="cancellableSelection.length === 0"
+                  :disabled="cancellableSelection.length === 0 || cancelling"
+                  :loading="cancelling"
                   data-test="downtime-list-bulk-cancel"
                   @click="askCancel(cancellableSelection)"
                 >
@@ -606,6 +607,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.downtimes.confirmDelete.title')"
       message-keypath="alerts.downtimes.confirmDelete.message"
       :message-name="pendingDeleteName"
+      :ok-label="t('alerts.downtimes.confirmDelete.ok')"
+      :cancel-label="t('alerts.downtimes.confirmDelete.keep')"
       ok-variant="destructive"
       @update:ok="confirmDelete"
       @update:cancel="deleteOpen = false"
@@ -683,8 +686,8 @@ import MuteMenuItems from "./MuteMenuItems.vue";
 import { useExtendDowntime } from "@/composables/downtimes/useExtendDowntime";
 import { isExtendable } from "@/utils/downtimes/extend";
 import {
+  isDeletable,
   isEditable,
-  isFinished,
   sortDowntimeRows,
   statKeyOf,
   type StatKey,
@@ -1153,19 +1156,53 @@ const cancellableSelection = computed(() =>
     .map((r) => r.id),
 );
 
+const serverReason = (err: any): string | undefined => err?.response?.data?.message || undefined;
+
+// Each row is its own request, so one failure no longer stops the rest; only failed rows stay selected.
+const cancelling = ref(false);
 const cancelIds = async (ids: string[]) => {
+  if (cancelling.value || ids.length === 0) return;
+  cancelling.value = true;
   try {
-    for (const id of ids) await cancelMutation.mutateAsync({ id, folder: folderOf(id) });
-    toast({
-      variant: "success",
-      message:
-        ids.length > 1
-          ? t("toastMessages.downtimes.cancelledMany", { count: ids.length }, ids.length)
-          : t("toastMessages.downtimes.cancelled"),
-    });
-    selectedIds.value = [];
-  } catch {
-    toast({ variant: "error", message: t("toastMessages.downtimes.cancelFailed") });
+    const results = await Promise.allSettled(
+      ids.map((id) => cancelMutation.mutateAsync({ id, folder: folderOf(id) })),
+    );
+    const failed = ids.filter((_, i) => results[i].status === "rejected");
+    const firstFailure = results.find((r) => r.status === "rejected") as
+      PromiseRejectedResult | undefined;
+    const reason = serverReason(firstFailure?.reason);
+    const done = ids.length - failed.length;
+    if (failed.length === 0) {
+      toast({
+        variant: "success",
+        message:
+          ids.length > 1
+            ? t("toastMessages.downtimes.cancelledMany", { count: ids.length }, ids.length)
+            : t("toastMessages.downtimes.cancelled"),
+      });
+    } else if (ids.length === 1) {
+      toast({
+        variant: "error",
+        message: raw(reason) || t("toastMessages.downtimes.cancelFailed"),
+      });
+    } else {
+      toast({
+        variant: "error",
+        message: reason
+          ? t("toastMessages.downtimes.cancelPartial", {
+              cancelled: done,
+              failed: failed.length,
+              reason,
+            })
+          : t("toastMessages.downtimes.cancelPartialNoReason", {
+              cancelled: done,
+              failed: failed.length,
+            }),
+      });
+    }
+    selectedIds.value = failed;
+  } finally {
+    cancelling.value = false;
   }
 };
 
@@ -1239,8 +1276,11 @@ const confirmDelete = async () => {
       variant: `clone:${id}`,
     });
     toast({ variant: "success", message: t("toastMessages.downtimes.deleted") });
-  } catch {
-    toast({ variant: "error", message: t("toastMessages.downtimes.deleteFailed") });
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(serverReason(err)) || t("toastMessages.downtimes.deleteFailed"),
+    });
   }
 };
 

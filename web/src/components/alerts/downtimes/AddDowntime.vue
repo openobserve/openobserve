@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="t('alerts.downtimes.form.checkSchedule')"
                   data-test="add-downtime-check-schedule"
                 />
-                <DowntimeScheduleFields />
+                <DowntimeScheduleFields :locked="scheduleLocked" />
                 <DowntimeNotifySection />
               </div>
 
@@ -448,6 +448,7 @@ import DowntimeNotifySection from "./DowntimeNotifySection.vue";
 import DowntimePreviewPane from "./DowntimePreviewPane.vue";
 import DowntimeSummary from "./DowntimeSummary.vue";
 import { browserTimezone } from "@/utils/timezoneAliases";
+import { firstWindowStart } from "@/utils/downtimes/listOrder";
 import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
@@ -728,6 +729,12 @@ const folderSettled = computed(() =>
     ? loadedFrom.value === sourceId.value
     : !!explicitFolder || folderDefault.ready.value,
 );
+
+// After the first window started, the server refuses a schedule change, so the controls lock.
+const scheduleLocked = computed(() => {
+  const row = isEdit.value ? detailQuery.data.value : null;
+  return !!row && firstWindowStart(row.schedule) <= serverNowMs() * 1000;
+});
 
 const editStatus = computed<DowntimeStatus | null>(() =>
   isEdit.value ? (detailQuery.data.value?.status ?? null) : null,

@@ -293,7 +293,7 @@ pub async fn get_downtime(
     tag = "Downtimes",
     operation_id = "UpdateDowntime",
     summary = "Update a downtime",
-    description = "Edits the condition, targets, schedule, reason and banner. The folder changes only through move.",
+    description = "Edits the condition, targets, schedule, reason and banner. The folder changes only through move. The body must carry the `version` the downtime was loaded at. A finished downtime (ended, ended early or cancelled) cannot be edited; duplicate it instead. After the first window started, only the end and the non-schedule fields can change.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -302,9 +302,10 @@ pub async fn get_downtime(
     request_body(content = DowntimeRequest, description = "Downtime definition", content_type = "application/json"),
     responses(
         (status = 200, description = "Updated", content_type = "application/json", body = Downtime),
-        (status = 400, description = "Invalid request", content_type = "application/json", body = ()),
+        (status = 400, description = "Invalid request, or no version", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
+        (status = 409, description = "Changed since loaded, finished, or a locked field of a started downtime changed", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": true})),
@@ -550,7 +551,7 @@ pub async fn move_downtimes(
         (status = 200, description = "Deleted"),
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
-        (status = 409, description = "Active, scheduled, or it corrected SLO slices", content_type = "application/json", body = ()),
+        (status = 409, description = "Active, scheduled, it corrected SLO data, or an extension of it is still running", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": true, "requires_confirmation": true})),

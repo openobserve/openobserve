@@ -856,8 +856,11 @@ const confirmCancel = async () => {
   try {
     await cancelMutation.mutateAsync({ id: id.value, folder: downtime.value?.folder_id });
     toast({ variant: "success", message: t("toastMessages.downtimes.cancelled") });
-  } catch {
-    toast({ variant: "error", message: t("toastMessages.downtimes.cancelFailed") });
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("toastMessages.downtimes.cancelFailed"),
+    });
   }
 };
 
