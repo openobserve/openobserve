@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- Main's welcome, one line per card with the description as the tooltip, so the Ask box stays the focus. -->
 <template>
-  <div class="@container flex w-full min-w-0 flex-col gap-4" data-test="assistant-home-examples">
+  <div
+    class="@container flex w-full min-w-0 flex-col gap-4 pt-4"
+    data-test="assistant-home-examples"
+  >
     <div class="grid grid-cols-1 gap-2 @sm:grid-cols-2 @2xl:grid-cols-4">
       <button
         v-for="card in CAPABILITY_CARDS"
