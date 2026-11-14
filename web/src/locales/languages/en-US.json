@@ -14368,6 +14368,7 @@
         "onceFor": "Once, {duration}"
       },
       "validation": {
+        "groupLimitLost": "Removing this alert also removes the group limit. Use Mute all groups to confirm.",
         "endInPast": "The end time is in the past. Pick an end time after now.",
         "pastSloOnly": "This window is in the past. It only corrects SLO data.",
         "neverProducesWindow": "This schedule never produces a window.",
@@ -14518,6 +14519,11 @@
         "cardCaption": "Folders first, then the optional blocks narrow further. The dimension condition above applies to this module too.",
         "noConditionForChecks": "The dimension condition above does not apply to checks.",
         "appliesTo": "Applies to",
+        "groupScope": "Mutes only {count} group of {alert}: {labels}. | Mutes only {count} groups of {alert}: {labels}.",
+        "groupScopeNoLabels": "Mutes only {count} group of {alert}. | Mutes only {count} groups of {alert}.",
+        "groupScopeEndsOnGroupClear": "Ends when this group stops firing.",
+        "groupScopeEndsOnAlertClear": "Ends when this alert stops firing.",
+        "groupScopeClear": "Mute all groups until the scheduled end",
         "tabTargets": "Targets",
         "tabSchedule": "Schedule",
         "tabAdvanced": "Advanced",

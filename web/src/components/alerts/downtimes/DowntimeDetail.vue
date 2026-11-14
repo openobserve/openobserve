@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.downtimes.actions.edit") }}
       </OButton>
       <OButton
+        v-if="isFinished(downtime)"
         variant="outline"
         size="sm"
         icon-left="notifications-paused"
@@ -475,7 +476,8 @@ import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryR
 import { useNowMicros } from "@/composables/downtimes/useNowMicros";
 import { useDowntimeValueLabels } from "@/composables/downtimes/useDowntimeValueLabels";
 import { isExtendable } from "@/utils/downtimes/extend";
-import { isEditable } from "@/utils/downtimes/listOrder";
+import { isEditable, isFinished } from "@/utils/downtimes/listOrder";
+import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { suppressedPage } from "@/utils/downtimes/suppressed";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 
@@ -861,11 +863,11 @@ const confirmCancel = async () => {
   }
 };
 
-// A one-time child window with the same scope, for the hour from now.
+// A one-time window with the same scope, for the hour from now; an active or scheduled row has Extend and Edit.
 const muteForHour = async () => {
   const d = downtime.value;
   if (!d) return;
-  const startsAt = Date.now() * 1000;
+  const startsAt = Math.round(serverNowMs()) * 1000;
   try {
     await muteMutation.mutateAsync({
       folder_id: d.folder_id,
@@ -873,6 +875,9 @@ const muteForHour = async () => {
       reason: d.reason,
       condition: d.condition,
       targets: d.targets,
+      // The groups keep the copy narrow; "until it clears" is not copied, as it can end at once.
+      alert_groups: d.alert_groups?.length ? d.alert_groups : null,
+      end_on_clear: null,
       schedule: {
         repeat: "none",
         starts_at: startsAt,

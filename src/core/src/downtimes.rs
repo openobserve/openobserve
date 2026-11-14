@@ -32,12 +32,12 @@ use std::{
 use config::{
     meta::{
         downtimes::{
-            AffectedItems, DimensionCondition, Downtime, DowntimeDetail, DowntimeListItem,
-            DowntimeNotifications, DowntimeRequest, DowntimeSchedule, DowntimeStatus,
-            DowntimeTarget, DowntimeWindow, EndOnClear, ExtendDowntimeRequest,
+            AffectedItems, AlertGroupRef, DimensionCondition, Downtime, DowntimeDetail,
+            DowntimeListItem, DowntimeNotifications, DowntimeRequest, DowntimeSchedule,
+            DowntimeStatus, DowntimeTarget, DowntimeWindow, EndOnClear, ExtendDowntimeRequest,
             ExtendDowntimeResponse, MoveDowntimesRequest, MuteSource, NotificationEvent,
             PreviewMatch, PreviewRequest, PreviewResponse, Repeat, ResourcesRequest,
-            ResourcesResponse, TargetModule, ValuesRequest, ValuesResponse,
+            ResourcesResponse, TargetModule, ValuesRequest, ValuesResponse, same_alert_groups,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
@@ -1002,6 +1002,9 @@ async fn checked_request(
     stored: Option<&Downtime>,
     check_destinations: bool,
 ) -> Result<DowntimeRequest, DowntimeError> {
+    if let Some(stored) = stored {
+        req.keep_omitted(stored);
+    }
     let groups = db::system_settings::get_semantic_field_groups(org).await;
     validate(&req, &groups).map_err(DowntimeError::BadRequest)?;
     req.check_alert_targets()
@@ -1018,7 +1021,7 @@ async fn checked_request(
         target.tags = config::meta::alerts::tags::normalize_tags(&target.tags)
             .map_err(|e| DowntimeError::BadRequest(format!("{e}.")))?;
     }
-    if scope_changed(stored, &req.targets, req.condition.as_ref()) {
+    if scope_changed(stored, &req.targets, req.condition.as_ref(), req.groups()) {
         let inventory = inventory::load(org).await?;
         access::check_targets(org, user_id, &req.targets, &inventory).await?;
     }
@@ -1043,13 +1046,19 @@ async fn check_notifications(
     .map_err(DowntimeError::BadRequest)
 }
 
-/// Unchanged stored targets and condition were checked when written; dropping a condition widens.
+/// Unchanged stored targets, condition and groups were checked when written; dropping a condition
+/// or a group limit widens.
 fn scope_changed(
     stored: Option<&Downtime>,
     targets: &[DowntimeTarget],
     condition: Option<&DimensionCondition>,
+    alert_groups: Option<&[AlertGroupRef]>,
 ) -> bool {
-    stored.is_none_or(|stored| stored.targets != targets || stored.condition.as_ref() != condition)
+    stored.is_none_or(|stored| {
+        stored.targets != targets
+            || stored.condition.as_ref() != condition
+            || !same_alert_groups(stored.alert_groups.as_deref(), alert_groups)
+    })
 }
 
 /// A request that names the version it was loaded at fails when the row moved on since.
@@ -1233,8 +1242,8 @@ fn created(
         reason: req.reason.clone(),
         condition: req.condition.clone(),
         targets: req.targets.clone(),
-        alert_groups: req.alert_groups.clone(),
-        end_on_clear: req.end_on_clear.clone(),
+        alert_groups: req.groups().map(<[_]>::to_vec),
+        end_on_clear: req.end().cloned(),
         source: None,
         schedule: req.schedule.clone(),
         cancelled_at: None,
@@ -1256,8 +1265,8 @@ fn edited(before: &Downtime, req: DowntimeRequest, user_id: &str, now: i64) -> D
         reason: req.reason,
         condition: req.condition,
         targets: req.targets,
-        alert_groups: req.alert_groups,
-        end_on_clear: req.end_on_clear,
+        alert_groups: req.alert_groups.flatten(),
+        end_on_clear: req.end_on_clear.flatten(),
         schedule: req.schedule,
         show_banner: req.show_banner,
         version: before.version + 1,
@@ -1309,8 +1318,8 @@ fn request_of(row: &Downtime) -> DowntimeRequest {
         show_banner: row.show_banner,
         notifications: row.notifications.clone(),
         version: None,
-        alert_groups: row.alert_groups.clone(),
-        end_on_clear: row.end_on_clear.clone(),
+        alert_groups: Some(row.alert_groups.clone()),
+        end_on_clear: Some(row.end_on_clear.clone()),
     }
 }
 
@@ -3164,35 +3173,151 @@ mod tests {
     fn an_edit_or_extend_checks_the_scope_only_when_it_changed() {
         let all = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
         assert!(
-            scope_changed(None, &all.targets, None),
+            scope_changed(None, &all.targets, None, None),
             "a create checks it"
         );
         assert!(
-            !scope_changed(Some(&all), &all.targets, all.condition.as_ref()),
+            !scope_changed(Some(&all), &all.targets, all.condition.as_ref(), None),
             "a rename or extend"
         );
         let extended = extended_once(&all, 13 * HOUR, "ops", 11 * HOUR);
         assert!(!scope_changed(
             Some(&all),
             &extended.targets,
-            extended.condition.as_ref()
+            extended.condition.as_ref(),
+            extended.alert_groups.as_deref()
         ));
         let mut some = all.clone();
         some.targets[0].folders = TargetFolders::Some {
             folder_ids: vec!["ops".to_string()],
         };
         assert!(
-            scope_changed(Some(&some), &all.targets, None),
+            scope_changed(Some(&some), &all.targets, None, None),
             "widened to All"
         );
         let mut with_id = some.targets.clone();
         with_id[0].ids = vec!["a1".to_string()];
-        assert!(scope_changed(Some(&some), &with_id, None));
+        assert!(scope_changed(Some(&some), &with_id, None, None));
         let mut narrowed = all.clone();
         narrowed.condition = Some(serde_json::from_value(serde_json::json!({"type": "pair", "key": "service", "operator": "=", "value": "api"})).unwrap());
         assert!(
-            scope_changed(Some(&narrowed), &narrowed.targets, None),
+            scope_changed(Some(&narrowed), &narrowed.targets, None, None),
             "dropping the condition widens to every alert"
+        );
+    }
+
+    fn group_of(alert_id: &str, key: &str, label: Option<&str>) -> AlertGroupRef {
+        AlertGroupRef {
+            alert_id: alert_id.to_string(),
+            group_key: key.to_string(),
+            group_labels: label.map(|v| [("region".to_string(), v.to_string())].into()),
+        }
+    }
+
+    /// A group-scoped "until it clears" mute of alert a1, which also names a2.
+    fn group_scoped_row() -> Downtime {
+        let mut stored = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        stored.targets[0].ids = vec!["a1".to_string(), "a2".to_string()];
+        stored.alert_groups = Some(vec![group_of("a1", "k1", Some("pune"))]);
+        stored.end_on_clear = Some(EndOnClear {
+            alert_id: "a1".to_string(),
+            group_key: Some("k1".to_string()),
+        });
+        stored
+    }
+
+    /// What `checked_request` does before it compares the scope (D8).
+    fn merged(stored: &Downtime, mut req: DowntimeRequest) -> DowntimeRequest {
+        req.keep_omitted(stored);
+        req
+    }
+
+    fn changes_scope(stored: &Downtime, req: &DowntimeRequest) -> bool {
+        scope_changed(
+            Some(stored),
+            &req.targets,
+            req.condition.as_ref(),
+            req.groups(),
+        )
+    }
+
+    #[test]
+    fn an_edit_that_omits_the_group_fields_keeps_them() {
+        let stored = group_scoped_row();
+        let mut older = request_of(&stored);
+        older.alert_groups = None;
+        older.end_on_clear = None;
+        older.reason = Some("Deploy of v2.3".to_string());
+        let req = merged(&stored, older);
+        assert!(
+            !changes_scope(&stored, &req),
+            "a reason edit keeps the scope"
+        );
+        assert!(req.check_alert_targets().is_ok());
+        let after = edited(&stored, req, "ops", 11 * HOUR);
+        assert_eq!(after.alert_groups, stored.alert_groups);
+        assert_eq!(after.end_on_clear, stored.end_on_clear);
+    }
+
+    #[test]
+    fn an_explicit_null_clears_the_group_fields_and_checks_the_scope() {
+        let stored = group_scoped_row();
+        let mut cleared = request_of(&stored);
+        cleared.alert_groups = Some(None);
+        cleared.end_on_clear = Some(None);
+        let req = merged(&stored, cleared);
+        assert!(changes_scope(&stored, &req), "mute all groups widens");
+        let after = edited(&stored, req, "ops", 11 * HOUR);
+        assert!(after.alert_groups.is_none() && after.end_on_clear.is_none());
+    }
+
+    #[test]
+    fn only_the_group_keys_decide_a_group_scope_change() {
+        let mut stored = group_scoped_row();
+        stored.alert_groups = Some(vec![
+            group_of("a1", "k1", Some("pune")),
+            group_of("a1", "k2", None),
+        ]);
+        let mut reordered = request_of(&stored);
+        reordered.alert_groups = Some(Some(vec![
+            group_of("a1", "k2", Some("delhi")),
+            group_of("a1", "k1", None),
+        ]));
+        assert!(!changes_scope(&stored, &merged(&stored, reordered)));
+        let mut other_key = request_of(&stored);
+        other_key.alert_groups = Some(Some(vec![group_of("a1", "k3", None)]));
+        assert!(changes_scope(&stored, &merged(&stored, other_key)));
+        let mut other_alert = request_of(&stored);
+        other_alert.alert_groups = Some(Some(vec![
+            group_of("a2", "k1", None),
+            group_of("a1", "k2", None),
+        ]));
+        assert!(changes_scope(&stored, &merged(&stored, other_alert)));
+        let mut none = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        none.alert_groups = None;
+        let mut empty = request_of(&none);
+        empty.alert_groups = Some(Some(vec![]));
+        assert!(
+            !changes_scope(&none, &merged(&none, empty)),
+            "none equals empty"
+        );
+    }
+
+    #[test]
+    fn an_omitted_group_field_still_must_name_a_targeted_alert() {
+        let stored = group_scoped_row();
+        let mut removed = request_of(&stored);
+        removed.alert_groups = None;
+        removed.end_on_clear = None;
+        removed.targets[0].ids = vec!["a2".to_string()];
+        let req = merged(&stored, removed);
+        assert!(req.check_alert_targets().is_err());
+        let mut dropped_end = request_of(&stored);
+        dropped_end.targets[0].ids = vec!["a2".to_string()];
+        dropped_end.alert_groups = Some(None);
+        assert!(
+            merged(&stored, dropped_end).check_alert_targets().is_err(),
+            "until it clears still names a1"
         );
     }
 

@@ -71,7 +71,7 @@ impl Downtime {
     pub fn same_coverage(&self, other: &Downtime) -> bool {
         self.condition == other.condition
             && self.targets == other.targets
-            && group_keys(self.alert_groups.as_deref()) == group_keys(other.alert_groups.as_deref())
+            && same_alert_groups(self.alert_groups.as_deref(), other.alert_groups.as_deref())
     }
 }
 
@@ -248,13 +248,37 @@ pub struct DowntimeRequest {
     /// The version the edit was loaded at; a newer stored row makes the edit a 409.
     #[serde(default)]
     pub version: Option<i64>,
-    #[serde(default)]
-    pub alert_groups: Option<Vec<AlertGroupRef>>,
-    #[serde(default)]
-    pub end_on_clear: Option<EndOnClear>,
+    /// Three-state (D8): absent keeps the stored value on an edit, `null` clears it.
+    #[serde(default, with = "::serde_with::rust::double_option")]
+    #[schema(value_type = Option<Vec<AlertGroupRef>>)]
+    pub alert_groups: Option<Option<Vec<AlertGroupRef>>>,
+    /// Three-state (D8): absent keeps the stored value on an edit, `null` clears it.
+    #[serde(default, with = "::serde_with::rust::double_option")]
+    #[schema(value_type = Option<EndOnClear>)]
+    pub end_on_clear: Option<Option<EndOnClear>>,
 }
 
 impl DowntimeRequest {
+    /// The alert groups the request sets; absent and `null` both read as none.
+    pub fn groups(&self) -> Option<&[AlertGroupRef]> {
+        self.alert_groups.as_ref().and_then(|g| g.as_deref())
+    }
+
+    /// The "until it clears" alert the request sets; absent and `null` both read as none.
+    pub fn end(&self) -> Option<&EndOnClear> {
+        self.end_on_clear.as_ref().and_then(|e| e.as_ref())
+    }
+
+    /// An edit that omits a field keeps the stored value, so an older client cannot widen a mute.
+    pub fn keep_omitted(&mut self, stored: &Downtime) {
+        if self.alert_groups.is_none() {
+            self.alert_groups = Some(stored.alert_groups.clone());
+        }
+        if self.end_on_clear.is_none() {
+            self.end_on_clear = Some(stored.end_on_clear.clone());
+        }
+    }
+
     /// Alert groups and the end-on-clear alert must be alerts this request names by id.
     pub fn check_alert_targets(&self) -> Result<(), String> {
         let ids: BTreeSet<&str> = self
@@ -263,7 +287,7 @@ impl DowntimeRequest {
             .filter(|t| t.module == TargetModule::Alerts)
             .flat_map(|t| t.ids.iter().map(String::as_str))
             .collect();
-        let groups = self.alert_groups.as_deref().unwrap_or_default();
+        let groups = self.groups().unwrap_or_default();
         if groups.len() > MAX_ALERT_GROUPS {
             return Err(format!(
                 "A downtime can name at most {MAX_ALERT_GROUPS} alert groups."
@@ -275,7 +299,7 @@ impl DowntimeRequest {
                 g.group_key, g.alert_id
             ));
         }
-        let Some(end) = &self.end_on_clear else {
+        let Some(end) = self.end() else {
             return Ok(());
         };
         if !ids.contains(end.alert_id.as_str()) {
@@ -798,6 +822,11 @@ pub fn default_folder() -> String {
     DEFAULT_FOLDER.to_string()
 }
 
+/// Two group lists cover the same groups: order and labels do not count, and none equals empty.
+pub fn same_alert_groups(a: Option<&[AlertGroupRef]>, b: Option<&[AlertGroupRef]>) -> bool {
+    group_keys(a) == group_keys(b)
+}
+
 /// Labels are display only, so two lists naming the same groups cover the same.
 fn group_keys(groups: Option<&[AlertGroupRef]>) -> BTreeSet<(&str, &str)> {
     groups
@@ -999,7 +1028,7 @@ mod tests {
             show_banner: false,
             notifications: None,
             version: None,
-            alert_groups: Some(
+            alert_groups: Some(Some(
                 groups
                     .into_iter()
                     .map(|alert_id| AlertGroupRef {
@@ -1008,11 +1037,11 @@ mod tests {
                         group_labels: None,
                     })
                     .collect(),
-            ),
-            end_on_clear: end.map(|alert_id| EndOnClear {
+            )),
+            end_on_clear: Some(end.map(|alert_id| EndOnClear {
                 alert_id: alert_id.to_string(),
                 group_key: None,
-            }),
+            })),
         };
         assert!(
             request(vec!["a1"], Some("a1"), vec!["a1"])
@@ -1037,6 +1066,79 @@ mod tests {
         let mut recurring = request(vec![], Some("a1"), vec!["a1"]);
         recurring.schedule.repeat = Repeat::Daily;
         assert!(recurring.check_alert_targets().is_err());
+    }
+
+    #[test]
+    fn request_groups_and_end_are_three_state() {
+        let base = serde_json::json!({
+            "targets": [],
+            "schedule": {"repeat": "none", "starts_at": 1, "ends_at": 2, "timezone": "UTC", "duration_secs": 1, "weekdays": []}
+        });
+        let absent: DowntimeRequest = serde_json::from_value(base.clone()).unwrap();
+        assert_eq!(absent.alert_groups, None);
+        assert_eq!(absent.end_on_clear, None);
+        let mut with_null = base.clone();
+        with_null["alert_groups"] = serde_json::Value::Null;
+        with_null["end_on_clear"] = serde_json::Value::Null;
+        let cleared: DowntimeRequest = serde_json::from_value(with_null).unwrap();
+        assert_eq!(cleared.alert_groups, Some(None));
+        assert_eq!(cleared.end_on_clear, Some(None));
+        let mut with_values = base;
+        with_values["alert_groups"] = serde_json::json!([{"alert_id": "a1", "group_key": "k1"}]);
+        with_values["end_on_clear"] = serde_json::json!({"alert_id": "a1", "group_key": "k1"});
+        let set: DowntimeRequest = serde_json::from_value(with_values).unwrap();
+        assert_eq!(set.groups().map(<[_]>::len), Some(1));
+        assert_eq!(set.end().map(|e| e.alert_id.as_str()), Some("a1"));
+    }
+
+    fn group_ref(key: &str, label: Option<&str>) -> AlertGroupRef {
+        AlertGroupRef {
+            alert_id: "a1".to_string(),
+            group_key: key.to_string(),
+            group_labels: label.map(|v| BTreeMap::from([("city".to_string(), v.to_string())])),
+        }
+    }
+
+    fn bare_request() -> DowntimeRequest {
+        serde_json::from_value(serde_json::json!({
+            "targets": [],
+            "schedule": {"repeat": "none", "starts_at": 1, "ends_at": 2, "timezone": "UTC", "duration_secs": 1, "weekdays": []}
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn keep_omitted_keeps_stored_values_and_null_clears_them() {
+        let mut stored = minimal();
+        stored.alert_groups = Some(vec![group_ref("k1", None)]);
+        stored.end_on_clear = Some(EndOnClear {
+            alert_id: "a1".into(),
+            group_key: Some("k1".into()),
+        });
+        let mut omitted = bare_request();
+        omitted.keep_omitted(&stored);
+        assert_eq!(omitted.groups().map(<[_]>::len), Some(1));
+        assert_eq!(
+            omitted.end().and_then(|e| e.group_key.as_deref()),
+            Some("k1")
+        );
+        let mut cleared = bare_request();
+        cleared.alert_groups = Some(None);
+        cleared.end_on_clear = Some(None);
+        cleared.keep_omitted(&stored);
+        assert!(cleared.groups().is_none() && cleared.end().is_none());
+    }
+
+    #[test]
+    fn same_alert_groups_ignores_order_labels_and_empty() {
+        let a = vec![group_ref("k1", Some("pune")), group_ref("k2", None)];
+        let b = vec![group_ref("k2", Some("x")), group_ref("k1", None)];
+        assert!(same_alert_groups(Some(&a), Some(&b)));
+        assert!(same_alert_groups(None, Some(&[])));
+        assert!(!same_alert_groups(Some(&a), Some(&a[..1])));
+        let mut other_alert = a.clone();
+        other_alert[0].alert_id = "a2".into();
+        assert!(!same_alert_groups(Some(&a), Some(&other_alert)));
     }
 
     #[test]

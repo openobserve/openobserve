@@ -24,6 +24,7 @@ import {
   MAX_NOTIFY_DESTINATIONS,
   MAX_TAGS_PER_TARGET,
   NOTIFICATION_EVENTS,
+  groupLimitLost,
   buildSchedule,
   hasIdentity,
   type DowntimeFormValues,
@@ -173,6 +174,17 @@ const targetIssues = (
     }
     return [...issues, ...capIssues(m, tv, at, t)];
   });
+
+/** A loaded group scope is cleared only through "Mute all groups", never as a side effect. */
+const groupScopeIssues = (v: DowntimeFormValues, t: TranslateFn): Issue[] =>
+  groupLimitLost(v)
+    ? [
+        {
+          path: ["targets", "alerts", "ids"],
+          message: t("alerts.downtimes.validation.groupLimitLost"),
+        },
+      ]
+    : [];
 
 const conditionIssues = (v: DowntimeFormValues, t: TranslateFn): Issue[] => {
   if (!v.condition_open || !v.modules.some(hasIdentity)) return [];
@@ -353,12 +365,16 @@ export const makeAddDowntimeSchema = (t: TranslateFn, ctx: AddDowntimeSchemaCont
       ),
       show_banner: z.boolean(),
       notifications: notifySchema,
+      // Kept so the rules below see the loaded group scope; the form owns their values.
+      alert_groups: z.any().optional(),
+      end_on_clear: z.any().optional(),
     })
     .superRefine((raw, zctx) => {
       const v = raw as DowntimeFormValues;
       const schedule = scheduleIssues(v.schedule, t);
       const issues = [
         ...targetIssues(v, t, ctx),
+        ...groupScopeIssues(v, t),
         ...conditionIssues(v, t),
         ...schedule,
         ...(schedule.length ? [] : pastIssues(v, t, now())),
