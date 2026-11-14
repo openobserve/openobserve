@@ -268,6 +268,12 @@ const barSourceLabel = computed(() => {
   }
   return undefined;
 });
+// Only a typed name: the input's default is a placeholder, not a cluster that exists.
+const barClusterName = computed(() => {
+  const value = inputValues.value.cluster?.trim();
+  const fallback = allInputs.value.find((inp) => inp.id === "cluster")?.default.trim();
+  return value && value !== fallback ? value : undefined;
+});
 const barState = ref<FirstEventState>("waiting");
 watch(barState, (next) => emit("state", next));
 const statusBar = ref<InstanceType<typeof FirstEventStatus> | null>(null);
@@ -962,6 +968,8 @@ function fireConfetti() {
                 :guide-name="content.provider.name"
                 :doc-url="content.docUrl ? safeHttpUrl(content.docUrl) : undefined"
                 :source-label="barSourceLabel"
+                :cluster-name="barClusterName"
+                :offers-pack="content.offersStarterPack"
                 @detected="onBarDetected"
                 @copy-command="copyFirstSnippet"
                 @state="(s) => (barState = s)"

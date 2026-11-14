@@ -536,6 +536,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </template>
 
+        <StarterPackLandingRow
+          v-if="packLanding"
+          :key="store.state.selectedOrganization?.identifier"
+          :org="store.state.selectedOrganization?.identifier"
+        />
         <KioskStrip
           v-if="kioskMode && !playlistEmbed"
           :title="currentDashboardData.data?.title"
@@ -745,6 +750,8 @@ import {
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import PublicLinksPanel from "@/components/dashboards/PublicLinksPanel.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
+import StarterPackLandingRow from "@/components/starterPacks/StarterPackLandingRow.vue";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import useNotifications from "@/composables/useNotifications";
 import {
   onDashboardConflictResolved,
@@ -872,6 +879,7 @@ export default defineComponent({
     DashboardSettings,
     RenderDashboardCharts,
     DeployMarkersUnavailable,
+    StarterPackLandingRow,
     ScheduledDashboards,
     PanelLayoutSettings,
     DashboardJsonEditor,
@@ -956,6 +964,12 @@ export default defineComponent({
     const isLoadingReports = ref(false);
 
     const dashboardId = computed(() => route.query.dashboard);
+    // Decided per dashboard: its own URL rewrites drop `pack`, so a query watch would lose the row.
+    const packLanding = ref(STARTER_PACKS_ENABLED && !!route.query.pack);
+    watch(
+      () => route.query.dashboard,
+      () => (packLanding.value = STARTER_PACKS_ENABLED && !!route.query.pack),
+    );
 
     const folderId = computed(() => route.query.folder);
 
@@ -2964,6 +2978,7 @@ export default defineComponent({
     ]);
 
     return {
+      packLanding,
       isMobile,
       currentDashboardData,
       dashboardRemountKey,

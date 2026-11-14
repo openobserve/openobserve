@@ -41,6 +41,8 @@ export interface LibraryInstallOptions {
   scheduledOnly?: boolean;
   /** Last edit of a scheduled alert's body before it is created. */
   decoratePayload?: (payload: Record<string, unknown>) => Record<string, unknown>;
+  /** Receives the id the create response carries for a scheduled alert. */
+  onSaved?: (id: string) => void;
 }
 
 export interface LibraryInstallHooks {
@@ -72,7 +74,8 @@ export function useLibraryInstall(org: () => string) {
     entry: AlertLibraryEntry,
     options: LibraryInstallOptions,
   ): Promise<boolean> => {
-    const { folderId, owner, timezone, overrides, seed, scheduledOnly, decoratePayload } = options;
+    const { folderId, owner, timezone, overrides, seed, scheduledOnly, decoratePayload, onSaved } =
+      options;
     const file =
       seed && seed.entry.id === entry.id
         ? seed.file
@@ -90,10 +93,11 @@ export function useLibraryInstall(org: () => string) {
     }
 
     const payload = buildInstallPayload({ entry, file, folderId, owner, timezone, overrides });
-    await installAlert.mutateAsync({
+    const saved = await installAlert.mutateAsync({
       payload: decoratePayload ? decoratePayload(payload) : payload,
       folderId,
     });
+    if (saved?.data?.id) onSaved?.(saved.data.id);
     return false;
   };
 

@@ -43,6 +43,8 @@ import {
   type StreamSignal,
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStillStuck from "./FirstEventStillStuck.vue";
+import StarterPackBannerSlot from "@/components/starterPacks/StarterPackBannerSlot.vue";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
 import { HEARD_FROM_ASKED_BY_HOST } from "@/components/login/heardFrom";
 import { FIRST_EVENT_ASK_AI, REJECTION_REASON_KEYS, askAiQuery } from "./firstEventAskAi";
@@ -66,6 +68,10 @@ const props = withDefaults(
     configTool?: string;
     /** The guide's host or cluster input, when the user typed one. */
     sourceLabel?: string;
+    /** The cluster the guide's input names, when the user typed one. */
+    clusterName?: string;
+    /** The guide's data fits a starter pack. */
+    offersPack?: boolean;
     /** `pill` renders the state pill and its one line only, for empty pages that link to the guide for diagnosis. */
     display?: "bar" | "pill";
     /** Replaces the generic waiting pill text in `pill` display. */
@@ -85,6 +91,8 @@ const props = withDefaults(
     snippetKind: "command",
     configTool: "Fluent Bit",
     sourceLabel: undefined,
+    clusterName: undefined,
+    offersPack: false,
     display: "bar",
     waitingLabel: undefined,
     diagnosisAfterMs: FIRST_EVENT_BUDGET.diagnosisAtMs,
@@ -327,6 +335,9 @@ const openLabel = computed(() => {
 const { isLocked, lockedReason } = useLicenseLocks();
 const openFeature = computed(() => streamTypeFeature(result.value?.streamType));
 const openLocked = computed(() => isLocked(openFeature.value));
+
+const packGuide = computed(() => STARTER_PACKS_ENABLED && props.offersPack);
+const packOffered = ref(false);
 
 const firstRecordJson = computed(() => {
   const record = result.value?.firstRecord;
@@ -740,7 +751,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
             <OTooltip :content="lockedReason(openFeature ?? '')" :disabled="!openLocked">
               <span class="inline-flex">
                 <OButton
-                  variant="primary"
+                  :variant="packOffered ? 'outline' : 'primary'"
                   size="sm-action"
                   :icon-left="openLocked ? 'lock' : 'open-in-new'"
                   :disabled="openLocked"
@@ -751,10 +762,18 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
                 </OButton>
               </span>
             </OTooltip>
+            <div v-if="packGuide" id="first-event-pack-actions" class="flex items-center gap-2" />
           </template>
         </div>
       </template>
     </OBanner>
+
+    <StarterPackBannerSlot
+      v-if="packGuide && state === 'received' && kind === 'standard' && !hostShowsSuccess"
+      :org="org"
+      :cluster-name="clusterName"
+      @offered="(offered) => (packOffered = offered)"
+    />
 
     <div
       v-if="state === 'received' && result?.firstRecord"

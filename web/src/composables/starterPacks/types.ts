@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import type { I18nKey } from "@/types/i18n";
 
 export type PackFolderType = "dashboards" | "alerts";
@@ -39,6 +40,12 @@ export interface PackSavedView {
   search: Record<string, any>;
 }
 
+/** A Library alert shipped in the build, so the pack installs with the Library out of reach. */
+export interface PackBundledAlert {
+  entry: AlertLibraryEntry;
+  file: AlertLibraryFile;
+}
+
 export interface StarterPack {
   id: string;
   titleKey: I18nKey;
@@ -49,6 +56,7 @@ export interface StarterPack {
   /** Alert Library entry ids. */
   alerts: string[];
   savedViews: PackSavedView[];
+  bundledAlerts?: PackBundledAlert[];
 }
 
 export interface PackRecordItem {
@@ -68,12 +76,44 @@ export interface PackInstallRecord {
   installId: string;
   status: PackInstallStatus;
   items: PackRecordItem[];
+  /** Microseconds; starts the Undo window. */
+  installedAt?: number;
+  installedBy?: string;
 }
 
 export interface PackKeptItem {
   kind: PackItemKind;
   itemId: string;
   reason: PackKeptReason;
+}
+
+export type PackNotIncludedReason = "already_have" | "no_data" | "unavailable" | "needs_plan";
+
+export interface PackNotIncludedItem {
+  kind: PackItemKind | "view";
+  itemId: string;
+  name: string;
+  reason: PackNotIncludedReason;
+}
+
+/** The ids the preview leaves out, which the install must never attempt. */
+export const leftOutIds = (preview: Pick<PackPreview, "notIncluded">): string[] =>
+  preview.notIncluded.filter(({ reason }) => reason !== "already_have").map(({ itemId }) => itemId);
+
+export interface PackPreview {
+  items: PackRecordItem[];
+  names: Record<string, string>;
+  notIncluded: PackNotIncludedItem[];
+  /** Panels of the pack dashboard that fit this org's data. */
+  panels: { kept: number; dropped: number };
+  /** The Library was out of reach, so this came from the build's own copy. */
+  offline: boolean;
+}
+
+export interface PackInstallOptions {
+  /** Item ids the preview left out; a resumed install keeps its own list. */
+  exclude?: string[];
+  onProgress?: (record: PackInstallRecord) => void;
 }
 
 export interface PackRemovalResult {

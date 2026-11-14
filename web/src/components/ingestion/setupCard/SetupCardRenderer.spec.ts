@@ -100,7 +100,18 @@ const barProbeNow = vi.fn();
 // The bar's own polling is covered by FirstEventStatus.spec; here it only reports into the card.
 const FirstEventStatusStub = defineComponent({
   name: "FirstEventStatus",
-  props: ["org", "signal", "targetStream", "match", "filter", "guideName", "docUrl", "sourceLabel"],
+  props: [
+    "org",
+    "signal",
+    "targetStream",
+    "match",
+    "filter",
+    "guideName",
+    "docUrl",
+    "sourceLabel",
+    "clusterName",
+    "offersPack",
+  ],
   emits: ["detected", "copy-command", "state"],
   setup(_props, { expose }) {
     expose({ start: barStart, probeNow: barProbeNow });
@@ -552,6 +563,26 @@ describe("SetupCardRenderer — first-event bar, detected emit & showOnDetect ac
     expect(bar(wrapper).props("sourceLabel")).toBe("web-07");
     await input.setValue("acme-prod-eks");
     expect(bar(wrapper).props("sourceLabel")).toBeUndefined();
+  });
+
+  it("passes out only a typed cluster name, never a host or the placeholder", async () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      steps: [
+        {
+          ...CONTENT.steps[0],
+          inputs: [{ id: "cluster", label: "Cluster", default: "cluster1" } as any],
+        },
+        CONTENT.steps[1],
+      ],
+    };
+    wrapper = mountCard(content);
+    expect(bar(wrapper).props("clusterName")).toBeUndefined();
+    const input = wrapper.find('[data-test="ai-input-cluster"] input');
+    await input.setValue(" staging-eu-1 ");
+    expect(bar(wrapper).props("clusterName")).toBe("staging-eu-1");
+    await input.setValue("cluster1");
+    expect(bar(wrapper).props("clusterName")).toBeUndefined();
   });
 });
 
