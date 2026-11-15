@@ -46,9 +46,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           "
           :class="[
-            'h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]',
+            'h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease] forced-colors:hidden',
             view.state === 'off' ? 'opacity-50 grayscale' : '',
           ]"
+        />
+        <!-- The image keeps its own fill in forced colours and vanishes on a matching canvas; the mask takes ButtonText -->
+        <span
+          aria-hidden="true"
+          data-icon="forced"
+          :class="[
+            'hidden size-5 shrink-0 bg-[ButtonText] forced-color-adjust-none [mask:var(--o-ai-icon)_center/contain_no-repeat] forced-colors:inline-block',
+            view.state === 'off' ? 'opacity-50' : '',
+          ]"
+          :style="{ '--o-ai-icon': `url(${getImageURL('images/common/ai_icon_gradient.svg')})` }"
         />
         <!-- Anchored by its start edge so a needs-you count grows away from the icon, not over it -->
         <span

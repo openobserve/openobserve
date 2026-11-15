@@ -257,6 +257,20 @@ describe("AssistantHeaderButton light", () => {
     );
   });
 
+  it("swaps the fixed-fill icon for a ButtonText mask in forced colours", () => {
+    const { wrapper } = setup();
+    expect(wrapper.get("img").classes()).toContain("forced-colors:hidden");
+    const mask = wrapper.get('[data-icon="forced"]').classes();
+    expect(mask).toEqual(
+      expect.arrayContaining([
+        "hidden",
+        "forced-colors:inline-block",
+        "bg-[ButtonText]",
+        "forced-color-adjust-none",
+      ]),
+    );
+  });
+
   it("shows open with the neutral pressed border while a container is visible", async () => {
     const { wrapper, store } = setup();
     session(store, "Checkout");
