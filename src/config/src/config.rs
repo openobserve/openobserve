@@ -3585,7 +3585,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
         default = 2,
-        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. Minimum 2"
+        help = "Per-file concurrent row_group workers for tantivy index generation, on ingesters and compactors. Minimum 2. Times ZO_FILE_MERGE_THREAD_NUM, it is the thread count of the shared tantivy build pool"
     )]
     pub tantivy_builder_thread_num: usize,
 }

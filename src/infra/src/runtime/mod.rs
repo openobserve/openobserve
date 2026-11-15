@@ -70,9 +70,7 @@ pub static TANTIVY_BUILD_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .thread_name("tantivy_build")
         .thread_stack_size(THREAD_STACK_SIZE)
         .max_blocking_threads(
-            cfg.limit
-                .cpu_num
-                .max(cfg.compact.tantivy_builder_thread_num),
+            cfg.compact.tantivy_builder_thread_num * cfg.limit.file_merge_thread_num,
         )
         .build()
         .unwrap()
@@ -119,10 +117,7 @@ mod tests {
     #[tokio::test]
     async fn test_tantivy_build_runtime_uses_fixed_thread_count() {
         let cfg = get_config();
-        let max_threads = cfg
-            .limit
-            .cpu_num
-            .max(cfg.compact.tantivy_builder_thread_num);
+        let max_threads = cfg.compact.tantivy_builder_thread_num * cfg.limit.file_merge_thread_num;
         let tasks: Vec<_> = (0..max_threads * 3)
             .map(|_| {
                 TANTIVY_BUILD_RUNTIME.spawn_blocking(|| {
