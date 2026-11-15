@@ -73,7 +73,9 @@ export function forkSeedOf(sessionId: string): ForkSeed | undefined {
 
 function toEntry(value: unknown): ForkEntry[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  const { linkDigest, sessionId, at } = value as Record<string, unknown>;
+  const { linkDigest: digest, tokenHash, sessionId, at } = value as Record<string, unknown>;
+  // Entries written before the rename keep the same SHA-256 digest under `tokenHash`.
+  const linkDigest = digest ?? tokenHash;
   if (typeof linkDigest !== "string" || !linkDigest || linkDigest.length > MAX_TOKEN) return [];
   if (typeof sessionId !== "string" || !sessionId || sessionId.length > MAX_TOKEN) return [];
   return [{ linkDigest, sessionId, at: typeof at === "number" && Number.isFinite(at) ? at : 0 }];

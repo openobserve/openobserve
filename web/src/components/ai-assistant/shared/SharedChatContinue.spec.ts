@@ -146,6 +146,18 @@ describe("forkMemory", () => {
     expect(await shareLinkDigest("secret-token")).toBe(linkDigest);
   });
 
+  it("reads an entry saved before the rename, whose tokenHash holds the same digest", async () => {
+    const linkDigest = await shareLinkDigest("tok");
+    localStorage.setItem(
+      "o2.assistant.forks:k1",
+      JSON.stringify([{ tokenHash: linkDigest, sessionId: "s-old", at: 3 }]),
+    );
+    expect(forksOf("k1", linkDigest)).toEqual([{ linkDigest, sessionId: "s-old", at: 3 }]);
+    rememberFork("k1", { linkDigest, sessionId: "s-new", at: 4 });
+    expect(localStorage.getItem("o2.assistant.forks:k1")).not.toContain("tokenHash");
+    expect(readForks("k1").map((entry) => entry.sessionId)).toEqual(["s-old", "s-new"]);
+  });
+
   it("ignores hostile or broken storage", () => {
     localStorage.setItem(
       "o2.assistant.forks:k1",
