@@ -139,7 +139,7 @@ test.describe("assistant approval cards", () => {
     await expect(region()).toContainText("Waiting for your approval: Allow bash. Expires in 2");
     const countdown = assistant.approval().locator('[data-test="assistant-approval-countdown"]');
     await expect(countdown).toHaveText(/^0:\d\d$/);
-    await expect(countdown).toHaveAttribute("aria-label", /^Expires in 0:\d\d$/);
+    await expect(countdown).toHaveAttribute("aria-label", /^Expires soon · 0:\d\d$/);
     const record = assistant.approvalResult();
     await expect(record).toHaveAttribute("data-state", "expired", { timeout: 35_000 });
     await expect(record).toContainText("Request expired. Nothing was changed.");

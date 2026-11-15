@@ -49,14 +49,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="remainingMs !== null"
           role="timer"
           aria-live="off"
-          :aria-label="t('assistant.approval.expiresIn', { time: clockText })"
+          :aria-label="
+            t(expiringSoon ? 'assistant.approval.expiringSoon' : 'assistant.approval.expiresIn', {
+              time: clockText,
+            })
+          "
           :class="[
-            'text-assistant-signal-attention shrink-0 text-xs whitespace-nowrap tabular-nums',
+            'text-assistant-signal-attention inline-flex shrink-0 items-center gap-0.5 text-xs whitespace-nowrap tabular-nums',
             expiringSoon && 'font-medium',
           ]"
           :data-expiring="expiringSoon ? '' : undefined"
           data-test="assistant-approval-countdown"
-          >{{ clockText }}</span
+        >
+          <!-- A shape, so the last minute never relies on colour and weight alone -->
+          <OIcon
+            v-if="expiringSoon"
+            :name="assistantGlyph.warning"
+            size="xs"
+            aria-hidden="true"
+            data-test="assistant-approval-expiring-icon"
+          />{{ clockText }}</span
         >
       </div>
       <h3

@@ -774,6 +774,8 @@ describe("AssistantApprovalCard", () => {
       expect(timer.text()).toBe("0:48");
       expect(timer.classes()).toContain("font-medium");
       expect(timer.attributes("data-expiring")).toBe("");
+      expect(timer.find('[data-test="assistant-approval-expiring-icon"]').exists()).toBe(true);
+      expect(timer.attributes("aria-label")).toBe("Expires soon · 0:48");
       expect(timer.findComponent(OBadge).exists()).toBe(false);
       expect(timer.classes()).toContain("text-assistant-signal-attention");
     });
@@ -783,6 +785,8 @@ describe("AssistantApprovalCard", () => {
       await flushPromises();
       const timer = wrapper.get('[data-test="assistant-approval-countdown"]');
       expect(timer.attributes("data-expiring")).toBeUndefined();
+      expect(timer.find('[data-test="assistant-approval-expiring-icon"]').exists()).toBe(false);
+      expect(timer.attributes("aria-label")).toBe("Expires in 2:00");
       expect(timer.findComponent(OBadge).exists()).toBe(false);
       expect(timer.classes()).toContain("text-assistant-signal-attention");
       expect(timer.classes()).not.toContain("font-medium");
