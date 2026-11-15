@@ -58,6 +58,8 @@ const ISSUE_READS: usize = 8;
 
 /// A finding's decision kind, stream entity id and onset.
 type IssueKey = (String, String, i64);
+/// One member's issue lookup: its incident's index, its key and the recovery its links recorded.
+type MemberIssue = (usize, IssueKey, Option<i64>);
 
 /// P6 over main's incident path: the incident's own automatic analysis is the investigation.
 pub struct IncidentInvestigation;
@@ -285,7 +287,7 @@ pub async fn list_with(
     })
 }
 
-/// Each item's issue context for the resolver's caller; an item with no issue row gets none.
+/// Each item's issue context, merged over its members, as the resolver's caller may see it.
 pub async fn attach_context(
     org: &str,
     items: &mut [AutoObserveIncident],
@@ -294,23 +296,28 @@ pub async fn attach_context(
     if !context::enabled() {
         return Ok(());
     }
-    let keys: Vec<Option<IssueKey>> = items.iter().map(issue_key).collect();
+    let members = member_issues(org, items);
+    let keys: Vec<IssueKey> = members.iter().map(|(_, key, _)| key.clone()).collect();
     let issues: Vec<Option<IssueRef>> = futures::stream::iter(keys)
-        .map(|key| issue_of(org.to_string(), key))
+        .map(|key| issue_of(org.to_string(), Some(key)))
         .buffered(ISSUE_READS)
         .try_collect()
         .await?;
-    let found: Vec<IssueRef> = issues.iter().flatten().cloned().collect();
+    let grouped = per_incident(items.len(), &members, issues);
+    let found: Vec<IssueRef> = grouped.iter().flatten().cloned().collect();
     if found.is_empty() {
         return Ok(());
     }
     let mut contexts = for_issues(&SearchAdapter, org, &found, resolver)
         .await?
         .into_iter();
-    for (item, issue) in items.iter_mut().zip(&issues) {
-        if issue.is_some() {
-            item.context = contexts.next();
-        }
+    for (item, issues) in items.iter_mut().zip(&grouped) {
+        let mut parts: Vec<IssueContext> = contexts.by_ref().take(issues.len()).collect();
+        item.context = match parts.len() {
+            0 => None,
+            1 => parts.pop(),
+            _ => Some(context::merge(parts)),
+        };
     }
     Ok(())
 }
@@ -413,6 +420,47 @@ async fn issue_of(org: String, key: Option<IssueKey>) -> anyhow::Result<Option<I
         return Ok(None);
     };
     issue_for(&SearchAdapter, &org, &kind, &entity_id, onset_us).await
+}
+
+/// Every member's issue, so a cohort shows each stream's context; a body without members uses the
+/// finding.
+fn member_issues(org: &str, items: &[AutoObserveIncident]) -> Vec<MemberIssue> {
+    let mut out = Vec::new();
+    for (n, item) in items.iter().enumerate() {
+        if item.members.is_empty() {
+            out.extend(issue_key(item).map(|key| (n, key, None)));
+        }
+        for m in &item.members {
+            let (Some(stream_type), Some(name)) = (&m.stream_type, &m.stream_name) else {
+                continue;
+            };
+            let entity = format!("{stream_type}/{name}");
+            let kind = decision_kinds::PAGED
+                .iter()
+                .find(|kind| finding_id(org, kind, &entity) == m.id);
+            if let Some(kind) = kind {
+                let key = (kind.to_string(), entity, m.first_seen_at);
+                out.push((n, key, m.recovered_at));
+            }
+        }
+    }
+    out
+}
+
+/// Each incident's issues; stream issue rows record no recovery, so the member's links supply it.
+fn per_incident(
+    len: usize,
+    members: &[MemberIssue],
+    found: Vec<Option<IssueRef>>,
+) -> Vec<Vec<IssueRef>> {
+    let mut out = vec![Vec::new(); len];
+    for ((n, _, recovered), issue) in members.iter().zip(found) {
+        if let Some(mut issue) = issue {
+            issue.recovered_us = issue.recovered_us.or(*recovered);
+            out[*n].push(issue);
+        }
+    }
+    out
 }
 
 async fn unrouted_samples(org: &str) -> anyhow::Result<HashSet<String>> {
@@ -682,6 +730,104 @@ mod tests {
         assert_eq!(
             item.investigation.summary, None,
             "an unreadable summary is null"
+        );
+    }
+
+    #[test]
+    fn a_cohort_reads_every_members_issue_with_its_recorded_recovery() {
+        use o2_enterprise::enterprise::autoobserve::context::{
+            ImpactEffect, ImpactKind, ImpactRecord, impact_sentence, subject_of,
+        };
+        const MINUTE: i64 = 60_000_000;
+        let (org, silence, drop) = (
+            "demo-org",
+            decision_kinds::STREAM_SILENCE,
+            decision_kinds::STREAM_DROP,
+        );
+        let member = |kind: &str, name: &str, seen: i64, recovered: Option<i64>| MemberView {
+            id: finding_id(org, kind, &format!("logs/{name}")),
+            title: String::new(),
+            stream_type: Some("logs".into()),
+            stream_name: Some(name.into()),
+            first_seen_at: seen,
+            recovered_at: recovered,
+        };
+        let checkout = finding_id(org, silence, "logs/checkout");
+        let mut cohort = item_of(&incident(finding_dims()), &link(&checkout));
+        cohort.members = vec![
+            member(silence, "checkout", 10, None),
+            member(drop, "okta_system_log", 20 * MINUTE, Some(95 * MINUTE)),
+            member(silence, "okta_admin", 30 * MINUTE, Some(210 * MINUTE)),
+            MemberView {
+                stream_type: None,
+                stream_name: None,
+                ..member(silence, "deleted", 40, None)
+            },
+        ];
+        let older = item_of(&incident(finding_dims()), &link(&checkout));
+        let items = [cohort, older];
+        let members = member_issues(org, &items);
+        let keys: Vec<(usize, &str, &str, i64)> = members
+            .iter()
+            .map(|(n, (kind, entity, onset), _)| (*n, kind.as_str(), entity.as_str(), *onset))
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                (0, silence, "logs/checkout", 10),
+                (0, drop, "logs/okta_system_log", 20 * MINUTE),
+                (0, silence, "logs/okta_admin", 30 * MINUTE),
+                (1, silence, "logs/checkout", 10),
+            ]
+        );
+        let found = members
+            .iter()
+            .map(|(_, (kind, entity, onset), _)| {
+                Some(IssueRef {
+                    org: org.into(),
+                    decision_kind: kind.clone(),
+                    subject: subject_of(kinds::STREAM, entity),
+                    decision_id: format!("{kind}/{entity}"),
+                    onset_us: *onset,
+                    detected_us: *onset,
+                    recovered_us: None,
+                    shadow: false,
+                })
+            })
+            .collect();
+        let sentence = |i: &IssueRef| {
+            let record = ImpactRecord {
+                provider: "security_blind_spot".into(),
+                kind: ImpactKind::Detection,
+                effect: if i.decision_kind == drop {
+                    ImpactEffect::Partial
+                } else {
+                    ImpactEffect::Blind
+                },
+                subject: i.subject.clone(),
+                counts: BTreeMap::from([("detections".to_string(), 12)]),
+                items: Vec::new(),
+                more: 0,
+                needs: None,
+                classes: Vec::new(),
+                issue: Some(i.decision_id.clone()),
+            };
+            impact_sentence(&record, i, false)
+        };
+        let read: Vec<Vec<String>> = per_incident(items.len(), &members, found)
+            .iter()
+            .map(|issues| issues.iter().map(sentence).collect())
+            .collect();
+        assert_eq!(
+            read,
+            [
+                vec![
+                    "12 detections get no data.",
+                    "12 detections saw only part of the data for 75 minutes.",
+                    "12 detections got no data for 3 hours.",
+                ],
+                vec!["12 detections get no data."],
+            ]
         );
     }
 

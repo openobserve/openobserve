@@ -440,8 +440,39 @@ impl ContextReadPort for ContextReads {
         }
     }
 
-    async fn security_sources(&self, _org: &str) -> (Checked, Vec<(String, String)>) {
-        (Checked::NotRecorded, Vec::new())
+    async fn security_sources(&self, org: &str) -> (Checked, Vec<(String, String)>) {
+        use o2_enterprise::enterprise::security::sources::selection::{StreamRef, resolve_sources};
+        let streams = match db::schema::list(org, Some(StreamType::Logs), false).await {
+            Ok(streams) => streams,
+            Err(e) => {
+                return (
+                    Checked::Failed(format!("reading stream settings: {e}")),
+                    Vec::new(),
+                );
+            }
+        };
+        let settings: Vec<(&str, Option<StreamSettings>)> = streams
+            .iter()
+            .map(|s| {
+                (
+                    s.stream_name.as_str(),
+                    infra::schema::unwrap_stream_settings(&s.schema),
+                )
+            })
+            .collect();
+        let refs: Vec<StreamRef<'_>> = settings
+            .iter()
+            .map(|(name, s)| StreamRef {
+                name,
+                setting: s.as_ref().and_then(|s| s.security.as_ref()),
+            })
+            .collect();
+        let logs = StreamType::Logs.to_string();
+        let sources = resolve_sources(org, &refs)
+            .into_iter()
+            .map(|e| (logs.clone(), e.name))
+            .collect();
+        (Checked::Ok, sources)
     }
 }
 
@@ -755,7 +786,7 @@ mod tests {
     use std::cell::Cell;
 
     use arrow_schema::{DataType, Field, Schema};
-    use config::meta::stream::{FileKey, FileMeta};
+    use config::meta::stream::{FileKey, FileMeta, SecuritySourceSetting};
     use infra::{errors::ErrorCodes, schema::SchemaCache};
     use o2_enterprise::enterprise::autoobserve::decision_log::engine_reads;
 
@@ -1113,6 +1144,50 @@ mod tests {
     async fn ai_is_refused_until_metering_is_connected() {
         let permit = NoAiUsage.authorize("default").await.unwrap();
         assert!(matches!(permit, AiPermit::Refused(_)));
+    }
+
+    #[tokio::test]
+    async fn security_sources_are_the_chosen_logs_streams_minus_internal_ones() {
+        let org = format!("ao_sec_{}", config::utils::time::now_micros());
+        let cached = |included: bool| {
+            let settings = StreamSettings {
+                security: Some(SecuritySourceSetting {
+                    included: Some(included),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+            let meta = std::collections::HashMap::from([(
+                "settings".to_string(),
+                serde_json::to_string(&settings).unwrap(),
+            )]);
+            SchemaCache::new(Schema::empty().with_metadata(meta))
+        };
+        let keys = [
+            (format!("{org}/logs/okta_system_log"), true),
+            (format!("{org}/logs/app"), false),
+            (format!("{org}/logs/_o2_autoobserve_health"), true),
+        ];
+        {
+            let mut w = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+            for (key, included) in &keys {
+                w.insert(key.clone(), cached(*included));
+            }
+        }
+        let got = ContextReads.security_sources(&org).await;
+        {
+            let mut w = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+            for (key, _) in &keys {
+                w.remove(key);
+            }
+        }
+        assert_eq!(
+            got,
+            (
+                Checked::Ok,
+                vec![("logs".to_string(), "okta_system_log".to_string())]
+            )
+        );
     }
 
     #[tokio::test]
