@@ -410,6 +410,16 @@ const ACTION_LABEL_KEYS: Partial<Record<OutcomeAction, I18nKey>> = {
   change_level: "assistant.outcome.actions.changeLevel",
 };
 
+// A bare HTTP reason phrase says no more than the status, so it is not a cause.
+const REASON_PHRASES: ReadonlySet<string> = new Set([
+  "bad gateway",
+  "bad request",
+  "gateway timeout",
+  "internal server error",
+  "service unavailable",
+]);
+const CAUSE_MAX = 200;
+
 let outcomeSeq = 0;
 
 /** The visible label of an outcome's action; role-split codes word it per role (`80` §1.3). */
@@ -430,6 +440,14 @@ export function outcomeActionLabel(
   const own = `assistant.error.${code}.action`;
   if (code !== "unknown" && te(own)) return t(own);
   return t(ACTION_LABEL_KEYS[action] ?? "assistant.outcome.retry");
+}
+
+/** The server's own first line for an error the client has no copy for; `null` when it adds nothing. */
+export function unknownCauseOf(error: AssistantError | undefined): string | null {
+  if (error?.code !== "unknown") return null;
+  const line = (error.serverMessage ?? "").trim().split("\n")[0].trim();
+  if (!line || REASON_PHRASES.has(line.toLowerCase())) return null;
+  return line.length > CAUSE_MAX ? `${line.slice(0, CAUSE_MAX - 1)}…` : line;
 }
 
 /** The one action of a block, before the role and the device are applied. */
@@ -607,6 +625,10 @@ const lines = computed<I18nText[]>(() => {
   const claimsFindings = FINDINGS_BODIES.has(error.code);
   const claimsNoChange = NO_CHANGE_BODIES.has(error.code) && failedAfterChange(error);
   if (te(bodyKey) && (!claimsFindings || props.partial) && !claimsNoChange) out.push(t(bodyKey));
+  const cause = unknownCauseOf(error);
+  if (cause) out.push(raw(cause));
+  else if (error.code === "unknown" && error.httpStatus)
+    out.push(t("assistant.error.unknown.status", { status: error.httpStatus }));
   const partialKey = `assistant.error.${error.code}.bodyPartial`;
   if (props.partial && te(partialKey)) out.push(t(partialKey));
   if (action.value === "ask_again" || failedAfterChange(error))
