@@ -194,6 +194,20 @@ describe("ActivityTab", () => {
     expect(w.get('[data-test="o2-table-prev-page-btn"]').attributes("aria-disabled")).toBe("true");
   });
 
+  it("ends the chain when the page after a full one comes back empty", async () => {
+    vi.mocked(assistantSettings.activity).mockImplementation(async (_org, filter) =>
+      filter?.cursor ? { rows: [] } : { rows: [ENTRY], next_cursor: "n1" },
+    );
+    const w = (wrapper = await mountTab(ActivityTab, true));
+    await w.find('[data-test="o2-table-next-page-btn"]').trigger("click");
+    await settle();
+    await settle();
+    expect(w.get('[data-test="o2-table-prev-page-btn"]').attributes("aria-disabled")).toBe("true");
+    expect(w.get('[data-test="o2-table-next-page-btn"]').attributes("aria-disabled")).toBe("true");
+    expect(w.get('[data-test="o2-table-pagination-info"]').text()).not.toContain("+");
+    expect(w.find('[data-test="settings-assistant-activity-a1-result"]').exists()).toBe(true);
+  });
+
   it("stops at the last page when the server sends no cursor", async () => {
     vi.mocked(assistantSettings.activity).mockResolvedValue({ rows: [ENTRY] });
     const w = (wrapper = await mountTab(ActivityTab, true));

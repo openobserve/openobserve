@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size="pageSize"
       :page-size-options="PAGE_SIZES"
       :total-count="knownTotal"
-      :total-count-exact="!activity.data.value?.next_cursor"
+      :total-count-exact="!hasNext"
       :default-columns="false"
       :show-global-filter="false"
       data-test="settings-assistant-activity-table"
@@ -223,9 +223,13 @@ const undone = ref(new Set<string>());
 
 const state = computed(() => readStateOf(activity));
 const rows = computed(() => activity.data.value?.rows ?? []);
+// A page that is exactly full still carries a cursor, so a next page that came back empty marks it dead.
+const deadCursors = ref(new Set<string>());
+const nextCursor = computed(() => activity.data.value?.next_cursor);
+const hasNext = computed(() => !!nextCursor.value && !deadCursors.value.has(nextCursor.value));
 // The cursor API returns no total, so while a next page exists the pager counts one row past this page.
 const knownTotal = computed(() =>
-  activity.data.value?.next_cursor
+  hasNext.value
     ? (cursors.value.length + 1) * pageSize.value + 1
     : cursors.value.length * pageSize.value + rows.value.length,
 );
@@ -285,16 +289,28 @@ function turnPage({ page: target, size }: OTablePaginationParams) {
     cursors.value = [];
     return;
   }
-  const next = activity.data.value?.next_cursor;
   if (target === 1) cursors.value = [];
-  else if (target === cursors.value.length + 2 && next) cursors.value.push(next);
+  else if (target === cursors.value.length + 2 && hasNext.value)
+    cursors.value.push(nextCursor.value!);
   else if (target === cursors.value.length) cursors.value.pop();
 }
 
 watch([range, actorQuery, searchQuery, () => page.org.value], () => {
   windowEnd.value = Date.now() * 1000;
   cursors.value = [];
+  deadCursors.value = new Set();
 });
+
+// Landing on an empty page steps back to the last page that had rows, which now ends the chain.
+watch(
+  () => activity.data.value,
+  (data) => {
+    const last = cursors.value.at(-1);
+    if (!data || data.rows.length || last === undefined) return;
+    deadCursors.value = new Set(deadCursors.value).add(last);
+    cursors.value = cursors.value.slice(0, -1);
+  },
+);
 
 /** Only in-app paths become links; a server-sent absolute URL is shown as text. */
 function safeLink(link: string | undefined): RouteLocationRaw | null {

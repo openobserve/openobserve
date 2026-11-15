@@ -5,6 +5,7 @@ import { flushPromises, mount, VueWrapper, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import { h, nextTick, Teleport } from "vue";
 import OTablePagination from "./OTablePagination.vue";
+import { publishFloatingObstacle } from "@/lib/core/Table/composables/useFloatingClearance";
 import { LOADER_DELAY_MS } from "@/lib/styles/motion";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -325,12 +326,78 @@ describe("OTablePagination footer", () => {
   });
 });
 
-describe("OTablePagination beside the assistant launcher", () => {
-  afterEach(() => wrapper?.unmount());
+describe("OTablePagination beside a floating launcher", () => {
+  const CONTROLS = '[data-test="o2-table-pagination-controls"]';
+  const box = (left: number, top: number, width: number, height: number) =>
+    ({ left, top, right: left + width, bottom: top + height, width, height }) as DOMRect;
+  let main: HTMLElement;
 
-  it("ends its controls before the width the launcher publishes on the page", () => {
-    mountPager();
-    const controls = wrapper.get(INFO).element.parentElement!;
-    expect(controls.className).toContain("me-[calc(var(--o-assistant-launcher-end,0)*1px)]");
+  function mountInMain(pagerBox: DOMRect) {
+    main = document.createElement("main");
+    document.body.append(main);
+    wrapper = mount(OTablePagination, {
+      props: {
+        currentPage: 1,
+        totalPages: 3,
+        totalCount: 30,
+        pageSize: 10,
+        pageSizeOptions: [10, 20],
+        showingFrom: 1,
+        showingTo: 10,
+        isFirstPage: true,
+        isLastPage: false,
+      },
+      attachTo: main,
+    });
+    wrapper.element.getBoundingClientRect = () => pagerBox;
+  }
+
+  afterEach(() => {
+    publishFloatingObstacle(null);
+    wrapper?.unmount();
+    main?.remove();
+  });
+
+  it("keeps its full width while no launcher is published", async () => {
+    mountInMain(box(240, 810, 1192, 34));
+    await nextTick();
+    expect(wrapper.get(CONTROLS).attributes("style")).toBeUndefined();
+  });
+
+  it("ends its controls before a launcher it overlaps", async () => {
+    mountInMain(box(240, 810, 1192, 34));
+    publishFloatingObstacle({ rect: box(1368, 800, 48, 48), scope: main });
+    await nextTick();
+    const controls = wrapper.get(CONTROLS);
+    expect(controls.attributes("style")).toContain("--o-pager-clearance: 4");
+    expect(controls.classes()).toContain("me-[calc(var(--o-pager-clearance)*1rem)]");
+    publishFloatingObstacle(null);
+    await nextTick();
+    expect(wrapper.get(CONTROLS).attributes("style")).toBeUndefined();
+  });
+
+  it("keeps its full width when the launcher is nowhere near it", async () => {
+    mountInMain(box(240, 300, 1192, 34));
+    publishFloatingObstacle({ rect: box(1368, 800, 48, 48), scope: main });
+    await nextTick();
+    expect(wrapper.get(CONTROLS).attributes("style")).toBeUndefined();
+  });
+
+  it("keeps its full width outside the launcher's page", async () => {
+    mountInMain(box(240, 810, 1192, 34));
+    publishFloatingObstacle({
+      rect: box(1368, 800, 48, 48),
+      scope: document.createElement("main"),
+    });
+    await nextTick();
+    expect(wrapper.get(CONTROLS).attributes("style")).toBeUndefined();
+  });
+
+  it("clears a launcher at the left edge in right-to-left layouts", async () => {
+    mountInMain(box(0, 810, 1192, 34));
+    wrapper.element.style.direction = "rtl";
+    publishFloatingObstacle({ rect: box(24, 800, 48, 48), scope: main });
+    await nextTick();
+    expect(wrapper.get(CONTROLS).attributes("style")).toContain("--o-pager-clearance: 4.5");
   });
 });

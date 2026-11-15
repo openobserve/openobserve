@@ -374,41 +374,6 @@ html.theme-switching *::after {
     }
   }
 }
-/* Home's Ask box: a faint, still halo at rest; on focus a ribbon rings the box flush and the halo brightens once. */
-@utility assistant-focus-glow {
-  position: relative;
-  isolation: isolate;
-  /* Both layers sit one ring width (0.125rem) outside the surface-radius box, on its radius plus that width, so they stay concentric. */
-  &::before,
-  &::after {
-    content: "";
-    position: absolute;
-    inset: -0.125rem;
-    z-index: -1;
-    border-radius: calc(var(--radius-surface) + 0.125rem);
-    background: var(--color-gradient-brand-ribbon-focus);
-    opacity: 0;
-    transition: opacity 0.2s ease-out;
-    pointer-events: none;
-  }
-  /* The halo sits under the crisp ring and spills only past the box's opaque fill. */
-  &::before {
-    filter: blur(1rem);
-    opacity: 0.15;
-  }
-  &:focus-within::before {
-    opacity: 0.35;
-  }
-  &:focus-within::after {
-    opacity: 1;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    &::before,
-    &::after {
-      transition: none;
-    }
-  }
-}
 /* Each bar sets --assistant-wave-peak and --assistant-wave-delay (seconds, unitless) so the bars move out of step. */
 @utility assistant-wave {
   animation: assistant-wave 1.1s ease-in-out infinite;

@@ -19,10 +19,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-import AssistantFloatingLauncher, {
-  LAUNCHER_INSET_VAR,
-  previewTitle,
-} from "./AssistantFloatingLauncher.vue";
+import * as clearance from "@/lib/core/Table/composables/useFloatingClearance";
+
+import AssistantFloatingLauncher, { previewTitle } from "./AssistantFloatingLauncher.vue";
 import type { ThreadPill } from "./threadsBar";
 
 const pill = (n: number, signal: ThreadPill["signal"] = "idle"): ThreadPill => ({
@@ -206,27 +205,30 @@ describe("AssistantFloatingLauncher", () => {
     expect(previewTitle("Exactly twenty six chars!!")).toBe("Exactly twenty six chars!!");
   });
 
-  it("publishes its footprint on the page, never on overlays, and clears it on unmount", () => {
+  it("publishes its rect scoped to the page, and withdraws it on unmount", () => {
     const main = document.createElement("main");
     main.dataset.test = "main-content";
     document.body.append(main);
-    main.getBoundingClientRect = () => ({ right: 1432 }) as DOMRect;
-    const rect = vi
-      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
-      .mockReturnValue({ left: 1368, width: 48 } as DOMRect);
+    const box = { left: 1368, right: 1416, top: 800, bottom: 848, width: 48 } as DOMRect;
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(box);
+    const publish = vi.spyOn(clearance, "publishFloatingObstacle");
     const wrapper = mountLauncher(1);
-    expect(main.style.getPropertyValue(LAUNCHER_INSET_VAR)).toBe("64");
-    expect(document.documentElement.style.getPropertyValue(LAUNCHER_INSET_VAR)).toBe("");
+    expect(publish).toHaveBeenLastCalledWith({ rect: box, scope: main });
     wrapper.unmount();
-    expect(main.style.getPropertyValue(LAUNCHER_INSET_VAR)).toBe("");
+    expect(publish).toHaveBeenLastCalledWith(null);
     rect.mockRestore();
+    publish.mockRestore();
+    main.remove();
   });
 
-  it("publishes nothing while hidden", () => {
+  it("publishes nothing while it has no size", () => {
     const main = document.createElement("main");
     main.dataset.test = "main-content";
     document.body.append(main);
-    mountLauncher(1);
-    expect(main.style.getPropertyValue(LAUNCHER_INSET_VAR)).toBe("");
+    const publish = vi.spyOn(clearance, "publishFloatingObstacle");
+    mountLauncher(1).unmount();
+    expect(publish.mock.calls.every(([next]) => next === null)).toBe(true);
+    publish.mockRestore();
+    main.remove();
   });
 });
