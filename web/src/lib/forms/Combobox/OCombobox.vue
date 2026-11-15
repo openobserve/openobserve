@@ -237,9 +237,8 @@ onMounted(() =>
             'placeholder:text-input-placeholder',
             'transition-[border-color,box-shadow] duration-150 outline-none',
             hasError
-              ? 'border-input-border-error'
-              : 'border-input-border hover:border-input-border-hover',
-            'focus:border-input-border-focus focus:ring-input-focus-ring focus:ring-2',
+              ? 'border-input-border-error focus:ring-control-error-halo focus:ring-3'
+              : 'border-input-border hover:border-input-border-hover focus:border-control-border-focus focus:ring-control-focus-halo focus:ring-3',
             'disabled:bg-input-disabled-bg disabled:text-input-disabled-text disabled:cursor-not-allowed',
             heightClass,
           ]"
@@ -257,7 +256,7 @@ onMounted(() =>
             'z-10001 w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) min-w-(--reka-combobox-trigger-width)',
             'max-h-60 overflow-hidden',
             'max-lg:max-h-[var(--reka-popper-available-height,15rem)]',
-            'rounded-default shadow-overlay border border-transparent',
+            'rounded-default shadow-overlay border-border-default border',
             'bg-select-content-bg',
             'p-1',
             // Clip-path reveal: unveiled at full size from its trigger edge (no

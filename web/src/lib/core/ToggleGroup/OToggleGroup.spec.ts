@@ -32,14 +32,14 @@ describe("OToggleGroup", () => {
     expect(element.getAttribute("class") || "").toContain("flex-row");
   });
 
-  it("sizes the bordered track from the md control token by default", () => {
+  it("sizes the filled, edgeless track from the md control token by default", () => {
     const wrapper = mountGroup();
     const classes = (wrapper.find("div").element as HTMLElement).getAttribute("class") || "";
     expect(classes).toContain("h-control-md");
-    expect(classes.split(" ")).toContain("border");
-    expect(classes).toContain("border-toggle-border");
-    // The edge takes one pixel of the inset, so a 28 px item still fits the 32 px track.
-    expect(classes.split(" ")).toContain("p-px");
+    expect(classes).toContain("bg-toggle-track-bg");
+    expect(classes.split(" ").filter((name) => name.startsWith("border"))).toEqual([]);
+    // A 2 px inset on each side fits the 28 px item inside the 32 px track.
+    expect(classes.split(" ")).toContain("p-0.5");
   });
 
   it('sizes the track from the sm control token when size="sm"', () => {

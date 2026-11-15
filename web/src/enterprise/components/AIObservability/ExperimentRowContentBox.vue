@@ -22,7 +22,7 @@
       <div class="grow" />
       <OButton
         icon-only
-        variant="secondary"
+        variant="ghost"
         :icon="fullscreen ? 'fullscreen-exit' : 'fullscreen'"
         :title="
           fullscreen

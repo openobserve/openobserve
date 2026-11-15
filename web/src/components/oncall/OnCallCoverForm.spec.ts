@@ -736,7 +736,7 @@ describe("OnCallCoverForm — taking a cover", () => {
     const field = wrapper.find('[data-test-field="window"]');
     expect(field.attributes("data-test-type")).toBe("absolute");
     // And the reader cannot choose one either: there is no forward-looking
-    // reading of "Past 30 Minutes" to offer here.
+    // reading of "Past 30 minutes" to offer here.
     expect(field.attributes("disable-relative")).toBeDefined();
   });
 

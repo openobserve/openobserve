@@ -18,7 +18,7 @@ export interface OTabProps {
   /** Material icon name shown before the label */
   icon?: string;
   /**
-   * Count after the label: tabular, capped at "999+", and always as wide as "999+".
+   * Count after the label: tabular, at least two digits wide, capped at "999+".
    * `null` reserves the chip's width while the count loads.
    */
   count?: number | null;

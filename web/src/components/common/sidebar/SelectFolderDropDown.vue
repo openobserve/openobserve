@@ -43,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         icon-only
         variant="secondary"
-        size="sm"
         :data-test="`${type}-folder-move-new-add`"
         :title="t(folderKey(type, 'common.addFolder'))"
         :disabled="disableDropdown"

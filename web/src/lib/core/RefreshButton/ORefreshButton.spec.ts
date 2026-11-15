@@ -38,11 +38,28 @@ describe("ORefreshButton", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("is one secondary md button with the refresh glyph", () => {
+  it("is one ghost md button with the refresh glyph while it has no age to show", () => {
     const wrapper = mountButton();
-    expect(button(wrapper).attributes("data-o2-variant")).toBe("secondary");
+    expect(button(wrapper).attributes("data-o2-variant")).toBe("ghost");
     expect(button(wrapper).classes()).toContain("h-control-md");
     expect(button(wrapper).attributes("aria-label")).toBe("Refresh");
+  });
+
+  it("becomes one bordered secondary button once it shows the data age", () => {
+    const wrapper = mountButton({ lastRunAt: now - 2 * 60_000 });
+    expect(button(wrapper).attributes("data-o2-variant")).toBe("secondary");
+    expect(wrapper.find('[data-test="refresh-button-age"]').exists()).toBe(true);
+  });
+
+  it("keeps the auto-refresh segment in the same variant as the button it joins", () => {
+    const bare = mountButton({ autoRefresh: "off" });
+    expect(bare.get('[data-test="refresh-button-auto-menu"]').attributes("data-o2-variant")).toBe(
+      "ghost",
+    );
+    const aged = mountButton({ autoRefresh: "off", lastRunAt: now });
+    expect(aged.get('[data-test="refresh-button-auto-menu"]').attributes("data-o2-variant")).toBe(
+      "secondary",
+    );
   });
 
   it("sits at sm in a panel header", () => {

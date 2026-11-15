@@ -130,7 +130,12 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
       expect(classesOf("logs-search-bar-refresh-cache-dropdown-trigger")).toContain(
         "size-control-md",
       );
-      expect(classesOf("logs-search-bar-date-time-dropdown").some((c) => /h-/.test(c))).toBe(false);
+      // The range group owns its control height; a call-site height override is what must not appear.
+      expect(
+        classesOf("logs-search-bar-date-time-dropdown").filter(
+          (c) => /(^|:)!?h-/.test(c) && !/(^|:)h-control-/.test(c),
+        ),
+      ).toEqual([]);
       expect(
         wrapper!
           .get('[data-test="logs-search-bar-date-time-dropdown"] [data-test="date-time-btn"]')

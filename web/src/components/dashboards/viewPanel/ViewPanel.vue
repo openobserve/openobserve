@@ -154,7 +154,7 @@
         <OButton
           icon-only
           :aria-label="t('common.close')"
-          variant="secondary"
+          variant="ghost"
           @click="goBack"
           data-test="dashboard-viewpanel-close-btn"
           icon="close"

@@ -38,10 +38,10 @@
   --text-2xs: 0.6875rem; /* 11px — key chips, chart axes, micro captions */
   --text-xs: 0.75rem; /* 12px — meta, helper text, chips, badges, column headers */
   --text-compact: 0.8125rem; /* 13px — UI text: controls, menus, table cells, labels */
-  --text-sm: 0.875rem; /* 14px — reading text: descriptions, dialog bodies, empty states */
-  --text-title: 0.9375rem; /* 15px — dialog, drawer and section titles */
-  --text-base: 1rem; /* 16px — page title, never larger */
-  --text-lg: 1.125rem; /* 18px — outside the v2 type table (guideline T1) */
+  --text-sm: 0.875rem; /* 14px — reading text; semibold, the section, card and panel titles */
+  --text-title: 0.9375rem; /* 15px — dialog and drawer titles */
+  --text-base: 1rem; /* 16px — outside the v2 type table (guideline T1) */
+  --text-lg: 1.125rem; /* 18px — the page title (OPageHeader), never larger */
   --text-xl: 1.25rem; /* 20px — small KPI values */
   --text-2xl: 1.5rem; /* 24px — KPI values */
   --text-3xl: 1.875rem; /* 30px — hero numbers / large display */
@@ -69,6 +69,8 @@
   --font-normal: normal;
   --font-medium: 500;
   --font-semibold: 550; /* Geist is variable, so 550 renders between medium and bold */
+  /* The 18px page title alone takes 600, so it outranks the 14px semibold section titles. */
+  --font-title: 600;
   --font-bold: 700;
   /* --- Primary palette — blue-teal #3F7994 ---
      The runtime theme engine is the AUTHORITY for brand colour. `constants/themes.ts`

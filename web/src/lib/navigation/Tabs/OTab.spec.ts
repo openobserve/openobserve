@@ -140,7 +140,7 @@ describe("OTab", () => {
 
   it("keeps the active styling on a disabled active tab, and the disabled one elsewhere", () => {
     const active = mountTab({ name: "tab1", activeTab: "tab1", disabled: true });
-    expect(active.find('[role="tab"]').classes()).toContain("text-tabs-active-text");
+    expect(active.find('[role="tab"]').classes()).toContain("text-text-heading");
     expect(active.find('[role="tab"]').classes()).not.toContain("text-tabs-disabled-text");
     const inactive = mountTab({ name: "tab2", activeTab: "tab1", disabled: true });
     expect(inactive.find('[role="tab"]').classes()).toContain("text-tabs-disabled-text");
@@ -225,12 +225,19 @@ describe("OTab", () => {
 
   // --- Count, dirty ---
 
-  it("renders a tabular count that reserves the width of 999+", () => {
+  it("renders a centred tabular count that reserves two digits", () => {
     const wrapper = mountTab({ label: "Runs", count: 3 });
     const chip = wrapper.get('[data-test="o-tab-count"]');
     expect(chip.text()).toBe("3");
-    expect(chip.classes()).toContain("tabular-nums");
-    expect(chip.classes()).toContain("min-w-[calc(4ch+0.625rem)]");
+    expect(chip.classes()).toEqual(
+      expect.arrayContaining(["tabular-nums", "justify-center", "min-w-[calc(2ch+0.5rem)]"]),
+    );
+  });
+
+  it("keeps the count neutral unless the caller passes a tone", () => {
+    const chip = mountTab({ label: "Runs", count: 3 }).get('[data-test="o-tab-count"]');
+    expect(chip.classes()).toContain("bg-surface-subtle");
+    expect(chip.classes()).not.toContain("bg-badge-error-soft-bg");
   });
 
   it("caps the count at 999+", () => {
@@ -371,12 +378,13 @@ describe("OTab", () => {
       expect(wrapper.find("[data-otab-grip]").exists()).toBe(false);
     });
 
-    it("should render a hover-revealed grip inside the left gutter when reorderable", () => {
+    it("should render a grip, hidden at rest, that hover or keyboard focus reveals", () => {
       const wrapper = mountTab({ reorderable: true });
       const grip = wrapper.find("[data-otab-grip]");
       expect(grip.exists()).toBe(true);
       expect(grip.classes()).toContain("opacity-0");
       expect(grip.classes()).toContain("group-hover/otab:opacity-50");
+      expect(grip.classes()).toContain("group-focus-visible/otab:opacity-50");
       // The gutter is padding on the tab, not flow width from the grip.
       expect(wrapper.find('[role="tab"]').classes()).toContain("ps-3");
       expect(grip.classes()).toContain("absolute");

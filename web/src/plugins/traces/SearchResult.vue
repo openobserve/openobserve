@@ -27,8 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Field panel toggle — same style as logs page -->
         <OButton
           icon-only
-          variant="secondary"
-          size="sm"
+          variant="ghost"
           class="me-1.5 shrink-0"
           data-test="traces-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
@@ -126,8 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              distinguishes one trace or span from the next. -->
         <OButton
           icon-only
-          variant="secondary"
-          size="xs"
+          variant="ghost"
           :pressed="searchObj.meta.resultGrid.wrapCells"
           @click.stop="toggleWrapCells"
           data-test="traces-search-result-wrap-btn"
@@ -145,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
+            size="sm"
             class="select-pagination ms-1 me-1 mt-0!"
             :searchable="false"
             data-test="traces-search-result-records-per-page"

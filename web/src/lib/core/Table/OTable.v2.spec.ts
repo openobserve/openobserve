@@ -148,11 +148,13 @@ describe("OTable row actions (B7, D7)", () => {
     ]);
   });
 
-  it("names the actions header for screen readers only, so it covers no label (D7)", () => {
+  it("gives the pinned actions column an opaque header cell, labelled for screen readers (D7)", () => {
     mountTable({ rowActions });
     const th = wrapper.find(`[data-test="o2-table-th-${ROW_ACTIONS_COLUMN_ID}"]`);
     expect(th.html()).toContain("sr-only");
-    expect(th.classes()).not.toContain("bg-table-header-bg");
+    expect(th.classes()).toContain("bg-table-header-bg");
+    expect(th.attributes("style")).toContain("position: sticky");
+    expect(th.attributes("style")).toContain("var(--shadow-sticky-right)");
   });
 });
 

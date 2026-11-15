@@ -85,14 +85,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 v-model="priority"
                 :options="priorityOptions"
-                :aria-label="t('alerts.firing.priorityLabel')"
+                :label="t('alerts.firing.priorityLabel')"
+                variant="filter"
                 width="s"
                 data-test="alerts-firing-priority"
               />
               <OSelect
                 v-model="folder"
                 :options="folderOptions"
-                :aria-label="t('alerts.firing.folderLabel')"
+                :label="t('alerts.firing.folderLabel')"
+                variant="filter"
                 width="s"
                 data-test="alerts-firing-folder"
               />
@@ -405,7 +407,7 @@ const columns = computed<OTableColumnDef<FiringRow>[]>(() => [
 ]);
 
 const priorityOptions = computed(() => [
-  { label: t("alerts.firing.priorityAll"), value: "all" },
+  { label: t("common.all"), value: "all" },
   ...[1, 2, 3, 4, 5].map((p) => ({ label: raw(`P${p}`), value: String(p) })),
   { label: t("alerts.firing.priorityUnset"), value: "unset" },
 ]);
@@ -414,7 +416,7 @@ const folderOptions = computed(() => {
   const names = new Set(rows.value.map((row) => row.folder_name));
   if (folder.value !== "all") names.add(folder.value);
   return [
-    { label: t("alerts.firing.folderAll"), value: "all" },
+    { label: t("common.all"), value: "all" },
     ...[...names].sort().map((name) => ({ label: raw(name), value: name })),
   ];
 });

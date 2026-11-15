@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <Teleport defer to="#o2-page-actions">
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           class="hideOnPrintMode"
           data-test="pipeline-json-edit-btn"
           @click="openJsonEditor"

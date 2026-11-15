@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- The Settings shell owns the header, scroll and gutter; the content just flows. -->
-  <div class="domain_management flex flex-col gap-4">
+  <div class="domain_management flex flex-col gap-6">
     <OFormSection
       variant="plain"
       :title="t('settings.domainManagement.claimParserTitle')"

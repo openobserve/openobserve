@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OCollapsible>
             <OButton
               icon-only
-              variant="secondary"
+              variant="ghost"
               icon="content-copy"
               :aria-label="t('alerts.incidents.panel.copyQuery')"
               data-test="incident-alert-panel-query-copy"

@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           icon="refresh"
           :loading="isLoading"
           data-test="services-catalog-refresh-btn"

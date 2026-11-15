@@ -446,7 +446,7 @@ const SIDE_OFFSET = 4;
 
 const contentClasses = computed(() => [
   "z-10100 max-w-70 px-2.5 py-1.5",
-  "bg-surface-overlay rounded-menu border border-tooltip-border shadow-md",
+  "bg-surface-overlay rounded-menu border border-transparent shadow-overlay",
   "text-xs text-text-body font-medium leading-snug",
   // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the
   // max-width box instead of overflowing onto the content behind the tooltip.

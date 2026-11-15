@@ -53,7 +53,7 @@
       </OButton>
       <OButton
         icon-only
-        variant="secondary"
+        variant="ghost"
         icon="refresh"
         :loading="loading"
         data-test="ai-remote-task-detail-refresh-btn"

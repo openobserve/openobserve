@@ -54,6 +54,6 @@ describe("LogsNoEventsState", () => {
   });
 
   it("keeps the rolling wording for a rolling period", () => {
-    expect(mountState("15m").text()).toContain("Past 15 Minutes");
+    expect(mountState("15m").text()).toContain("Past 15 minutes");
   });
 });

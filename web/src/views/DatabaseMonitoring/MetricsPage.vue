@@ -84,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSelect
                   v-model="loadBreakdown"
                   :options="breakdownOptions"
-                  size="sm"
                   width="s"
                   :searchable="false"
                   class="shrink-0"
@@ -101,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <OButton
                       variant="ghost"
-                      size="sm"
                       icon="info-outline"
                       data-test="dbm-metrics-load-hint-trigger"
                     >

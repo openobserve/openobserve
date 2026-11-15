@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OFormSection
     variant="plain"
-    class="mb-4"
+    class="mb-6"
     :title="t('about.license_status_title')"
     data-test="license-status-card"
   >
     <div
       v-if="(envKeyActive && revHwmWarning?.source !== 'env') || revHwmWarning"
-      class="border-border-default flex flex-col gap-3 border-b px-4 py-3"
+      class="border-border-subtle flex flex-col gap-3 border-b py-3"
     >
       <OInlineNotice
         v-if="envKeyActive && revHwmWarning?.source !== 'env'"

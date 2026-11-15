@@ -295,7 +295,7 @@ onBeforeUnmount(() => {
           'flex max-w-[calc(100vw-1rem)] flex-col outline-none',
           SIZE_CLASSES[size],
           'max-h-[min(30rem,calc(100vh-2rem))] max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
-          'bg-dropdown-bg rounded-menu shadow-overlay border border-transparent',
+          'bg-dropdown-bg rounded-menu shadow-overlay border-border-default border',
           // Open/close reveal animation (matches ODropdown)
           'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
           'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',

@@ -176,12 +176,13 @@ const chipGlyphClass = computed(() => {
 const chipBadgeClass = computed(() => {
   if (props.selected && !props.quiet)
     return "bg-badge-primary-soft-bg text-badge-primary-soft-text font-semibold";
-  if (isMuted.value) return "bg-surface-subtle text-table-row-text-secondary-tinted font-medium";
+  // A neutral count sits on the chip's own soft fill, so its pill takes the page surface to stay a pill.
+  if (isMuted.value) return "bg-surface-base text-table-row-text-secondary-tinted font-medium";
   if (props.tone === "error" || props.tone === "orange")
     return "bg-badge-error-soft-bg text-badge-error-soft-text font-semibold";
   if (props.tone === "warning")
     return "bg-badge-warning-soft-bg text-badge-warning-soft-text font-semibold";
-  return "bg-surface-subtle text-text-heading font-semibold";
+  return "bg-surface-base text-text-heading font-semibold";
 });
 const chipTooltip = computed(() => {
   if (props.hint) return props.hint;
@@ -217,8 +218,8 @@ const trendClass = computed(() =>
             selected && !quiet
               ? 'border-accent bg-surface-accent-hover'
               : [
-                  'border-border-default bg-surface-base',
-                  clickable ? 'hover:bg-surface-accent-hover' : '',
+                  'bg-surface-subtle border-transparent',
+                  clickable ? 'hover:bg-surface-subtle-hover' : '',
                 ],
           ]
         : variant === 'kpi'

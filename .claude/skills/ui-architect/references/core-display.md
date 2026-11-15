@@ -159,7 +159,7 @@ or modal surface (dialogs, drawers).
 **Key props:**
 
 - `title` · `meta` (I18nText) — the 40 px header shows when `title` or `#header` is set:
-  title 13/600 strong, meta 12 tertiary, `border-b border-border-subtle`.
+  title 14 px semibold strong (a section title, T1), meta 12 tertiary, `border-b border-border-subtle`.
 - `flush` (boolean) — no body padding, for a table or chart; the body is `p-3`, 13 px otherwise.
 - `loading` (boolean) — skeleton body; the frame and header stay.
 
@@ -413,13 +413,13 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 
 ### OFormSection
 **Import:** `@/lib/core/FormSection/OFormSection.vue`
-**Use when:** One titled section of a multi-section form — a bordered card with a heading and the section's fields or `OSettingRow`s inside.
+**Use when:** One titled section of a multi-section form — a 14 px semibold heading (never larger than the 18 px page title, T2) over the section's fields or `OSettingRow`s.
 **Don't use for:** A page's own content inset (use `OContent`), or a section wrapped around a single control — except where the heading is that control's label, and the danger zone.
 **Key props:**
 - `title` (`I18nText`, required — the section heading)
-- `variant` (`"accent" | "plain"`, default `"accent"` — `"plain"` drops the accent bar, gives the header a tinted band above its divider and renders the heading as an `h2`; Settings and IAM pages use it)
-- `description` (`I18nText` — one line under the heading, either variant)
-- `tone` (`"default" | "danger"`, default `"default"` — `"danger"` applies to `variant="plain"` only: error-coloured heading with a warning icon and an error-coloured card border, for a destructive section)
+- `variant` (`"accent" | "plain"`, default `"accent"` — `"accent"` is a bordered card; `"plain"` is unboxed: an `h2` and its description over one hairline, no tinted band, and the body aligned to the heading with setting rows on lighter rules. Settings and IAM pages use it)
+- `description` (`I18nText` — one 13 px secondary line under the heading, either variant)
+- `tone` (`"default" | "danger"`, default `"default"` — `"danger"` applies to `variant="plain"` only: error-coloured heading with a warning icon and an error-coloured hairline, for a destructive section)
 - `info` (`I18nText` — tooltip on an info icon after the heading)
 - `required` (boolean — appends the required marker to the heading)
 - `dataTest` (string)
@@ -448,7 +448,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
   …
 </OFormSection>
 ```
-**Family:** `OSettingRow` for the rows inside. One `h1` (the page title) above the plain sections' `h2`s.
+**Family:** `OSettingRow` for the rows inside. One `h1` (the page title) above the plain sections' `h2`s. The parent stacks sections 24 px apart (`gap-6`, L4, V1). In a plain section the body has no inset: a block aligns with the heading (no `px-4`), and a table or list that needs edges sits in its own `rounded-surface border` frame instead of bleeding with negative margins.
 
 ---
 
@@ -476,7 +476,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 
 ### OSettingRow
 **Import:** `@/lib/core/SettingRow/OSettingRow.vue`
-**Use when:** One labelled setting inside a settings card — name and one-line description on the left, the control on the right, hairline rule between rows (the last row drops its own). Pass `name` (or `error`) and the field's error takes the description's place, so nothing moves. Pass `loading` while the value is pending. `control-at="end"` pins a fixed control column to the row's end; Settings forms use it.
+**Use when:** One labelled setting inside a settings section — a 13 px medium name and 13 px secondary description on the left, the control on the right, hairline rule between rows (the last row drops its own). Pass `name` (or `error`) and the field's error takes the description's place, so nothing moves. Pass `loading` while the value is pending. `control-at="end"` pins a fixed control column to the row's end; Settings forms use it.
 **Don't use for:** Form fields with a label above the control — use `OFormInput` directly.
 **Key props:**
 - `label` (`I18nText`, required — the setting's name)
@@ -501,7 +501,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
   <OFormInput name="min_length" type="number" width="s" />
 </OSettingRow>
 ```
-**Family:** Pair with `OFormSection`, which supplies the card. On Settings and IAM pages use `variant="plain"`: one heading level, no accent bar, no section over a single control.
+**Family:** Pair with `OFormSection`, which supplies the heading. On Settings and IAM pages use `variant="plain"`: one heading level, no tinted band, no section over a single control.
 
 ---
 

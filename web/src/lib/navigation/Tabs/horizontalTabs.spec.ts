@@ -38,8 +38,9 @@ const MAIN: Record<string, [string, string]> = {
   "--color-tabs-active-text": ["#326176", "#ffffff"],
   "--color-tabs-disabled-text": ["#9ea4b4", "#4b5163"],
   "--color-tabs-hover-text": ["#222534", "#e3e5eb"],
-  "--color-tabs-inactive-text": ["#222534", "#e3e5eb"],
   "--color-tabs-indicator": ["#3f7994", "#3f7994"],
+  "--color-text-heading": ["#222534", "#e3e5eb"],
+  "--color-text-secondary": ["#4b5163", "#9ea4b4"],
 };
 
 const UTILITY = /^(?:[a-z-]+:)*(?:text|bg|border(?:-[se])?|outline)-([a-z][a-z0-9-]+)$/;
@@ -76,21 +77,21 @@ function colourTokens(classes: string[]): string[] {
 }
 
 describe("horizontal tabs keep their pinned colours", () => {
-  it("colours the active tab in brand ink and the others in main's inactive ink and hover", () => {
+  it("colours the active tab in strong ink and the others in secondary ink with a strong hover", () => {
     const [active, inactive, disabled, slot] = mountStrip().findAll('[role="tab"]');
-    expect(active.classes()).toContain("text-tabs-active-text");
-    expect(active.classes()).not.toContain("text-text-heading");
+    expect(active.classes()).toContain("text-text-heading");
+    expect(active.classes()).not.toContain("text-tabs-active-text");
     for (const tab of [inactive, slot]) {
       expect(tab.classes()).toEqual(
-        expect.arrayContaining(["text-tabs-inactive-text", "enabled:hover:text-tabs-hover-text"]),
+        expect.arrayContaining(["text-text-secondary", "enabled:hover:text-tabs-hover-text"]),
       );
     }
     expect(disabled.classes()).toContain("text-tabs-disabled-text");
   });
 
-  it("keeps a locked active tab in brand ink", () => {
+  it("keeps a locked active tab in strong ink", () => {
     const [active] = mountStrip(true).findAll('[role="tab"]');
-    expect(active.classes()).toContain("text-tabs-active-text");
+    expect(active.classes()).toContain("text-text-heading");
   });
 
   it("draws the sliding underline in main's indicator colour", () => {

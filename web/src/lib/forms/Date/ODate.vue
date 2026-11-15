@@ -133,13 +133,10 @@ const heightClasses: Record<NonNullable<DateProps["size"]>, string> = {
 
 const wrapperClasses = computed(() => [
   "flex items-center w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
-  "ring-offset-1 ring-offset-surface-base",
   "bg-datepicker-bg",
   hasError.value
-    ? "border-datepicker-error-border"
-    : "border-datepicker-border hover:border-datepicker-hover-border",
-  "focus-within:border-datepicker-focus-border",
-  "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
+    ? "border-datepicker-error-border focus-within:ring-3 focus-within:ring-control-error-halo"
+    : "border-datepicker-border hover:not-focus-within:border-datepicker-hover-border focus-within:border-datepicker-focus-border focus-within:ring-3 focus-within:ring-control-focus-halo",
   isDisabled.value ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
 ]);
@@ -254,7 +251,7 @@ const wrapperClasses = computed(() => [
       <DatePickerContent
         :side-offset="4"
         align="start"
-        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-10001 border p-3 shadow-md"
+        class="rounded-default bg-datepicker-popup-bg shadow-overlay border-border-default z-10001 border p-3"
       >
         <DatePickerCalendar v-slot="{ weekDays, grid }">
           <DatePickerHeader class="mb-3 flex items-center justify-between">

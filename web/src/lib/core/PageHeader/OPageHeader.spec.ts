@@ -139,14 +139,14 @@ afterEach(() => {
 });
 
 describe("OPageHeader anatomy (H1)", () => {
-  it("stacks a 16 px context line over a 24 px title in a fixed 56 px band", async () => {
+  it("stacks a 16 px context line over an 18 px title on a 24 px line in a fixed 56 px band", async () => {
     await mountAt("/logs", { title: raw("Logs") });
     expect(byTest("o-page-header-band").classes()).toContain("h-14");
     expect(byTest("o-page-header-context").classes()).toContain("h-4");
     expect(byTest("o-page-header-title-row").classes()).toContain("h-6");
     const title = wrapper!.find("h1");
     expect(title.text()).toBe("Logs");
-    expect(title.classes()).toEqual(expect.arrayContaining(["text-base", "font-semibold"]));
+    expect(title.classes()).toEqual(expect.arrayContaining(["text-lg", "leading-6", "font-title"]));
   });
 
   it("renders no icon tile and no subtitle paragraph (H2)", async () => {
@@ -200,6 +200,12 @@ describe("OPageHeader context line (H4)", () => {
   it("names the org on an ungrouped page", async () => {
     await mountAt("/logs", { title: raw("Logs") }, {}, links);
     expect(contextText()).toBe("");
+    expect(byTest("o-page-header-context-label").exists()).toBe(true);
+  });
+
+  it("names the org instead of a group spelled like the title", async () => {
+    await mountAt("/pipelines", { title: raw("data") }, {}, links);
+    expect(contextText()).not.toBe("Data");
     expect(byTest("o-page-header-context-label").exists()).toBe(true);
   });
 

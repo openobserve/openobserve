@@ -32,21 +32,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="min-w-0"
       :class="atEnd ? 'flex-1 @max-2xl:basis-full' : 'w-[22.5%] shrink-0 max-md:w-full'"
     >
-      <div class="text-text-heading text-sm font-medium">{{ label }}</div>
+      <div class="text-text-heading text-compact font-medium">{{ label }}</div>
       <div
         v-if="shownError"
         :id="errorId"
         role="alert"
-        class="text-input-error-text mt-0.5 flex items-start gap-1 text-xs"
+        class="text-input-error-text text-compact mt-0.5 flex items-start gap-1"
       >
-        <OIcon name="error-outline" size="xs" class="mt-0.5 shrink-0" />
+        <OIcon name="error-outline" size="xs" class="mt-1 shrink-0" />
         <span class="min-w-0" :data-test="errorTestId">{{ shownError }}</span>
       </div>
-      <div v-else-if="description || $slots.description" class="text-text-secondary mt-0.5 text-xs">
+      <div
+        v-else-if="description || $slots.description"
+        class="text-text-secondary text-compact mt-0.5"
+      >
         <slot name="description">{{ description }}</slot>
       </div>
       <!-- Holds the line an error will take, so a row without help does not grow. -->
-      <div v-else-if="reservesLine" class="mt-0.5 min-h-4" aria-hidden="true"></div>
+      <div v-else-if="reservesLine" class="mt-0.5 min-h-5" aria-hidden="true"></div>
     </div>
     <div
       class="flex items-center"

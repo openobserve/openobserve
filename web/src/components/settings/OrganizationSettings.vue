@@ -115,7 +115,7 @@
 
       <DataRetentionDefaults
         v-if="showDataRetentionDefaults"
-        class="mt-4"
+        class="mt-6"
         :form="form"
         :loading="!settingsLoaded"
       />

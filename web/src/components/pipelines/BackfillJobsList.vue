@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           class="shrink-0"
           @click="refreshJobs"
           :disabled="loading"

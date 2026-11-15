@@ -1,7 +1,7 @@
 <template>
   <OFormSection
     variant="plain"
-    class="mb-4"
+    class="mb-6"
     :title="t('about.online_title')"
     data-test="license-online-card"
   >
@@ -98,10 +98,7 @@
         <span v-else class="text-text-secondary">{{ t("about.online_key_root_only") }}</span>
       </div>
     </OSettingRow>
-    <div
-      v-if="!canUpdate || outcome || neverRefreshed || refresh.rotate_recommended"
-      class="px-4 py-3"
-    >
+    <div v-if="!canUpdate || outcome || neverRefreshed || refresh.rotate_recommended" class="py-3">
       <div v-if="!canUpdate" class="text-text-secondary text-sm">
         {{ t("about.online_ask_admin") }}
       </div>

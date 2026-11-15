@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OButton
                 icon-only
-                variant="secondary"
+                variant="ghost"
                 icon="filter-list"
                 class="md:hidden"
                 data-test="alert-library-mobile-filters-btn"

@@ -45,7 +45,7 @@
 
     <template v-else>
       <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
-        <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-6">
           <!-- Standard attribute is read first, then each fallback in order. -->
           <OFormSection
             variant="plain"
@@ -77,7 +77,7 @@
                 @blur="markLeft(f.key)"
               />
             </OSettingRow>
-            <p class="text-text-secondary px-4 py-3 text-xs">
+            <p class="text-text-secondary py-3 text-xs">
               {{ t("genAiAgentMapping.fallbacksNote") }}
             </p>
           </OFormSection>
@@ -124,7 +124,7 @@
                   @blur="markLeft(d)"
                 />
               </OSettingRow>
-              <p class="text-text-secondary px-4 py-3 text-xs">
+              <p class="text-text-secondary py-3 text-xs">
                 {{ t("genAiAgentMapping.fallbacksNote") }}
                 {{ t("llmAttribution.settings.note") }}
               </p>
@@ -167,7 +167,7 @@
               </OButton>
             </OSettingRow>
 
-            <div class="flex flex-col gap-3 px-4 py-3">
+            <div class="flex flex-col gap-3 py-3">
               <p
                 v-if="harnessRules.length === 0"
                 class="text-text-secondary text-xs"

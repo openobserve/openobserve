@@ -1069,7 +1069,7 @@ async function onSaved() {
         <template #toolbar-trailing>
           <OButton
             icon-only
-            variant="secondary"
+            variant="ghost"
             icon="refresh"
             :loading="loading || sweep.running.value"
             data-test="security-intel-refresh"
@@ -1186,7 +1186,7 @@ async function onSaved() {
         @row-click="(r: IndicatorRow) => openIndicator(r.indicator)"
       >
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="flex min-w-0 flex-1 items-center gap-2 max-md:basis-full">
             <OSearchInput
               v-model="search"
               :placeholder="t('siem.intel.search')"
@@ -1215,7 +1215,7 @@ async function onSaved() {
         <template #toolbar-trailing>
           <OButton
             icon-only
-            variant="secondary"
+            variant="ghost"
             icon="refresh"
             :loading="loading"
             data-test="security-intel-indicators-refresh"

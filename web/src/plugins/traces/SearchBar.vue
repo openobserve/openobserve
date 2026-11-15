@@ -78,7 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showDrillDown"
             data-test="insights-button"
             variant="secondary"
-            size="sm"
             :disabled="searchObj.loading"
             :disabled-reason="t('common.loading')"
             @click="$emit('drill-down')"
@@ -99,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             inert
             data-test="insights-button-placeholder"
           >
-            <OButton variant="secondary" size="sm" tabindex="-1">
+            <OButton variant="secondary" tabindex="-1">
               <template #icon>
                 <OIcon name="timeline" size="sm" class="shrink-0" />
               </template>
@@ -431,7 +430,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ShareButton
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
-            variant="secondary"
             shortcut-id="tracesCopyUrl"
           />
           <ODropdown side="bottom" align="end">
@@ -440,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-only
                 data-test="traces-search-bar-more-actions-btn"
                 class="hover:bg-interactive-hover-bg!"
-                variant="secondary"
+                variant="ghost"
               >
                 <OIcon name="menu" size="sm" />
                 <OTooltip :content="t('search.moreActions')" />
@@ -534,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               icon-only
               data-test="service-graph-refresh-btn"
-              variant="secondary"
+              variant="ghost"
               @click="$emit('service-graph-refresh')"
             >
               <OIcon name="refresh" size="sm" />

@@ -396,7 +396,7 @@ describe("LibraryCard", () => {
       const button = wrapper
         .findAllComponents({ name: "OButton" })
         .find((b) => b.attributes("data-test") === CUSTOMIZE_ID);
-      expect(button?.props("variant")).toBe("secondary");
+      expect(button?.props("variant")).toBe("ghost");
       expect(button?.props("iconOnly")).toBe(true);
       expect(button?.props("icon")).toBe("edit");
     });

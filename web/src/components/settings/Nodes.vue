@@ -37,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <OButton
                 variant="secondary"
-                size="sm"
                 :class="filterApplied ? 'text-primary' : ''"
                 @click="clearAll()"
                 >{{ t("nodes.clear_all") }}</OButton

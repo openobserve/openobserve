@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="!isAnomaly"
           icon-only
-          variant="secondary"
+          variant="ghost"
           icon="edit"
           :aria-label="t('alert_library.drawer.customize')"
           :aria-describedby="titleId"

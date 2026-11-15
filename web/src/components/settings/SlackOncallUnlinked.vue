@@ -146,7 +146,7 @@ const runRemind = async () => {
         {{ t("slackApp.oncallUnlinked.remind") }}
       </OButton>
     </template>
-    <div class="rounded-b-surface -mx-4 -my-3 overflow-hidden">
+    <div class="rounded-surface border-border-default overflow-hidden border">
       <OTable
         :data="rows"
         :columns="columns"

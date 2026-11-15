@@ -724,6 +724,66 @@ describe("OSelect", () => {
       wrapper = mountFilter({ label: undefined, modelValue: "paused", clearable: true });
       expect(wrapper.find('button[aria-label="Clear selection"]').exists()).toBe(true);
     });
+
+    describe("reset value", () => {
+      const withAll = [{ label: "All", value: "all" }, ...options];
+      const isTinted = () =>
+        wrapper.find('button[role="combobox"]').classes().includes("bg-select-item-selected-bg");
+      const clearButton = () => wrapper.find('button[aria-label="Clear selection"]');
+
+      it("reads untinted and unclearable at its All option", () => {
+        wrapper = mountFilter({ options: withAll, modelValue: "all" });
+        expect(wrapper.find('button[role="combobox"]').text()).toContain("Status:");
+        expect(wrapper.find('[data-test="o-select-filter-value"]').text()).toBe("All");
+        expect(isTinted()).toBe(false);
+        expect(clearButton().exists()).toBe(false);
+      });
+
+      it("tints and offers clear once a real value is picked", () => {
+        wrapper = mountFilter({ options: withAll, modelValue: "paused" });
+        expect(isTinted()).toBe(true);
+        expect(clearButton().exists()).toBe(true);
+      });
+
+      it("returns to the All option on clear", async () => {
+        wrapper = mountFilter({ options: withAll, modelValue: "paused" });
+        await clearButton().trigger("click");
+        expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["all"]);
+      });
+
+      it("empties the model on clear when there is no reset value", async () => {
+        wrapper = mountFilter({ modelValue: "paused" });
+        await clearButton().trigger("click");
+        expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([undefined]);
+      });
+
+      it.each([
+        ["a sentinel valued All", { label: "All agents", value: "__all__" }],
+        ["a null option", { label: "Auto", value: null }],
+        ["a wildcard", { label: "Everything", value: "*" }],
+        ["an Any label", { label: "Any status", value: "x" }],
+      ])("infers the reset value from %s", (_, first) => {
+        wrapper = mountFilter({ options: [first, ...options], modelValue: first.value });
+        expect(isTinted()).toBe(false);
+        expect(clearButton().exists()).toBe(false);
+      });
+
+      it("treats a first option that is a real value as a pick", () => {
+        const unassigned = [{ label: "Unassigned", value: "none" }, ...options];
+        wrapper = mountFilter({ options: unassigned, modelValue: "none" });
+        expect(isTinted()).toBe(true);
+      });
+
+      it("takes an explicit reset value for a default that is not All", async () => {
+        const withOff = [{ label: "Off", value: "off" }, ...options];
+        wrapper = mountFilter({ options: withOff, modelValue: "off", resetValue: "off" });
+        expect(isTinted()).toBe(false);
+        await wrapper.setProps({ modelValue: "paused" });
+        expect(isTinted()).toBe(true);
+        await clearButton().trigger("click");
+        expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["off"]);
+      });
+    });
   });
 
   describe("menu contents", () => {

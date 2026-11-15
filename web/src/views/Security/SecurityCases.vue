@@ -1347,7 +1347,7 @@ onMounted(() => {
       <OButton
         v-if="canAdmin"
         icon-only
-        variant="secondary"
+        variant="ghost"
         icon="settings"
         :aria-label="t('siem.cases.settings.open')"
         data-test="security-cases-settings"
@@ -1471,7 +1471,7 @@ onMounted(() => {
         <template #toolbar-trailing>
           <OButton
             icon-only
-            variant="secondary"
+            variant="ghost"
             icon="refresh"
             :loading="loading"
             data-test="security-cases-refresh"
@@ -1881,7 +1881,7 @@ onMounted(() => {
           <template #trigger>
             <OButton
               icon-only
-              variant="secondary"
+              variant="ghost"
               icon="more-vert"
               :label="t('siem.cases.moreActions')"
               data-test="security-cases-drawer-more"

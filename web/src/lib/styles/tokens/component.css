@@ -38,15 +38,16 @@
 
   /* Button — outline */
   --color-button-outline-text: var(--color-text-heading);
-  --color-button-outline-border: var(--color-border-control);
-  --color-button-outline-hover-bg: var(--color-interactive-hover-bg);
+  --color-button-outline-border: var(--color-control-border);
+  --color-button-outline-hover-bg: var(--color-surface-subtle);
   --color-button-outline-hover-border: var(--color-primary-300);
-  --color-button-outline-active-bg: var(--color-surface-accent-active);
+  --color-button-outline-active-bg: var(--color-surface-subtle-hover);
 
   /* Button — ghost */
-  --color-button-ghost-text: var(--color-text-heading);
-  --color-button-ghost-hover-bg: var(--color-surface-accent-hover);
-  --color-button-ghost-active-bg: var(--color-surface-accent-active);
+  --color-button-ghost-text: var(--color-text-secondary);
+  /* Hover is neutral: the accent marks selection only (C1), and a pressed ghost takes the accent tint. */
+  --color-button-ghost-hover-bg: var(--color-grey-150);
+  --color-button-ghost-active-bg: var(--color-surface-subtle-hover);
   --color-button-ghost-hover-ring: var(--color-primary-300);
   --color-button-ghost-focus-ring: var(--color-focus-ring-accent);
 
@@ -137,18 +138,17 @@
   --color-button-destructive-foreground: var(--color-white);
 
   /* ButtonGroup */
-  --color-button-group-divider: var(--color-border-default);
+  --color-button-group-divider: var(--color-control-border);
 
-  /* ToggleGroup */
+  /* ToggleGroup: a filled tray with no edge; the selected segment is the raised surface. */
   --color-toggle-track-bg: var(--color-surface-subtle);
   --color-toggle-item-bg: transparent;
   --color-toggle-item-text: var(--color-text-body);
   --color-toggle-item-hover-bg: var(--color-grey-150);
-  --color-toggle-item-active-bg: var(--color-surface-accent-active);
-  --color-toggle-item-active-text: var(--color-primary-700);
-  --color-toggle-item-active-border: var(--color-primary-600);
+  --color-toggle-item-active-bg: var(--color-surface-base);
+  --color-toggle-item-active-text: var(--color-text-heading);
+  --color-toggle-item-active-border: var(--color-border-default);
   --color-toggle-item-disabled: var(--color-text-disabled);
-  --color-toggle-border: var(--color-border-subtle);
   --color-toggle-focus-ring: var(--color-focus-ring-accent);
   /* Insertion line shown while dragging to reorder (reorderable groups) */
   --color-toggle-drop-indicator: var(--color-primary-600);
@@ -260,7 +260,7 @@
 
   /* Panel */
   --color-dialog-bg: var(--color-surface-overlay);
-  --color-dialog-border: var(--color-border-default);
+  --color-dialog-border: var(--color-border-subtle);
   /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
   --shadow-dialog: 0 0 0 1px rgb(19 21 31 / 0.06), 0 20px 48px -12px rgb(19 21 31 / 0.28);
 
@@ -588,8 +588,8 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
-  --color-input-border: var(--color-border-control);
-  --color-input-border-hover: var(--color-accent);
+  --color-input-border: var(--color-control-border);
+  --color-input-border-hover: var(--color-control-border-hover);
   --color-input-border-focus: var(--color-accent);
   --color-input-border-error: var(--color-error-500);
   /* Disabled-bg uses grey-200 (#e5e5e5) — `surface-subtle` (grey-100 #f5f5f5)
@@ -613,9 +613,9 @@
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
-  --color-select-border: var(--color-border-control);
+  --color-select-border: var(--color-control-border);
   --color-select-disabled-border: var(--color-border-default);
-  --color-select-border-hover: var(--color-accent);
+  --color-select-border-hover: var(--color-control-border-hover);
   --color-select-border-focus: var(--color-accent);
   --color-select-border-error: var(--color-error-500);
   /* Same rationale as input-disabled-bg. */
@@ -731,9 +731,9 @@
 
   /* Date / Time / Color (ODate, OTime, OColor) — share input surface */
   --color-datepicker-bg: var(--color-surface-base);
-  --color-datepicker-border: var(--color-border-default);
-  --color-datepicker-hover-border: var(--color-primary-300);
-  --color-datepicker-focus-border: var(--color-primary-300);
+  --color-datepicker-border: var(--color-control-border);
+  --color-datepicker-hover-border: var(--color-control-border-hover);
+  --color-datepicker-focus-border: var(--color-control-border-focus);
   --color-datepicker-focus-ring: var(--color-focus-ring-accent);
   --color-datepicker-disabled-bg: var(--color-surface-subtle);
   --color-datepicker-disabled-border: var(--color-border-default);
@@ -1294,7 +1294,6 @@
    killing dark mode on primary toggle groups. The pair must stay together. */
 [data-variant="primary"] {
   --color-toggle-track-bg: var(--color-primary-200);
-  --color-toggle-border: var(--color-primary-300);
   --color-toggle-item-hover-bg: var(--color-primary-100);
   --color-toggle-item-active-bg: var(--color-surface-base);
   --color-toggle-item-active-text: var(--color-primary-700);
@@ -1501,7 +1500,6 @@
   --color-toggle-item-active-text: var(--color-toggle-item-active-text);
   --color-toggle-item-active-border: var(--color-toggle-item-active-border);
   --color-toggle-item-disabled: var(--color-toggle-item-disabled);
-  --color-toggle-border: var(--color-toggle-border);
   --color-toggle-focus-ring: var(--color-toggle-focus-ring);
   --color-toggle-drop-indicator: var(--color-toggle-drop-indicator);
 
@@ -1588,6 +1586,7 @@
   --color-select-border-focus: var(--color-select-border-focus);
   --color-select-border-error: var(--color-select-border-error);
   --color-select-disabled-bg: var(--color-select-disabled-bg);
+  --color-select-disabled-border: var(--color-select-disabled-border);
   --color-select-disabled-text: var(--color-select-disabled-text);
   --color-select-text: var(--color-select-text);
   --color-select-placeholder: var(--color-select-placeholder);
@@ -2353,6 +2352,7 @@
   --font-weight-normal: var(--font-normal);
   --font-weight-medium: var(--font-medium);
   --font-weight-semibold: var(--font-semibold);
+  --font-weight-title: var(--font-title);
   --font-weight-bold: var(--font-bold);
   --tracking-tight: var(--tracking-tight);
   --tracking-normal: var(--tracking-normal);

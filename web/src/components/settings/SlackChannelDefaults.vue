@@ -229,7 +229,7 @@ const save = async (value: DefaultForm): Promise<void> => {
       </OButton>
     </template>
 
-    <div class="rounded-b-surface -mx-4 -my-3 overflow-hidden">
+    <div class="rounded-surface border-border-default overflow-hidden border">
       <OTable
         :data="rows"
         :columns="columns"

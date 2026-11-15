@@ -830,7 +830,7 @@ function openInLogs() {
           </OButton>
           <OButton
             icon-only
-            variant="secondary"
+            variant="ghost"
             icon="refresh"
             :loading="loading"
             data-test="log-explorer-run"
@@ -977,7 +977,7 @@ function openInLogs() {
           <div class="flex shrink-0 items-center gap-1">
             <OButton
               icon-only
-              variant="secondary"
+              variant="ghost"
               icon="chevron-left"
               :disabled="!hasPrev"
               data-test="log-explorer-detail-prev"
@@ -990,7 +990,7 @@ function openInLogs() {
             >
             <OButton
               icon-only
-              variant="secondary"
+              variant="ghost"
               icon="chevron-right"
               :disabled="!hasNext"
               data-test="log-explorer-detail-next"

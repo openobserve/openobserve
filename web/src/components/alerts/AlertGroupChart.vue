@@ -38,7 +38,7 @@
 <template>
   <div class="flex flex-col gap-2" data-test="alerts-alertgroupchart">
     <div class="flex items-center justify-between gap-2">
-      <span class="text-compact text-text-heading font-bold">
+      <span class="text-text-heading text-sm font-semibold">
         {{ t("alerts.groups.evaluation") }}
       </span>
       <OToggleGroup

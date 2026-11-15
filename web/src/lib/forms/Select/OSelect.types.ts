@@ -157,6 +157,11 @@ export interface SelectProps {
   variant?: SelectVariant;
   /** Filter only: the value text while nothing is picked; defaults to "Any" */
   anyLabel?: I18nText;
+  /**
+   * Single filter only: the value meaning "no filter", which reads untinted and is what ✕ restores.
+   * Inferred from a first option valued "", null, "all", "any" or "*", or labelled "All…"/"Any…".
+   */
+  resetValue?: SelectValue;
   /** Filter only: show the picked value or the count once several are picked */
   summary?: SelectFilterSummary;
   /** HTML id */

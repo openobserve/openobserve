@@ -303,7 +303,13 @@ describe("OStatStrip filter chips (selectable)", () => {
     const chips = group.findAll("[aria-pressed]");
     expect(chips).toHaveLength(5);
     expect(chips[1].classes()).toEqual(
-      expect.arrayContaining(["h-8", "rounded-default", "border", "bg-surface-base"]),
+      expect.arrayContaining([
+        "h-8",
+        "rounded-default",
+        "border",
+        "border-transparent",
+        "bg-surface-subtle",
+      ]),
     );
     expect(w.find(".h-1").exists()).toBe(false);
   });
@@ -358,11 +364,11 @@ describe("OStatStrip filter chips (selectable)", () => {
       expect.arrayContaining(["bg-badge-warning-soft-bg", "text-badge-warning-soft-text"]),
     );
     expect(badge(w, "Active")).toEqual(
-      expect.arrayContaining(["bg-surface-subtle", "text-text-heading"]),
+      expect.arrayContaining(["bg-surface-base", "text-text-heading"]),
     );
     expect(badge(w, "Paused")).toEqual(
       expect.arrayContaining([
-        "bg-surface-subtle",
+        "bg-surface-base",
         "text-table-row-text-secondary-tinted",
         "font-medium",
       ]),
@@ -377,7 +383,7 @@ describe("OStatStrip filter chips (selectable)", () => {
     const total = chip(w, "Total");
     expect(total.attributes("aria-pressed")).toBe("true");
     expect(total.classes()).toEqual(
-      expect.arrayContaining(["border-border-default", "bg-surface-base"]),
+      expect.arrayContaining(["border-transparent", "bg-surface-subtle"]),
     );
     expect(total.classes()).not.toContain("border-accent");
     expect(total.classes()).not.toContain("bg-surface-accent-hover");
@@ -385,7 +391,7 @@ describe("OStatStrip filter chips (selectable)", () => {
       expect.arrayContaining(["text-text-heading", "font-semibold"]),
     );
     expect(badge(w, "Total")).toEqual(
-      expect.arrayContaining(["bg-surface-subtle", "text-text-heading"]),
+      expect.arrayContaining(["bg-surface-base", "text-text-heading"]),
     );
     expect(badge(w, "Total")).not.toContain("bg-badge-primary-soft-bg");
   });

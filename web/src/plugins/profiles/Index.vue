@@ -37,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <ShareButton
         :url="shareUrl"
-        variant="secondary"
         :disabled="!hasProfileData"
         class="h-8"
         data-test="profiles-share-btn"

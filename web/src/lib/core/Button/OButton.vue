@@ -31,7 +31,7 @@ import { activates } from "./activation";
 defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(defineProps<ButtonProps>(), {
-  variant: "secondary",
+  variant: undefined,
   size: undefined,
   type: "button",
   disabled: false,
@@ -102,16 +102,17 @@ const looks: Record<ButtonVariant, ButtonVariantLook> = {
     disabled: "bg-button-primary-disabled text-button-primary-foreground border-transparent",
   },
   secondary: {
-    base: "bg-transparent text-button-outline-text border-button-outline-border",
+    base: "bg-surface-base text-button-outline-text border-button-outline-border",
     interactive:
-      "hover:bg-button-outline-hover-bg hover:border-button-outline-hover-border active:bg-button-outline-active-bg",
-    pressed: "bg-surface-accent-active text-accent-on-tint border-button-outline-hover-border",
+      "hover:bg-button-outline-hover-bg hover:border-control-border-hover active:bg-button-outline-active-bg",
+    pressed: "bg-surface-accent-active text-accent-on-tint border-control-border-selected",
     // Faded whole, so a disabled outline keeps its edge where it sits in a joined group.
     disabled: "bg-transparent text-button-outline-text border-button-outline-border opacity-50",
   },
   ghost: {
     base: "bg-transparent text-button-ghost-text border-transparent",
-    interactive: `hover:bg-button-ghost-hover-bg active:bg-button-ghost-active-bg ${ROW_STEP}`,
+    // The secondary rest ink falls under 4.5:1 on the dark accent fills, so a filled state takes heading ink.
+    interactive: `hover:bg-button-ghost-hover-bg hover:text-text-heading active:bg-button-ghost-active-bg active:text-text-heading ${ROW_STEP}`,
     pressed: "bg-surface-accent-hover text-accent-on-tint border-transparent",
     disabled: BARE_DISABLED,
   },
@@ -167,8 +168,13 @@ const linkSizes: Record<ButtonSize, string> = {
   lg: "gap-1.5 text-sm rounded-chip",
 };
 
+// A toolbar icon carries no edge of its own; only a labelled button defaults to the bordered secondary.
+const variant = computed<ButtonVariant>(
+  () => props.variant ?? (props.iconOnly ? "ghost" : "secondary"),
+);
+
 // Untyped callers (a v-bind object, a script value) can still hand in a retired name; it renders as the default.
-const look = computed(() => looks[props.variant] ?? looks.secondary);
+const look = computed(() => looks[variant.value] ?? looks.secondary);
 
 const stateClasses = computed(() => {
   if (isDisabled.value) return `${look.value.disabled} cursor-not-allowed`;
@@ -179,7 +185,7 @@ const stateClasses = computed(() => {
 });
 
 const sizeClasses = computed(() => {
-  if (props.variant === "link") return `h-auto min-w-0 p-0 ${linkSizes[size.value]}`;
+  if (variant.value === "link") return `h-auto min-w-0 p-0 ${linkSizes[size.value]}`;
   return props.iconOnly ? iconOnlySizes[size.value] : textSizes[size.value];
 });
 
@@ -187,7 +193,7 @@ const classes = computed(() => [
   props.block ? "flex w-full" : "inline-flex",
   "relative box-border items-center justify-center border whitespace-nowrap select-none",
   "font-medium leading-none transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
-  props.variant === "link" ? "" : "no-underline hover:no-underline",
+  variant.value === "link" ? "" : "no-underline hover:no-underline",
   // An offset outline stays visible on accent fills, where a hugging ring would vanish.
   "outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-focus-ring-accent",
   sizeClasses.value,

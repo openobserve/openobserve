@@ -109,13 +109,11 @@ const charCount = computed(() => {
 
 const wrapperClasses = computed(() => [
   "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
-  "ring-offset-1 ring-offset-surface-base",
   "bg-input-bg",
-  /* Keep the red error border on focus (don't let the focus color override it);
-     focus border color applies only when there's no error. See OInput.vue. */
+  // The red edge stays on focus; the accent edge applies only without an error. See OInput.vue.
   hasError.value
-    ? "border-input-border-error"
-    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus",
+    ? "border-input-border-error focus-within:ring-3 focus-within:ring-control-error-halo"
+    : "border-input-border hover:not-focus-within:border-input-border-hover focus-within:border-control-border-focus focus-within:ring-3 focus-within:ring-control-focus-halo",
   /* Same opacity+dashed treatment as OInput so disabled textareas are
      visually obvious vs enabled ones. */
   isDisabled.value

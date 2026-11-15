@@ -571,10 +571,10 @@ describe("Header Component", () => {
       const tooltip = aiButton.findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
       expect(String(tooltip.props("content"))).toBe(
-        "AI Assistant is available in OpenObserve Enterprise",
+        "AI assistant is available in OpenObserve Enterprise",
       );
       expect(aiButton.attributes("aria-label")).toBe(
-        "AI Assistant is available in OpenObserve Enterprise",
+        "AI assistant is available in OpenObserve Enterprise",
       );
       aiWrapper.unmount();
     });

@@ -160,7 +160,7 @@ function unregisterSlashTarget(target: SlashTarget) {
         size="sm"
         :model-value="scope"
         type="single"
-        class="self-center"
+        class="-me-1.5 self-center"
         :data-test="dataTest && `${dataTest}-scope`"
         @update:model-value="emit('update:scope', String($event))"
       >

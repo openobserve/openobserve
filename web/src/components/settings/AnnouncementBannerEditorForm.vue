@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         separator-class="field-list-separator"
       >
         <template #before>
-          <div class="flex h-full min-h-0 flex-col gap-4 overflow-y-auto px-6 py-5 max-md:px-4">
+          <div class="flex h-full min-h-0 flex-col gap-6 overflow-y-auto px-6 py-5 max-md:px-4">
             <OInlineNotice v-if="saveError" tone="err" data-test="announcement-editor-error">
               {{ saveError }}
               <template v-if="conflict" #actions>

@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #title>
         <OFormInlineEdit
           ref="step1Ref"
+          size="lg"
           name="name"
           :readonly="beingUpdated || anomalyEditMode"
           :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"

@@ -44,7 +44,7 @@ describe("OCard", () => {
     expect(header.classes()).toEqual(expect.arrayContaining(["h-10", "border-b"]));
     expect(header.get("h3").text()).toBe("Requests by status");
     expect(header.get("h3").classes()).toEqual(
-      expect.arrayContaining(["text-compact", "font-semibold", "text-text-heading"]),
+      expect.arrayContaining(["text-sm", "font-semibold", "text-text-heading"]),
     );
     expect(header.text()).toContain("last 1 hour");
     expect(header.text()).toContain("Rate");

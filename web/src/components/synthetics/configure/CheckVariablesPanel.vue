@@ -428,7 +428,7 @@ function onPromoted(name: string) {
           <OButton
             icon-only
             icon="add"
-            variant="secondary"
+            variant="ghost"
             size="xs"
             class="ms-auto"
             :aria-label="t('synthetics.authNetwork.addVariable')"

@@ -154,7 +154,7 @@ describe("CreateProtocolCheck opened from AutoObserve", () => {
       "Suggested by AutoObserve for svc-c (cluster-k / ns-a). A synthetic check sends a request on a schedule and alerts when it fails.",
     );
     expect(wrapper.find('[data-test="synthetics-prefill-banner"]').text()).toContain(
-      "Nothing is created until you click Save & Exit.",
+      "Nothing is created until you click Save & exit.",
     );
     expect(wrapper.find('[data-test="synthetics-prefill-after-save"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="page"]').attributes("data-title")).toBe(

@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         icon-only
         class="md:hidden"
-        variant="secondary"
+        variant="ghost"
         icon="add"
         :aria-label="t('fleet.fleets.newFleet')"
         data-test="fleet-rail-mobile-add"

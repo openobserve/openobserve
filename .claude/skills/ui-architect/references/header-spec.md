@@ -25,7 +25,8 @@ Both break rule P3, "Nothing jumps". This spec fixes them.
     - Grouped top-level pages show the rail group: "Reliability", "Data", "Infra", "Experience", "Dashboards".
     - Ungrouped top-level pages show the org: "acme-prod". This covers Home, Logs, Metrics, Traces, AutoObserve and Profiles.
     - Detail, editor and import pages show a back link to the parent: "‹ Alerts", "‹ Pipelines". It is real link styling, and Back uses the smart-back rules (N3).
-  - **Title line**: 24 px tall, 16 px semibold in `--text-strong`. An optional status chip (H5) follows the title.
+  - **Title line**: 24 px tall, 18 px at weight 600 (`text-lg leading-6 font-title`) in `--text-strong`. An optional status chip (H5) follows the title. An inline-edited title (`#title` slot) uses `OInlineEdit size="lg"` so it matches.
+  - The title is the strongest text on the page (T2): section titles below it are 14 px semibold with no tinted band.
   - The title is the page or object name. It does **not** change when the user switches tabs inside the page.
   - Long titles truncate with an ellipsis and show a tooltip; they never wrap.
 - **Right side**: page actions, vertically centred, right-aligned, in this order: secondary actions, then the primary, then ⋯ More (H3).
@@ -37,13 +38,14 @@ Both break rule P3, "Nothing jumps". This spec fixes them.
 - The tab row is 40 px, directly under the header.
   - The first tab starts at the content edge (x = 16).
   - Tabs never sit after the title on the same line.
-- Active and inactive tabs use **one font weight** (500).
-  - The active tab differs only in colour (`--text-strong`) and a 2 px accent underline.
+- Active and inactive tabs use **one font weight** (500) at 13 px, with 14 px glyphs.
+  - Inactive tabs are `--text-secondary`; the active tab differs only in colour (`--text-strong`) and a 2 px accent underline on the row's divider.
   - Hover changes colour only.
 - Counts in tabs:
   - use tabular figures;
-  - reserve the width of their largest value, with a minimum pill width and "999+" as the cap;
-  - so a changing count never moves the next tab.
+  - sit centred in a compact neutral pill that reserves two digits, so the common counts never move the next tab; a third digit grows it, and "999+" is the cap;
+  - take a status tint only when the caller passes a tone (Firing: a soft error tint).
+- The reorder grip of a reorderable tab shows only on hover or keyboard focus.
 - More than six tabs: the rest go into "More ▾" at the end of the row, never wrapped.
 - Areas without peers have no tab row.
 

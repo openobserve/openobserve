@@ -70,10 +70,10 @@ export default defineComponent({
       type: String,
       default: "",
     },
-    // OButton variant
+    // Unset lets OButton choose: ghost when icon-only, secondary with the label.
     variant: {
       type: String as PropType<ButtonVariant>,
-      default: "secondary",
+      default: undefined,
     },
     // OButton size
     size: {

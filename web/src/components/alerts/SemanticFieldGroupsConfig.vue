@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <slot name="header-actions" />
       </template>
-      <div class="-mx-4 -my-3">
+      <div class="rounded-surface border-border-default overflow-hidden border">
         <!-- Category strip + global search -->
         <div
           v-if="categoryOptions.length > 0"

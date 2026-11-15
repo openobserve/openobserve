@@ -35,7 +35,7 @@ export function providePageNavContext(context: PageNavContext): void {
 }
 
 /** The context line of a page without a parent link: its module, solution or rail group, else the org (H4). */
-export function usePageContextLabel(): ComputedRef<I18nText> {
+export function usePageContextLabel(title?: () => string | undefined): ComputedRef<I18nText> {
   const { t } = useI18nTyped();
   const router = useRouter();
   const store = useStore() as { state?: Record<string, any> } | undefined;
@@ -69,13 +69,24 @@ export function usePageContextLabel(): ComputedRef<I18nText> {
     return null;
   };
 
-  return computed(() => {
-    const route = router?.currentRoute?.value;
-    const fixed = route ? moduleOrSolution(route) : null;
-    if (fixed) return fixed;
-    const group = route ? railGroupForRoute(route, childPath, shownGroups.value) : null;
-    if (group) return t(group.titleKey);
+  const orgLabel = (): I18nText => {
     const org = store?.state?.selectedOrganization;
     return raw(org?.label || org?.identifier || "");
+  };
+  const same = (a: string, b?: string) => !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+
+  const containerLabel = (route: Parameters<typeof railGroupForRoute>[0]): I18nText | null => {
+    const fixed = moduleOrSolution(route);
+    if (fixed) return fixed;
+    const group = railGroupForRoute(route, childPath, shownGroups.value);
+    return group ? t(group.titleKey) : null;
+  };
+
+  return computed(() => {
+    const route = router?.currentRoute?.value;
+    const label = route ? containerLabel(route) : null;
+    // A container named exactly like the page ("Dashboards / Dashboards") says nothing, so name the org.
+    if (!label || same(String(label), title?.())) return orgLabel();
+    return label;
   });
 }

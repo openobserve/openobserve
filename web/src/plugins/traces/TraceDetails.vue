@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="canManualEvaluate"
               icon-only
               data-test="trace-details-evaluate-trace-btn"
-              variant="secondary"
+              variant="ghost"
               :aria-label="t('onlineEvals.manualEvaluation.titles.trace')"
               @click="openTraceEvaluation"
             >
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-else
                 icon-only
-                variant="secondary"
+                variant="ghost"
                 :aria-label="t('aiObservability.traceActions.annotate.button')"
                 data-test="trace-details-annotate-trace-btn"
                 @click="openUpgradeDialog"
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="canAnnotateContext"
               icon-only
               data-test="trace-details-dataset-trace-btn"
-              variant="secondary"
+              variant="ghost"
               :aria-label="t('aiObservability.traceActions.dataset.button')"
               @click="openTraceDataset"
             >
@@ -163,7 +163,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
-              variant="secondary"
             />
 
             <!-- Close button -->
@@ -171,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="showCloseButton"
               icon-only
               data-test="trace-details-close-btn"
-              variant="secondary"
+              variant="ghost"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
@@ -325,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="mode === 'embedded' && showExpandButton"
               icon-only
               data-test="trace-details-expand-btn"
-              variant="secondary"
+              variant="ghost"
               @click="handleExpandToFullView"
             >
               <OIcon name="open-in-new" size="sm" />
@@ -337,7 +336,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isStandaloneMode && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
-              variant="secondary"
               buttonClass="me-1!"
             />
 
@@ -346,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isStandaloneMode && showCloseButton"
               icon-only
               data-test="trace-details-close-btn"
-              variant="secondary"
+              variant="ghost"
               class="me-1!"
               @click="handleBackOrClose"
             >

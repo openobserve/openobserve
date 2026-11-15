@@ -8,6 +8,7 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
+  onUpdated,
   provide,
   readonly,
   ref,
@@ -1089,6 +1090,13 @@ provide(OTableNumericColumnsKey, numericColumnIds);
 // With an external `scrollEl` the table must not create its own scroll container,
 // or a second nested scrollbar appears; it flows into the caller's element instead.
 const isDelegatedScroll = computed(() => !!props.scrollEl);
+const stickyEdgeVars = computed<Record<string, string>>(() => {
+  if (isDelegatedScroll.value) return {};
+  return {
+    ...(edgeStart.value ? {} : { "--shadow-sticky-left": "none" }),
+    ...(edgeEnd.value ? {} : { "--shadow-sticky-right": "none" }),
+  };
+});
 
 // ── Per-column CSS size-var overrides ──────────────────────────
 // Override channel the table style/sums read from, overriding the nominal sizes
@@ -1157,11 +1165,23 @@ const EXPANSION_COL_WIDTH = 16; // w-4
 const containerWidth = ref(0);
 let containerRO: ResizeObserver | null = null;
 
+// A pinned column's edge shadow only means something while columns scroll under it.
+const edgeStart = ref(false);
+const edgeEnd = ref(false);
+function updateStickyEdges(el: HTMLElement | null | undefined): void {
+  if (!el) return;
+  edgeStart.value = el.scrollLeft > 0;
+  edgeEnd.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+}
+onUpdated(() => updateStickyEdges(scrollContainerRef.value));
+
 onMounted(() => {
+  updateStickyEdges(scrollContainerRef.value);
   if (scrollContainerRef.value && typeof ResizeObserver !== "undefined") {
     containerWidth.value = scrollContainerRef.value.clientWidth;
     containerRO = new ResizeObserver(() => {
       containerWidth.value = scrollContainerRef.value?.clientWidth ?? 0;
+      updateStickyEdges(scrollContainerRef.value);
     });
     containerRO.observe(scrollContainerRef.value);
   }
@@ -1552,6 +1572,7 @@ function handleScroll(event: Event) {
   hideCellOverflow();
   const el = event.target as HTMLElement;
   if (!el) return;
+  updateStickyEdges(el);
   emit("scroll", { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
 
   // Detect scroll end for lazy loading
@@ -1693,6 +1714,7 @@ defineExpose({
           props.fillHeight && !isDelegatedScroll ? 'flex-1' : '',
         ]"
         :style="{
+          ...stickyEdgeVars,
           maxHeight: props.maxHeight
             ? typeof props.maxHeight === 'number'
               ? `${props.maxHeight}px`

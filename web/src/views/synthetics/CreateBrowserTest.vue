@@ -2020,7 +2020,7 @@ function onClearResults() {
           icon-only
           :pressed="variablesPanelOpen"
           ref="variablesToggleRef"
-          variant="secondary"
+          variant="ghost"
           size="sm"
           :aria-label="variablesToggleLabel"
           :aria-pressed="variablesPanelOpen"

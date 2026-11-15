@@ -10,7 +10,7 @@
       <OButton
         v-if="canManageSettings"
         icon-only
-        variant="secondary"
+        variant="ghost"
         icon="settings"
         :aria-label="t('aiObservability.promptManagement.settings')"
         data-test="prompts-settings"

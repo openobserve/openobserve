@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="inline-flex min-w-0 items-center gap-2">
           <OInlineEdit
             v-model="workflowObj.currentSelectedWorkflow.name"
+            size="lg"
             class="max-md:max-w-40"
             data-test="workflow-editor-name"
             :placeholder="t('workflow.namePlaceholder')"

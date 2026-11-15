@@ -495,7 +495,7 @@ k8s.loadStreams();
           v-if="ready"
           icon-only
           class="md:hidden"
-          variant="secondary"
+          variant="ghost"
           :aria-label="t('infra.k8s2.paletteButton')"
           data-test="k8s2-palette-open-compact"
           @click="openPalette"

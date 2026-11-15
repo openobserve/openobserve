@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- A slotted title (an inline-edited name) owns its overflow, so its focus ring is not clipped. -->
           <h1
             v-if="slots.title"
-            class="text-text-heading flex min-w-0 items-center text-base leading-6 font-semibold tracking-normal"
+            class="text-text-heading font-title flex min-w-0 items-center text-lg leading-6 tracking-normal"
             :data-test="titleDataTest"
           >
             <slot name="title" />
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTruncatedText
             v-else
             as="h1"
-            class="text-text-heading min-w-0 text-base leading-6 font-semibold tracking-normal"
+            class="text-text-heading font-title min-w-0 text-lg leading-6 tracking-normal"
             :data-test="titleDataTest"
             >{{ title }}</OTruncatedText
           >
@@ -228,7 +228,7 @@ const lockedLabel = computed(() =>
   }),
 );
 const aboutLabel = computed(() => t("pageHeader.about"));
-const derivedContext = usePageContextLabel();
+const derivedContext = usePageContextLabel(() => props.title);
 
 const backHref = computed(() => {
   const to = props.back?.to;

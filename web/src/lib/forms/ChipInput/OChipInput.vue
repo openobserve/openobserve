@@ -86,8 +86,9 @@ const fieldClasses = computed(() => [
   "rounded-default border px-1.5 py-0.75 transition-[border-color,box-shadow] duration-150",
   props.disabled
     ? "bg-input-disabled-bg border-input-disabled-border border-dashed"
-    : "bg-input-bg border-input-border hover:border-input-border-hover",
-  showList.value ? "border-input-border-focus ring-focus-ring-accent ring-[0.125rem]" : "",
+    : showList.value
+      ? "bg-input-bg border-control-border-focus ring-control-focus-halo ring-3"
+      : "bg-input-bg border-input-border hover:border-input-border-hover",
 ]);
 
 const sizeClasses = computed(() => {
@@ -584,7 +585,7 @@ function onFieldFocusOut() {
         :disable-outside-pointer-events="false"
         :collision-padding="8"
         :data-test="testId('suggest')"
-        class="rounded-default bg-select-content-bg border-select-content-border z-10001 flex w-max max-w-[min(20rem,calc(100vw-1.5rem))] min-w-52 flex-col overflow-hidden border shadow-md"
+        class="rounded-default bg-select-content-bg shadow-overlay border-border-default z-10001 flex w-max max-w-[min(20rem,calc(100vw-1.5rem))] min-w-52 flex-col overflow-hidden border"
         :style="{ maxHeight: 'min(20rem, var(--reka-popover-content-available-height, 20rem))' }"
         @open-auto-focus.prevent
         @close-auto-focus.prevent

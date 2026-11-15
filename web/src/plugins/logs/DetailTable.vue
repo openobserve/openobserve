@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="flex h-full w-full min-w-0 flex-col flex-nowrap"
-    :class="severityBorderClass"
     data-test="dialog-box"
     data-no-autofocus
   >
     <!-- A narrow drawer wraps the actions under the tabs instead of pushing them past its edge. -->
     <div class="flex shrink-0 flex-wrap items-center justify-between gap-y-1">
-      <div class="-mb-0.75 flex max-w-full min-w-0 items-center gap-2">
+      <!-- Cancels OTabs' top gutter, so the labels centre with the actions and the underline sits on the divider. -->
+      <div class="-mt-0.75 flex max-w-full min-w-0 items-center gap-2">
         <OTabs
           :model-value="tab"
           reorderable
@@ -663,7 +663,7 @@ import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
-import { resolveLogSeverity, type KnownLogSeverityLevel } from "@/utils/logs/statusParser";
+import { resolveLogSeverity } from "@/utils/logs/statusParser";
 import useLogSeverity from "@/composables/useLogs/useLogSeverity";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
@@ -702,18 +702,6 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
-const SEVERITY_BORDER_CLASSES: Record<KnownLogSeverityLevel, string> = {
-  emergency: "border-log-severity-emergency-indicator",
-  alert: "border-log-severity-alert-indicator",
-  critical: "border-log-severity-critical-indicator",
-  error: "border-log-severity-error-indicator",
-  warning: "border-log-severity-warning-indicator",
-  notice: "border-log-severity-notice-indicator",
-  info: "border-log-severity-info-indicator",
-  debug: "border-log-severity-debug-indicator",
-  trace: "border-log-severity-trace-indicator",
-  ok: "border-log-severity-ok-indicator",
-};
 
 const defaultValue: any = () => {
   return {
@@ -1098,12 +1086,6 @@ export default defineComponent({
     const severityFieldValue = computed(() => {
       const value = severity.value.field ? props.modelValue?.[severity.value.field] : undefined;
       return value === undefined ? "" : `(${String(value)})`;
-    });
-    const severityBorderClass = computed(() => {
-      if (props.embedded) return "";
-      const { level } = severity.value;
-      if (level === "unknown") return "border-t-3 border-border-default";
-      return `border-t-3 border-solid ${SEVERITY_BORDER_CLASSES[level]}`;
     });
 
     // Check if service streams feature is enabled
@@ -1517,7 +1499,6 @@ export default defineComponent({
       severity,
       severityTagLabel,
       severityFieldValue,
-      severityBorderClass,
       tableColumns,
       tableRows,
       detailSearchQuery,

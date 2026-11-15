@@ -123,6 +123,8 @@ const props = withDefaults(defineProps<SelectProps>(), {
   disabled: false,
   // Undefined so a filter defaults to clearable (S6) while a field defaults to not.
   clearable: undefined,
+  // Undefined so Vue's boolean casting never turns an absent reset value into false.
+  resetValue: undefined,
   error: false,
   multiple: false,
   maxChips: 2,
@@ -516,6 +518,21 @@ const selectedValues = computed<SelectPrimitiveValue[]>(() => {
 
 const hasSelection = computed(() => selectedValues.value.some((v) => v !== undefined));
 
+// A filter's "All" choice is the absence of a filter, so it never reads as narrowed (F3, S6).
+const resetOption = computed<{ value: SelectPrimitiveValue; label?: I18nText } | null>(() => {
+  if (!isFilter.value || props.multiple) return null;
+  if (props.resetValue !== undefined) {
+    const match = normalizedOptions.value.find((o) => !o.header && o.value === props.resetValue);
+    return { value: props.resetValue, label: match?.label };
+  }
+  const first = normalizedOptions.value.find((o) => !o.header && !o.expandable);
+  return first && isResetOption(first) ? { value: first.value, label: first.label } : null;
+});
+const isAtReset = computed(
+  () => resetOption.value !== null && selectedValues.value[0] === resetOption.value.value,
+);
+const canClear = computed(() => isClearable.value && hasSelection.value && !isAtReset.value);
+
 const selectedLabels = computed(() => {
   return selectedValues.value
     .map((selectedValue) => {
@@ -677,7 +694,7 @@ const listboxStringModelValue = computed<string | string[]>(() => {
 });
 
 function handleClear() {
-  const clearedValue: SelectModelValue = props.multiple ? [] : undefined;
+  const clearedValue: SelectModelValue = props.multiple ? [] : resetOption.value?.value;
   emit("update:modelValue", clearedValue);
   emit("clear");
   searchTerm.value = "";
@@ -1231,7 +1248,7 @@ function estimateChipWidth(label: string): number {
 // calculation matches the actual squeeze on the content area.
 const reservedTriggerSpace = computed(() => {
   let reserved = 12 + 28; // ps-3 (12px) + pe-7 (28px) — chevron-only
-  if (isClearable.value && hasSelection.value) reserved += 20; // pe-12 - pe-7
+  if (canClear.value) reserved += 20; // pe-12 - pe-7
   return reserved;
 });
 
@@ -1284,9 +1301,7 @@ const triggerTextTone = computed(() =>
 );
 
 // Chevron and clear sit absolutely at the end, so this padding only squeezes the content and the chevron never moves.
-const triggerEndPadding = computed(() =>
-  isClearable.value && hasSelection.value ? "pe-12" : "pe-7",
-);
+const triggerEndPadding = computed(() => (canClear.value ? "pe-12" : "pe-7"));
 
 // A filter sizes to its text from 160 (S7) unless the page gives it a width.
 const fieldWidthClass = computed(() =>
@@ -1296,11 +1311,12 @@ const fieldWidthClass = computed(() =>
 // "Status: Any" → "Status: Firing" → "Status: 3" (F3).
 const filterValueText = computed(() => {
   const count = selectedLabels.value.length;
-  if (!hasSelection.value || count === 0) return props.anyLabel ?? t("components.select.any");
+  if (!hasSelection.value || count === 0)
+    return props.anyLabel ?? resetOption.value?.label ?? t("components.select.any");
   if (count === 1 && props.summary === "value") return selectedLabels.value[0];
   return raw(String(count));
 });
-const isNarrowed = computed(() => isFilter.value && isClearable.value && hasSelection.value);
+const isNarrowed = computed(() => isFilter.value && canClear.value);
 
 const triggerChromeClasses = computed(() => [
   "rounded-default relative flex w-full items-center border",
@@ -1309,8 +1325,8 @@ const triggerChromeClasses = computed(() => [
   isNarrowed.value ? "bg-select-item-selected-bg" : "bg-select-bg",
   // The red error border stays on focus; the focus colour applies only without an error.
   hasError.value
-    ? "border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]"
-    : "border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-focus-ring-accent data-[state=open]:border-select-border-focus data-[state=open]:ring-focus-ring-accent focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]",
+    ? "border-select-border-error focus:ring-control-error-halo data-[state=open]:ring-control-error-halo focus:ring-3 data-[state=open]:ring-3"
+    : "border-select-border hover:border-select-border-hover focus:border-control-border-focus focus:ring-control-focus-halo data-[state=open]:border-control-border-focus data-[state=open]:ring-control-focus-halo focus:ring-3 data-[state=open]:ring-3",
   isNarrowed.value && !hasError.value ? "border-select-border-focus" : "",
   "disabled:bg-select-disabled-bg disabled:border-select-disabled-border disabled:cursor-not-allowed disabled:border-dashed",
   "data-disabled:bg-select-disabled-bg data-disabled:border-select-disabled-border data-disabled:cursor-not-allowed data-disabled:border-dashed",
@@ -1385,6 +1401,21 @@ const WIDTH_CLASSES: Record<FieldWidth, string> = {
   l: "w-field-width-l",
   full: "w-full",
 };
+const RESET_VALUE_KEYS = new Set(["", "all", "any", "*"]);
+const RESET_LABEL = /^(all|any)\b/i;
+
+// Sentinels like "__all__" count too, since their label is translated and may not read "All".
+function isResetOption(opt: { value: SelectPrimitiveValue; label: string }): boolean {
+  if (opt.value === null) return true;
+  if (typeof opt.value === "string") {
+    const key = opt.value
+      .trim()
+      .toLowerCase()
+      .replace(/^_+|_+$/g, "");
+    if (RESET_VALUE_KEYS.has(key)) return true;
+  }
+  return RESET_LABEL.test(opt.label.trim());
+}
 </script>
 
 <template>
@@ -1464,7 +1495,9 @@ const WIDTH_CLASSES: Record<FieldWidth, string> = {
                 <span
                   :class="[
                     'min-w-0 flex-1 truncate text-start',
-                    hasSelection ? 'text-select-text font-medium' : 'text-select-text',
+                    hasSelection && !isAtReset
+                      ? 'text-select-text font-medium'
+                      : 'text-select-text',
                   ]"
                   data-test="o-select-filter-value"
                   >{{ filterValueText }}</span
@@ -1514,7 +1547,7 @@ const WIDTH_CLASSES: Record<FieldWidth, string> = {
           <!-- pointer-events-none so the chevron never blocks the trigger; anchored to the end so clear never moves it. -->
           <div class="pointer-events-none absolute end-2.5 flex items-center gap-1.5">
             <button
-              v-if="isClearable && hasSelection && !isDisabled"
+              v-if="canClear && !isDisabled"
               type="button"
               tabindex="-1"
               :aria-label="t('components.select.clearSelection')"
@@ -1553,7 +1586,7 @@ const WIDTH_CLASSES: Record<FieldWidth, string> = {
             :class="[
               'z-10001 max-w-[max(var(--reka-popover-trigger-width),22.5rem)] min-w-[max(var(--reka-popover-trigger-width),12.5rem)]',
               'flex flex-col overflow-hidden',
-              'rounded-menu shadow-overlay border border-transparent',
+              'rounded-menu shadow-overlay border-border-default border',
               'bg-select-content-bg text-compact',
             ]"
             :style="[
@@ -2036,7 +2069,11 @@ const WIDTH_CLASSES: Record<FieldWidth, string> = {
           <!-- reka's SelectValue is pointer-events:none, so the wrapper is what cuts and takes the hover. -->
           <OTruncatedText
             v-else
-            :class="['flex-1 text-start', isFilter ? 'font-medium' : '', triggerTextTone]"
+            :class="[
+              'flex-1 text-start',
+              isFilter && !isAtReset ? 'font-medium' : '',
+              triggerTextTone,
+            ]"
             :tooltip="hasSelection && !$slots.trigger ? undefined : false"
           >
             <SelectValue :placeholder="placeholder">
@@ -2047,7 +2084,7 @@ const WIDTH_CLASSES: Record<FieldWidth, string> = {
 
         <div class="pointer-events-none absolute end-2.5 flex items-center gap-1.5">
           <button
-            v-if="isClearable && hasSelection && !isDisabled"
+            v-if="canClear && !isDisabled"
             type="button"
             tabindex="-1"
             :aria-label="t('components.select.clearSelection')"
@@ -2084,7 +2121,7 @@ const WIDTH_CLASSES: Record<FieldWidth, string> = {
             'z-10001 min-w-[max(var(--reka-select-trigger-width),12.5rem)] max-lg:max-w-[calc(100vw-1rem)]',
             'text-compact overflow-hidden',
             'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
-            'rounded-menu shadow-overlay border border-transparent',
+            'rounded-menu shadow-overlay border-border-default border',
             'bg-select-content-bg',
             // Clip-path reveal from the trigger edge: wipes down by default, up when placed on top.
             'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',

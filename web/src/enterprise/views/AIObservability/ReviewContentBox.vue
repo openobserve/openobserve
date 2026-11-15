@@ -16,7 +16,7 @@
       <div class="flex items-center gap-1">
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           size="xs"
           :data-test="`ai-review-content-copy-${contentType}`"
           :title="t('aiObservability.queues.workbench.copyContent', { label })"
@@ -26,7 +26,7 @@
         </OButton>
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           size="xs"
           :data-test="`ai-review-content-expand-${contentType}`"
           :title="

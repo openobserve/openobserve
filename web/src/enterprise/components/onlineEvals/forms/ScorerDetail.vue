@@ -28,7 +28,7 @@
         />
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           icon="refresh"
           :loading="isLoadingRuns"
           :title="t('onlineEvals.scorer.detail.refresh')"

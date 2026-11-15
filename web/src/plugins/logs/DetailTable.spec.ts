@@ -910,7 +910,7 @@ describe("DetailTable Component", () => {
       expect(traceWrapper.find(WRAP_TOGGLE).isVisible()).toBe(true);
     });
   });
-  describe("severity tag and drawer border (A7)", () => {
+  describe("severity tag (A7)", () => {
     let sevWrapper: any;
     const BADGE = '[data-test="log-detail-severity-badge"]';
     const POPOVER = '[data-test="log-detail-severity-popover"]';
@@ -926,7 +926,7 @@ describe("DetailTable Component", () => {
       document.body.querySelectorAll("[data-o-popover-content]").forEach((n) => n.remove());
     });
 
-    it("AC-A1.3: an inferred row shows an 'inferred' tag and the same solid border", async () => {
+    it("AC-A1.3: an inferred row shows an 'inferred' tag, and no band under the drawer header", async () => {
       sevWrapper = mountWith({ message: "2026-10-06 12:00:01 ERROR payment failed" });
       await flushPromises();
       const badge = sevWrapper.find(BADGE);
@@ -934,44 +934,31 @@ describe("DetailTable Component", () => {
       expect(badge.element.tagName).toBe("BUTTON");
       expect(badge.attributes("data-severity-source")).toBe("message");
       expect(badge.text()).toContain("inferred");
+      // The drawer header's hairline is the only line above the tabs; the tag carries the level.
       const root = sevWrapper.find('[data-test="dialog-box"]');
-      expect(root.classes()).toEqual(
-        expect.arrayContaining([
-          "border-t-3",
-          "border-log-severity-error-indicator",
-          "border-solid",
-        ]),
-      );
-      expect(root.classes()).not.toContain("border-dashed");
+      expect(root.classes().some((c: string) => c.startsWith("border-"))).toBe(false);
     });
 
-    it("an HTTP row shows a solid tag and border", async () => {
+    it("an HTTP row shows a solid tag", async () => {
       sevWrapper = mountWith({ status: 503 });
       await flushPromises();
       const badge = sevWrapper.find(BADGE);
       expect(badge.attributes("data-severity-source")).toBe("http");
       expect(badge.text()).not.toContain("inferred");
-      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).toEqual(
-        expect.arrayContaining(["border-log-severity-error-indicator", "border-solid"]),
-      );
     });
 
-    it("a row with no evidence shows an unknown tag and a neutral border", async () => {
+    it("a row with no evidence shows an unknown tag", async () => {
       sevWrapper = mountWith({ host: "a" });
       await flushPromises();
       const badge = sevWrapper.find(BADGE);
       expect(badge.attributes("data-severity-source")).toBe("none");
       expect(badge.text()).toBe("Unknown");
-      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).toContain(
-        "border-border-default",
-      );
     });
 
-    it("is hidden, with no border, when embedded", async () => {
+    it("is hidden when embedded", async () => {
       sevWrapper = mountWith({ message: "[ERROR] x" }, { embedded: true });
       await flushPromises();
       expect(sevWrapper.find(BADGE).exists()).toBe(false);
-      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).not.toContain("border-t-3");
     });
 
     it("opens its popover from the keyboard with the 'Not searchable' note", async () => {

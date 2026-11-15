@@ -953,7 +953,7 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
     <template #actions>
       <OButton
         icon-only
-        variant="secondary"
+        variant="ghost"
         icon="refresh"
         :loading="streamsLoading || rulesLoading || catalogQuery.isPending.value"
         data-test="security-content-refresh"

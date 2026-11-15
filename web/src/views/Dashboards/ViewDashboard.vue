@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isFullscreen && !isEditingLayout"
             icon-only
             v-show="store.state.printMode !== true"
-            variant="secondary"
+            variant="ghost"
             @click="addPanelData"
             data-test="dashboard-panel-add"
             icon="add"
@@ -226,7 +226,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isFullscreen && !isEditingLayout"
             :icon-only="isMobile"
             v-show="store.state.printMode !== true"
-            variant="secondary"
             icon="edit"
             :aria-label="t('dashboard.layoutEdit.enter')"
             data-test="dashboard-edit-btn"
@@ -242,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="!isMobile">
               <OButton
                 icon-only
-                variant="secondary"
+                variant="ghost"
                 icon="undo"
                 :disabled="!canUndoLayout || isSavingLayout"
                 :aria-label="t('dashboard.layoutEdit.undo')"
@@ -256,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 icon-only
-                variant="secondary"
+                variant="ghost"
                 icon="redo"
                 :disabled="!canRedoLayout || isSavingLayout"
                 :aria-label="t('dashboard.layoutEdit.redo')"
@@ -311,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #trigger>
                 <OButton
                   :icon-only="isMobile"
-                  variant="secondary"
+                  variant="ghost"
                   icon="more-horiz"
                   :aria-label="
                     hasSettingsDraft
@@ -460,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="store.state.printMode === true || isFullscreen"
               icon-only
-              variant="secondary"
+              variant="ghost"
               @click="printDashboard"
               data-test="dashboard-print-btn"
             >
@@ -474,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               icon-only
               v-show="store.state.printMode !== true"
-              variant="secondary"
+              variant="ghost"
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
             >
@@ -490,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="isEditingLayout && isMobile">
             <OButton
               icon-only
-              variant="secondary"
+              variant="ghost"
               icon="undo"
               :disabled="!canUndoLayout || isSavingLayout"
               :aria-label="t('dashboard.layoutEdit.undo')"
@@ -501,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               icon-only
-              variant="secondary"
+              variant="ghost"
               icon="redo"
               :disabled="!canRedoLayout || isSavingLayout"
               :aria-label="t('dashboard.layoutEdit.redo')"

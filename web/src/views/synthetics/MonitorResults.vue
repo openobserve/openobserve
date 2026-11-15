@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         icon-only
         :aria-label="t('common.refresh')"
-        variant="secondary"
+        variant="ghost"
         icon="refresh"
         :loading="isRefreshing"
         data-test="synthetic-monitor-results-refresh-btn"

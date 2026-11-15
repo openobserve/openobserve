@@ -52,7 +52,7 @@ const toggleClasses = computed(() => [
   "h-control-xs px-2 cursor-pointer",
   "focus-visible:ring-badge-focus-ring focus-visible:ring-2 focus-visible:outline-none",
   props.pressed
-    ? CHIP_TONE_CLASSES.accent
+    ? "border-badge-primary-ol-border bg-badge-primary-soft-bg text-badge-primary-soft-text"
     : props.tone === "neutral"
       ? "border-border-default bg-surface-base text-text-secondary hover:border-border-strong hover:text-text-heading"
       : [CHIP_TONE_CLASSES[props.tone], "hover:border-current/50"],

@@ -15,7 +15,7 @@
           />
           <OButton
             icon-only
-            variant="secondary"
+            variant="ghost"
             icon="refresh"
             class=""
             :loading="isLoading"

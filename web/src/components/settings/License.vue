@@ -10,7 +10,7 @@
     <div v-else class="grid grid-cols-1 items-start gap-4 pb-4">
       <div class="col-span-1 min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
-          <OFormSection variant="plain" class="mb-4" :title="t('about.no_license_found')">
+          <OFormSection variant="plain" class="mb-6" :title="t('about.no_license_found')">
             <div class="pb-2">
               <div class="text-sm">
                 {{ t("about.installation_id") }}:
@@ -104,7 +104,7 @@
             @add-license-key="showUpdateFormAndFocus"
             @refreshed="reloadLicenseData"
           />
-          <OFormSection variant="plain" class="mb-4" :title="t('about.license_info')">
+          <OFormSection variant="plain" class="mb-6" :title="t('about.license_info')">
             <template v-if="licenseData.can_update_license" #actions>
               <OButton
                 variant="secondary"
@@ -211,7 +211,7 @@
           <OFormSection
             v-show="showUpdateForm"
             variant="plain"
-            class="mt-4"
+            class="mt-6"
             :title="t('about.update_license_key')"
           >
             <div class="pt-2 pb-2">

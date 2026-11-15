@@ -149,7 +149,7 @@ describe("DashboardHeader", () => {
 
       const backButton = wrapper.findComponent({ name: "OButton" });
 
-      expect(backButton.props("variant")).toBe("secondary");
+      expect(backButton.props("variant")).toBe("ghost");
       expect(backButton.props("iconOnly")).toBe(true);
       // Migration replaced the legacy margin class with me-2.
       expect(backButton.classes().some((c) => c.includes("me-2"))).toBe(true);

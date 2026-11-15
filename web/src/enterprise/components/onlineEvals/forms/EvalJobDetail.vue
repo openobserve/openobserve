@@ -28,7 +28,7 @@
         />
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           icon="refresh"
           :loading="isLoadingKpis || isLoadingRuns"
           :title="t('onlineEvals.job.detail.refresh')"

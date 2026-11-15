@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- One OForm owns every field across the stepper; the pinned bar's Save submits it. -->
       <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 flex-1 flex-col">
         <div class="min-h-0 flex-1 overflow-auto px-4 py-3">
-          <div class="flex w-full max-w-5xl flex-col gap-4">
+          <div class="flex w-full max-w-5xl flex-col gap-6">
             <OFormSection variant="plain" :title="t('cipherKey.sectionKey')">
               <OFormInput
                 data-test="add-cipher-key-name-input"

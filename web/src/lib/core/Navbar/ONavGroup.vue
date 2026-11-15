@@ -875,7 +875,7 @@ function onChildMouseenter(event: MouseEvent) {
         :aria-label="title"
         :aria-describedby="showTrialNote ? trialNoteId : undefined"
         :data-layout="useColumns ? 'columns' : 'single'"
-        class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay min-w-52 overflow-y-auto overscroll-contain border border-transparent p-1"
+        class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay border-border-default min-w-52 overflow-y-auto overscroll-contain border p-1"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"

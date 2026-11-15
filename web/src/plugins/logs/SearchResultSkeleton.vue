@@ -25,31 +25,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       inert
     >
-      <OButton icon-only variant="secondary" size="sm" class="ms-1.5 shrink-0">
+      <OButton icon-only variant="ghost" size="sm" class="ms-1.5 shrink-0">
         <OIcon :name="collapseIcon" size="sm" />
       </OButton>
       <div class="min-w-0 flex-1 ps-2 max-md:min-w-32" />
       <div class="flex flex-none items-center justify-end gap-1 pe-2 max-md:ms-auto">
-        <OButton v-if="narrow" icon-only variant="secondary" size="xs">
+        <OButton v-if="narrow" icon-only variant="ghost" size="xs">
           <OIcon name="more-horiz" size="sm" />
         </OButton>
         <template v-else>
-          <div
-            class="border-card-glass-border rounded-default inline-flex h-6 items-center overflow-hidden border px-1"
-          >
-            <ORefreshButton
-              :last-run-at="searchObj.meta.lastRunAt"
-              :loading="searchObj.loading || searchObj.loadingHistogram"
-              :disabled="searchObj.loading || searchObj.loadingHistogram"
-            />
-          </div>
+          <ORefreshButton
+            size="sm"
+            :last-run-at="searchObj.meta.lastRunAt"
+            :loading="searchObj.loading || searchObj.loadingHistogram"
+            :disabled="searchObj.loading || searchObj.loadingHistogram"
+          />
           <div v-if="logsTab" class="inline-flex items-center gap-0.5">
-            <OButton
-              icon-only
-              variant="secondary"
-              size="xs"
-              :pressed="!!searchObj.meta.toggleSourceWrap"
-            >
+            <OButton icon-only size="xs" :pressed="!!searchObj.meta.toggleSourceWrap">
               <OIcon name="wrap-text" size="sm" />
             </OButton>
           </div>

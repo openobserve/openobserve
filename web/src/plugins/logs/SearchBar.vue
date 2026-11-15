@@ -151,7 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!toolbarMoveResetToMenu"
             :icon-only="shouldHideToolbarButtonText"
             data-test="logs-search-bar-reset-filters-btn"
-            variant="secondary"
             @click="resetFilters"
           >
             <OIcon name="restart-alt" size="sm" />
@@ -169,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedHistogram"
             as="div"
             data-test="logs-search-bar-histogram-btn"
-            variant="secondary"
+            variant="ghost"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <OSwitch
@@ -193,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedSqlMode"
             as="div"
             data-test="logs-search-bar-sql-mode-pinned-btn"
-            variant="secondary"
+            variant="ghost"
             @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           >
             <OSwitch
@@ -211,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedQuickMode"
             as="div"
             data-test="logs-search-bar-quick-mode-pinned-btn"
-            variant="secondary"
+            variant="ghost"
             @click="handleQuickMode"
           >
             <OSwitch
@@ -562,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-only
               data-test="logs-search-bar-more-options-btn"
               class="download-logs-btn hover:bg-interactive-hover-bg! order-4"
-              variant="secondary"
+              variant="ghost"
             >
               <OIcon name="menu" size="sm" />
               <OTooltip :content="t('search.moreActions')" />
@@ -577,7 +576,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <ShareButton
               :url="shareURL"
-              variant="secondary"
               :show-label="true"
               :disabled="!!shareReason"
               :tooltip="shareReason || undefined"
@@ -810,7 +808,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!shouldMoveShareToMenu"
           data-test="logs-search-bar-share-link-btn"
           :url="shareURL"
-          variant="secondary"
           :disabled="!!shareReason"
           :tooltip="shareReason || undefined"
           class="order-3"
@@ -820,7 +817,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="showPinnedFunctionEditor"
           as="div"
           data-test="logs-search-bar-function-editor-pinned-btn"
-          variant="secondary"
+          variant="ghost"
           class="order-1"
           @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
         >
@@ -1223,7 +1220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-query-editor-full_screen-btn"
         variant="ghost"
         @click="toggleEditorFullscreen"
-        class="rounded-default border-card-glass-border! absolute! top-0.75 right-1 z-51 border!"
+        class="absolute! top-0.75 right-1 z-51"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
@@ -1259,7 +1256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-pressed="filterBuilderOn"
                 variant="ghost"
                 @click="toggleFilterBuilder"
-                class="rounded-default border-card-glass-border! absolute! top-0.75 z-51 border!"
+                class="absolute! top-0.75 z-51"
                 :style="{ right: filterBuilderToggleRight }"
               >
                 <OTooltip

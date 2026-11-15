@@ -1126,7 +1126,7 @@ onUnmounted(() => {
         <template #toolbar-trailing>
           <OButton
             icon-only
-            variant="secondary"
+            variant="ghost"
             icon="refresh"
             :loading="inFlight > 0"
             data-test="security-alerts-refresh"

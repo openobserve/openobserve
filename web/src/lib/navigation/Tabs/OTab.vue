@@ -105,6 +105,8 @@ const baseClasses = computed<string>(() =>
     "group/otab",
     "relative items-center",
     isVertical.value ? "flex justify-start gap-2" : "inline-flex justify-center gap-1.5",
+    // Call sites slot 16px glyphs (OIcon size="sm"), often inside their own wrapper; the horizontal strip draws them at 14px.
+    isVertical.value ? "" : "[&_.size-4]:size-3.5",
     // The rail's px-1 plus this px-2 puts a vertical tab's icon on the 12px page-edge grid line.
     // Reorderable tabs keep a fixed 0.75rem gutter for the grip, so hovering or editing never shifts the label.
     isReorderable.value
@@ -127,12 +129,9 @@ const baseClasses = computed<string>(() =>
 const stateClasses = computed<string>(() => {
   // A locked page disables its active tab too; it still has to read as the current one.
   if (isDisabled.value && isActive.value) {
-    return [
-      "text-tabs-active-text cursor-not-allowed opacity-60",
-      isVertical.value
-        ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
-        : "border-b-2 border-transparent",
-    ].join(" ");
+    return isVertical.value
+      ? "text-tabs-active-text cursor-not-allowed opacity-60 bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
+      : "text-text-heading cursor-not-allowed opacity-60 border-b-2 border-transparent";
   }
   if (isDisabled.value) {
     return [
@@ -141,21 +140,16 @@ const stateClasses = computed<string>(() => {
     ].join(" ");
   }
   if (isActive.value) {
-    // Horizontal tabs: colored text only. The active underline is a single
-    // shared bar in OTabs that slides between tabs, so each tab keeps a
-    // transparent 2px border (layout parity with inactive) rather than drawing
-    // its own colored one.
-    return [
-      "text-tabs-active-text cursor-pointer",
-      isVertical.value
-        ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
-        : "border-b-2 border-transparent",
-    ].join(" ");
+    // The strip's accent underline is one shared bar in OTabs, so the active tab only darkens its ink (H8).
+    return isVertical.value
+      ? "text-tabs-active-text cursor-pointer bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
+      : "text-text-heading cursor-pointer border-b-2 border-transparent";
   }
   if (isVertical.value) {
     return "text-text-body cursor-pointer enabled:hover:text-tabs-hover-text enabled:hover:bg-tabs-rail-hover-bg";
   }
-  return "text-tabs-inactive-text cursor-pointer enabled:hover:text-tabs-hover-text border-b-2 border-transparent";
+  // Secondary ink keeps the strip quieter than the 16px title above it.
+  return "text-text-secondary cursor-pointer enabled:hover:text-tabs-hover-text border-b-2 border-transparent";
 });
 
 // A muted glyph lets the rail's labels lead; the active tab's icon inherits its accent text.
@@ -174,9 +168,9 @@ const heightClasses = computed<string>(() => {
 
 const countClasses = computed<string>(() =>
   [
-    "o-tab__count inline-block shrink-0 rounded-full px-1.25 text-center text-2xs leading-4 font-medium tabular-nums",
-    // Four characters wide: "999+" is the cap, so a growing count never pushes the next tab.
-    "min-w-[calc(4ch+0.625rem)]",
+    "o-tab__count inline-flex shrink-0 items-center justify-center rounded-full px-1 text-2xs leading-4 font-medium tabular-nums",
+    // Two digits wide, so the common counts never move the next tab (H8); a third digit grows it.
+    "min-w-[calc(2ch+0.5rem)]",
     props.countTone === "error"
       ? "bg-badge-error-soft-bg text-badge-error-soft-text"
       : "bg-surface-subtle text-text-secondary",
@@ -226,19 +220,20 @@ const countClasses = computed<string>(() =>
         class="absolute inset-y-0 left-0 z-10 flex w-3 items-center justify-center transition-opacity duration-150"
         :class="
           isDraggable
-            ? 'cursor-grab opacity-0 group-hover/otab:opacity-50 hover:!opacity-100 active:cursor-grabbing'
+            ? 'cursor-grab opacity-0 group-hover/otab:opacity-50 group-focus-visible/otab:opacity-50 hover:!opacity-100 active:cursor-grabbing'
             : 'pointer-events-none opacity-0'
         "
         @mousedown.stop="isDraggable && armDrag()"
       >
-        <OIcon name="drag-indicator" size="sm" />
+        <OIcon name="drag-indicator" size="sm" :class="!isVertical && 'size-3.5!'" />
       </span>
       <template v-if="label || icon">
         <slot name="icon">
           <img
             v-if="icon && isImgIcon"
             :src="imgSrc"
-            class="o-tab__icon h-4 w-4 shrink-0 object-contain"
+            class="o-tab__icon shrink-0 object-contain"
+            :class="isVertical ? 'size-4' : 'size-3.5'"
             aria-hidden="true"
             alt=""
           />
@@ -251,8 +246,8 @@ const countClasses = computed<string>(() =>
           />
           <span
             v-else-if="icon"
-            class="o-tab__icon material-icons-outlined shrink-0 text-base leading-none"
-            :class="iconToneClass"
+            class="o-tab__icon material-icons-outlined shrink-0 leading-none"
+            :class="[iconToneClass, isVertical ? 'text-base' : 'text-sm']"
             >{{ icon }}</span
           >
         </slot>

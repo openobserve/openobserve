@@ -103,6 +103,15 @@
   /* Soft divider — lighter than the structural border. Use for in-list row
      dividers and intra-card section splits. */
   --color-border-subtle: var(--color-grey-150);
+  /* One resting edge for every bordered control, so a toolbar row reads as one set (S2).
+     Hover lifts it to the 3:1 control edge; selected controls take the accent-300 edge. */
+  --color-control-border: var(--color-grey-400);
+  --color-control-border-hover: var(--color-border-control);
+  --color-control-border-selected: var(--color-primary-300);
+  /* Input focus: an accent-500 edge plus a 3px outer halo at 18% (16% red when invalid), never an inset ring. */
+  --color-control-border-focus: var(--color-primary-500);
+  --color-control-focus-halo: color-mix(in srgb, var(--color-primary-500) 18%, transparent);
+  --color-control-error-halo: color-mix(in srgb, var(--color-error-500) 16%, transparent);
 
   /* Overlay scrim — semi-transparent backdrop */
   --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
@@ -221,11 +230,9 @@
   --spacing-control-md: 2rem; /* 32px — default: inputs, selects, buttons, toggles, date pickers */
   --spacing-control-lg: 2.25rem; /* 36px — sign-in and empty-state call to action only */
 
-  /* Floating menus and popovers: the 1px ring lives in the shadow; dark values in dark.css. */
+  /* Floating menus and popovers: the edge is the surface's own border; dark values in dark.css. */
   /* eslint-disable local/no-hardcoded-px -- optical shadow geometry, not layout */
-  --shadow-overlay:
-    0 0 0 1px rgb(19 21 31 / 0.06), 0 6px 16px -4px rgb(19 21 31 / 0.14),
-    0 2px 4px -2px rgb(19 21 31 / 0.06);
+  --shadow-overlay: 0 12px 28px -6px rgb(19 21 31 / 0.22), 0 4px 8px -4px rgb(19 21 31 / 0.1);
   /* eslint-enable local/no-hardcoded-px */
 }
 
@@ -277,6 +284,12 @@
   --color-border-strong: var(--color-border-strong);
   --color-border-control: var(--color-border-control);
   --color-border-subtle: var(--color-border-subtle);
+  --color-control-border: var(--color-control-border);
+  --color-control-border-hover: var(--color-control-border-hover);
+  --color-control-border-selected: var(--color-control-border-selected);
+  --color-control-border-focus: var(--color-control-border-focus);
+  --color-control-focus-halo: var(--color-control-focus-halo);
+  --color-control-error-halo: var(--color-control-error-halo);
 
   /* Overlay scrim */
   --color-overlay-scrim: var(--color-overlay-scrim);

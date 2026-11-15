@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           size="xs"
           class="ms-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
@@ -146,12 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
-              <OButton
-                icon-only
-                variant="secondary"
-                size="xs"
-                data-test="logs-result-actions-menu-btn"
-              >
+              <OButton icon-only variant="ghost" size="xs" data-test="logs-result-actions-menu-btn">
                 <OIcon name="more-horiz" size="sm" />
                 <OTooltip :content="t('search.moreActions')" />
               </OButton>
@@ -186,24 +181,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- INLINE BUTTONS (wider container) -->
           <template v-else>
-            <!-- Refresh in bordered wrapper -->
-            <div
-              class="border-card-glass-border rounded-default inline-flex h-6 items-center border px-1"
-            >
-              <ORefreshButton
-                size="sm"
-                :last-run-at="searchObj.meta.lastRunAt"
-                :loading="searchObj.loading || histogramSettling"
-                :disabled="searchObj.loading || histogramSettling"
-                @click="$emit('run-query')"
-              />
-            </div>
+            <ORefreshButton
+              size="sm"
+              :last-run-at="searchObj.meta.lastRunAt"
+              :loading="searchObj.loading || histogramSettling"
+              :disabled="searchObj.loading || histogramSettling"
+              @click="$emit('run-query')"
+            />
             <!-- Action buttons -->
             <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-0.5">
               <OButton
                 v-if="inspectAvailable"
                 :icon-only="!showActionLabels"
-                variant="secondary"
                 size="xs"
                 :disabled="!showInspectBtn"
                 @click="openSearchJobInspector"
@@ -221,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="showWrapBtn"
                 icon-only
-                variant="secondary"
+                variant="ghost"
                 size="xs"
                 :pressed="searchObj.meta.toggleSourceWrap"
                 @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
@@ -829,7 +818,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :correlation-loading="correlationLoading"
           :correlation-error="correlationError ?? undefined"
           :initial-tab="detailTableInitialTab"
-          class="rounded-default"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex ?? -1"
           :totalLength="searchObj.data.queryResults?.hits?.length || 0"
           :has-prev-page="hasPrevPage"

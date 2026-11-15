@@ -90,7 +90,7 @@ describe("DatabaseDeprecationBanner", () => {
     await wrapper.vm.$nextTick();
 
     const message = wrapper.find('[data-test="database-deprecation-banner-message"]');
-    expect(message.text()).toContain("MySQL support is DEPRECATED");
+    expect(message.text()).toContain("MySQL support is deprecated");
   });
 
   it("should display migration subtitle", async () => {

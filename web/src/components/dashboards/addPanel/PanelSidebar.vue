@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         icon-only
         :aria-label="t('common.collapse')"
-        variant="secondary"
+        variant="ghost"
         size="sm"
         class="rotate-90"
         @click="toggleSidebar"

@@ -195,10 +195,10 @@ const wrapperClasses = computed(() => [
   "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "bg-input-bg",
   SIZE_CLASSES[props.size ?? "md"],
-  // The focus ring is opaque: at 25% alpha it measured 1.38:1 against the 3:1 floor of SC 1.4.11.
+  // The accent edge carries the 3:1 focus indicator, so the halo outside it can stay soft.
   hasError.value
-    ? "border-input-border-error focus-within:ring-[0.125rem] focus-within:ring-input-border-error/30"
-    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
+    ? "border-input-border-error focus-within:ring-3 focus-within:ring-control-error-halo"
+    : "border-input-border hover:not-focus-within:border-input-border-hover focus-within:border-control-border-focus focus-within:ring-3 focus-within:ring-control-focus-halo",
   isDisabled.value
     ? "bg-input-disabled-bg border-input-disabled-border cursor-not-allowed border-dashed"
     : "",

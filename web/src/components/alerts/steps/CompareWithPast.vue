@@ -333,7 +333,7 @@ export default defineComponent({
     };
 
     // Offset code ("15m") → counted noun. Shares the *Count plural keys with
-    // convertMinutesToDisplayValue so "1m" reads "1 Minute", not "1 Minutes".
+    // convertMinutesToDisplayValue so "1m" reads "1 minute", not "1 minutes".
     const UNIT_COUNT_KEYS: Record<string, I18nKey> = {
       s: "alerts.compareWithPast.secondCount",
       m: "alerts.compareWithPast.minuteCount",
@@ -359,9 +359,8 @@ export default defineComponent({
       return value;
     };
 
-    // Counted nouns → vue-i18n plural forms ("{n} Minute | {n} Minutes"),
-    // called as t(key, n). vue-i18n picks the singular form only for n === 1
-    // (n === 0 → "0 Minutes").
+    // Counted nouns use vue-i18n plural forms via t(key, n), which picks the
+    // singular only for n === 1, so 0 reads "0 minutes".
     const convertMinutesToDisplayValue = (minutes: number) => {
       if (minutes < 60) {
         return t("alerts.compareWithPast.minuteCount", minutes);

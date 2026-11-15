@@ -18233,7 +18233,7 @@
   "search_history": {
     "title": "Usage & cost history",
     "get_history": "Get history",
-    "executed_at": "Executed At",
+    "executed_at": "Executed at",
     "sql_query": "SQL query",
     "delayMessage": "Usage & cost history might be delayed by"
   },
@@ -30993,7 +30993,7 @@
       "sendTest": "Send test",
       "setsDefault": "Sets #{channel}'s default org to {org}",
       "answersFor": "#{channel} answers questions for org {org}. Alerts from {thisOrg} post here and their threads answer in {thisOrg}; the channel default is unchanged.",
-      "sharedTag": "Shared · {product} connect",
+      "sharedTag": "Shared · {product} Connect",
       "sharedTitle": "#{channel} is shared with people outside {workspace}.",
       "sharedDetail": "They will see alert names, values, charts and links. Their clicks on the buttons are refused.",
       "sharedConfirm": "I understand, post alerts to this shared channel",

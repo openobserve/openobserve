@@ -76,7 +76,7 @@ function resetToDefault(): void {
       <div class="relative inline-flex">
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           :aria-label="
             hiddenCount > 0
               ? t('common.manageColumnsHidden', { count: hiddenCount })

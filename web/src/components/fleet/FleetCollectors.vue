@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="contents">
           <OButton
             icon-only
-            variant="secondary"
+            variant="ghost"
             icon="filter-list"
             class="lg:hidden"
             data-drawer-anchor="fleet-collectors-toolbar"

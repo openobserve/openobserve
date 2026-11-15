@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                (SearchResult.vue): outline icon button + double-arrow + tooltip. -->
           <OButton
             icon-only
-            variant="secondary"
+            variant="ghost"
             size="sm"
             class="shrink-0"
             data-test="workflow-ndv-steps-collapse"

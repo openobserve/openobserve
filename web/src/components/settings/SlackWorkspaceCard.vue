@@ -379,7 +379,7 @@ useSlackSavePart({
           refused ||
           appTokenWarning
         "
-        class="border-border-default flex flex-col gap-3 border-b px-4 py-3"
+        class="border-border-subtle flex flex-col gap-3 border-b py-3"
       >
         <OInlineNotice v-if="managed" tone="info" data-test="slack-managed-banner">
           <span class="font-semibold">{{ t("slackApp.card.managedTitle") }}</span>
@@ -577,7 +577,7 @@ useSlackSavePart({
 
       <div
         v-if="testItems.length"
-        class="border-border-default flex flex-col gap-3 border-t px-4 py-3"
+        class="border-border-subtle flex flex-col gap-3 border-t py-3"
         data-test="slack-test-results"
       >
         <span class="text-text-heading text-sm font-medium">
@@ -612,7 +612,7 @@ useSlackSavePart({
       :description="otherOrgsLine"
       data-test="slack-connected-orgs"
     >
-      <div class="rounded-b-surface -mx-4 -my-3 overflow-hidden">
+      <div class="rounded-surface border-border-default overflow-hidden border">
         <OTable
           :data="orgRows"
           :columns="orgColumns"
@@ -633,7 +633,7 @@ useSlackSavePart({
     >
       <p
         v-if="readOnly"
-        class="text-text-secondary border-border-default flex items-start gap-2 border-b px-4 py-3 text-sm"
+        class="text-text-secondary border-border-subtle flex items-start gap-2 border-b py-3 text-sm"
         data-test="slack-danger-locked"
       >
         <OIcon name="lock" size="sm" class="mt-0.5 shrink-0" />

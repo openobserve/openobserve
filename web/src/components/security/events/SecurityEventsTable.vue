@@ -224,7 +224,7 @@ function fmtTs(ms: number | null): string {
     <template #toolbar-trailing>
       <OButton
         icon-only
-        variant="secondary"
+        variant="ghost"
         icon="refresh"
         :loading="loading"
         data-test="security-events-refresh"

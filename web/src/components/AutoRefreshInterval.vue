@@ -150,7 +150,7 @@ export default defineComponent({
     },
     variant: {
       type: String as PropType<ButtonVariant>,
-      default: "secondary",
+      default: undefined,
     },
     hideRelativeNote: {
       type: Boolean,

@@ -19,7 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="date-time-container inline-flex items-stretch [&_button:focus-visible]:z-1"
     :class="{
-      'rounded-default border-button-outline-border border': !hideRangeShift,
+      'rounded-default border-button-outline-border hover:border-control-border-hover bg-surface-base border':
+        !hideRangeShift,
       'h-control-sm': !hideRangeShift && size === 'sm',
       'h-control-md': !hideRangeShift && size !== 'sm',
       'w-full [&>*]:flex-1': fieldAppearance,
@@ -46,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :z-index="10001"
       :aria-label="t('common.selectDateRange')"
       :collision-padding="POPOVER_COLLISION_PADDING"
-      content-class="border-border-default! overflow-hidden p-0 shadow-lg!"
+      content-class="overflow-hidden p-0"
       @update:open="onMenuOpenChange"
       @open-auto-focus="onPopoverOpenAutoFocus"
     >
@@ -102,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div
             v-if="!(hideClipboard && disableRelative)"
-            class="border-border-default row-start-1 flex min-w-0 items-center gap-1 border-b px-3 py-2"
+            class="row-start-1 flex min-w-0 items-center gap-1 px-3 pt-3 pb-1"
             :class="showRail ? 'col-start-2 max-sm:order-2' : 'col-start-1'"
           >
             <OToggleGroup
@@ -146,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="showRail"
-            class="bg-surface-panel border-border-default relative col-span-1 col-start-1 row-span-2 row-start-1 border-e max-sm:static max-sm:order-1 max-sm:border-e-0 max-sm:border-b"
+            class="bg-surface-panel border-border-subtle relative col-span-1 col-start-1 row-span-2 row-start-1 border-e max-sm:static max-sm:order-1 max-sm:border-e-0 max-sm:border-b"
             data-test="date-time-rail-frame"
           >
             <DateTimeRail
@@ -177,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="date-time-table relative flex flex-col">
                   <div
-                    class="relative-row border-border-default flex items-center border-b py-2 ps-3 [&>*]:me-1.5"
+                    class="relative-row flex items-center py-1.5 ps-3 [&>*]:me-1.5"
                     v-for="(period, index) in relativePeriods"
                     :key="'date_' + index"
                   >
@@ -218,9 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
-                  <div
-                    class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:me-1.5"
-                  >
+                  <div class="relative-row flex items-center px-3 pt-3 pb-2 [&>*]:me-1.5">
                     <div class="text-compact min-w-18.75 font-medium">
                       {{ t("common.custom") }}
                     </div>
@@ -288,7 +287,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-text-secondary ps-6 pe-6 text-xs">
                     {{ t("common.datetimeMessage") }}
                   </div>
-                  <OSeparator v-if="!disableRelative" class="my-2" />
 
                   <table
                     v-if="!hideRelativeTime"
@@ -391,7 +389,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import DateTimeRail from "@/components/DateTimeRail.vue";
 import {
@@ -475,7 +472,6 @@ const zoneOffsets = new Map<string, string>();
 export default defineComponent({
   name: "ODateTimeRange",
   components: {
-    OSeparator,
     OButton,
     OIcon,
     OToggleGroup,

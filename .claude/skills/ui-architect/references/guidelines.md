@@ -23,13 +23,15 @@ Where an older house rule in this skill disagrees with a rule here, this file wi
 | Radius 10: dialogs, drawers, cards, panels, the content frame (L1) | `rounded-surface` | `--radius-surface` |
 | Pills, avatars, dots | `rounded-full` | `--radius-full` |
 | Text 11 · 12 · 13 · 14 (T1) | `text-2xs` · `text-xs` · `text-compact` · `text-sm` | `--text-*` in `base.css` |
-| Text 16 (page title) · 20 · 24 (KPI values) | `text-base` · `text-xl` · `text-2xl` | `--text-*` in `base.css` |
+| Text 15 (dialog and drawer titles) · 18 (page title) | `text-title` · `text-lg leading-6` | `--text-*` in `base.css` |
+| Text 20 · 24 (KPI values) | `text-xl` · `text-2xl` | `--text-*` in `base.css` |
 | Text colour strong · default · secondary · tertiary · disabled (T3) | `text-text-heading` · `text-text-body` · `text-text-secondary` · `text-text-muted` · `text-text-disabled` | `--color-text-*` in `semantic.css` |
 | Spacing 4 · 8 · 12 · 16 · 24 · 32 (L4) | `*-1` · `*-2` · `*-3` · `*-4` · `*-6` · `*-8` | Tailwind's rem scale |
 
 The component sets its own height, radius and text size from its `size` prop. A call site
-never overrides them (`local/o2-control-height`). Text 15 (dialog, drawer and section titles)
-is `text-title`; `ODialog`, `ODrawer` and `OFormSection` set it, so a call site does not.
+never overrides them (`local/o2-control-height`). The title sizes are owned too: `OPageHeader` sets
+the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSection` and `OCard` the
+14 px semibold section titles, so a call site never sets a title size.
 
 ## Quick answers
 
@@ -84,17 +86,17 @@ is `text-title`; `ODialog`, `ODrawer` and `OFormSection` set it, so a call site 
 | --- | --- | --- | --- |
 | 11 | 16 | Key chips, chart axes, micro captions | p95 latency · 10:42 |
 | 12 | 16 | Meta, helper text, chips, badges, column headers | Updated 2 min ago |
-| 13 | 20 | All UI: controls, menus, tables, labels | payments-api returned 503 for /checkout |
-| 14 | 20 | Reading text: descriptions, empty states, dialog body | Alerts notify your team when a condition is met. |
-| 15 | 22 | Dialog, drawer and section titles | Notification settings |
-| 16 | 24 | Page title (never larger) | Checkout service health |
+| 13 | 20 | All UI: controls, menus, tables, labels; setting-row labels (medium) and their help; section descriptions | payments-api returned 503 for /checkout |
+| 14 | 20 | Reading text: descriptions, empty states, dialog body. Semibold: section, card and panel titles | Alerts notify your team when a condition is met. |
+| 15 | 22 | Dialog and drawer titles (semibold) | Notification settings |
+| 18 | 24 | Page title (semibold 600, never larger) | Checkout service health |
 | 20 · 24 | 28 · 32 | KPI values only | 1,284 |
 
 - **T1** (must) Use only the sizes in the table above, by role.
   - Today: In-page section headings come in about 9 size and weight pairs, from 13/550 to 30/400. Custom headers use 7 title styles; AutoObserve titles are 24–30 px. _(screens-settings-iam.md §4 · screens-ai-infra-security.md §6)_
   - Why: Changes the house rule's 14 px default to 13 px for UI text, matching the density of the data it sits beside; 14 stays for text people read.
-- **T2** (must) The page title is 16 px semibold in the strong text colour — never larger, never pure black. The context line and the title identify the page together, not size.
-  - Today: OPageHeader titles are already 16 px semibold: keep them. The custom headers are the outliers. _(lib/core/PageHeader/OPageHeader.vue:135)_
+- **T2** (must) The page title is 18 px at weight 600 in the strong text colour, on the 24 px title line — never larger, never pure black. It is the strongest text on the page: section, card and panel titles are 14 px semibold, dialog and drawer titles 15 px, and no section heading sits on a tinted band.
+  - Today: The review found the 16 px page title read as weak as, or weaker than, the 15 px section titles on their grey header bands (Settings › General: "Theme", "Query defaults"). _(lib/core/PageHeader/OPageHeader.vue · lib/core/FormSection/OFormSection.vue)_
 - **T3** (must) Four text colours, chosen by role: strong (titles, values), default (body), secondary (labels, column headers, metadata), tertiary (timestamps, hints, placeholders). Plus disabled. Never dim text with opacity.
 - **T4** (must) Machine values are mono: timestamps, IDs, queries, durations, field keys, code. Every number uses tabular figures; a unit is separated by a space ("158 ms").
   - Today: Nine timestamp formats in Observe alone; "1162 ms" next to "158.00ms"; "0.30spans/s". _(screens-observe.md §9)_
@@ -118,7 +120,7 @@ is `text-title`; `ODialog`, `ODrawer` and `OFormSection` set it, so a call site 
 
 ## 5. Page header
 
-- **H1** (must) Every page has one header band, 56 px, with two stacked lines on the left: a context line (12 px, secondary) and the title (16 px semibold). Page actions sit on the right. The title is at the same x and y on every page, and the band never wraps.
+- **H1** (must) Every page has one header band, 56 px, with two stacked lines on the left: a context line (12 px, secondary) and the title (18 px, weight 600). Page actions sit on the right. The title is at the same x and y on every page, and the band never wraps.
   - Today: The header is 60 px, or 96 px with tabs; Respond alone has five header layouts; the Logs, Metrics and Traces explorers have no header at all. _(screens-respond.md · screens-observe.md §9)_
 - **H2** (must) No icon tile and no subtitle paragraph; the rail already shows the area's icon. Explanations open from an About (ⓘ) button beside the title.
   - Today: Icon tile, title and subtitle on 46 screens in AI, Infra and Security, and on 18 in Respond. _(screens-ai-infra-security.md §6 · screens-respond.md)_
@@ -260,7 +262,7 @@ is `text-title`; `ODialog`, `ODrawer` and `OFormSection` set it, so a call site 
 | Settings page | Sticky bar while dirty: "Unsaved changes · Discard · Save" | "Discard changes?" — Keep editing · Discard |
 | Explorer (logs, metrics, traces) | "Save view" in the saved views menu; a modified view shows a dot | No guard; the edited query stays until Run |
 
-- **V1** (must) Forms are one column of titled sections (15 px semibold): 16 px between fields, 24 px between sections.
+- **V1** (must) Forms are one column of titled sections: 16 px between fields, 24 px between sections. A section is a 14 px semibold title with an optional 13 px secondary description over one hairline, never on a tinted band; Settings and IAM sections (`OFormSection variant="plain"`) draw no box. Its rows carry a 13 px medium label and 13 px secondary help.
 - **V2** (must) Save lives where the eye ends, as in the table above. Never inline in the middle of the content, never twice on one page.
   - Today: Code puts Save in 8 kinds of place (dialog footer 58, inline in a page or panel 51, inline in a form 33, sticky bar 21, drawer footer 21, pinned footer 20, header 20, table slot 19); Settings alone has 10. New destination's Save jumps from y = 318 to 836 with the chosen type. _(composition.md key findings · screens-settings-iam.md §0 · screens-respond.md)_
 - **V3** (must) Settings pages show the sticky "Unsaved changes · Discard · Save" bar only while there are changes. A switch that applies immediately needs no Save and confirms with a toast.
@@ -377,7 +379,7 @@ is `text-title`; `ODialog`, `ODrawer` and `OFormSection` set it, so a call site 
 ## 18. Checklist for AI agents
 
 - [L2] Bands in order: header, tabs, toolbar, strip, chips, content, footer.
-- [H1] Header is a context line above a 16 px title, actions right.
+- [H1] Header is a context line above an 18 px title, actions right.
 - [H8] Nothing in the header moves on tab switch or navigation.
 - [H3] At most two secondary, one primary, then ⋯ More.
 - [H6] Create button: "New <object>", label only.

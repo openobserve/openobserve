@@ -84,6 +84,16 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "SC 1.4.11 decorative: the hairline of a tinted chip whose state is already carried by its fill and text, so the border is not the sole state indicator",
   },
   {
+    fg: "--color-control-border",
+    category: "exempt",
+    why: "SC 1.4.11: the approved resting edge (2.5:1) is not the only cue; every control carries its label, value or placeholder at 4.5:1, hover lifts the edge to 3:1 and focus adds the accent edge",
+  },
+  {
+    fg: "--color-control-border-selected",
+    category: "exempt",
+    why: "SC 1.4.11 decorative: the edge of a selected control whose state is already carried by its accent fill and ink, so the border is not the sole state indicator",
+  },
+  {
     fg: "--color-border-default",
     category: "exempt",
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
@@ -600,20 +610,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["light"],
   },
   {
-    fg: "--color-datepicker-focus-border",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["light"],
-  },
-  {
-    fg: "--color-datepicker-hover-border",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["light"],
-  },
-  {
     fg: "--color-datepicker-segment-focus-text",
     bg: "--color-datepicker-segment-focus-bg",
     category: "pending",
@@ -892,13 +888,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "fails the threshold against the page surface it is painted on",
     issue: "WCAG-AA colour remediation (follow-up PR)",
     themes: ["light"],
-  },
-  {
-    fg: "--color-toggle-border",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["dark"],
   },
   {
     fg: "--color-badge-blue-solid-text",

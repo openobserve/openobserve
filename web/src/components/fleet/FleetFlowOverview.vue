@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
           <OButton
             icon-only
-            variant="secondary"
+            variant="ghost"
             :icon="expanded ? 'close-fullscreen' : 'open-in-full'"
             :aria-label="expandLabel"
             data-test="fleet-flow-overview-expand"

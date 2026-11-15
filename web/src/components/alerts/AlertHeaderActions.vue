@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #trigger>
       <OButton
         icon-only
-        variant="secondary"
+        variant="ghost"
         icon="more-vert"
         :aria-label="t('alerts.moreActions')"
         data-test="alerts-alertdetail-ack-menu"

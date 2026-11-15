@@ -232,7 +232,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ShareButton
           v-if="shareUrl"
           :url="shareUrl"
-          variant="secondary"
           data-test="metrics-explorer-share-btn"
           shortcut-id="metricsCopyUrl"
         />

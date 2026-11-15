@@ -195,7 +195,7 @@
         <template #trigger>
           <OButton
             icon-only
-            variant="secondary"
+            variant="ghost"
             icon="more-vert"
             :loading="snoozing || escalatingNow"
             :aria-label="t('oncall.moreActions')"

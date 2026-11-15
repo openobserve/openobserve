@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <OForm id="general-settings-form" :form="form">
-      <div class="flex flex-col gap-4">
+      <div class="flex flex-col gap-6">
         <template v-if="!trialExpired">
           <OFormSection
             variant="plain"
@@ -312,17 +312,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             data-test="general-settings-delete-org-facts"
-            class="divide-border-default grid grid-cols-4 divide-x max-md:grid-cols-1 max-md:divide-x-0"
+            class="divide-border-subtle grid grid-cols-4 divide-x max-md:grid-cols-1 max-md:divide-x-0"
           >
             <div
               v-for="fact in deleteOrgFacts"
               :key="fact.key"
               :data-test="`general-settings-delete-org-fact-${fact.key}`"
-              class="flex flex-col gap-1 px-4 py-3"
+              class="flex flex-col gap-1 px-4 py-3 first:ps-0 max-md:px-0"
             >
               <div class="flex items-center gap-2">
                 <OIcon :name="fact.icon" size="sm" class="text-text-muted shrink-0" />
-                <span class="text-text-heading text-sm font-semibold">{{ fact.title }}</span>
+                <span class="text-text-heading text-compact font-medium">{{ fact.title }}</span>
               </div>
               <span class="text-text-secondary text-xs">{{ fact.detail }}</span>
             </div>

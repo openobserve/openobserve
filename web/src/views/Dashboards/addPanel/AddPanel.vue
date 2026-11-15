@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   )
                 "
                 icon-only
-                variant="secondary"
+                variant="ghost"
                 @click="showViewPanel = true"
                 data-test="dashboard-panel-data-view-query-inspector-btn"
                 icon="manage-search"

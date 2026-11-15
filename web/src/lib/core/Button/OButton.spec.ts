@@ -139,6 +139,16 @@ describe("OButton", () => {
       });
       expect(wrapper.attributes("aria-label")).toBe("Close panel");
     });
+
+    it("defaults to an edgeless ghost, and keeps the border only when a variant asks for it", () => {
+      const props = { iconOnly: true, icon: "refresh", label: raw("Refresh") } as const;
+      const bare = mount(OButton, { props, global });
+      expect(bare.attributes("data-o2-variant")).toBe("ghost");
+      expect(bare.classes()).toContain("border-transparent");
+      const outlined = mount(OButton, { props: { ...props, variant: "secondary" }, global });
+      expect(outlined.attributes("data-o2-variant")).toBe("secondary");
+      expect(outlined.classes()).toContain("border-button-outline-border");
+    });
   });
 
   describe("pressed", () => {
@@ -155,7 +165,7 @@ describe("OButton", () => {
     it("marks the selected secondary with the selected border, never a fill colour of its own", () => {
       const classes = mount(OButton, { props: { pressed: true } }).classes();
       expect(classes).toContain("text-accent-on-tint");
-      expect(classes).toContain("border-button-outline-hover-border");
+      expect(classes).toContain("border-control-border-selected");
       expect(classes).not.toContain("bg-button-primary");
     });
   });

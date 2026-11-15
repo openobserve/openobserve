@@ -58,6 +58,7 @@
   --d-divider: #3a3f51; /* subtle: row & section separators            */
   --d-border: #43485a; /* default: card / input / table / rail edges  */
   --d-border-strong: #656b7f; /* strong: checkbox / radio / file outlines    */
+  --d-control-border: #51576b; /* control rest edge: 2.5:1 on base, as grey-400 on white */
 
   /* Text — mapped straight to the registered --color-grey-* palette in the
        block below (mirrors light mode, where each tier = a grey step). No
@@ -161,6 +162,8 @@
      the dark surfaces, so dark mode reuses it rather than inventing a value —
      the light theme needs its own only because grey-400 falls short there. */
   --color-border-control: var(--d-border-strong);
+  --color-control-border: var(--d-control-border);
+  --color-control-border-selected: var(--color-primary-700);
   /* Soft divider — one step quieter than border-default so row/section
        splits don't read as hard structural lines (but still visible). */
   --color-border-subtle: var(--d-divider);
@@ -187,15 +190,15 @@
 
   /* outline */
   --color-button-outline-text: var(--color-text-heading);
-  --color-button-outline-border: var(--color-border-control);
-  --color-button-outline-hover-bg: var(--color-primary-900);
+  --color-button-outline-border: var(--color-control-border);
+  --color-button-outline-hover-bg: var(--color-surface-subtle);
   --color-button-outline-hover-border: var(--color-border-strong);
-  --color-button-outline-active-bg: var(--color-surface-accent-active);
+  --color-button-outline-active-bg: var(--color-surface-subtle-hover);
 
   /* ghost */
-  --color-button-ghost-text: var(--color-text-heading);
-  --color-button-ghost-hover-bg: var(--color-surface-accent-hover);
-  --color-button-ghost-active-bg: var(--color-surface-accent-active);
+  --color-button-ghost-text: var(--color-text-secondary);
+  --color-button-ghost-hover-bg: var(--color-surface-subtle);
+  --color-button-ghost-active-bg: var(--color-surface-subtle-hover);
 
   /* ghost-primary */
   --color-button-ghost-primary-text: var(--color-primary-400);
@@ -238,9 +241,6 @@
 
   /* ToggleGroup */
   --color-toggle-item-hover-bg: var(--d-divider);
-  --color-toggle-item-active-bg: var(--color-primary-900);
-  --color-toggle-item-active-text: var(--color-white);
-  --color-toggle-item-active-border: var(--color-primary-400);
   /* The item also dims to 60%, which makes --color-text-disabled vanish on the dark track. */
   --color-toggle-item-disabled: var(--color-grey-500);
   /* Accent lightens on dark so the insertion line stays visible on the track */
@@ -404,10 +404,7 @@
        a distinct lighter gray; disabled-bg uses --d-well so disabled fields
        still read as a clearly different, inert surface. */
   --color-input-bg: var(--color-surface-base);
-  /* Matched to the outline button's border (--color-border-control) so a text
-     field and a button side by side share one border weight — now the
-     already-passing control-border value instead of border-default. */
-  --color-input-border: var(--color-border-control);
+  --color-input-border: var(--color-control-border);
   --color-input-disabled-bg: var(--d-well);
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-placeholder: var(--color-text-placeholder);
@@ -416,8 +413,7 @@
 
   /* Select (OSelect) — same surface-matching bg + disabled strategy as input. */
   --color-select-bg: var(--color-surface-base);
-  /* See --color-input-border above: this override had the same effect. */
-  --color-select-border: var(--color-border-control);
+  --color-select-border: var(--color-control-border);
   --color-select-disabled-bg: var(--d-well);
   --color-select-disabled-text: var(--color-text-secondary);
   --color-select-placeholder: var(--color-text-placeholder);
@@ -490,7 +486,7 @@
 
   /* Date / Time / Color (ODate, OTime, OColor) */
   --color-datepicker-bg: var(--color-surface-panel);
-  --color-datepicker-border: var(--color-border-strong);
+  --color-datepicker-border: var(--color-control-border);
   --color-datepicker-disabled-bg: var(--color-surface-subtle);
   --color-datepicker-disabled-border: var(--color-border-default);
   --color-datepicker-error-text: var(--color-error-400);
@@ -525,18 +521,17 @@
 
   /* Dialog */
   --color-dialog-overlay: color-mix(in srgb, var(--d-chrome) 80%, transparent);
-  /* Body matches the normal content canvas (so inputs sit flush like on a
-       page); header + footer take the folder-rail surface so they read as a
-       slightly lifted frame around the content. Shared by ODialog + ODrawer. */
-  --color-dialog-bg: var(--color-surface-base);
+  /* One overlay surface, a step above the page, so a dialog or drawer lifts off what it covers.
+     Shared by ODialog + ODrawer. */
+  --color-dialog-bg: var(--color-surface-overlay);
   --color-dialog-border: var(--d-border);
   --shadow-dialog:
     0 1.5rem 3rem -0.75rem var(--shadow-lg-c1), 0 0.5rem 1rem -0.25rem var(--shadow-lg-c2);
-  --color-dialog-header-bg: var(--color-surface-panel);
+  --color-dialog-header-bg: var(--color-surface-overlay);
   --color-dialog-header-text: var(--color-text-heading);
   --color-dialog-header-border: var(--d-border);
   --color-dialog-content-text: var(--color-text-heading);
-  --color-dialog-footer-bg: var(--color-surface-panel);
+  --color-dialog-footer-bg: var(--color-surface-overlay);
   --color-dialog-footer-border: var(--d-border);
   --color-dialog-close-text: var(--color-text-muted);
   --color-dialog-close-hover-bg: var(--d-divider);
@@ -798,7 +793,6 @@
 /* ToggleGroup — primary variant dark overrides */
 .dark [data-variant="primary"] {
   --color-toggle-track-bg: var(--color-primary-900);
-  --color-toggle-border: var(--color-primary-700);
   --color-toggle-item-hover-bg: var(--color-primary-950);
   --color-toggle-item-active-bg: var(--color-surface-accent-active);
   --color-toggle-item-active-text: var(--color-primary-200);

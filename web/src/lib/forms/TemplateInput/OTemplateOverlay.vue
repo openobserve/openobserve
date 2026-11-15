@@ -34,7 +34,7 @@ defineSlots<TemplateOverlaySlots<T>>();
       !props.suggest.listOpen.value
     "
     :data-test="props.dataTest ? `${props.dataTest}-peek` : undefined"
-    class="bg-select-content-bg border-select-content-border rounded-default absolute start-0 bottom-full z-10 mb-1 max-w-72 border px-2 py-1.5 shadow-md"
+    class="bg-select-content-bg rounded-default shadow-overlay border-border-default absolute start-0 bottom-full z-10 mb-1 max-w-72 border px-2 py-1.5"
   >
     <span class="text-accent text-2xs font-mono font-semibold">{{
       props.suggest.format(props.suggest.peekName.value)

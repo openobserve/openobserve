@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</span>
                   <OButton
                     icon-only
-                    variant="secondary"
+                    variant="ghost"
                     size="sm"
                     class="rotate-90"
                     icon="unfold-less"

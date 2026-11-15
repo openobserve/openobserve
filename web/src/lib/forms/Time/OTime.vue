@@ -325,13 +325,10 @@ const heightClasses: Record<NonNullable<TimeProps["size"]>, string> = {
 
 const fieldClasses = computed(() => [
   "flex items-center w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
-  "ring-offset-1 ring-offset-surface-base",
   "bg-datepicker-bg",
   hasError.value
-    ? "border-datepicker-error-border"
-    : "border-datepicker-border hover:border-datepicker-hover-border",
-  "focus-within:border-datepicker-focus-border",
-  "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
+    ? "border-datepicker-error-border focus-within:ring-3 focus-within:ring-control-error-halo"
+    : "border-datepicker-border hover:not-focus-within:border-datepicker-hover-border focus-within:border-datepicker-focus-border focus-within:ring-3 focus-within:ring-control-focus-halo",
   isDisabled.value
     ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60 cursor-not-allowed"
     : "",
@@ -455,7 +452,7 @@ const fieldClasses = computed(() => [
           :side-offset="4"
           align="start"
           :class="[
-            'rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-10001 overflow-hidden border shadow-md outline-none',
+            'rounded-default bg-datepicker-popup-bg shadow-overlay border-border-default z-10001 overflow-hidden border outline-none',
             'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
             withSeconds ? 'w-64' : 'w-56',
           ]"

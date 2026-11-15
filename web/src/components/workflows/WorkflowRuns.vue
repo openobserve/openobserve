@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           class="absolute top-2 right-2 z-10"
           data-test="workflow-runs-panel-collapse"
           :aria-label="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"

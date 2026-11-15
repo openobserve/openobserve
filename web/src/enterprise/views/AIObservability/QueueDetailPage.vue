@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar-trailing>
           <OButton
             icon-only
-            variant="secondary"
+            variant="ghost"
             icon="refresh"
             :loading="loading"
             data-test="ai-queue-detail-refresh-btn"

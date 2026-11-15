@@ -124,13 +124,10 @@ function handleClear() {
 
 const wrapperClasses = computed(() => [
   "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
-  "ring-offset-1 ring-offset-surface-base",
   "bg-datepicker-bg",
   hasError.value
-    ? "border-datepicker-error-border"
-    : "border-datepicker-border hover:border-datepicker-hover-border",
-  "focus-within:border-datepicker-focus-border",
-  "focus-within:ring-2 focus-within:ring-datepicker-focus-ring",
+    ? "border-datepicker-error-border focus-within:ring-3 focus-within:ring-control-error-halo"
+    : "border-datepicker-border hover:not-focus-within:border-datepicker-hover-border focus-within:border-datepicker-focus-border focus-within:ring-3 focus-within:ring-control-focus-halo",
   isDisabled.value ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
 ]);
@@ -176,7 +173,7 @@ const wrapperClasses = computed(() => [
           <PopoverContent
             :side-offset="6"
             align="start"
-            class="rounded-default bg-colorpicker-popup-bg border-colorpicker-popup-border z-10001 flex w-55 flex-col gap-3 border p-3 shadow-md max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
+            class="rounded-default bg-colorpicker-popup-bg shadow-overlay border-border-default z-10001 flex w-55 flex-col gap-3 border p-3 max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
           >
             <!-- Saturation / Brightness area -->
             <!-- ColorAreaRoot passes gradient styles via scoped slot -->

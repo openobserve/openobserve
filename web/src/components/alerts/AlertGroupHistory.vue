@@ -72,7 +72,7 @@
       <template #toolbar-trailing>
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           icon="refresh"
           :loading="loading"
           data-test="alerts-alertgrouphistory-refresh"

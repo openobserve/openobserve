@@ -49,26 +49,33 @@ describe("tab label weight", () => {
 });
 
 describe("segmented control (item 3)", () => {
-  const EDGE = ["ring-1", "ring-inset", "ring-toggle-item-active-border"];
-  const ON = "data-[state=on]:not-focus-visible:";
+  // The selected segment is the raised surface on the filled tray: a hairline ring and a small shadow.
+  const EDGE = /(^|:)(ring|shadow)(-|$)/;
   // A border, padding, margin or size class would change the box the indicator is measured from.
   const BOX = /(^|:)(border|p[xyse]?|m[xyse]?|w|h|size)(-|$)/;
   const BOX_CLASSES = ["h-control-xs", "px-2"];
 
-  it("edges the sliding indicator with an inset brand ring and main's shadow", () => {
+  it("paints the sliding indicator as a raised segment with a hairline ring", () => {
     const indicator = mountToggle("single").find('[aria-hidden="true"].absolute');
     expect(indicator.classes()).toEqual(
-      expect.arrayContaining(["bg-toggle-item-active-bg", "shadow-xs", ...EDGE]),
+      expect.arrayContaining([
+        "bg-toggle-item-active-bg",
+        "ring-1",
+        "ring-toggle-item-active-border",
+        "shadow-xs",
+      ]),
     );
     expect(indicator.classes().filter((name) => BOX.test(name))).toEqual([]);
   });
 
-  it("edges a per-item active segment the same way without touching its box", () => {
+  it("paints a per-item active segment the same way without touching its box", () => {
     const item = mountToggle("multiple").findAll("button")[0];
     expect(item.classes()).toContain("data-[state=on]:bg-toggle-item-active-bg");
-    expect(item.classes()).toEqual(expect.arrayContaining(EDGE.map((name) => ON + name)));
     const stateClasses = item.classes().filter((name) => name.startsWith("data-[state=on]:"));
-    expect(stateClasses.filter((name) => BOX.test(name.replace(ON, "")))).toEqual([]);
+    expect(stateClasses.filter((name) => EDGE.test(name)).length).toBeGreaterThan(0);
+    expect(stateClasses.filter((name) => BOX.test(name.replace("data-[state=on]:", "")))).toEqual(
+      [],
+    );
   });
 
   it("leaves the item's own box classes as they were", () => {

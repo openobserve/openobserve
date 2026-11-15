@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-only
         data-cy="syntax-guide-button"
         v-bind="$attrs"
-        variant="secondary"
+        variant="ghost"
         :class="[sqlmode ? 'sql-mode' : 'normal-mode']"
       >
         <OIcon name="help" size="sm" />

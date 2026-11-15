@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           icon="account-tree"
           data-test="fleet-editor-canvas-auto-layout"
           @click="autoLayout"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           icon="fullscreen"
           data-test="fleet-editor-canvas-fit"
           @click="fit"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           icon-only
-          variant="secondary"
+          variant="ghost"
           icon="delete-sweep"
           :aria-label="t('fleet.editor.clear')"
           data-test="fleet-editor-canvas-clear"

@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="collapsible && collapsed && icon"
       icon-only
       variant="ghost"
-      size="sm"
       class="bg-tabs-hover-bg mx-auto mt-3 mb-1 shrink-0"
       :aria-expanded="false"
       :aria-label="collapsedLabel"
@@ -61,8 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="collapsible"
         icon-only
-        variant="secondary"
-        size="sm"
+        variant="ghost"
         class="shrink-0"
         :aria-expanded="true"
         :aria-label="toggleLabel"

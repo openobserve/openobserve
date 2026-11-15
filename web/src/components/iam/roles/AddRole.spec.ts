@@ -321,7 +321,7 @@ describe("AddRole", () => {
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
       expect(mockToast).toHaveBeenCalledWith({
-        message: 'Role "test_role" Created Successfully!',
+        message: 'Role "test_role" created successfully!',
         variant: "success",
       });
     });

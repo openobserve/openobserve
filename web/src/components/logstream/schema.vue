@@ -288,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-only
                           data-test="schema-add-fields-title"
                           :disabled="isDialogOpen"
-                          variant="secondary"
+                          variant="ghost"
                           @click.stop="openDialog"
                           :title="t('logStream.addFieldsTitle')"
                           icon="add"

@@ -290,7 +290,8 @@ function headerPaddingClass(header: any): string {
   return m?.compactPadding ? "px-1" : "px-3";
 }
 
-// The sticky actions header is empty and see-through, so a label scrolled under it stays readable (D7).
+// The actions header names its column for screen readers only; it stays opaque like its cells,
+// or a label scrolled under the pinned column would show through above the row icons (D7).
 function isActionHeader(header: any): boolean {
   return !!(header.column.columnDef.meta as any)?.isAction;
 }
@@ -517,7 +518,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
     v-for="headerGroup in headerGroups"
     :key="headerGroup.id"
     :class="[
-      'bg-table-header-bg',
+      'group/thead bg-table-header-bg',
       'border-table-header-border border-b',
       stickyHeader ? 'sticky top-0 z-10' : '',
     ]"
@@ -601,7 +602,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           // Sortable's `filter` selector — this header can't start a drag, so it
           // must not advertise the move cursor the draggable <tr> sets either.
           header.id === pinnedFirstColumn ? 'o2-table-th-pinned-first cursor-default' : '',
-          headerPin(header) && !isActionHeader(header) ? 'bg-table-header-bg' : '',
+          headerPin(header) ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -637,7 +638,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: isActionHeader(header) ? 'none' : 'var(--shadow-sticky-right)',
+                boxShadow: 'var(--shadow-sticky-right)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).
@@ -978,7 +979,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               'rounded-full transition-all duration-150',
               header.column.getIsResizing()
                 ? 'bg-table-resize-handle h-full w-0.5'
-                : 'bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px group-hover/resizer:h-full group-hover/resizer:w-0.5',
+                : 'group-hover/thead:bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px bg-transparent group-hover/resizer:h-full group-hover/resizer:w-0.5',
             ]"
           />
         </div>
@@ -1044,7 +1045,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           density === 'compact' ? 'group h-control-sm' : 'group h-control-md',
           'border-table-header-border border-b',
-          headerPin(header) && !isActionHeader(header) ? 'bg-table-header-bg' : '',
+          headerPin(header) ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -1080,7 +1081,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: isActionHeader(header) ? 'none' : 'var(--shadow-sticky-right)',
+                boxShadow: 'var(--shadow-sticky-right)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).
@@ -1385,7 +1386,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               'rounded-full transition-all duration-150',
               header.column.getIsResizing()
                 ? 'bg-table-resize-handle h-full w-0.5'
-                : 'bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px group-hover/resizer:h-full group-hover/resizer:w-0.5',
+                : 'group-hover/thead:bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px bg-transparent group-hover/resizer:h-full group-hover/resizer:w-0.5',
             ]"
           />
         </div>

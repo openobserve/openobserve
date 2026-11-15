@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="branch" class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2">
       <OButton
         icon-only
-        variant="secondary"
+        variant="ghost"
         size="xs"
         :icon="branch === 'open' ? 'remove' : 'add'"
         :aria-label="

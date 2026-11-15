@@ -1,7 +1,6 @@
 ﻿<template>
   <OCard flush class="h-full">
     <div class="flex h-full flex-col">
-      <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
       <div class="flex flex-wrap items-center gap-2 gap-y-1 p-1.5 pb-0">
         <!-- Stream selector (hidden when a parent drives selection, e.g. the
            Agent Graph page which selects by agent). -->
@@ -35,9 +34,112 @@
             @update:model-value="applyFilters"
           />
         </div>
-        <!-- Spacer -->
         <div class="flex-1" />
-        <!-- Legends (horizontal) -->
+        <!-- Inventory chip: total entity count. Click to expand the per-kind
+           distribution (read-only; the show/hide toggles live in "Show types"). -->
+        <ODropdown side="bottom" align="start">
+          <template #trigger>
+            <OButton data-test="service-graph-entity-count" variant="ghost" icon-end="expand-more">
+              <span v-if="lastRunAt !== null" class="text-text-secondary font-bold">{{
+                totalEntities
+              }}</span>
+              <span class="text-text-body ms-1">{{ t("traces.serviceGraph.entities") }}</span>
+            </OButton>
+          </template>
+          <div class="min-w-48" data-test="service-graph-entity-distribution">
+            <ODropdownGroup :label="t('traces.serviceGraph.distribution')">
+              <ODropdownItem
+                v-for="row in kindRows"
+                :key="row.key"
+                :data-test="`service-graph-distribution-${row.key}`"
+              >
+                {{ row.label }}
+                <span class="ms-auto ps-4 tabular-nums opacity-70">{{ row.count }}</span>
+              </ODropdownItem>
+            </ODropdownGroup>
+            <ODropdownSeparator />
+            <ODropdownItem data-test="service-graph-distribution-total">
+              <span class="font-semibold">{{ t("traces.serviceGraph.total") }}</span>
+              <span class="ms-auto ps-4 font-semibold tabular-nums">{{ totalEntities }}</span>
+            </ODropdownItem>
+          </div>
+        </ODropdown>
+        <!-- "Show types": unifies the kind inventory (each kind's count) with
+           the kind filter (show/hide) and the layout mode. -->
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              data-test="service-graph-density-btn"
+              variant="secondary"
+              icon="filter-list"
+              :pressed="activeFilterCount > 0"
+            >
+              {{ t("traces.serviceGraph.showTypes") }}
+              <!-- Filter-active dot: signals the graph is filtered (some types
+                 hidden), not simply empty. Per-type detail lives in the
+                 dropdown below. -->
+              <span
+                v-if="activeFilterCount > 0"
+                class="ms-1.5 inline-block h-1.5 w-1.5 rounded-full bg-white"
+                data-test="service-graph-active-filter-indicator"
+              />
+              <OTooltip
+                v-if="activeFilterCount > 0"
+                :content="t('traces.serviceGraph.typesFiltered')"
+              />
+            </OButton>
+          </template>
+          <div class="flex min-w-52 flex-col gap-2 p-2" data-test="service-graph-collapse-mode">
+            <div class="text-3xs font-bold uppercase opacity-60">
+              {{ t("traces.serviceGraph.layout") }}
+            </div>
+            <OToggleGroup
+              size="sm"
+              :model-value="collapseMode"
+              class="w-full"
+              @update:model-value="(v) => setCollapseMode(v as 'auto' | 'expanded' | 'collapsed')"
+            >
+              <OToggleGroupItem
+                v-for="m in ['auto', 'expanded', 'collapsed'] as const"
+                :key="m"
+                :value="m"
+                class="flex-1"
+                :data-test="`service-graph-collapse-${m}`"
+              >
+                {{ t(`traces.serviceGraph.mode.${m}`) }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <div class="text-3xs mt-1 font-bold uppercase opacity-60">
+              {{ t("traces.serviceGraph.types") }}
+            </div>
+            <!-- Each row: type name + live count, with a checkbox to show/hide.
+               Services are always shown, so their row is count-only
+               (non-toggleable). -->
+            <div
+              v-for="row in kindRows"
+              :key="row.key"
+              :data-test="
+                row.toggleable
+                  ? `service-graph-kind-toggle-${row.key}`
+                  : `service-graph-kind-count-${row.key}`
+              "
+              class="flex items-center gap-2 text-xs"
+            >
+              <OCheckbox
+                v-if="row.toggleable"
+                :model-value="!hiddenKinds.has(row.key)"
+                @update:model-value="toggleKindVisibility(row.key)"
+              />
+              <!-- Spacer aligning the always-on Services row with the checkboxes -->
+              <span v-else class="inline-block w-3.5 shrink-0" />
+              <span class="flex-1">{{ row.label }}</span>
+              <span class="tabular-nums opacity-70">{{ row.count }}</span>
+            </div>
+          </div>
+        </ODropdown>
+      </div>
+      <!-- A key, not a control: its own row keeps the toolbar on one line. -->
+      <div class="flex px-1.5 pt-1">
         <div
           data-test="service-graph-legends"
           class="rounded-default border-card-glass-border! flex max-w-full flex-row flex-wrap items-center gap-3 gap-y-1.5 border p-[0.325rem]"
@@ -95,116 +197,6 @@
               {{ t("traces.serviceGraph.dashedRingInferred") }}
             </div>
           </div>
-          <OSeparator vertical class="mx-1 self-stretch max-md:hidden" />
-          <!-- Inventory chip: total entity count. Click to expand the per-kind
-             distribution (read-only; the show/hide toggles live in "Show types"). -->
-          <ODropdown side="bottom" align="start">
-            <template #trigger>
-              <OButton
-                data-test="service-graph-entity-count"
-                variant="ghost"
-                size="sm"
-                icon-end="expand-more"
-              >
-                <span v-if="lastRunAt !== null" class="text-text-secondary font-bold">{{
-                  totalEntities
-                }}</span>
-                <span class="text-text-body ms-1">{{ t("traces.serviceGraph.entities") }}</span>
-              </OButton>
-            </template>
-            <div class="min-w-48" data-test="service-graph-entity-distribution">
-              <ODropdownGroup :label="t('traces.serviceGraph.distribution')">
-                <ODropdownItem
-                  v-for="row in kindRows"
-                  :key="row.key"
-                  :data-test="`service-graph-distribution-${row.key}`"
-                >
-                  {{ row.label }}
-                  <span class="ms-auto ps-4 tabular-nums opacity-70">{{ row.count }}</span>
-                </ODropdownItem>
-              </ODropdownGroup>
-              <ODropdownSeparator />
-              <ODropdownItem data-test="service-graph-distribution-total">
-                <span class="font-semibold">{{ t("traces.serviceGraph.total") }}</span>
-                <span class="ms-auto ps-4 font-semibold tabular-nums">{{ totalEntities }}</span>
-              </ODropdownItem>
-            </div>
-          </ODropdown>
-          <OSeparator vertical class="mx-1 self-stretch" />
-          <!-- "Show types": unifies the kind inventory (each kind's count) with
-             the kind filter (show/hide) and the layout mode. -->
-          <ODropdown side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                data-test="service-graph-density-btn"
-                variant="secondary"
-                size="sm"
-                icon="filter-list"
-                :pressed="activeFilterCount > 0"
-              >
-                {{ t("traces.serviceGraph.showTypes") }}
-                <!-- Filter-active dot: signals the graph is filtered (some types
-                   hidden), not simply empty. Per-type detail lives in the
-                   dropdown below. -->
-                <span
-                  v-if="activeFilterCount > 0"
-                  class="ms-1.5 inline-block h-1.5 w-1.5 rounded-full bg-white"
-                  data-test="service-graph-active-filter-indicator"
-                />
-                <OTooltip
-                  v-if="activeFilterCount > 0"
-                  :content="t('traces.serviceGraph.typesFiltered')"
-                />
-              </OButton>
-            </template>
-            <div class="flex min-w-52 flex-col gap-2 p-2" data-test="service-graph-collapse-mode">
-              <div class="text-3xs font-bold uppercase opacity-60">
-                {{ t("traces.serviceGraph.layout") }}
-              </div>
-              <OToggleGroup
-                size="sm"
-                :model-value="collapseMode"
-                class="w-full"
-                @update:model-value="(v) => setCollapseMode(v as 'auto' | 'expanded' | 'collapsed')"
-              >
-                <OToggleGroupItem
-                  v-for="m in ['auto', 'expanded', 'collapsed'] as const"
-                  :key="m"
-                  :value="m"
-                  class="flex-1"
-                  :data-test="`service-graph-collapse-${m}`"
-                >
-                  {{ t(`traces.serviceGraph.mode.${m}`) }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-              <div class="text-3xs mt-1 font-bold uppercase opacity-60">
-                {{ t("traces.serviceGraph.types") }}
-              </div>
-              <!-- Each row: type name + live count, with a checkbox to show/hide.
-                 Services are always shown, so their row is count-only
-                 (non-toggleable). -->
-              <div
-                v-for="row in kindRows"
-                :key="row.key"
-                :data-test="
-                  row.toggleable
-                    ? `service-graph-kind-toggle-${row.key}`
-                    : `service-graph-kind-count-${row.key}`
-                "
-                class="flex items-center gap-2 text-xs"
-              >
-                <OCheckbox
-                  v-if="row.toggleable"
-                  :model-value="!hiddenKinds.has(row.key)"
-                  @update:model-value="toggleKindVisibility(row.key)"
-                />
-                <!-- Spacer aligning the always-on Services row with the checkboxes -->
-                <span v-else class="inline-block w-3.5 shrink-0" />
-                <span class="flex-1">{{ row.label }}</span>
-                <span class="tabular-nums opacity-70">{{ row.count }}</span>
-              </div>
-            </div>
-          </ODropdown>
           <OSeparator vertical v-if="resolvedVizType === 'graph'" class="mx-1 self-stretch" />
           <div
             v-if="resolvedVizType === 'graph'"

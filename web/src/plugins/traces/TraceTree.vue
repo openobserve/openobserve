@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span v-if="logsLocked" class="inline-flex">
                         <OButton
                           icon-only
-                          variant="secondary"
+                          variant="ghost"
                           size="xs"
                           disabled
                           :aria-label="t('traces.viewLogs')"
@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         v-else
                         icon-only
-                        variant="secondary"
+                        variant="ghost"
                         size="xs"
                         :title="t('traces.viewLogs')"
                         @click.stop="viewSpanLogs((spans as any[])[virtualRow.index])"

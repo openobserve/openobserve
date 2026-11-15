@@ -178,7 +178,7 @@ const itemAriaLabel = computed(
         'data-[state=on]:text-toggle-item-active-text',
         // Gated off while focused so the focus ring keeps its own width and colour.
         !isAnimated &&
-          'data-[state=on]:not-focus-visible:ring-toggle-item-active-border data-[state=on]:not-focus-visible:ring-1 data-[state=on]:not-focus-visible:ring-inset',
+          'data-[state=on]:not-focus-visible:ring-toggle-item-active-border data-[state=on]:not-focus-visible:ring-1',
         // Sit above the sliding indicator so the icon/label stay readable.
         isAnimated && 'relative z-10',
         // Focus ring

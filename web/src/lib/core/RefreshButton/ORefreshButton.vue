@@ -78,6 +78,11 @@ const failedText = computed<I18nText | null>(() => {
 
 const failedId = useId();
 
+// With visible text it is a labelled, bordered button; a bare ↻ is a toolbar icon and has no edge.
+const variant = computed(() =>
+  failedText.value || autoInterval.value || props.lastRunAt ? "secondary" : "ghost",
+);
+
 // The age alone is the visible label, so the name leads with the action a screen reader announces.
 const buttonName = computed(() => {
   if (failedText.value) return t("common.retry");
@@ -116,7 +121,7 @@ function handleClick(e: MouseEvent) {
   <OButtonGroup :size="size">
     <!-- A failed refresh restyles this same button rather than swapping it, so focus stays on it. -->
     <OButton
-      variant="secondary"
+      :variant="variant"
       :disabled="disabled"
       :aria-busy="loading || undefined"
       :data-test="dataTest"
@@ -146,7 +151,6 @@ function handleClick(e: MouseEvent) {
         >
       </template>
       <template v-else-if="autoInterval || lastRunAt">
-        <span class="bg-border-default h-4 w-px shrink-0 max-lg:hidden" aria-hidden="true" />
         <!-- No colour class: the age is the button's label, so it takes the button's ink. -->
         <span
           v-if="autoInterval"
@@ -167,7 +171,7 @@ function handleClick(e: MouseEvent) {
     <ODropdown v-if="autoRefresh !== undefined" align="end">
       <template #trigger>
         <OButton
-          variant="secondary"
+          :variant="variant"
           icon-only
           icon="arrow-drop-down"
           :disabled="disabled"

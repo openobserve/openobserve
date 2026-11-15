@@ -28,7 +28,8 @@ Any routed view is an `OPageLayout` (rule 1): the stacked `OPageHeader` on top,
 then the page body, all inside a **full-height flex column** so the header stays
 put and only the body scrolls. The header is [header-spec.md](header-spec.md):
 
-- **One 56 px band on every page** (H1): a 16 px context line over a 24 px title,
+- **One 56 px band on every page** (H1): a 16 px context line over a 24 px title line
+  holding the 18 px title,
   actions on the right. The band never wraps and nothing in it is sized by its
   content, so the title sits at the same x and y on every page.
 - **The context line names the container** (H4), derived for you from the route
@@ -483,7 +484,7 @@ parameters, Password policy): no edit mode, no dialog, one Save for the page.
   page adds no second title.
 - `OForm validate-on="leave"` with a colocated schema; list fields that are
   checked together in `coupled`.
-- One `OFormSection variant="plain"` per group, with
+- One `OFormSection variant="plain"` per group, stacked 24 px apart (`gap-6`), with
   `OSettingRow control-at="end" name="<field>"` rows inside. The row prints the
   field's error in place of its description, so nothing moves.
 - Rows pass `loading` until the saved values arrive, and the bar gets

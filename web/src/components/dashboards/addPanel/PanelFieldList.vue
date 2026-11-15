@@ -9,7 +9,7 @@
       <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
         icon-only
-        variant="secondary"
+        variant="ghost"
         size="sm"
         class="rotate-90"
         icon="unfold-less"

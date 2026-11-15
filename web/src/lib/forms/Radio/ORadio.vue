@@ -55,7 +55,7 @@ const surfaceClasses = computed(() => [
     ? [
         "w-full items-start rounded-surface border border-border-default bg-surface-base p-4",
         "transition-[color,background-color,border-color,box-shadow] duration-150",
-        "hover:border-input-border-hover",
+        "hover:border-accent",
         "has-[[data-state=checked]]:border-input-border-focus",
         "has-[[data-state=checked]]:ring-2 has-[[data-state=checked]]:ring-accent/20",
       ]

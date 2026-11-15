@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="toolbar"
           :icon-only="!label"
           data-cy="syntax-guide-button"
-          variant="secondary"
           :class="sqlmode ? 'sql-mode' : 'normal-mode'"
         >
           <OIcon name="help" size="sm" />

@@ -64,7 +64,7 @@ read it once, it is the backbone of everything below.
 1. **Every page header is `OPageHeader`, the stacked v2 header** — never a
    hand-rolled `<div class="header">…<h1>` or a `q-toolbar`
    ([header-spec](references/header-spec.md), guidelines H1–H8). One 56 px band: a
-   context line above a 16 px title, actions on the right. The context line is
+   context line above an 18 px title, actions on the right. The context line is
    derived from the route (the rail group, else the org); a detail, editor or import
    page passes **`:back="{ label, to }"`** and it becomes a real "‹ Parent" link on
    `useSmartBack` (H4, N3). The title sits at the same x and y on every page and
@@ -181,16 +181,16 @@ read it once, it is the backbone of everything below.
      | `text-2xs` | 11 | key chips, chart axes, micro captions |
      | `text-xs` | 12 | meta, helper text, chips, badges, column headers |
      | `text-compact` | 13 | **all UI text** (start here): controls, menus, table cells, labels |
-     | `text-sm` | 14 | **reading text only**: descriptions, dialog bodies, empty-state text, notices |
-     | `text-title` | 15 | dialog, drawer and section titles: owned by `ODialog` / `ODrawer` / `OFormSection` |
-     | `text-base` | 16 | the page title (owned by `OPageHeader`), never larger |
+     | `text-sm` | 14 | **reading text only**: descriptions, dialog bodies, empty-state text, notices; semibold, the section, card and panel titles (owned by `OFormSection` / `OCard`) |
+     | `text-title` | 15 | dialog and drawer titles: owned by `ODialog` / `ODrawer` |
+     | `text-lg` | 18 | the page title, 600 on a 24 px line (owned by `OPageHeader`), never larger |
      | `text-xl` · `text-2xl` | 20 · 24 | KPI values only |
 
      `text-compact` is the UI default: every O* control, menu, table cell and label
      sets it itself, so a call site does not. Reach for `text-sm` only for prose a
-     person reads. `text-3xs`, `text-lg`, `text-3xl` and `text-4xl` sit outside T1:
+     person reads. `text-3xs`, `text-base`, `text-3xl` and `text-4xl` sit outside T1:
      no new uses. A settings form's section heading comes from
-     `OFormSection variant="plain"`, never a hand-set size. If a design needs a size not on the scale, snap to the nearest
+     `OFormSection variant="plain"`, never a hand-set size; it must never outweigh the page title (T2). If a design needs a size not on the scale, snap to the nearest
      step — do **not** reintroduce an arbitrary `text-[..]`.
    - **Casing — never uppercase anywhere in the app, except an established short
      form.** This is app-wide and strict. No shouting: don't bake caps into a string
@@ -685,7 +685,7 @@ Each line is the short form of the rule in
 [references/guidelines.md](references/guidelines.md).
 
 - [ ] **L2** Bands in order: header, tabs, toolbar, strip, chips, content, footer.
-- [ ] **H1** Header is a context line above a 16 px title, actions right.
+- [ ] **H1** Header is a context line above an 18 px title, actions right.
 - [ ] **H8** Nothing in the header moves on tab switch or navigation.
 - [ ] **H3** At most two secondary, one primary, then ⋯ More.
 - [ ] **H6** Create button: "New <object>", label only.

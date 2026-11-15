@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div>
               <!-- Empty state: nothing configured anywhere -->
-              <div v-if="allConfiguredEnvs.length === 0 && !addingToEnv" class="px-4 py-3">
+              <div v-if="allConfiguredEnvs.length === 0 && !addingToEnv" class="py-3">
                 <div
                   class="rounded-default flex flex-col items-center gap-2 border border-dashed px-4 py-3"
                   :class="'border-border-default bg-surface-subtle'"
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Each group is a direct child, so its rule reaches the card edges. -->
               <template v-else>
-                <div v-if="isAutoSuggested" class="px-4 pt-3">
+                <div v-if="isAutoSuggested" class="pt-3">
                   <div
                     class="rounded-default flex items-start gap-2 px-3 py-2 text-xs"
                     :class="'bg-status-info-bg text-status-info-text'"
@@ -222,11 +222,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="envKey in allConfiguredEnvs"
                   :key="envKey"
-                  class="border-border-default flex flex-col gap-2 border-b px-4 py-3 last:border-b-0"
+                  class="border-border-subtle flex flex-col gap-2 border-b py-3 last:border-b-0"
                 >
                   <div
                     v-if="allConfiguredEnvs.length > 1"
-                    class="text-text-heading text-sm font-medium"
+                    class="text-text-heading text-compact font-medium"
                   >
                     {{ getIdentitySetLabel(envKey) }}
                   </div>
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Adding to a new env (not yet in the list) -->
                 <template v-if="addingToEnv && !allConfiguredEnvs.includes(addingToEnv)">
-                  <div class="flex flex-wrap items-center gap-2 px-4 py-3">
+                  <div class="flex flex-wrap items-center gap-2 py-3">
                     <OSelect
                       ref="addFieldSelectRef"
                       v-model="addFieldValue"
@@ -370,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <!-- Add group -->
-                <div v-if="!addingToEnv" class="flex items-center justify-between px-4 py-3">
+                <div v-if="!addingToEnv" class="flex items-center justify-between py-3">
                   <OButton variant="secondary" @click="addingToEnv = generateGroupId()" icon="add">
                     {{ t("settings.correlation.addGroup") }}
                     <OTooltip side="top" :content="t('settings.correlation.addGroupTooltip')" />
@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("settings.serviceIdentitySetup.goToServices") }}
           </OButton>
         </template>
-        <div class="-mx-4 -my-3">
+        <div class="rounded-surface border-border-default border">
           <!-- Collapsible: Workload detected using fields (N) -->
           <div
             class="rounded-default mx-3 mt-3 overflow-hidden border transition-all"

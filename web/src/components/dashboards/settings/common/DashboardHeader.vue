@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-only
           :aria-label="t('common.goBack')"
           data-test="dashboard-header-back-button"
-          variant="secondary"
+          variant="ghost"
           class="me-2"
           @click="onBackClicked"
           icon="arrow-back-ios-new"

@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="showAskAi"
               icon-only
-              variant="secondary"
+              variant="ghost"
               :aria-label="t('traces.askAi.askAboutSpan')"
               data-test="trace-span-ask-ai-btn"
               @click.stop="askAiAboutSpan"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="showEvaluateButton && canPreviewSpan"
               icon-only
-              variant="secondary"
+              variant="ghost"
               :aria-label="t('onlineEvals.manualEvaluation.titles.span')"
               data-test="trace-details-sidebar-evaluate-span-btn"
               @click.stop="evaluateSpan"
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="showAnnotateButtons"
               icon-only
-              variant="secondary"
+              variant="ghost"
               :aria-label="t('aiObservability.traceActions.dataset.button')"
               data-test="trace-details-sidebar-dataset-span-btn"
               @click.stop="addSpanToDataset"
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="canOpenPlayground"
               icon-only
-              variant="secondary"
+              variant="ghost"
               :aria-label="t('aiObservability.traceActions.playground.button')"
               data-test="trace-details-sidebar-playground-span-btn"
               @click.stop="openInPlayground"
@@ -587,7 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-1">
                     <OButton
                       icon-only
-                      variant="secondary"
+                      variant="ghost"
                       size="xs"
                       :title="
                         isFullscreen
@@ -600,7 +600,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       icon-only
-                      variant="secondary"
+                      variant="ghost"
                       size="xs"
                       :title="t('traces.traceDetailsSidebar.copyInput')"
                       @click="copyContent(previewInput, 'input')"
@@ -661,7 +661,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-1">
                     <OButton
                       icon-only
-                      variant="secondary"
+                      variant="ghost"
                       size="xs"
                       :title="
                         isFullscreen
@@ -674,7 +674,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       icon-only
-                      variant="secondary"
+                      variant="ghost"
                       size="xs"
                       :title="t('traces.traceDetailsSidebar.copyOutput')"
                       @click="copyContent(previewOutput, 'output')"

@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             icon-only
             data-test="rca-more-btn"
-            variant="secondary"
+            variant="ghost"
             class="shrink-0"
             :aria-label="t('alerts.incidents.rcaRun.more')"
           >

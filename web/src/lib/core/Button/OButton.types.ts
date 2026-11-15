@@ -28,7 +28,7 @@ export const BUTTON_VARIANTS = [
 export const BUTTON_SIZES = ["xs", "sm", "md", "lg"] as const satisfies readonly ButtonSize[];
 
 export interface ButtonProps {
-  /** Visual job of the button. Defaults to `secondary`. */
+  /** Visual job of the button. Defaults to `ghost` when icon-only, else `secondary`. */
   variant?: ButtonVariant;
   /** Height token; inherits the enclosing OButtonGroup's size, else `md`. */
   size?: ButtonSize;

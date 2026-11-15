@@ -194,8 +194,8 @@ describe("labels on the accent fills under every preset and its semantic colours
     "--color-table-row-action-hover-bg",
   ];
   // Status inks are left out: they sit on their own status tints, never on these fills.
+  // So is the ghost's rest ink: hover and press lift it to heading ink before a fill appears.
   const INKS = [
-    "--color-button-ghost-text",
     "--color-button-outline-text",
     "--color-button-secondary-foreground",
     "--color-button-ghost-primary-hover-text",
@@ -288,27 +288,34 @@ describe("segmented control (item 3)", () => {
   const MAIN: Record<Theme, [string, string][]> = {
     light: [
       ["--color-toggle-item-text", "--color-text-body"],
-      ["--color-toggle-item-active-bg", "--color-surface-accent-active"],
-      ["--color-toggle-item-active-text", "--color-primary-700"],
-      ["--color-toggle-item-active-border", "--color-primary-600"],
+      ["--color-toggle-item-active-bg", "--color-surface-base"],
+      ["--color-toggle-item-active-text", "--color-text-heading"],
+      ["--color-toggle-item-active-border", "--color-border-default"],
       ["--color-toggle-item-hover-bg", "--color-grey-150"],
+      ["--color-toggle-track-bg", "--color-surface-subtle"],
     ],
     dark: [
-      ["--color-toggle-item-active-bg", "--color-primary-900"],
-      ["--color-toggle-item-active-text", "--color-white"],
-      ["--color-toggle-item-active-border", "--color-primary-400"],
+      ["--color-toggle-item-active-bg", "--color-surface-base"],
+      ["--color-toggle-item-active-text", "--color-text-heading"],
+      ["--color-toggle-item-active-border", "--color-border-default"],
+      ["--color-toggle-track-bg", "--color-surface-subtle"],
     ],
   };
 
-  it.each(BOTH)("keeps main's segment text, fill, edge and hover in %s", (theme) => {
+  it.each(BOTH)("keeps the segment text, fill, tray and hover in %s", (theme) => {
     for (const [token, main] of MAIN[theme]) expect(same(token, main, theme), token).toBe(true);
   });
 
-  it.each(BOTH)("keeps the selected-segment edge at 3:1 on its fill in %s", (theme) => {
-    expect(
-      ratio("--color-toggle-item-active-border", "--color-toggle-item-active-bg", theme),
-    ).toBeGreaterThanOrEqual(NON_TEXT_MIN);
-  });
+  it.each(PREDEFINED_THEMES.flatMap((t) => BOTH.map((mode) => [t.name, mode, t[mode].themeColor])))(
+    "keeps the selected segment's ink at 4.5:1 on its fill under %s %s",
+    (_name, mode, themeColor) => {
+      const scope = themed(themeColor as string, mode as Theme);
+      const page = resolveColor("--color-surface-base", scope)!;
+      const fill = composite(resolveColor("--color-toggle-item-active-bg", scope)!, page);
+      const ink = composite(resolveColor("--color-toggle-item-active-text", scope)!, fill);
+      expect(contrastRatio(ink, fill)).toBeGreaterThanOrEqual(TEXT_MIN);
+    },
+  );
 
   it.each(BOTH)("keeps inactive text readable on the track and the hover in %s", (theme) => {
     for (const bg of ["--color-toggle-track-bg", "--color-toggle-item-hover-bg"]) {
@@ -322,7 +329,7 @@ describe("segmented control (item 3)", () => {
 
 describe("stat strip filter chips", () => {
   const badgeFill = (tone: "error" | "neutral", value: number) =>
-    tone === "error" && value > 0 ? "--color-badge-error-soft-bg" : "--color-surface-subtle";
+    tone === "error" && value > 0 ? "--color-badge-error-soft-bg" : "--color-surface-base";
 
   const tileToken = (part: "value" | "label", tone: "error" | "neutral", value: number) => {
     const wrapper = mount(OStatCard, {
@@ -364,7 +371,7 @@ describe("stat strip filter chips", () => {
       const fill =
         part === "value"
           ? badgeFill(tone as "error" | "neutral", value as number)
-          : "--color-surface-base";
+          : "--color-surface-subtle";
       expect(ratio(token, fill, theme)).toBeGreaterThanOrEqual(TEXT_MIN);
     },
   );
