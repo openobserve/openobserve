@@ -19,7 +19,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-import AssistantFloatingLauncher, { previewTitle } from "./AssistantFloatingLauncher.vue";
+import AssistantFloatingLauncher, {
+  LAUNCHER_INSET_VAR,
+  previewTitle,
+} from "./AssistantFloatingLauncher.vue";
 import type { ThreadPill } from "./threadsBar";
 
 const pill = (n: number, signal: ThreadPill["signal"] = "idle"): ThreadPill => ({
@@ -201,5 +204,29 @@ describe("AssistantFloatingLauncher", () => {
       "Why is checkout-api failin…",
     );
     expect(previewTitle("Exactly twenty six chars!!")).toBe("Exactly twenty six chars!!");
+  });
+
+  it("publishes its footprint on the page, never on overlays, and clears it on unmount", () => {
+    const main = document.createElement("main");
+    main.dataset.test = "main-content";
+    document.body.append(main);
+    main.getBoundingClientRect = () => ({ right: 1432 }) as DOMRect;
+    const rect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ left: 1368, width: 48 } as DOMRect);
+    const wrapper = mountLauncher(1);
+    expect(main.style.getPropertyValue(LAUNCHER_INSET_VAR)).toBe("64");
+    expect(document.documentElement.style.getPropertyValue(LAUNCHER_INSET_VAR)).toBe("");
+    wrapper.unmount();
+    expect(main.style.getPropertyValue(LAUNCHER_INSET_VAR)).toBe("");
+    rect.mockRestore();
+  });
+
+  it("publishes nothing while hidden", () => {
+    const main = document.createElement("main");
+    main.dataset.test = "main-content";
+    document.body.append(main);
+    mountLauncher(1);
+    expect(main.style.getPropertyValue(LAUNCHER_INSET_VAR)).toBe("");
   });
 });

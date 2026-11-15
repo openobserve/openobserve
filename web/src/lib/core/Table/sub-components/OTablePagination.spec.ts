@@ -324,3 +324,13 @@ describe("OTablePagination footer", () => {
     expect(wrapper.html()).not.toMatch(/\btext-primary\b/);
   });
 });
+
+describe("OTablePagination beside the assistant launcher", () => {
+  afterEach(() => wrapper?.unmount());
+
+  it("ends its controls before the width the launcher publishes on the page", () => {
+    mountPager();
+    const controls = wrapper.get(INFO).element.parentElement!;
+    expect(controls.className).toContain("me-[calc(var(--o-assistant-launcher-end,0)*1px)]");
+  });
+});

@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    ref="root"
     class="relative"
     role="presentation"
     data-test="assistant-launcher"
@@ -178,6 +179,11 @@ const STAGGER = [
 // Time the pointer may spend crossing the gap between the icon and the previews.
 const LEAVE_GRACE_MS = 150;
 
+/** Unitless px from the page's end edge to the launcher's start edge; table pagers end before it. */
+export const LAUNCHER_INSET_VAR = "--o-assistant-launcher-end";
+
+const MAIN_SELECTOR = "main[data-test='main-content']";
+
 /** The first PREVIEW_CHARS characters of a title, with an ellipsis when cut. */
 export function previewTitle(title: string): string {
   const chars = [...title.trim()];
@@ -188,7 +194,7 @@ export function previewTitle(title: string): string {
 </script>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
@@ -209,6 +215,7 @@ const { isDark } = useTheme();
 const logoSrc = computed(() =>
   getImageURL(isDark.value ? "images/common/o2_ai_logo_dark.svg" : "images/common/o2_ai_logo.svg"),
 );
+const root = ref<HTMLElement | null>(null);
 const toggleButton = ref<{ $el?: HTMLElement } | null>(null);
 const wanted = ref(false);
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -255,12 +262,34 @@ function onRestore(sid: Sid): void {
   emit("restore", sid);
 }
 
-function onDismiss(): void {
-  close();
-  emit("dismiss");
+// The launcher floats over the page's bottom-end corner, so it publishes its footprint on the page, never on overlays.
+let footprint: ResizeObserver | null = null;
+
+function publishFootprint(): void {
+  const main = document.querySelector<HTMLElement>(MAIN_SELECTOR);
+  if (!main) return;
+  const box = root.value?.getBoundingClientRect();
+  const end = main.getBoundingClientRect().right;
+  if (!box?.width || box.left >= end) main.style.removeProperty(LAUNCHER_INSET_VAR);
+  else main.style.setProperty(LAUNCHER_INSET_VAR, String(Math.ceil(end - box.left)));
 }
 
-onBeforeUnmount(() => clearTimeout(timer));
+onMounted(() => {
+  publishFootprint();
+  window.addEventListener("resize", publishFootprint);
+  if (typeof ResizeObserver === "undefined") return;
+  footprint = new ResizeObserver(publishFootprint);
+  if (root.value) footprint.observe(root.value);
+  const main = document.querySelector(MAIN_SELECTOR);
+  if (main) footprint.observe(main);
+});
+
+onBeforeUnmount(() => {
+  clearTimeout(timer);
+  footprint?.disconnect();
+  window.removeEventListener("resize", publishFootprint);
+  document.querySelector<HTMLElement>(MAIN_SELECTOR)?.style.removeProperty(LAUNCHER_INSET_VAR);
+});
 
 defineExpose({ focus: () => toggleButton.value?.$el?.focus() });
 </script>

@@ -11,6 +11,9 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { activates } from "@/lib/core/Button/activation";
 
 const { t } = useI18nTyped();
+// The assistant launcher floats over the page's bottom-end corner and publishes its width, so the controls end before it.
+// eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless inset the launcher writes
+const LAUNCHER_CLEARANCE = "me-[calc(var(--o-assistant-launcher-end,0)*1px)]";
 const slots = useSlots();
 
 const props = withDefaults(
@@ -219,7 +222,10 @@ const selectionLabel = computed(() => {
 
     <!-- min-h is one small control, so a one-row footer keeps its height even when the page-size select is absent. -->
     <div
-      class="ms-auto flex min-h-[2.125rem] min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 max-md:basis-full max-md:justify-between max-md:gap-x-2"
+      :class="[
+        'ms-auto flex min-h-[2.125rem] min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 max-md:basis-full max-md:justify-between max-md:gap-x-2',
+        LAUNCHER_CLEARANCE,
+      ]"
     >
       <span
         v-if="loading"
