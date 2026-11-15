@@ -393,11 +393,9 @@ const KEPT_ALIVE_VIEWS = ["AppAnalytics", "AppTraces"];
 // The assistant's sheet and floating card write their footprint here, so Tab never lands under them (`95` §6).
 const ASSISTANT_INSET_CLASSES = [
   // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless inset the sheet writes
-  "max-lg:pb-[max(calc(var(--o-assistant-inset-bottom,0)*1px),calc(var(--o-threads-bar-inset,0)*1rem))] max-lg:scroll-pb-[max(calc(var(--o-assistant-inset-bottom,0)*1px),calc(var(--o-threads-bar-inset,0)*1rem))]",
+  "max-lg:pb-[calc(var(--o-assistant-inset-bottom,0)*1px)] max-lg:scroll-pb-[calc(var(--o-assistant-inset-bottom,0)*1px)]",
   // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless inset the floating card writes
   "lg:scroll-pe-[calc(var(--o-assistant-inset-end,0)*1px)]",
-  // The Threads bar floats over the page's last row, so the page ends above the band it publishes.
-  "lg:pb-[calc(var(--o-threads-bar-inset,0)*1rem)] lg:scroll-pb-[calc(var(--o-threads-bar-inset,0)*1rem)]",
 ];
 
 let mainLayoutMixin: any = null;

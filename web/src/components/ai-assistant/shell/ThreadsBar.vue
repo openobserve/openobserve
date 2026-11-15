@@ -136,7 +136,7 @@ export interface ThreadsBarProps {
 
 <script setup lang="ts">
 import { useQuery } from "@tanstack/vue-query";
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -250,38 +250,6 @@ const hasItems = computed(
 
 watch(hasItems, (has) => {
   if (!has) expanded.value = false;
-});
-
-// The launcher floats over the page's last row, so it publishes the band it covers and the page ends above it.
-const INSET_VAR = "--o-threads-bar-inset";
-let band: ResizeObserver | null = null;
-
-function publishBand(): void {
-  const toggle = root.value?.querySelector('[data-test="assistant-launcher-toggle"]');
-  const box = toggle?.getBoundingClientRect();
-  const style = document.documentElement.style;
-  if (!box?.height) style.removeProperty(INSET_VAR);
-  else style.setProperty(INSET_VAR, String((window.innerHeight - box.top) / 16));
-}
-
-watch(
-  root,
-  (el) => {
-    band?.disconnect();
-    publishBand();
-    if (!el || typeof ResizeObserver === "undefined") return;
-    band ??= new ResizeObserver(publishBand);
-    band.observe(el);
-  },
-  { flush: "post" },
-);
-
-window.addEventListener("resize", publishBand);
-
-onBeforeUnmount(() => {
-  band?.disconnect();
-  window.removeEventListener("resize", publishBand);
-  document.documentElement.style.removeProperty(INSET_VAR);
 });
 
 useShortcuts([{ id: "threadsBarOpen", handler: () => (expanded.value ? collapse() : expand()) }]);
