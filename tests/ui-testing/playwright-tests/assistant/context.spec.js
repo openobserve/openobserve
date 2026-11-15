@@ -64,6 +64,9 @@ test.describe("assistant composer and context", () => {
     }, chips);
   }
 
+  // Runs after every task already queued, such as a focus restore scheduled by an unmounting popover.
+  const flushTasks = (page) => page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
   const requests = (page) => page.evaluate(() => window.__o2mock.requests.map((r) => JSON.parse(r.body)));
 
   test.beforeEach(async ({ context, page }) => {
@@ -102,9 +105,9 @@ test.describe("assistant composer and context", () => {
     await expect(popover).toBeVisible();
     const inPopover = () => page.evaluate(() => !!document.activeElement?.closest("[data-o-popover-content]"));
     for (let i = 0; i < 8 && (await inPopover()); i += 1) await page.keyboard.press("Tab");
-    await expect(popover).toBeHidden();
-    // The exit animation runs after Tab moved focus on; the popover must not pull it back to the chip.
-    await page.waitForTimeout(400);
+    // The popover must not pull focus back to the chip once its exit animation has unmounted it.
+    await expect(popover).toHaveCount(0);
+    await flushTasks(page);
     await expect(assistant.chips().first().locator('[data-test="assistant-context-chip-remove"]')).toBeFocused();
     // The pointer still rests on the stream chip, whose hover tooltip would cover the time chip until it leaves.
     await page.mouse.move(0, 0);
@@ -141,14 +144,22 @@ test.describe("assistant composer and context", () => {
     const box = assistant.composer();
     await box.click();
     await page.keyboard.insertText("にほん");
-    await box.dispatchEvent("keydown", { key: "Enter", isComposing: true, bubbles: true });
-    await box.dispatchEvent("keydown", { key: "Enter", keyCode: 229, bubbles: true });
-    await page.waitForTimeout(300);
+    // The composer takes an Enter it acts on with preventDefault, so an unprevented IME Enter was not taken.
+    const imeEnterTaken = await page.evaluate(() => {
+      const field = document.querySelector('[data-assistant-root] [data-test="assistant-composer-field"]');
+      return [{ isComposing: true }, { keyCode: 229 }].map((init) => {
+        const event = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true, ...init });
+        field.dispatchEvent(event);
+        return event.defaultPrevented;
+      });
+    });
+    expect(imeEnterTaken).toEqual([false, false]);
     expect(await requests(page)).toHaveLength(0);
     await box.press("Enter");
     await box.press("Enter");
     await expect.poll(async () => (await requests(page)).length).toBe(1);
-    await page.waitForTimeout(500);
+    await expect(assistant.answerDone()).toBeVisible({ timeout: 20_000 });
+    await expect(assistant.composerState()).toHaveAttribute("data-state", "empty");
     expect(await requests(page)).toHaveLength(1);
     expect((await requests(page))[0].messages.at(-1).content).toBe("にほん");
   });
@@ -156,7 +167,16 @@ test.describe("assistant composer and context", () => {
   test("CTX-04 a draft survives a reload in its tab and a second tab starts empty", { tag: ["@mock"] }, async ({ page, context }) => {
     await openOnLogs(page);
     await assistant.composer().fill("half a thought");
-    await page.waitForTimeout(400);
+    // The draft is written to sessionStorage after a debounce; reload only once it is there.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Object.keys(sessionStorage).some(
+            (key) => key.startsWith("o2.assistant.draft:") && sessionStorage.getItem(key).includes("half a thought"),
+          ),
+        ),
+      )
+      .toBe(true);
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(assistant.composer()).toHaveValue("half a thought", { timeout: 30_000 });
     await expect(assistant.container().locator('[data-test="assistant-composer-status"]')).toHaveText("Draft restored");
@@ -183,9 +203,11 @@ test.describe("assistant composer and context", () => {
   });
 
   test("CTX-05 the store refuses rows past 32 KB, and a multi-row chip is cut on the wire @edition", { tag: ["@mock"] }, async ({
+    context,
     page,
   }) => {
     test.skip(!harness.ENV.viteDev, "stages rows through the dev server's module graph");
+    await harness.forceEnterpriseBuild(context);
     await openOnLogs(page);
     // Honest sizes: the store's 32 KB cap refuses the rows that do not fit.
     const results = await page.evaluate(async () => {
@@ -227,8 +249,9 @@ test.describe("assistant composer and context", () => {
     expect(new TextEncoder().encode(body).length).toBeLessThanOrEqual(32 * 1024);
   });
 
-  test("SEC-11 attached data cannot close its block @edition", { tag: ["@mock"] }, async ({ page }) => {
+  test("SEC-11 attached data cannot close its block @edition", { tag: ["@mock"] }, async ({ context, page }) => {
     test.skip(!harness.ENV.viteDev, "stages the planted chips through the dev server's module graph");
+    await harness.forceEnterpriseBuild(context);
     const planted = (await loadPayloads()).PAYLOADS.delimiter_breakout;
     await openOnLogs(page);
     await stageChips(page, [

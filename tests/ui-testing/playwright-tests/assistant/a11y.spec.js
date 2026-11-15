@@ -78,7 +78,7 @@ test.describe("assistant accessibility", () => {
   async function expectClean(page, flow) {
     await settled(page);
     const { blocking } = await a11y.axeScan(page, flow);
-    expect.soft(blocking, `${flow}: serious or critical axe results`).toEqual([]);
+    expect(blocking, `${flow}: serious or critical axe results`).toEqual([]);
   }
 
   async function openSettingsTab(page, tab) {
@@ -402,7 +402,7 @@ test.describe("assistant accessibility", () => {
       };
       await a11y.capture(page, `forced-colors-header-${name}`, assistant.headerButton);
       const { blocking } = await a11y.axeScan(page, `forced-colors-header-${name}`, { scope: ['[data-test="menu-link-ai-item"]'] });
-      expect.soft(blocking, `header ${name}`).toEqual([]);
+      expect(blocking, `header ${name}`).toEqual([]);
       const marks = await light.evaluate((el) =>
         [...el.querySelectorAll("*")]
           .filter((m) => m.getBoundingClientRect().width > 0)
@@ -612,7 +612,7 @@ test.describe("assistant accessibility", () => {
     await expect(dock.locator('[data-test="assistant-status-region"]')).toContainText(/Press Control I to review it\.$/);
     await settled(page);
     const { blocking } = await a11y.axeScan(page, "docked-approval-1280-dark", { scope: ['[data-test="assistant-shell-docked"]'] });
-    expect.soft(blocking).toEqual([]);
+    expect(blocking).toEqual([]);
     await buffer.click();
     await page.keyboard.press("Control+i");
     // The chord lands on the card's heading, as APPR-01 asserts.

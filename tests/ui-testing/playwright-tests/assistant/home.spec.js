@@ -80,18 +80,16 @@ test.describe("assistant on Home", () => {
     await expect(input()).toBeEnabled();
   });
 
-  test("SHELL-05 a turn started from Home keeps running when Full moves to Panel", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
+  test("SHELL-05 a turn started from Home keeps running when the user leaves Home", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await openHome(page);
     await harness.nextScenario(page, "slow");
     await input().fill("why 5xx?");
     await input().press("Enter");
     await page.waitForURL(threadUrl);
     await expect(assistant.status()).toBeVisible();
-    await assistant.container().locator('[data-test="assistant-shell-place-sidebar"]').click();
-    await expect(assistant.sidebar).toBeVisible();
+    // Home's chat offers no move to the panel, so leaving Home is how the turn outlives the full view.
     await page.goto(`${harness.ENV.appUrl}/logs?org_identifier=${harness.ENV.org}`, { waitUntil: "domcontentloaded" });
-    await expect(assistant.sidebar).toBeVisible({ timeout: 30_000 });
-    await expect(assistant.headerButton).toHaveAttribute("data-state", /working|open|unread/, { timeout: 30_000 });
+    await expect(assistant.headerButton).toHaveAttribute("data-state", /working|unread/, { timeout: 30_000 });
     expect(await page.evaluate(() => window.__o2mock.requests.length)).toBeLessThanOrEqual(1);
   });
 });

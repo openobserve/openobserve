@@ -137,10 +137,10 @@ test.describe("assistant history", () => {
       }
       expect(after.rows).toContain("Checkout 5xx spike in prod");
       await harness.login(page);
-      await openOnLogs(page);
-      await assistant.openHistory();
-      await expect(assistant.history().locator('[data-test="assistant-history-kept"]')).toHaveText(
+      // The notice is read once by the first chat list shown, and sign-in lands on Home's chats rail.
+      await expect(page.locator('[data-test="assistant-home-chats"] [data-test="assistant-history-kept"]')).toHaveText(
         "Your browser chats were kept when you signed out.",
+        { timeout: 30_000 },
       );
     });
   }

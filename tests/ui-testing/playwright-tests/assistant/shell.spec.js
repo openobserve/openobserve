@@ -138,7 +138,7 @@ test.describe("assistant shell", () => {
     expect(aiRequests).toBe(0);
   });
 
-  test("the full view takes over from the sidebar and hands the session back", { tag: ["@mock"] }, async ({
+  test("the full view takes over from the sidebar as Home's AI tab, which offers no move to another container", { tag: ["@mock"] }, async ({
     page,
   }) => {
     await gotoLogs(page);
@@ -157,9 +157,8 @@ test.describe("assistant shell", () => {
     );
     await expect(landmarks.filter({ visible: true })).toHaveCount(1);
     await expect(assistant.headerButton).toHaveAttribute("data-state", "open");
-    await assistant.placeAs("sidebar");
-    await expect(page).toHaveURL(/\/logs/);
-    await expect(assistant.sidebar).toBeVisible();
+    // Home's chat is the page itself, so its bar has no Side panel or Floating Window move.
+    await expect(assistant.full.locator('[data-test^="assistant-shell-place-"]')).toHaveCount(0);
   });
 
   test("SHELL-08 below lg the sidebar is a non-modal snap sheet that insets the page", { tag: ["@mock", "@responsive"] }, async ({
