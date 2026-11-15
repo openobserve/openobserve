@@ -261,7 +261,7 @@ const showPods = () => emit("navigate", { view: "pods", search: props.details.na
       <div class="flex min-w-0 flex-col gap-1" data-test="k8s2-drawer-header">
         <OText variant="meta" data-test="k8s2-drawer-kind">{{ t(info.title) }}</OText>
         <div class="flex min-w-0 items-center gap-1">
-          <OTruncatedText class="text-base font-semibold" data-test="k8s2-drawer-name">{{
+          <OTruncatedText class="text-title font-semibold" data-test="k8s2-drawer-name">{{
             raw(details.name)
           }}</OTruncatedText>
           <OCopyButton

@@ -168,9 +168,9 @@ body {
   }
 
   h4 {
-    font-size: var(--text-base);
-    font-weight: var(--font-medium);
-    line-height: var(--leading-md);
+    font-size: var(--text-sm);
+    font-weight: var(--font-semibold);
+    line-height: var(--leading-base);
     letter-spacing: var(--tracking-heading);
   }
 
@@ -184,8 +184,14 @@ body {
   h6 {
     font-size: var(--text-compact);
     font-weight: var(--font-medium);
-    line-height: var(--leading-sm);
+    line-height: var(--leading-base);
     letter-spacing: var(--tracking-normal);
+  }
+
+  /* The UA default is bolder (700), heavier than any step of the type scale. */
+  b,
+  strong {
+    font-weight: var(--font-semibold);
   }
 
   p {
@@ -232,7 +238,7 @@ body {
   .log-line {
     font-family: var(--font-mono);
     font-size: var(--text-compact);
-    line-height: 1.6;
+    line-height: var(--leading-base);
   }
 }
 

@@ -135,7 +135,7 @@
               alt=""
             />
             <span
-              class="text-base leading-8 font-semibold"
+              class="text-sm leading-8 font-semibold"
               data-test="associated-regex-patterns-no-pattern-applied-title"
               >{{ t("regex_patterns.no_patterns_applied_title") }}</span
             >
@@ -258,7 +258,7 @@
             >
               <div class="flex flex-col gap-2.5">
                 <div class="flex items-center justify-between">
-                  <span class="text-compact leading-6 font-bold">
+                  <span class="text-compact leading-6 font-semibold">
                     {{ t("regex_patterns.test_pattern") }}
                   </span>
                   <OButton

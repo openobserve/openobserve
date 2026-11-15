@@ -431,7 +431,7 @@ const isStopped = computed(() =>
   line-height: 1.3 !important;
 }
 .text-block :deep(h4) {
-  font-size: var(--text-base) !important;
+  font-size: var(--text-sm) !important;
   font-weight: 600 !important;
   margin: 0.625rem 0 0.3125rem 0 !important;
   line-height: 1.3 !important;

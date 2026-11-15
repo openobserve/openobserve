@@ -100,7 +100,7 @@
         class="mb-3"
         data-test="slos-slodetail-frozen-banner"
       >
-        <span class="font-bold">{{ frozenBanner.title }}</span>
+        <span class="font-semibold">{{ frozenBanner.title }}</span>
         {{ frozenBanner.body }}
       </OInlineNotice>
 

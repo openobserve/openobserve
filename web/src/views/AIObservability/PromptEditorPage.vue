@@ -20,7 +20,7 @@
     >
       <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
         <div
-          class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto]"
+          class="px-page-edge flex min-h-0 min-w-0 flex-[6.5] flex-col gap-3 overflow-auto py-3 max-[68.75rem]:flex-[1_1_auto]"
         >
           <div
             v-if="prompt && baseVersion"
@@ -42,7 +42,7 @@
                 {{ t("aiObservability.promptManagement.form.detailsSection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <div class="grid grid-cols-2 gap-3 max-md:grid-cols-1">
                 <OFormInput
                   name="name"
@@ -89,7 +89,7 @@
                 {{ t("aiObservability.promptManagement.configuration") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <div class="flex flex-col gap-1">
                 <span
                   class="text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium"

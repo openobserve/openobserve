@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="localGroups.length > 0 && showFingerprintFields"
       class="border-separator mt-4 border-t pt-4"
     >
-      <div class="mb-2 text-base font-medium">
+      <div class="mb-2 text-sm font-medium">
         {{ t("correlation.deduplicateFields") }} *
         <OTooltip :content="t('correlation.deduplicateFieldTooltip')" />
       </div>

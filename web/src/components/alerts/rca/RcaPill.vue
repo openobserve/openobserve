@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <span
-    class="text-3xs inline-flex items-center gap-1.5 border px-2 font-bold"
+    class="text-2xs inline-flex items-center gap-1.5 border px-2 font-semibold"
     :class="[
       RCA_PILL_TONE_CLASS[tone],
       wrap

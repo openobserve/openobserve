@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-2">
             <ODateTimeRange
               auto-apply
               menu-align="end"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="px-page-edge border-table-row-divider flex flex-wrap items-center gap-x-3 gap-y-1 border-b py-1.5"
             data-test="dbm-activity-wait-breakdown"
           >
-            <span class="text-text-secondary text-3xs shrink-0 font-semibold">
+            <span class="text-text-secondary text-2xs shrink-0 font-semibold">
               {{ t("dbm.activity.columns.waitEvent") }}
             </span>
             <span
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-2xs font-mono tabular-nums">
                 {{ formatCount(bucket.sessions) }}
               </span>
-              <span v-if="bucket.share !== null" class="text-text-secondary text-3xs font-mono">
+              <span v-if="bucket.share !== null" class="text-text-secondary text-2xs font-mono">
                 {{ formatPercent(bucket.share, 0) }}
               </span>
             </span>

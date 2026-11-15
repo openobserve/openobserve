@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="no-underline"
   >
     <template #value>
-      <span class="text-text-heading text-2xl font-bold" :data-test="`${dataTest}-value`">
+      <span class="text-text-heading text-2xl font-semibold" :data-test="`${dataTest}-value`">
         {{ value }}
       </span>
       <span class="text-text-secondary text-xs lg:hidden" :data-test="`${dataTest}-compact`">

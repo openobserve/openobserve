@@ -6,7 +6,7 @@
     :class="frameless ? '' : 'border-border-default border-e'"
   >
     <div v-if="!frameless" class="px-page-edge my-3 flex shrink-0 items-center justify-between">
-      <span class="text-base font-bold">{{ t("panel.fields") }}</span>
+      <span class="text-sm font-semibold">{{ t("panel.fields") }}</span>
       <OButton
         icon-only
         variant="ghost"

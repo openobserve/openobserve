@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OTruncatedText
               as="h4"
-              class="text-text-heading m-0 text-base leading-tight font-semibold"
+              class="text-text-heading text-title m-0 leading-tight font-semibold"
             >
               {{ selectedPattern?.pattern?.description || t("search.patternDetailsTitle") }}
             </OTruncatedText>
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("search.patternOccurrences") }}
                   </div>
                   <div
-                    class="text-primary mt-1 text-2xl font-bold font-semibold"
+                    class="text-primary mt-1 text-2xl font-semibold"
                     :title="
                       volumeCount !== null
                         ? t('logs.patternList.exactCountTooltip', {
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-xs" :class="'text-text-secondary'">
                     {{ t("search.patternPercentage") }}
                   </div>
-                  <div class="text-primary mt-1 text-2xl font-bold font-semibold">
+                  <div class="text-primary mt-1 text-2xl font-semibold">
                     {{ selectedPattern.pattern.percentage.toFixed(2) }}%
                   </div>
                 </OCard>
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="warning" size="sm" class="mt-0.5 shrink-0" />
                 <div>
-                  <div class="text-status-error-text font-bold">
+                  <div class="text-status-error-text font-semibold">
                     {{ t("search.patternAnomalyDetected") }}
                   </div>
                   <div class="text-text-secondary mt-1 text-xs">
@@ -268,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-card-glass-border w-full border border-solid"
             >
               <template #cell-name="{ row }">
-                <span class="text-primary text-left font-bold">
+                <span class="text-primary text-left font-semibold">
                   {{ raw(row.name || "var_" + row.index) }}
                 </span>
               </template>

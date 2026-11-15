@@ -140,7 +140,7 @@ const displayValue = computed(() => {
         :class="[
           'o2-slider-input',
           'relative z-10 m-0 w-full appearance-none bg-transparent',
-          'ring-offset-surface-base focus-visible:ring-slider-focus-ring rounded-full ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2',
+          'ring-offset-surface-base focus-visible:ring-slider-focus-ring rounded-full ring-offset-1 transition-[box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2',
           'h-1.5',
           isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
         ]"

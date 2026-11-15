@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { providePageRailGroup } from "@/lib/core/PageHeader/pageContext";
 import SectionRail from "@/components/common/SectionRail.vue";
 import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
 import { type SectionHubGroup } from "@/components/common/SectionHub.vue";
@@ -209,6 +210,12 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   ];
   return groups;
 });
+providePageRailGroup(
+  computed(
+    () =>
+      sectionGroups.value.find((g) => g.items.some((i) => i.key === activeSection.value))?.label,
+  ),
+);
 
 // The rail is always shown, so the IAM root has no standalone landing — send it
 // to the first section (Users, always available). Also: non-meta users can't use

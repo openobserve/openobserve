@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <span v-else class="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
               <span
-                :class="['text-3xl font-bold tabular-nums', item.tone]"
+                :class="['text-2xl font-semibold tabular-nums', item.tone]"
                 data-test="overview-tile-value"
                 >{{ item.value }}</span
               >

@@ -384,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="usedPercent !== null">
                 <div class="mb-3 flex items-baseline gap-2">
                   <span
-                    class="text-text-body text-4xl leading-none font-bold"
+                    class="text-text-body text-2xl leading-none font-semibold"
                     :class="
                       usedPercent > 90
                         ? 'text-status-error-text'

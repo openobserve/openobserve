@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-2">
             <ODateTimeRange
               auto-apply
               menu-align="end"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ row.name ? raw(row.name) : t("dbm.breakdown.noSchema") }}
                 </OTruncatedText>
               </template>
-              <span class="text-text-secondary text-3xs shrink-0">
+              <span class="text-text-secondary text-2xs shrink-0">
                 {{ t("dbm.breakdown.queryCount", { count: row.queryCount }, row.queryCount) }}
               </span>
             </template>
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dbm.databases.unnamedInstance") }}
               <OTooltip side="bottom" :content="t('dbm.databases.unnamedInstanceHint')" />
             </span>
-            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
+            <div class="text-text-secondary text-2xs flex min-w-0 items-center gap-1">
               <OTag type="dbSystem" :value="row.db_system" size="sm" />
               <template v-if="namedSchemaCount(row) === 1">
                 <span class="opacity-45">·</span>
@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : formatPercent(attentionOf(row).ratio, 0)
               }}
             </span>
-            <span class="text-text-secondary text-3xs">{{ attentionLabel(row) }}</span>
+            <span class="text-text-secondary text-2xs">{{ attentionLabel(row) }}</span>
           </div>
         </template>
 
@@ -394,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
                 {{ formatNs(row.total_time_ns) }}
               </span>
-              <span class="text-text-secondary text-3xs font-mono tabular-nums">
+              <span class="text-text-secondary text-2xs font-mono tabular-nums">
                 {{ formatPercent(row.share, 0) }}
               </span>
             </span>
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              is the only place that gap can be read where it happens. -->
         <template #tree-warning="{ row }">
           <span
-            class="text-banner-warning-text text-3xs"
+            class="text-banner-warning-text text-2xs"
             :data-test="`dbm-databases-shortfall-${row.rowKey}`"
           >
             {{ shortfallLine(row) }}

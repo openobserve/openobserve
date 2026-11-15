@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="collapseFieldList"
         >
           <OIcon name="expand-all" size="sm" class="mt-2.5 rotate-90 text-xl" />
-          <div class="text-xs font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
+          <div class="text-xs font-semibold [text-orientation:mixed] [writing-mode:vertical-rl]">
             {{ t("pipeline.buildQuery") }}
           </div>
         </div>
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         class="flex items-center gap-2"
                       >
-                        <div class="flex w-40 shrink-0 items-center gap-1 font-bold">
+                        <div class="flex w-40 shrink-0 items-center gap-1 font-semibold">
                           <span>{{ t("pipeline.trigger") }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
                             <OTooltip side="right">
@@ -272,7 +272,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="scheduled-pipeline-promlq-condition-value"
                         />
                       </div>
-                      <div v-if="tab === 'custom'" class="mb-4 flex items-center gap-2 font-bold">
+                      <div
+                        v-if="tab === 'custom'"
+                        class="mb-4 flex items-center gap-2 font-semibold"
+                      >
                         <div data-test="scheduled-pipeline-aggregation-title" class="w-43 shrink-0">
                           {{ t("pipeline.aggregation") }}
                         </div>
@@ -289,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <div
                           data-test="scheduled-pipeline-group-by-title"
-                          class="font-bold"
+                          class="font-semibold"
                           style="width: 11.875rem"
                         >
                           {{ t("alerts.groupBy") }}
@@ -343,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <div
                           data-test="scheduled-pipeline-threshold-title"
-                          class="flex items-center font-bold"
+                          class="flex items-center font-semibold"
                           style="width: 11.875rem"
                         >
                           {{ t("alerts.threshold") + " *" }}
@@ -479,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex items-center gap-2">
                         <div
                           data-test="scheduled-pipeline-cron-toggle-title"
-                          class="flex w-40 shrink-0 items-center gap-1 font-bold"
+                          class="flex w-40 shrink-0 items-center gap-1 font-semibold"
                         >
                           <span>{{ t("alerts.crontitle") + " *" }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
@@ -500,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex items-start gap-2">
                         <div
                           data-test="scheduled-pipeline-frequency-title"
-                          class="flex w-40 shrink-0 items-center gap-1 pt-2 font-bold"
+                          class="flex w-40 shrink-0 items-center gap-1 pt-2 font-semibold"
                         >
                           <span>{{ t("alerts.frequency") + " *" }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
@@ -600,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex items-start gap-2">
                         <div
                           data-test="scheduled-pipeline-period-title"
-                          class="flex w-40 shrink-0 items-center gap-1 pt-2 font-bold"
+                          class="flex w-40 shrink-0 items-center gap-1 pt-2 font-semibold"
                         >
                           <span>{{ t("alerts.period") + " *" }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
@@ -665,7 +668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex items-center gap-2">
                         <div
                           data-test="scheduled-pipeline-delay-title"
-                          class="flex w-40 shrink-0 items-center gap-1 font-bold"
+                          class="flex w-40 shrink-0 items-center gap-1 font-semibold"
                         >
                           <span>{{ t("pipeline.delay") }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
@@ -710,9 +713,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #separator>
-            <div
-              class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
-            ></div>
+            <div class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors"></div>
           </template>
           <template #after>
             <div class="border-border-default flex h-full w-full flex-col border-s">
@@ -761,7 +762,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
                     >
                       <span
-                        class="query-editor-placeholder-typewriter text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
+                        class="query-editor-placeholder-typewriter text-text-placeholder text-compact overflow-hidden font-mono leading-5 text-ellipsis whitespace-nowrap"
                         >{{ editorPlaceholder }}</span
                       >
                     </div>

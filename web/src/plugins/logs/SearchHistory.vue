@@ -260,7 +260,7 @@
         <div>
           <OIcon name="history" class="h-25 w-25 opacity-10" />
         </div>
-        <div class="text-3xl font-semibold opacity-80">
+        <div class="text-2xl font-semibold opacity-80">
           {{ t("logs.index.searchHistoryNotEnabled") }}
         </div>
         <div class="mt-2 flex items-center justify-center opacity-80">

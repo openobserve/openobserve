@@ -28,6 +28,7 @@ import { fillField } from "@/test/unit/helpers/fillField";
 import { pressEscape } from "@/test/unit/helpers/draftDom";
 import AlertList from "./AlertList.vue";
 import AddAlert from "./AddAlert.vue";
+import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 
 vi.mock("@/aws-exports", () => ({ default: { isCloud: "false", isEnterprise: "false" } }));
 vi.mock("@/composables/useStreams", () => ({
@@ -248,6 +249,21 @@ describe("AlertList clone dialog", () => {
 
   it("closes on Escape while the clone form is as it opened", async () => {
     const list = await openClone();
+
+    pressEscape();
+    await flushPromises();
+
+    expect(byTest("o-dialog-discard-row")).toBeNull();
+    expect(list.showForm).toBe(false);
+  });
+
+  it("closes on Escape when only the folder picker settled after the dialog opened", async () => {
+    const list = await openClone();
+    const picker = wrapper!
+      .findAllComponents(SelectFolderDropDown)
+      .find((c) => !!c.element.closest?.('[data-test="alert-list-form-dialog"]'));
+    picker!.vm.$emit("folder-selected", { label: "Ops", value: "ops" });
+    await flushPromises();
 
     pressEscape();
     await flushPromises();

@@ -293,7 +293,7 @@ const trendClass = computed(() =>
         </slot>
       </span>
       <span
-        class="inline-flex h-5 items-center text-base leading-5 tabular-nums"
+        class="inline-flex h-5 items-center text-sm leading-5 tabular-nums"
         :class="isMuted ? 'text-text-muted font-medium' : 'text-text-heading font-semibold'"
         data-test="o-stat-card-value"
       >
@@ -392,7 +392,7 @@ const trendClass = computed(() =>
            only the fill width changes. -->
       <div class="bg-surface-subtle h-1 overflow-hidden rounded-full">
         <div
-          class="h-full rounded-full transition-all duration-300"
+          class="h-full rounded-full transition-[width] duration-(--duration-expand) ease-(--ease-control)"
           :class="tc.bar"
           :style="{ width: pct + '%' }"
         />

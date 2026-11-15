@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-2">
             <ODateTimeRange
               auto-apply
               menu-align="end"
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex min-w-0 flex-1 flex-col gap-px">
               <div v-if="row.pill" class="flex min-w-0 items-center gap-1.5">
                 <span
-                  class="text-3xs shrink-0 rounded-full px-1.5 py-px font-bold"
+                  class="text-2xs shrink-0 rounded-full px-1.5 py-px font-semibold"
                   :class="row.pill.tone"
                   :data-test="`dbm-blocked-pill-${row.kind}`"
                 >
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ raw(row.query ?? "—") }}
               </OTruncatedText>
 
-              <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
+              <div class="text-text-secondary text-2xs flex min-w-0 items-center gap-1">
                 <OTag type="dbSystem" :value="row.db_system" size="sm" />
                 <template v-if="row.application || row.db_instance || row.waitingOnPid != null">
                   <span class="opacity-45">·</span>
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <span
                   v-if="row.longestWait"
-                  class="bg-status-error-bg text-status-error-text rounded-default text-3xs ms-0.5 shrink-0 px-1 py-px font-semibold"
+                  class="bg-status-error-bg text-status-error-text rounded-default text-2xs ms-0.5 shrink-0 px-1 py-px font-semibold"
                 >
                   {{ t("dbm.blocked.longestWait") }}
                 </span>
@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-muted text-xs">{{ raw("—") }}</span>
             <OTruncatedText
               v-if="row.waitEventLabel && row.waitEventRaw"
-              class="text-text-secondary text-3xs max-w-full font-mono"
+              class="text-text-secondary text-2xs max-w-full font-mono"
             >
               {{ raw(row.waitEventRaw) }}
             </OTruncatedText>
@@ -284,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText class="text-text-body max-w-full text-xs">
               {{ raw(row.blockerApplication ?? "—") }}
             </OTruncatedText>
-            <span class="text-text-muted text-3xs flex items-center justify-end gap-1">
+            <span class="text-text-muted text-2xs flex items-center justify-end gap-1">
               <span v-if="row.blockerPid != null">
                 {{ t("dbm.deadlocks.detail.pid", { pid: row.blockerPid }) }}
               </span>
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ row.blockingCount }}
             </span>
-            <span class="text-text-secondary text-3xs">
+            <span class="text-text-secondary text-2xs">
               {{ t("dbm.blocked.sessionCount", { count: row.blockingCount }, row.blockingCount) }}
             </span>
           </div>
@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-else class="flex flex-col items-end leading-tight">
             <span class="text-text-muted">{{ raw("—") }}</span>
-            <span class="text-text-secondary text-3xs">{{ t("dbm.blocked.notWaiting") }}</span>
+            <span class="text-text-secondary text-2xs">{{ t("dbm.blocked.notWaiting") }}</span>
           </div>
         </template>
 

@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <span
             v-if="row.discount > 0 && shareOf(row) >= TAG_MIN_SHARE"
-            class="text-3xs text-status-success-text bg-surface-base shrink-0 rounded-full px-1.5 font-semibold"
+            class="text-2xs text-status-success-text bg-surface-base shrink-0 rounded-full px-1.5 font-semibold"
           >
             {{ t("billing.usageV2.discountBadge", { percent: row.discountPercent }) }}
           </span>

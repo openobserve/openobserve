@@ -83,7 +83,7 @@ const caretPlaceholder = computed(() =>
 );
 
 const fieldClasses = computed(() => [
-  "rounded-default border px-1.5 py-0.75 transition-[border-color,box-shadow] duration-150",
+  "rounded-default border px-1.5 py-0.75 transition-[border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
   props.disabled
     ? "bg-input-disabled-bg border-input-disabled-border border-dashed"
     : showList.value

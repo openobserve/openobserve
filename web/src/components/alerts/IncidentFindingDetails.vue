@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-3" data-test="incident-finding-details">
     <div v-if="facts" class="space-y-2">
       <div class="flex flex-col gap-0.5">
-        <span class="text-text-secondary text-3xs">
+        <span class="text-text-secondary text-2xs">
           {{ t("alerts.incidents.findingWhatHappened") }}
         </span>
         <span class="text-text-body text-sm font-medium" data-test="incident-finding-what">
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div class="flex flex-col gap-0.5">
-          <span class="text-text-secondary text-3xs">{{ t("alerts.streamType") }}</span>
+          <span class="text-text-secondary text-2xs">{{ t("alerts.streamType") }}</span>
           <OTag
             type="streamType"
             :value="facts.streamType"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="flex min-w-0 flex-col gap-0.5">
-          <span class="text-text-secondary text-3xs">{{ t("alerts.stream_name") }}</span>
+          <span class="text-text-secondary text-2xs">{{ t("alerts.stream_name") }}</span>
           <OTruncatedText
             class="text-text-body text-sm font-medium"
             data-test="incident-finding-stream-name"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="flex flex-col gap-0.5">
-        <span class="text-text-secondary text-3xs">{{ t("alerts.incidents.findingStarted") }}</span>
+        <span class="text-text-secondary text-2xs">{{ t("alerts.incidents.findingStarted") }}</span>
         <span class="text-text-body text-sm font-medium" data-test="incident-finding-started">
           {{ started }}
         </span>

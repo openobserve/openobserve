@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section data-test="rca-evidence-list" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-2.5 flex flex-wrap items-center gap-2">
-      <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
+      <h3 :id="headingId" class="text-text-heading m-0 text-sm font-semibold">
         {{ t("alerts.incidents.rcaSummary.evidence") }}
       </h3>
       <span class="text-text-secondary text-xs">
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #lead>
           <span
-            class="rounded-default border-border-control text-3xs inline-grid h-5 min-w-5.5 shrink-0 place-items-center border font-mono font-semibold"
+            class="rounded-default border-border-control text-2xs inline-grid h-5 min-w-5.5 shrink-0 place-items-center border font-mono font-semibold"
           >
             {{ entry.number }}
           </span>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mt-4 flex flex-col"
       tabindex="-1"
     >
-      <h4 class="text-text-heading m-0 mb-2 text-sm font-bold">
+      <h4 class="text-text-heading m-0 mb-2 text-sm font-semibold">
         {{ t("alerts.incidents.rcaSummary.citedNotVerified") }}
         <span class="text-text-secondary text-xs font-normal">{{ unverified.length }}</span>
       </h4>

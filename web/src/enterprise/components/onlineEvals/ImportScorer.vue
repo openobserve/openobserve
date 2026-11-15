@@ -134,7 +134,7 @@ the Free Software Foundation, either version 3 of the License, or
 
           <div v-if="creators.length" class="mb-2.5 p-2.5">
             <div
-              class="section-title text-text-heading mb-2.5 text-base uppercase"
+              class="section-title text-text-heading mb-2.5 text-sm"
               data-test="scorer-import-creation-title"
             >
               {{ t("onlineEvals.scorer.import.creation") }}
@@ -147,7 +147,7 @@ the Free Software Foundation, either version 3 of the License, or
             >
               <div
                 :class="{
-                  'px-0 py-1.25 text-sm font-bold': true,
+                  'px-0 py-1.25 text-sm font-semibold': true,
                   'text-status-success-text': c.status === 'success',
                   'text-error-600': c.status === 'error',
                   'text-text-secondary': c.status === 'exists',

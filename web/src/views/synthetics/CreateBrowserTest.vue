@@ -2284,7 +2284,7 @@ function onClearResults() {
               </template>
               <template #separator>
                 <div
-                  class="hover:bg-table-resize-handle h-full w-1 border-t bg-transparent transition-colors duration-300"
+                  class="hover:bg-table-resize-handle h-full w-1 border-t bg-transparent transition-colors"
                 />
               </template>
               <template #after>

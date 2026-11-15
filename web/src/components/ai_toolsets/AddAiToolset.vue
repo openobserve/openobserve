@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- MCP fields -->
           <template v-if="selectedKind === 'mcp'">
-            <div class="mb-3 text-base font-medium font-semibold">
+            <div class="mb-3 text-sm font-semibold">
               {{ t("aiToolset.mcpConfig") }}
             </div>
             <div class="o2-input mb-4">
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- CLI fields -->
           <template v-if="selectedKind === 'cli'">
             <div class="mb-4 flex items-center gap-3">
-              <div class="text-base font-medium font-semibold">
+              <div class="text-sm font-semibold">
                 {{ t("aiToolset.cliConfig") }}
               </div>
               <div class="flex items-center gap-1">
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                into the form (skill.content); its required rule lives in the
                schema and the error shows after the first submit (R3). -->
           <template v-if="selectedKind === 'skill'">
-            <div class="mb-2 text-base font-medium font-semibold">
+            <div class="mb-2 text-sm font-semibold">
               {{ t("aiToolset.skillConfig") }}
             </div>
             <div class="text-text-muted mb-1 text-xs">{{ t("aiToolset.skillContent") }} *</div>

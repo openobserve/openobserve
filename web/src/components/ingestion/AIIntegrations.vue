@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <span
                   v-else
-                  class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-bold"
+                  class="rounded-default bg-theme-accent text-text-inverse text-2xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-semibold"
                   aria-hidden="true"
                   >{{ integration.name.charAt(0) }}</span
                 >
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <span
                           v-else
-                          class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-bold"
+                          class="rounded-default bg-theme-accent text-text-inverse text-2xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-semibold"
                           aria-hidden="true"
                           >{{ integration.name.charAt(0) }}</span
                         >

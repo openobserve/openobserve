@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ><OIcon
               name="arrow-drop-down"
               size="sm"
-              class="date-time-arrow ms-auto text-lg! transition-transform duration-250"
+              class="date-time-arrow ms-auto text-lg! transition-transform duration-(--duration-indicator) ease-(--ease-control)"
           /></template>
         </OButton>
       </template>
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             queryRangeRestrictionInHour && queryRangeRestrictionInHour > 0
                         "
                         :data-test="`date-time-relative-${item}-${period.value}-btn`"
-                        class="w-8! font-bold! disabled:opacity-35"
+                        class="w-8! font-semibold! disabled:opacity-35"
                         :class="
                           selectedType == 'relative' &&
                           calendarToken === null &&

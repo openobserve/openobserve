@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label
           }}</strong>
           <span
-            class="text-text-heading text-3xl leading-none font-semibold tabular-nums"
+            class="text-text-heading text-2xl leading-none font-semibold tabular-nums"
             data-test="sample-remove-percent"
             >{{ percent }}</span
           >

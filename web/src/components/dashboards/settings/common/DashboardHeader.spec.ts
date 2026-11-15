@@ -380,8 +380,8 @@ describe("DashboardHeader", () => {
 
       const titleElement = findTitle(wrapper);
       expect(titleElement?.exists()).toBe(true);
-      // The migrated heading uses text-base + font-semibold.
-      expect(titleElement?.classes().some((c) => c.includes("text-base"))).toBe(true);
+      // The migrated heading uses text-sm + font-semibold.
+      expect(titleElement?.classes().some((c) => c.includes("text-sm"))).toBe(true);
     });
 
     it("should support keyboard navigation for back button", async () => {

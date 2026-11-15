@@ -1180,7 +1180,7 @@ function fireConfetti() {
   border-radius: var(--radius-default);
   display: grid;
   place-items: center;
-  font-weight: 800;
+  font-weight: var(--font-semibold);
   font-size: var(--text-xs);
   letter-spacing: -0.02em;
   background: var(--clay-bright);
@@ -1222,11 +1222,11 @@ function fireConfetti() {
 }
 
 .c-h1 {
-  font-weight: 800;
-  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  font-size: var(--text-lg);
   letter-spacing: -0.02em;
   margin: 0;
-  line-height: 1.1;
+  line-height: var(--leading-lg);
 }
 
 .c-sub {
@@ -1292,7 +1292,7 @@ function fireConfetti() {
 /* Step context chip is now <OTag> (lib). Only the terminal "$_" glyph (used
    in the badge's #icon slot) keeps a monospace style. */
 .step-tag-glyph {
-  font-weight: 800;
+  font-weight: var(--font-semibold);
   font-size: var(--text-2xs);
 }
 
@@ -1354,7 +1354,7 @@ function fireConfetti() {
 /* In-card jump link (see noteMd) — same treatment as the footer's doc link. */
 .step-note :deep(a.note-jump) {
   color: var(--primary-ink);
-  font-weight: 700;
+  font-weight: var(--font-semibold);
   text-decoration: none;
   cursor: pointer;
 }
@@ -1407,7 +1407,7 @@ function fireConfetti() {
   display: flex;
   align-items: center;
   gap: 0.5625rem;
-  font-weight: 800;
+  font-weight: var(--font-semibold);
   font-size: var(--text-sm);
   color: var(--warn-ink);
 }
@@ -1495,7 +1495,7 @@ function fireConfetti() {
   display: flex;
   align-items: flex-start;
   gap: 0.5625rem;
-  font-weight: 700;
+  font-weight: var(--font-semibold);
   font-size: var(--text-compact);
   color: var(--text-1);
 }
@@ -1530,7 +1530,7 @@ function fireConfetti() {
 
 .pv-foot a {
   color: var(--primary-ink);
-  font-weight: 700;
+  font-weight: var(--font-semibold);
   text-decoration: none;
 }
 

@@ -390,6 +390,27 @@ describe("ODrawer", () => {
       expect(wrapper.emitted("update:open")).toBeFalsy();
     });
 
+    it("stays open, and does not ask, when a closing menu moves focus outside it", async () => {
+      const wrapper = mount(ODrawer, {
+        attachTo: document.body,
+        props: { open: true, title: "Backfill", dirty: true, primary: { label: "Save" } },
+      });
+      const trigger = document.createElement("button");
+      document.body.appendChild(trigger);
+      const event = new CustomEvent("dismissableLayer.focusOutside", {
+        cancelable: true,
+        detail: { originalEvent: { target: trigger } },
+      });
+      await findDrawerPanel(wrapper).vm.$emit("interactOutside", event);
+      await flushPromises();
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(wrapper.emitted("update:open")).toBeFalsy();
+      expect(wrapper.find('[data-test="o-drawer-discard-row"]').exists()).toBe(false);
+      trigger.remove();
+      wrapper.unmount();
+    });
+
     it("stays open on an outside interaction when modal=false", async () => {
       const wrapper = mount(ODrawer, {
         props: { open: true, title: "Test", modal: false, seamless: true },

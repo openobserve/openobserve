@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body text-xs font-medium">
               {{ t("dbm.queries.foldRowText", { count: row.foldCount ?? 0 }) }}
             </span>
-            <OTruncatedText class="text-text-secondary text-3xs">
+            <OTruncatedText class="text-text-secondary text-2xs">
               {{
                 tailExpanded
                   ? t("dbm.queries.foldRowDetailOpen", { share: formatPercent(row.share, 0) })
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <div
               v-if="!row.isOther"
-              class="text-text-secondary text-3xs flex min-w-0 items-center gap-1"
+              class="text-text-secondary text-2xs flex min-w-0 items-center gap-1"
               :class="row.isTail ? 'ps-4' : ''"
             >
               <OTag type="dbSystem" :value="row.db_system" size="sm" />
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Every remainder states its own call count; only the first
                  explains what a remainder is, because three copies of the same
                  sentence is what made this block unreadable. -->
-            <span v-else class="text-text-secondary text-3xs">
+            <span v-else class="text-text-secondary text-2xs">
               {{
                 row.otherRowExplained
                   ? t("dbm.queries.otherRowDetail", { calls: formatCount(row.calls) })
@@ -1938,7 +1938,7 @@ const errorLabel = (row: QueryRow): I18nText =>
 
 const errorClass = (row: QueryRow) => {
   if ((row.errors ?? 0) <= 0) return "text-text-secondary";
-  return row.critical ? "text-status-error-text font-bold" : "text-status-error-text";
+  return row.critical ? "text-status-error-text font-semibold" : "text-status-error-text";
 };
 
 /**

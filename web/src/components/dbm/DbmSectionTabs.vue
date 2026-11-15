@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            available. -->
         <span
           v-if="section.count != null"
-          class="text-2xs inline-flex items-baseline gap-1 rounded-full px-1.5 py-1 leading-none font-bold"
+          class="text-2xs inline-flex items-baseline gap-1 rounded-full px-1.5 py-1 leading-none font-semibold"
           :class="
             section.key === activeTab
               ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ><span>{{ section.count }}</span
           ><span
             v-if="section.vantageLabel"
-            class="text-3xs font-normal opacity-80"
+            class="text-2xs font-normal opacity-80"
             :data-test="`dbm-section-tab-vantage-${section.key}`"
             >{{ section.vantageLabel }}</span
           ></span

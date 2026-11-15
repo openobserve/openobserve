@@ -414,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="isLLMSpan && (config.isEnterprise === 'true' || config.isCloud === 'true')"
           >
             <OSeparator vertical class="mx-1.5 h-3.5" />
-            <span class="text-3xs text-text-secondary me-1 shrink-0 font-medium">{{
+            <span class="text-2xs text-text-secondary me-1 shrink-0 font-medium">{{
               t("traces.traceDetailsSidebar.scores")
             }}</span>
             <TraceScoreChips
@@ -580,7 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pe-2"
               >
                 <div
-                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-semibold"
                   :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.input") }}</div>
@@ -654,7 +654,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col"
               >
                 <div
-                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-semibold"
                   :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.output") }}</div>
@@ -859,7 +859,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="shrink-0 ps-1 pe-1 pb-[0.325rem]"
               data-test="trace-details-sidebar-events-timeline"
             >
-              <div class="text-3xs text-text-muted flex items-center justify-between pb-1">
+              <div class="text-2xs text-text-muted flex items-center justify-between pb-1">
                 <span>{{ t("traces.spanEventTimeline") }}</span>
                 <span>{{ getDuration }}</span>
               </div>
@@ -1034,10 +1034,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="flex h-full items-center justify-center py-20">
             <div class="text-center">
               <OSpinner v-if="correlationLoading" size="lg" class="mb-4" />
-              <div v-else-if="correlationError" class="text-sm font-bold">
+              <div v-else-if="correlationError" class="text-sm font-semibold">
                 {{ correlationError }}
               </div>
-              <div v-else class="text-text-muted text-base">
+              <div v-else class="text-text-muted text-sm">
                 {{ t("correlation.clickToLoadLogs") }}
               </div>
             </div>
@@ -1084,10 +1084,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="flex h-full items-center justify-center py-20">
             <div class="text-center">
               <OSpinner v-if="correlationLoading" size="lg" class="mb-4" />
-              <div v-else-if="correlationError" class="text-sm font-bold">
+              <div v-else-if="correlationError" class="text-sm font-semibold">
                 {{ correlationError }}
               </div>
-              <div v-else class="text-text-muted text-base">
+              <div v-else class="text-text-muted text-sm">
                 {{ t("correlation.clickToLoadMetrics") }}
               </div>
             </div>

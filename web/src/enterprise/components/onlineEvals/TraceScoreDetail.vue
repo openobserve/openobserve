@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-center justify-between gap-3">
       <div class="flex min-w-0 items-center gap-1.5">
         <OIcon name="task-alt" size="xs" class="text-status-success-text shrink-0" />
-        <span class="text-text-heading font-bold wrap-anywhere">{{ chip.label }}</span>
+        <span class="text-text-heading font-semibold wrap-anywhere">{{ chip.label }}</span>
       </div>
       <span
         class="border-border-default text-text-body rounded-default shrink-0 border px-1.5 py-0.25 font-semibold tabular-nums"
@@ -29,26 +29,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
-    <p v-if="chip.description" class="text-text-secondary text-3xs leading-relaxed">
+    <p v-if="chip.description" class="text-text-secondary text-2xs leading-relaxed">
       {{ chip.description }}
     </p>
 
     <div class="border-border-default rounded-default flex gap-1.5 border p-1.75">
       <OIcon name="lightbulb-outline" size="xs" class="text-text-secondary mt-0.5 shrink-0" />
       <div class="min-w-0">
-        <div class="text-text-secondary text-3xs mb-0.25 font-bold tracking-[0.05em]">
+        <div class="text-text-secondary text-2xs mb-0.25 font-semibold tracking-[0.05em]">
           {{ t("onlineEvals.traceScoreChip.reasoning") }}
         </div>
         <p
           v-if="chip.reasoning"
-          class="text-text-body text-3xs max-h-40 overflow-y-auto pe-1 leading-relaxed"
+          class="text-text-body text-2xs max-h-40 overflow-y-auto pe-1 leading-relaxed"
           data-test="trace-score-detail-reasoning"
         >
           {{ chip.reasoning }}
         </p>
         <p
           v-else
-          class="text-text-secondary text-3xs italic"
+          class="text-text-secondary text-2xs italic"
           data-test="trace-score-detail-no-reasoning"
         >
           {{ t("onlineEvals.traceScoreChip.noReasoning") }}
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div v-if="scoredAtLabel" class="text-text-secondary text-3xs flex items-center gap-1">
+    <div v-if="scoredAtLabel" class="text-text-secondary text-2xs flex items-center gap-1">
       <OIcon name="schedule" size="xs" />
       {{ t("onlineEvals.traceScoreChip.scoredAt", { time: scoredAtLabel }) }}
     </div>

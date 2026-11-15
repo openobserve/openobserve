@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="error-section mb-2.5 p-2.5" v-if="tempalteCreators.length > 0">
-            <div class="text-primary mb-2.5 text-base" data-test="template-import-creation-title">
+            <div class="text-primary mb-2.5 text-sm" data-test="template-import-creation-title">
               {{ t("alert_templates.templateCreationTitle") }}
             </div>
             <div
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'error-item px-0 py-1.25 text-sm font-bold wrap-break-word': true,
+                  'error-item px-0 py-1.25 text-sm font-semibold wrap-break-word': true,
                   'text-green': val.success,
                   'text-status-negative': !val.success,
                 }"

@@ -116,13 +116,13 @@ onMounted(() =>
         isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
         'outline-none',
         'focus-visible:ring-focus-ring-accent focus-visible:ring-4',
-        'transition-[color,background-color,border-color,box-shadow] duration-200',
+        'transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)',
       ]"
     >
       <span
         :class="[
           'block size-3 rounded-full',
-          'transition-transform duration-200',
+          'transition-transform duration-(--duration-indicator) ease-(--ease-control)',
           isDisabled ? 'bg-switch-disabled-thumb' : isChecked ? 'bg-white' : offClasses.thumb,
           isChecked ? 'translate-x-3 rtl:-translate-x-3' : 'translate-x-0',
         ]"

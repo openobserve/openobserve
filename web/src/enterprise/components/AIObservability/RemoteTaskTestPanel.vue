@@ -21,7 +21,7 @@
   >
     <div class="flex flex-col gap-4 p-5">
       <div class="flex flex-col gap-1">
-        <h3 class="text-text-heading m-0 text-sm font-bold">
+        <h3 class="text-text-heading m-0 text-sm font-semibold">
           {{ t("aiObservability.remoteTasks.testPanel.title") }}
         </h3>
         <p

@@ -890,7 +890,7 @@ export default defineComponent({
 
 /* Pivot table styles */
 .table-wrapper :deep(.pivot-total-row) {
-  font-weight: bold;
+  font-weight: var(--font-semibold);
   background-color: var(--color-table-row-striped-bg);
 }
 
@@ -908,12 +908,12 @@ export default defineComponent({
 
 .table-wrapper :deep(.pivot-value-header) {
   font-weight: 500;
-  font-size: 0.85em;
+  font-size: var(--text-2xs);
 }
 
 /* Sticky total row */
 .table-wrapper :deep(.pivot-sticky-total-row) {
-  font-weight: bold;
+  font-weight: var(--font-semibold);
 }
 
 .table-wrapper :deep(.pivot-sticky-total-row td) {

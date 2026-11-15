@@ -1069,7 +1069,7 @@ const noUserSources = computed(
               /></span>
             </div>
           </div>
-          <div class="text-text-secondary text-3xs grid grid-cols-24 gap-0.5 ps-30">
+          <div class="text-text-secondary text-2xs grid grid-cols-24 gap-0.5 ps-30">
             <span v-for="h in HOURS" :key="h" class="text-center">{{
               h % 6 === 0 ? String(h).padStart(2, "0") : ""
             }}</span>

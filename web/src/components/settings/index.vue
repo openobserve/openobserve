@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { providePageRailGroup } from "@/lib/core/PageHeader/pageContext";
 import SectionRail from "@/components/common/SectionRail.vue";
 import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
 import { defineComponent, ref, onBeforeMount, onActivated, onUpdated, computed } from "vue";
@@ -539,6 +540,13 @@ export default defineComponent({
         .sort((a, b) => rank(a) - rank(b))
         .map((label) => ({ label: groupLabels[label] ?? raw(label), items: buckets.get(label)! }));
     });
+    providePageRailGroup(
+      computed(
+        () =>
+          sectionGroups.value.find((g) => g.items.some((i) => i.key === activeSection.value))
+            ?.label,
+      ),
+    );
 
     return {
       raw,

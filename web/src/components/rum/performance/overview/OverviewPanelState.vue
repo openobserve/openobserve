@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div v-if="status === 'low'" class="mb-3">
         <OInlineNotice tone="info" :data-test="`${dataTest}-low-data`">
-          <p class="font-bold">
+          <p class="font-semibold">
             {{ t("rum.overviewPage.stateLowTitle", { count: formatCount(lowCount) }, lowCount) }}
           </p>
           <p>{{ t("rum.overviewPage.stateLowBody", { min: MIN_VIEWS }) }}</p>

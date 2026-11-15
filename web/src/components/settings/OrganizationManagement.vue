@@ -353,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @submit="onExtendTrialSubmit"
       >
         <div class="flex flex-col gap-3">
-          <div class="font-bold">{{ t("settings.organizationManagementPage.weeks") }}</div>
+          <div class="font-semibold">{{ t("settings.organizationManagementPage.weeks") }}</div>
           <div class="flex gap-1">
             <span
               v-for="page in 4"

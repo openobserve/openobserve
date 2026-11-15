@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               data-test="enterprise-upgrade-hero-title"
-              class="mb-4 text-center text-3xl leading-[1.2] font-bold text-white"
+              class="mb-4 text-center text-2xl leading-[1.2] font-semibold text-white"
             >
               {{ dialogConfig.heroTitle }}
             </div>
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling shadow and blur with text makes elevation bloom -->
                 <div
                   data-test="enterprise-upgrade-offer-badge"
-                  class="rounded-default shadow-success-500/40 inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg backdrop-blur-[10px]"
+                  class="rounded-default shadow-success-500/40 inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-semibold text-white shadow-lg backdrop-blur-[10px]"
                   :class="{
                     'bg-[rgba(255,255,255,0.2)]! shadow-md!': dialogConfig.isLicensed,
                   }"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="isIngestionUnlimited"
                     class="mt-1 text-center text-xs"
-                    style="color: rgba(255, 255, 255, 0.7); font-size: var(--text-3xs)"
+                    style="color: rgba(255, 255, 255, 0.7); font-size: var(--text-2xs)"
                   >
                     {{ t("about.usage_shows_zero_unlimited") }}
                   </div>
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
-                class="rounded-default! text-theme-accent! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.01875rem] shadow-md transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-0.1875rem)_scale(1.02)] hover:shadow-lg active:[transform:translateY(-1px)_scale(0.98)]"
+                class="rounded-default! text-theme-accent! bg-white! px-8 py-2.5 text-sm font-semibold! [letter-spacing:0.01875rem] shadow-md transition-[box-shadow,transform] duration-(--duration-control) ease-(--ease-control) hover:[transform:translateY(-0.1875rem)_scale(1.02)] hover:shadow-lg active:[transform:translateY(-1px)_scale(0.98)]"
               >
                 <!-- eslint-enable local/no-hardcoded-px -->
                 {{ dialogConfig.primaryButtonText }}

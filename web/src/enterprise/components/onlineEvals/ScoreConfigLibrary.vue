@@ -59,7 +59,7 @@ the Free Software Foundation, either version 3 of the License, or
           :data-test="`score-config-library-section-${group.dataType}`"
         >
           <div
-            class="text-text-heading mx-0 mt-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-bold tracking-[0.04em] uppercase"
+            class="text-text-heading mx-0 mt-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-semibold tracking-[0.04em] uppercase"
           >
             <span class="text-text-heading">{{ group.label }}</span>
             <span class="text-text-secondary font-medium">({{ group.entries.length }})</span>

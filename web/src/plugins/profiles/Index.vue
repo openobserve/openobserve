@@ -111,9 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #subnav>
-      <OContent class="flex flex-nowrap items-center gap-1.5 py-1.5 max-lg:flex-wrap">
+      <OContent class="flex flex-nowrap items-center gap-2 py-2 max-lg:flex-wrap">
         <div
-          class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
+          class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.25rem)]"
         >
           <OSelect
             width="full"
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div
-          class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
+          class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.25rem)]"
         >
           <OSelect
             width="full"
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div
-          class="max-w-44 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
+          class="max-w-44 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.25rem)]"
         >
           <OSelect
             width="full"

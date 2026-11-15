@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-shrink-0 items-center gap-1.5">
           <span
             v-if="selectedTrace.metadata?.errorCount > 0"
-            class="rounded-default text-2xs bg-status-error-bg! text-status-error-text! inline-flex items-center gap-1 px-1.5 py-0.5 font-bold"
+            class="rounded-default text-2xs bg-status-error-bg! text-status-error-text! inline-flex items-center gap-1 px-1.5 py-0.5 font-semibold"
           >
             <OIcon name="error" size="xs" />
             {{ selectedTrace.metadata.errorCount }}
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <span
             v-if="rowHttpStatus(selectedTrace) >= 400"
-            class="rounded-default text-2xs bg-status-error-bg! text-status-error-text! inline-flex items-center gap-1 px-1.5 py-0.5 font-bold"
+            class="rounded-default text-2xs bg-status-error-bg! text-status-error-text! inline-flex items-center gap-1 px-1.5 py-0.5 font-semibold"
             data-test="rum-player-traces-tab-http-status"
           >
             <OIcon name="error" size="xs" />

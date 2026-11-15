@@ -102,7 +102,7 @@ describe("OEmptyState", () => {
         expect.arrayContaining(["size-10", "rounded-surface"]),
       );
       expect(wrapper.find("h2").text()).toBe("No alerts yet");
-      expect(wrapper.find("h2").classes()).toContain("text-base");
+      expect(wrapper.find("h2").classes()).toContain("text-sm");
     });
 
     it("inline renders a 32 px menu tile, a 14 px title and 13 px text", () => {

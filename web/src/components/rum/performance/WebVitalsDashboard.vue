@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="performance-dashboard" :class="isLoading.length ? 'invisible' : 'visible'">
         <div
           data-test="learn-web-vitals-link"
-          class="rounded-default bg-badge-indigo-soft-bg ms-3 mt-2 flex w-fit items-center px-2 py-1 text-sm font-bold"
+          class="rounded-default bg-badge-indigo-soft-bg ms-3 mt-2 flex w-fit items-center px-2 py-1 text-sm font-semibold"
         >
           <OIcon name="info" size="sm" class="me-1" />
           {{ t("rum.learnWebVitalsLabel", { product: raw("Web Vitals") }) }}

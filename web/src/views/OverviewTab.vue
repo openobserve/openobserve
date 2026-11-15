@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-wrap items-baseline gap-x-2 ps-1"
         data-test="overview-time-range-heading"
       >
-        <h2 class="text-text-heading text-base font-semibold">
+        <h2 class="text-text-heading text-sm font-semibold">
           {{ t("overview.timeRange.heading") }}
         </h2>
         <OText

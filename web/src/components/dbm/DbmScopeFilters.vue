@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   short list it usually is.
 -->
 <template>
-  <div class="flex min-w-0 items-center gap-1.5" data-test="dbm-queries-scope">
+  <div class="flex min-w-0 items-center gap-2" data-test="dbm-queries-scope">
     <OPopover size="sm" v-model:open="open">
       <template #trigger>
         <OButton
@@ -80,7 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The chips scroll rather than push: five set dimensions are wider than
          the toolbar, and a chip strip that grows must not shove the refresh and
          column controls off the right edge. -->
-    <div class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+    <!-- Rendered only with chips: an empty flex item still costs the row a gap. -->
+    <div
+      v-if="activeFilters.length || insightChip || activeCount"
+      class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto"
+    >
       <!-- The wrapper keeps each chip at full width so a crowded strip scrolls instead of truncating it. -->
       <span v-for="filter in activeFilters" :key="filter.key" class="inline-flex shrink-0">
         <ODimensionChip

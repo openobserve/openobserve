@@ -1204,7 +1204,7 @@ async function getQueryData(
             // Markup + an English "TraceID:" label on purpose: useQueryError reads
             // the id back out of this string with /TraceID:\s*([a-f0-9A-F-]+)/i, so a
             // translated label would stop QueryErrorState from finding the trace id.
-            errorMsg += raw(` <br><span class='text-base font-medium'>TraceID: ${trace_id}</span>`);
+            errorMsg += raw(` <br><span class='text-sm font-medium'>TraceID: ${trace_id}</span>`);
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";

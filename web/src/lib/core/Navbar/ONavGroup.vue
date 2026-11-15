@@ -761,7 +761,7 @@ function onChildMouseenter(event: MouseEvent) {
               role="menuitem"
               :to="child.locked ? undefined : childTo(child)"
               :tabindex="child.locked ? 0 : undefined"
-              class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
+              class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]!"
               :class="[
                 flyoutTextClass,
                 isChildActive(child) ? 'bg-nav-flyout-item-selected-bg font-medium' : '',
@@ -809,7 +809,7 @@ function onChildMouseenter(event: MouseEvent) {
             role="menuitem"
             :to="block.child.locked ? undefined : childTo(block.child)"
             :tabindex="block.child.locked ? 0 : undefined"
-            class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
+            class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]!"
             :class="[
               flyoutTextClass,
               block.spaced ? 'mt-2' : '',
@@ -939,7 +939,7 @@ function onChildMouseenter(event: MouseEvent) {
                     role="menuitem"
                     :to="child.locked ? undefined : childTo(child)"
                     :tabindex="child.locked ? 0 : undefined"
-                    class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+                    class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
                     :class="[
                       flyoutTextClass,
                       childIndex > 0 ? 'mt-0.5' : '',
@@ -1001,7 +1001,7 @@ function onChildMouseenter(event: MouseEvent) {
                   role="menuitem"
                   :to="block.child.locked ? undefined : childTo(block.child)"
                   :tabindex="block.child.locked ? 0 : undefined"
-                  class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+                  class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
                   :class="[
                     flyoutTextClass,
                     // Matches the pt-4 a header gets, so leaving a run and starting

@@ -58,7 +58,7 @@
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
-            <span class="text-text-secondary text-2xl leading-none font-bold">
+            <span class="text-text-secondary text-2xl leading-none font-semibold">
               {{ card.value }}
             </span>
             <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
@@ -240,7 +240,7 @@
                   </span>
                   <div class="flex min-w-0 flex-1 flex-col gap-1.25">
                     <div class="flex flex-wrap items-center gap-2">
-                      <span class="text-text-heading text-sm font-bold">{{ item.name }}</span>
+                      <span class="text-text-heading text-sm font-semibold">{{ item.name }}</span>
                       <OTag
                         v-if="item.scorerTypeLabel"
                         type="scorerType"
@@ -262,7 +262,7 @@
                       <span class="font-medium">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
                       </span>
-                      <span class="text-text-body font-bold">{{ item.scoreConfigName }}</span>
+                      <span class="text-text-body font-semibold">{{ item.scoreConfigName }}</span>
                       <template v-if="item.scoreConfigDataType">
                         <span class="text-text-secondary opacity-50">·</span>
                         <span class="text-text-secondary">

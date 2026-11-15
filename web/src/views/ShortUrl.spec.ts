@@ -120,7 +120,7 @@ describe("ShortUrl", () => {
 
   it("should render message with correct CSS class", () => {
     const message = wrapper.find('[data-test="message"]');
-    expect(message.classes()).toContain("text-base");
+    expect(message.classes()).toContain("text-sm");
     expect(message.classes()).toContain("text-text-secondary");
   });
 

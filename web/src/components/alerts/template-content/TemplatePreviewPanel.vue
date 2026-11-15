@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ activeChannelLabel }}
           </div>
-          <div class="text-sm font-bold" data-test="template-preview-panel-title">
+          <div class="text-sm font-semibold" data-test="template-preview-panel-title">
             {{ previewModel.title }}
           </div>
           <!-- `prose` is load-bearing, not decoration: Tailwind's preflight
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-else>
         <pre
-          class="bg-surface-panel rounded-default text-3xs overflow-auto p-3"
+          class="bg-surface-panel rounded-default text-2xs overflow-auto p-3"
           data-test="template-preview-panel-raw-json"
           >{{ rawPayloadJson }}</pre>
       </template>

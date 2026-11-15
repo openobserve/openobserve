@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-h-0 flex-1 flex-col">
       <!-- Above the rail and the charts, so it stays put while they scroll, as on every other tab. -->
       <div
-        class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-1.5"
+        class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-2"
         data-test="dbm-metrics-toolbar"
       >
         <DbmScopeFilters class="min-w-0 flex-1" :filters="dimensionFilters" @clear="clearScope" />

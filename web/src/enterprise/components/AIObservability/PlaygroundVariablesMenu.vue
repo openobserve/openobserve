@@ -21,7 +21,7 @@
            since a sample can land while the user is mid-typing somewhere
            else. -->
       <div
-        class="rounded-default ring-2 transition-colors duration-300 motion-reduce:transition-none"
+        class="rounded-default ring-2 transition-colors motion-reduce:transition-none"
         :class="flashing ? 'ring-accent' : 'ring-transparent'"
         :data-flashing="flashing || undefined"
         data-test="ai-playground-variables-trigger"

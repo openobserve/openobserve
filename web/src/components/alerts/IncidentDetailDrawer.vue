@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- Bottom: Large Number -->
-                    <div :class="'text-text-body'" class="text-3xl leading-none font-semibold">
+                    <div :class="'text-text-body'" class="text-2xl leading-none font-semibold">
                       {{ triggers.length }}
                     </div>
                   </div>
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- Bottom: Large Number -->
-                    <div :class="'text-text-body'" class="text-3xl leading-none font-semibold">
+                    <div :class="'text-text-body'" class="text-2xl leading-none font-semibold">
                       {{ uniqueAlertsCount }}
                     </div>
                   </div>
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- Bottom: Large Number -->
-                    <div :class="'text-text-body'" class="text-3xl leading-none font-semibold">
+                    <div :class="'text-text-body'" class="text-2xl leading-none font-semibold">
                       {{ affectedServicesCount }}
                     </div>
                   </div>
@@ -1054,7 +1054,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="space-y-2">
                           <!-- Alert Name -->
                           <div class="flex flex-col gap-0.5">
-                            <span :class="'text-text-secondary'" class="text-3xs">
+                            <span :class="'text-text-secondary'" class="text-2xs">
                               {{ t("alerts.incidents.alertName") }}
                             </span>
                             <span :class="'text-text-body'" class="text-sm font-medium">
@@ -1067,7 +1067,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-if="alerts[selectedAlertIndex]?.alert_type === 'composite'"
                             class="flex flex-col gap-0.5"
                           >
-                            <span :class="'text-text-secondary'" class="text-3xs">
+                            <span :class="'text-text-secondary'" class="text-2xs">
                               {{ t("alerts.alertType") }}
                             </span>
                             <OTag type="alertType" :value="'composite'" class="w-fit" />
@@ -1076,7 +1076,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Stream Type & Name -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.streamType") }}
                               </span>
                               <OTag
@@ -1086,7 +1086,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               />
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.stream_name") }}
                               </span>
                               <OTruncatedText :class="'text-text-body'" class="text-sm font-medium">
@@ -1098,7 +1098,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Threshold & Period -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.messages.thresholdMarkLine") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -1110,7 +1110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.incidents.period") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -1126,7 +1126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Frequency & Silence -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.incidents.frequency") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -1134,7 +1134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.incidents.silence") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -1338,7 +1338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="mb-4"
                     data-test="incident-telemetry-loading-indicator"
                   />
-                  <div class="text-base">{{ t("alerts.incidents.loadingCorrelatedMetrics") }}</div>
+                  <div class="text-sm">{{ t("alerts.incidents.loadingCorrelatedMetrics") }}</div>
                 </div>
 
                 <!-- Error/No Data State -->
@@ -1440,7 +1440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="mb-4"
                     data-test="incident-telemetry-loading-indicator"
                   />
-                  <div class="text-base">{{ t("alerts.incidents.loadingCorrelatedTraces") }}</div>
+                  <div class="text-sm">{{ t("alerts.incidents.loadingCorrelatedTraces") }}</div>
                 </div>
 
                 <!-- Error/No Data State -->

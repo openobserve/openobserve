@@ -354,10 +354,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-baseline gap-[0.2rem]" data-test="llm-insights-kpi-value">
                   <span
                     v-if="card.prefix"
-                    class="text-text-secondary text-lg leading-none font-bold max-lg:text-base"
+                    class="text-text-secondary text-lg leading-none font-semibold max-lg:text-base"
                     >{{ card.prefix }}</span
                   >
-                  <span class="text-text-secondary text-2xl leading-none font-bold max-lg:text-lg">
+                  <span
+                    class="text-text-secondary text-2xl leading-none font-semibold max-lg:text-lg"
+                  >
                     {{ card.value }}
                   </span>
                   <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">

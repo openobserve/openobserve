@@ -26,10 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageHeader :title="t('menu.metrics')" title-data-test="metrics-explorer-title" />
     <!-- items-center: LabelFilterBar wraps its own chips internally (flex-wrap),
          so the row keeps every control on one centred line rather than items-start. -->
-    <!-- `p-1.5`, the SAME padding the Logs and Traces toolbars use
-         (SearchBar.vue:23 / traces SearchBar.vue:19), so the toolbars share geometry. -->
     <div
-      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5 max-md:flex-wrap max-md:gap-x-1 max-md:gap-y-1"
+      class="border-border-default px-page-edge flex shrink-0 items-center gap-2 border-b py-2 max-md:flex-wrap max-md:gap-x-1 max-md:gap-y-1"
       data-test="metrics-explorer-filter-bar"
     >
       <!-- Page mode toggle at the start of the toolbar — Explore (browse grid)

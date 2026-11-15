@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Selection shares the search row: its own row would push the grid down.
                  Only the search field and the chips' scroll box give up width to it. -->
             <div
-              class="border-border-default px-page-edge flex shrink-0 flex-wrap items-center gap-3 border-b py-2"
+              class="border-border-default px-page-edge flex shrink-0 flex-wrap items-center gap-2 border-b py-2"
               data-test="alert-library-toolbar"
             >
               <OButton

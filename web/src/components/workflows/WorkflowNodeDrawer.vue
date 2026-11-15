@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex h-8 items-center"
           :class="stepsCollapsed ? 'justify-center' : 'justify-between ps-2'"
         >
-          <span v-if="!stepsCollapsed" class="text-text-body text-sm font-bold">
+          <span v-if="!stepsCollapsed" class="text-text-body text-sm font-semibold">
             {{ t("workflow.results.nodesTitle") }}
           </span>
           <!-- Same toggle style as the Logs field-panel collapse button
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="flex h-8 items-center gap-2 ps-2">
-          <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.input") }}</div>
+          <div class="text-text-body text-sm font-semibold">{{ t("workflow.ndv.input") }}</div>
           <div
             v-if="inputPaged && inputCount > 1"
             data-test="workflow-ndv-input-pager"
@@ -654,7 +654,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <div class="flex h-8 shrink-0 items-center gap-2 ps-2">
-          <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.output") }}</div>
+          <div class="text-text-body text-sm font-semibold">{{ t("workflow.ndv.output") }}</div>
           <!-- Run status (Passed / Errored / No Records) — same source as the canvas
                badge and the results dock. -->
           <OBadge

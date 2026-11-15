@@ -176,7 +176,7 @@
           @click="handleMetricCardClick(card)"
         >
           <template #value>
-            <span class="text-text-secondary text-2xl leading-none font-bold">
+            <span class="text-text-secondary text-2xl leading-none font-semibold">
               {{ raw(card.value) }}
             </span>
             <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
@@ -184,7 +184,7 @@
             </span>
           </template>
           <template v-if="card.footer" #footer>
-            <span class="text-3xs text-text-secondary font-medium">{{ raw(card.footer) }}</span>
+            <span class="text-2xs text-text-secondary font-medium">{{ raw(card.footer) }}</span>
           </template>
         </KpiCard>
       </KpiCardRow>

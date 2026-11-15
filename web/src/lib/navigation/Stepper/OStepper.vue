@@ -122,7 +122,7 @@ function indicatorClasses(step: StepRegistration): string {
     "flex items-center justify-center",
     "size-control-md rounded-full shrink-0",
     "text-compact font-semibold leading-none",
-    "transition-colors duration-150",
+    "transition-colors duration-(--duration-control) ease-(--ease-control)",
   ].join(" ");
 
   if (step.error) {
@@ -147,7 +147,7 @@ function triggerClasses(step: StepRegistration): string {
   const base = [
     "flex flex-row items-center gap-2 px-2 py-1.5",
     "rounded-default outline-none select-none",
-    "transition-colors duration-150",
+    "transition-colors duration-(--duration-control) ease-(--ease-control)",
   ].join(" ");
   if (canNavigateTo(step)) {
     return [

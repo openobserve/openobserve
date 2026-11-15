@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip>
                         <template #content>
                           <div class="min-w-60">
-                            <div class="text-compact mb-0.75 font-bold">
+                            <div class="text-compact mb-0.75 font-semibold">
                               {{ row.name }}
                             </div>
                             <table class="w-full border-collapse">
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip side="top">
                     <template #content>
                       <div class="min-w-60">
-                        <div class="text-compact mb-1 font-bold">{{ row.name }}</div>
+                        <div class="text-compact mb-1 font-semibold">{{ row.name }}</div>
                         <div
                           v-for="(tier, tIdx) in row.tiers ?? []"
                           :key="tIdx"

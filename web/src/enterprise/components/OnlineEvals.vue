@@ -62,7 +62,7 @@ the Free Software Foundation, either version 3 of the License, or
         class="online-evals__header bg-card-glass-bg flex min-h-17 shrink-0 items-center justify-between gap-4 px-4 py-2.5"
       >
         <div>
-          <h1 class="text-text-heading m-0 font-semibold [letter-spacing:0] text-[var(--text-lg)]">
+          <h1 class="text-text-heading font-title m-0 text-lg leading-6 [letter-spacing:0]">
             {{ t("onlineEvals.title") }}
           </h1>
         </div>

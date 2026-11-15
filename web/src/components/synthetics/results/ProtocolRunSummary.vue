@@ -286,7 +286,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <div class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
             <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
-            <h3 class="text-text-heading text-base font-semibold">
+            <h3 class="text-text-heading text-sm font-semibold">
               {{ t("synthetics.protocolRun.result") }}
             </h3>
           </div>
@@ -344,7 +344,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <div v-if="timingBars.length" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
             <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
-            <h3 class="text-text-heading text-base font-semibold">
+            <h3 class="text-text-heading text-sm font-semibold">
               {{ t("synthetics.protocolRun.timings") }}
             </h3>
           </div>
@@ -376,7 +376,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <div v-if="showAssertions" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
             <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
-            <h3 class="text-text-heading text-base font-semibold">
+            <h3 class="text-text-heading text-sm font-semibold">
               {{ t("synthetics.protocolRun.assertions") }}
             </h3>
             <OBadge
@@ -437,7 +437,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <div v-if="certExpiryDate" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
             <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
-            <h3 class="text-text-heading text-base font-semibold">
+            <h3 class="text-text-heading text-sm font-semibold">
               {{ t("synthetics.protocolRun.tlsCert") }}
             </h3>
           </div>
@@ -457,7 +457,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
         <div class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
             <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
-            <h3 class="text-text-heading text-base font-semibold">
+            <h3 class="text-text-heading text-sm font-semibold">
               {{ t("synthetics.protocolRun.probe") }}
             </h3>
           </div>

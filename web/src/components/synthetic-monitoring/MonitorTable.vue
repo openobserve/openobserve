@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #more="{ count }">
             <span
-              class="rounded-default bg-surface-subtle px-1 py-0.5 text-xs font-bold whitespace-nowrap"
+              class="rounded-default bg-surface-subtle px-1 py-0.5 text-xs font-semibold whitespace-nowrap"
               >+{{ count }}</span
             >
           </template>

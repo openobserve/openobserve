@@ -218,7 +218,7 @@ function toggleSteps(executionId: string) {
         >
           <div>
             <p
-              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
+              class="text-2xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.maxDuration") }}
             </p>
@@ -226,7 +226,7 @@ function toggleSteps(executionId: string) {
           </div>
           <div>
             <p
-              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
+              class="text-2xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.locations") }}
             </p>
@@ -234,7 +234,7 @@ function toggleSteps(executionId: string) {
           </div>
           <div>
             <p
-              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
+              class="text-2xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.runId") }}
             </p>
@@ -349,7 +349,7 @@ function toggleSteps(executionId: string) {
                     class="flex items-start gap-2.5 py-1.5 text-xs"
                   >
                     <span
-                      class="text-3xs mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold text-white"
+                      class="text-2xs mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-semibold text-white"
                       :class="step.status === 'ok' ? 'bg-success-600' : 'bg-error-500'"
                       >{{ idx + 1 }}</span
                     >
@@ -390,7 +390,7 @@ function toggleSteps(executionId: string) {
                         class="h-2 w-2 shrink-0 rounded-full"
                         :class="step.status === 'ok' ? 'bg-success-500' : 'bg-error-500'"
                       />
-                      <span class="text-3xs text-text-muted truncate font-mono">{{
+                      <span class="text-2xs text-text-muted truncate font-mono">{{
                         step.stepId
                       }}</span>
                     </div>

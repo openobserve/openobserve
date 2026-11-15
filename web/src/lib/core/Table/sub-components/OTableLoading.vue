@@ -6,6 +6,7 @@ import type { Column } from "@tanstack/vue-table";
 import {
   ROW_ACTIONS_COLUMN_ID,
   TABLE_CHECKBOX_COL_SIZE,
+  TABLE_EXPAND_COL_STYLE,
   type OTableColumnDef,
 } from "../OTable.types";
 import { useI18nTyped } from "@/types/i18n";
@@ -148,7 +149,7 @@ const alignClassFor = (col: Column<any, any>): string => {
       }"
     >
       <!-- Expand chevron placeholder — matches OTableBodyRow exactly -->
-      <td v-if="expansionEnabled" class="w-6 max-w-6 min-w-6 px-0 text-center align-middle" />
+      <td v-if="expansionEnabled" class="pe-0 align-middle" :style="TABLE_EXPAND_COL_STYLE" />
 
       <!-- Selection checkbox placeholder — matches OTableBodyRow exactly -->
       <td

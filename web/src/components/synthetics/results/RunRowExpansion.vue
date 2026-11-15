@@ -244,7 +244,7 @@ function failedAtStep(steps: StepResult[]): string {
               size="sm"
               class="text-text-muted shrink-0"
             />
-            <span :class="STATUS_COLOR[group.status]" class="text-sm font-bold">
+            <span :class="STATUS_COLOR[group.status]" class="text-sm font-semibold">
               {{ statusDot(group.status) }}
             </span>
             <span class="text-text-heading font-semibold">{{ group.location }}</span>
@@ -265,27 +265,27 @@ function failedAtStep(steps: StepResult[]): string {
                 <thead>
                   <tr class="bg-surface-panel border-border-default border-b">
                     <th
-                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
+                      class="text-text-muted text-2xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.runRowExpansion.browserHeader") }}
                     </th>
                     <th
-                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
+                      class="text-text-muted text-2xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.runRowExpansion.deviceHeader") }}
                     </th>
                     <th
-                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
+                      class="text-text-muted text-2xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.results.status") }}
                     </th>
                     <th
-                      class="text-text-muted text-3xs px-3 py-2 text-right font-semibold tracking-wide uppercase"
+                      class="text-text-muted text-2xs px-3 py-2 text-right font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.results.duration") }}
                     </th>
                     <th
-                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
+                      class="text-text-muted text-2xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.runRowExpansion.failedAtHeader") }}
                     </th>
@@ -310,7 +310,7 @@ function failedAtStep(steps: StepResult[]): string {
                         class="flex items-center gap-1.5 font-semibold"
                         :class="STATUS_COLOR[ex.status]"
                       >
-                        <span class="text-base leading-none">{{ statusDot(ex.status) }}</span>
+                        <span class="text-sm leading-none">{{ statusDot(ex.status) }}</span>
                         {{ statusLabel(ex.status) }}
                         <span v-if="ex.status === 'warning'" class="text-text-muted font-normal">{{
                           t("synthetics.runRowExpansion.flaky")

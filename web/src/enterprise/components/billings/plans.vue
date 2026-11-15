@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="mb-2.5 text-xl font-bold tracking-[-0.0125rem]">
+      <div class="mb-2.5 text-xl font-semibold tracking-[-0.0125rem]">
         {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
       <div class="mb-6 max-w-110 text-sm leading-[1.65] opacity-65">
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="warning" size="sm" />
         >{{ store.state.selectedOrganization.note }}
       </div>
-      <div v-if="loading" class="text-center text-xl font-medium font-semibold">
+      <div v-if="loading" class="text-center text-xl font-semibold">
         <OSpinner size="lg" class="mx-auto mt-3 block text-center" />
       </div>
       <div v-else class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3">

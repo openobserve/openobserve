@@ -47,7 +47,7 @@
         >
           <OIcon name="public" size="md" />
         </span>
-        <span class="text-dialog-header-text truncate text-base font-semibold">
+        <span class="text-dialog-header-text text-title truncate font-semibold">
           {{ drawerTitle }}
         </span>
         <BetaBadge class="shrink-0" />
@@ -77,7 +77,7 @@
       data-test="dashboards-public-links-panel-created"
     >
       <div class="flex items-center gap-2">
-        <span class="text-text-heading text-base font-medium">
+        <span class="text-text-heading text-sm font-medium">
           {{ t("dashboard.publicLinks.createdTitle") }}
         </span>
         <OTag

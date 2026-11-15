@@ -60,6 +60,7 @@ const ODialogStub = {
     "</div>",
   props: [
     "open",
+    "dirty",
     "side",
     "persistent",
     "size",
@@ -252,6 +253,21 @@ describe("MoveAcrossFolders.vue", () => {
 
     const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props("primary")?.disabled).toBeFalsy();
+  });
+
+  it("asks before closing only after the user picked a folder, not when the picker settles", async () => {
+    wrapper = createWrapper({ activeFolderId: "folder1", type: "alerts" });
+    const selectDropdown = wrapper.findComponent({ name: "SelectFolderDropDown" });
+    const dialog = () => wrapper.findComponent(ODialogStub);
+
+    await selectDropdown.vm.$emit("folder-selected", { value: "default", label: "Default Folder" });
+    await nextTick();
+    expect(dialog().props("dirty")).toBe(false);
+
+    window.dispatchEvent(new Event("pointerdown"));
+    await selectDropdown.vm.$emit("folder-selected", { value: "folder2", label: "Test Folder 2" });
+    await nextTick();
+    expect(dialog().props("dirty")).toBe(true);
   });
 
   // Test 8: getModuleName function for alerts

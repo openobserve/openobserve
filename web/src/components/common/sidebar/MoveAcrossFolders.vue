@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     data-test="move-across-folders-dialog"
     :open="open"
+    :dirty="folderChanged"
     size="md"
     :title="
       t(folderKey(type, 'dashboard.moveToAnotherFolder'), {
@@ -68,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { folderKey } from "./folderTerms";
+import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { moveModuleToAnotherFolder } from "@/utils/commons";
@@ -109,6 +111,11 @@ export default defineComponent({
     // The picker excludes the active folder, so seeding it here would name a
     // destination the list cannot offer and cannot be re-picked.
     const selectedFolder = ref({ label: "", value: "" });
+    // The picker settles on a folder once its list loads; only a pick after that is the user's (V5).
+    const { dirty: folderChanged } = useUnsavedChanges(
+      () => selectedFolder.value.value,
+      () => props.open,
+    );
     const { t } = useI18nTyped();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
@@ -173,6 +180,7 @@ export default defineComponent({
       store,
       getImageURL,
       selectedFolder,
+      folderChanged,
       onSubmit,
       getModuleName,
       emit,

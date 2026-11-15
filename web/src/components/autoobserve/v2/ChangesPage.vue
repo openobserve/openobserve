@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ stat.label }}
             </dt>
             <dd
-              class="text-text-heading text-3xl leading-none font-semibold tracking-tight tabular-nums"
+              class="text-text-heading text-2xl leading-none font-semibold tracking-tight tabular-nums"
             >
               {{ stat.value }}
             </dd>

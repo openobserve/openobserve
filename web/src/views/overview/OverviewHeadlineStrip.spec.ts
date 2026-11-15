@@ -83,7 +83,7 @@ describe("OverviewHeadlineStrip", () => {
     for (const key of ALL) {
       const text = tile(w, key).text();
       const value = valueOf(w, key);
-      expect(value.classes()).toContain("text-3xl");
+      expect(value.classes()).toContain("text-2xl");
       expect(text.indexOf(value.text())).toBeGreaterThan(0);
     }
   });
@@ -117,7 +117,7 @@ describe("OverviewHeadlineStrip", () => {
     for (const key of ["quiet", "pipelines", "incidents"]) {
       expect(valueOf(w, key).text()).toBe("0");
       expect(valueOf(w, key).classes()).toEqual(
-        expect.arrayContaining(["text-text-heading", "font-bold", "tabular-nums"]),
+        expect.arrayContaining(["text-text-heading", "font-semibold", "tabular-nums"]),
       );
       expect(card(w, key).classes()).toContain("bg-surface-panel");
     }

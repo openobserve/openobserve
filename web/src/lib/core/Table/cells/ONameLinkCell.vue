@@ -10,7 +10,7 @@ defineProps<{
 
 // `data-o2-cell-clip` lets the table's cut-off tooltip measure the link, which truncates on its own.
 const LINK_CLASS =
-  "text-text-link hover:text-text-link-hover focus-visible:ring-focus-ring-accent rounded-default inline-block max-w-full cursor-pointer truncate border-0 bg-transparent p-0 align-middle font-medium no-underline outline-none hover:underline focus-visible:underline focus-visible:ring-2";
+  "text-text-link hover:text-text-link-hover focus-visible:ring-focus-ring-accent rounded-default inline-block transition-[color,box-shadow] max-w-full cursor-pointer truncate border-0 bg-transparent p-0 align-middle font-medium no-underline outline-none hover:underline focus-visible:underline focus-visible:ring-2";
 </script>
 
 <template>

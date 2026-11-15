@@ -11,7 +11,7 @@
 -->
 <template>
   <div
-    class="border-border-default flex flex-wrap items-start gap-2.5 border-b px-4 py-2.5"
+    class="border-border-default px-page-edge flex flex-wrap items-start gap-2 border-b py-2.5"
     data-test="ai-playground-variable-bar"
   >
     <OTag

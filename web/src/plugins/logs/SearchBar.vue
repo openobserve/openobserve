@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
     <div
-      class="solid border-border-default m-0! flex w-full items-center! overflow-hidden border-b p-1.5! max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
+      class="border-border-default px-page-edge m-0! flex w-full items-center! overflow-hidden border-b py-2 max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
     >
       <div
         ref="toolbarLeftRef"
@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon>
                 <span
-                  class="rounded-default bg-section-header-bg text-text-secondary text-compact text-accent inline-flex h-7 w-7 shrink-0 items-center justify-center font-mono font-bold italic"
+                  class="rounded-default bg-section-header-bg text-text-secondary text-compact text-accent inline-flex h-7 w-7 shrink-0 items-center justify-center font-mono font-semibold italic"
                   >fx</span
                 >
               </template>
@@ -826,7 +826,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-label="t('search.functionEditorLabel')"
             @click.stop
           />
-          <span class="text-accent shrink-0 font-mono text-sm font-bold italic">fx</span>
+          <span class="text-accent shrink-0 font-mono text-sm font-semibold italic">fx</span>
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
@@ -938,7 +938,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-visualize-cancel-btn"
                   :title="t('search.cancel')"
                   variant="ghost"
-                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -948,7 +948,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked"
-                  class="hover:shadow-button-primary/70 rounded-s-default! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="hover:shadow-button-primary/70 rounded-s-default! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)] hover:opacity-90 hover:shadow-md"
                   :class="runButtonTone"
                   @click="handleRunQueryFn()"
                 >
@@ -996,7 +996,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-visualize-cancel-btn"
                   variant="ghost"
                   :title="t('search.cancel')"
-                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -1007,7 +1007,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked || disable"
-                  class="hover:shadow-button-primary/70 rounded-s-default! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
+                  class="hover:shadow-button-primary/70 rounded-s-default! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)] hover:opacity-90 hover:shadow-md"
                   :class="runButtonTone"
                   @click="handleRunQueryFn()"
                 >
@@ -1057,7 +1057,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-patterns-cancel-btn"
                 variant="ghost"
                 :title="t('search.cancel')"
-                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-default min-w-[5.875rem] [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-default min-w-[5.875rem] [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)]"
                 @click="autoRun.engine.cancelGeneration(null, { cause: 'user' })"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1067,7 +1067,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-cy="search-bar-refresh-button"
                 variant="primary"
                 :title="t('search.cancel')"
-                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)]"
                 @click="cancelRun"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1080,7 +1080,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
                 variant="primary"
                 :title="t('search.runQuery')"
-                class="rounded-s-default! relative min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="rounded-s-default! relative min-w-[5.875rem] rounded-e-none! [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)]"
                 :class="[
                   showRunQueryPending
                     ? ''
@@ -5715,7 +5715,9 @@ export default defineComponent({
 
 .logs-search-bar-component .download-logs-btn {
   border-radius: var(--radius-default);
-  transition: all 0.2s ease;
+  transition-property: color, background-color, border-color, box-shadow;
+  transition-duration: var(--duration-control);
+  transition-timing-function: var(--ease-control);
 }
 
 .logs-search-bar-component .query-editor-container {

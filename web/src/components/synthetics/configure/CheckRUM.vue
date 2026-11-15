@@ -49,7 +49,7 @@ const sessionReplay = computed({
 
 <template>
   <div class="rounded-default border-border-default bg-surface-base mb-4 border p-6">
-    <h3 class="text-text-heading pb-4 text-base font-semibold">{{ t("synthetics.rum.title") }}</h3>
+    <h3 class="text-text-heading pb-4 text-sm font-semibold">{{ t("synthetics.rum.title") }}</h3>
     <div class="flex flex-col gap-4">
       <div>
         <OSwitch

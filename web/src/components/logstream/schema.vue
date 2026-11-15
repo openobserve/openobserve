@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="lg"
     data-test="schema-drawer"
     :open="open"
+    :dirty="formDirtyFlag"
     :title="indexData.name"
     :title-data-test="'schema-title-text'"
     :subtitle="t('logStream.schemaHeader')"
@@ -39,13 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="flex items-center gap-1.5">
           <span
-            class="text-3xs rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5 font-medium"
+            class="text-2xs rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5 font-medium"
           >
             {{ displayTimezone }}
           </span>
           <div class="text-text-body text-xs font-semibold">
             {{ indexData.stats.doc_time_min }}
-            <span class="text-base leading-none">→</span>
+            <span class="text-sm leading-none">→</span>
             {{ indexData.stats.doc_time_max }}
           </div>
         </div>
@@ -81,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("common.events") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -103,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("logStream.storageSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -125,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("logStream.compressedSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -147,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("logStream.indexSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -624,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mt-2 flex min-h-0 flex-1 flex-col">
                       <div class="mt-2 flex items-center text-center">
                         <div class="flex items-center">
-                          <span class="font-bold"> {{ t("logStream.selectDate") }}</span>
+                          <span class="font-semibold"> {{ t("logStream.selectDate") }}</span>
                           <ODateTimeRange
                             class="mx-2"
                             @on:date-change="dateChangeValue"
@@ -634,7 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :minDate="minDate ?? undefined"
                           />
                         </div>
-                        <span class="font-bold"> {{ t("logStream.utcTimezone") }} </span>
+                        <span class="font-semibold"> {{ t("logStream.utcTimezone") }} </span>
                       </div>
 
                       <div class="mt-2 flex min-h-0 flex-1 flex-col">

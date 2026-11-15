@@ -9,7 +9,7 @@
         class="chat-header border-separator bg-surface-base z-2 flex shrink-0 items-end justify-between border-b px-3 pt-0 pb-1"
         :style="{ height: headerHeight ? headerHeight + 'px' : '' }"
       >
-        <div class="chat-title flex w-full items-center justify-between font-bold">
+        <div class="chat-title flex w-full items-center justify-between font-semibold">
           <div class="flex min-w-0 items-center gap-2">
             <div class="inline-flex h-6 w-6 shrink-0 overflow-hidden rounded-full">
               <img alt="" :src="o2AiTitleLogo" class="h-full w-full object-cover" />
@@ -305,12 +305,12 @@
 
         <div
           v-show="showScrollToBottom"
-          class="scroll-to-bottom-container pointer-events-none absolute bottom-2.5 left-1/2 z-1000 -translate-x-1/2 [transition:all_0.3s_ease]"
+          class="scroll-to-bottom-container pointer-events-none absolute bottom-2.5 left-1/2 z-1000 -translate-x-1/2"
         >
           <OButton
             icon-only
             variant="ghost"
-            class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-sm [backdrop-filter:blur(0.5rem)] transition-all duration-300 hover:scale-110 hover:shadow-md active:scale-100"
+            class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-sm [backdrop-filter:blur(0.5rem)] transition-[color,background-color,border-color,box-shadow,opacity,scale] hover:scale-110 hover:shadow-md active:scale-100"
             :aria-label="t('aiAssistant.scrollToBottom')"
             @click="scrollToBottomSmooth"
           >

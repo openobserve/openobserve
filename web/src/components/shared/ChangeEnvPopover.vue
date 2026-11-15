@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-if="hint" class="text-text-secondary text-xs">{{ hint }}</span>
         </div>
         <div
-          class="rounded-default bg-surface-panel border-border-default border px-3 py-2 text-[0.8125rem]"
+          class="rounded-default bg-surface-panel border-border-default text-compact border px-3 py-2"
           data-test="svcver-env-impact"
         >
           <div>

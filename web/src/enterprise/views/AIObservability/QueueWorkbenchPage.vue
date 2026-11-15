@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="ai-queue-workbench-system-scores"
               >
                 <span class="inline-flex items-center gap-2">
-                  <span class="text-text-heading text-sm font-bold">
+                  <span class="text-text-heading text-sm font-semibold">
                     {{ t("aiObservability.queues.workbench.systemScores") }}
                   </span>
                   <span class="text-text-disabled text-sm font-normal">
@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="min-h-0 flex-1 overflow-y-auto p-4">
                 <div class="mb-4 flex flex-col gap-1">
                   <span class="inline-flex items-center gap-2">
-                    <span class="text-text-heading text-base font-semibold">
+                    <span class="text-text-heading text-sm font-semibold">
                       {{ t("aiObservability.queues.workbench.scoreTitle") }}
                     </span>
                     <span class="text-text-secondary text-xs">
@@ -503,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div class="flex items-center gap-2">
                         <span
-                          class="bg-primary/15 text-text-body text-2xs flex h-5 w-5 items-center justify-center rounded-full font-bold"
+                          class="bg-primary/15 text-text-body text-2xs flex h-5 w-5 items-center justify-center rounded-full font-semibold"
                         >
                           {{ a.initials }}
                         </span>

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex flex-col"
   >
     <div class="mb-1 flex items-baseline gap-2">
-      <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
+      <h3 :id="headingId" class="text-text-heading m-0 text-sm font-semibold">
         {{ t("alerts.incidents.rcaSummary.hypotheses") }}
       </h3>
       <span class="text-text-secondary text-xs">{{ hypotheses.length }}</span>
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="id in hypothesis.unverified_ids"
               :key="id"
               data-test="rca-hypothesis-unverified"
-              class="rounded-default border-status-warning-text text-status-warning-text text-3xs inline-flex h-5 items-center border border-dashed px-1.5 font-mono font-semibold"
+              class="rounded-default border-status-warning-text text-status-warning-text text-2xs inline-flex h-5 items-center border border-dashed px-1.5 font-mono font-semibold"
             >
               {{ t("alerts.incidents.rcaSummary.notVerifiedId") }}
             </span>

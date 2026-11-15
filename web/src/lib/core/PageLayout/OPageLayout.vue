@@ -29,8 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <!-- Named container: the header's status compacts on the page's width, which the AI panel narrows without changing the viewport. -->
-  <div class="@container/page flex h-full flex-col">
-    <div v-if="hasHeader" :class="headerClass ?? 'shrink-0'">
+  <div
+    class="@container/page flex h-full flex-col"
+    :data-o2-page-frame="showsOwnBody ? undefined : ''"
+  >
+    <div v-if="hasHeader" data-o2-page-shell :class="headerClass ?? 'shrink-0'">
       <slot name="header">
         <OPageHeader
           :title="title"
@@ -117,9 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #separator>
         <slot name="separator">
-          <div
-            class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
-          ></div>
+          <div class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors"></div>
         </slot>
       </template>
       <template #after>
@@ -171,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { ref, computed, watch, useSlots, provide, inject, onActivated } from "vue";
 import { useRouter } from "vue-router";
-// The route view already fades the whole page in, so the body takes only the slide and the header stays still.
+// The route fade skips the header band (ROUTE_ENTER), so the body brings its own fade with the slide.
 import { ENTER_SLIDE as BODY_ENTER } from "@/lib/styles/motion";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
@@ -277,7 +278,8 @@ const hasHeader = computed(
 const showsOwnBody = computed(() => hasHeader.value || !slots.sidebar);
 // A locked page, and the shell around it, shows its license message without the slide so nothing moves while it appears.
 const { locked: pageLocked } = useFeatureLock();
-const bodyEnter = computed(() => (pageLocked.value ? "" : enterClass.value));
+// A sidebar shell's routed child fades its own body, so the shell stays still and nothing fades twice.
+const bodyEnter = computed(() => (pageLocked.value || !showsOwnBody.value ? "" : enterClass.value));
 
 const internalWidth = ref(props.sidebarWidth);
 

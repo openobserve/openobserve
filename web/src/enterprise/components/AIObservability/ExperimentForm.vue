@@ -30,7 +30,7 @@
     >
       <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
         <div
-          class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto]"
+          class="px-page-edge flex min-h-0 min-w-0 flex-[6.5] flex-col gap-3 overflow-auto py-3 max-[68.75rem]:flex-[1_1_auto]"
         >
           <!-- Identity — what this run IS: its name, what it measures, and the
              dataset it is pinned to. The dataset lives here because nothing
@@ -45,7 +45,7 @@
                 {{ t("aiObservability.experiments.form.identitySection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <OFormInput
                 name="name"
                 :label="t('aiObservability.experiments.form.nameLabel')"

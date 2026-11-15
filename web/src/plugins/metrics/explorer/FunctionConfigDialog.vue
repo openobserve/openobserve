@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OTruncatedText
           as="div"
-          class="text-3xs text-text-secondary font-mono"
+          class="text-2xs text-text-secondary font-mono"
           :data-test="`metrics-fn-expr-${variant.id}`"
         >
           {{ exprOf(variant) }}

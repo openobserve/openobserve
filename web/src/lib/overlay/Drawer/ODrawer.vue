@@ -29,7 +29,11 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OOverlayFooter from "@/lib/overlay/shared/OOverlayFooter.vue";
-import { blockMultiFieldEnter, useDismissGuard } from "@/lib/overlay/shared/useDismissGuard";
+import {
+  blockMultiFieldEnter,
+  outsideInteraction,
+  useDismissGuard,
+} from "@/lib/overlay/shared/useDismissGuard";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_DIRTY_STATE_KEY, FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { useI18nTyped } from "@/types/i18n";
@@ -169,12 +173,18 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 function handleInteractOutside(e: Event) {
   e.preventDefault();
   if (!props.modal) return;
-  // A portaled popup opened from inside the drawer sits outside its DOM but belongs to it.
-  const originalEvent = (e as CustomEvent & { detail?: { originalEvent?: PointerEvent } }).detail
-    ?.originalEvent;
-  const target = originalEvent?.target as Element | null;
-  if (target?.closest("[data-reka-popper-content-wrapper]")) return;
-  guard.requestDismiss();
+  const outside = outsideInteraction(e);
+  if (outside === "dismiss") guard.requestDismiss();
+  else if (outside === "refocus") refocusInside(e);
+}
+
+// Focus code moved out of a modal overlay comes back to its first field, or to the panel itself.
+function refocusInside(e: Event) {
+  handleOpenAutoFocus(e);
+  nextTick(() => {
+    const panel = bodyRef.value?.closest<HTMLElement>("[data-o2-drawer]");
+    if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
+  });
 }
 
 const overlayZIndex = computed(() => 5999 + drawerDepth * 1000);
@@ -340,7 +350,7 @@ const activeTab = computed(() => props.tab ?? props.tabs?.[0]?.value ?? "");
           seamless ? 'pointer-events-none bg-transparent' : 'bg-dialog-overlay',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=open]:duration-(--duration-dialog-in)',
+          'data-[state=closed]:animation-duration-(--duration-drawer-out) data-[state=open]:animation-duration-(--duration-drawer-in)',
         ]"
         :style="overlayStyle"
       />
@@ -370,8 +380,8 @@ const activeTab = computed(() => props.tab ?? props.tabs?.[0]?.value ?? "");
                 'data-[state=open]:animate-in data-[state=open]:slide-in-from-left',
                 'data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left',
               ],
-          'data-[state=open]:duration-(--duration-dialog-in) data-[state=open]:ease-(--ease-out-expo)',
-          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=closed]:ease-(--ease-overlay-out)',
+          'data-[state=open]:animation-duration-(--duration-drawer-in) data-[state=open]:ease-(--ease-out-expo)',
+          'data-[state=closed]:animation-duration-(--duration-drawer-out) data-[state=closed]:ease-(--ease-overlay-out)',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"

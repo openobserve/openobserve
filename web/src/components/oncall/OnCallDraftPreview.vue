@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section class="flex flex-col gap-4" data-test="oncall-draft-preview">
     <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <h3 class="text-base font-semibold">{{ t("oncall.previewHeading") }}</h3>
+      <h3 class="text-sm font-semibold">{{ t("oncall.previewHeading") }}</h3>
       <OText variant="meta" data-test="oncall-draft-preview-zone">{{ rangeLine }}</OText>
       <span class="ms-auto flex items-center gap-2">
         <OButton

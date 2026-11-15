@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- left -->
           <div class="hero-page__left max-w-120 flex-1">
             <div
-              class="hero-page__headline text-text-heading mb-4.5 text-4xl leading-tight font-bold tracking-tight"
+              class="hero-page__headline text-text-heading mb-4.5 text-2xl leading-tight font-semibold tracking-tight"
             >
               {{ t("storage_settings.heroHeadline") }}
               <span class="hero-page__brand-text text-theme-accent">{{
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</span>
             </div>
 
-            <div class="hero-page__sub text-text-secondary mb-9 max-w-100 text-base leading-[1.7]">
+            <div class="hero-page__sub text-text-secondary mb-9 max-w-100 text-sm leading-[1.7]">
               {{ t("storage_settings.heroSub") }}
             </div>
 
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="feature-card__content flex-1 pt-0.5">
-                <div class="feature-card__title text-text-heading mb-1.25 text-sm font-bold">
+                <div class="feature-card__title text-text-heading mb-1.25 text-sm font-semibold">
                   {{ feature.title }}
                 </div>
                 <div class="feature-card__desc text-text-secondary text-compact leading-[1.55]">

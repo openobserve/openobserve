@@ -194,7 +194,7 @@ onBeforeUnmount(() => {
 const indicatorClasses = computed(() => [
   "pointer-events-none absolute left-0 top-0 rounded-default bg-toggle-item-active-bg ring-1 ring-toggle-item-active-border shadow-xs",
   transitionOn.value &&
-    "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
+    "transition-[transform,width,height] duration-(--duration-indicator) ease-(--ease-control) motion-reduce:transition-none",
   indicatorVisible.value ? "opacity-100" : "opacity-0",
 ]);
 

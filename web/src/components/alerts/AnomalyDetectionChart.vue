@@ -33,7 +33,7 @@
 <template>
   <div class="flex flex-col gap-3" data-test="alerts-anomalydetectionchart">
     <div class="flex items-center justify-between gap-2">
-      <span class="text-compact text-text-heading font-bold">
+      <span class="text-compact text-text-heading font-semibold">
         {{ t("alerts.anomaly.detectionCharts") }}
       </span>
       <OToggleGroup

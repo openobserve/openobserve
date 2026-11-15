@@ -120,9 +120,9 @@ const convertKeyValueListsToTables = (content: string): string => {
 
 // RcaReportContent owns colors; renderer classes supply structure only.
 const HEADING_CLASSES = [
-  "rca-h1 font-bold text-lg text-center mb-4 pb-2 border-b-2",
-  "rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-s-4",
-  "rca-h3 font-semibold text-base mt-4 mb-2",
+  "rca-h1 font-semibold text-lg text-center mb-4 pb-2 border-b-2",
+  "rca-h2 font-semibold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-s-4",
+  "rca-h3 font-semibold text-sm mt-4 mb-2",
   "rca-h4 font-semibold text-sm mt-3 mb-2",
 ];
 

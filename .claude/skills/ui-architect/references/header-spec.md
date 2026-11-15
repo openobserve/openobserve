@@ -21,7 +21,7 @@ Both break rule P3, "Nothing jumps". This spec fixes them.
 
 - **Left column**, starting at the content edge (x = the 16 px gutter):
   - **Context line**: 16 px tall, 12 px text in `--text-secondary`. It always exists, so the title never moves vertically. It names the container:
-    - Pages inside a module with its own rail show the module: "Settings", "IAM", "AI Observability". Security-solution pages show "Security".
+    - Pages inside a module with its own rail (Settings, IAM, AI observability) show the page's rail group: "General", "Access & security", "Monitor". The rail's heading already names the module, so the line never repeats it. A page outside every rail group shows the org. Security-solution pages show "Security".
     - Grouped top-level pages show the rail group: "Reliability", "Data", "Infra", "Experience", "Dashboards".
     - Ungrouped top-level pages show the org: "acme-prod". This covers Home, Logs, Metrics, Traces, AutoObserve and Profiles.
     - Detail, editor and import pages show a back link to the parent: "‹ Alerts", "‹ Pipelines". It is real link styling, and Back uses the smart-back rules (N3).
@@ -32,6 +32,12 @@ Both break rule P3, "Nothing jumps". This spec fixes them.
 - **Right side**: page actions, vertically centred, right-aligned, in this order: secondary actions, then the primary, then ⋯ More (H3).
   - Actions may change label per tab.
   - Nothing sits to the right of ⋯, so nothing else moves.
+
+## Module rails: one header row with the page
+
+- A module rail's heading row (the module name, and its collapse control) is 56 px, the same as the header band.
+- Its bottom hairline sits at the same y as the band's, so the rail heading and the page header read as one header row.
+- The rail heading names the module; the page's context line names the rail group (above).
 
 ## Tabs: their own row, never inline with the title
 

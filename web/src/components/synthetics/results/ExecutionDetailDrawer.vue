@@ -230,7 +230,7 @@ function fmtDuration(ms: number) {
                   :class="step.status === 'fail' ? 'bg-error-500/10' : 'bg-surface-panel'"
                 >
                   <span
-                    class="text-3xs mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-bold text-white"
+                    class="text-2xs mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-semibold text-white"
                     :class="step.status === 'fail' ? 'bg-error-500' : 'bg-success-600'"
                     >{{ i + 1 }}</span
                   >
@@ -239,7 +239,7 @@ function fmtDuration(ms: number) {
                       {{ step.name || step.stepId }}
                     </p>
                     <p
-                      class="text-3xs text-text-muted mt-0.5 truncate font-mono"
+                      class="text-2xs text-text-muted mt-0.5 truncate font-mono"
                       :title="step.stepId"
                     >
                       {{ step.stepId }}

@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
-            <div class="mb-4 text-4xl leading-[1.2] font-bold tracking-[-0.0375rem]">
+            <div class="mb-4 text-2xl leading-[1.2] font-semibold tracking-[-0.0375rem]">
               {{ t("billing.billingGroup.childHeadline") }}
               <span
                 class="text-tabs-active-text inline-block max-w-full cursor-pointer overflow-hidden align-bottom text-ellipsis whitespace-nowrap"
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </span>
             </div>
-            <div class="mb-8 max-w-105 text-base leading-[1.7] opacity-70">
+            <div class="mb-8 max-w-105 text-sm leading-[1.7] opacity-70">
               {{ t("billing.billingGroup.childHeroSub") }}
             </div>
             <div class="flex flex-wrap items-center gap-3">
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.invitedBy") }}
                 </div>
-                <OTruncatedText as="div" class="text-base font-semibold">
+                <OTruncatedText as="div" class="text-sm font-semibold">
                   {{ membership?.created_by }}
                 </OTruncatedText>
               </div>
@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.acceptedBy") }}
                 </div>
-                <OTruncatedText as="div" class="text-base font-semibold">
+                <OTruncatedText as="div" class="text-sm font-semibold">
                   {{ membership?.accepted_by || t("billing.billingGroup.addedOnCreation") }}
                 </OTruncatedText>
               </div>
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.memberSince") }}
                 </div>
-                <div class="text-base font-semibold">
+                <div class="text-sm font-semibold">
                   {{ formatDate(membership?.created_at) }}
                 </div>
               </div>
@@ -363,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="mb-2.5 text-xl font-bold tracking-[-0.0125rem]">
+          <div class="mb-2.5 text-xl font-semibold tracking-[-0.0125rem]">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.emptyTitle")

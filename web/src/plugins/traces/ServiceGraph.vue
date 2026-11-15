@@ -40,7 +40,7 @@
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton data-test="service-graph-entity-count" variant="ghost" icon-end="expand-more">
-              <span v-if="lastRunAt !== null" class="text-text-secondary font-bold">{{
+              <span v-if="lastRunAt !== null" class="text-text-secondary font-semibold">{{
                 totalEntities
               }}</span>
               <span class="text-text-body ms-1">{{ t("traces.serviceGraph.entities") }}</span>
@@ -90,7 +90,7 @@
             </OButton>
           </template>
           <div class="flex min-w-52 flex-col gap-2 p-2" data-test="service-graph-collapse-mode">
-            <div class="text-3xs font-bold uppercase opacity-60">
+            <div class="text-2xs font-semibold uppercase opacity-60">
               {{ t("traces.serviceGraph.layout") }}
             </div>
             <OToggleGroup
@@ -109,7 +109,7 @@
                 {{ t(`traces.serviceGraph.mode.${m}`) }}
               </OToggleGroupItem>
             </OToggleGroup>
-            <div class="text-3xs mt-1 font-bold uppercase opacity-60">
+            <div class="text-2xs mt-1 font-semibold uppercase opacity-60">
               {{ t("traces.serviceGraph.types") }}
             </div>
             <!-- Each row: type name + live count, with a checkbox to show/hide.
@@ -153,7 +153,9 @@
                 : undefined
             "
           >
-            <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap max-md:hidden">
+            <div
+              class="text-text-label! mb-0! text-xs font-semibold whitespace-nowrap max-md:hidden"
+            >
               {{ t("traces.serviceGraph.borderColor") }}
               <span class="font-normal opacity-55"
                 >| {{ t("traces.serviceGraph.borderColorMetric") }}</span
@@ -180,7 +182,7 @@
                   <div class="text-text-secondary! text-left text-xs font-semibold">
                     {{ level.label }}
                   </div>
-                  <div class="text-3xs text-left opacity-55 max-md:hidden">{{ level.range }}</div>
+                  <div class="text-2xs text-left opacity-55 max-md:hidden">{{ level.range }}</div>
                 </div>
               </div>
             </div>
@@ -204,7 +206,7 @@
             class="flex min-w-0 flex-row items-center gap-2"
           >
             <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
-            <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap">
+            <div class="text-text-label! mb-0! text-xs font-semibold whitespace-nowrap">
               {{ t("traces.serviceGraph.nodeSize") }}
               <span class="font-normal opacity-55"
                 >| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span
@@ -219,7 +221,7 @@
                   t("traces.serviceGraph.sizeLow")
                 }}</span>
               </div>
-              <div class="mb-0 text-base tracking-[0.125rem] opacity-35">···</div>
+              <div class="mb-0 text-sm tracking-[0.125rem] opacity-35">···</div>
               <div class="flex flex-row items-center gap-1.5">
                 <span
                   class="border-service-health-healthy h-7 w-7 shrink-0 rounded-full border-2 bg-transparent"
@@ -341,6 +343,7 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { getFontSans } from "@/utils/fonts";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -1256,8 +1259,8 @@ export default defineComponent({
         tooltipEl.style.height = "";
         tooltipEl.style.padding = "0.5625rem 0.8125rem";
         tooltipEl.style.fontSize = "0.75rem";
-        tooltipEl.style.lineHeight = "1.5";
-        tooltipEl.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
+        tooltipEl.style.lineHeight = "1rem";
+        tooltipEl.style.fontFamily = getFontSans();
         tooltipEl.style.letterSpacing = "0.01em";
         tooltipEl.style.whiteSpace = "nowrap";
         tooltipEl.style.color = isDark.value ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.82)";

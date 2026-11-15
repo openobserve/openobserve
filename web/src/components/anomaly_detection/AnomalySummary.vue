@@ -108,7 +108,7 @@ onMounted(async () => {
 /* keep(generated-content): styles v-html output from anomalySummaryGenerator (no scope id) */
 .summary-text :deep(strong) {
   display: inline;
-  font-weight: 700;
+  font-weight: var(--font-semibold);
   font-size: var(--text-sm);
 }
 

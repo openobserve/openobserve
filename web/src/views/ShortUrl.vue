@@ -1,7 +1,7 @@
 <template>
   <div data-test="loading-container" class="flex h-[100vh] flex-col items-center justify-center">
     <OSpinner size="lg" data-test="spinner" />
-    <div data-test="message" class="text-text-secondary text-base">
+    <div data-test="message" class="text-text-secondary text-sm">
       {{ t("common.shortUrl.redirecting") }}
     </div>
   </div>

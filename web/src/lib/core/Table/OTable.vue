@@ -31,6 +31,7 @@ import {
 import { isElementTruncated, readElementText } from "@/lib/overlay/Tooltip/useIsTruncated";
 import {
   TABLE_CHECKBOX_COL_SIZE,
+  TABLE_EXPAND_COL_SIZE,
   TABLE_CELL_CLIP_ATTR,
   TABLE_ROW_HEIGHT_PX,
   ROW_ACTIONS_COLUMN_ID,
@@ -1161,7 +1162,6 @@ onMounted(scheduleMeasureActions);
 //     invisible trailing spacer absorbs any slack so the pinned actions column
 //     stays flush-right and the table grows + scrolls only as needed.
 // `containerWidth` tracks the scroll container's live inner width.
-const EXPANSION_COL_WIDTH = 16; // w-4
 const containerWidth = ref(0);
 let containerRO: ResizeObserver | null = null;
 
@@ -1328,7 +1328,7 @@ function nonFlexFixedSum(): number {
     sum += measuredVar ? parseFloat(measuredVar) : col.getSize();
   }
   if (selection.isMultiple.value) sum += TABLE_CHECKBOX_COL_SIZE;
-  if (expansion.isEnabled.value) sum += EXPANSION_COL_WIDTH;
+  if (expansion.isEnabled.value) sum += TABLE_EXPAND_COL_SIZE;
   return sum;
 }
 

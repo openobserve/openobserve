@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- No Logs State -->
           <div v-else class="flex h-full flex-col items-center justify-center py-20">
-            <div class="mb-2 text-base font-medium opacity-90">
+            <div class="mb-2 text-sm font-medium opacity-90">
               {{ t("correlation.noLogsFound") }}
             </div>
             <div class="text-sm opacity-70">
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @click="toggleGroupCollapse(group.id)"
                         >
                           <div
-                            class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+                            class="text-2xs flex items-center gap-1.5 font-semibold tracking-[0.05em] uppercase opacity-75"
                           >
                             <OIcon
                               :name="
@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else-if="error"
                     class="flex h-full flex-col items-center justify-center py-20"
                   >
-                    <div class="mb-2 text-base font-medium opacity-90">
+                    <div class="mb-2 text-sm font-medium opacity-90">
                       {{ t("correlation.metricsError") }}
                     </div>
                     <div class="mb-4 text-sm opacity-70">
@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     class="flex h-[calc(100vh-7.5rem)] flex-col items-center justify-center py-20"
                   >
-                    <div class="mb-2 text-base font-medium opacity-90">
+                    <div class="mb-2 text-sm font-medium opacity-90">
                       {{ t("correlation.noMetrics") }}
                     </div>
                     <div class="text-sm opacity-70">
@@ -434,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="tracesError"
             class="flex h-full flex-col items-center justify-center py-20"
           >
-            <div class="mb-2 text-base font-medium opacity-90">
+            <div class="mb-2 text-sm font-medium opacity-90">
               {{ t("correlation.tracesError") }}
             </div>
             <div class="mb-4 text-sm opacity-70">
@@ -544,7 +544,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Initial State (waiting for tab to be shown) -->
           <div v-else class="flex h-full flex-col items-center justify-center py-20">
-            <div class="mb-2 text-base font-medium opacity-90">
+            <div class="mb-2 text-sm font-medium opacity-90">
               {{ t("correlation.correlatedTraces") }}
             </div>
             <div class="text-sm opacity-70">
@@ -628,7 +628,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- No Logs State -->
           <div v-else class="flex h-full flex-col items-center justify-center py-20">
-            <div class="mb-2 text-base font-medium opacity-90">
+            <div class="mb-2 text-sm font-medium opacity-90">
               {{ t("correlation.noLogsFound") }}
             </div>
             <div class="text-sm opacity-70">
@@ -672,7 +672,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @click="toggleGroupCollapse(group.id)"
                         >
                           <div
-                            class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+                            class="text-2xs flex items-center gap-1.5 font-semibold tracking-[0.05em] uppercase opacity-75"
                           >
                             <OIcon
                               :name="
@@ -843,7 +843,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else-if="error"
                     class="flex h-full flex-col items-center justify-center py-20"
                   >
-                    <div class="mb-2 text-base font-medium opacity-90">
+                    <div class="mb-2 text-sm font-medium opacity-90">
                       {{ t("correlation.metricsError") }}
                     </div>
                     <div class="mb-4 text-sm opacity-70">
@@ -865,7 +865,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="border-none"
                   />
                   <div v-else class="flex h-full flex-col items-center justify-center py-20">
-                    <div class="mb-2 text-base font-medium opacity-90">
+                    <div class="mb-2 text-sm font-medium opacity-90">
                       {{ t("correlation.noMetrics") }}
                     </div>
                     <div class="text-sm opacity-70">
@@ -893,7 +893,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex h-full flex-col items-center justify-center py-20"
             >
               <OSpinner size="lg" class="mb-4" />
-              <div class="text-base">{{ t("correlation.loadingTraces") }}</div>
+              <div class="text-sm">{{ t("correlation.loadingTraces") }}</div>
             </div>
 
             <!-- Error State -->
@@ -902,7 +902,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex h-full flex-col items-center justify-center py-20"
             >
               <OIcon name="error-outline" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
-              <div class="mb-2 text-base">
+              <div class="mb-2 text-sm">
                 {{ t("correlation.tracesError") }}
               </div>
               <div class="text-text-secondary text-sm">{{ tracesError }}</div>
@@ -1013,7 +1013,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Initial State (waiting for tab to be shown) -->
             <div v-else class="flex h-full flex-col items-center justify-center py-20">
               <OIcon name="account-tree" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
-              <div class="text-base">
+              <div class="text-sm">
                 {{ t("correlation.correlatedTraces") }}
               </div>
               <div class="text-text-secondary mt-2 text-sm">
@@ -1050,7 +1050,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="bg-section-header-bg border-border-default sticky top-0 z-10 flex items-center justify-between border-b border-solid px-2 py-1.5"
             >
               <div
-                class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+                class="text-2xs flex items-center gap-1.5 font-semibold tracking-[0.05em] uppercase opacity-75"
               >
                 <OIcon
                   v-if="typeof group.icon === 'string'"

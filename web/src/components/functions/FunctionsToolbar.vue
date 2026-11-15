@@ -140,7 +140,7 @@
         @click="emit('open:chat', !store.state.isAiChatEnabled)"
         data-test="menu-link-ai-item"
         :aria-label="t('menu.aiAssistant')"
-        class="rounded-default hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-in-out ![background:var(--color-gradient-ai-subtle)] hover:shadow-md hover:![background:var(--color-gradient-ai)]"
+        class="rounded-default hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-(--duration-control) ease-(--ease-control) ![background:var(--color-gradient-ai-subtle)] hover:shadow-md hover:![background:var(--color-gradient-ai)]"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         :disabled="isSubmitting"
         @mouseenter="isHovered = true"
@@ -149,7 +149,7 @@
         <img
           alt=""
           :src="getBtnLogo"
-          class="opacity-70 transition-transform duration-600 [.ai-btn-active_&]:!opacity-100"
+          class="opacity-70 transition-transform duration-(--duration-indicator) [.ai-btn-active_&]:!opacity-100"
         />
       </OButton>
       <OButton

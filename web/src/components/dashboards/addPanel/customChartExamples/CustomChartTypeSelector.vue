@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-full w-full flex-nowrap">
       <!-- Left Sidebar -->
       <div class="border-border-subtle h-full w-40 shrink-0 overflow-y-auto border-e p-3">
-        <div class="mb-3 text-sm font-bold font-medium">
+        <div class="mb-3 text-sm font-semibold">
           {{ t("dashboard.customChartTypeSelector.chartTypes") }}
         </div>
         <ul class="m-0 flex list-none flex-col p-0">
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-category="category.chartLabelKey"
           data-test="chart-category-section"
         >
-          <div class="mb-3 text-xl font-medium font-semibold">
+          <div class="mb-3 text-xl font-semibold">
             {{ t(category.chartLabelKey) }}
           </div>
           <div class="flex gap-3">

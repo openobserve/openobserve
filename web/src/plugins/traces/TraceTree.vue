@@ -176,11 +176,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <!-- shrink-0 + a cap, not plain shrink: flex shrinks in proportion to width, so a long operation name would eat a short service name first. -->
                       <OTruncatedText
-                        class="me-2 max-w-[50%] shrink-0 text-sm font-bold font-medium"
+                        class="me-2 max-w-[50%] shrink-0 text-sm font-semibold"
                         :class="{
-                          'bg-table-highlight-bg text-table-highlight-text font-bold':
+                          'bg-table-highlight-bg text-table-highlight-text font-semibold':
                             isHighlighted((spans as any[])[virtualRow.index].spanId),
-                          'bg-table-highlight-bg text-status-error-text font-bold':
+                          'bg-table-highlight-bg text-status-error-text font-semibold':
                             currentSelectedValue === (spans as any[])[virtualRow.index].spanId,
                         }"
                         :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"

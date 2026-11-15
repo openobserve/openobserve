@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-label="t('onboarding.rail.label')"
     data-test="onboarding-guide-rail"
   >
-    <h2 class="text-text-heading text-base leading-snug font-semibold text-balance">
+    <h2 class="text-text-heading text-sm leading-5 font-semibold text-balance">
       {{ t("onboarding.rail.title", { name }) }}
     </h2>
     <ol>

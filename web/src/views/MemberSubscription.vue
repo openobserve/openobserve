@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <SanitizedHtmlRenderer
       v-else-if="status == 'error' && error !== ''"
       :htmlContent="error"
-      class="mx-auto w-[70%] text-left text-base leading-7.5"
+      class="mx-auto w-[70%] text-left text-sm leading-7.5"
     />
 
     <div v-else>{{ t("billing.memberSubscription.thankYou") }}</div>

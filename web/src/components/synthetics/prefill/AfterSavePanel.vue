@@ -32,7 +32,7 @@ const { t } = useI18nTyped();
     class="rounded-default border-border-default bg-surface-base flex flex-col gap-3 border p-3"
     data-test="synthetics-prefill-after-save"
   >
-    <h3 class="text-text-heading text-base font-semibold">
+    <h3 class="text-text-heading text-sm font-semibold">
       {{ t("synthetics.prefill.after.title") }}
     </h3>
     <p class="text-text-body text-sm" data-test="synthetics-prefill-after-save-runs">

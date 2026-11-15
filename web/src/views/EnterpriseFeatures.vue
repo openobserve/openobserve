@@ -31,13 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="rounded-surface flex flex-wrap items-center justify-between gap-4 bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] px-8 py-6 text-white"
       >
         <div class="flex flex-col gap-1">
-          <div class="text-2xl font-bold">{{ dialogConfig.heroTitle }}</div>
+          <div class="text-2xl font-semibold">{{ dialogConfig.heroTitle }}</div>
           <div class="text-sm italic opacity-90">{{ dialogConfig.offerText }}</div>
         </div>
         <div class="flex flex-wrap items-center gap-4">
           <div
             v-if="!isLoadingLicense"
-            class="rounded-default bg-success-500 px-4 py-2 text-base font-bold text-white"
+            class="rounded-default bg-success-500 px-4 py-2 text-sm font-semibold text-white"
           >
             {{ dialogConfig.badgeText }}
           </div>
@@ -75,7 +75,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div class="flex flex-col gap-1">
-          <div data-test="enterprise-features-title" class="text-text-heading text-xl font-bold">
+          <div
+            data-test="enterprise-features-title"
+            class="text-text-heading text-xl font-semibold"
+          >
             {{ dialogConfig.featuresTitle }}
           </div>
           <div class="text-text-secondary text-sm italic">
@@ -119,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="min-w-0 flex-1">
               <div
-                class="text-text-heading flex flex-wrap items-center gap-1.5 text-base leading-tight font-semibold"
+                class="text-text-heading flex flex-wrap items-center gap-1.5 text-sm leading-tight font-semibold"
               >
                 {{ feature.name }}
                 <OTag v-if="feature.beta" type="featureFlag" value="beta" />

@@ -129,7 +129,7 @@ const renderedSections = computed(() =>
 
       <!-- Documentation link — identical markup to the legacy ingestion cards
            (AIIntegrationDetail.vue) so it looks the same across all sections. -->
-      <div v-if="docUrl" class="pt-6 pb-2 font-bold">
+      <div v-if="docUrl" class="pt-6 pb-2 font-semibold">
         {{ t("ingestion.docLinkClick") }}
         <a
           :href="safeHttpUrl(docUrl)"
@@ -167,7 +167,7 @@ const renderedSections = computed(() =>
 }
 
 .o2-section-title {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 600;
   margin: 0 0 0.5rem;
   letter-spacing: 0.01em;

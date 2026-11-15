@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Job Information -->
       <section class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">{{ t("pipeline.jobInformation") }}</h3>
+        <h3 class="text-sm font-semibold">{{ t("pipeline.jobInformation") }}</h3>
         <div
           class="rounded-default border-card-border bg-card-bg grid grid-cols-2 gap-x-6 gap-y-3 border p-4"
         >
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Progress -->
       <section class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">{{ t("pipeline.progressLabel") }}</h3>
+        <h3 class="text-sm font-semibold">{{ t("pipeline.progressLabel") }}</h3>
         <div class="rounded-default border-card-border bg-card-bg flex flex-col gap-4 border p-4">
           <div>
             <div class="mb-2 flex items-center justify-between">
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Deletion Details (if applicable) -->
       <section v-if="job.delete_before_backfill || job.deletion_status" class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">{{ t("pipeline.deletionDetails") }}</h3>
+        <h3 class="text-sm font-semibold">{{ t("pipeline.deletionDetails") }}</h3>
         <div class="rounded-default border-card-border bg-card-bg flex flex-col gap-3 border p-4">
           <div class="grid grid-cols-2 gap-x-6 gap-y-3">
             <div>
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Error Details (if present) -->
       <section v-if="job.error" class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">{{ t("pipeline.errorDetails") }}</h3>
+        <h3 class="text-sm font-semibold">{{ t("pipeline.errorDetails") }}</h3>
         <div
           class="rounded-default border-banner-error-soft-border bg-banner-error-soft-bg flex items-start gap-3 border p-4"
         >
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Timeline -->
       <section class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">{{ t("pipeline.timeline") }}</h3>
+        <h3 class="text-sm font-semibold">{{ t("pipeline.timeline") }}</h3>
         <OTimeline>
           <OTimelineItem
             :title="t('pipeline.jobCreated')"

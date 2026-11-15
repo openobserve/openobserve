@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-if="filteredIntegrations.length === 0" class="text-text-secondary py-12 text-center">
       <OIcon name="search-off" class="mb-2 h-12 w-12" />
-      <div class="text-base">{{ t("ingestion.awsSetup.noResults") }}</div>
+      <div class="text-sm">{{ t("ingestion.awsSetup.noResults") }}</div>
     </div>
 
     <!-- Responsive columns via Tailwind utilities — replaces a scoped-style

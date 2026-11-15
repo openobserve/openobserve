@@ -77,7 +77,7 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
       </OButton>
     </template>
 
-    <div class="text-text-secondary text-3xs px-3.5 pt-1.5 pb-1 font-bold">
+    <div class="text-text-secondary text-2xs px-3.5 pt-1.5 pb-1 font-semibold">
       {{ t("solutionSwitcher.title") }}
     </div>
 

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="wcp__header-right flex shrink-0 items-baseline gap-1">
         <span
-          class="wcp__unique-count text-text-body text-sm font-bold [font-variant-numeric:tabular-nums]"
+          class="wcp__unique-count text-text-body text-sm font-semibold [font-variant-numeric:tabular-nums]"
           >{{ displayValues.length }}</span
         >
         <span class="wcp__unique-label text-2xs text-text-secondary">{{
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ item.value || t("logs.wildcardValuePopover.empty") }}</span
           >
           <span
-            class="wcp__row-count text-compact text-text-body shrink-0 font-bold [font-variant-numeric:tabular-nums]"
+            class="wcp__row-count text-compact text-text-body shrink-0 font-semibold [font-variant-numeric:tabular-nums]"
             >{{ item.count.toLocaleString() }}</span
           >
         </div>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- Percentage -->
-        <div class="wcp__row-pct text-3xs text-text-secondary [font-variant-numeric:tabular-nums]">
+        <div class="wcp__row-pct text-2xs text-text-secondary [font-variant-numeric:tabular-nums]">
           {{ totalOccurrences > 0 ? ((item.count / totalOccurrences) * 100).toFixed(1) + "%" : "" }}
         </div>
       </div>

@@ -102,6 +102,7 @@
   --color-grey-150: #eceef2; /* soft divider step (between 100 and 200) */
   --color-grey-200: #e3e5eb;
   --color-grey-300: #d0d5e1;
+  --color-grey-350: #c5cad6; /* resting control edge (between 300 and 400) */
   --color-grey-400: #9ea4b4;
   /* The lightest grey that clears 3:1 on white and on grey-100. */
   --color-grey-450: #848b9c;

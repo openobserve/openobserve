@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="functionName">
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-text-secondary text-sm">{{ t("workflow.results.functionLabel") }}</span>
-          <span class="text-text-body text-sm font-bold">{{ functionName }}</span>
+          <span class="text-text-body text-sm font-semibold">{{ functionName }}</span>
           <OBadge tone="neutral" size="sm">{{ flattenLabel }}</OBadge>
         </div>
         <div

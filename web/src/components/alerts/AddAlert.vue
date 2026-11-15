@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- LEFT column wrapper (flex: 6.5) -->
         <div
           :class="[
-            'flex min-h-0 min-w-0 flex-col gap-2 py-2 max-lg:flex-none',
+            'flex min-h-0 min-w-0 flex-col gap-2 pb-2 max-lg:flex-none',
             isCompositeMode ? 'flex-1' : 'flex-[6.5]',
           ]"
         >
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
           >
-            <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
+            <div class="border-border-default px-page-edge flex items-center gap-0 border-b py-2.5">
               <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
                 t("alerts.alertType")
               }}</span>
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!isCompositeMode"
-              class="flex items-center gap-4 px-3 py-2 max-md:flex-wrap max-md:gap-2"
+              class="px-page-edge flex items-center gap-4 py-2 max-md:flex-wrap max-md:gap-2"
             >
               <!-- Stream Type -->
               <div v-if="!isCompositeMode" class="flex items-center gap-1.5">
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- TIER 3: Configuration Tabs -->
           <div
-            class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col max-lg:flex-none"
+            class="alert-v3-tabs bg-card-glass-bg mx-page-edge flex min-h-0 flex-1 flex-col max-lg:flex-none"
           >
             <!-- Tab Headers -->
             <OToggleGroup
@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Footer: Cancel / Save (left column, separate card) -->
           <div
-            class="bg-card-glass-bg border-border-default flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
+            class="bg-card-glass-bg border-border-default px-page-edge flex shrink-0 items-center justify-end gap-2 border-t py-2.5"
             data-toast-avoid
           >
             <p
@@ -507,12 +507,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- border-s: full-height vertical divider flush against the Preview/Summary pane -->
         <div
           v-if="!isCompositeMode"
-          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pt-2 pb-2 max-lg:h-160 max-lg:flex-none max-lg:border-s-0 max-lg:border-t"
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pb-2 max-lg:h-160 max-lg:flex-none max-lg:border-s-0 max-lg:border-t"
         >
           <!-- Preview Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
-              class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2.5 select-none"
+              class="border-border-default px-page-edge flex shrink-0 items-center gap-2 border-b py-2.5 select-none"
             >
               <span class="text-sm font-medium">{{ t("alerts.preview") }}</span>
               <template v-if="!isAnomalyMode && activeEvaluationStatus">
@@ -573,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Summary Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
-              class="border-border-default flex shrink-0 items-center border-b px-3 py-2.5 select-none"
+              class="border-border-default px-page-edge flex shrink-0 items-center border-b py-2.5 select-none"
             >
               <span class="text-sm font-medium">{{ t("alerts.summary.title") }}</span>
             </div>

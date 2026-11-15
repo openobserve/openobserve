@@ -105,7 +105,7 @@ describe("LibraryCard", () => {
       wrapper
         .find(`[data-test="${test}"]`)
         .classes()
-        .filter((c) => c.startsWith("rounded-") || c.startsWith("px-") || c.startsWith("text-3xs"))
+        .filter((c) => c.startsWith("rounded-") || c.startsWith("px-") || c.startsWith("text-2xs"))
         .sort();
     const shape = shapeOf("alert-library-card-needs-data");
     expect(shape.length).toBeGreaterThan(0); // else the comparison is vacuous

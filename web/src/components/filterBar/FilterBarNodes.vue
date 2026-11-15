@@ -78,7 +78,7 @@ const groupJoin = (index: number) => {
     />
     <span
       v-if="anyOfGroups && item.kind === 'group'"
-      class="text-3xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
+      class="text-2xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
       :data-test="`${dataTest}-group-join-${pathOf(index)}`"
       >{{ groupJoin(index) }}</span
     >

@@ -30,7 +30,7 @@ import { createMemoryHistory, createRouter, type Router } from "vue-router";
 import i18n from "@/locales";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import { providePageHeaderStatus } from "@/lib/core/PageHeader/pageHeaderStatus";
-import { providePageNavContext } from "@/lib/core/PageHeader/pageContext";
+import { providePageNavContext, providePageRailGroup } from "@/lib/core/PageHeader/pageContext";
 import { raw } from "@/types/i18n";
 import OAccessHeaderChip from "@/components/access/OAccessHeaderChip.vue";
 import { viewDenial } from "@/composables/useAccessStore";
@@ -89,6 +89,7 @@ async function mountAt(
   slots: Record<string, () => unknown> = {},
   links?: NavItem[] | Ref<NavItem[]>,
   flat = false,
+  railGroup?: string,
 ): Promise<Router> {
   const router = makeRouter();
   await router.push(path);
@@ -99,6 +100,7 @@ async function mountAt(
           links: computed(() => unref(links)),
           flat: computed(() => flat),
         });
+      if (railGroup !== undefined) providePageRailGroup(computed(() => raw(railGroup)));
       return () => h(OPageHeader, props, slots);
     },
   });
@@ -225,15 +227,32 @@ describe("OPageHeader context line (H4)", () => {
   ];
 
   it.each([
-    ["/settings/correlation/services", "Settings"],
-    ["/iam/users", "IAM"],
-    ["/ai/model-pricing", "AI observability"],
-  ])("names the module whose section rail holds %s, in either solution", async (path, label) => {
-    await mountAt(path, { title: raw("Page") }, {}, links);
-    expect(contextText()).toBe(label);
-    wrapper!.unmount();
-    await mountAt(path, { title: raw("Page") }, {}, securityLinks, true);
-    expect(contextText()).toBe(label);
+    ["/settings/correlation/services", "Data"],
+    ["/iam/users", "Access"],
+    ["/ai/model-pricing", "Configure"],
+  ])(
+    "names the rail group of %s inside its module rail, in either solution",
+    async (path, group) => {
+      await mountAt(path, { title: raw("Page") }, {}, links, false, group);
+      expect(contextText()).toBe(group);
+      wrapper!.unmount();
+      await mountAt(path, { title: raw("Page") }, {}, securityLinks, true, group);
+      expect(contextText()).toBe(group);
+    },
+  );
+
+  it.each(["/settings/correlation/services", "/iam/users", "/ai/model-pricing"])(
+    "never repeats the module the rail heading names on %s",
+    async (path) => {
+      await mountAt(path, { title: raw("Page") }, {}, links);
+      expect(["Settings", "IAM", "AI observability"]).not.toContain(contextText());
+      expect(contextText()).toBe("");
+    },
+  );
+
+  it("names the org when the rail group is spelled like the title", async () => {
+    await mountAt("/iam/users", { title: raw("access") }, {}, links, false, "Access");
+    expect(contextText()).toBe("");
   });
 
   it("names the Security solution on a page of its flat rail", async () => {
@@ -247,11 +266,11 @@ describe("OPageHeader context line (H4)", () => {
   });
 
   it.each([
-    ["/iam/users", "IAM", false],
+    ["/iam/users", "Access", false],
     ["/security/overview", "Security", true],
   ])("keeps %s on its label while the rail's links load", async (path, label, flat) => {
     const pending = ref<NavItem[]>([]);
-    await mountAt(path, { title: raw("Page") }, {}, pending, flat);
+    await mountAt(path, { title: raw("Page") }, {}, pending, flat, flat ? undefined : label);
     expect(contextText()).toBe(label);
     pending.value = flat ? securityLinks : links;
     await flushPromises();

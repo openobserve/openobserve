@@ -82,6 +82,32 @@ export const canvasFont = (
   return `${weight ? `${weight} ` : ""}${size} ${stack}`;
 };
 
+// zrender text elements (graphic, custom-series renderItem) never read `textStyle`, so they need the family themselves.
+const withElementFont = (el: any, family: string): any => {
+  if (!el || typeof el !== "object") return el;
+  if (Array.isArray(el)) return el.map((e) => withElementFont(e, family));
+  const next = { ...el };
+  if (el.type === "text" && el.style && el.style.fontFamily == null && el.style.font == null) {
+    next.style = { ...el.style, fontFamily: family };
+  }
+  if (Array.isArray(el.children)) next.children = withElementFont(el.children, family);
+  return next;
+};
+
+const withGraphicFont = (graphic: any, family: string): any =>
+  graphic && !Array.isArray(graphic) && Array.isArray(graphic.elements)
+    ? { ...graphic, elements: withElementFont(graphic.elements, family) }
+    : withElementFont(graphic, family);
+
+const withCustomSeriesFont = (series: any, family: string): any => {
+  if (!series || series.type !== "custom" || typeof series.renderItem !== "function") return series;
+  const renderItem = series.renderItem;
+  return {
+    ...series,
+    renderItem: (...args: any[]) => withElementFont(renderItem(...args), family),
+  };
+};
+
 /**
  * Stamp the sans token onto an ECharts option object as its default text family.
  *
@@ -102,10 +128,18 @@ export const canvasFont = (
  */
 export const withChartFont = <T extends Record<string, any>>(options: T): T => {
   if (!options || typeof options !== "object") return options;
-  return {
+  const family = getFontSans();
+  const next: Record<string, any> = {
     ...options,
-    textStyle: { fontFamily: getFontSans(), ...(options.textStyle ?? {}) },
+    textStyle: { fontFamily: family, ...(options.textStyle ?? {}) },
   };
+  if (options.graphic) next.graphic = withGraphicFont(options.graphic, family);
+  if (options.series) {
+    next.series = Array.isArray(options.series)
+      ? options.series.map((s: any) => withCustomSeriesFont(s, family))
+      : withCustomSeriesFont(options.series, family);
+  }
+  return next as T;
 };
 
 /** Test-only: drop the cached values so a fresh token read happens. */

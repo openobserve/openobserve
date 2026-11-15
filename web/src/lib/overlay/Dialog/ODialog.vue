@@ -28,7 +28,11 @@ import {
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OOverlayFooter from "@/lib/overlay/shared/OOverlayFooter.vue";
-import { blockMultiFieldEnter, useDismissGuard } from "@/lib/overlay/shared/useDismissGuard";
+import {
+  blockMultiFieldEnter,
+  outsideInteraction,
+  useDismissGuard,
+} from "@/lib/overlay/shared/useDismissGuard";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_DIRTY_STATE_KEY, FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -161,12 +165,18 @@ function handleContentKeydown(e: KeyboardEvent) {
 
 function handleInteractOutside(e: Event) {
   e.preventDefault();
-  // A portaled popup opened from inside the dialog sits outside its DOM but belongs to it.
-  const originalEvent = (e as CustomEvent & { detail?: { originalEvent?: PointerEvent } }).detail
-    ?.originalEvent;
-  const target = originalEvent?.target as Element | null;
-  if (target?.closest("[data-reka-popper-content-wrapper]")) return;
-  guard.requestDismiss();
+  const outside = outsideInteraction(e);
+  if (outside === "dismiss") guard.requestDismiss();
+  else if (outside === "refocus") refocusInside(e);
+}
+
+// Focus code moved out of a modal overlay comes back to its first field, or to the panel itself.
+function refocusInside(e: Event) {
+  handleOpenAutoFocus(e);
+  nextTick(() => {
+    const panel = bodyRef.value?.closest<HTMLElement>("[data-o2-dialog]");
+    if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
+  });
 }
 
 const closeShown = computed(() => props.showClose && !props.persistent);
@@ -330,7 +340,7 @@ watch(shown, (open) => {
           'bg-dialog-overlay',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=open]:duration-(--duration-dialog-in)',
+          'data-[state=closed]:animation-duration-(--duration-dialog-out) data-[state=open]:animation-duration-(--duration-dialog-in)',
         ]"
       />
 
@@ -351,8 +361,8 @@ watch(shown, (open) => {
           'focus-visible:ring-dialog-focus-ring outline-none focus-visible:ring-2',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-          'data-[state=open]:duration-(--duration-dialog-in) data-[state=open]:ease-(--ease-out-expo)',
-          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=closed]:ease-(--ease-overlay-out)',
+          'data-[state=open]:animation-duration-(--duration-dialog-in) data-[state=open]:ease-(--ease-out-expo)',
+          'data-[state=closed]:animation-duration-(--duration-dialog-out) data-[state=closed]:ease-(--ease-overlay-out)',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"

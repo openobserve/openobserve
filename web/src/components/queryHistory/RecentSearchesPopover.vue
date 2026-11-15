@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="rootRef"
     tabindex="-1"
-    class="text-select-item-text flex min-h-0 w-[min(26.75rem,calc(100vw-1rem))] max-w-full flex-col font-sans text-[0.8125rem] outline-none"
+    class="text-select-item-text text-compact flex min-h-0 w-[min(26.75rem,calc(100vw-1rem))] max-w-full flex-col font-sans outline-none"
     data-test="recent-searches-popover"
     @keydown="onKeydown"
   >

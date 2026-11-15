@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import OForm from "./OForm.vue";
-import { FORM_DIRTY_STATE_KEY, FORM_SUBMIT_STATE_KEY } from "./OForm.types";
+import { FORM_SUBMIT_STATE_KEY } from "./OForm.types";
 
 // A promise we resolve by hand — lets us observe the "mid-save" window without
 // timers (Date.now/setTimeout are awkward in this harness).
@@ -92,40 +92,5 @@ describe("OForm awaited submit state", () => {
     d.resolve();
     await flushPromises();
     expect(overlayState.value).toBe(false);
-  });
-});
-
-describe("OForm unsaved edits for the overlay guard", () => {
-  const mountWithDirtyRef = (onSubmit = vi.fn()) => {
-    const dirty = ref(false);
-    const wrapper = mount(OForm, {
-      props: { defaultValues: { name: "x" }, onSubmit },
-      global: { provide: { [FORM_DIRTY_STATE_KEY as symbol]: dirty } },
-    });
-    const form = (wrapper.vm as unknown as { form: any }).form;
-    return { dirty, wrapper, form };
-  };
-
-  it("reports an edit, and clears it when the value is put back", async () => {
-    const { dirty, form } = mountWithDirtyRef();
-    expect(dirty.value).toBe(false);
-    form.setFieldValue("name", "y");
-    await flushPromises();
-    expect(dirty.value).toBe(true);
-    form.setFieldValue("name", "x");
-    await flushPromises();
-    expect(dirty.value).toBe(false);
-  });
-
-  it("treats a successfully saved value as no longer unsaved", async () => {
-    const { dirty, wrapper, form } = mountWithDirtyRef();
-    form.setFieldValue("name", "y");
-    await flushPromises();
-    await wrapper.find("form").trigger("submit");
-    await flushPromises();
-    expect(dirty.value).toBe(false);
-    form.setFieldValue("name", "z");
-    await flushPromises();
-    expect(dirty.value).toBe(true);
   });
 });

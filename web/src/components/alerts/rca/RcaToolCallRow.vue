@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-w-0 items-center gap-2">
       <span
         data-test="rca-tool-call-name"
-        class="text-text-heading text-2xs min-w-0 truncate font-mono font-bold"
+        class="text-text-heading text-2xs min-w-0 truncate font-mono font-semibold"
       >
         {{ call.tool }}
       </span>
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <span
         data-test="rca-tool-call-status"
-        class="text-2xs shrink-0 font-bold"
+        class="text-2xs shrink-0 font-semibold"
         :class="statusClass"
       >
         {{ statusText }}

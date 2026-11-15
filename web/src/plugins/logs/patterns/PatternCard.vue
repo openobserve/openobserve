@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Count + share bar -->
     <div class="w-28 flex-shrink-0 ps-3 pe-1">
       <div
-        class="text-text-body text-sm font-bold tabular-nums"
+        class="text-text-body text-sm font-semibold tabular-nums"
         :data-test="`pattern-card-${index}-frequency`"
         :title="
           volumeCount !== null
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-for="badge in badges"
           :key="badge.key"
-          class="rounded-default text-2xs inline-flex cursor-help items-center px-1 font-bold tracking-wide uppercase"
+          class="rounded-default text-2xs inline-flex cursor-help items-center px-1 font-semibold tracking-wide uppercase"
           :class="badge.class"
           :data-test="`pattern-card-${index}-badge-${badge.key}`"
         >
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <span
           v-if="pattern.is_anomaly"
-          class="rounded-default text-2xs text-status-error-text bg-status-error-bg inline-flex cursor-help items-center px-1 font-bold tracking-wide uppercase"
+          class="rounded-default text-2xs text-status-error-text bg-status-error-bg inline-flex cursor-help items-center px-1 font-semibold tracking-wide uppercase"
           :data-test="`pattern-card-${index}-anomaly-badge`"
         >
           {{ t("search.anomalyLabel") }}
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-for="(tok, i) in templateTokens" :key="i">
           <span v-if="tok.kind === 'text'">
             <template v-for="(seg, si) in highlightLevels(tok.value)" :key="si">
-              <span v-if="seg.colorClass" :class="seg.colorClass" class="font-bold">{{
+              <span v-if="seg.colorClass" :class="seg.colorClass" class="font-semibold">{{
                 seg.text
               }}</span>
               <span v-else>{{ seg.text }}</span>

@@ -15,7 +15,7 @@
 
 import { onScopeDispose, type VNode } from "vue";
 import type { Router } from "vue-router";
-import { ENTER_FADE } from "@/lib/styles/motion";
+import { ROUTE_ENTER } from "@/lib/styles/motion";
 
 /** Picks the route view's entrance class: a fade on a fresh navigation, none on a kept-alive return or a Back/Forward restore. */
 export function useRouteEnterFade(router: Router, keptViews: readonly string[]) {
@@ -24,7 +24,7 @@ export function useRouteEnterFade(router: Router, keptViews: readonly string[]) 
   let keptReturn = false;
   const cachedViews = new Set<string>();
   let shownType: unknown = undefined;
-  let shownClass = ENTER_FADE;
+  let shownClass = ROUTE_ENTER;
   let pathNavs = 0;
   let decidedAt = -1;
 
@@ -52,7 +52,7 @@ export function useRouteEnterFade(router: Router, keptViews: readonly string[]) 
     const type = view?.type;
     if (type === shownType) {
       // A path change under the same view swaps its nested child, which mounts with this class, so it follows that navigation.
-      if (decidedAt !== pathNavs) shownClass = lastNavWasPop ? "" : ENTER_FADE;
+      if (decidedAt !== pathNavs) shownClass = lastNavWasPop ? "" : ROUTE_ENTER;
       decidedAt = pathNavs;
       return shownClass;
     }
@@ -63,7 +63,7 @@ export function useRouteEnterFade(router: Router, keptViews: readonly string[]) 
     keptReturn = kept && cachedViews.has(name);
     const returning = lastNavWasPop || keptReturn;
     if (kept) cachedViews.add(name);
-    shownClass = returning ? "" : ENTER_FADE;
+    shownClass = returning ? "" : ROUTE_ENTER;
     return shownClass;
   };
 

@@ -429,9 +429,14 @@ onMounted(reload);
   <OPageLayout
     :title="t('siem.nav.sources')"
     :about="t('siem.sources.subtitle')"
+    bleed
     data-test="security-sources"
   >
-    <SecurityNotices :notices="notices" data-test="security-sources-notices" />
+    <SecurityNotices
+      :notices="notices"
+      class="mx-page-edge mt-2"
+      data-test="security-sources-notices"
+    />
     <OTable
       :data="rows"
       :columns="columns"

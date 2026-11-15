@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-start gap-2">
                     <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                     <span>
-                      <span class="highlight text-text-link font-bold">{{
+                      <span class="highlight text-text-link font-semibold">{{
                         t("alerts.enrichmentTablesTerm")
                       }}</span>
                       {{ t("alerts.enrichmentTablesDestinationNote") }}

@@ -177,14 +177,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-start gap-2">
                 <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                 <span>
-                  <span class="text-text-link font-bold">{{ t("flow.function.rbf") }}</span>
+                  <span class="text-text-link font-semibold">{{ t("flow.function.rbf") }}</span>
                   {{ t("flow.function.rbfDesc") }}
                 </span>
               </div>
               <div class="flex items-start gap-2">
                 <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                 <span>
-                  <span class="text-text-link font-bold">{{ t("flow.function.raf") }}</span>
+                  <span class="text-text-link font-semibold">{{ t("flow.function.raf") }}</span>
                   {{ t("flow.function.rafDesc") }}
                 </span>
               </div>

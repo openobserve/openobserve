@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="autoobserve2-paged"
   >
     <template #title>
-      <h2 class="text-text-heading text-base font-semibold whitespace-nowrap">
+      <h2 class="text-text-heading text-sm font-semibold whitespace-nowrap">
         <ODropdown align="start">
           <template #trigger>
             <button

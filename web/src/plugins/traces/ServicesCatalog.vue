@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="services-catalog-status-legend"
       >
         <span
-          class="text-2xs font-bold text-text-heading whitespace-nowrap"
+          class="text-2xs font-semibold text-text-heading whitespace-nowrap"
         >
           {{ t("traces.servicesCatalog.legend.title") }}
         </span>
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.healthy") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-2xs opacity-55 text-text-label"
               >&lt;&nbsp;1%</span
             >
           </div>
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.degraded") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-2xs opacity-55 text-text-label"
               >1&nbsp;–&nbsp;5%</span
             >
           </div>
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.warning") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-2xs opacity-55 text-text-label"
               >5&nbsp;–&nbsp;10%</span
             >
           </div>
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.critical") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-2xs opacity-55 text-text-label"
               >&gt;&nbsp;10%</span
             >
           </div>
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        plain total to its left. Hover explains it. -->
                   <span
                     v-if="categoryUnhealthyCounts[cat] > 0"
-                    class="text-3xs inline-flex h-[1.05rem] min-w-[1.05rem] items-center justify-center rounded-full px-1 leading-none font-semibold text-white"
+                    class="text-2xs inline-flex h-[1.05rem] min-w-[1.05rem] items-center justify-center rounded-full px-1 leading-none font-semibold text-white"
                     :style="{ backgroundColor: tabStatusColorVar(cat) }"
                     :data-test="`services-catalog-type-unhealthy-${cat}`"
                   >

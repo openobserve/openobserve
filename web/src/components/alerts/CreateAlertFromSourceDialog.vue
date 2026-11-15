@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="pickQueryOnly && pickedQuery" data-test="create-alert-picked-query">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-bold tracking-wider">
+          <span class="text-xs font-semibold tracking-wider">
             {{ t("alerts.prefill.dialog.queryLabel") }}
           </span>
           <OCopyButton
@@ -236,6 +236,7 @@ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import { useColorizedQuery } from "@/composables/useColorizedQuery";
 import { escapeHtml } from "@/utils/html";
 import type {
@@ -367,31 +368,29 @@ const previewQuery = computed(() => {
   return prefill.queryType === "promql" ? (prefill.promql ?? "") : formatSqlForDisplay(prefill.sql);
 });
 
-const choices = () =>
-  JSON.stringify([
+// A stray dismiss asks before dropping a changed answer (V5); the seeding below is not one.
+const { dirty: isChoiceChanged } = useUnsavedChanges(
+  () => [
     props.prefill?.queryIndex ?? null,
     patternMode.value,
     selectedStream.value,
     thresholdShape.value,
-    String(thresholdDraft.value),
-  ]);
-// The answers as the dialog opened, so a stray dismiss asks before dropping a changed one (V5).
-const openedWith = ref<string | null>(null);
-const isChoiceChanged = computed(() => openedWith.value !== null && choices() !== openedWith.value);
+    thresholdDraft.value,
+  ],
+  () => props.open,
+);
 
 // Seed the controls from the incoming prefill each time the dialog opens, so a
 // second run never inherits the previous run's answers.
 watch(
   () => [props.open, props.prefill] as const,
   ([open, prefill]) => {
-    if (!open) openedWith.value = null;
     if (!open || !prefill) return;
     selectedStream.value = prefill.streamName;
     thresholdShape.value =
       prefill.thresholdShape ?? getAlertSource(prefill.source).defaultThreshold;
     // A rebuild without a usable value keeps what the user is typing.
     if (prefill.thresholdInput?.value != null) thresholdDraft.value = prefill.thresholdInput.value;
-    if (openedWith.value === null) openedWith.value = choices();
   },
   { immediate: true },
 );

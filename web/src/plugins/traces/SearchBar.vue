@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="search-bar-component flex h-full flex-col pb-px" id="searchBarComponent">
     <div
-      class="border-border-default m-0! flex w-full items-center justify-between border-b p-1.5 max-lg:flex-wrap max-lg:gap-y-1"
+      class="border-border-default px-page-edge m-0! flex w-full items-center justify-between border-b py-2 max-lg:flex-wrap max-lg:gap-y-1"
     >
       <div
         ref="toolbarLeftRef"
@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 aria-busy="true"
                 data-test="traces-search-bar-cancel-btn"
                 :title="t('search.cancel')"
-                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)]"
                 @click="cancelQueryData"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -344,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-run-pending="showRunQueryPending ? 'true' : undefined"
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
                 :title="t('search.runQuery')"
-                class="min-w-[5.875rem] [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
+                class="min-w-[5.875rem] [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)]"
                 :class="[
                   store.state.zoConfig.auto_query_enabled
                     ? 'rounded-s-default! rounded-e-none!'

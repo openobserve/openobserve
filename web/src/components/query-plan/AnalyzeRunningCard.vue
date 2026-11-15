@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </h3>
     <div class="flex flex-wrap items-baseline gap-2.5">
       <span
-        class="text-text-heading font-mono text-3xl font-semibold tabular-nums"
+        class="text-text-heading font-mono text-2xl font-semibold tabular-nums"
         data-test="query-plan-analyze-elapsed"
         >{{ elapsed }}</span
       >

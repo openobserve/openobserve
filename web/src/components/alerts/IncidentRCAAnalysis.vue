@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rca-trigger-section"
       class="rounded-default border-border-default bg-surface-base flex max-w-215 flex-col items-start gap-2 border p-6"
     >
-      <h2 class="text-text-heading m-0 text-base font-bold">
+      <h2 class="text-text-heading m-0 text-sm font-semibold">
         {{ t("alerts.incidents.rcaRun.noAnalysisTitle") }}
       </h2>
       <p class="text-text-body text-compact m-0">
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : t("alerts.incidents.rcaRun.state.investigating")
         }}
       </RcaPill>
-      <h2 class="text-text-heading m-0 text-base font-bold">
+      <h2 class="text-text-heading m-0 text-sm font-semibold">
         {{
           cardState === "investigating"
             ? t("alerts.incidents.rcaRun.reportAfterRun")

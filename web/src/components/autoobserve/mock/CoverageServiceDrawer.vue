@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </svg>
         <div class="min-w-0 flex-1">
           <OTruncatedText
-            class="text-text-heading block text-base font-semibold"
+            class="text-text-heading text-title block font-semibold"
             data-test="autoobserve-coverage-drawer-title"
             >{{ row.service }}</OTruncatedText
           >

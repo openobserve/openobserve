@@ -28,7 +28,7 @@ const { t } = useI18nTyped();
     <OIcon
       name="chevron-right"
       size="sm"
-      class="transition-transform duration-200"
+      class="transition-transform duration-(--duration-indicator) ease-(--ease-control)"
       :class="expanded ? 'rotate-90' : 'rotate-0'"
     />
   </button>

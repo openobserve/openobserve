@@ -63,7 +63,7 @@ const spanToggle = computed(() => props.toggle && props.removable);
 
 const classes = computed(() => [
   "rounded-chip inline-flex max-w-full items-center gap-1 border whitespace-nowrap",
-  "text-xs leading-none font-medium transition-colors duration-150",
+  "text-xs leading-none font-medium transition-colors duration-(--duration-control) ease-(--ease-control)",
   props.mono && "font-mono",
   props.toggle ? toggleClasses.value : [CHIP_TONE_CLASSES[props.tone], sizeClasses[props.size]],
   props.disabled && "pointer-events-none opacity-40",

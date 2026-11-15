@@ -547,8 +547,8 @@ const openResult = () => {
   height: 0.9375rem;
   padding: 0 0.1875rem;
   border-radius: 0.5rem;
-  font-size: 0.625rem;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: var(--font-semibold);
   line-height: 0.9375rem;
   text-align: center;
 }

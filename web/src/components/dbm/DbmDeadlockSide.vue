@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="isVictim ? 'bg-status-error-bg' : 'bg-status-success-bg'"
     :data-test="dataTest"
   >
-    <div class="text-2xs flex items-center gap-1.5 font-bold">
+    <div class="text-2xs flex items-center gap-1.5 font-semibold">
       <OIcon
         :name="isVictim ? 'error-outline' : 'check-circle'"
         class="size-3.5 shrink-0"

@@ -1362,6 +1362,7 @@ import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { isAnomalyDataReadinessStatus } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import { matchesAnyKey, readFilterKeys, toggleFilterKey } from "@/utils/filterKeys";
 import {
   ALERT_DRAFT_KIND,
@@ -3298,16 +3299,16 @@ export default defineComponent({
       showAddAlertDialog.value = true;
     };
 
-    // The clone form as it opened, so a stray dismiss asks before dropping an edit (V5).
-    const cloneFormState = () =>
-      JSON.stringify([
+    // A stray dismiss asks before dropping an edit (V5); the folder picker settling after open is none.
+    const { dirty: isCloneFormChanged } = useUnsavedChanges(
+      () => [
         toBeCloneAlertName.value,
         toBeClonestreamType.value,
         toBeClonestreamName.value,
         folderIdToBeCloned.value,
-      ]);
-    const cloneOpenedWith = ref("");
-    const isCloneFormChanged = computed(() => cloneFormState() !== cloneOpenedWith.value);
+      ],
+      () => showForm.value,
+    );
 
     const duplicateAlert = async (row: any) => {
       if (anomalyRowLocked(row)) return;
@@ -3342,7 +3343,6 @@ export default defineComponent({
       const request = ++cloneSourceRequest;
       toBeClonedAlert.value = null;
       isCloneSourceLoading.value = needsSource;
-      cloneOpenedWith.value = cloneFormState();
       showForm.value = true;
       // Load the stream-name options for the pre-filled stream type so the
       // dialog's dropdown reflects it instead of showing an empty list. A

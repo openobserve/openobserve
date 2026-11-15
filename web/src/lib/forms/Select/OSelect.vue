@@ -1321,7 +1321,7 @@ const isNarrowed = computed(() => isFilter.value && canClear.value);
 const triggerChromeClasses = computed(() => [
   "rounded-default relative flex w-full items-center border",
   slots.icon ? "ps-2" : "ps-3",
-  "focus:outline-none transition-[color,background-color,border-color,box-shadow] duration-150",
+  "focus:outline-none transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
   isNarrowed.value ? "bg-select-item-selected-bg" : "bg-select-bg",
   // The red error border stays on focus; the focus colour applies only without an error.
   hasError.value
@@ -1588,6 +1588,10 @@ function isResetOption(opt: { value: SelectPrimitiveValue; label: string }): boo
               'flex flex-col overflow-hidden',
               'rounded-menu shadow-overlay border-border-default border',
               'bg-select-content-bg text-compact',
+              'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
+              'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
+              'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
+              'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
             ]"
             :style="[
               menuWidthStyle,
@@ -1927,7 +1931,7 @@ function isResetOption(opt: { value: SelectPrimitiveValue; label: string }): boo
                               <OTruncatedText
                                 v-if="filteredOptions[vRow.index].subLabel"
                                 :lines="2"
-                                class="text-text-secondary w-full text-xs leading-snug whitespace-normal"
+                                class="text-text-secondary w-full text-xs leading-4 whitespace-normal"
                                 >{{ filteredOptions[vRow.index].subLabel }}</OTruncatedText
                               >
                               <div
@@ -2123,7 +2127,6 @@ function isResetOption(opt: { value: SelectPrimitiveValue; label: string }): boo
             'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
             'rounded-menu shadow-overlay border-border-default border',
             'bg-select-content-bg',
-            // Clip-path reveal from the trigger edge: wipes down by default, up when placed on top.
             'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
             'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
             'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
@@ -2169,12 +2172,12 @@ function isResetOption(opt: { value: SelectPrimitiveValue; label: string }): boo
       v-if="effectiveError && effectiveError.trim()"
       :id="errorId"
       :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
-      class="text-select-error-text text-xs leading-snug"
+      class="text-select-error-text text-xs leading-4"
       role="alert"
     >
       {{ effectiveError }}
     </span>
-    <span v-else-if="helpText" class="text-input-help-text text-xs leading-snug">
+    <span v-else-if="helpText" class="text-input-help-text text-xs leading-4">
       {{ helpText }}
     </span>
   </div>

@@ -27,7 +27,7 @@
       <div
         class="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] gap-0 overflow-hidden max-[68.75rem]:grid-cols-1"
       >
-        <div class="flex min-h-0 min-w-0 flex-col gap-2 overflow-auto p-2">
+        <div class="px-page-edge flex min-h-0 min-w-0 flex-col gap-3 overflow-auto py-3">
           <!-- Identity -->
           <section
             class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
@@ -38,7 +38,7 @@
                 {{ t("aiObservability.remoteTasks.form.identitySection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <OFormInput
                 name="name"
                 :label="t('aiObservability.remoteTasks.form.nameLabel')"
@@ -102,7 +102,7 @@
                 {{ t("aiObservability.remoteTasks.form.authSection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <OFormSelect
                 name="authType"
                 :label="t('aiObservability.remoteTasks.form.authTypeLabel')"
@@ -321,7 +321,7 @@
                 {{ t("aiObservability.remoteTasks.form.signingSection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <OFormSwitch
                 name="signingEnabled"
                 :label="t('aiObservability.remoteTasks.form.signingToggle')"

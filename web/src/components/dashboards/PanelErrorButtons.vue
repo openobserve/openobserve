@@ -228,7 +228,7 @@
     <!-- Universal Last Refreshed Clock Icon and Time; a narrow bar drops it before any notice chip. -->
     <span
       v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView"
-      class="lastRefreshedAt ms-1.25 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap @max-[28rem]/panelbar:hidden"
+      class="lastRefreshedAt text-2xs ms-1.25 overflow-hidden text-ellipsis whitespace-nowrap @max-[28rem]/panelbar:hidden"
       data-test="panel-last-refreshed-at"
     >
       <span class="lastRefreshedAtIcon me-0.5 inline-flex align-middle">

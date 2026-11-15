@@ -53,12 +53,12 @@ const CHIP_BASE =
 // compete for the same property — which class wins would otherwise depend on
 // Tailwind's emit order rather than on intent.
 const CHIP_DEFAULT =
-  "hover:border-accent bg-surface-panel text-text-secondary! hover:text-accent! cursor-pointer transition-[border-color,color,background-color] duration-150 hover:bg-accent/6";
+  "hover:border-accent bg-surface-panel text-text-secondary! hover:text-accent! cursor-pointer transition-[border-color,color,background-color] duration-(--duration-control) ease-(--ease-control) hover:bg-accent/6";
 
 // `ai-hover-btn` survives only as the hook for the two rules the utility layer
 // cannot express: the color-mix() glow and the filter on the slotted <img>.
 const CHIP_AI =
-  "hover:border-accent ai-hover-btn bg-gradient-ai-subtle! text-ai-accent! hover:bg-gradient-ai! hover:text-white! dark:text-white! cursor-pointer transition-[background,box-shadow,color] duration-300";
+  "hover:border-accent ai-hover-btn bg-gradient-ai-subtle! text-ai-accent! hover:bg-gradient-ai! hover:text-white! dark:text-white! cursor-pointer transition-[background,box-shadow,color] duration-(--duration-control) ease-(--ease-control)";
 
 // No hover utilities and no `ai-hover-btn` hook, whose scoped rules would otherwise still glow.
 const CHIP_UNAVAILABLE_DEFAULT = "bg-surface-panel text-text-secondary!";
@@ -116,6 +116,6 @@ function onClick(event: MouseEvent) {
 
 .ai-hover-btn:hover :deep(img) {
   filter: brightness(0) invert(1);
-  transition: filter 0.3s ease;
+  transition: filter var(--duration-control) var(--ease-control);
 }
 </style>

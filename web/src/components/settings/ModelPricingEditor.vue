@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="examples-table border-card-glass-border rounded-default overflow-hidden border"
             >
               <div
-                class="bg-surface-subtle border-card-glass-border text-2xs text-text-secondary grid grid-cols-[11.25rem_1fr_auto] gap-3 border-b px-3 py-1.5 font-bold tracking-[0.06em] uppercase"
+                class="bg-surface-subtle border-card-glass-border text-2xs text-text-secondary grid grid-cols-[11.25rem_1fr_auto] gap-3 border-b px-3 py-1.5 font-semibold tracking-[0.06em] uppercase"
               >
                 <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
                 <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>

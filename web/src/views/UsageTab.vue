@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon name="window" size="sm" />
           </span>
-          <span class="text-text-heading text-base font-semibold">{{ t("home.streams") }}</span>
+          <span class="text-text-heading text-sm font-semibold">{{ t("home.streams") }}</span>
         </div>
         <OButton
           v-if="canView('logstreams')"

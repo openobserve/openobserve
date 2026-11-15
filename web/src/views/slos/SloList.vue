@@ -498,6 +498,7 @@
 
     <ODialog
       v-model:open="moveDialog"
+      :dirty="moveTargetChanged"
       :title="t('slos.moveTitle', { count: pendingMove.length })"
       data-test="slos-slolist-move-dialog"
     >
@@ -558,6 +559,7 @@ import { useStore } from "vuex";
 
 import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
+import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
@@ -687,6 +689,11 @@ const selectedIds = ref<string[]>([]);
 const moveDialog = ref(false);
 const moveTarget = ref("");
 const pendingMove = ref<SloListItem[]>([]);
+// The picker settles on a folder once its list loads; only a pick after that is the user's (V5).
+const { dirty: moveTargetChanged } = useUnsavedChanges(
+  () => moveTarget.value,
+  () => moveDialog.value,
+);
 const oTableRef: any = ref(null);
 
 // URL-synced so returning from add/edit/detail (Back/Update/Cancel) lands on the same page instead of resetting to page 1.

@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <label
                 for="onboarding-hear-about-us"
-                class="text-text-heading text-base font-medium whitespace-nowrap"
+                class="text-text-heading text-sm font-medium whitespace-nowrap"
                 >{{ t("login.getStarted.heard.label") }}</label
               >
               <OSelect

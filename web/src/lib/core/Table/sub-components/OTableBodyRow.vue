@@ -13,6 +13,8 @@ import {
   ROW_STATE_FILL_CLASS,
   ROW_STATE_RAIL_CLASS,
   TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH,
+  TABLE_EXPAND_COL_SIZE,
+  TABLE_EXPAND_COL_STYLE,
   type OTableRowState,
 } from "../OTable.types";
 
@@ -187,7 +189,7 @@ const showTreeWarning = computed(
  * Used to align the warning row's content + connector line under the chevron.
  */
 const treeConnectorX = computed(() => {
-  const expansionWidth = props.expansionEnabled ? 32 : 0; // w-8
+  const expansionWidth = props.expansionEnabled ? TABLE_EXPAND_COL_SIZE : 0;
   const selectionWidth = props.selectionEnabled ? TABLE_CHECKBOX_COL_WIDTH : 0;
   const dragWidth = props.enableRowReorder ? 16 : 0; // w-4
   const cellPaddingLeft = 12; // px-3
@@ -280,9 +282,8 @@ function onRowMouseleave() {
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
-      :class="[
-        'border-table-row-divider w-6 max-w-6 min-w-6 border-b px-0 text-center align-middle',
-      ]"
+      class="border-table-row-divider border-b pe-0 text-left align-middle"
+      :style="TABLE_EXPAND_COL_STYLE"
       data-test="o2-table-expand-cell"
     >
       <OTableExpandButton

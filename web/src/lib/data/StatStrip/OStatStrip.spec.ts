@@ -572,7 +572,7 @@ describe("OStatStrip inline KPI line", () => {
     expect(glyphs[2]).toContain("text-text-muted");
     const values = w.findAll('[data-test="o-stat-card-value"]').map((v) => v.classes());
     expect(values[0]).toEqual(
-      expect.arrayContaining(["text-base", "font-semibold", "text-text-heading", "tabular-nums"]),
+      expect.arrayContaining(["text-sm", "font-semibold", "text-text-heading", "tabular-nums"]),
     );
     expect(values[2]).toContain("text-text-muted");
   });

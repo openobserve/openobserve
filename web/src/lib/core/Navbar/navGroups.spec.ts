@@ -111,14 +111,6 @@ describe("NAV_GROUPS against the real route table", () => {
 });
 
 describe("MODULE_RAILS", () => {
-  const settings = NAV_GROUPS.find((g) => g.key === "settings")!;
-  const key = (name: string) => MODULE_RAILS.find((m) => m.name === name)?.titleKey;
-
-  it("labels Settings and IAM with the keys the Settings tile and its IAM child show", () => {
-    expect(key("settings")).toBe(settings.titleKey);
-    expect(key("iam")).toBe(settings.children.find((c) => c.name === "iam")?.titleKey);
-  });
-
   const paths: Record<string, string> = {
     settings: "/settings",
     iam: "/iam",

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'flex w-full items-center gap-2': formRows.length == 0,
     }"
   >
-    <div class="custom-input-label pb-1 font-bold">
+    <div class="custom-input-label pb-1 font-semibold">
       <span>
         {{ t("alerts.variables.label") }}
       </span>

@@ -14,11 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Fades start at 40% opacity so an entering element never paints a blank frame.
+// animation-duration, not duration-*: the latter also sets a transition-duration that animates every later change.
 export const ENTER_FADE =
-  "motion-safe:animate-in motion-safe:fade-in-40 motion-safe:duration-200 motion-safe:ease-out";
+  "motion-safe:animate-in motion-safe:fade-in-40 motion-safe:animation-duration-(--duration-page-in) motion-safe:ease-(--ease-control)";
 
 export const ENTER_SLIDE =
-  "motion-safe:animate-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 motion-safe:ease-out";
+  "motion-safe:animate-in motion-safe:fade-in-40 motion-safe:slide-in-from-bottom-1 motion-safe:animation-duration-(--duration-page-in) motion-safe:ease-(--ease-control)";
+
+// Fades the route view's children but not its header band (data-o2-page-shell), so the shell never dims between pages.
+export const ROUTE_ENTER = "o2-route-enter";
 
 // Region loaders (skeleton, progress line, button spinner) wait this long, so fast loads never flash one.
 export const LOADER_DELAY_MS = 300;
@@ -39,7 +43,7 @@ export const STALE_DIM = "opacity-60";
 
 // A CSS wait, not a timer, so every re-display restarts it; o2-motion-keep stops reduced motion zeroing the wait.
 export const LOADER_REVEAL =
-  "o2-motion-keep animate-in fade-in-0 fill-mode-backwards delay-300 duration-(--duration-overlay-in)";
+  "o2-motion-keep animate-in fade-in-0 fill-mode-backwards delay-300 animation-duration-(--duration-overlay-in)";
 
 // The first tooltip waits; a neighbour opened inside the skip window opens at once.
 export const TOOLTIP_DELAY_MS = 300;

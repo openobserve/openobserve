@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-details-sidebar-db-response-status-code"
   >
     <div class="flex-col items-center gap-1">
-      <div class="text-text-label! text-3xs w-full ps-2 pb-0.5 tracking-[0.03rem]">
+      <div class="text-text-label! text-2xs w-full ps-2 pb-0.5 tracking-[0.03rem]">
         {{ t("traces.traceErrorTab.dbResponseStatusCode") }}
       </div>
       <div class="flex items-center ps-2">
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-details-sidebar-process-exit-code"
   >
     <div class="flex-col items-center gap-1">
-      <div class="text-text-label! text-3xs w-full ps-2 pb-0.5 tracking-[0.03rem]">
+      <div class="text-text-label! text-2xs w-full ps-2 pb-0.5 tracking-[0.03rem]">
         {{ t("traces.traceErrorTab.processExitCode") }}
       </div>
       <div class="flex items-center ps-2">
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="mb-1 flex items-center gap-2">
       <OIcon name="error" size="sm" class="text-status-error-text" />
       <span
-        class="text-status-error-text text-base font-semibold"
+        class="text-status-error-text text-sm font-semibold"
         data-test="trace-details-sidebar-error-summary-title"
       >
         {{ errorBannerTitle }}

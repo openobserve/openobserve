@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div class="mb-2.5 p-2.5" v-if="regexPatternCreators.length > 0">
               <div
-                class="text-primary mb-2.5 text-base uppercase"
+                class="text-primary mb-2.5 text-sm"
                 data-test="regex-pattern-import-creation-title"
               >
                 {{ t("settings.importRegexPattern.regexPatternCreation") }}
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   :class="{
-                    'py-1.25 text-sm font-bold': true,
+                    'py-1.25 text-sm font-semibold': true,
                     'text-green': val.success,
                     'text-status-negative': !val.success,
                   }"

@@ -58,7 +58,6 @@
   --d-divider: #3a3f51; /* subtle: row & section separators            */
   --d-border: #43485a; /* default: card / input / table / rail edges  */
   --d-border-strong: #656b7f; /* strong: checkbox / radio / file outlines    */
-  --d-control-border: #51576b; /* control rest edge: 2.5:1 on base, as grey-400 on white */
 
   /* Text — mapped straight to the registered --color-grey-* palette in the
        block below (mirrors light mode, where each tier = a grey step). No
@@ -162,7 +161,7 @@
      the dark surfaces, so dark mode reuses it rather than inventing a value —
      the light theme needs its own only because grey-400 falls short there. */
   --color-border-control: var(--d-border-strong);
-  --color-control-border: var(--d-control-border);
+  --color-control-border: var(--d-border);
   --color-control-border-selected: var(--color-primary-700);
   /* Soft divider — one step quieter than border-default so row/section
        splits don't read as hard structural lines (but still visible). */

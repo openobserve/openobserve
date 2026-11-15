@@ -25,8 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @date-change="onDateChange"
     @refresh="refresh"
   >
-    <div class="px-page-edge flex min-h-0 flex-1 flex-col gap-2 py-2">
-      <div class="flex flex-wrap items-center gap-2">
+    <!-- The gutter goes on the rows that need it, so the table keeps its own edge inset (L3). -->
+    <div class="flex min-h-0 flex-1 flex-col gap-2 py-2">
+      <div class="px-page-edge flex flex-wrap items-center gap-2">
         <OSelect
           v-model="stream"
           :options="availableStreams.map((s) => ({ value: s, label: raw(s) }))"
@@ -66,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="noStream"
-        class="text-compact text-text-secondary flex flex-1 flex-col items-center justify-center gap-1"
+        class="text-compact text-text-secondary px-page-edge flex flex-1 flex-col items-center justify-center gap-1"
         data-test="ai-users-no-stream"
       >
         <span class="text-text-heading font-semibold">{{
@@ -119,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
         <span
           v-if="!failed && !loading"
-          class="text-2xs text-text-secondary"
+          class="text-2xs text-text-secondary px-page-edge"
           data-test="ai-users-count"
         >
           {{

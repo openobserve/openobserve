@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ShortUrl > should match snapshot 1`] = `
-"<div data-test="loading-container" class="flex h-[100vh] flex-col items-center justify-center"><span class="inline-flex shrink-0 size-5 o2-motion-keep animate-in fade-in-0 fill-mode-backwards delay-300 duration-(--duration-overlay-in)" role="status" aria-label="Loading" aria-live="polite" data-test="spinner"><span class="border-border-default border-t-spinner o2-motion-keep inline-block size-full animate-spin rounded-full border-2" aria-hidden="true" data-test="o-spinner-ring"></span></span>
-  <div data-test="message" class="text-text-secondary text-base">Redirecting...</div>
+"<div data-test="loading-container" class="flex h-[100vh] flex-col items-center justify-center"><span class="inline-flex shrink-0 size-5 o2-motion-keep animate-in fade-in-0 fill-mode-backwards delay-300 animation-duration-(--duration-overlay-in)" role="status" aria-label="Loading" aria-live="polite" data-test="spinner"><span class="border-border-default border-t-spinner o2-motion-keep inline-block size-full animate-spin rounded-full border-2" aria-hidden="true" data-test="o-spinner-ring"></span></span>
+  <div data-test="message" class="text-text-secondary text-sm">Redirecting...</div>
 </div>"
 `;

@@ -105,7 +105,7 @@
   --color-border-subtle: var(--color-grey-150);
   /* One resting edge for every bordered control, so a toolbar row reads as one set (S2).
      Hover lifts it to the 3:1 control edge; selected controls take the accent-300 edge. */
-  --color-control-border: var(--color-grey-400);
+  --color-control-border: var(--color-grey-350);
   --color-control-border-hover: var(--color-border-control);
   --color-control-border-selected: var(--color-primary-300);
   /* Input focus: an accent-500 edge plus a 3px outer halo at 18% (16% red when invalid), never an inset ring. */
@@ -213,14 +213,20 @@
   --color-focus-ring-success: var(--color-success-600);
   --color-focus-ring-warning: var(--color-warning-700);
 
-  /* Motion: every interactive control colours on one timing; overlays open slower than they close. */
-  --duration-control: 120ms;
-  --ease-control: cubic-bezier(0, 0, 0.2, 1);
+  /* Motion: every interactive control colours on one timing; overlays open slower than they close.
+     Nothing decorative runs past 220 ms, so motion never makes a person wait. */
+  --duration-control: 100ms;
+  --ease-control: cubic-bezier(0.2, 0, 0, 1);
+  --duration-indicator: 150ms;
+  --duration-expand: 180ms;
+  --duration-page-in: 120ms;
   --duration-overlay-in: 140ms;
   --duration-overlay-out: 100ms;
   --ease-overlay-out: cubic-bezier(0.4, 0, 1, 1);
-  --duration-dialog-in: 200ms;
-  --duration-dialog-out: 150ms;
+  --duration-dialog-in: 160ms;
+  --duration-dialog-out: 120ms;
+  --duration-drawer-in: 200ms;
+  --duration-drawer-out: 150ms;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Control heights: a size name is one height in every component, and controls that
@@ -238,6 +244,10 @@
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
 @theme inline {
+  /* A bare transition-colors or transition takes the control timing, so no control falls back to 150 ms. */
+  --default-transition-duration: var(--duration-control);
+  --default-transition-timing-function: var(--ease-control);
+
   /* Text */
   --color-text-heading: var(--color-text-heading);
   --color-text-body: var(--color-text-body);

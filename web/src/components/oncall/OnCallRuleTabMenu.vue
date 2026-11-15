@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`oncall-schedule-rule-stop-popover-${ruleIndex}`"
       >
         <div class="flex flex-col gap-1">
-          <h3 class="text-base font-semibold">
+          <h3 class="text-sm font-semibold">
             {{ t("oncall.stopTitle", { name: raw(ruleLabel) }) }}
           </h3>
           <OText variant="meta">{{ t("oncall.stopAfter") }}</OText>

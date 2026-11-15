@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="px-3 pb-2">
         <!-- Alert set for header -->
         <div
-          class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
+          class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-semibold"
         >
           <span>{{ t("alerts.compareWithPast.alertSetFor") }}</span>
           <div class="border-line h-px flex-1"></div>
@@ -43,14 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="bg-card-glass-bg border-border-default flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
         >
           <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
           >
             {{ t("alerts.compareWithPast.currentWindow") }}
           </div>
 
           <div class="flex flex-col items-start gap-2">
             <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
             >
               {{ t("alerts.compareWithPast.cycle") }}
               <span class="cursor-pointer">
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Comparing with header -->
         <div
           v-if="localMultiTimeRange.length > 0"
-          class="multi-window-text text-text-body mt-2 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
+          class="multi-window-text text-text-body mt-2 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-semibold"
         >
           <span>{{ t("alerts.compareWithPast.comparingWith") }}</span>
           <div class="border-line h-px flex-1"></div>
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="reference-window-container bg-card-glass-bg border-border-default mt-2 flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
         >
           <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
           >
             {{ t("alerts.compareWithPast.referenceWindow") }} {{ index + 1 }}
           </div>
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Cycle Info -->
           <div class="flex flex-col items-start gap-2">
             <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
             >
               {{ t("alerts.compareWithPast.cycle") }}
               <span class="cursor-pointer">

@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div class="flex items-center gap-1">
-      <h2 class="text-text-heading text-base font-bold">{{ t("rum.overviewPage.pagesTitle") }}</h2>
+      <h2 class="text-text-heading text-sm font-semibold">
+        {{ t("rum.overviewPage.pagesTitle") }}
+      </h2>
       <OPopover
         size="lg"
         v-model:open="aboutOpen"
@@ -41,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OPopover>
       <router-link
         :to="allPagesLink"
-        class="text-text-link ms-auto text-sm font-bold"
+        class="text-text-link ms-auto text-sm font-semibold"
         :aria-label="t('rum.overviewPage.pagesAllLinkAria')"
         data-test="rum-overview-pages-all-link"
       >

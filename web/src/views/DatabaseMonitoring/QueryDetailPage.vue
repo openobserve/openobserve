@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSkeleton v-if="loading" class="h-6 w-16" />
                   <template v-else>
                     <span
-                      class="text-2xl leading-none font-bold tabular-nums"
+                      class="text-2xl leading-none font-semibold tabular-nums"
                       :class="tile.tone || 'text-text-heading'"
                       >{{ tile.num }}</span
                     >

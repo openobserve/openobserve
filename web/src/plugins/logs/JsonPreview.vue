@@ -222,7 +222,7 @@
       <div class="text-compact font-mono leading-5">}</div>
       <div
         v-if="showMenu"
-        class="context-menu rounded-default [font-size: var(--text-compact)] bg-surface-overlay border-border-default text-text-body min-w-50 border py-1 shadow-lg"
+        class="context-menu rounded-default text-compact bg-surface-overlay border-border-default text-text-body min-w-50 border py-1 shadow-lg"
         :style="{
           position: 'fixed',
           top: `${menuY}px`,

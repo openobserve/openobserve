@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-sidebar"
       />
       <div
-        class="font-bold [text-orientation:mixed] [writing-mode:vertical-rl]"
+        class="font-semibold [text-orientation:mixed] [writing-mode:vertical-rl]"
         data-test="panel-sidebar-collapsed-title"
       >
         {{ title }}

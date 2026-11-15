@@ -36,12 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-1">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count text-3! text-3xs text-accent font-medium"
+          class="selection-count text-3! text-2xs text-accent font-medium"
           data-test="field-values-panel-selection-count"
         >
           {{ selectedValues.length }} {{ t("search.selectedLabel") }}
         </span>
-        <span v-else class="selection-hint text-3! text-3xs text-text-secondary">{{
+        <span v-else class="selection-hint text-3! text-2xs text-text-secondary">{{
           t("search.selectToFilter")
         }}</span>
         <OButton

@@ -179,7 +179,7 @@ describe("OverviewAlertsCard", () => {
     expect(box(w, "incidents").text()).toBe("6Open incidents");
     expect(box(w, "failing").text()).toBe("4Rules failing");
     expect(count("critical").classes()).toEqual(
-      expect.arrayContaining(["text-xl", "font-bold", "text-status-negative"]),
+      expect.arrayContaining(["text-xl", "font-semibold", "text-status-negative"]),
     );
     expect(count("warning").classes()).toContain("text-status-warning-text");
     expect(count("incidents").classes()).toContain("text-text-heading");

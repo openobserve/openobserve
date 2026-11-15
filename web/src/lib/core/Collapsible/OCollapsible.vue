@@ -80,13 +80,13 @@ watch(
 <template>
   <CollapsibleRoot :open="isOpen" @update:open="handleOpenChange" v-bind="$attrs">
     <CollapsibleTrigger
-      class="rounded-default hover:bg-collapsible-trigger-hover-bg active:bg-collapsible-trigger-active-bg focus-visible:ring-collapsible-trigger-focus-ring min-h-control-md flex w-full cursor-pointer items-center gap-1 ps-1 pe-2 text-start transition-colors duration-150 outline-none select-none focus-visible:ring-2"
+      class="rounded-default hover:bg-collapsible-trigger-hover-bg active:bg-collapsible-trigger-active-bg focus-visible:ring-collapsible-trigger-focus-ring min-h-control-md flex w-full cursor-pointer items-center gap-1 ps-1 pe-2 text-start transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none focus-visible:ring-2"
       data-test="o-collapsible-trigger"
     >
       <OIcon
         name="chevron-right"
         size="sm"
-        class="text-collapsible-icon shrink-0 transition-transform duration-200"
+        class="text-collapsible-icon shrink-0 transition-transform duration-(--duration-indicator) ease-(--ease-control)"
         :class="isOpen ? 'rotate-90' : 'rotate-0'"
       />
       <span v-if="hasCustomTrigger" class="flex min-w-0 flex-1 items-center gap-2">
@@ -123,11 +123,11 @@ watch(
 /* keep(keyframes): reka's height animation reads --reka-collapsible-content-height;
    no utility expresses it, and the keyframes are only referenced from this block. */
 .o-collapsible-content[data-state="open"] {
-  animation: o-collapsible-open 200ms ease-out;
+  animation: o-collapsible-open var(--duration-expand) var(--ease-control);
 }
 
 .o-collapsible-content[data-state="closed"] {
-  animation: o-collapsible-close 200ms ease-out;
+  animation: o-collapsible-close var(--duration-expand) var(--ease-overlay-out);
 }
 
 @keyframes o-collapsible-open {

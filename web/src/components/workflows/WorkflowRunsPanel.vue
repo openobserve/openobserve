@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full min-h-0 flex-col" data-test="workflow-runs-panel">
     <!-- Compact header: title + datetime range picker + refresh -->
     <div
-      class="border-border-default flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2"
+      class="border-border-default px-page-edge flex shrink-0 items-center justify-between gap-2 border-b py-2"
     >
       <div class="min-w-0">
         <div class="text-text-body text-sm leading-tight font-semibold">
@@ -76,9 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="flex min-h-0 flex-1 flex-col gap-2 p-2">
+    <!-- The gutter goes on the rows above the table, so the table keeps its own edge inset (L3). -->
+    <div class="flex min-h-0 flex-1 flex-col gap-2 py-2">
       <!-- Offered only once the workflow has or had an endpoint; every other workflow keeps today's list. -->
-      <div v-if="showTriggerFilter" class="flex shrink-0 flex-wrap items-center gap-2">
+      <div v-if="showTriggerFilter" class="px-page-edge flex shrink-0 flex-wrap items-center gap-2">
         <OToggleGroup
           :model-value="activeFilter"
           mobile-dropdown
@@ -104,12 +105,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <WorkflowRunsTimeline
-        :runs="timelineRuns"
-        :start="dateTimeValues.startTime"
-        :end="dateTimeValues.endTime"
-        :timezone="store.state.timezone"
-      />
+      <!-- The timeline insets its own label by 0.5rem; this tops it up to the page edge. -->
+      <div class="px-2">
+        <WorkflowRunsTimeline
+          :runs="timelineRuns"
+          :start="dateTimeValues.startTime"
+          :end="dateTimeValues.endTime"
+          :timezone="store.state.timezone"
+        />
+      </div>
 
       <div class="alert-history-table min-h-0 flex-1">
         <OTable

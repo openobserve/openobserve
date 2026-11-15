@@ -58,7 +58,7 @@
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-0.75">
-            <span class="text-text-secondary text-2xl leading-none font-bold">
+            <span class="text-text-secondary text-2xl leading-none font-semibold">
               {{ card.value }}
             </span>
             <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
@@ -849,7 +849,7 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-produces__name {
-  font-weight: 700;
+  font-weight: var(--font-semibold);
 }
 
 .sd-produces__version,
@@ -913,7 +913,7 @@ function relativeTime(timestampMs: number): string {
 
 .sd-used-list__meta {
   margin-left: auto;
-  font-size: var(--text-3xs);
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }

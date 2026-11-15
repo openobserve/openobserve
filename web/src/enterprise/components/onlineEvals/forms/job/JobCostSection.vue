@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`job-form-cost-${tile.id}`"
         >
           <span class="text-2xs text-text-secondary font-semibold">{{ tile.label }}</span>
-          <span class="text-text-heading text-lg leading-none font-bold tabular-nums">{{
+          <span class="text-text-heading text-lg leading-none font-semibold tabular-nums">{{
             tile.value
           }}</span>
           <span v-if="tile.id === 'perDay' && unpricedJudge" class="text-2xs">

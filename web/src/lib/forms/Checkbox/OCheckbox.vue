@@ -142,7 +142,7 @@ function toggle() {
         // Focus
         'ring-offset-surface-base focus-visible:ring-checkbox-focus-ring ring-offset-1 outline-none focus-visible:ring-2',
         // Transition
-        'transition-[color,background-color,border-color,box-shadow] duration-150',
+        'transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)',
         // Centering for indicator
         'flex items-center justify-center',
       ]"

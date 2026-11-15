@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-center gap-2">
         <span
-          class="text-3xs text-text-inverse grid size-3.5 shrink-0 place-items-center rounded-full leading-none font-bold"
+          class="text-2xs text-text-inverse grid size-3.5 shrink-0 place-items-center rounded-full leading-none font-semibold"
           :class="STATUS_TONES[check.status]"
         >
           {{ STATUS_GLYPHS[check.status] }}

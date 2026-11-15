@@ -2185,7 +2185,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       class="flex flex-col items-center justify-center gap-4 py-16 text-center"
     >
       <OIcon name="open-in-browser" size="xl" class="text-text-muted" aria-hidden="true" />
-      <h3 class="text-text-heading m-0 text-base font-semibold">
+      <h3 class="text-text-heading m-0 text-sm font-semibold">
         {{ t("synthetics.journey.noSteps") }}
       </h3>
       <div class="flex items-center gap-3">

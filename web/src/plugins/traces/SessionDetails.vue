@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error -->
         <div v-else-if="error" class="flex flex-1 flex-col items-center justify-center text-center">
           <OIcon name="error-outline" size="xl" class="text-error-600 mb-3" />
-          <div class="text-text-heading mb-2 text-base">
+          <div class="text-text-heading mb-2 text-sm">
             {{ t("traces.sessionDetail.failedToLoad") }}
           </div>
           <div class="text-text-muted mb-3 max-w-[30rem] text-sm">
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex flex-1 flex-col items-center justify-center text-center"
         >
           <OIcon name="search-off" size="xl" class="text-text-muted mb-3" />
-          <div class="text-text-heading mb-2 text-base">
+          <div class="text-text-heading mb-2 text-sm">
             {{ t("traces.sessionDetail.sessionNotFound") }}
           </div>
           <div class="text-text-muted max-w-[30rem] text-sm">
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-baseline gap-[0.2rem]">
                   <span
                     :class="[
-                      'text-2xl leading-none font-bold tabular-nums',
+                      'text-2xl leading-none font-semibold tabular-nums',
                       kpiAccentClass(card.variant) || 'text-text-secondary',
                     ]"
                   >
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </div>
                 <div
-                  class="text-3xs text-text-secondary flex flex-wrap items-center gap-1 leading-normal font-medium"
+                  class="text-2xs text-text-secondary flex flex-wrap items-center gap-1 leading-normal font-medium"
                 >
                   <span v-if="card.subLead">{{ card.subLead }}</span>
                   <template v-for="chip in card.subTurns" :key="chip.n">
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :user-text="turnPreviewText(turnAt(chip.n))"
                     >
                       <span
-                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs hover:border-border-tint-neutral hover:bg-surface-tint-neutral inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-bold transition-colors"
+                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs hover:border-border-tint-neutral hover:bg-surface-tint-neutral inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-semibold transition-colors"
                         @click="jumpToTurn(chip.n)"
                         >{{ chip.label }}</span
                       >
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="border-border-default flex flex-shrink-0 items-center gap-2.5 border-b px-4 py-3"
                 >
-                  <span class="text-text-heading text-base font-semibold">
+                  <span class="text-text-heading text-sm font-semibold">
                     {{ t("traces.sessionDetail.conversation") }}
                   </span>
                   <OTag type="countChip" value="neutral">
@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-text-muted flex-shrink-0"
                         />
                         <span
-                          class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-bold tabular-nums"
+                          class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-semibold tabular-nums"
                           :class="
                             trace.status === 'error'
                               ? 'text-error-500 bg-error-500/15'
@@ -610,7 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="border-border-default flex items-center justify-between border-b px-2.5 py-1.5"
                             >
-                              <span class="text-text-heading text-xs font-bold">
+                              <span class="text-text-heading text-xs font-semibold">
                                 {{ t("traces.sessionDetail.roles.user") }}
                               </span>
                               <!-- Harness text hidden by the agent's patterns; Show puts it back. -->
@@ -664,7 +664,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="border-border-default flex items-center justify-between border-b px-2.5 py-1.5"
                             >
                               <span
-                                class="text-text-heading flex items-center gap-1.5 text-xs font-bold"
+                                class="text-text-heading flex items-center gap-1.5 text-xs font-semibold"
                               >
                                 {{ t("traces.sessionDetail.roles.assistant") }}
                                 <OTag
@@ -822,7 +822,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(turnNumberOf(row.topTraceId))"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
+                        class="rounded-default text-2xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -848,12 +848,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip side="left" content-class="p-0!">
                       <template #content>
                         <div class="text-text-body w-50 px-3 py-2.25 text-xs">
-                          <div class="mb-0.5 font-bold break-words">{{ row.name }}</div>
-                          <div class="text-3xs text-text-muted mb-1.75">
+                          <div class="mb-0.5 font-semibold break-words">{{ row.name }}</div>
+                          <div class="text-2xs text-text-muted mb-1.75">
                             {{ t("traces.sessionDetail.rail.call", { n: row.calls }) }}
                           </div>
                           <div
-                            class="text-3xs text-text-secondary mb-1 font-bold tracking-[0.05em]"
+                            class="text-2xs text-text-secondary mb-1 font-semibold tracking-[0.05em]"
                           >
                             {{ t("traces.sessionDetail.rail.usedIn") }}
                           </div>
@@ -861,7 +861,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <span
                               v-for="tn in row.turns"
                               :key="tn"
-                              class="rounded-default border-border-default bg-surface-base text-3xs inline-flex h-[1.05rem] items-center border px-[0.35rem] font-semibold tabular-nums"
+                              class="rounded-default border-border-default bg-surface-base text-2xs inline-flex h-[1.05rem] items-center border px-[0.35rem] font-semibold tabular-nums"
                               >{{ t("traces.sessionDetail.turnLabel") }} {{ tn }}</span
                             >
                           </div>
@@ -905,7 +905,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
+                        class="rounded-default text-2xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -921,7 +921,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span
                           v-if="detail && detail.cost > 0"
-                          class="text-3xs text-text-muted tabular-nums"
+                          class="text-2xs text-text-muted tabular-nums"
                         >
                           {{ ((row.cost / detail.cost) * 100).toFixed(1) }}%
                         </span>
@@ -958,7 +958,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
+                        class="rounded-default text-2xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -2056,10 +2056,10 @@ onMounted(load);
     line-height: 1.3;
   }
   :deep(h1) {
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
   }
   :deep(h2) {
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
   }
   :deep(h3) {
     font-size: var(--text-sm);

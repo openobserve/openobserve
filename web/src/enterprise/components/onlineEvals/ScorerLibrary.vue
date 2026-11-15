@@ -58,7 +58,7 @@ the Free Software Foundation, either version 3 of the License, or
             :data-test="`scorer-library-section-${group.category === CODE_GROUP ? 'code' : group.category}`"
           >
             <h4
-              class="text-text-heading m-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-bold tracking-[0.04em] uppercase"
+              class="text-text-heading m-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-semibold tracking-[0.04em] uppercase"
             >
               <span>{{
                 group.category === CODE_GROUP ? t("codeScorer.libraryGroup") : group.category

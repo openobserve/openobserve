@@ -38,7 +38,7 @@
                   <OButton
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
                     variant="ghost"
-                    class="w-8! font-bold! disabled:opacity-35"
+                    class="w-8! font-semibold! disabled:opacity-35"
                     :class="
                       isSelected(item, period.value)
                         ? 'bg-button-primary! text-button-primary-foreground!'

@@ -154,7 +154,7 @@ all resolve to these semantic tokens, registered in `semantic.css`:
 
 | Utility                                 | Token                             | Light / dark               | Use for                                    |
 | --------------------------------------- | --------------------------------- | -------------------------- | ------------------------------------------ |
-| `border-control-border`                 | `--color-control-border`          | grey-400 / `#51576b` (2.5:1) | every bordered control at rest             |
+| `border-control-border`                 | `--color-control-border`          | grey-350 `#c5cad6` (1.6:1) / `--d-border` (2:1) | every bordered control at rest             |
 | `hover:border-control-border-hover`     | `--color-control-border-hover`    | the 3:1 `--color-border-control` | the same edge under the pointer       |
 | `border-control-border-selected`        | `--color-control-border-selected` | primary-300 / primary-700  | a pressed `secondary` (with the accent fill) |
 | `focus-within:border-control-border-focus` | `--color-control-border-focus` | primary-500                | an input-like control's focused edge       |
@@ -165,6 +165,12 @@ Focus on an input-like control is the canvas `.input:focus-within`: a 1 px accen
 plus a 3 px outer halo, never an opaque or inset ring. An invalid field keeps its red edge
 and takes the red halo. Hover is gated with `hover:not-focus-within:` so the pointer never
 greys a focused edge. Ghost buttons stay borderless in `text-text-secondary`.
+
+The resting edge is deliberately below the 3:1 of SC 1.4.11: the review found grey-400 too
+heavy for a toolbar of inputs. It is an accepted exemption, recorded in
+`contrast-manifest.ts`, because the edge is never the only cue: every control carries its
+label, value or placeholder at 4.5:1, hover lifts the edge to the 3:1 `--color-border-control`
+and focus adds the accent edge and halo. Do not darken it back without a review.
 
 ## Type roles (T1)
 

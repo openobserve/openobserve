@@ -405,7 +405,7 @@
                 <div
                   v-if="isIngestionUnlimited"
                   class="text-text-secondary mt-1 text-center text-xs"
-                  style="font-size: var(--text-3xs)"
+                  style="font-size: var(--text-2xs)"
                 >
                   {{ t("about.usage_shows_zero_unlimited") }}
                 </div>

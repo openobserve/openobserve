@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 flex-col gap-1" data-test="alerts-firing-drawer-title">
         <div class="flex min-w-0 items-center gap-2">
           <OTag v-if="view?.priority" type="alertPriority" :value="`p${view.priority}`" />
-          <OTruncatedText class="text-text-heading text-base font-semibold">
+          <OTruncatedText class="text-text-heading text-title font-semibold">
             {{ raw(view?.name ?? alertId ?? "") }}
           </OTruncatedText>
           <template v-if="view">

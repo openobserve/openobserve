@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).start
           }}</span>
-          <span class="text-3xs opacity-60">{{ t("latencyInsights.arrowSeparator") }}</span>
+          <span class="text-2xs opacity-60">{{ t("latencyInsights.arrowSeparator") }}</span>
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).end
           }}</span>
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               selectedTimeRangeDisplay!.endTime,
             ).start
           }}</span>
-          <span class="text-3xs opacity-70">{{ t("latencyInsights.arrowSeparator") }}</span>
+          <span class="text-2xs opacity-70">{{ t("latencyInsights.arrowSeparator") }}</span>
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay!.startTime,
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Additional filter info -->
-        <span v-if="filterMetadata" class="text-3xs ms-1 opacity-60">
+        <span v-if="filterMetadata" class="text-2xs ms-1 opacity-60">
           {{ filterMetadata }}
         </span>
       </div>
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleDimensionSelector"
         >
           <OIcon name="expand-all" size="sm" class="mt-2.5 rotate-90 text-xl" />
-          <div class="text-xs font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
+          <div class="text-xs font-semibold [text-orientation:mixed] [writing-mode:vertical-rl]">
             {{ t("traces.tracesAnalysisDashboard.dimensions") }}
           </div>
         </div>
@@ -192,9 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #separator>
-            <div
-              class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
-            ></div>
+            <div class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors"></div>
           </template>
 
           <!-- RIGHT: Dashboard Charts -->
@@ -208,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="mb-4"
                     data-test="traces-analysis-dashboard-loading-indicator"
                   />
-                  <div class="text-base">
+                  <div class="text-sm">
                     {{ t("latencyInsights.analyzingDimensions") }}
                   </div>
                   <div class="text-text-secondary mt-2 text-xs">
@@ -231,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="mb-4"
                     style="width: 3.75rem; height: 3.75rem"
                   />
-                  <div class="mb-2 text-base">
+                  <div class="mb-2 text-sm">
                     {{ t("latencyInsights.failedToLoad") }}
                   </div>
                   <div class="text-text-secondary text-sm">{{ error }}</div>

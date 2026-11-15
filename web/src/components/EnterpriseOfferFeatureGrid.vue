@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         data-test="enterprise-upgrade-features-title"
-        class="text-text-heading mb-1 text-lg font-bold [letter-spacing:-0.01875rem]"
+        class="text-text-heading mb-1 text-lg font-semibold [letter-spacing:-0.01875rem]"
       >
         {{ featuresTitle }}
       </div>

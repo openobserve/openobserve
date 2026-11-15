@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="dimension.dataType === 'numeric'">
             <div class="flex items-baseline gap-2">
               <span
-                class="font-mono text-lg font-bold"
+                class="font-mono text-lg font-semibold"
                 :class="isHealthy(dimension) ? 'text-text-heading' : 'text-status-warning-text'"
               >
                 {{ numericDisplay(dimension) }}

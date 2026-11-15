@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-text-muted flex flex-col items-center justify-center py-8"
     >
       <OIcon name="forum" class="mb-2 size-10! opacity-40" />
-      <div class="mb-1 text-base font-medium">{{ emptyTitle }}</div>
+      <div class="mb-1 text-sm font-medium">{{ emptyTitle }}</div>
       <div class="text-text-muted text-sm">{{ emptySubtitle }}</div>
     </div>
 

@@ -191,8 +191,8 @@ defineProps<{
     th {
       padding: 0.5rem 0.75rem;
       color: var(--rca-text-primary);
-      font-weight: 700;
-      font-size: var(--text-3xs);
+      font-weight: var(--font-semibold);
+      font-size: var(--text-2xs);
       letter-spacing: 0.08em;
       text-align: left;
       /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */

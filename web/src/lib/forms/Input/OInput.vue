@@ -192,7 +192,7 @@ const trailingPadding = computed(() =>
 );
 
 const wrapperClasses = computed(() => [
-  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
   "bg-input-bg",
   SIZE_CLASSES[props.size ?? "md"],
   // The accent edge carries the 3:1 focus indicator, so the halo outside it can stay soft.
@@ -355,12 +355,12 @@ const WIDTH_CLASSES: Record<FieldWidth, string> = {
         :id="errorId"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         :data-test-error-text="effectiveError"
-        class="text-input-error-text text-xs leading-snug"
+        class="text-input-error-text text-xs leading-4"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" class="text-input-hint text-xs leading-snug">
+      <span v-else-if="helpText" class="text-input-hint text-xs leading-4">
         {{ helpText }}
       </span>
       <span v-else class="flex-1" />

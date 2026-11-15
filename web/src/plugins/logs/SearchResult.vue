@@ -3481,7 +3481,7 @@ export default defineComponent({
   border-radius: var(--radius-default);
   cursor: pointer;
   font-size: var(--text-compact);
-  font-weight: 700;
+  font-weight: var(--font-semibold);
   line-height: 1;
 }
 

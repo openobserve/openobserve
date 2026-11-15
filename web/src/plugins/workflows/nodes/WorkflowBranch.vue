@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default bg-surface-subtle rounded-surface flex w-full items-center gap-2 border border-dashed p-3"
       >
         <OBadge tone="neutral" size="sm">{{ cases.length + 1 }}</OBadge>
-        <span class="text-text-body text-sm font-bold">
+        <span class="text-text-body text-sm font-semibold">
           {{ t("workflow.node.branchElseTitle") }}
         </span>
         <span class="text-text-secondary text-xs">{{ t("workflow.node.branchElseHint") }}</span>

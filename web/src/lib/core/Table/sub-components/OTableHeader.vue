@@ -21,7 +21,10 @@ import {
   type OTableColumnMeta,
   type OTableDensity,
 } from "../OTable.types";
-import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
+import {
+  TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH,
+  TABLE_EXPAND_COL_STYLE,
+} from "../OTable.types";
 
 const { t } = useI18nTyped();
 const props = defineProps<{
@@ -542,10 +545,11 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       @end="handleDragEnd"
       @update:model-value="handleDraggableUpdate"
     >
-      <!-- Expand placeholder -->
+      <!-- Expand placeholder: the chevron sits on the table edge line, as the selection checkbox does. -->
       <th
         v-if="expansionEnabled"
-        class="border-table-header-border w-6 max-w-6 min-w-6 border-b px-0"
+        class="border-table-header-border border-b pe-0"
+        :style="TABLE_EXPAND_COL_STYLE"
         data-test="o2-table-th-expand"
       />
 
@@ -686,7 +690,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             <button
               type="button"
               :class="[
-                'rounded-default focus-visible:ring-focus-ring-accent flex min-w-0 items-center gap-1 text-start focus-visible:ring-2 focus-visible:outline-none',
+                'rounded-default focus-visible:ring-focus-ring-accent flex min-w-0 items-center gap-1 text-start transition-shadow focus-visible:ring-2 focus-visible:outline-none',
                 sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
                 headerAlignClass(header),
@@ -793,7 +797,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :class="[
-                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center focus-visible:ring-2 focus-visible:outline-none',
+                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center transition-shadow focus-visible:ring-2 focus-visible:outline-none',
                   sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 ]"
                 data-test="o2-table-th-sort-trigger"
@@ -976,7 +980,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                default, the accent (full-height) while hovering it or resizing. -->
           <div
             :class="[
-              'rounded-full transition-all duration-150',
+              'rounded-full transition-[background-color,height,width] duration-(--duration-control) ease-(--ease-control)',
               header.column.getIsResizing()
                 ? 'bg-table-resize-handle h-full w-0.5'
                 : 'group-hover/thead:bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px bg-transparent group-hover/resizer:h-full group-hover/resizer:w-0.5',
@@ -998,7 +1002,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
            checkbox gutter had its header columns offset from its body. -->
       <th
         v-if="expansionEnabled"
-        class="border-table-header-border w-6 max-w-6 min-w-6 border-b px-0"
+        class="border-table-header-border border-b pe-0"
+        :style="TABLE_EXPAND_COL_STYLE"
         data-test="o2-table-th-expand"
       />
 
@@ -1128,7 +1133,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             <button
               type="button"
               :class="[
-                'rounded-default focus-visible:ring-focus-ring-accent flex items-center gap-1 overflow-hidden text-start whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none',
+                'rounded-default focus-visible:ring-focus-ring-accent flex items-center gap-1 overflow-hidden text-start whitespace-nowrap transition-shadow focus-visible:ring-2 focus-visible:outline-none',
                 sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
                 headerAlignClass(header),
@@ -1215,7 +1220,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :class="[
-                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center focus-visible:ring-2 focus-visible:outline-none',
+                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center transition-shadow focus-visible:ring-2 focus-visible:outline-none',
                   sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 ]"
                 data-test="o2-table-th-sort-trigger"
@@ -1383,7 +1388,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                default, the accent (full-height) while hovering it or resizing. -->
           <div
             :class="[
-              'rounded-full transition-all duration-150',
+              'rounded-full transition-[background-color,height,width] duration-(--duration-control) ease-(--ease-control)',
               header.column.getIsResizing()
                 ? 'bg-table-resize-handle h-full w-0.5'
                 : 'group-hover/thead:bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px bg-transparent group-hover/resizer:h-full group-hover/resizer:w-0.5',

@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <h2
       v-if="!graded"
       data-test="rca-verdict-headline"
-      class="text-text-heading m-0 max-w-215 text-base leading-normal font-bold [text-wrap:pretty]"
+      class="text-text-heading m-0 max-w-215 text-sm leading-5 font-semibold [text-wrap:pretty]"
     >
       <RcaInlineText :text="headline" />
     </h2>
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rca-verdict-band"
         :data-band="card?.band ?? 'none'"
         :type="unverifiedCount > 0 ? 'button' : undefined"
-        class="text-text-heading inline-flex items-center gap-2 border-none bg-transparent p-0 font-bold"
+        class="text-text-heading inline-flex items-center gap-2 border-none bg-transparent p-0 font-semibold"
         :class="{ 'cursor-pointer hover:underline': unverifiedCount > 0 }"
         @click="unverifiedCount > 0 && $emit('show-unverified')"
       >

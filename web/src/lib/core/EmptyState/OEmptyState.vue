@@ -40,10 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <component
       :is="isInline ? 'p' : 'h2'"
       v-if="title"
-      :class="[
-        'text-text-heading font-semibold wrap-break-word',
-        isInline ? 'text-sm' : 'text-base',
-      ]"
+      class="text-text-heading text-sm font-semibold wrap-break-word"
       data-test="o2-empty-state-title"
     >
       {{ title }}

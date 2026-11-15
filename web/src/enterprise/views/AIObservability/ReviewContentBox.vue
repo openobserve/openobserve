@@ -12,7 +12,7 @@
 <template>
   <div class="flex min-w-0 flex-col gap-1.5" :class="fill ? 'min-h-0 flex-1' : ''">
     <div class="flex items-center justify-between">
-      <span class="text-text-heading text-sm font-bold">{{ label }}</span>
+      <span class="text-text-heading text-sm font-semibold">{{ label }}</span>
       <div class="flex items-center gap-1">
         <OButton
           icon-only

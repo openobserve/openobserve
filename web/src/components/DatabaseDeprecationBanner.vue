@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-center">
       <div class="flex flex-col">
         <span
-          class="text-text-heading text-base leading-6 font-semibold"
+          class="text-text-heading text-sm leading-5 font-semibold"
           data-test="database-deprecation-banner-title"
         >
           {{ t("components.databaseDeprecationBanner.title") }}

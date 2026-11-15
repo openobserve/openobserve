@@ -198,13 +198,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div v-if="importResults.length > 0" class="mb-2.5 p-2.5">
-              <div class="text-primary mb-2.5 text-base" data-test="function-import-results-title">
+              <div class="text-primary mb-2.5 text-sm" data-test="function-import-results-title">
                 {{ t("function.import.results") }}
               </div>
               <div
                 v-for="(result, index) in importResults"
                 :key="index"
-                class="py-1.25 text-sm font-bold whitespace-pre-wrap"
+                class="py-1.25 text-sm font-semibold whitespace-pre-wrap"
                 :class="resultClass(result.status)"
                 :data-test="`function-import-result-${index}`"
               >

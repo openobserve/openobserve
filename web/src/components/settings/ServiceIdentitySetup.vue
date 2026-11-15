@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Service name source banner -->
           <div
             v-if="!serviceOptional"
-            class="rounded-default overflow-hidden border transition-all"
+            class="rounded-default overflow-hidden border transition-colors"
             :class="
               serviceNameDetected
                 ? 'bg-banner-info-bg border-banner-info-border'
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-compact min-w-0 flex-1 leading-tight">
                 <template v-if="serviceNameDetected">
                   {{ t("settings.serviceIdentitySetup.serviceNameDetectedFrom") }}
-                  <span class="text-primary font-bold">{{
+                  <span class="text-primary font-semibold">{{
                     t("settings.correlation.service")
                   }}</span>
                   {{ t("settings.serviceIdentitySetup.fieldAlias") }}
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Legend row -->
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div
-                    class="text-3xs flex flex-wrap items-center gap-3"
+                    class="text-2xs flex flex-wrap items-center gap-3"
                     :class="'text-text-secondary'"
                   >
                     <div class="flex items-center gap-1">
@@ -403,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="rounded-surface border-border-default border">
           <!-- Collapsible: Workload detected using fields (N) -->
           <div
-            class="rounded-default mx-3 mt-3 overflow-hidden border transition-all"
+            class="rounded-default mx-3 mt-3 overflow-hidden border transition-colors"
             :class="'bg-banner-info-bg border-banner-info-border'"
           >
             <div
@@ -527,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="env in detectedEnvironments"
               :key="env.key"
-              class="rounded-t-default relative min-w-17.5 cursor-pointer border border-b-0 px-4 py-2 text-center text-xs font-medium transition-all"
+              class="rounded-t-default relative min-w-17.5 cursor-pointer border border-b-0 px-4 py-2 text-center text-xs font-medium transition-colors"
               :class="
                 activeEnvironment === env.key
                   ? 'text-text-body'
@@ -574,7 +574,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="text-2xs font-medium" :class="'text-text-secondary'">{{
                       card.label
                     }}</span>
-                    <span class="ms-auto text-lg font-bold" :class="card.theme.countClass">{{
+                    <span class="ms-auto text-lg font-semibold" :class="card.theme.countClass">{{
                       card.count
                     }}</span>
                   </div>
@@ -658,19 +658,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Stream type legend -->
             <div class="ms-1 mt-2 flex items-center gap-3">
-              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <div class="text-2xs flex items-center gap-1" :class="'text-text-secondary'">
                 <span class="bg-badge-blue-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
                 <span>{{ t("settings.correlation.foundInLogs") }}</span>
               </div>
-              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <div class="text-2xs flex items-center gap-1" :class="'text-text-secondary'">
                 <span class="bg-badge-orange-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
                 <span>{{ t("settings.correlation.foundInTraces") }}</span>
               </div>
-              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <div class="text-2xs flex items-center gap-1" :class="'text-text-secondary'">
                 <span class="bg-badge-success-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
                 <span>{{ t("settings.correlation.foundInMetrics") }}</span>
               </div>
-              <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <div class="text-2xs flex items-center gap-1" :class="'text-text-secondary'">
                 <span class="bg-badge-purple-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
                 <span>{{ t("settings.correlation.foundInProfiles") }}</span>
               </div>
@@ -689,7 +689,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="'bg-surface-subtle'"
           >
             <div class="min-w-0 flex-1 text-xs" :class="'text-text-secondary'">
-              <span class="font-bold" :class="'text-text-body'">{{
+              <span class="font-semibold" :class="'text-text-body'">{{
                 t("settings.serviceIdentitySetup.recommended")
               }}</span>
               {{ " " }}{{ t("settings.serviceIdentitySetup.recommendedUse") }}
@@ -734,7 +734,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #header>
               <div class="min-w-0 flex-1">
                 <div
-                  class="flex items-center text-base"
+                  class="flex items-center text-sm"
                   data-test="service-identity-setup-insight-header"
                 >
                   {{ insightData.subtitle }}
@@ -865,7 +865,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="'bg-surface-subtle'"
                     >
                       <div
-                        class="h-full rounded-full transition-all"
+                        class="h-full rounded-full transition-[width] duration-(--duration-expand)"
                         :class="
                           insightDialogLevel === 'primary'
                             ? 'bg-blue-5'
@@ -909,7 +909,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex min-w-0 flex-1 flex-col px-3"
                     :class="[dimIdx > 0 ? 'border-border-default border-s' : '']"
                   >
-                    <div class="text-compact mb-2 font-bold" :class="'text-text-body'">
+                    <div class="text-compact mb-2 font-semibold" :class="'text-text-body'">
                       {{ dim.label }}
                       <span class="font-normal" :class="'text-text-secondary'"
                         >({{ dim.values.length }})</span
@@ -1055,7 +1055,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="typeIdx > 0"
-                      class="text-3xs text-text-label bg-surface-subtle sticky top-0 z-10 border-t border-b px-4 py-1 font-bold uppercase"
+                      class="text-2xs text-text-label bg-surface-subtle sticky top-0 z-10 border-t border-b px-4 py-1 font-semibold uppercase"
                     >
                       {{ typeName }}
                     </div>

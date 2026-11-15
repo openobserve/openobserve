@@ -109,7 +109,7 @@ const childLink = (child: CompositeChildOption): string =>
         :data-test="`alerts-composite-selected-child-${id}`"
       >
         <span
-          class="bg-theme-accent-soft text-theme-accent rounded-default flex h-7 w-7 shrink-0 items-center justify-center font-bold"
+          class="bg-theme-accent-soft text-theme-accent rounded-default flex h-7 w-7 shrink-0 items-center justify-center font-semibold"
         >
           {{ raw(letterFor(index)) }}
         </span>

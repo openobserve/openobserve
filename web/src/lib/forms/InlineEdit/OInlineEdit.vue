@@ -229,9 +229,13 @@ const onDisplayKeydown = (event: KeyboardEvent) => {
 // The value must render at an identical size and weight in BOTH modes,
 // otherwise the header jumps as it swaps between the button and the input.
 const textClasses = computed(() => {
-  if (props.tone === "meta") return "text-xs leading-normal font-normal";
-  const scale = { sm: "text-sm", md: "text-base", lg: "text-lg" }[props.size];
-  return `${scale} leading-[1.45] font-semibold tracking-[-0.02em]`;
+  if (props.tone === "meta") return "text-xs leading-4 font-normal";
+  const scale = {
+    sm: "text-sm leading-5",
+    md: "text-title leading-5.5",
+    lg: "text-lg leading-6",
+  }[props.size];
+  return `${scale} font-semibold tracking-[-0.02em]`;
 });
 
 /** Colour of a filled value — headings lead, meta values recede. */
@@ -252,7 +256,7 @@ const valueToneClass = computed(() =>
 // box and contributes no size — and a `-my-0.5` on the root that cancels the
 // vertical padding exactly. Net contribution to the line box: zero.
 const BOX_CLASSES =
-  "rounded-default px-1.5 py-0.5 ring-1 ring-inset transition-[background-color,box-shadow,color] duration-150 ease-out";
+  "rounded-default px-1.5 py-0.5 ring-1 ring-inset transition-[background-color,box-shadow,color] duration-(--duration-control) ease-(--ease-control)";
 
 // Imperative focus for callers that walk to "the invalid field and focus it"
 // (e.g. the alert form's focus manager). In display mode there is no input to

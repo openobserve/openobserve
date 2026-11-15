@@ -129,7 +129,7 @@ onMounted(fetch);
         <div class="flex min-w-0 items-center gap-2">
           <span
             v-if="!isResult(lane)"
-            class="bg-theme-accent-soft text-theme-accent rounded-default flex h-6 w-6 shrink-0 items-center justify-center text-xs font-bold"
+            class="bg-theme-accent-soft text-theme-accent rounded-default flex h-6 w-6 shrink-0 items-center justify-center text-xs font-semibold"
           >
             {{ raw(letterFor(lane.slot ?? index)) }}
           </span>

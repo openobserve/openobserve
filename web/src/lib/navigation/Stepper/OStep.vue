@@ -148,7 +148,7 @@ const indicatorClasses = computed<string>(() => {
     "flex items-center justify-center",
     "size-control-md rounded-full shrink-0",
     "text-compact font-semibold leading-none",
-    "transition-colors duration-150",
+    "transition-colors duration-(--duration-control) ease-(--ease-control)",
   ].join(" ");
 
   const cursor = canClick.value ? "cursor-pointer" : "cursor-default";
@@ -176,7 +176,7 @@ const triggerClasses = computed<string>(() => {
   const base = [
     "flex items-center gap-3 w-full text-start",
     "rounded-default px-1.5 py-1.5 outline-none select-none",
-    "transition-colors duration-150",
+    "transition-colors duration-(--duration-control) ease-(--ease-control)",
   ].join(" ");
   if (canClick.value) {
     return [

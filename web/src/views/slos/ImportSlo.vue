@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(result, index) in results"
             :key="index"
-            class="px-0 py-1.25 text-sm font-bold wrap-break-word"
+            class="px-0 py-1.25 text-sm font-semibold wrap-break-word"
             :class="result.success ? 'text-green' : 'text-status-negative'"
             :data-test="`slo-import-result-${index}`"
           >

@@ -121,9 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="source ? 'min-h-14' : ''"
         data-test="autoobserve-coverage-summary"
       >
-        <span class="text-text-heading text-base font-semibold tabular-nums">{{
-          summaryText
-        }}</span>
+        <span class="text-text-heading text-sm font-semibold tabular-nums">{{ summaryText }}</span>
         <span
           v-if="totals.added"
           class="text-text-secondary flex items-center gap-1 text-xs tabular-nums"

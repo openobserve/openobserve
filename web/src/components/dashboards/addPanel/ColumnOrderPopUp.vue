@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-column-order-empty-state"
       >
         <OIcon name="view-column" class="mb-3 h-12 w-12" />
-        <div class="text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
+        <div class="text-sm">{{ t("dashboard.noColumnsOrdered") }}</div>
         <div class="text-xs">
           {{ t("dashboard.columnsDefaultOrder") }}
         </div>

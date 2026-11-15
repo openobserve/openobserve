@@ -35,14 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="['col-start-1 row-start-1', i > 0 && 'invisible']"
         :aria-hidden="i > 0 || undefined"
       >
-        <p class="text-onboarding-panel-text text-xs font-bold">{{ p.eyebrow }}</p>
+        <p class="text-onboarding-panel-text text-xs font-semibold">{{ p.eyebrow }}</p>
         <h2
           class="text-onboarding-panel-text mt-1.5 text-2xl leading-tight font-semibold text-balance"
           :data-test="i === 0 ? 'onboarding-preview-title' : undefined"
         >
           {{ p.title }}
         </h2>
-        <p v-if="p.text" class="text-onboarding-panel-text/90 mt-3.5 text-base">
+        <p v-if="p.text" class="text-onboarding-panel-text/90 mt-3.5 text-sm">
           {{ p.text }}
         </p>
         <!-- A 10% white fill keeps white text at 4.5:1 on the panel's light-theme top. -->
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
         </ul>
         <ul v-if="p.lines" class="mt-4 grid gap-2.5">
-          <li v-for="line in p.lines" :key="line" class="flex items-start gap-2 text-base">
+          <li v-for="line in p.lines" :key="line" class="flex items-start gap-2 text-sm">
             <OIcon name="check" size="sm" class="mt-1 shrink-0" />
             <span>{{ line }}</span>
           </li>

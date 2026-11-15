@@ -86,7 +86,7 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   {
     fg: "--color-control-border",
     category: "exempt",
-    why: "SC 1.4.11: the approved resting edge (2.5:1) is not the only cue; every control carries its label, value or placeholder at 4.5:1, hover lifts the edge to 3:1 and focus adds the accent edge",
+    why: "SC 1.4.11: the approved light resting edge (1.6:1 light, 2:1 dark, accepted on review) is not the only cue; every control carries its label, value or placeholder at 4.5:1, hover lifts the edge to 3:1 and focus adds the accent edge",
   },
   {
     fg: "--color-control-border-selected",

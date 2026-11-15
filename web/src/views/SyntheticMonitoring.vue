@@ -483,6 +483,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -998,10 +999,11 @@ const duplicateSource = ref<any>(null);
 // "browser" | "http" | "tcp" | "tls" | "ssh" — picks the mapper/payload builder.
 const duplicateSourceType = ref<string>("browser");
 const isDuplicating = ref(false);
-// The duplicate form as it opened, so a stray dismiss asks before dropping an edit (V5).
-const duplicateFormState = () => JSON.stringify([duplicateName.value, duplicateFolder.value]);
-const duplicateOpenedWith = ref("");
-const isDuplicateFormChanged = computed(() => duplicateFormState() !== duplicateOpenedWith.value);
+// A stray dismiss asks before dropping an edit (V5); the folder picker settling after open is none.
+const { dirty: isDuplicateFormChanged } = useUnsavedChanges(
+  () => [duplicateName.value, duplicateFolder.value],
+  () => showDuplicateDialog.value,
+);
 
 const openBulkDeleteConfirm = () => {
   bulkDeleteCount.value = selectedMonitorIds.value.length;
@@ -1710,7 +1712,6 @@ async function duplicateMonitor(m: any) {
   // should land beside its original rather than jump to the active folder.
   duplicateFolder.value = m.folderId || activeFolderId.value || "default";
   duplicateSource.value = null;
-  duplicateOpenedWith.value = duplicateFormState();
   showDuplicateDialog.value = true;
   try {
     const res = await syntheticsService.get(

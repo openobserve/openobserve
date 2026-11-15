@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Data Source Selection (only for new tables) -->
       <div v-if="!isUpdating" class="flex flex-col gap-2">
-        <div class="text-text-label font-bold">{{ t("function.dataSource") }}</div>
+        <div class="text-text-label font-semibold">{{ t("function.dataSource") }}</div>
         <OFormOptionGroup
           name="source"
           data-test="add-enrichment-table-source"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
       <div v-if="isUpdating && formData.source === 'url'" class="flex flex-col gap-2">
-        <div class="text-text-label font-bold">{{ t("function.updateModeLabel") }}</div>
+        <div class="text-text-label font-semibold">{{ t("function.updateModeLabel") }}</div>
         <OFormOptionGroup
           name="updateMode"
           data-test="add-enrichment-table-update-mode"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         class="flex flex-col gap-2"
       >
-        <div class="text-text-label text-compact font-bold">
+        <div class="text-text-label text-compact font-semibold">
           {{ t("function.existingUrlsCount", { count: formData.urlJobs.length }) }}
         </div>
         <div
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <pre
         v-if="compilationErr"
-        class="text-status-error-text text-sm font-bold whitespace-pre-wrap"
+        class="text-status-error-text text-sm font-semibold whitespace-pre-wrap"
         >{{ compilationErr }}</pre>
     </OForm>
   </ODialog>

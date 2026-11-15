@@ -40,7 +40,7 @@ defineProps<{
       data-test="slack-link-card-working"
     >
       <OSpinner size="lg" />
-      <p class="text-text-heading text-base font-medium">{{ title }}</p>
+      <p class="text-text-heading text-sm font-medium">{{ title }}</p>
       <p v-if="description" class="text-text-secondary text-sm">{{ description }}</p>
     </div>
     <OEmptyState v-else :kind="kind" :icon="icon" :title="title" :text="description">

@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div v-if="isHelpOpen" style="width: 21.875rem" class="p-2">
                       <div class="flex items-center justify-between px-2">
-                        <div style="font-size: var(--text-base)">
+                        <div style="font-size: var(--text-sm)">
                           {{ t("iam.editRole.quickReference") }}
                         </div>
                         <OIcon
@@ -199,10 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <pre style="font-size: var(--text-xs)">{{ raw(jsonPermissionSample) }}</pre>
                         <div>
-                          <span class="font-bold">{{ t("iam.editRole.childResource") }}</span>
+                          <span class="font-semibold">{{ t("iam.editRole.childResource") }}</span>
                           <br />
                           {{ t("iam.editRole.specificInstanceOr") }}
-                          <span class="font-bold">{{ raw("organizationID") }}</span>
+                          <span class="font-semibold">{{ raw("organizationID") }}</span>
                           {{ t("iam.editRole.forAllInstances") }}
                         </div>
                       </div>

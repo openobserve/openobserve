@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="mb-3 flex items-center justify-between">
       <div>
-        <div class="text-base font-bold">{{ resolvedTitle }}</div>
+        <div class="text-sm font-semibold">{{ resolvedTitle }}</div>
         <div v-if="subtitle" class="text-text-muted text-xs">
           {{ subtitle }}
         </div>
@@ -32,7 +32,7 @@
             <!-- Name -->
             <OTruncatedText
               as="div"
-              class="text-text-heading text-sm font-bold font-medium"
+              class="text-text-heading text-sm font-semibold"
               :tooltip="raw(link.name)"
               :data-test="`cross-link-item-name-${idx}`"
             >

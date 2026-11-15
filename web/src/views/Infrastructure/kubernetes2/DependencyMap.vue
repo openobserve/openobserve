@@ -513,7 +513,7 @@ function onKeydown(event: KeyboardEvent) {
             />
             <OIcon :name="data.icon" size="sm" class="text-text-secondary shrink-0" />
             <div class="min-w-0 flex-1 leading-tight">
-              <div class="text-text-heading truncate text-base leading-tight font-semibold">
+              <div class="text-text-heading truncate text-sm leading-tight font-semibold">
                 {{ raw(data.label) }}
               </div>
               <div class="text-text-secondary truncate text-sm leading-tight">

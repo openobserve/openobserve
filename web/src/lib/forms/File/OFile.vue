@@ -325,7 +325,7 @@ const bottomError = computed<I18nText | null>(() => {
 });
 
 const zoneClasses = computed(() => [
-  "flex flex-col items-center justify-center gap-2 rounded-surface border border-dashed p-4 text-center text-compact transition-colors duration-150",
+  "flex flex-col items-center justify-center gap-2 rounded-surface border border-dashed p-4 text-center text-compact transition-colors duration-(--duration-control) ease-(--ease-control)",
   switchable.value && "h-full",
   isDragging.value
     ? "border-file-drag-border bg-file-drag-bg text-text-body"
@@ -337,7 +337,7 @@ const zoneClasses = computed(() => [
 ]);
 
 const compactBoxClasses = computed(() => [
-  "flex h-control-md min-w-0 flex-1 items-center gap-2 rounded-default border ps-2.5 pe-1 text-compact transition-colors duration-150",
+  "flex h-control-md min-w-0 flex-1 items-center gap-2 rounded-default border ps-2.5 pe-1 text-compact transition-colors duration-(--duration-control) ease-(--ease-control)",
   isDragging.value
     ? "border-file-drag-border bg-file-drag-bg"
     : isDisabled.value
@@ -574,12 +574,12 @@ const compactBoxClasses = computed(() => [
       <span
         v-if="bottomError"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
-        class="text-file-error-text text-xs leading-snug"
+        class="text-file-error-text text-xs leading-4"
         role="alert"
       >
         {{ bottomError }}
       </span>
-      <span v-else-if="helpText" class="text-file-label text-xs leading-snug">
+      <span v-else-if="helpText" class="text-file-label text-xs leading-4">
         {{ helpText }}
       </span>
     </div>

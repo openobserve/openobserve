@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span class="text-2xs text-text-label font-semibold">{{ t("alerts.streamType") }}</span>
             <span class="text-2xs text-text-label">:</span>
-            <span class="text-text-link text-xs font-bold">{{ streamType }}</span>
+            <span class="text-text-link text-xs font-semibold">{{ streamType }}</span>
           </div>
           <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
           <div
@@ -59,10 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               t("alerts.stream_name")
             }}</span>
             <span class="text-2xs text-text-label">:</span>
-            <span v-if="streamName" class="text-sql-accent text-xs font-bold">{{
+            <span v-if="streamName" class="text-sql-accent text-xs font-semibold">{{
               streamName
             }}</span>
-            <span v-else class="text-text-muted text-xs font-bold italic">{{
+            <span v-else class="text-text-muted text-xs font-semibold italic">{{
               t("alerts.queryEditor.noStream")
             }}</span>
           </div>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="menu-link-ai-item"
           :aria-label="t('menu.aiAssistant')"
           variant="ghost"
-          class="group hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-md hover:[background:var(--color-gradient-ai)]!"
+          class="group hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-(--duration-control) ease-(--ease-control) [background:var(--color-gradient-ai-subtle)]! hover:shadow-md hover:[background:var(--color-gradient-ai)]!"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                       >
                         <span
-                          class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
+                          class="text-text-placeholder text-compact overflow-hidden font-mono leading-5 text-ellipsis whitespace-nowrap"
                           >{{ fullEditorPlaceholder }}</span
                         >
                       </div>
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                     >
                       <span
-                        class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
+                        class="text-text-placeholder text-compact overflow-hidden font-mono leading-5 text-ellipsis whitespace-nowrap"
                         >{{ vrlPlaceholder }}</span
                       >
                     </div>
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
-                      class="text-3xs rounded-default bg-status-info-bg border-banner-info-border text-text-link border px-1.75 py-px font-bold tracking-[0.04em]"
+                      class="text-2xs rounded-default bg-status-info-bg border-banner-info-border text-text-link border px-1.75 py-px font-semibold tracking-[0.04em]"
                       >{{ t("alerts.queryEditor.resultsAcrossWindows") }}</span
                     >
                   </div>
@@ -424,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       t("alerts.queryEditor.combinedOutput")
                     }}</span>
                     <span
-                      class="text-3xs rounded-default bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-ol-text border px-1.75 py-px font-bold tracking-[0.04em]"
+                      class="text-2xs rounded-default bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-ol-text border px-1.75 py-px font-semibold tracking-[0.04em]"
                       >{{ t("alerts.queryEditor.sqlVrlBadge") }}</span
                     >
                   </div>
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       class="query-editor-run-dot bg-status-positive h-1.5 w-1.5 rounded-full"
                     />
-                    <span class="text-3xs text-status-positive font-semibold">{{
+                    <span class="text-2xs text-status-positive font-semibold">{{
                       t("alerts.queryEditor.running")
                     }}</span>
                   </div>

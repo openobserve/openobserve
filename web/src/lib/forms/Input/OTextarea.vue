@@ -108,7 +108,7 @@ const charCount = computed(() => {
 });
 
 const wrapperClasses = computed(() => [
-  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
   "bg-input-bg",
   // The red edge stays on focus; the accent edge applies only without an error. See OInput.vue.
   hasError.value

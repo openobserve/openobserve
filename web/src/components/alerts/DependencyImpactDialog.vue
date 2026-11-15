@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="depKindColor(focusNode ?? { kind: focus.kind, orphan: false, missing: false })"
         />
         <div class="min-w-0">
-          <OTruncatedText as="div" class="text-text-heading text-base font-semibold">
+          <OTruncatedText as="div" class="text-text-heading text-title font-semibold">
             {{ entityName }}
           </OTruncatedText>
           <OTruncatedText

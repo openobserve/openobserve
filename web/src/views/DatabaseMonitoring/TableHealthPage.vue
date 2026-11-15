@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-2">
             <ODateTimeRange
               auto-apply
               menu-align="end"

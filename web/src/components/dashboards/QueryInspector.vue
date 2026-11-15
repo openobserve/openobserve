@@ -39,13 +39,13 @@
           class="bg-theme-body-bg-primary border-card-glass-border flex items-start justify-start gap-3 border-b p-2"
         >
           <span
-            class="rounded-default text-sm font-bold"
+            class="rounded-default text-sm font-semibold"
             :data-test="`query-inspector-query-name-${index}`"
           >
             {{ query.tabName || t("dashboard.queryInspector.queryN", { n: index + 1 }) }}
           </span>
           <span
-            class="bg-theme-body-bg-primary border-card-glass-border text-text-secondary text-3xs rounded-default border px-2 py-0.5 font-bold"
+            class="bg-theme-body-bg-primary border-card-glass-border text-text-secondary text-2xs rounded-default border px-2 py-0.5 font-semibold"
           >
             {{ getQueryTypeDisplay(query.queryType) }}
           </span>
@@ -109,7 +109,7 @@
           <!-- Original Query -->
           <div v-if="query.originalQuery">
             <div class="flex items-center justify-between">
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.originalQuery")
               }}</label>
               <OButton
@@ -137,7 +137,7 @@
           <!-- Executed Query -->
           <div>
             <div class="flex items-center justify-between">
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.executedQuery")
               }}</label>
               <OButton variant="accent-ghost" @click="copyText(query.query)" icon="content-copy">
@@ -161,7 +161,7 @@
           <!-- Time Metadata -->
           <div class="border-card-glass-border grid grid-cols-2 gap-4 border-t pt-2">
             <div class="space-y-1" :data-test="`dashboard-query-inspector-start-time-${index}`">
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.startTime")
               }}</label>
               <div class="text-text-secondary flex items-center gap-2 text-xs font-medium">
@@ -170,7 +170,7 @@
               </div>
             </div>
             <div class="space-y-1" :data-test="`dashboard-query-inspector-end-time-${index}`">
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.endTime")
               }}</label>
               <div class="text-text-secondary flex items-center gap-2 text-xs font-medium">
@@ -184,7 +184,7 @@
           <div class="border-card-glass-border space-y-3 border-t">
             <!-- Standard Variables -->
             <div class="pt-2">
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.variables")
               }}</label>
               <div class="mt-1 flex flex-wrap gap-2">
@@ -194,7 +194,7 @@
                     :key="v.name"
                     class="rounded-default border-card-glass-border bg-card-glass-bg flex items-center gap-2 border p-1 text-xs"
                   >
-                    <span class="text-text-label font-bold">{{ v.name }}</span>
+                    <span class="text-text-label font-semibold">{{ v.name }}</span>
                     <span class="text-text-muted">:</span>
                     <span class="text-text-secondary italic">{{ v.value }}</span>
                   </div>
@@ -205,7 +205,7 @@
 
             <!-- Fixed Variables -->
             <div>
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.fixedVariables")
               }}</label>
               <div class="mt-1 flex flex-wrap gap-2">
@@ -215,7 +215,7 @@
                     :key="v.name"
                     class="rounded-default border-card-glass-border bg-card-glass-bg flex items-center gap-2 border p-1 text-xs"
                   >
-                    <span class="text-text-label font-bold">{{ v.name }}</span>
+                    <span class="text-text-label font-semibold">{{ v.name }}</span>
                     <span class="text-text-muted">:</span>
                     <span class="text-text-secondary italic">{{ v.value }}</span>
                   </div>
@@ -226,7 +226,7 @@
 
             <!-- Dynamic Variables -->
             <div>
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.dynamicVariables")
               }}</label>
               <div class="mt-1 flex flex-wrap gap-2">
@@ -236,7 +236,7 @@
                     :key="v.name"
                     class="rounded-default border-card-glass-border bg-card-glass-bg flex items-center gap-2 border p-1 text-xs"
                   >
-                    <span class="text-text-label font-bold">{{ v.name }}</span>
+                    <span class="text-text-label font-semibold">{{ v.name }}</span>
                     <span class="text-text-muted">{{ v.operator }}</span>
                     <span class="text-text-secondary italic">{{ v.value }}</span>
                   </div>

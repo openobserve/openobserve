@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-if-row-logs"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                     >{{ t("alerts.threshold") }}*</span
                   >
                   <div class="flex flex-col gap-1.5">
@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-group-by-row"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 font-semibold whitespace-nowrap"
                   >
                     {{ t("alerts.groupBy") }}
                     <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" side="top" />
@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-having-groups-row"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                   >
                     {{ t("alerts.queryConfig.havingGroups") }}
                     <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" side="top" />
@@ -434,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                     >{{ t("alerts.threshold") }}*</span
                   >
                   <div class="flex flex-col gap-1.5">
@@ -696,7 +696,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default text-compact flex items-center gap-3 px-3 py-2"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 font-semibold whitespace-nowrap"
                   >
                     {{ t("alerts.groupBy") }}
                     <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" side="top" />
@@ -748,7 +748,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
-                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                   >
                     {{ t("alerts.queryConfig.havingGroups") }}
                     <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" side="top" />
@@ -793,7 +793,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
               >
                 <span
-                  class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-bold whitespace-nowrap"
+                  class="text-text-heading text-compact min-w-22.5 shrink-0 leading-7 font-semibold whitespace-nowrap"
                 >
                   {{ t("alerts.queryConfig.checkEvery") }} *
                   <OTooltip :content="t('alerts.howOftenCheckTooltip')" side="top" />
@@ -878,7 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <span
                         v-if="filterCount > 0"
-                        class="text-2xs rounded-full px-1.5 py-0 leading-5 font-bold"
+                        class="text-2xs rounded-full px-1.5 py-0 leading-5 font-semibold"
                         :class="'bg-status-info-bg text-status-info-text'"
                       >
                         {{ filterCount }}
@@ -974,7 +974,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <span
                     v-if="filterCount > 0"
-                    class="text-2xs rounded-full px-1.5 py-0 leading-5 font-bold"
+                    class="text-2xs rounded-full px-1.5 py-0 leading-5 font-semibold"
                     :class="'bg-status-info-bg text-status-info-text'"
                   >
                     {{ filterCount }}
@@ -1250,7 +1250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
               >
                 <span
-                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-7 font-bold whitespace-nowrap"
+                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-7 font-semibold whitespace-nowrap"
                 >
                   {{ t("alerts.queryConfig.checkEvery") }} *
                   <OTooltip :content="t('alerts.howOftenCheckTooltip')" side="top" />
@@ -1347,7 +1347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
               >
                 <span
-                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                   >{{ t("alerts.alertIfNoOfEvents") }} *</span
                 >
                 <div class="flex flex-col gap-1.5">
@@ -1462,7 +1462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
               >
                 <span
-                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                  class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                   >{{ t("alerts.alertIfColumn") }} *</span
                 >
                 <div class="flex flex-col gap-1.5">
@@ -1600,7 +1600,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
-                    class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                     >{{ t("alerts.alertIfValueIs") }} *
                     <OTooltip :content="t('alerts.queryConfig.alertIfValueIsTooltip')" side="top" />
                   </span>
@@ -1718,7 +1718,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
-                    class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
+                    class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                     >{{ t("alerts.havingSeries") }} *
                     <OTooltip :content="t('alerts.queryConfig.havingSeriesTooltip')" side="top" />
                   </span>

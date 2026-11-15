@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else
                       :name="destType.icon"
                       size="lg"
-                      class="card-icon text-icon-color group-[.selected]:text-card-glass-border mb-2 [transition:color_0.3s_ease]"
+                      class="card-icon text-icon-color group-[.selected]:text-card-glass-border mb-2 [transition:color_var(--duration-control)_var(--ease-control)]"
                     />
                     <div
                       class="card-label text-compact text-text-body group-[.selected]:text-text-body mt-1 text-center leading-[1.3] font-medium"
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Destination-specific Metadata Section -->
                 <div v-if="showMetadataFields" class="mt-4 flex flex-col gap-4">
-                  <div class="text-input-label w-full text-sm font-bold">
+                  <div class="text-input-label w-full text-sm font-semibold">
                     {{ t("alert_destinations.metadataConfigurationTitle") }}
                   </div>
 

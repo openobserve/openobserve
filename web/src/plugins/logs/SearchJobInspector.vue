@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </svg>
         <div class="flex items-center gap-1.5">
           <span
-            class="text-3xs font-small rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5"
+            class="text-2xs font-small rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5"
           >
             {{ store.state.timezone || "UTC" }}
           </span>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="font-small text-text-label text-sm max-md:hidden">
                   {{ t("logs.searchJobInspector.results") }}
                 </div>
                 <div
@@ -88,11 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
                 <div
-                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                  class="text-text-body text-2xl font-semibold max-md:max-w-full max-md:truncate max-md:text-sm"
                 >
                   {{ hasNoData ? raw("NA") : (profileData?.data_records || 0).toLocaleString() }}
                 </div>
-                <div class="text-3xs text-text-secondary max-md:hidden">
+                <div class="text-2xs text-text-secondary max-md:hidden">
                   {{ t("logs.searchJobInspector.returnedFromQuery") }}
                 </div>
               </div>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="font-small text-text-label text-sm max-md:hidden">
                   {{ t("logs.searchJobInspector.scannedEvents") }}
                 </div>
                 <div
@@ -124,11 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
                 <div
-                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                  class="text-text-body text-2xl font-semibold max-md:max-w-full max-md:truncate max-md:text-sm"
                 >
                   {{ hasNoData ? raw("NA") : (profileData?.scan_records || 0).toLocaleString() }}
                 </div>
-                <div class="text-3xs text-text-secondary max-md:hidden">
+                <div class="text-2xs text-text-secondary max-md:hidden">
                   {{ t("logs.searchJobInspector.scannedEventsForQuery") }}
                 </div>
               </div>
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="font-small text-text-label text-sm max-md:hidden">
                   {{ t("logs.searchJobInspector.timeTaken") }}
                 </div>
                 <div
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
                 <div
-                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                  class="text-text-body text-2xl font-semibold max-md:max-w-full max-md:truncate max-md:text-sm"
                 >
                   {{
                     hasNoData
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </div>
                 <div
-                  class="text-3xs max-md:hidden"
+                  class="text-2xs max-md:hidden"
                   :class="
                     hasNoData
                       ? 'text-text-secondary'
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="font-small text-text-label text-sm max-md:hidden">
                   {{ t("logs.searchJobInspector.traceId") }}
                 </div>
                 <div

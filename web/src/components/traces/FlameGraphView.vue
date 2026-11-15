@@ -14,7 +14,7 @@
         class="border-border-default bg-card-glass-bg! flex items-center justify-between border-b px-6 py-3"
       >
         <div class="flex items-center space-x-4">
-          <div class="text-text-secondary text-xs font-bold">
+          <div class="text-text-secondary text-xs font-semibold">
             <span class="text-text-body">{{ totalSpans }}</span>
             {{ t("traces.flameGraphView.spans") }}
             <span class="mx-2">•</span>
@@ -37,7 +37,7 @@
           <span
             v-for="(tick, index) in timelineTicks"
             :key="'lbl-' + index"
-            class="text-3xs text-text-secondary absolute leading-none whitespace-nowrap"
+            class="text-2xs text-text-secondary absolute leading-none whitespace-nowrap"
             style="top: 50%; padding-left: 0.1875rem"
             :style="{ left: tick.left, transform: tick.transform }"
             >{{ tick.label }}</span
@@ -60,7 +60,7 @@
             :style="{ left: cursorX + 'px' }"
           >
             <div
-              class="text-3xs rounded-default px-1.5 py-0.5 font-medium whitespace-nowrap text-white"
+              class="text-2xs rounded-default px-1.5 py-0.5 font-medium whitespace-nowrap text-white"
               style="background: rgba(30, 30, 30, 0.9); line-height: 1.4"
             >
               {{ cursorTimeLabel }}
@@ -650,7 +650,7 @@ const chartOptions = computed(() => {
 
         return `
           <div style="padding: 0.25rem 0;">
-            <div style="font-weight: bold; margin-bottom: 0.375rem;">${escapeHtml(span.operationName)}</div>
+            <div style="font-weight: var(--font-semibold); margin-bottom: 0.375rem;">${escapeHtml(span.operationName)}</div>
             <div style="font-size: var(--text-2xs); line-height: 1.6;">
               <div style="display: flex; justify-content: space-between; gap: 1rem;">
                 <span class="text-flame-tooltip-label">${t("traces.flameGraphView.service")}</span>

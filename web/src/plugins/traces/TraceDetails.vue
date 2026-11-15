@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTruncatedText
                 as="div"
                 data-test="trace-details-operation-name"
-                class="text-text-heading max-w-96! text-base leading-tight font-semibold"
+                class="text-text-heading text-title max-w-96! leading-tight font-semibold"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
               </OTruncatedText>
@@ -731,7 +731,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="border-s-solid border-s-card-glass-border min-h-0 shrink-0 overflow-x-hidden overflow-y-auto border-s transition-all duration-300"
+                class="border-s-solid border-s-card-glass-border min-h-0 shrink-0 overflow-x-hidden overflow-y-auto border-s"
                 :class="isTimelineExpanded ? '' : 'full'"
                 :style="{
                   width: `calc(100% - ${leftWidth}px)`,
@@ -929,7 +929,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="p-10 text-center" style="color: var(--color-text-secondary)">
                 <OIcon name="table-chart" class="mb-4" style="width: 3rem; height: 3rem" />
-                <div class="mb-2 font-semibold" style="font-size: var(--text-base)">
+                <div class="mb-2 font-semibold" style="font-size: var(--text-sm)">
                   {{ t("traces.spansTableView") }}
                 </div>
                 <div style="font-size: var(--text-sm)">{{ t("traces.comingSoon") }}</div>

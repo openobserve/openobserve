@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @keydown.space.prevent="selectedSeriesIdx = idx"
             >
               <span
-                class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                class="text-2xs rounded-default shrink-0 px-1.25 py-0.5 font-semibold tracking-[0.05em] uppercase"
                 :class="badgeClass(draft.matchBy === 'name')"
                 :data-test="`series-override-row-${idx}-badge`"
               >
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-border-strong/18 flex min-w-0 flex-col gap-2 overflow-y-auto border-s p-3"
           >
             <div
-              class="text-3xs text-text-secondary flex items-center gap-1.25 font-bold tracking-[0.06em] uppercase"
+              class="text-2xs text-text-secondary flex items-center gap-1.25 font-semibold tracking-[0.06em] uppercase"
             >
               <OIcon name="visibility" size="xs" />
               <span>{{ t("dashboard.inlinePreview") }}</span>
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span class="flex items-center gap-2">
                   <span
-                    class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                    class="text-2xs rounded-default shrink-0 px-1.25 py-0.5 font-semibold tracking-[0.05em] uppercase"
                     :class="badgeClass(opt.isNumeric)"
                   >
                     {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @keydown.space.prevent="selectedIdx = idx"
             >
               <span
-                class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                class="text-2xs rounded-default shrink-0 px-1.25 py-0.5 font-semibold tracking-[0.05em] uppercase"
                 :class="badgeClass(isNumericColumn(col))"
               >
                 {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-border-strong/18 flex min-w-0 flex-col gap-2 overflow-y-auto border-s p-3"
           >
             <div
-              class="text-3xs text-text-secondary flex items-center gap-1.25 font-bold tracking-[0.06em] uppercase"
+              class="text-2xs text-text-secondary flex items-center gap-1.25 font-semibold tracking-[0.06em] uppercase"
             >
               <OIcon name="visibility" size="xs" />
               <span>{{ t("dashboard.inlinePreview") }}</span>
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <span class="flex items-center gap-2">
                       <span
-                        class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                        class="text-2xs rounded-default shrink-0 px-1.25 py-0.5 font-semibold tracking-[0.05em] uppercase"
                         :class="badgeClass(opt.isNumeric)"
                       >
                         {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}

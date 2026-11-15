@@ -759,7 +759,7 @@ export default defineComponent({
 }
 
 .rich-text-input :deep(.reference-chip .chip-meta) {
-  font-size: var(--text-3xs);
+  font-size: var(--text-2xs);
   white-space: nowrap;
   color: var(--color-text-secondary);
 }
@@ -775,7 +775,7 @@ export default defineComponent({
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   line-height: 1;
   border-radius: 0.1875rem;
   transition: all 0.15s ease;

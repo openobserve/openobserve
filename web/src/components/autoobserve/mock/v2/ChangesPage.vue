@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ stat.label }}
           </dt>
           <dd
-            class="text-3xl leading-none font-semibold tracking-tight tabular-nums"
+            class="text-2xl leading-none font-semibold tracking-tight tabular-nums"
             :class="
               stat.id === 'worked' && stat.value
                 ? 'from-badge-success-soft-text to-badge-teal-soft-text bg-linear-to-br bg-clip-text text-transparent'

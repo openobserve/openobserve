@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex h-full flex-col items-center justify-center py-20"
             data-test="error-state"
           >
-            <p class="max-w-md text-center text-base opacity-70">
+            <p class="max-w-md text-center text-sm opacity-70">
               {{ error || t("correlation.logs.errorDetails") }}
             </p>
           </div>
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex h-full flex-col items-center justify-center py-20"
             data-test="empty-state"
           >
-            <p class="mb-2 text-base font-medium opacity-90">
+            <p class="mb-2 text-sm font-medium opacity-90">
               {{ t("correlation.logs.noData") }}
             </p>
             <p class="mb-4 text-sm opacity-70">

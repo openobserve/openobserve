@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                   >
                     <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
-                      <span class="text-text-heading text-sm font-bold">{{
+                      <span class="text-text-heading text-sm font-semibold">{{
                         t("synthetics.runs.statusTimeline")
                       }}</span>
                     </div>
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </template>
                           <template v-else>
                             <span
-                              class="text-text-heading text-xl leading-none font-bold"
+                              class="text-text-heading text-xl leading-none font-semibold"
                               :class="card.valueClass"
                             >
                               {{ card.value }}
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                        <span class="text-text-heading text-sm font-bold">
+                        <span class="text-text-heading text-sm font-semibold">
                           {{ t("synthetics.results.responseTime") }}
                         </span>
                         <span class="flex-1" />
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                        <span class="text-text-heading text-sm font-bold">
+                        <span class="text-text-heading text-sm font-semibold">
                           {{ t("synthetics.runs.errorsOverTime") }}
                         </span>
                         <span class="flex-1" />
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                        <span class="text-text-heading text-sm font-bold">
+                        <span class="text-text-heading text-sm font-semibold">
                           {{
                             dim === "Environment"
                               ? t("synthetics.runs.passRateByEnvironment")
@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
                         <OIcon name="layers" size="sm" class="text-accent" />
-                        <span class="text-text-heading text-sm font-bold">
+                        <span class="text-text-heading text-sm font-semibold">
                           {{ t("synthetics.runs.passRateByEnvironment") }}
                         </span>
                       </div>
@@ -443,7 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <span
-                            class="w-12 text-right font-mono text-xs font-bold tabular-nums"
+                            class="w-12 text-right font-mono text-xs font-semibold tabular-nums"
                             :style="{ color: e.textColor }"
                           >
                             {{ e.pct }}
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
                         <OIcon name="language" size="sm" class="text-accent" />
-                        <span class="text-text-heading text-sm font-bold">
+                        <span class="text-text-heading text-sm font-semibold">
                           {{ t("synthetics.runs.passRateByBrowser") }}
                         </span>
                       </div>
@@ -484,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <span
-                            class="w-12 text-right font-mono text-xs font-bold tabular-nums"
+                            class="w-12 text-right font-mono text-xs font-semibold tabular-nums"
                             :style="{ color: b.textColor }"
                           >
                             {{ b.pct }}
@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
                         <OIcon name="location-on" size="sm" class="text-accent" />
-                        <span class="text-text-heading text-sm font-bold">
+                        <span class="text-text-heading text-sm font-semibold">
                           {{ t("synthetics.runs.passRateByLocation") }}
                         </span>
                       </div>
@@ -523,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <span
-                            class="w-12 text-right font-mono text-xs font-bold tabular-nums"
+                            class="w-12 text-right font-mono text-xs font-semibold tabular-nums"
                             :style="{ color: l.textColor }"
                           >
                             {{ l.pct }}
@@ -537,7 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
                         <OIcon name="devices" size="sm" class="text-accent" />
-                        <span class="text-text-heading text-sm font-bold">
+                        <span class="text-text-heading text-sm font-semibold">
                           {{ t("synthetics.runs.passRateByDevice") }}
                         </span>
                       </div>
@@ -563,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <span
-                            class="w-12 text-right font-mono text-xs font-bold tabular-nums"
+                            class="w-12 text-right font-mono text-xs font-semibold tabular-nums"
                             :style="{ color: d.textColor }"
                           >
                             {{ d.pct }}
@@ -577,7 +577,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
                         <OIcon name="schedule" size="sm" class="text-accent" />
-                        <span class="text-text-heading text-sm font-bold">
+                        <span class="text-text-heading text-sm font-semibold">
                           {{ t("synthetics.runs.durationByLocation") }}
                         </span>
                       </div>
@@ -603,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <span
-                            class="w-12 text-right font-mono text-xs font-bold tabular-nums"
+                            class="w-12 text-right font-mono text-xs font-semibold tabular-nums"
                             :style="{ color: d.textColor }"
                           >
                             {{ d.pct }}
@@ -971,7 +971,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #cell-failRate="{ row }">
                       <div class="flex flex-col gap-1">
                         <span
-                          class="font-mono text-xs font-bold tabular-nums"
+                          class="font-mono text-xs font-semibold tabular-nums"
                           :style="{ color: row.failColor }"
                         >
                           {{ row.failRatePct }}%&ensp;<span class="text-text-muted font-normal">{{
@@ -1062,7 +1062,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabPanel name="errors">
             <div class="mx-auto flex flex-col gap-2 px-2 py-2 pb-7">
               <div class="flex items-center gap-2.5">
-                <span class="text-text-heading text-sm font-bold">
+                <span class="text-text-heading text-sm font-semibold">
                   {{ t("synthetics.runs.errorPatterns") }}
                 </span>
                 <span class="text-text-secondary text-xs">
@@ -1089,7 +1089,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-text-body truncate font-mono text-xs tabular-nums">
                     {{ e.pattern }}
                   </span>
-                  <span class="text-status-error-text text-sm font-bold">
+                  <span class="text-status-error-text text-sm font-semibold">
                     {{ e.count }}
                   </span>
                   <span class="text-text-secondary text-xs">
