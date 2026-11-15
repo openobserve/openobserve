@@ -47,6 +47,13 @@ describe("AssistantQueryText", () => {
     expect(html).not.toContain("hljs-");
   });
 
+  it("scrolls a long query sideways instead of wrapping it mid-clause", () => {
+    for (const chrome of [false, true]) {
+      const html = mountText({ chrome }).get('[data-test="q"]').html();
+      expect(html).not.toContain("o2-code-pre--wrap");
+    }
+  });
+
   it("has no chrome of its own unless asked", () => {
     const wrapper = mountText();
     expect(wrapper.find('[data-test="q-chrome"]').exists()).toBe(false);

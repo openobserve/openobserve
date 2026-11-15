@@ -186,7 +186,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :code="part.code"
               :lang="String(codeLang(part.lang))"
               :highlight="false"
-              wrap
               padded
               :highlighted-html="part.highlighted"
               :copyable="!part.open"

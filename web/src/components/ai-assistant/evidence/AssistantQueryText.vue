@@ -48,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :highlighted-html="highlighted"
       :copyable="false"
       :toolbar="false"
-      wrap
       padded
       :max-lines="cap"
       contrast="aa"
@@ -79,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div v-else class="flex min-w-0 flex-col gap-1">
-    <!-- One Monaco per query breaks the transcript budget; wrapped, since overlay scrollbars hide a sideways overflow -->
+    <!-- One Monaco per query breaks the transcript budget; SQL scrolls sideways so a clause never breaks -->
     <OCodeBlock
       :code="text"
       class="my-0!"
@@ -87,7 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :highlighted-html="highlighted"
       :copyable="false"
       :toolbar="false"
-      wrap
       :max-lines="cap"
       contrast="aa"
       :scroll-label="label"
