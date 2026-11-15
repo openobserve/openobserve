@@ -42,6 +42,12 @@ export interface AssistantPlacesInput {
   dockHost?: DockHostId;
 }
 
+// The Navigation API is not in TypeScript's DOM lib yet; only the entry list is read.
+interface NavigationEntries {
+  currentEntry: { index: number } | null;
+  entries(): { url: string | null }[];
+}
+
 export interface AssistantPlace {
   id: PlaceId;
   label: I18nText;
@@ -55,15 +61,17 @@ export function placementMode(placement: AssistantPlacementName, sheet: boolean)
   return sheet ? "sheet" : "sidebar";
 }
 
-/** Leaves the full view by going back, unless the entry before it is another chat, which would reopen at full page. */
+/** Leaves the full view by going back past every chat it pushed; Home replaces it when the browser cannot list them. */
 export function leaveFullThreadRoute(router: Router, route: RouteLocationNormalizedLoaded): void {
   if (!isFullThreadRoute(route)) return;
   const back = window.history.state?.back;
   // Home's own query (period, org) stays; only the thread key goes.
   const home = { name: "home", query: withoutThread(route.query) };
   if (typeof back !== "string") return void router.push(home);
-  if (isFullThreadRoute(router.resolve(back))) void router.replace(home);
-  else router.back();
+  if (!isFullThreadRoute(router.resolve(back))) return router.back();
+  const steps = stepsPastFullChats(router);
+  if (steps > 0) router.go(-steps);
+  else void router.replace(home);
 }
 
 /** The Open as moves a container offers: Side panel, Full page, Floating window and its editor's dock, by viewport and placement. */
@@ -227,4 +235,27 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
   }
 
   return { places, freshFull };
+}
+
+// Back must skip every chat the full view pushed, or it reopens one at full page (C-06).
+function stepsPastFullChats(router: Router): number {
+  const nav = (window as { navigation?: NavigationEntries }).navigation;
+  const current = nav?.currentEntry?.index ?? -1;
+  if (!nav || current < 1) return 0;
+  const entries = nav.entries();
+  for (let i = current - 1; i >= 0; i -= 1) {
+    const path = appPath(entries[i]?.url ?? null, router.options.history.base);
+    if (path === null) return 0;
+    if (!isFullThreadRoute(router.resolve(path))) return current - i;
+  }
+  return 0;
+}
+
+function appPath(url: string | null, base: string): string | null {
+  if (!url) return null;
+  const parsed = new URL(url);
+  if (parsed.origin !== window.location.origin) return null;
+  const inApp = base && parsed.pathname.startsWith(base);
+  const path = inApp ? parsed.pathname.slice(base.length) || "/" : parsed.pathname;
+  return path + parsed.search + parsed.hash;
 }

@@ -29,8 +29,18 @@ async function onChat(back: string | undefined) {
   return router;
 }
 
+function stubNavigation(urls: string[]) {
+  const origin = window.location.origin;
+  const navigation = {
+    currentEntry: { index: urls.length - 1 },
+    entries: () => urls.map((url) => ({ url: url && origin + url })),
+  };
+  Object.defineProperty(window, "navigation", { value: navigation, configurable: true });
+}
+
 afterEach(() => {
   window.history.replaceState(null, "");
+  Reflect.deleteProperty(window, "navigation");
   vi.restoreAllMocks();
 });
 
@@ -60,6 +70,24 @@ describe("leaveFullThreadRoute", () => {
       name: "home",
       query: { period: "7d", org_identifier: "acme" },
     });
+  });
+
+  it("C-06: Back skips every chat the full view pushed and lands on the page before them", async () => {
+    const router = await onChat("/?thread=a");
+    stubNavigation(["/?period=7d", "/?thread=a&period=7d", "/?thread=b&period=7d"]);
+    vi.spyOn(router, "go").mockImplementation(() => {});
+    leaveFullThreadRoute(router, router.currentRoute.value);
+    expect(router.go).toHaveBeenCalledWith(-2);
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Home when an earlier entry is not this app's", async () => {
+    const router = await onChat("/?thread=a");
+    stubNavigation(["", "/?thread=a", "/?thread=b"]);
+    vi.spyOn(router, "go");
+    leaveFullThreadRoute(router, router.currentRoute.value);
+    expect(router.go).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith(expect.objectContaining({ name: "home" }));
   });
 
   it("goes to Home when there is no entry before", async () => {
