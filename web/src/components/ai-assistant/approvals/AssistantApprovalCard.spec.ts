@@ -127,7 +127,7 @@ describe("AssistantApprovalCard", () => {
     await flushPromises();
     const group = wrapper.get('[data-test="assistant-approval-card"]');
     expect(group.attributes("role")).toBe("group");
-    expect(group.attributes("aria-label")).toBe("Needs your OK: delete 1 alert");
+    expect(group.attributes("aria-label")).toBe("Needs you: delete 1 alert");
     expect(wrapper.get('[data-test="assistant-approval-heading"]').text()).toBe("Delete 1 alert");
     const timer = wrapper.get('[data-test="assistant-approval-countdown"]');
     expect(timer.text()).toBe("3:42");
@@ -141,24 +141,27 @@ describe("AssistantApprovalCard", () => {
     expect(menuItems(wrapper)).toEqual(["assistant-approval-reply"]);
     expect(wrapper.text()).not.toContain("Reply declines");
     const strip = wrapper.get('[data-test="assistant-approval-strip"]');
-    expect(strip.get('[data-test="assistant-approval-strip-label"]').text()).toBe("Needs your OK");
+    expect(strip.get('[data-test="assistant-approval-strip-label"]').text()).toBe("Needs you");
     expect(
       strip.get('[data-test="assistant-approval-strip-label"]').attributes("aria-hidden"),
     ).toBe("true");
     expect(strip.element.contains(timer.element)).toBe(true);
   });
 
-  it("draws the amber edge and no box, and keeps the normal primary for an irreversible kind", () => {
+  it("draws the amber edge and no box, and marks an irreversible kind's verb destructive", () => {
     const wrapper = mountCard(cardOf(DELETE_ONE));
     const group = wrapper.get('[data-test="assistant-approval-card"]');
     expect(group.classes()).toEqual(
-      expect.arrayContaining(["border-s-2", "border-status-warning-text"]),
+      expect.arrayContaining(["border-s-2", "border-assistant-signal-attention"]),
     );
     expect(group.classes()).not.toContain("rounded-surface");
     const approve = wrapper.get('[data-test="assistant-approval-approve"]');
-    expect(approve.attributes("data-o2-variant")).toBe("primary");
-    expect(approve.classes().join(" ")).not.toContain("destructive");
+    expect(approve.attributes("data-o2-variant")).toBe("destructive");
     expect(approve.text()).toBe("Delete 1 alert");
+    const pause = mountCard(cardOf(PAUSE));
+    expect(
+      pause.get('[data-test="assistant-approval-approve"]').attributes("data-o2-variant"),
+    ).toBe("primary");
   });
 
   it("takes focus to the heading within one frame from the page, and says it is waiting", async () => {
@@ -675,10 +678,13 @@ describe("AssistantApprovalCard", () => {
     expect(extendable.emitted("extend")).toHaveLength(1);
   });
 
-  it("opens ⋯ upward from the start, so the menu never covers Deny or Approve", () => {
-    const menu = mountCard(cardOf(DELETE_ONE)).get('[data-test="assistant-approval-menu"]');
+  it("sits ⋯ beside Deny and opens it upward, so the menu never covers Deny or Approve", () => {
+    const card = mountCard(cardOf(DELETE_ONE));
+    const menu = card.get('[data-test="assistant-approval-menu"]');
     expect(menu.attributes("data-side")).toBe("top");
-    expect(menu.attributes("data-align")).toBe("start");
+    expect(menu.attributes("data-align")).toBe("end");
+    const footer = card.get('[data-test="assistant-approval-footer"]').element;
+    expect(footer.firstElementChild?.classList.contains("flex-1")).toBe(true);
   });
 
   it("the footer holds only Deny and the verb primary as buttons", () => {
@@ -761,14 +767,15 @@ describe("AssistantApprovalCard", () => {
       expect(spoken.filter((text) => text.includes("Approval expires in"))).toEqual([]);
     });
 
-    it("inverts the timer into a warning badge in the last 60 s", async () => {
+    it("keeps the timer plain text and only weights it in the last 60 s", async () => {
       const wrapper = mountCard(cardOf(PAUSE, { expiresAt: Date.now() + 48_000 }));
       await flushPromises();
       const timer = wrapper.get('[data-test="assistant-approval-countdown"]');
       expect(timer.text()).toBe("0:48");
       expect(timer.classes()).toContain("font-medium");
       expect(timer.attributes("data-expiring")).toBe("");
-      expect(timer.findComponent(OBadge).props("variant")).toBe("warning");
+      expect(timer.findComponent(OBadge).exists()).toBe(false);
+      expect(timer.classes()).toContain("text-assistant-signal-attention");
     });
 
     it("keeps the timer plain before the last minute", async () => {
@@ -777,7 +784,8 @@ describe("AssistantApprovalCard", () => {
       const timer = wrapper.get('[data-test="assistant-approval-countdown"]');
       expect(timer.attributes("data-expiring")).toBeUndefined();
       expect(timer.findComponent(OBadge).exists()).toBe(false);
-      expect(timer.classes()).toContain("text-status-warning-text");
+      expect(timer.classes()).toContain("text-assistant-signal-attention");
+      expect(timer.classes()).not.toContain("font-medium");
     });
   });
 

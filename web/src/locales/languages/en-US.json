@@ -11004,7 +11004,7 @@
       "moreTime": "More time",
       "named": "{verb} {name}",
       "nameUnknown": "Couldn't load the name of {entity} {shortId}; you may not have access to it.",
-      "needsOk": "Needs your OK",
+      "needsOk": "Needs you",
       "noDecision": "No answer was recorded for this request",
       "nothingSelected": "Nothing selected",
       "open": "Open",
@@ -11083,7 +11083,7 @@
       "gateNoEditor": "Approvals aren't available on this server.",
       "meta": "Until {time} · {scope}",
       "metaUntil": "Until {time}",
-      "needsOkName": "Needs your OK: {name}",
+      "needsOkName": "Needs you: {name}",
       "notifies": "notifies",
       "retry": "Retry",
       "record": {
@@ -12152,7 +12152,7 @@
       "filterEmpty": "No chats match these filters",
       "group": {
         "browser": "In this browser",
-        "needsYou": "Needs You",
+        "needsYou": "Needs you",
         "older": "Older",
         "pinned": "Pinned",
         "running": "In Progress",

@@ -550,7 +550,7 @@ describe("AssistantHistoryList", () => {
     await flushPromises();
     const groups = wrapper.findAll('[data-test="assistant-history-group"]');
     expect(groups[0].attributes("data-group")).toBe("needs_you");
-    expect(groups[0].get("h3").text()).toBe("Needs You 1");
+    expect(groups[0].get("h3").text()).toBe("Needs you 1");
     expect(groups[0].text()).toContain("Gamma this week");
     expect(wrapper.find('[data-group="week"]').exists()).toBe(false);
   });
