@@ -328,15 +328,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @retry="retryHistory"
         />
       </div>
-      <div
-        v-else-if="state === 'empty' && !startersShown"
-        class="flex min-h-full flex-col items-center justify-center gap-2 p-4"
-        data-test="assistant-shell-empty"
-      >
-        <img :src="aiLogo" alt="" class="size-20 dark:hidden" />
-        <img :src="aiLogoDark" alt="" class="hidden size-20 dark:block" />
-        <OText variant="card-title" as="p">{{ t("assistant.name") }}</OText>
-      </div>
       <AssistantWelcome
         v-else-if="state === 'empty' && welcome"
         :variant="density === 'roomy' ? 'roomy' : 'compact'"
@@ -616,8 +607,6 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import aiLogoDark from "@/assets/images/common/o2_ai_logo_dark.svg";
-import aiLogo from "@/assets/images/common/o2_ai_logo.svg";
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantActionTimeline from "@/components/ai-assistant/approvals/AssistantActionTimeline.vue";
 import AssistantApprovalCard from "@/components/ai-assistant/approvals/AssistantApprovalCard.vue";
@@ -968,9 +957,6 @@ const visible = computed(() => {
   return kind === props.placement;
 });
 
-// Home and the dock suggest prompts; the side panel and a window open on the logo alone.
-const startersShown = computed(() => props.placement === "full" || props.placement === "docked");
-
 // The opening plays only on the open that showed this container, never on a remount or a new chat.
 const { opening } = useOpeningMotion(() => visible.value);
 
@@ -1014,7 +1000,7 @@ const welcomeScope = effectScope();
 const welcome = shallowRef<ReturnType<typeof useAssistantStarters> | null>(null);
 const page = () => (props.placement === "full" ? "assistant" : String(route.name ?? ""));
 watch(
-  () => state.value === "empty" && startersShown.value,
+  () => state.value === "empty",
   (empty) => {
     if (!empty || welcome.value) return;
     welcome.value =

@@ -128,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import type { ComposerState, TimeWindow } from "@/composables/assistant";
+import type { I18nKey } from "@/types/i18n";
 
 export interface AssistantTimePrefixProps {
   window: TimeWindow;
@@ -155,6 +156,16 @@ const FIT_CLASS =
   "max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] overflow-y-auto";
 
 const DEFAULT_PERIOD = "15m";
+
+// The Logs time picker's own keys, so a range reads the same in the composer as on the page.
+const PAST_KEYS: Record<string, I18nKey> = {
+  s: "common.pastSecond",
+  m: "common.pastMinute",
+  h: "common.pastHour",
+  d: "common.pastDay",
+  w: "common.pastWeek",
+  M: "common.pastMonth",
+};
 
 // The popup takes the top layer of the dialog or sheet it opens in, on ODialog's ladder.
 const LAYER_BASE = 6000;
@@ -248,6 +259,8 @@ const tabbableId = computed(() => {
 });
 
 function textOf(window: TimeWindow): I18nText {
+  const match = /^(\d+)([smhdwM])$/.exec(window.period ?? "");
+  if (match) return t(PAST_KEYS[match[2]], { count: Number(match[1]) }, Number(match[1]));
   const short = timeRangeShortText(window);
   return window.period ? t("assistant.context.time.last", { period: short }) : short;
 }

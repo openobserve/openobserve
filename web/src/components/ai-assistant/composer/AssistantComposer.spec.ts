@@ -1318,7 +1318,7 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
     mounted.push(wrapper);
     await flushPromises();
     const pill = () => wrapper.get('[data-test="assistant-context-chip-time"]');
-    expect(pill().text()).toBe("Last 15 min");
+    expect(pill().text()).toBe("Past 15 Minutes");
     plus(wrapper, "time");
     await flushPromises();
     expect(
@@ -1328,7 +1328,7 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
       document.body.querySelector('[data-test="assistant-context-time-24h"]') as HTMLElement
     ).click();
     await flushPromises();
-    expect(pill().text()).toBe("Last 24 h");
+    expect(pill().text()).toBe("Past 24 Hours");
     expect(fake.current.store.state.sessions[sid].composer.timeOverride).toMatchObject({
       period: "24h",
     });

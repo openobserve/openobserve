@@ -15,7 +15,12 @@
 
 import { computed, onBeforeUnmount, onMounted, ref, type ComputedRef, type Ref } from "vue";
 
-import { COMPOSER_NARROW_REM, COMPOSER_TIGHT_REM, COMPOSER_WIDE_REM } from "./composerUi";
+import {
+  COMPOSER_AGENT_LABEL_REM,
+  COMPOSER_NARROW_REM,
+  COMPOSER_TIGHT_REM,
+  COMPOSER_WIDE_REM,
+} from "./composerUi";
 
 export interface ComposerWidth {
   /** The composer's own width in px; 0 until measured. */
@@ -23,6 +28,7 @@ export interface ComposerWidth {
   narrow: ComputedRef<boolean>;
   tight: ComputedRef<boolean>;
   wide: ComputedRef<boolean>;
+  agentIconOnly: ComputedRef<boolean>;
 }
 
 /** Follows the composer's own width, since a window or a sidebar is narrow on any screen. */
@@ -47,5 +53,8 @@ export function useComposerWidth(root: Ref<HTMLElement | null>): ComposerWidth {
     narrow: computed(() => atMost(COMPOSER_NARROW_REM)),
     tight: computed(() => atMost(COMPOSER_TIGHT_REM)),
     wide: computed(() => width.value >= COMPOSER_WIDE_REM * rem.value),
+    agentIconOnly: computed(
+      () => width.value > 0 && width.value < COMPOSER_AGENT_LABEL_REM * rem.value,
+    ),
   };
 }

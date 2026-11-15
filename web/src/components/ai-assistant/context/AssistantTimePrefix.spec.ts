@@ -77,8 +77,15 @@ describe("AssistantTimePrefix", () => {
   it("names the range and where it comes from", () => {
     const wrapper = mount(AssistantTimePrefix, { props: { window: DEFAULT } });
     const button = wrapper.get('[data-test="assistant-context-chip-time"]');
-    expect(button.text()).toBe("Last 15 min");
-    expect(button.attributes("aria-label")).toBe("Time range, Last 15 min, default");
+    expect(button.text()).toBe("Past 15 Minutes");
+    expect(button.attributes("aria-label")).toBe("Time range, Past 15 Minutes, default");
+  });
+
+  it("words each preset as the Logs time picker does", async () => {
+    const { row } = await open({ window: DEFAULT });
+    expect(row("1h")?.textContent).toContain("Past 1 Hour");
+    expect(row("24h")?.textContent).toContain("Past 24 Hours");
+    expect(row("7d")?.textContent).toContain("Past 7 Days");
   });
 
   it("offers no Page time on a page with no range, and draws no default tag", async () => {

@@ -75,7 +75,12 @@ const stubs = {
   },
 };
 
-function setup(roster: CapabilityAgent[] = ROSTER, messages = false, narrow = false) {
+function setup(
+  roster: CapabilityAgent[] = ROSTER,
+  messages = false,
+  agentIconOnly = false,
+  narrow = agentIconOnly,
+) {
   fake.current = fakeAssistant("available", { agents: roster });
   const { store } = fake.current;
   store.syncCapability({ ...store.state.capability, agents: roster });
@@ -89,7 +94,12 @@ function setup(roster: CapabilityAgent[] = ROSTER, messages = false, narrow = fa
       plugins: [fakeVuex()],
       stubs,
       provide: {
-        [composerLayoutKey as symbol]: computed(() => ({ narrow, tight: false, wide: false })),
+        [composerLayoutKey as symbol]: computed(() => ({
+          narrow,
+          tight: false,
+          wide: false,
+          agentIconOnly,
+        })),
       },
     },
     attachTo: document.body,
@@ -110,7 +120,13 @@ afterEach(() => {
 });
 
 describe("AssistantAgentPicker", () => {
-  it("keeps only the icon in a narrow composer, naming the agent in its label and tooltip", () => {
+  it("keeps the agent's name in a narrow composer that still has room for it", () => {
+    const { wrapper } = setup(ROSTER, false, false, true);
+    expect(trigger(wrapper).text()).toContain("O2 Assistant");
+    expect(trigger(wrapper).attributes("aria-label")).toBeUndefined();
+  });
+
+  it("keeps only the icon without room for the name, naming the agent in its label and tooltip", () => {
     const wide = trigger(setup().wrapper);
     expect(wide.text()).toContain(`${brandNames.autobot}`);
     expect(wide.attributes("aria-label")).toBeUndefined();

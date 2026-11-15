@@ -19,26 +19,26 @@ export const CAPABILITY_CARDS: CapabilityCard[] = [
   {
     id: "query",
     icon: "edit",
-    iconColorClass: "text-[#7B61FF]",
-    iconBgClass: "bg-[#7B61FF]/10",
+    iconColorClass: "text-ai-accent",
+    iconBgClass: "bg-ai-accent/10",
   },
   {
     id: "incident",
     icon: "warning",
-    iconColorClass: "text-[#F59E0B]",
-    iconBgClass: "bg-[#F59E0B]/10",
+    iconColorClass: "text-status-warning-text",
+    iconBgClass: "bg-status-warning-bg",
   },
   {
     id: "dashboard",
     icon: "dashboard",
-    iconColorClass: "text-[#10B981]",
-    iconBgClass: "bg-[#10B981]/10",
+    iconColorClass: "text-status-success-text",
+    iconBgClass: "bg-status-success-bg",
   },
   {
     id: "alert",
     icon: "notifications",
-    iconColorClass: "text-[#EF4444]",
-    iconBgClass: "bg-[#EF4444]/10",
+    iconColorClass: "text-status-error-text",
+    iconBgClass: "bg-status-error-bg",
   },
 ];
 

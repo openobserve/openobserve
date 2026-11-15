@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="card in CAPABILITY_CARDS"
         :key="card.id"
         type="button"
-        class="rounded-default border-border-default bg-card-bg hover:border-ai-accent/50 hover:shadow-ai-accent/30 focus-visible:ring-ai-accent/40 flex min-w-0 cursor-pointer items-center gap-2 border px-2.5 py-2 text-left transition-[border-color,box-shadow,translate] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:ring-2 focus-visible:outline-none"
+        class="rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 flex min-w-0 cursor-pointer items-center gap-2 border px-2.5 py-2 text-left transition-[border-color,box-shadow,translate] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:ring-2 focus-visible:outline-none"
         :data-test="`assistant-home-capability-${card.id}`"
         @click="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
       >

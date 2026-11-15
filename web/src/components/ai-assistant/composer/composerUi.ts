@@ -35,6 +35,9 @@ export const COMPOSER_NARROW_REM = 24;
 /** The narrowest window; popovers take its width less 3 px a side. */
 export const COMPOSER_TIGHT_REM = 20;
 
+/** Below this the agent pill drops its name: + menu, Past 15 Minutes, the named pill, mic and Send need 24.5 rem. */
+export const COMPOSER_AGENT_LABEL_REM = 24.5;
+
 /** Chips shown before `+N` by width: none when narrow, one at 27 rem, three in a full view. */
 export const COMPOSER_WIDE_REM = 40;
 
@@ -86,6 +89,8 @@ export interface ComposerLayout {
   narrow: boolean;
   tight: boolean;
   wide: boolean;
+  /** The agent pill shows its icon only, with its name in a tooltip and the aria-label. */
+  agentIconOnly?: boolean;
 }
 
 export const composerLayoutKey: InjectionKey<ComputedRef<ComposerLayout>> =

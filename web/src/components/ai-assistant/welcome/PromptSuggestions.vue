@@ -29,11 +29,11 @@ function selectPrompt(s: PromptSuggestion) {
         v-for="s in PROMPT_SUGGESTIONS"
         :key="s.id"
         type="button"
-        class="suggestion-chip group rounded-default border-border-default text-text-secondary hover:text-text-body hover:shadow-ai-accent/30 focus-visible:ring-ai-accent/40 relative inline-flex cursor-pointer items-center gap-2 overflow-hidden border bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-card-bg)_100%,transparent),color-mix(in_srgb,var(--color-card-bg)_92%,transparent))] px-2.5 py-2 ps-3 text-left text-xs leading-tight [transition:border-color_0.15s_ease,background_0.15s_ease,color_0.15s_ease,transform_0.15s_ease,box-shadow_0.15s_ease] hover:-translate-y-px hover:border-[rgba(123,97,255,0.5)] hover:shadow-md focus-visible:border-[rgba(123,97,255,0.7)] focus-visible:ring-2 focus-visible:outline-none"
+        class="suggestion-chip group rounded-default border-border-default bg-surface-base text-text-secondary hover:text-text-body hover:border-accent hover:bg-tabs-hover-bg focus-visible:border-accent focus-visible:ring-accent/40 relative inline-flex cursor-pointer items-center gap-2 overflow-hidden border px-2.5 py-2 ps-3 text-left text-xs leading-tight transition-[color,background-color,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:ring-2 focus-visible:outline-none"
         @click="selectPrompt(s)"
       >
         <span
-          class="suggestion-chip__icon rounded-default text-typography-meta group-hover:text-ai-accent bg-border-default/40 inline-flex h-5.5 w-5.5 shrink-0 items-center justify-center [transition:background_0.15s_ease,color_0.15s_ease] group-hover:bg-[rgba(123,97,255,0.15)]"
+          class="suggestion-chip__icon rounded-default text-typography-meta group-hover:text-accent bg-border-default/40 group-hover:bg-tabs-active-bg inline-flex h-5.5 w-5.5 shrink-0 items-center justify-center transition-colors duration-150"
         >
           <OIcon :name="s.icon" size="sm" />
         </span>
@@ -41,7 +41,7 @@ function selectPrompt(s: PromptSuggestion) {
           {{ t(keyOf(s)) }}
         </OTruncatedText>
         <span
-          class="suggestion-chip__arrow text-typography-meta group-hover:text-ai-accent inline-flex shrink-0 -translate-x-1 items-center justify-center opacity-0 [transition:opacity_0.15s_ease,transform_0.15s_ease,color_0.15s_ease] group-hover:translate-x-0 group-hover:opacity-100"
+          class="suggestion-chip__arrow text-typography-meta group-hover:text-accent inline-flex shrink-0 -translate-x-1 items-center justify-center opacity-0 transition-[opacity,transform,color] duration-150 group-hover:translate-x-0 group-hover:opacity-100"
           aria-hidden="true"
         >
           <OIcon name="arrow-forward" size="xs" />

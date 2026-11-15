@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? { ...fieldAttrs, class: `${fieldAttrs.class} ${CORNER_FIELD_CLASS}` }
           : fieldAttrs
       "
-      :class="[glow ? GLOW_FRAME_CLASS : FRAME_CLASS, inert ? INERT_CLASS : '']"
+      :class="[FRAME_CLASS, inert ? INERT_CLASS : '']"
       @update:model-value="(value: string) => emit('update:modelValue', value)"
     >
       <template #header>
@@ -65,8 +65,6 @@ export interface AssistantComposerFrameProps {
   opening?: boolean;
   /** Attributes for the textarea itself; `class` adds to the frame's own. */
   inputAttrs?: Record<string, string | number | boolean | undefined>;
-  /** Home's Ask box: a solid edge, soft lift and faint halo at rest; on focus a brand ribbon rings the box and the halo brightens. */
-  glow?: boolean;
   /** Both composers start three lines tall. */
   tall?: boolean;
 }
@@ -82,13 +80,6 @@ export const MAX_ROWS = 6;
 const FRAME_CLASS = [
   "[&>div]:rounded-surface [&>div]:border-border-default [&>div]:gap-0.5 [&>div]:px-2 [&>div]:pt-1.5 [&>div]:pb-2",
   "[&>div]:ring-offset-0 [&>div]:motion-reduce:transition-none [&>div]:focus-within:border-input-border-focus [&>div]:focus-within:ring-1 [&>div]:focus-within:ring-focus-ring-accent",
-].join(" ");
-
-// At rest the box keeps OTextarea's 3:1 border; on focus it clears, so the ribbon (every stop 3:1) is the one focus edge.
-const GLOW_FRAME_CLASS = [
-  "assistant-focus-glow",
-  "[&>div]:rounded-surface [&>div]:gap-0.5 [&>div]:px-2 [&>div]:pt-1.5 [&>div]:pb-2 [&>div]:motion-reduce:transition-none",
-  "[&>div]:shadow-sm [&>div]:focus-within:border-transparent",
 ].join(" ");
 
 const INERT_CLASS = "[&>div]:bg-surface-subtle";
@@ -115,7 +106,6 @@ const props = withDefaults(defineProps<AssistantComposerFrameProps>(), {
   inert: false,
   opening: false,
   inputAttrs: () => ({}),
-  glow: false,
   tall: false,
 });
 

@@ -31,14 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           clickable
           :disabled="disabled"
           :class="['h-7 shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
-          :aria-label="layout.narrow ? agentName(current, t) : undefined"
+          :aria-label="layout.agentIconOnly ? agentName(current, t) : undefined"
           data-test="assistant-launcher-agent"
           :data-agent="current"
         >
-          <!-- A narrow composer keeps the agent's icon and puts its name in the tooltip, so the row never wraps -->
-          <template v-if="!layout.narrow">{{ agentName(current, t) }}</template
+          <!-- Without room for its name the pill keeps the icon and moves the name to the tooltip, so the row never wraps -->
+          <template v-if="!layout.agentIconOnly">{{ agentName(current, t) }}</template
           ><OIcon :name="assistantGlyph.expand" size="xs" />
-          <OTooltip v-if="layout.narrow" :content="agentName(current, t)" />
+          <OTooltip v-if="layout.agentIconOnly" :content="agentName(current, t)" />
         </OTag>
       </template>
       <ODropdownGroup :label="t('assistant.agent.picker.heading')">

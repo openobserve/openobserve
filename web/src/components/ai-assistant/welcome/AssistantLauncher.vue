@@ -116,7 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AssistantComposerFrame
           ref="input"
           :model-value="shownText"
-          :glow="layout === 'overview'"
           :state="state ?? undefined"
           :disabled="fieldLoading"
           :placeholder="placeholder"

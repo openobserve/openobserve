@@ -13,9 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed } from "vue";
@@ -418,18 +415,18 @@ describe("AssistantLauncher", () => {
     expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(true);
   });
 
-  it("always shows the time chip after +, Last 15 min by default, and a pick from the chip replaces it with no remove", async () => {
+  it("always shows the time chip after +, Past 15 Minutes by default, and a pick from the chip replaces it with no remove", async () => {
     const { wrapper } = setup();
     const field = wrapper.get('[data-test="assistant-launcher-input"]');
     const chip = () => field.find('[data-test="assistant-context-chip-time"]');
     const remove = () => chip().find('[data-test="assistant-context-chip-remove"]');
-    expect(chip().text()).toBe("Last 15 min");
+    expect(chip().text()).toBe("Past 15 Minutes");
     expect(remove().exists()).toBe(false);
     await chip().trigger("click");
     await flushPromises();
     (document.body.querySelector('[data-test="assistant-context-time-1h"]') as HTMLElement).click();
     await flushPromises();
-    expect(chip().text()).toBe("Last 1 h");
+    expect(chip().text()).toBe("Past 1 Hour");
     expect(remove().exists()).toBe(false);
     await input(wrapper).setValue("why?");
     await input(wrapper).trigger("keydown", { key: "Enter" });
@@ -522,36 +519,15 @@ describe("AssistantLauncher", () => {
     expect(added?.textContent).toContain("checkout");
   });
 
-  it("rings Home's field with one flush ribbon on focus, over a solid edge at rest, and keeps the card plain", async () => {
+  it("gives Home's field the same plain frame as every other composer", async () => {
     const { wrapper } = setupOn({ layout: "overview" });
-    const frame = wrapper.get('[data-test="assistant-composer-frame"] > div');
-    expect(frame.classes()).toEqual(
-      expect.arrayContaining([
-        "assistant-focus-glow",
-        "[&>div]:rounded-surface",
-        "[&>div]:focus-within:border-transparent",
-        "[&>div]:shadow-sm",
-      ]),
-    );
-    // One focus edge: no second coloured border, no gap padding, no gradient painted at rest.
-    expect(frame.classes().some((c) => /gradient|rounded-3xl|focus-ring-accent/.test(c))).toBe(
-      false,
-    );
-    expect(frame.classes()).not.toContain("p-0.5");
-    expect(frame.get(":scope > div").classes()).toContain("border-input-border");
-    const card = setup().wrapper.get('[data-test="assistant-composer-frame"] > div');
-    expect(card.classes()).not.toContain("assistant-focus-glow");
-    expect(card.classes()).not.toContain("[&>div]:shadow-sm");
-    expect(card.classes()).toContain("[&>div]:focus-within:ring-1");
+    const home = wrapper.get('[data-test="assistant-composer-frame"] > div').classes();
+    const card = setup().wrapper.get('[data-test="assistant-composer-frame"] > div').classes();
+    expect(home).toEqual(card);
+    expect(home).toContain("[&>div]:focus-within:ring-1");
+    expect(home.some((c) => /glow|gradient|shadow/.test(c))).toBe(false);
     expect(wrapper.get('[data-test="assistant-composer-bar"]').classes()).toContain("border-t");
     expect(input(wrapper).classes()).toContain("placeholder:text-text-secondary");
-    const ask = () => wrapper.get('[data-test="assistant-launcher-ask"]');
-    await input(wrapper).setValue("why?");
-    expect(
-      ask()
-        .classes()
-        .some((c) => c.includes("gradient")),
-    ).toBe(false);
   });
 
   it("types example prompts while idle and empty, and shows the plain hint on focus or with a draft", async () => {
@@ -576,24 +552,6 @@ describe("AssistantLauncher", () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it("rests on a faint still halo, brightens it with the ring on focus, never loops, and holds still under reduced motion", () => {
-    const css = readFileSync(resolve(__dirname, "../../../styles/tailwind.css"), "utf8");
-    const start = css.indexOf("@utility assistant-focus-glow {");
-    const rule = css.slice(start, css.indexOf("\n}\n", start));
-    expect(start).toBeGreaterThan(-1);
-    expect(rule).toContain("background: var(--color-gradient-brand-ribbon-focus)");
-    // Ring and halo sit one ring width out, on the box's radius plus that width, so all three are concentric.
-    expect(rule).toMatch(/inset: -0\.125rem;/);
-    expect(rule).toContain("border-radius: calc(var(--radius-surface) + 0.125rem)");
-    // The ring is hidden at rest, the halo shows at 0.15, and focus lifts them to 1 and 0.35.
-    expect(rule).toMatch(/opacity: 0;\s*transition: opacity 0\.2s/);
-    expect(rule).toMatch(/&::before \{\s*filter: blur\(1rem\);\s*opacity: 0\.15;/);
-    expect(rule).toMatch(/&:focus-within::before \{\s*opacity: 0\.35;/);
-    expect(rule).toMatch(/&:focus-within::after \{\s*opacity: 1;/);
-    expect(rule).not.toMatch(/animation|infinite/);
-    expect(rule).toMatch(/prefers-reduced-motion: reduce\)[\s\S]*transition: none/);
   });
 
   it("turns Ask on only with text or an image, and says why it is off while it stays reachable", async () => {
@@ -909,13 +867,13 @@ describe("AssistantLauncher", () => {
           .click();
         await flushPromises();
       };
-      expect(chip().text()).toBe("Last 15 min");
+      expect(chip().text()).toBe("Past 15 Minutes");
       expect(await ask("first")).toBeUndefined();
       await pick("7d");
-      expect(chip().text()).toBe("Last 7 days");
+      expect(chip().text()).toBe("Past 7 Days");
       expect(await ask("second")).toMatchObject({ period: "7d" });
       await pick("15m");
-      expect(chip().text()).toBe("Last 15 min");
+      expect(chip().text()).toBe("Past 15 Minutes");
       expect(await ask("third")).toBeUndefined();
     });
 
