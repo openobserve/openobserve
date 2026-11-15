@@ -864,17 +864,15 @@ mod tests {
         ] {
             assert!(tools.iter().all(|tool| tool.name != name), "{name}");
         }
-        // Enterprise exposes only UserGet on the user path, so UserUpdate is not a tool there.
-        let user_update_is_tool = !cfg!(feature = "enterprise");
-        assert_eq!(
-            tools.iter().any(|tool| tool.name == "UserUpdate"),
-            user_update_is_tool
-        );
-        let mut body_checks = vec![("CreateAlert", &["name", "folder_id"][..])];
-        if user_update_is_tool {
-            body_checks.push(("UserUpdate", &["first_name", "new_password", "role"][..]));
-        }
-        for (name, fields) in body_checks {
+        // User changes are opted out of MCP in every edition.
+        assert!(tools.iter().all(|tool| tool.name != "UserUpdate"));
+        for (name, fields) in [
+            ("CreateAlert", &["name", "folder_id"][..]),
+            (
+                "SetFleetDesired",
+                &["config", "version", "verify", "auto_rollback"][..],
+            ),
+        ] {
             let tool = tools
                 .iter()
                 .find(|tool| tool.name == name)
@@ -887,27 +885,29 @@ mod tests {
                 );
             }
         }
-        if !user_update_is_tool {
-            return;
-        }
 
-        let user_update = openobserve_mcp::tools::get_tool_metadata("UserUpdate").unwrap();
-        for body in [
-            serde_json::json!({"first_name": "name"}),
-            serde_json::json!({"role": "admin"}),
+        // A body naming only some of the optional fields must pass request validation.
+        let set_desired = openobserve_mcp::tools::get_tool_metadata("SetFleetDesired").unwrap();
+        for optional in [
+            serde_json::json!({"verify": true}),
+            serde_json::json!({"auto_rollback": true}),
         ] {
+            let mut body = serde_json::json!({"config": "c", "version": 1});
+            body.as_object_mut()
+                .unwrap()
+                .extend(optional.as_object().unwrap().clone());
             let arguments = serde_json::json!({
                 "org_id": "default",
-                "email_id": "user@example.com",
+                "fleet_id": "f",
                 "request_body": body,
             });
             let result = openobserve_mcp::tools::get_shared_http_client()
-                .execute_tool_call(&user_update, &arguments)
+                .execute_tool_call(&set_desired, &arguments)
                 .await;
             if let Err(error) = result {
                 assert!(
                     !format!("{error:?}").starts_with("Validation"),
-                    "UserUpdate refused {body}: {error}"
+                    "SetFleetDesired refused {body}: {error}"
                 );
             }
         }

@@ -4,8 +4,6 @@ all AckAlert
 all AcknowledgeIncident
 ent ActivateRemoteTaskSigningCandidate
 all AddPanel
-oss AddUserToOrg
-all AssumeServiceAccount
 ent AutoObserveCoverage
 ent AutoObserveCoverageHistory
 ent AutoObserveDecide
@@ -286,7 +284,6 @@ all RemoveKVValue
 all RemoveTimedAnnotationFromPanel
 all RenameFleet
 all RenameFleetCollector
-all RenameOrganization
 ent ReopenAlertCalibrationDismissal
 ent ReplaceRemoteTaskAuthSecret
 ent ReplaceRemoteTaskHeaderSecret
