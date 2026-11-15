@@ -1186,9 +1186,7 @@ export default defineComponent({
     const splitterModel = ref(100);
     const selectedLanguage: any = langList.find((l) => l.code == getLocale()) || langList[0];
 
-    // Insert / remove the AI Observability menu entry based on the live config
-    // flag. Position: directly after Traces. Idempotent — safe to call from
-    // multiple lifecycle hooks.
+    // Profiles is inserted right after Traces, so anchoring on Traces would land between the two.
     const updateAIObservabilityMenu = () => {
       syncFeatureLink(
         {
