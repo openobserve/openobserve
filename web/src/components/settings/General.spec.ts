@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import General from "./General.vue";
+import { fullConfigLoad } from "@/composables/useFullConfigLoad";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
@@ -794,6 +795,19 @@ describe("General", () => {
         ]);
       });
 
+      it("marks the org's full config loaded after the upload refetches it", async () => {
+        fullConfigLoad.loadedOrg = "";
+        const wrapper = createWrapper();
+
+        Object.assign(wrapper.vm, { filesLight: lightFile });
+        await nextTick();
+        await formOf(wrapper).handleSubmit();
+        await flushPromises();
+
+        expect(mockConfigService.get_config_full).toHaveBeenCalledWith("test-org");
+        expect(fullConfigLoad.loadedOrg).toBe("test-org");
+      });
+
       it("names the logo whose upload failed and keeps only that file unsaved", async () => {
         mockSettingsService.createLogo.mockImplementation(
           (_org: string, _data: any, mode: string) =>
@@ -863,6 +877,17 @@ describe("General", () => {
         variant: "success",
         message: "Light Mode logo deleted successfully.",
       });
+    });
+
+    it("marks the org's full config loaded after a delete refetches it", async () => {
+      fullConfigLoad.loadedOrg = "";
+      const wrapper = createWrapper();
+
+      await wrapper.vm.deleteLogo();
+      await flushPromises();
+
+      expect(mockConfigService.get_config_full).toHaveBeenCalledWith("test-org");
+      expect(fullConfigLoad.loadedOrg).toBe("test-org");
     });
 
     it("should delete dark mode logo successfully", async () => {
