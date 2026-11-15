@@ -49,6 +49,8 @@ const AUTO_AWESOME_CALL_SITES = [
   "components/alerts/rca/RcaAnalysisBar.vue",
   "components/autoobserve/v2/TopBar.vue",
   "components/login/firstSourceOptions.ts",
+  // Main's folder icon picker lists every registry icon by name; it is a catalog, not an assistant glyph.
+  "lib/forms/EmojiPicker/flatIconCatalog.ts",
   "layouts/MainLayout.vue",
   "components/rum/productAnalytics/FunnelBuilder.vue",
   "components/rum/productAnalytics/funnelParts/FunnelAddStep.vue",
