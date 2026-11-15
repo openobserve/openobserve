@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, defineComponent, inject, ref, shallowRef } from "vue";
 
 import type { AssistantCapability, GateCode, Starter } from "@/composables/assistant";
-import { assistantSessionSourceKey } from "@/composables/assistant/pure";
+import { assistantSessionSourceKey, viewedChatSids } from "@/composables/assistant/pure";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { CREDIT_NOTICE_PREFIX } from "@/composables/assistant/useAssistantCredits";
@@ -1005,6 +1005,36 @@ describe("WP-06 conversation wiring", () => {
     await wrapper.get('[data-test="assistant-turn-outcome-action"]').trigger("click");
     expect(wrapper.find('[data-test="assistant-turn-outcome-open-here"]').exists()).toBe(true);
     open.mockRestore();
+  });
+
+  it("counts its chat as viewed only while the transcript is on screen", async () => {
+    const { wrapper, store } = live({ state: "done" }, MESSAGES);
+    // Earlier shells in this file stay mounted on the same store, so this one shows its own chat.
+    const sid = store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "window" },
+      detached: true,
+    });
+    store.state.sessions[sid].messages.push(...(MESSAGES as never[]));
+    await wrapper.setProps({ sid });
+    await flushPromises();
+    expect(viewedChatSids().has(sid)).toBe(true);
+    await wrapper.setProps({ sheet: true });
+    store.setSheetSnap("peek");
+    await flushPromises();
+    expect(viewedChatSids().has(sid)).toBe(false);
+    store.setSheetSnap("half");
+    await wrapper.setProps({ covered: true });
+    expect(viewedChatSids().has(sid)).toBe(false);
+    await wrapper.setProps({ covered: false });
+    const vm = wrapper.vm as unknown as { $: { setupState: { chatsOpen: boolean } } };
+    vm.$.setupState.chatsOpen = true;
+    await flushPromises();
+    expect(viewedChatSids().has(sid)).toBe(false);
+    vm.$.setupState.chatsOpen = false;
+    await flushPromises();
+    expect(viewedChatSids().has(sid)).toBe(true);
+    wrapper.unmount();
+    expect(viewedChatSids().has(sid)).toBe(false);
   });
 });
 

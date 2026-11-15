@@ -553,6 +553,8 @@ export interface AssistantShellProps {
   narrow?: boolean;
   /** Rendered inside OSheet below `lg`; changes density and the menu items only. */
   sheet?: boolean;
+  /** Another view sits over this shell, such as a followed RCA run. */
+  covered?: boolean;
   host?: AssistantHostAdapter;
   density?: "compact" | "roomy";
   /** No chat bar: the chat's controls float in its top corner as icons, and the page around it lists the chats. It is the page's main surface, so it offers no Open as move. */
@@ -684,6 +686,7 @@ import {
   pushFromThread,
   recordedLedger,
   homeQueryFrom,
+  useViewedChat,
   type AssistantEvidenceHost,
   type AssistantTranscriptHost,
 } from "@/composables/assistant/pure";
@@ -719,6 +722,7 @@ const props = withDefaults(defineProps<AssistantShellProps>(), {
   focused: false,
   narrow: false,
   sheet: false,
+  covered: false,
   host: undefined,
   density: "compact",
   bare: false,
@@ -906,6 +910,15 @@ watch(
 watch(showTitle, (shown) => {
   if (!shown) chatsOpen.value = false;
 });
+// Seen clears the chat's badge on every device, so it needs the transcript itself on screen.
+useViewedChat(() =>
+  state.value === "conversation" &&
+  !chatsOpen.value &&
+  !props.covered &&
+  !(props.sheet && store.state.shell.sheetSnap === "peek")
+    ? activeSid.value
+    : null,
+);
 watch(
   () => history.deletedNotice.value,
   (notice) => {

@@ -54,6 +54,7 @@ export { INLINE_HOST_IDS, isDockHostId } from "./hostIds";
 export { openTabWithoutOpener } from "./openTab";
 export { answerTextOf, lastAnswerOf, markdownMessage } from "./answers";
 export { useAssistantName } from "./useAssistantName";
+export { useViewedChat, viewedChatSids } from "./viewedChats";
 export {
   foldTurns,
   hidesAttachments,

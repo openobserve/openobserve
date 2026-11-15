@@ -59,6 +59,10 @@ function session(sid: string, over: Record<string, unknown> = {}): AssistantSess
 const answering = (sid: string, over: Record<string, unknown> = {}) =>
   session(sid, { turn: { state: "responding.writing" }, ...over });
 
+async function settle() {
+  for (let tick = 0; tick < 4; tick += 1) await nextTick();
+}
+
 function chat(sid: string, over: Partial<ChatSummaryWire> = {}): ChatSummaryWire {
   return { session_id: sid, title: `Server ${sid}`, updated_at: NOW * 1000, ...over } as never;
 }
@@ -354,6 +358,9 @@ describe("createRuns", () => {
       stopElsewhere: vi.fn(async () => undefined),
       approvalElsewhere: vi.fn(() => false),
       cachedLapsedAt: () => null,
+      viewed: () => new Set(shownSids(store.state)),
+      pageVisible: () => true,
+      onSeen: vi.fn(),
       ...over,
     };
     const runs = createRuns(deps as RunsDeps);
@@ -466,6 +473,76 @@ describe("createRuns", () => {
     store.state.shell.placement = { kind: "sidebar" } as never;
     await nextTick();
     expect(seen).not.toHaveBeenCalled();
+  });
+
+  it("marks a finished turn seen once however often the list still says unseen, and again for the next turn", async () => {
+    const seen = vi.spyOn(assistantService, "markChatSeen").mockResolvedValue(undefined);
+    const { store, feed, sid } = setup();
+    const done = { seen: false, last_turn_status: "completed", last_turn_ended_at: 1 };
+    store.state.shell.activeSid = sid;
+    store.state.shell.placement = { kind: "full" } as never;
+    feed([chat(sid, done)]);
+    await settle();
+    for (let poll = 0; poll < 4; poll += 1) {
+      feed([chat(sid, done)]);
+      await settle();
+    }
+    expect(seen).toHaveBeenCalledTimes(1);
+    feed([chat(sid, { ...done, last_turn_ended_at: 2 })]);
+    await settle();
+    expect(seen).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry a failed mark on the next polls of the same turn", async () => {
+    const seen = vi.spyOn(assistantService, "markChatSeen").mockRejectedValue(new Error("500"));
+    const { store, feed, sid, deps } = setup();
+    const done = { seen: false, last_turn_status: "completed", last_turn_ended_at: 1 };
+    store.state.shell.activeSid = sid;
+    store.state.shell.placement = { kind: "full" } as never;
+    feed([chat(sid, done)]);
+    await settle();
+    feed([chat(sid, done)]);
+    await settle();
+    expect(seen).toHaveBeenCalledTimes(1);
+    expect(deps.onSeen).not.toHaveBeenCalled();
+  });
+
+  it("marks only a chat whose transcript is on screen in a visible page", async () => {
+    const seen = vi.spyOn(assistantService, "markChatSeen").mockResolvedValue(undefined);
+    const viewed = ref(new Set<string>());
+    const visible = ref(false);
+    const { store, feed, sid } = setup({
+      viewed: () => viewed.value,
+      pageVisible: () => visible.value,
+    });
+    store.state.shell.activeSid = sid;
+    store.state.shell.placement = { kind: "sidebar" } as never;
+    feed([chat(sid, { seen: false, last_turn_status: "completed" })]);
+    await settle();
+    viewed.value = new Set([sid]);
+    await settle();
+    expect(seen).not.toHaveBeenCalled();
+    visible.value = true;
+    await settle();
+    expect(seen).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a recorded mark over a poll that started before it, and updates the cached reads", async () => {
+    vi.spyOn(assistantService, "markChatSeen").mockResolvedValue(undefined);
+    const { store, runs, hints, feed, sid, deps } = setup();
+    const done = { seen: false, last_turn_status: "completed", last_turn_ended_at: 1 };
+    store.state.shell.activeSid = sid;
+    store.state.shell.placement = { kind: "full" } as never;
+    feed([chat(sid, done)]);
+    await settle();
+    expect(deps.onSeen).toHaveBeenCalledWith("default", sid);
+    store.state.shell.placement = { kind: "hidden" } as never;
+    store.dropSession(sid, "cleared");
+    localStorage.clear();
+    hints.fire({ type: "runs_cleared", sid });
+    feed([chat(sid, done)]);
+    await settle();
+    expect(runs.rows.value).toEqual([]);
   });
 
   it("re-reads the cleared set when another tab clears", async () => {

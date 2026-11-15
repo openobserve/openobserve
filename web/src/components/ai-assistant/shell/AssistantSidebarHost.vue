@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="stopFollowingRca"
           @reanalyze="({ runId }) => followNewRun(runId)"
         />
-        <AssistantShell v-show="!followed" placement="sidebar" />
+        <AssistantShell v-show="!followed" placement="sidebar" :covered="!!followed" />
       </div>
     </div>
     <OSheet
@@ -99,7 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="stopFollowingRca"
         @reanalyze="({ runId }) => followNewRun(runId)"
       />
-      <AssistantShell v-show="!followed" placement="sidebar" sheet :sid="sheetWindowSid" />
+      <AssistantShell
+        v-show="!followed"
+        placement="sidebar"
+        sheet
+        :covered="!!followed"
+        :sid="sheetWindowSid"
+      />
     </OSheet>
   </template>
   <AssistantLifecycleDialogs />

@@ -108,6 +108,7 @@ import { createApprovalsRuntime, type ApprovalsRuntime } from "./useAssistantApp
 import { createAssistantHistory, type AssistantHistory } from "./useAssistantHistory";
 import { useAssistantClient } from "./useAssistantClient";
 import { assistantKeydownAt } from "./useAssistantIdleFocus";
+import { viewedChatSids } from "./viewedChats";
 
 const TELEMETRY_ROLES: Record<string, TelemetryRole> = {
   admin: "admin",
@@ -326,6 +327,7 @@ function buildRuntime(): AssistantRuntime {
         () => lifecycle,
         hints,
         () => history,
+        pageVisible,
       ),
     );
     const keepAlive = createApprovalKeepAlive({
@@ -431,6 +433,7 @@ function runsDeps(
   lifecycle: () => AssistantLifecycleRuntime,
   hints: AssistantHintChannel,
   history: () => AssistantHistory,
+  pageVisible: Ref<boolean>,
 ): RunsDeps {
   return {
     store,
@@ -462,7 +465,24 @@ function runsDeps(
       history()
         .localRecords()
         .find((record) => record.sessionId === sid)?.cachedLapsedAt,
+    viewed: viewedChatSids,
+    pageVisible: () => pageVisible.value,
+    onSeen: markSeenInCache,
   };
+}
+
+// Every cached list read, the active one included, so a refetch already in flight is the only stale copy.
+function markSeenInCache(org: string, sid: string): void {
+  queryClient.setQueriesData<ChatsPage>({ queryKey: assistantKeys.chats(org) }, (page) =>
+    page?.chats
+      ? {
+          ...page,
+          chats: page.chats.map((chat) =>
+            chat.session_id === sid ? { ...chat, seen: true } : chat,
+          ),
+        }
+      : page,
+  );
 }
 
 // History is built after the store and the capability, which take it lazily through `deps`.
