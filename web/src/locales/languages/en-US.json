@@ -12031,7 +12031,7 @@
         "scope": "Scope",
         "tool": "Tool or operation"
       },
-      "empty": "No standing approvals.",
+      "empty": "No standing approvals",
       "loadFailed": "Standing approvals could not be loaded.",
       "openChat": "Open chat",
       "revoke": "Revoke",
@@ -12598,7 +12598,7 @@
         "help": "Members can dictate into the composer and edit the text before sending. Nothing is sent until they press Send.",
         "localOnly": "Saved in this browser, for you only. Settings for the whole organization need a newer server version.",
         "off": "Off",
-        "offHelp": "No mic button in the composer.",
+        "offHelp": "Members see no mic button; admins see it crossed out.",
         "readOnly": "Server speech-to-text needs a newer server version.",
         "title": "Voice dictation"
       }
@@ -12985,7 +12985,7 @@
       "deleteTitle": "Delete {name}?",
       "deleted": "{name} deleted",
       "editNamed": "Edit {name}",
-      "empty": "No toolsets yet. Add an MCP server, a CLI tool or a skill @:{'brand.autobot'} can use.",
+      "empty": "Add an MCP server, a CLI tool or a skill the assistant can use.",
       "emptyTitle": "No toolsets yet",
       "enableFailed": "{name} could not be updated.",
       "enabledFor": "Enabled, {name}",

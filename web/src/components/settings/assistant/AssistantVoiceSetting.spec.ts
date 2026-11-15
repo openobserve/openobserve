@@ -64,7 +64,7 @@ describe("AssistantVoiceSetting", () => {
   it("defaults to Off on self-hosted (A5)", () => {
     const wrapper = render();
     expect(pressed(wrapper, "off")).toBe("on");
-    expect(wrapper.text()).toContain("No mic button in the composer.");
+    expect(wrapper.text()).toContain("Members see no mic button; admins see it crossed out.");
   });
 
   it("lets an admin turn on this browser, saved per user+org", async () => {
