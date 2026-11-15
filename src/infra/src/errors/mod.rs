@@ -268,6 +268,12 @@ pub enum ErrorCodes {
     LicenseFeatureNotEntitled(String),
 }
 
+impl From<config::meta::search::QueryOutOfRange> for Error {
+    fn from(value: config::meta::search::QueryOutOfRange) -> Self {
+        Error::ErrorCode(ErrorCodes::InvalidParams(value.to_string()))
+    }
+}
+
 impl From<sea_orm::DbErr> for Error {
     fn from(value: sea_orm::DbErr) -> Self {
         Error::DbError(DbError::SeaORMError(value.to_string()))

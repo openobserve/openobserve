@@ -1923,7 +1923,10 @@ pub async fn result_schema(
         return res;
     }
 
-    let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
+    let query: proto::cluster_rpc::SearchQuery = match req.query.clone().try_into() {
+        Ok(v) => v,
+        Err(e) => return MetaHttpResponse::bad_request(e),
+    };
     let sql = match search::sql::Sql::new(&query, &org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
