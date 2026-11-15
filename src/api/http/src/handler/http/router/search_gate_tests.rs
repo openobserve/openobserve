@@ -270,14 +270,14 @@ const BACKGROUND_SEARCH_FNS: [(&str, Option<&str>); 10] = [
     ),
 ];
 
-const SEARCH_ENTRY: &str = r"\b(?:\w+::)*(?:search|search_service|SearchService|core_promql|promql_service)::(?:(?:cache|search)::)?(?:search|search_request|search_multi|search_partition|search_partition_multi)\(|\bgrpc_search(?:_partition)?\(|process_search_stream_request(?:_multi)?\(|eval_jobs::search::execute|execute_training_query\(";
+const SEARCH_ENTRY: &str = r"\b(?:\w+::)*(?:search|search_service|SearchService|core_promql|promql_service)::(?:(?:cache|search)::)?(?:search|search_request|search_multi|search_partition|search_partition_multi)\(|\bgrpc_search(?:_partition)?\(|process_search_stream_request(?:_multi)?\(|eval_jobs::search::execute|execute_training_query\(|\bsearch_partition_mode\(";
 
 /// A `use` that brings a search entry fn into scope, so calls name it bare.
 const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchService|promql_service::search)::(search|search_request|search_multi|search_partition|search_partition_multi)(?:\s+as\s+(\w+))?\b[^;]*;";
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 78] = [
+const SEARCH_CALLERS: [(&str, &str, Caller); 79] = [
     ("api/management/src/request/alert_calibration/digests.rs", "search_at", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
@@ -333,6 +333,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 78] = [
     ("core/src/anomaly_detection/partitioned_search.rs", "search", Caller::Background("anomaly detection runs")),
     ("core/src/autoobserve/ports.rs", "promql", Caller::Background("AutoObserve engine runs")),
     ("core/src/autoobserve/ports.rs", "search", Caller::Background("AutoObserve engine runs")),
+    ("core/src/autoobserve/ports.rs", "search_streamed", Caller::Background("AutoObserve engine runs")),
     ("core/src/db_monitoring/rollup.rs", "run_dbm_search", Caller::Background("DBM rollup")),
     ("core/src/downtimes/values.rs", "run_search", Caller::Routed("downtimes::")),
     ("core/src/fleet.rs", "instant", Caller::Helper("fleet pipelines; request/fleet/mod.rs checks the licence")),

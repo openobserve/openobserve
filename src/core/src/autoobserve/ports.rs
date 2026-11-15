@@ -67,6 +67,8 @@ const ORG_BUCKETS: u64 = 32;
 const RECORDS_BATCH: usize = 500;
 /// The file list's hour partition key, `YYYY/MM/DD/HH`.
 const DATE_KEY: &str = "%Y/%m/%d/%H";
+/// A querier that does not answer a cancel this soon is left to its own query timeout.
+const CANCEL_BUDGET: Duration = Duration::from_secs(5);
 
 pub struct SearchAdapter;
 
@@ -97,6 +99,34 @@ impl SearchPort for SearchAdapter {
                 Ok(SearchPage::default())
             }
             other => other.map_err(rejected_or_failed),
+        }
+    }
+
+    /// A read cut by the deadline or dropped by its caller has its scans cancelled in the
+    /// background.
+    async fn sql_streamed(
+        &self,
+        org: &str,
+        sql: &str,
+        range: (i64, i64),
+        size: i64,
+        timeout: Duration,
+    ) -> anyhow::Result<SearchPage> {
+        let trace_id = ider::generate_trace_id();
+        let mut guard = CancelOnDrop {
+            org: org.to_string(),
+            trace_id: trace_id.clone(),
+            armed: true,
+        };
+        let read = search_streamed(&trace_id, org, sql, range, size, timeout);
+        let read = tokio::time::timeout(timeout, read).await;
+        guard.armed = read.is_err();
+        match read {
+            Err(_) => anyhow::bail!("streamed search timed out after {timeout:?}"),
+            Ok(Err(InfraError::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(_)))) => {
+                Ok(SearchPage::default())
+            }
+            Ok(other) => other.map_err(rejected_or_failed),
         }
     }
 
@@ -417,6 +447,37 @@ impl TriggerPort for EngineTrigger {
     }
 }
 
+/// The collector's producer runs detached, so a read that did not finish cancels the trace's scans.
+struct CancelOnDrop {
+    org: String,
+    trace_id: String,
+    armed: bool,
+}
+
+impl Drop for CancelOnDrop {
+    fn drop(&mut self) {
+        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        if !self.armed {
+            return;
+        }
+        let (org, trace_id) = (
+            std::mem::take(&mut self.org),
+            std::mem::take(&mut self.trace_id),
+        );
+        runtime.spawn(async move {
+            search_service::abort_trace_family(&org, &trace_id).await;
+            let cancel = search_service::cancel_query(&org, &trace_id);
+            match tokio::time::timeout(CANCEL_BUDGET, cancel).await {
+                Ok(Ok(_)) => {}
+                Ok(Err(e)) => log::warn!("[autoobserve] trace_id {trace_id}: cancel failed: {e}"),
+                Err(_) => log::warn!("[autoobserve] trace_id {trace_id}: cancel unanswered"),
+            }
+        });
+    }
+}
+
 pub fn ports() -> Ports {
     Ports {
         search: Arc::new(SearchAdapter),
@@ -448,6 +509,44 @@ async fn search(
     Ok(SearchPage {
         hits: resp.hits,
         is_partial: resp.is_partial,
+    })
+}
+
+/// The partitioned streaming search folded into one answer; a clamped range or cut answer fails.
+async fn search_streamed(
+    trace_id: &str,
+    org: &str,
+    sql: &str,
+    range: (i64, i64),
+    size: i64,
+    timeout: Duration,
+) -> Result<SearchPage, InfraError> {
+    let mut req = engine_request(sql, range, (0, size), timeout);
+    let streams = config::meta::sql::resolve_stream_names(sql).map_err(|e| {
+        InfraError::ErrorCode(infra::errors::ErrorCodes::SearchSQLNotValid(e.to_string()))
+    })?;
+    let resp = search_service::streaming::collect::search_partition_mode(
+        trace_id,
+        org,
+        "",
+        &mut req,
+        StreamType::Logs,
+        streams,
+        None,
+        String::new(),
+        tracing::Span::current(),
+        false,
+    )
+    .await?;
+    if resp.is_partial {
+        return Err(InfraError::Message(format!(
+            "partial streamed search: {}",
+            resp.function_error.join("; ")
+        )));
+    }
+    Ok(SearchPage {
+        hits: resp.hits,
+        is_partial: false,
     })
 }
 
