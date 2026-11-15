@@ -162,6 +162,18 @@ describe("AssistantContextSeesPopover", () => {
     expect(trackAssistant).toHaveBeenCalledWith("ai_context_inspected", { target: "sees" });
   });
 
+  it("wraps the Not Sent list over up to three lines so no withheld name is cut off", async () => {
+    const { group } = await openPopover();
+    const notSent = group("page")!.querySelector('[data-field="not_read"]')!;
+    const value = notSent.querySelector('[data-test="o-truncated-text"]')!;
+    expect(value.classList.contains("line-clamp-3")).toBe(true);
+    expect(notSent.classList.contains("items-start")).toBe(true);
+    const page = group("page")!.querySelector(
+      '[data-field="currentPage"] [data-test="o-truncated-text"]',
+    )!;
+    expect(page.classList.contains("line-clamp-3")).toBe(false);
+  });
+
   it("shows each row as one line with an icon, a label and a value", async () => {
     const { group } = await openPopover();
     const rows = group("page")!.querySelectorAll('[data-test="assistant-context-sees-row"]');

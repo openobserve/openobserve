@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="line in lines"
           :key="line.id"
-          :class="[ROW, line.secondary ? 'items-start' : 'items-center']"
+          :class="[ROW, line.secondary || line.lines ? 'items-start' : 'items-center']"
           data-test="assistant-context-sees-row"
           :data-field="line.id"
         >
@@ -73,9 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span class="text-text-secondary shrink-0 text-xs">{{ line.label }}</span>
           <div class="flex min-w-0 flex-1 flex-col items-end">
-            <OTruncatedText class="text-text-body max-w-full text-sm">{{
-              line.value
-            }}</OTruncatedText>
+            <OTruncatedText
+              :lines="line.lines ?? 1"
+              class="text-text-body max-w-full text-end text-sm"
+              >{{ line.value }}</OTruncatedText
+            >
             <OTruncatedText
               v-if="line.secondary"
               class="text-text-secondary max-w-full text-xs leading-tight"
@@ -156,6 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { fieldRowOf, type ContextDraft, type SeesRow, type Sid } from "@/composables/assistant";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
+import type { TruncatedTextLines } from "@/lib/core/Typography/OTruncatedText.types";
 
 export interface AssistantContextSeesPopoverProps {
   sid: Sid | null;
@@ -173,6 +176,7 @@ interface SeesLine {
   secondary?: string;
   secondaryTest?: string;
   help?: boolean;
+  lines?: TruncatedTextLines;
 }
 
 const STREAMS_ROW = "selectedStreams";
@@ -180,6 +184,9 @@ const STREAMS_ROW = "selectedStreams";
 const ATTACHMENTS_ROW = "attachments";
 
 const PANEL_GAP_PX = 8;
+
+// Not Sent lists every withheld field, so it wraps instead of hiding names behind an ellipsis.
+const NOT_SENT_LINES: TruncatedTextLines = 3;
 
 const CARD =
   "rounded-default border-border-subtle bg-surface-subtle divide-border-subtle flex flex-col divide-y border";
@@ -317,6 +324,7 @@ const lines = computed<SeesLine[]>(() => {
       value: notRead.value.map((row) => row.label).join(", "),
       glyph: assistantGlyph.withheld,
       help: true,
+      lines: NOT_SENT_LINES,
     });
   return out;
 });
