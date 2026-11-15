@@ -62,6 +62,22 @@ pub static DATAFUSION_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
     )
 });
 
+/// Blocking-only pool for tantivy index builds. A fixed thread count keeps build garbage in a few
+/// reused allocator heaps instead of spreading it over every blocking thread of the caller.
+pub static TANTIVY_BUILD_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+    let cfg = get_config();
+    tokio::runtime::Builder::new_current_thread()
+        .thread_name("tantivy_build")
+        .thread_stack_size(THREAD_STACK_SIZE)
+        .max_blocking_threads(
+            cfg.limit
+                .cpu_num
+                .max(cfg.compact.tantivy_builder_thread_num),
+        )
+        .build()
+        .unwrap()
+});
+
 pub static WAL_RUNTIME: Lazy<Option<Arc<Runtime>>> = Lazy::new(|| {
     let cfg = get_config();
 
@@ -93,3 +109,43 @@ pub static WAL_RUNTIME: Lazy<Option<Arc<Runtime>>> = Lazy::new(|| {
         .ok()
         .map(Arc::new)
 });
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashSet, time::Duration};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_tantivy_build_runtime_uses_fixed_thread_count() {
+        let cfg = get_config();
+        let max_threads = cfg
+            .limit
+            .cpu_num
+            .max(cfg.compact.tantivy_builder_thread_num);
+        let tasks: Vec<_> = (0..max_threads * 3)
+            .map(|_| {
+                TANTIVY_BUILD_RUNTIME.spawn_blocking(|| {
+                    std::thread::sleep(Duration::from_millis(20));
+                    let t = std::thread::current();
+                    (t.id(), t.name().map(str::to_string))
+                })
+            })
+            .collect();
+        let mut ids = HashSet::new();
+        for task in tasks {
+            let (id, name) = task.await.unwrap();
+            assert_eq!(name.as_deref(), Some("tantivy_build"));
+            ids.insert(id);
+        }
+        assert!(ids.len() <= max_threads, "{} > {max_threads}", ids.len());
+    }
+
+    #[tokio::test]
+    async fn test_tantivy_build_runtime_propagates_panic() {
+        let res = TANTIVY_BUILD_RUNTIME
+            .spawn_blocking(|| panic!("build failed"))
+            .await;
+        assert!(res.unwrap_err().is_panic());
+    }
+}
