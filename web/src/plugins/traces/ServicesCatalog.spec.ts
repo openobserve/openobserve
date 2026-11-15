@@ -3819,7 +3819,7 @@ describe("ServicesCatalog Health of the version serving now", () => {
   });
 });
 
-describe("ServicesCatalog Env cells while version tracking is down", () => {
+describe("ServicesCatalog version cells with no registry scope", () => {
   let view: VueWrapper | undefined;
   beforeEach(() => {
     config.isEnterprise = "true";
@@ -3827,17 +3827,6 @@ describe("ServicesCatalog Env cells while version tracking is down", () => {
     resetListViewState();
     mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
     mockGetStreams.mockResolvedValue({ list: [{ name: "default" }] });
-    mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
-      callbacks.data(null, {
-        type: "search_response_hits",
-        content: { results: { hits: [{ service_name: "checkout", total_requests: 10 }] } },
-      });
-      callbacks.complete(null, {});
-    });
-    vi.spyOn(serviceVersionsService, "services").mockRejectedValue({
-      isAxiosError: true,
-      response: { status: 404 },
-    });
   });
   afterEach(() => {
     view?.unmount();
@@ -3846,62 +3835,55 @@ describe("ServicesCatalog Env cells while version tracking is down", () => {
     queryClient.clear();
   });
 
-  it("shows the muted unavailable dash, as the other version cells do", async () => {
-    view = mountServicesCatalog({
-      stubs: {
-        OTable: {
-          template: `<div data-test="services-catalog-table"><slot name="cell-version_env" :row="{ service_name: 'checkout' }" /></div>`,
-        },
-        OTooltip: { props: ["content"], template: '<i class="tip">{{ content }}</i>' },
+  it.each([
+    {
+      state: "version tracking is down",
+      row: "{ service_name: 'checkout' }",
+      registry: () =>
+        vi.spyOn(serviceVersionsService, "services").mockRejectedValue({
+          isAxiosError: true,
+          response: { status: 404 },
+        }),
+      cells: { "cell-version_env": "svcver-env-unavailable" },
+      tip: "unavailable",
+    },
+    {
+      state: "the row's spans carry no place",
+      row: "{ service_name: 'querier', where_key: '' }",
+      registry: () =>
+        vi.spyOn(serviceVersionsService, "services").mockResolvedValue({
+          data: { services: [], envs: [] },
+        } as never),
+      cells: {
+        "cell-version_env": "svcver-env-none",
+        "cell-version_where": "svcver-where-unreported",
       },
-    });
-    await flushPromises();
-    const cell = view.get('[data-test="svcver-env-unavailable"]');
-    expect(cell.text()).toContain("—");
-    expect(cell.get(".tip").text()).toBe("unavailable");
-  });
-});
-
-describe("ServicesCatalog Env and Where of a row its spans do not place", () => {
-  let view: VueWrapper | undefined;
-  beforeEach(() => {
-    config.isEnterprise = "true";
-    queryClient.clear();
-    resetListViewState();
-    mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
-    mockGetStreams.mockResolvedValue({ list: [{ name: "default" }] });
+      tip: "",
+    },
+  ])("shows the muted dash with its reason in each version cell when $state", async (c) => {
+    const service = c.row.match(/service_name: '([^']+)'/)![1];
     mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
       callbacks.data(null, {
         type: "search_response_hits",
-        content: { results: { hits: [{ service_name: "querier", total_requests: 10 }] } },
+        content: { results: { hits: [{ service_name: service, total_requests: 10 }] } },
       });
       callbacks.complete(null, {});
     });
-    vi.spyOn(serviceVersionsService, "services").mockResolvedValue({
-      data: { services: [], envs: [] },
-    } as never);
-  });
-  afterEach(() => {
-    view?.unmount();
-    config.isEnterprise = "false";
-    vi.restoreAllMocks();
-    queryClient.clear();
-  });
-
-  it("shows the muted dash with its reason instead of an empty cell", async () => {
+    c.registry();
+    const slots = Object.keys(c.cells).map((slot) => `<slot name="${slot}" :row="${c.row}" />`);
     view = mountServicesCatalog({
       stubs: {
-        OTable: {
-          template: `<div data-test="services-catalog-table"><slot name="cell-version_env" :row="{ service_name: 'querier', where_key: '' }" /><slot name="cell-version_where" :row="{ service_name: 'querier', where_key: '' }" /></div>`,
-        },
+        OTable: { template: `<div data-test="services-catalog-table">${slots.join("")}</div>` },
         OTooltip: { props: ["content"], template: '<i class="tip">{{ content }}</i>' },
       },
     });
     await flushPromises();
-    for (const id of ["svcver-env-none", "svcver-where-unreported"]) {
+    for (const id of Object.values(c.cells)) {
       const cell = view.get(`[data-test="${id}"]`);
       expect(cell.text()).toContain("—");
-      expect(cell.get(".tip").text().trim()).not.toBe("");
+      const tip = cell.get(".tip").text();
+      if (c.tip) expect(tip).toBe(c.tip);
+      else expect(tip.trim()).not.toBe("");
     }
   });
 });

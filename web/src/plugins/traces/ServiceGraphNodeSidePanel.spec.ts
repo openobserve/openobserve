@@ -1681,51 +1681,66 @@ describe("ServiceGraphNodeSidePanel", () => {
   });
 
   describe("versions tab placement and identity header", () => {
-    it("orders Operations, then Metrics, then Versions last with its count, and shows the current identity", async () => {
-      const previous = config.isEnterprise;
-      config.isEnterprise = "true";
-      Object.assign(routeQuery, { panel: "operations", panelSvc: "svc", panelWhere: "k8s:c1/web" });
-      panelVersions.splice(
-        0,
-        panelVersions.length,
-        ...[
-          { version: "2.0", active: true, first_seen: 2 },
-          { version: "1.0", active: false, first_seen: 1 },
-          { version: "9.9", active: true, first_seen: 3, where_key: "k8s:c2/web" },
-        ].map((row) => ({
-          version_key: row.version,
-          where_key: "k8s:c1/web",
-          where: { kind: "k8s", k8s_cluster: "c1", k8s_namespace: "web" },
-          env: "prod",
-          env_source: "attribute",
-          signals: {},
-          deploys: [],
-          ...row,
-        })),
-      );
-      try {
-        wrapper = mountPanel();
-        await flushPromises();
-        await flushPromises();
-        const tabs = wrapper
-          .findAll('[data-test="service-graph-node-panel-tabs"] [data-test]')
-          .map((tab) => tab.attributes("data-test"))
-          .filter((id) => /tab-operations|svcver-versions-tab|tab-metrics/.test(id || ""));
-        expect(tabs).toEqual([
-          "service-graph-node-panel-tab-operations",
-          "service-graph-node-panel-tab-metrics",
-          "svcver-versions-tab",
-        ]);
-        expect(wrapper.find('[data-test="svcver-versions-count"]').text()).toBe("2");
-        const identity = wrapper.find('[data-test="svcver-panel-identity"]').text();
-        expect(identity).toContain("c1 · web");
-        expect(identity).toContain("2.0");
-      } finally {
-        config.isEnterprise = previous;
-        for (const key of Object.keys(routeQuery)) delete routeQuery[key];
-        panelVersions.splice(0);
-      }
-    });
+    it.each([
+      { scope: "route's", panel: "operations", where: "k8s:c1/web", spans: "k8s:c1/web" },
+      { scope: "Versions tab's own", panel: "versions", where: "", spans: "" },
+    ])(
+      "orders Operations, then Metrics, then Versions last with its count, and shows the $scope place",
+      async (c) => {
+        const previous = config.isEnterprise;
+        config.isEnterprise = "true";
+        getStreamMock.mockResolvedValueOnce({
+          schema: ["service_name", "o2_service_where"].map((name) => ({ name, type: "keyword" })),
+        });
+        Object.assign(routeQuery, { panel: c.panel, panelSvc: "frontend", panelWhere: c.where });
+        panelVersions.splice(
+          0,
+          panelVersions.length,
+          ...[
+            { version: "2.0", active: true, first_seen: 2 },
+            { version: "1.0", active: false, first_seen: 1 },
+            { version: "9.9", active: true, first_seen: 3, where_key: "k8s:c2/web" },
+          ].map((row) => ({
+            version_key: row.version,
+            where_key: "k8s:c1/web",
+            where: { kind: "k8s", k8s_cluster: "c1", k8s_namespace: "web" },
+            env: "prod",
+            env_source: "attribute",
+            signals: {},
+            deploys: [],
+            ...row,
+          })),
+        );
+        try {
+          wrapper = mountPanel();
+          await flushPromises();
+          await flushPromises();
+          const tabs = wrapper
+            .findAll('[data-test="service-graph-node-panel-tabs"] [data-test]')
+            .map((tab) => tab.attributes("data-test"))
+            .filter((id) => /tab-operations|svcver-versions-tab|tab-metrics/.test(id || ""));
+          expect(tabs).toEqual([
+            "service-graph-node-panel-tab-operations",
+            "service-graph-node-panel-tab-metrics",
+            "svcver-versions-tab",
+          ]);
+          expect(wrapper.find('[data-test="svcver-versions-count"]').text()).toBe("2");
+          const identity = wrapper.find('[data-test="svcver-panel-identity"]').text();
+          expect(identity).toContain("c1 · web");
+          expect(identity).toContain("2.0");
+          const ops = vi
+            .mocked(searchService.search)
+            .mock.calls.map((call: any) => call[0].query.query.sql)
+            .find((sql: string) => sql.includes("GROUP BY operation_name"));
+          if (c.spans) expect(ops).toContain(`o2_service_where = '${c.spans}'`);
+          else expect(ops).not.toContain("o2_service_where");
+        } finally {
+          config.isEnterprise = previous;
+          for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+          panelVersions.splice(0);
+        }
+      },
+    );
 
     it.each([
       { tab: "service-version", lands: "service-version" },

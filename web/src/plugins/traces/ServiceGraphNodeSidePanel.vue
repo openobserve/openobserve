@@ -377,6 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabPanel name="versions"
             ><ServiceVersionsTab
               :service="selectedNode?.name || selectedNode?.label || selectedNode?.id || ''"
+              @scope="(scope) => (versionsTabScope = scope)"
           /></OTabPanel>
           <!-- Operations Tab -->
           <OTabPanel
@@ -1203,9 +1204,19 @@ export default defineComponent({
           !props.selectedNode?.service_type,
       })),
     );
+    // The tab's own pick labels the header and count only; spans never take it, since unstamped spans match no place.
+    const versionsTabScope = ref({ service: "", where: "" });
+    const versionsWhere = computed(() => {
+      const node = props.selectedNode;
+      const name = node?.name || node?.label || node?.id || "";
+      return (
+        versionPanel.state.value.where ||
+        (versionsTabScope.value.service === name ? versionsTabScope.value.where : "")
+      );
+    });
     const scopedVersions = computed(() =>
       (panelVersions.data.value?.versions || []).filter(
-        (row) => row.where_key === versionPanel.state.value.where,
+        (row) => row.where_key === versionsWhere.value,
       ),
     );
     const versionCount = computed(() => scopedVersions.value.length);
@@ -3077,6 +3088,7 @@ export default defineComponent({
       markerQuery,
       deployBuildLabel,
       versionCount,
+      versionsTabScope,
       headerIdentity,
       headerVersion,
       compareDrawer,

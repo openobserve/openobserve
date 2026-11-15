@@ -421,6 +421,7 @@ type PanelRow = Version & {
   history: Transition[];
 };
 const props = defineProps<{ service: string }>();
+const emit = defineEmits<{ scope: [scope: { service: string; where: string }] }>();
 const enabled = config.isEnterprise === "true" || config.isCloud === "true";
 const historyEnd = Date.now() * 1000;
 const pageSize = 20;
@@ -485,6 +486,9 @@ watch(
   { immediate: true },
 );
 const where = computed(() => panel.state.value.where || autoWhere.value);
+watch(where, (value) => emit("scope", { service: props.service, where: value }), {
+  immediate: true,
+});
 const query = useQuery(
   computed(() => ({
     ...versionsQuery(org.value, user.value, {
