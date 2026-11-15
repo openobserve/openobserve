@@ -382,7 +382,7 @@ test.describe("assistant accessibility", () => {
     await start(context, page);
     await openOnLogs(page);
     await expectClean(page, "forced-colors-sidebar");
-    // The status light was folded into the header button; its data-state and name now carry the signal.
+    // The header button carries the signal in data-state and its name; the status light inside is the visible mark.
     const light = assistant.headerButton;
     const shots = {};
     const signal = async (name, scenario, ready, closeWhen) => {

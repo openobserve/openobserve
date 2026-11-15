@@ -50,8 +50,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             view.state === 'off' ? 'opacity-50 grayscale' : '',
           ]"
         />
+        <span v-if="view.signal" class="absolute -end-1 -top-1 inline-flex">
+          <AssistantStatusDot
+            :state="view.signal"
+            :count="view.count"
+            data-test="assistant-header-status-light"
+          />
+        </span>
         <span
-          v-if="view.badge"
+          v-else-if="view.badge"
           aria-hidden="true"
           class="rounded-default bg-surface-base text-text-secondary absolute -end-1.5 -top-1.5 inline-flex size-3.5 items-center justify-center"
         >
@@ -165,6 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import type { AssistantSession, GateReason } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
+import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 
 export type HeaderButtonState = "loading" | "hidden" | "idle" | "open" | "locked" | "off";
 
@@ -175,6 +183,8 @@ interface HeaderView {
   state: HeaderButtonState;
   name: I18nText;
   tooltip: I18nText;
+  signal: AssistantSignal | null;
+  count?: number;
   badge: "locked" | "notSetUp" | null;
   /** The pitch or setup card a click opens instead of the container. */
   dialog: GateReason | null;
@@ -193,6 +203,7 @@ import { useStore } from "vuex";
 
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
+import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantGateState, {
   gateLearnOpen,
@@ -285,7 +296,7 @@ function titleOf(sid: string | null): I18nText {
 }
 
 function plain(state: HeaderButtonState, name: I18nText, tooltip: I18nText): HeaderView {
-  return { state, name, tooltip, badge: null, dialog: null };
+  return { state, name, tooltip, signal: null, badge: null, dialog: null };
 }
 
 function gateView(): HeaderView | null {
@@ -334,9 +345,74 @@ function gateView(): HeaderView | null {
 
 // Chat activity never restyles the button; only the container and the gate do (owner decision).
 function lightView(): HeaderView {
-  if (store.headerLight.value.state === "open" || visible.value) return openView();
-  const name = t("assistant.header.tooltip", { product });
-  return plain("idle", name, name);
+  const light = store.headerLight.value;
+  const p = { product };
+  const open = visible.value;
+  if (light.state === "needs_you") {
+    const waiting = runs.needsCount.value || mine.value.filter(needsYou).length;
+    const session = light.sid ? store.state.sessions[light.sid] : undefined;
+    const consent = session?.turn.state === "awaiting_consent" || !!session?.pendingConsent;
+    return {
+      ...plain(
+        "needs_you",
+        waiting > 0
+          ? t(
+              open
+                ? "assistant.header.needsYouCountNameOpen"
+                : "assistant.header.needsYouCountName",
+              { ...p, count: waiting },
+            )
+          : t(open ? "assistant.header.needsYouNameOpen" : "assistant.header.needsYouName", p),
+        consent ? t("assistant.turn.waitingConsent") : t("assistant.notice.decision"),
+      ),
+      signal: "attention",
+      ...(waiting > 0 && { count: waiting }),
+    };
+  }
+  if (light.state === "working") {
+    const running = mine.value.filter(isRunning).length;
+    const name = t(
+      open ? "assistant.header.answeringNameOpen" : "assistant.header.answeringName",
+      p,
+    );
+    const title = knownTitle(light.sid);
+    return {
+      ...plain(
+        "working",
+        name,
+        running > 1
+          ? t("assistant.header.stateRunningCount", { count: running }, running)
+          : title
+            ? t("assistant.header.stateWorking", { title })
+            : name,
+      ),
+      signal: "working",
+    };
+  }
+  if (light.state === "unread") {
+    const title = { title: titleOf(light.sid) };
+    return light.failed
+      ? {
+          ...plain(
+            "unread",
+            t("assistant.header.failedName", p),
+            t("assistant.header.stateFailed", title),
+          ),
+          signal: "failed",
+        }
+      : {
+          ...plain(
+            "unread",
+            t("assistant.header.readyName", p),
+            t("assistant.header.stateDone", title),
+          ),
+          signal: "unread",
+        };
+  }
+  const others = otherOrgView();
+  if (others) return others;
+  if (light.state === "open" || open) return openView();
+  return plain("idle", t("assistant.header.tooltip", p), t("assistant.header.tooltip", p));
 }
 
 // The label names what a click does: close the sidebar, or bring windows-only users to a sidebar chat.
@@ -352,6 +428,27 @@ function openView(): HeaderView {
     return plain("open", name, name);
   }
   return plain("open", t("assistant.header.nameOpen", p), t("assistant.header.stateOpen", p));
+}
+
+// Another org's chats count in the light; a click lists them, never opens them in place (PO B51).
+function otherOrgView(): HeaderView | null {
+  const rows = runs.otherOrg.value;
+  if (!rows.length) return null;
+  const p = { product };
+  const waiting = rows.filter((row) => row.group === "needs_you").length;
+  if (waiting)
+    return {
+      ...plain(
+        "needs_you",
+        t("assistant.header.needsYouCountName", { ...p, count: waiting }),
+        t("assistant.notice.decision"),
+      ),
+      signal: "attention",
+      count: waiting,
+      otherOrg: true,
+    };
+  const name = t("assistant.header.answeringName", p);
+  return { ...plain("working", name, name), signal: "working", otherOrg: true };
 }
 
 function buttonEl(): HTMLElement | null {
