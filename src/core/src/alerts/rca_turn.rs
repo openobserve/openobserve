@@ -65,7 +65,8 @@ use o2_enterprise::enterprise::{
             spawn_headless_turn,
         },
         client::{
-            POLICY_CONTEXT_KEY, QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER, get_agent_client,
+            HealthResponse, POLICY_CONTEXT_KEY, QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER,
+            get_agent_client,
         },
         toolsets::{CliEntry, McpEntry, SkillEntry, push::load_agent_tools},
     },
@@ -535,11 +536,14 @@ async fn start_turn(
 }
 
 /// Bound the agent health probe independently of the streaming timeout.
-async fn probe_health<T, E: std::fmt::Display>(
-    probe: impl Future<Output = Result<T, E>>,
+async fn probe_health<E: std::fmt::Display>(
+    probe: impl Future<Output = Result<HealthResponse, E>>,
 ) -> Result<(), RcaTurnError> {
     match tokio::time::timeout(HEALTH_CHECK_TIMEOUT, probe).await {
-        Ok(Ok(_)) => Ok(()),
+        Ok(Ok(health)) if health.is_healthy() => Ok(()),
+        Ok(Ok(_)) => Err(RcaTurnError::AgentUnavailable(
+            "health check answered but the agent is not healthy".to_string(),
+        )),
         Ok(Err(e)) => Err(RcaTurnError::AgentUnavailable(format!("{e:#}"))),
         Err(_) => Err(RcaTurnError::AgentUnavailable(
             "health check timed out".to_string(),
@@ -3399,7 +3403,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_health_probe_that_never_answers_is_agent_unavailable() {
         let began = Instant::now();
-        let result = probe_health(std::future::pending::<anyhow::Result<()>>()).await;
+        let result = probe_health(std::future::pending::<anyhow::Result<HealthResponse>>()).await;
         assert_eq!(began.elapsed(), HEALTH_CHECK_TIMEOUT);
         assert_eq!(
             result,
@@ -3411,8 +3415,9 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn a_health_probe_answer_decides_before_the_deadline() {
-        let refused =
-            probe_health(async { Err::<(), _>(anyhow::anyhow!("503 Service Unavailable")) });
+        let refused = probe_health(async {
+            Err::<HealthResponse, _>(anyhow::anyhow!("503 Service Unavailable"))
+        });
         assert_eq!(
             refused.await,
             Err(RcaTurnError::AgentUnavailable(
@@ -3422,10 +3427,27 @@ mod tests {
         let began = Instant::now();
         let late_ok = probe_health(async {
             tokio::time::sleep(HEALTH_CHECK_TIMEOUT - Duration::from_millis(1)).await;
-            Ok::<_, anyhow::Error>(())
+            Ok::<_, anyhow::Error>(health("healthy"))
         });
         assert_eq!(late_ok.await, Ok(()));
         assert!(began.elapsed() < HEALTH_CHECK_TIMEOUT);
+    }
+
+    fn health(status: &str) -> HealthResponse {
+        serde_json::from_value(json!({ "status": status })).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_200_health_answer_that_reports_unhealthy_is_agent_unavailable() {
+        let unhealthy = probe_health(async { Ok::<_, anyhow::Error>(health("unhealthy")) });
+        assert_eq!(
+            unhealthy.await,
+            Err(RcaTurnError::AgentUnavailable(
+                "health check answered but the agent is not healthy".to_string()
+            ))
+        );
+        let ok = probe_health(async { Ok::<_, anyhow::Error>(health("ok")) });
+        assert_eq!(ok.await, Ok(()));
     }
 
     // ---- the continuation's start retries ----
