@@ -207,14 +207,20 @@
      },
      {
       "type": "error",
-      "error": "bad key",
-      "recoverable": false
+      "error_type": "auth_error",
+      "error": "AI service authentication error. Please contact your administrator.",
+      "recoverable": false,
+      "code": "provider_error",
+      "message": "AI service authentication error. Please contact your administrator.",
+      "retryable": false,
+      "action": "none"
      },
      {
       "type": "complete"
      }
     ],
-    "error": "bad key",
+    "error": "AI service authentication error. Please contact your administrator.",
+    "error_code": "provider_error",
     "first_seq": 1,
     "last_seq": 4
    }

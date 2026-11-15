@@ -259,6 +259,7 @@
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 1,
     "last_seq": 4
    }

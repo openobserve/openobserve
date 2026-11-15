@@ -92,14 +92,20 @@
     "frames": [
      {
       "type": "error",
-      "error": "rate limited",
-      "recoverable": false
+      "error_type": "rate_limit",
+      "error": "Too many requests. Please wait before trying again.",
+      "recoverable": true,
+      "code": "rate_limited",
+      "message": "Too many requests. Please wait before trying again.",
+      "retryable": true,
+      "action": "retry"
      },
      {
       "type": "complete"
      }
     ],
-    "error": "rate limited",
+    "error": "Too many requests. Please wait before trying again.",
+    "error_code": "rate_limited",
     "first_seq": 0,
     "last_seq": 1
    },
@@ -116,6 +122,7 @@
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 2,
     "last_seq": 3
    }

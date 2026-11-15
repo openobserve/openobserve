@@ -22,6 +22,7 @@ pub mod projection;
 pub mod rca_ledger;
 pub mod rca_thread;
 pub mod record_v2;
+pub mod turn_error;
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},

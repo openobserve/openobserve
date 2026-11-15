@@ -1755,6 +1755,14 @@
         }
        }
       },
+      "query": {
+       "language": "sql",
+       "text": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
+       "stream_type": "logs",
+       "from": 1784530385630000,
+       "to": 1784533985630000,
+       "stream": "app_logs"
+      },
       "call_id": "call_02_EsGyjrUBWjb4aBuxNxwO8561"
      },
      {
@@ -1762,6 +1770,7 @@
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 2,
     "last_seq": 55
    }

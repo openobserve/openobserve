@@ -304,6 +304,7 @@
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 1,
     "last_seq": 3
    },
@@ -324,6 +325,7 @@
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 4,
     "last_seq": 7
    }
