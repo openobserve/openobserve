@@ -215,7 +215,7 @@ describe("useAssistantStarters", () => {
     const { starters } = setup("alertList", { currentPage: "alerts" });
     await flushPromises();
     expect(labels(starters)).toEqual([
-      "Which alerts fired most in the last 24 h?",
+      "Which alerts fired most in the past 24 hours?",
       "Draft an alert for errors",
       "What can you do here?",
     ]);

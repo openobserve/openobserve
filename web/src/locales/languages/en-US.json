@@ -10808,22 +10808,22 @@
     },
     "capabilities": {
       "query": {
-        "title": "Write a Query",
+        "title": "Write a query",
         "description": "SQL for logs, traces, RUM, or PromQL for metrics.",
         "prompt": "Help me write a query"
       },
       "incident": {
-        "title": "Investigate Incidents",
+        "title": "Investigate incidents",
         "description": "Root-cause across logs, traces, alerts — e.g. \"Why did gateway-5xx fire?\"",
         "prompt": "Help me investigate an incident"
       },
       "dashboard": {
-        "title": "Build a Dashboard",
+        "title": "Build a dashboard",
         "description": "From a topic — e.g. \"K8s node health: CPU, memory, restarts\". Also creates panels.",
         "prompt": "Help me build a dashboard or panel"
       },
       "alert": {
-        "title": "Create an Alert",
+        "title": "Create an alert",
         "description": "Threshold or scheduled alerts, and ingest-time VRL pipelines.",
         "prompt": "Help me create an alert or pipeline"
       }
@@ -13199,7 +13199,7 @@
       "starter": {
         "otherToolToO2": "Convert a query from another tool to OpenObserve SQL",
         "alerts": {
-          "1": "Which alerts fired most in the last 24 h?",
+          "1": "Which alerts fired most in the past 24 hours?",
           "2": "Draft an alert for errors in `{stream}`",
           "2Generic": "Draft an alert for errors"
         },
