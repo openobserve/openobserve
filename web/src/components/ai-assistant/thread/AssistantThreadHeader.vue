@@ -437,6 +437,13 @@ const renamePending = computed(() => !!props.sid && history.pending[props.sid] =
 const running = computed(
   () => !!session.value && (isRunning(session.value.turn) || !!session.value.pendingApproval),
 );
+// A waiting chat is not answering; the title mark and header badge already say it needs you.
+const answeringNow = computed(
+  () =>
+    running.value &&
+    !session.value?.pendingApproval &&
+    session.value?.turn.state !== "awaiting_approval",
+);
 const notSavedHere = computed(() => history.notSaved(props.sid));
 const saveTag = computed(() => {
   const current = session.value;
@@ -601,6 +608,7 @@ function newFromList(): void {
 // New never asks (PO A12): a running answer keeps going and a pending approval stays pending.
 function askNew(): void {
   const previous = running.value ? props.sid : null;
+  const answeringSid = answeringNow.value ? props.sid : null;
   const title = String(titleText.value);
   const shownChat = () => host?.currentSid?.() ?? store.state.shell.activeSid;
   const before = shownChat();
@@ -609,7 +617,7 @@ function askNew(): void {
   if (shownChat() === before) return;
   history.announceText(t("assistant.thread.newAnnounce"));
   trackAssistant("ai_thread_action", { action: "new", had_running: !!previous });
-  if (previous) keepsAnswering(previous, title);
+  if (answeringSid) keepsAnswering(answeringSid, title);
 }
 
 function keepsAnswering(sid: Sid, title: string): void {

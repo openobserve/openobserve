@@ -234,6 +234,18 @@ describe("AssistantThreadHeader", () => {
     expect(open).toHaveBeenCalledWith({ sid }, { focus: true });
   });
 
+  it("starts a new chat from a waiting approval without saying it keeps answering", async () => {
+    const { wrapper, newChat, store, sid } = await setup();
+    newChat.mockImplementation(() => store.setActive(null));
+    store.setActive(sid);
+    store.state.sessions[sid].turn = { state: "awaiting_approval" } as never;
+    await nextTick();
+    await wrapper.get('[data-test="assistant-thread-new"]').trigger("click");
+    expect(newChat).toHaveBeenCalledTimes(1);
+    expect(toast).not.toHaveBeenCalled();
+    expect(track).toHaveBeenCalledWith("ai_thread_action", { action: "new", had_running: true });
+  });
+
   it("orders Tab stops title, +, then the container's controls", async () => {
     const { wrapper } = await setup();
     const order = wrapper
