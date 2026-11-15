@@ -901,12 +901,12 @@ export default defineComponent({
       if (await alertEditorDraft.draft.confirmLeave()) emit("cancel:hideform");
     };
     const jsonDock = useAssistantDockToggle("json_editor");
-    const userEdited = alertForm.form.useStore((s: { isDirty: boolean }) => s.isDirty);
     const alertName = computed(() => String(alertForm.formData.value?.name ?? ""));
     provide(assistantObjectNameKey, alertName);
     useAssistantLeaveGuard({
       host: "alert",
-      isDirty: () => !saved && !!userEdited.value,
+      // The form's own isDirty is already set by a new alert's defaults; the draft's baseline is not.
+      isDirty: () => !saved && alertEditorDraft.draft.hasUnsavedChanges(),
       name: () =>
         alertName.value ? raw(alertName.value) : alertForm.t("assistant.shell.leaveGuardThisAlert"),
     });
