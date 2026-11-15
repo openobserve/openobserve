@@ -291,18 +291,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
           </div>
 
-          <!-- Empty State -->
-          <div
-            v-else-if="isEmpty"
-            class="flex h-full flex-col items-center justify-center py-20"
-            data-test="empty-state"
-          >
-            <p class="mb-2 text-base font-medium opacity-90">
-              {{ t("correlation.logs.noData") }}
-            </p>
-            <p class="mb-4 text-sm opacity-70">
-              {{ t("correlation.logs.noDataDetails") }}
-            </p>
+          <div v-else-if="noLogStreams" class="min-h-80">
+            <OEmptyState
+              size="hero"
+              illustration="logs"
+              :title="t('correlation.noLogsFound')"
+              :description="t('traces.noLogStreamForCorrelation')"
+              data-test="no-log-streams-state"
+            />
+          </div>
+
+          <div v-else-if="isEmpty" class="min-h-80">
+            <OEmptyState
+              size="hero"
+              illustration="logs"
+              :title="t('correlation.logs.noData')"
+              :description="t('correlation.logs.noDataDetails')"
+              data-test="empty-state"
+            />
           </div>
         </div>
 
@@ -366,6 +372,7 @@ import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { canvasFont } from "@/utils/fonts";
@@ -398,6 +405,7 @@ const {
   hasResults,
   isLoading,
   hasError,
+  noLogStreams,
   isEmpty,
   fetchCorrelatedLogs,
   goToPage,
