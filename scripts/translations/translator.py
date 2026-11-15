@@ -685,10 +685,21 @@ _locale_spans = {}
 # Batches are translated concurrently (see translate_pending), so the lazy client
 # construction below must be race-free.
 _client_lock = threading.Lock()
+# HTTP statuses that fail identically on every retry and for every string.
+FATAL_STATUS = {
+    401: "DeepSeek rejected DEEPSEEK_API_KEY (HTTP 401). Rotate the repository secret.",
+    402: "DeepSeek account has insufficient balance (HTTP 402). Top up the account behind DEEPSEEK_API_KEY.",
+    403: "DeepSeek refused DEEPSEEK_API_KEY (HTTP 403). Check the key's permissions.",
+    404: "DeepSeek returned HTTP 404. Check DEEPSEEK_MODEL and DEEPSEEK_BASE_URL.",
+}
 
 
 class TranslationError(Exception):
     """Raised when the translation backend fails for a batch."""
+
+
+class FatalTranslationError(Exception):
+    """Raised when retrying cannot help: the account or key is refused, or the service is down."""
 
 
 def _script_dir():
@@ -1096,6 +1107,7 @@ def translate_batch(items, locale, prompt, max_retries=3, _depth=0):
         agent_key=locale,
         attributes={"ai.translations.locale": locale, "ai.translations.items": len(items)},
     )
+    service_failures = 0
     for attempt in range(max_retries):
         try:
             resp = call.create(
@@ -1133,8 +1145,21 @@ def translate_batch(items, locale, prompt, max_retries=3, _depth=0):
         except Exception as e:  # noqa: BLE001 — network / API / rate-limit errors
             last_err = e
             call.reject(e)
+            status = getattr(e, "status_code", None)
+            if status in FATAL_STATUS:
+                call.end()
+                raise FatalTranslationError(f"{FATAL_STATUS[status]} {e}") from e
+            if status is None or status in (408, 409, 429) or status >= 500:
+                service_failures += 1
             time.sleep(2 * (attempt + 1))
     call.end()
+
+    # Splitting multiplies the calls, so it only helps when the response was bad,
+    # not when the service never answered.
+    if service_failures == max_retries:
+        raise FatalTranslationError(
+            f"Translation service unavailable after {max_retries} attempts: {last_err}"
+        ) from last_err
 
     # Retries exhausted. Split to isolate the offending element so its neighbours
     # aren't lost with it. Recursion bottoms out naturally at a single string
@@ -1403,7 +1428,12 @@ def _translate_pending(pending, locale, module_terms):
             # misalign a translation with its source string.
             for fut in as_completed(futures):
                 i = futures[fut]
-                batch_results[i] = fut.result()
+                try:
+                    batch_results[i] = fut.result()
+                except FatalTranslationError:
+                    for other in futures:
+                        other.cancel()
+                    raise
                 done += len(chunks[i])
                 print(f"    {locale}: {done}/{total} strings translated", flush=True)
 
