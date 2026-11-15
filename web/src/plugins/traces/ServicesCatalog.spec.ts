@@ -3569,21 +3569,35 @@ describe("ServicesCatalog Health of the version serving now", () => {
     expect(panel.props("selectedNode").health_status).toBe("healthy");
   });
 
-  it("keeps the service's row in the panel without its Health when the route picks a place with no row", async () => {
-    setRouteQuery({ panel: "operations", panelSvc: "rollback-api", panelWhere: "k8s:b/prod" });
-    try {
-      view = mountServicesCatalog();
-      await flushPromises();
-      await flushPromises();
-      const panel = view.findComponent('[data-test="services-catalog-node-side-panel"]');
-      expect(panel.props("selectedNode")).toMatchObject({
-        name: "rollback-api",
-        health_withheld: true,
-      });
-    } finally {
-      setRouteQuery({});
-    }
-  });
+  it.each([
+    { selected: "the service's own row", dependency: false, name: "rollback-api", withheld: true },
+    { selected: "an inferred dependency", dependency: true, name: "mysql", withheld: false },
+  ])(
+    "withholds Health of $selected only while the route picks a place with no row for it",
+    async ({ dependency, name, withheld }) => {
+      setRouteQuery({ panel: "operations", panelSvc: "rollback-api", panelWhere: "k8s:b/prod" });
+      try {
+        view = mountServicesCatalog();
+        await flushPromises();
+        await flushPromises();
+        if (dependency) {
+          (view.vm as any).selectedServiceRow = {
+            ...(view.vm as any).services[0],
+            id: "dep-mysql",
+            service_name: "mysql",
+            infer_service_name: "mysql",
+            infer_service_type: "database",
+            where_key: "",
+          };
+          await flushPromises();
+        }
+        const panel = view.findComponent('[data-test="services-catalog-node-side-panel"]');
+        expect(panel.props("selectedNode")).toMatchObject({ name, health_withheld: withheld });
+      } finally {
+        setRouteQuery({});
+      }
+    },
+  );
 
   it("shows no Health, and counts none, when the shown version sent no requests in the window", async () => {
     vi.spyOn(serviceVersionsService, "services").mockResolvedValue({

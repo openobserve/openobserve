@@ -1027,13 +1027,16 @@ const selectedServiceNode = computed(() => {
   if (!selected) return null;
   // The serving-version read can land after the click, so the panel reads the row as it is now.
   const current = envServices.value.find((row) => row.id === selected.id);
-  // A picked place with no row here is scoped by the route, so the kept row's Health would describe another place.
-  const otherPlace =
-    panelRoute.state.value.open && (selected.where_key || "") !== panelRoute.state.value.where;
-  return {
+  const node = {
     id: selected.id,
     name: selected.service_name,
     service_type: selected.infer_service_type,
+  };
+  // A picked place with no row here is scoped by the route, so the kept row's Health would describe another place.
+  const otherPlace =
+    panelRoute.owns(node) && (selected.where_key || "") !== panelRoute.state.value.where;
+  return {
+    ...node,
     service_system: selected.infer_service_system,
     error_rate: selected.error_rate,
     health_status: current?.status ?? selected.status,

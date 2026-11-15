@@ -473,8 +473,18 @@ const places = computed(() => {
     .map(([key, place]) => ({ key, ...place }))
     .sort((a, b) => a.key.localeCompare(b.key));
 });
-// An auto-picked place stays local; only a user pick writes the route, whose where also scopes the panel's spans.
-const where = computed(() => panel.state.value.where || places.value[0]?.key || "");
+// An auto-picked place stays local and fixed while valid; only a user pick writes the route, which also scopes spans.
+const autoWhere = ref("");
+watch(
+  [places, () => props.service, org, user] as const,
+  ([values, ...owner], prev) => {
+    const sameOwner = prev?.slice(1).every((value, index) => value === owner[index]);
+    if (!sameOwner || !values.some((place) => place.key === autoWhere.value))
+      autoWhere.value = values[0]?.key || "";
+  },
+  { immediate: true },
+);
+const where = computed(() => panel.state.value.where || autoWhere.value);
 const query = useQuery(
   computed(() => ({
     ...versionsQuery(org.value, user.value, {

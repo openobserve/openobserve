@@ -1158,12 +1158,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const router = useRouter();
     const versionPanel = useServicePanelRoute();
-    // Parents keep the last service's route while a dependency is selected, so only the node it names may read or write it.
-    const routeOwnsNode = computed(() => {
-      const node = props.selectedNode;
-      if (!versionPanel.state.value.open || !node || node.service_type) return false;
-      return [node.name, node.label, node.id].includes(versionPanel.state.value.service);
-    });
+    const routeOwnsNode = computed(() => versionPanel.owns(props.selectedNode));
     const versionsEnabled = config.isEnterprise === "true" || config.isCloud === "true";
     const compareDrawer = useVersionCompareDrawer();
     const markerQuery = useQuery(
