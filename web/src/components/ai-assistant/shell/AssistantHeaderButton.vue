@@ -50,7 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             view.state === 'off' ? 'opacity-50 grayscale' : '',
           ]"
         />
-        <span v-if="view.signal" class="absolute -end-1 -top-1 inline-flex">
+        <!-- Anchored by its start edge so a needs-you count grows away from the icon, not over it -->
+        <span
+          v-if="view.signal"
+          data-test="assistant-header-status-anchor"
+          class="absolute start-4 -top-1 inline-flex"
+        >
           <AssistantStatusDot
             :state="view.signal"
             :count="view.count"

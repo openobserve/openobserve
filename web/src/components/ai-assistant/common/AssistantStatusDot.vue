@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <span
         v-if="count"
-        class="text-text-secondary text-2xs font-medium tabular-nums max-md:sr-only"
+        class="text-text-secondary text-2xs leading-none font-medium tabular-nums max-md:sr-only"
         >{{ count }}</span
       >
     </template>

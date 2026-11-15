@@ -414,6 +414,9 @@ describe("AssistantHeaderButton light", () => {
     expect(
       wrapper.find('[data-test="assistant-header-status-light"]').attributes("data-shape"),
     ).toBe("dot-count");
+    const anchor = wrapper.get('[data-test="assistant-header-status-anchor"]').classes();
+    expect(anchor).toContain("start-4");
+    expect(anchor.some((c) => c.startsWith("-end-") || c.startsWith("end-"))).toBe(false);
   });
 
   it("names the visible needs-you count so the label matches the content", async () => {
