@@ -69,6 +69,9 @@ pub(crate) const SESSION_ARG: &str = "_o2_session";
 const NAVIGATION_TOOL: &str = "create_navigation";
 const FIRST_PARTY_MCP_PREFIX: &str = "o2_";
 const O2_DELETE_TOOL: &str = "o2_delete";
+/// How long a delete confirmation can be answered (ms); the web's `DELETE_TTL_MS` holds a live one
+/// as long.
+pub const DELETE_CONFIRMATION_TTL_MS: i64 = 10 * 60_000;
 const MCP_SERVER_PREFIXES: [&str; 1] = ["o2"];
 const SEARCH_SQL_MAX_HITS: usize = 10;
 const TEST_FUNCTION_MAX_INPUT_EVENTS: usize = 5;
@@ -590,9 +593,21 @@ impl StreamState {
                 .cloned()
                 .unwrap_or_else(|| Value::Object(Map::new()));
             let result = coerce_tool_output(tool_state.get("output"), metadata);
-            self.tool_completed(call_id, tool_name, result, frames);
-        }
-    }
+            let expires_at = delete_confirmation_expiry(&result, tool_name, tool_state);
+            if let Some(confirmation) =
+                delete_confirmation_frame(&result, tool_name, call_id, expires_at)
+            {
+                self.last_tools_call_info = None;
+                frames.push(confirmation);
+                return;
+            }
+            if let Some(navigation) = navigation_frame(&result, tool_name) {
+                self.last_tools_call_info = None;
+                frames.push(navigation);
+                return;
+            }
+            result
+        };
 
     /// The call a result answers: its own, else the last call announced.
     fn take_call(&mut self, call_id: &str) -> Option<CallInfo> {
@@ -1208,12 +1223,37 @@ pub fn keep_inline_images(turn: &mut Value) {
     }
 }
 
-/// Call ids (maybe empty) of the deletes awaiting confirmation in a 1.x or 2.x record.
-pub fn delete_confirmation_calls(event_type: &str, data: &Value) -> Vec<String> {
-    record_parts(event_type, data)
-        .iter()
-        .filter_map(|part| delete_confirmation_call(part))
-        .collect()
+/// The call id (maybe empty) of a delete the agent asked to confirm in this event, while it can
+/// still be answered at `now_ms`.
+pub fn delete_confirmation_call(event_type: &str, data: &Value, now_ms: i64) -> Option<String> {
+    if live_type(event_type) != "message.part.updated" {
+        return None;
+    }
+    let part = obj(data.get("part"))?;
+    let state = obj(part.get("state"))?;
+    if state.get("status").and_then(Value::as_str) != Some("completed") {
+        return None;
+    }
+    let tool = part.get("tool").and_then(Value::as_str).unwrap_or_default();
+    let metadata = state
+        .get("metadata")
+        .filter(|v| truthy(v))
+        .cloned()
+        .unwrap_or_else(|| Value::Object(Map::new()));
+    let result = coerce_tool_output(state.get("output"), metadata);
+    if !is_delete_confirmation(&result, tool) {
+        return None;
+    }
+    // A confirmation with no time to read keeps the 24 h turn window it had before expiries.
+    let expired = delete_confirmation_expiry(&result, tool, state).is_some_and(|at| at <= now_ms);
+    (!expired).then(|| {
+        [part.get("callID"), part.get("id")]
+            .into_iter()
+            .flatten()
+            .find(|v| truthy(v))
+            .map(py_str)
+            .unwrap_or_default()
+    })
 }
 
 /// The stored turns as `audience` reads them; every viewer audience is model-name scrubbed.
@@ -2588,28 +2628,42 @@ fn delete_sentinels<'a>(
     candidates
 }
 
-/// o2-ai's end-of-turn card for the turn's queued deletes; `expires_at` 0 is a stored card.
-fn delete_card(items: &[Value]) -> Value {
-    let id = delete_batch_id("", items);
-    let name = |it: &Value| py_str(&it["name"]);
-    let kind = |it: &Value| py_str(&it["resource_type"]);
-    let mut message = match items {
-        [it] => format!(
-            "Do you really want to delete the \"{}\" {}?",
-            name(it),
-            kind(it)
-        ),
-        _ => {
-            let listing: Vec<String> = items
-                .iter()
-                .map(|it| format!("\"{}\" ({})", name(it), kind(it)))
-                .collect();
-            format!(
-                "Do you really want to delete these {} resources: {}?",
-                items.len(),
-                listing.join("; ")
-            )
-        }
+/// When (epoch ms) a delete confirmation stops being answerable: its own `expires_at`, else its
+/// tool end plus the TTL.
+fn delete_confirmation_expiry(
+    result: &Map<String, Value>,
+    tool_name: &str,
+    tool_state: &Map<String, Value>,
+) -> Option<i64> {
+    let sentinels = delete_sentinels(result, tool_name);
+    let own = sentinels
+        .first()
+        .and_then(|first| first.get("expires_at"))
+        .and_then(Value::as_i64);
+    own.or_else(|| {
+        let time = obj(tool_state.get("time"))?;
+        let at = ["end", "start"]
+            .into_iter()
+            .find_map(|key| time.get(key).and_then(Value::as_i64))?;
+        Some(at.saturating_add(DELETE_CONFIRMATION_TTL_MS))
+    })
+}
+
+/// The `confirmation_required` frame the live stream showed for a delete awaiting approval.
+fn delete_confirmation_frame(
+    result: &Map<String, Value>,
+    tool_name: &str,
+    call_id: &str,
+    expires_at: Option<i64>,
+) -> Option<Value> {
+    let sentinels = delete_sentinels(result, tool_name);
+    let first = sentinels.first()?;
+    let name_of = |item: &Map<String, Value>| {
+        item.get("name")
+            .filter(|v| truthy(v))
+            .or_else(|| item.get("id"))
+            .map(py_str)
+            .unwrap_or_default()
     };
     let widened: Vec<String> = items
         .iter()
@@ -2655,210 +2709,10 @@ fn delete_card(items: &[Value]) -> Value {
     {
         card["call_id"] = call_id.into();
     }
-    if !widened.is_empty() {
-        let impact: Vec<String> = widened
-            .iter()
-            .map(|n| format!("Also deletes everything associated with \"{n}\""))
-            .collect();
-        card["impact"] = impact.into();
+    if let Some(at) = expires_at {
+        frame["expires_at"] = Value::from(at);
     }
-    card
-}
-
-/// o2-ai's `delete_batch_id`: the session and the calls, so a reload names the same card.
-fn delete_batch_id(o2_session_id: &str, items: &[Value]) -> String {
-    let keys = items.iter().map(|it| match it["call_id"].as_str() {
-        Some(call) if !call.is_empty() => call.to_string(),
-        _ => format!("{}:{}", py_str(&it["resource_type"]), py_str(&it["id"])),
-    });
-    let material = std::iter::once(o2_session_id.to_string())
-        .chain(keys)
-        .collect::<Vec<_>>()
-        .join("\n");
-    let digest = Sha256::digest(material.as_bytes());
-    let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
-    format!("apr_{}", &hex[..20])
-}
-
-/// Whether delete `params` ask for more than the named resource.
-fn widens_delete_scope(params: &Value) -> bool {
-    match params.get("delete_all") {
-        Some(Value::String(v)) => ["1", "true", "yes"].contains(&v.trim().to_lowercase().as_str()),
-        Some(v) => truthy(v),
-        None => false,
-    }
-}
-
-/// o2-ai's `typed_query` of a SQL, PromQL or traces step: `{language, text, stream?, ...}`.
-fn typed_query(tool: &str, args: Option<&Map<String, Value>>) -> Option<Value> {
-    let empty = Map::new();
-    let mut args = args.unwrap_or(&empty);
-    // A `tools_call` step records the wrapper `{tool, args}`; the query is in the inner args.
-    if args.get("tool").is_some_and(Value::is_string)
-        && let Some(inner) = obj(args.get("args"))
-    {
-        args = inner;
-    }
-    let tool = strip_mcp_prefix(tool);
-    let either = |a: &str, b: &str| args.get(a).or_else(|| args.get(b));
-    if SQL_TOOLS.contains(&tool) {
-        let body = obj(args.get("request_body"));
-        let query = body.and_then(|b| obj(b.get("query"))).unwrap_or(&empty);
-        let text = text_arg(query, &["sql"]).or_else(|| text_arg(args, &["sql", "query"]));
-        let text = decoded_sql(text, args, body);
-        let span_of = |key: &str| {
-            if query.contains_key(key) {
-                query.get(key)
-            } else {
-                args.get(key)
-            }
-        };
-        let mut typed = typed(
-            "sql",
-            text,
-            args,
-            None,
-            (span_of("start_time"), span_of("end_time")),
-        )?;
-        if typed.get("stream").is_none()
-            && let Some(found) = SQL_FROM.captures(typed["text"].as_str().unwrap_or_default())
-        {
-            let stream = found
-                .get(1)
-                .or_else(|| found.get(2))
-                .map(|m| m.as_str().to_string());
-            typed["stream"] = stream.into();
-        }
-        return Some(typed);
-    }
-    if PROMQL_TOOLS.contains(&tool) {
-        let text = text_arg(args, &["query", "promql"]);
-        let span = (either("start", "time"), either("end", "time"));
-        return typed("promql", text, args, Some("metrics"), span);
-    }
-    if TRACE_TOOLS.contains(&tool) {
-        let text = text_arg(args, &["filter", "query", "sql"]);
-        let span = (args.get("start_time"), args.get("end_time"));
-        return typed("traces", text, args, Some("traces"), span);
-    }
-    None
-}
-
-fn typed(
-    language: &str,
-    text: Option<String>,
-    args: &Map<String, Value>,
-    default_stream_type: Option<&str>,
-    span: (Option<&Value>, Option<&Value>),
-) -> Option<Value> {
-    let text = text.filter(|t| !t.is_empty())?;
-    let mut typed = json!({"language": language, "text": text});
-    if let Some(stream) = text_arg(args, &STREAM_NAME_KEYS) {
-        typed["stream"] = stream.into();
-    }
-    if let Some(stream_type) =
-        text_arg(args, &STREAM_TYPE_KEYS).or_else(|| default_stream_type.map(str::to_string))
-    {
-        typed["stream_type"] = stream_type.into();
-    }
-    if let (Some(from), Some(to)) = (span.0.and_then(micros), span.1.and_then(micros)) {
-        typed["from"] = from.into();
-        typed["to"] = to.into();
-    }
-    Some(typed)
-}
-
-fn text_arg(source: &Map<String, Value>, keys: &[&str]) -> Option<String> {
-    keys.iter().find_map(|key| {
-        source
-            .get(*key)
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .map(str::to_string)
-    })
-}
-
-/// The SQL as it runs: OpenObserve decodes it first when the call says `encoding: base64`.
-fn decoded_sql(
-    sql: Option<String>,
-    args: &Map<String, Value>,
-    body: Option<&Map<String, Value>>,
-) -> Option<String> {
-    use base64::Engine;
-    let encoding = body
-        .and_then(|b| b.get("encoding"))
-        .filter(|v| truthy(v))
-        .or_else(|| args.get("encoding"))
-        .filter(|v| truthy(v))
-        .map(py_str)
-        .unwrap_or_default();
-    let sql = sql?;
-    if !encoding.eq_ignore_ascii_case("base64") {
-        return Some(sql);
-    }
-    let decoded = base64::engine::general_purpose::STANDARD
-        .decode(&sql)
-        .ok()?;
-    let text = String::from_utf8(decoded).ok()?;
-    let text = text.trim();
-    (!text.is_empty()).then(|| text.to_string())
-}
-
-/// An absolute time in microseconds from seconds, milliseconds, microseconds or RFC 3339.
-fn micros(value: &Value) -> Option<i64> {
-    let number = match value {
-        Value::String(text) => match text.trim().parse::<f64>() {
-            Ok(n) => n,
-            Err(_) => return rfc3339_micros(text),
-        },
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                return positive_micros_int(i);
-            }
-            n.as_f64()?
-        }
-        _ => return None,
-    };
-    if !number.is_finite() || number <= 0.0 {
-        return None;
-    }
-    let scaled = if number < SECONDS_MAX {
-        number * 1_000_000.0
-    } else if number < MILLIS_MAX {
-        number * 1_000.0
-    } else {
-        number
-    };
-    Some(scaled as i64)
-}
-
-fn positive_micros_int(value: i64) -> Option<i64> {
-    if value <= 0 {
-        None
-    } else if (value as f64) < SECONDS_MAX {
-        value.checked_mul(1_000_000)
-    } else if (value as f64) < MILLIS_MAX {
-        value.checked_mul(1_000)
-    } else {
-        Some(value)
-    }
-}
-
-fn rfc3339_micros(text: &str) -> Option<i64> {
-    let text = text.replace('Z', "+00:00");
-    if let Ok(at) = chrono::DateTime::parse_from_rfc3339(&text) {
-        return Some(at.timestamp_micros());
-    }
-    [
-        "%Y-%m-%dT%H:%M:%S%.f",
-        "%Y-%m-%d %H:%M:%S%.f",
-        "%Y-%m-%dT%H:%M",
-        "%Y-%m-%d %H:%M",
-    ]
-    .iter()
-    .find_map(|format| chrono::NaiveDateTime::parse_from_str(&text, format).ok())
-    .map(|at| at.and_utc().timestamp_micros())
+    Some(frame)
 }
 
 /// A first-party tool's `navigation_action` payload, forwarded verbatim.
@@ -3453,44 +3307,60 @@ mod tests {
                 "state": {"status": status, "output": sentinel.to_string()}}})
         };
         let updated = "message.part.updated.1";
-        let calls = |event_type: &str, data: &Value| delete_confirmation_calls(event_type, data);
-        assert_eq!(calls(updated, &part("o2_delete", "completed")), ["call_9"]);
-        assert!(calls(updated, &part("o2_delete", "running")).is_empty());
-        assert!(calls(updated, &part("SearchSQL", "completed")).is_empty());
-        assert!(calls("message.updated.1", &part("o2_delete", "completed")).is_empty());
+        assert_eq!(
+            delete_confirmation_call(updated, &part("o2_delete", "completed"), 0).as_deref(),
+            Some("call_9")
+        );
+        assert_eq!(
+            delete_confirmation_call(updated, &part("o2_delete", "running"), 0),
+            None
+        );
+        assert_eq!(
+            delete_confirmation_call(updated, &part("SearchSQL", "completed"), 0),
+            None
+        );
+        assert_eq!(
+            delete_confirmation_call("message.updated.1", &part("o2_delete", "completed"), 0),
+            None
+        );
     }
 
-    /// A 2.x log names the pending deletes and shows the cards of the 1.x log it records.
     #[test]
-    fn a_2x_record_names_the_deletes_its_1x_log_asked_to_confirm() {
-        use crate::ai_chat::record_v2::tests::{golden_events, to_v2};
-        let calls = |events: &[DurableEvent]| -> Vec<String> {
-            let mut calls: Vec<String> = events
-                .iter()
-                .flat_map(|e| delete_confirmation_calls(&e.event_type, &e.data))
-                .collect();
-            calls.sort();
-            calls.dedup();
-            calls
+    fn a_delete_confirmation_expires_a_ttl_after_its_tool_ended() {
+        let timed = |own: Option<i64>| {
+            let mut sentinel =
+                json!({"type": "delete_confirmation", "resource_type": "alert", "id": "a1"});
+            if let Some(at) = own {
+                sentinel["expires_at"] = at.into();
+            }
+            json!({"part": {"id": "prt_1", "callID": "call_9", "tool": "o2_delete",
+                "state": {"status": "completed", "output": sentinel.to_string(),
+                "time": {"start": 900, "end": 1_000}}}})
         };
-        let cards = |projected: &Value| -> Vec<Value> {
-            projected["turns"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .flat_map(|t| t["frames"].as_array().unwrap().clone())
-                .filter(|f| frame_type(f) == CONFIRMATION_REQUIRED)
-                .collect()
-        };
-        for name in ["tool_heavy.json", "findings.json"] {
-            let v1 = golden_events(name);
-            let v2 = to_v2(&v1);
-            assert!(v2.iter().all(is_v2_record), "{name}");
-            assert!(!calls(&v1).is_empty(), "{name}");
-            assert_eq!(calls(&v2), calls(&v1), "{name}");
-            assert!(!cards(&project(&v1)).is_empty(), "{name}");
-            assert_eq!(cards(&project(&v2)), cards(&project(&v1)), "{name}");
-        }
+        let updated = "message.part.updated.1";
+        let until = 1_000 + DELETE_CONFIRMATION_TTL_MS;
+        assert_eq!(
+            delete_confirmation_call(updated, &timed(None), until - 1).as_deref(),
+            Some("call_9")
+        );
+        assert_eq!(delete_confirmation_call(updated, &timed(None), until), None);
+        assert_eq!(
+            delete_confirmation_call(updated, &timed(Some(2_000)), 2_000),
+            None
+        );
+        assert_eq!(
+            delete_confirmation_call(updated, &timed(Some(2_000)), 1_999).as_deref(),
+            Some("call_9")
+        );
+        // The replayed request carries the expiry, so a reload shows it only while it can be
+        // answered.
+        let state = timed(None)["part"]["state"].as_object().unwrap().clone();
+        let result = coerce_tool_output(state.get("output"), json!({}));
+        let expires_at = delete_confirmation_expiry(&result, O2_DELETE_TOOL, &state);
+        assert_eq!(expires_at, Some(until));
+        let frame =
+            delete_confirmation_frame(&result, O2_DELETE_TOOL, "call_9", expires_at).unwrap();
+        assert_eq!(frame["expires_at"], until);
     }
 
     /// What the web client's rendered record and the server's frames must agree on.
@@ -3749,6 +3619,8 @@ mod tests {
         assert_eq!(asked.len(), 1, "{asked:?}");
         assert_eq!(asked[0]["tool"], O2_DELETE_TOOL);
         assert_eq!(asked[0]["args"]["items"][0]["id"], "a1");
+        // This recording's tool state has no time, so the legacy request carries no expiry.
+        assert!(asked[0].get("expires_at").is_none());
         assert_eq!(
             asked[0]["message"],
             "Do you really want to delete the \"A\" alert?"

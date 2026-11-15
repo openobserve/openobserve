@@ -463,3 +463,47 @@ describe("historyRecords: a gathered card past its deadline", () => {
     expect(cards[0].approval?.noDecision).toBeUndefined();
   });
 });
+
+// C-08: the server stamps a replayed delete request with its expiry, so a reload knows when it lapses.
+describe("historyRecords: a replayed delete request with the server's expiry", () => {
+  const cardOf = (expiresAt?: number) => {
+    const detail = parseChatDetail({
+      session_id: "s1",
+      pending_approval: true,
+      turns: [
+        {
+          turn_id: "t1",
+          user: { text: "delete the alert" },
+          status: "completed",
+          frames: [
+            { type: "tool_call", tool: "delete", call_id: "call_9" },
+            {
+              type: "confirmation_required",
+              tool: "o2_delete",
+              kind: "delete",
+              id: "call_9",
+              targets: [{ type: "alert", id: "a1", name: "A" }],
+              args: { items: [{ resource_type: "alert", name: "A", id: "a1" }] },
+              message: 'Do you really want to delete the "A" alert?',
+              ...(expiresAt !== undefined && { expires_at: expiresAt }),
+            },
+            { type: "complete" },
+          ],
+        },
+      ],
+    });
+    const messages = projectRecord(shownTurns(detail), "owner", {
+      timezone: "UTC",
+      scrubModels: false,
+    });
+    return messages.flatMap((m) => m.contentBlocks ?? []).find((b) => b.approval)?.approval;
+  };
+
+  it("keeps the frame's expiry on the card, in milliseconds", () => {
+    expect(cardOf(1_800_000_600_000)).toMatchObject({ id: "call_9", expiresAt: 1_800_000_600_000 });
+  });
+
+  it("leaves a legacy request with no expiry unanswerable after a reload", () => {
+    expect(cardOf(undefined)?.expiresAt).toBeUndefined();
+  });
+});

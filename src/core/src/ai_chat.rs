@@ -405,6 +405,7 @@ pub async fn pending_confirmations(
         quoted(newest.iter().map(|(_, turn, _)| *turn).collect()),
     );
     let rows = search_rows(org_id, sql, start, end).await?;
+    let now_ms = now_micros() / 1000;
     let mut pending: HashMap<String, (String, HashSet<String>)> = HashMap::new();
     for row in rows {
         let Some((chat, ..)) = newest
@@ -418,7 +419,9 @@ pub async fn pending_confirmations(
         }
         // A split event cannot be parsed from one row; it still marks the chat as waiting.
         let call = match row.to_verified_event() {
-            Ok(event) => projection::delete_confirmation_call(&event.event_type, &event.data),
+            Ok(event) => {
+                projection::delete_confirmation_call(&event.event_type, &event.data, now_ms)
+            }
             Err(_) => Some(String::new()),
         };
         if let Some(call) = call {
