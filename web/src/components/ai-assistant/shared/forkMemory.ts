@@ -16,9 +16,9 @@
 import type { ForkSeed } from "@/composables/assistant/pure";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 
-/** One fork of a share made in this browser; the token is the link's credential, so only its hash is stored. */
+/** One fork of a share made in this browser; the link's token is a credential, so only a one-way digest is stored. */
 export interface ForkEntry {
-  tokenHash: string;
+  linkDigest: string;
   sessionId: string;
   at: number;
 }
@@ -30,16 +30,16 @@ const MAX_TOKEN = 256;
 // The seed the first open reads until the record keeps it; a reload elsewhere honestly has none.
 const seeds = new Map<string, ForkSeed>();
 
-/** SHA-256 of `share:{token}`, hex; equal tokens give equal hashes and the token never reaches storage. */
-export async function hashShareToken(token: string): Promise<string> {
-  if (!token) return "";
-  return computeUserOrgKey("share", token);
+/** SHA-256 of `share:{token}`, hex; equal links give equal digests and the token never reaches storage. */
+export async function shareLinkDigest(link: string): Promise<string> {
+  if (!link) return "";
+  return computeUserOrgKey("share", link);
 }
 
-/** This browser's forks of the share whose token hashes to `tokenHash`, oldest first. */
-export function forksOf(userOrgKey: string, tokenHash: string): ForkEntry[] {
-  if (!tokenHash) return [];
-  return readForks(userOrgKey).filter((entry) => entry.tokenHash === tokenHash);
+/** This browser's forks of the share whose link digests to `linkDigest`, oldest first. */
+export function forksOf(userOrgKey: string, linkDigest: string): ForkEntry[] {
+  if (!linkDigest) return [];
+  return readForks(userOrgKey).filter((entry) => entry.linkDigest === linkDigest);
 }
 
 /** Read-merge-write, newest last, capped so the key never grows past 50 entries. */
@@ -73,8 +73,8 @@ export function forkSeedOf(sessionId: string): ForkSeed | undefined {
 
 function toEntry(value: unknown): ForkEntry[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  const { tokenHash, sessionId, at } = value as Record<string, unknown>;
-  if (typeof tokenHash !== "string" || !tokenHash || tokenHash.length > MAX_TOKEN) return [];
+  const { linkDigest, sessionId, at } = value as Record<string, unknown>;
+  if (typeof linkDigest !== "string" || !linkDigest || linkDigest.length > MAX_TOKEN) return [];
   if (typeof sessionId !== "string" || !sessionId || sessionId.length > MAX_TOKEN) return [];
-  return [{ tokenHash, sessionId, at: typeof at === "number" && Number.isFinite(at) ? at : 0 }];
+  return [{ linkDigest, sessionId, at: typeof at === "number" && Number.isFinite(at) ? at : 0 }];
 }

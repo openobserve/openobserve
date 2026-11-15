@@ -95,7 +95,7 @@ import { forkSharedChatMutation, renameForkMutation } from "@/services/ai_chat_s
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-import { forksOf, hashShareToken, keepForkSeed, rememberFork } from "./forkMemory";
+import { forksOf, shareLinkDigest, keepForkSeed, rememberFork } from "./forkMemory";
 
 const props = defineProps<SharedChatContinueProps>();
 
@@ -105,23 +105,23 @@ const router = useRouter();
 const pending = ref(false);
 const unavailable = ref(false);
 const version = ref(0);
-const tokenHash = ref("");
+const linkDigest = ref("");
 
 const forkMutation = useMutation(() => forkSharedChatMutation(props.org));
 const renameMutation = useMutation(() => renameForkMutation(props.org));
 
 const forks = computed(() => {
   void version.value;
-  return forksOf(props.userOrgKey, tokenHash.value);
+  return forksOf(props.userOrgKey, linkDigest.value);
 });
 const latest = computed(() => forks.value[forks.value.length - 1] ?? null);
 
 watch(
   () => props.token,
   async (token) => {
-    tokenHash.value = "";
-    const hash = await hashShareToken(token);
-    if (token === props.token) tokenHash.value = hash;
+    linkDigest.value = "";
+    const hash = await shareLinkDigest(token);
+    if (token === props.token) linkDigest.value = hash;
   },
   { immediate: true },
 );
@@ -162,7 +162,7 @@ async function adopt(result: ForkResult, chat: SharedChat): Promise<void> {
     ...(chat.hidden && { hidden: chat.hidden }),
   });
   rememberFork(props.userOrgKey, {
-    tokenHash: tokenHash.value || (await hashShareToken(props.token)),
+    linkDigest: linkDigest.value || (await shareLinkDigest(props.token)),
     sessionId: result.session_id,
     at: Date.now(),
   });

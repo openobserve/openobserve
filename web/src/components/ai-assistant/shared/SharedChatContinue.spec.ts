@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SharedChat } from "@/services/ai_chat_share";
 
 import { fakeRouter } from "../__tests__/fakeAssistant";
-import { forkSeedOf, forksOf, hashShareToken, readForks, rememberFork } from "./forkMemory";
+import { forkSeedOf, forksOf, shareLinkDigest, readForks, rememberFork } from "./forkMemory";
 import SharedChatContinue from "./SharedChatContinue.vue";
 
 const { api, toast, track } = vi.hoisted(() => ({
@@ -113,7 +113,7 @@ describe("SharedChatContinue", () => {
   });
 
   it("offers Open my copy and numbers the next fork", async () => {
-    rememberFork("k1", { tokenHash: await hashShareToken("tok"), sessionId: "s-first", at: 1 });
+    rememberFork("k1", { linkDigest: await shareLinkDigest("tok"), sessionId: "s-first", at: 1 });
     const { wrapper, router } = await setup();
     await vi.waitFor(() => expect(at(wrapper, "assistant-shared-open-copy").exists()).toBe(true));
     await at(wrapper, "assistant-shared-open-copy").trigger("click");
@@ -130,33 +130,33 @@ describe("forkMemory", () => {
 
   it("keeps forks per user and org, newest last, capped at 50", () => {
     for (let i = 0; i < 60; i++)
-      rememberFork("k1", { tokenHash: `h${i % 2}`, sessionId: `s${i}`, at: i });
+      rememberFork("k1", { linkDigest: `h${i % 2}`, sessionId: `s${i}`, at: i });
     expect(readForks("k1")).toHaveLength(50);
     expect(readForks("k1").at(-1)?.sessionId).toBe("s59");
     expect(readForks("k2")).toEqual([]);
-    expect(forksOf("k1", "h1").every((entry) => entry.tokenHash === "h1")).toBe(true);
+    expect(forksOf("k1", "h1").every((entry) => entry.linkDigest === "h1")).toBe(true);
     expect(forksOf("k1", "")).toEqual([]);
   });
 
   it("stores a hash of the share token, never the token", async () => {
-    const tokenHash = await hashShareToken("secret-token");
-    rememberFork("k1", { tokenHash, sessionId: "s1", at: 1 });
+    const linkDigest = await shareLinkDigest("secret-token");
+    rememberFork("k1", { linkDigest, sessionId: "s1", at: 1 });
     expect(localStorage.getItem("o2.assistant.forks:k1")).not.toContain("secret-token");
-    expect(tokenHash).toMatch(/^[0-9a-z]+$/);
-    expect(await hashShareToken("secret-token")).toBe(tokenHash);
+    expect(linkDigest).toMatch(/^[0-9a-z]+$/);
+    expect(await shareLinkDigest("secret-token")).toBe(linkDigest);
   });
 
   it("ignores hostile or broken storage", () => {
     localStorage.setItem(
       "o2.assistant.forks:k1",
       JSON.stringify([
-        { __proto__: { polluted: true }, tokenHash: "t", sessionId: "s" },
+        { __proto__: { polluted: true }, linkDigest: "t", sessionId: "s" },
         { token: "raw-legacy-token", sessionId: "s2" },
         "x",
         { token: 1 },
       ]),
     );
-    expect(readForks("k1")).toEqual([{ tokenHash: "t", sessionId: "s", at: 0 }]);
+    expect(readForks("k1")).toEqual([{ linkDigest: "t", sessionId: "s", at: 0 }]);
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     localStorage.setItem("o2.assistant.forks:k1", "{not json");
     expect(readForks("k1")).toEqual([]);
