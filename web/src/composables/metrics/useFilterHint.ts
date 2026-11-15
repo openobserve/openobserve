@@ -15,64 +15,18 @@
 
 import { computed, type Ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 
-/**
- * The typewriter hint on the empty filter row.
- *
- * Prefers the org's real label names, falling back to static examples until they
- * exist. Label names are fetched lazily on the first click of `+ Filter`
- * (`@focus-picker`) — that call walks up to three widening time windows against a
- * backend that already times out on heavy metrics, so it must not fire on page load.
- */
-
-/**
- * Matcher shapes, not real labels — examples of syntax. Two of the four show
- * ALTERNATION (`a|b`): chips are ANDed and this engine has no OR matcher, so
- * `=~ "500|503"` is the only way to say "either of these".
- */
-const EXAMPLES = [
-  raw('pod = "api-1"'),
-  raw('status =~ "500|503"'),
-  raw('job != "canary"'),
-  raw('pod =~ "api-1|api-2"'),
-];
-
-/** Each prompt costs ~2-4s to type, hold and erase; more is never reached. */
-const MAX_PROMPTS = 4;
-
+/** The placeholder on the empty filter row; label names are fetched lazily on the first `+ Filter` click. */
 export function useFilterHint(
   /** Label names from the grid's schema; empty until the picker is first opened. */
   labelNames: Ref<string[]>,
-  /** Paused unless the row is idle and unfiltered — see the call site. */
-  enabled: Ref<boolean>,
 ) {
-  if (isAssistantV2()) return { placeholder: staticFilterHint(labelNames) };
-  const prompts = computed(() => {
-    const names = labelNames.value;
-    if (!names.length) return EXAMPLES;
-
-    // Evenly spaced, not the first N: names arrive sorted, so the head is often
-    // a run of one prefix (`__name__`, `_o2_*`) and the user would see only that
-    // family typed out.
-    const step = Math.max(1, Math.floor(names.length / MAX_PROMPTS));
-    const picked: string[] = [];
-    for (let i = 0; i < names.length && picked.length < MAX_PROMPTS; i += step) {
-      picked.push(`${names[i]} = …`);
-    }
-    return picked.length ? picked : EXAMPLES;
-  });
-
-  return useTypewriterPlaceholder(prompts, { enabled });
-}
-
-// Internal labels (`__name__`, `_o2_*`) make a poor example of a filter.
-function staticFilterHint(labelNames: Ref<string[]>) {
   const { t } = useI18nTyped();
-  return computed<string>(() => {
+  // Internal labels (`__name__`, `_o2_*`) make a poor example of a filter.
+  const placeholder = computed<string>(() => {
     if (!labelNames.value.length) return t("metrics.filter.placeholderEmpty");
     const label = labelNames.value.find((name) => !name.startsWith("_")) ?? "status";
     return t("metrics.filter.placeholder", { label: raw(label) });
   });
+  return { placeholder };
 }

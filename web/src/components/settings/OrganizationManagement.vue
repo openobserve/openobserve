@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :loading="loading"
           :forbidden="forbidden"
-          :row-rail-tone="assistantV2 ? overAllowanceTone : undefined"
+          :row-rail-tone="overAllowanceTone"
         >
           <template #toolbar>
             <OSearchInput
@@ -417,14 +417,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="ai-credits-limit-input"
               :label="t('settings.organizationManagementPage.totalAiCredits')"
               :input-attrs="
-                assistantV2 && aiBelowUsage
-                  ? { 'aria-describedby': ALLOWANCE_FLOOR_WARNING_ID }
-                  : undefined
+                aiBelowUsage ? { 'aria-describedby': ALLOWANCE_FLOOR_WARNING_ID } : undefined
               "
               required
             />
             <AssistantAllowanceFloor
-              v-if="assistantV2"
               :org="usageLimitsRow?.identifier ?? ''"
               :used="Number(usageLimitsRow?.credits_used ?? 0)"
               field="creditsLimit"
@@ -573,7 +570,6 @@ import {
 import AssistantAllowanceFloor, {
   ALLOWANCE_FLOOR_WARNING_ID,
 } from "./assistant/AssistantAllowanceFloor.vue";
-import { isAssistantV2 } from "@/composables/assistant";
 import { formatCount } from "@/utils/formatters";
 import { belowUsageOf } from "@/services/assistant_billing.queries";
 
@@ -696,11 +692,10 @@ export default defineComponent({
         ? t("settings.organizationManagementPage.setSyntheticsStatusStepsSubtitle")
         : t("settings.organizationManagementPage.setSyntheticsStepsSubtitle");
     });
-    const assistantV2 = isAssistantV2();
     const aiBelowUsage = ref(false);
     const usageLimitsPrimaryLabel = computed(() => {
       if (!isAiCreditsTab.value) return t("settings.organizationManagementPage.saveSteps");
-      return assistantV2 && aiBelowUsage.value
+      return aiBelowUsage.value
         ? t("assistant.billing.allowance.setAnyway")
         : t("settings.organizationManagementPage.saveCredits");
     });
@@ -793,9 +788,7 @@ export default defineComponent({
       },
       {
         id: "ai_credits_used",
-        header: assistantV2
-          ? t("assistant.billing.allowance.used")
-          : t("settings.organizationManagementPage.aiCreditsUsed"),
+        header: t("assistant.billing.allowance.used"),
         accessorKey: "credits_used",
         sortable: true,
         resizable: true,
@@ -805,9 +798,7 @@ export default defineComponent({
       },
       {
         id: "ai_credits_total",
-        header: assistantV2
-          ? t("assistant.billing.allowance.limit")
-          : t("settings.organizationManagementPage.aiCreditsTotal"),
+        header: t("assistant.billing.allowance.limit"),
         accessorKey: "credits_limit",
         sortable: true,
         resizable: true,
@@ -1074,7 +1065,7 @@ export default defineComponent({
       force = false,
     ): Promise<void> => {
       const used = Number(usageLimitsRow.value?.credits_used ?? 0);
-      if (assistantV2 && pool === "ai_credits" && !force && limit < used) {
+      if (pool === "ai_credits" && !force && limit < used) {
         if (!(await confirmBelowUsage(limit, used))) return;
         force = true;
       }
@@ -1089,7 +1080,7 @@ export default defineComponent({
           {
             org_id: usageLimitsRow.value.identifier,
             limit,
-            ...(assistantV2 && force ? { force: true } : {}),
+            ...(force ? { force: true } : {}),
           },
         );
         analytics.track("org_management_usage_limit_updated", { pool });
@@ -1097,7 +1088,7 @@ export default defineComponent({
         usageLimitsPrompt.value = false;
         toast({ variant: "success", message: copy.success });
       } catch (error: any) {
-        floor = assistantV2 && pool === "ai_credits" && !force ? belowUsageOf(error) : null;
+        floor = pool === "ai_credits" && !force ? belowUsageOf(error) : null;
         if (!floor)
           toast({
             variant: "error",
@@ -1396,7 +1387,6 @@ export default defineComponent({
     ]);
 
     return {
-      assistantV2,
       aiBelowUsage,
       overAllowanceTone,
       ALLOWANCE_FLOOR_WARNING_ID,

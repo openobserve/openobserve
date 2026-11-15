@@ -62,14 +62,6 @@
       </div>
     </div>
     <AssistantDock v-if="docked" :host="docked.adapter" />
-    <!-- o2aichat enabled -->
-    <div v-else-if="store.state.isAiChatEnabled" class="ms-2 h-full w-[25vw]">
-      <O2AIChat
-        class="h-full"
-        :is-open="store.state.isAiChatEnabled"
-        @close="store.state.isAiChatEnabled = false"
-      />
-    </div>
   </div>
 </template>
 
@@ -84,19 +76,13 @@ import {
   type PropType,
 } from "vue";
 import { type I18nText, raw, useI18nTyped } from "@/types/i18n";
-import { useStore } from "vuex";
-import { getImageURL } from "@/utils/zincutils";
-import O2AIChat from "../O2AIChat.vue";
-import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
-import useTheme from "@/composables/useTheme";
-import { isAssistantV2, useDockedEditor, type DockedEditor } from "@/composables/assistant/pure";
+import { useDockedEditor, type DockedEditor } from "@/composables/assistant/pure";
 
 export default defineComponent({
   name: "JsonEditor",
   components: {
     QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
-    O2AIChat,
     OButton,
     // The assistant's parts load only where the revamp renders them, never in the flag-off chunk.
     AiLabel: defineAsyncComponent(() => import("@/components/ai-assistant/entry/AiLabel.vue")),
@@ -134,8 +120,6 @@ export default defineComponent({
   emits: ["close", "saveJson"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
-    const store = useStore();
-    const { isDark } = useTheme();
     const jsonContent = ref("");
     const isValidJson = ref(true);
     const queryEditorRef = ref();
@@ -240,7 +224,7 @@ export default defineComponent({
 
     const editorArea = ref<HTMLElement | null>(null);
     let openedWith = "";
-    const docked: DockedEditor | null = isAssistantV2() ? jsonHost() : null;
+    const docked: DockedEditor = jsonHost();
 
     function landWithProtectedFields(text: string): { text: string; kept: boolean } {
       try {
@@ -328,35 +312,14 @@ export default defineComponent({
       },
       { immediate: true, deep: true },
     );
-    const toggleAIChat = () => {
-      const isEnabled = !store.state.isAiChatEnabled;
-      store.dispatch("setIsAiChatEnabled", isEnabled);
-    };
-    const isHovered = ref(false);
-    const getBtnLogo = computed(() => {
-      if (isHovered.value || store.state.isAiChatEnabled) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-
-      return isDark.value
-        ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon_gradient.svg");
-    });
-
     return {
       t,
-      store,
       jsonContent,
       isValidJson,
       localValidationErrors,
       queryEditorRef,
       handleEditorChange,
-      getImageURL,
       saveChanges,
-      config,
-      toggleAIChat,
-      isHovered,
-      getBtnLogo,
       protectedFields,
       storedFields,
       docked,

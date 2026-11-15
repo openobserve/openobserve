@@ -25,12 +25,6 @@ import i18n from "@/locales";
 import useDnD from "@/plugins/pipelines/useDnD";
 import store from "@/test/unit/helpers/store";
 
-const { flag } = vi.hoisted(() => ({ flag: { on: true } }));
-
-vi.mock("@/composables/assistant/flags", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/composables/assistant/flags")>()),
-  isAssistantV2: () => flag.on,
-}));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/services/search", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -55,10 +49,6 @@ vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () =>
 vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
   import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
 );
-vi.mock("@/components/O2AIChat.vue", () => ({
-  default: { name: "O2AIChat", template: "<div data-test='legacy-chat'></div>" },
-}));
-
 import Query from "./Query.vue";
 
 const editorProvider = { getContext: async () => ({ pipelineName: "orders" }) };
@@ -110,7 +100,6 @@ function setup() {
 }
 
 beforeEach(() => {
-  flag.on = true;
   sessionStorage.clear();
   contextRegistry.cleanup();
   contextRegistry.register("pipelines", editorProvider);
@@ -148,14 +137,5 @@ describe("ScheduledPipeline with the revamped assistant", () => {
     await settleAsyncParts();
     expect(runtime.hosts.has("scheduled_query")).toBe(false);
     expect(await contextRegistry.getActiveContext()).toEqual({ pipelineName: "orders" });
-  });
-
-  it("keeps the legacy register path with the revamp off", async () => {
-    flag.on = false;
-    const { wrapper, runtime } = setup();
-    await settleAsyncParts();
-    expect(runtime.hosts.has("scheduled_query")).toBe(false);
-    expect(wrapper.find('[data-test="assistant-dock-stub"]').exists()).toBe(false);
-    expect(await contextRegistry.getActiveContext()).not.toEqual({ pipelineName: "orders" });
   });
 });

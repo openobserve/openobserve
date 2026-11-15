@@ -857,22 +857,6 @@ describe("FunctionList", () => {
     });
   });
 
-  describe("AI Chat Integration", () => {
-    it("should emit sendToAiChat event", async () => {
-      const wrapper = mount(FunctionList, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      vm.sendToAiChat("test AI value");
-
-      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
-      expect(wrapper.emitted("sendToAiChat")?.[0]).toEqual(["test AI value"]);
-    });
-  });
-
   describe("Associated Pipelines ODialog (migrated)", () => {
     it("should render ODialog stub for associated pipelines", async () => {
       const wrapper = mount(FunctionList, {

@@ -78,7 +78,14 @@ const mountCard = (zoConfig: Record<string, unknown> = {}) =>
         createStore({ state: { zoConfig: { sso_enabled: false, ...zoConfig } } }),
         createRouter({
           history: createWebHistory(),
-          routes: [{ path: "/", component: { template: "<div />" } }],
+          routes: [
+            { path: "/", component: { template: "<div />" } },
+            {
+              path: "/settings/assistant/:tab?",
+              name: "assistantSettings",
+              component: { template: "<div />" },
+            },
+          ],
         }),
       ],
       stubs: { OCodeBlock: CODE_BLOCK_STUB },
@@ -273,7 +280,7 @@ describe("McpServerCard", () => {
       const wrapper = mountCard();
       const block = configBlock(wrapper);
 
-      expect(block.props("code")).toContain("Basic <base64 of service-account-email:token>");
+      expect(block.props("code")).toContain("Basic <your-token>");
       expect(block.props("codeMasked")).toBeUndefined();
       expect(wrapper.text()).not.toContain("[BASIC_PASSCODE]");
     });

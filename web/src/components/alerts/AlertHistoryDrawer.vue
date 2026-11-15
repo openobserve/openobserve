@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
-    :inset-beside="assistantV2"
+    inset-beside
     data-test="alert-history-drawer"
     bleed
     :open="open"
@@ -77,11 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #header-right>
       <div class="col-auto flex items-center gap-1">
-        <AiEntryButton
-          v-if="assistantV2 && alertDetails && lgUp"
-          v-bind="headerDoor"
-          appearance="toolbar-icon"
-        />
+        <AiEntryButton v-if="alertDetails && lgUp" v-bind="headerDoor" appearance="toolbar-icon" />
         <DateTime
           :class="activeTab !== 'history' ? 'invisible' : ''"
           ref="dateTimeRef"
@@ -100,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Content -->
     <div class="flex h-full min-h-0 flex-col" v-if="alertDetails">
-      <div v-if="assistantV2 && !lgUp" class="flex justify-end px-2 pt-2">
+      <div v-if="!lgUp" class="flex justify-end px-2 pt-2">
         <AiEntryButton v-bind="headerDoor" appearance="chip" />
       </div>
       <!-- Tab Panels -->
@@ -176,14 +172,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                     </div>
                     <!-- Normal row -->
-                    <span v-else-if="!assistantV2" class="inline-flex cursor-default">
-                      <OTag
-                        type="alertState"
-                        :value="row.status"
-                        data-test="alert-history-status-chip"
-                      />
-                      <OTooltip v-if="row.error" :max-width="'18.75rem'" :content="row.error" />
-                    </span>
                     <span v-else class="inline-flex cursor-default items-center gap-1">
                       <span class="inline-flex">
                         <OTag
@@ -430,7 +418,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import AlertHistoryTimeline from "./AlertHistoryTimeline.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import { alertBuild, alertFiringBuild } from "@/components/alerts/alertDoors";
 
@@ -438,7 +425,6 @@ import { alertBuild, alertFiringBuild } from "@/components/alerts/alertDoors";
 const { t } = useI18nTyped();
 const store = useStore();
 
-const assistantV2 = isAssistantV2();
 const { lgUp } = useBreakpoint();
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
@@ -448,7 +434,7 @@ const alertRecord = () => ({ ...(props.alertDetails ?? {}), id: props.alertId })
 const headerDoor = computed(() => ({
   verb: "troubleshoot" as const,
   entryKind: "object_verb" as const,
-  boundOrg: loadedOrg?.value,
+  boundOrg: loadedOrg.value,
   objectKind: "alert" as const,
   label: t("assistant.entry.troubleshootAlert"),
   tooltip: t("assistant.entry.tooltip.troubleshootAlert"),
@@ -458,7 +444,7 @@ const headerDoor = computed(() => ({
 const firingDoor = (row: Record<string, any>, verb: "troubleshoot" | "add_to_chat") => ({
   verb,
   entryKind: "object_verb" as const,
-  boundOrg: loadedOrg?.value,
+  boundOrg: loadedOrg.value,
   objectKind: "alert_firing" as const,
   label: t(
     verb === "troubleshoot" ? "assistant.entry.troubleshootAlert" : "assistant.entry.addFiring",
@@ -494,12 +480,10 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const loadedOrg = assistantV2
-  ? useLoadedOrg(
-      () => props.alertDetails,
-      () => store.state.selectedOrganization?.identifier ?? "",
-    )
-  : null;
+const loadedOrg = useLoadedOrg(
+  () => props.alertDetails,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
 
 const isAnomaly = computed(() => props.alertType === "anomaly_detection");
 

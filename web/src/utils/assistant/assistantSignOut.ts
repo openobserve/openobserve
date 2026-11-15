@@ -13,13 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { isAssistantV2 } from "@/composables/assistant/flags";
-
 /** Every sign-out asks the revamped assistant first: it cancels running answers, tells the other tabs and purges per-user data; "cancel" keeps the user signed in. */
 export async function assistantSignOut(
   trigger: { invoker?: HTMLElement | null; forced?: boolean } = {},
 ): Promise<"proceed" | "cancel"> {
-  if (!isAssistantV2()) return "proceed";
   // A chunk that fails to load (a tab left open across a deploy) or a throw must never keep the user signed in.
   try {
     const { assistantLifecycle } = await import("@/composables/assistant");

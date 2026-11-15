@@ -17,7 +17,6 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } 
 import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createWebHistory } from "vue-router";
 import OrganizationManagement from "./OrganizationManagement.vue";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import { makeAiCreditsSchema, makeExtendTrialSchema } from "./OrganizationManagement.schema";
 import i18nInstance from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
@@ -1209,14 +1208,7 @@ describe("OrganizationManagement.vue", () => {
   });
 
   describe("assistant allowance floor", () => {
-    afterEach(() => {
-      delete window.__O2_ASSISTANT_V2__;
-      resetAssistantV2ForTests();
-    });
-
     it("keeps loading until the forced retry after a 409 below_usage resolves", async () => {
-      window.__O2_ASSISTANT_V2__ = true;
-      resetAssistantV2ForTests();
       let finish: (value: unknown) => void = () => {};
       mockSetQuotaUsageLimit
         .mockRejectedValueOnce({

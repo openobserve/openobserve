@@ -740,7 +740,9 @@ describe("door registry (DG-12 AC 1)", () => {
         used.add(`ai-entry-${m[1]}`);
     }
     used.delete("ai-entry-secondary");
-    for (const id of used) expect(registered.has(id as never), `${id} in src`).toBe(true);
+    // A plain menu row reuses its door's id with a `-menu` suffix.
+    for (const id of used)
+      expect(registered.has(id.replace(/-menu$/, "") as never), `${id} in src`).toBe(true);
   });
 
   it("keeps menu-link-ai-item on the header button and the editor toggles WP-09 replaces (constraint 52)", () => {
@@ -752,16 +754,12 @@ describe("door registry (DG-12 AC 1)", () => {
       "components/pipeline/NodeForm/Query.vue",
     ];
     const owners = files(SRC)
-      // Header.vue binds the id (`:data-test`) since the license lock shares its button.
       .filter((file) =>
         /data-test="menu-link-ai-item"|'menu-link-ai-item'/.test(readFileSync(file, "utf8")),
       )
       .map((file) => relative(SRC, file))
       .filter((file) => !toggles.includes(file));
-    expect(owners.sort()).toEqual([
-      "components/Header.vue",
-      "components/ai-assistant/shell/AssistantHeaderButton.vue",
-    ]);
+    expect(owners.sort()).toEqual(["components/ai-assistant/shell/AssistantHeaderButton.vue"]);
   });
 });
 

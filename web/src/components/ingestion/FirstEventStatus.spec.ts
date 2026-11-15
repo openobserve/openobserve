@@ -12,7 +12,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, nextTick, ref } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
@@ -26,7 +26,6 @@ import type {
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStatus from "./FirstEventStatus.vue";
 import { markHeardFromPending } from "@/components/login/heardFrom";
-import { FIRST_EVENT_ASK_AI } from "./firstEventAskAi";
 import {
   FIRST_EVENT_REPORTER,
   FIRST_EVENT_SUCCESS_BY_HOST,
@@ -65,8 +64,8 @@ vi.mock("@/composables/firstEvent/useFirstEventWatch", () => ({
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 const awsConfig = vi.hoisted(() => ({ isEnterprise: "false", isCloud: "false" }));
 vi.mock("@/aws-exports", () => ({ default: awsConfig }));
-const assistant = vi.hoisted(() => ({ v2: false, gate: { value: "available" } }));
-vi.mock("@/composables/assistant/flags", () => ({ isAssistantV2: () => assistant.v2 }));
+// The door stays hidden unless a case opens the gate, so the other cases see only the docs link.
+const assistant = vi.hoisted(() => ({ gate: { value: "not_configured" } }));
 vi.mock("@/composables/assistant", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/assistant")>()),
   useAssistantCapability: () => ({ gate: assistant.gate }),
@@ -121,7 +120,6 @@ let router: ReturnType<typeof createRouter>;
 const mountBar = (
   props: Record<string, unknown> = {},
   opts: {
-    askAi?: (q: string) => void;
     zoConfig?: Record<string, unknown>;
     reporter?: FirstEventReporter;
     successByHost?: boolean;
@@ -135,7 +133,6 @@ const mountBar = (
     global: {
       plugins: [i18n, makeStore(opts.zoConfig, opts.org, opts.organizations), router],
       provide: {
-        ...(opts.askAi ? { [FIRST_EVENT_ASK_AI as symbol]: opts.askAi } : {}),
         ...(opts.reporter ? { [FIRST_EVENT_REPORTER as symbol]: opts.reporter } : {}),
         ...(opts.successByHost ? { [FIRST_EVENT_SUCCESS_BY_HOST as symbol]: true } : {}),
       },
@@ -153,6 +150,11 @@ const rejection = (reason: string, status: number, extra: Record<string, unknown
   ...extra,
 });
 
+// Every mount imports the assistant barrel; a first import under fake timers never settles.
+beforeAll(async () => {
+  await import("@/composables/assistant");
+});
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
@@ -166,8 +168,7 @@ beforeEach(() => {
   fake.targetExists.value = true;
   fake.deciding.value = false;
   awsConfig.isEnterprise = "false";
-  assistant.v2 = false;
-  assistant.gate = { value: "available" };
+  assistant.gate = { value: "not_configured" };
   built.last = null;
 });
 
@@ -673,56 +674,6 @@ describe("FirstEventStatus — diagnosis", () => {
     expect(wrapper.find('[data-test="first-event-diagnosis-still-stuck"]').exists()).toBe(false);
   });
 
-  it("shows Ask AI only where AI chat is on, and its prompt never carries the token", async () => {
-    awsConfig.isEnterprise = "true";
-    const askAi = vi.fn();
-    mountBar({}, { askAi, zoConfig: { ai_enabled: true } });
-    fake.diagnosis.value = {
-      form: "rejected",
-      trigger: "auto",
-      rejections: [rejection("invalid_credentials", 401)],
-    };
-    fake.state.value = "rejected";
-    await nextTick();
-    await q("first-event-diagnosis-ask-ai-btn").trigger("click");
-    expect(askAi).toHaveBeenCalledTimes(1);
-    const prompt = askAi.mock.calls[0][0] as string;
-    expect(prompt).toContain("Kubernetes");
-    expect(prompt).toContain("401");
-    expect(prompt).toContain("acme-prod");
-    expect(prompt).toContain("https://api.openobserve.ai");
-    expect(prompt).not.toContain("secret-token-value");
-  });
-
-  it("tells Ask AI that nothing has arrived and no request was refused", async () => {
-    awsConfig.isEnterprise = "true";
-    const askAi = vi.fn();
-    mountBar({}, { askAi, zoConfig: { ai_enabled: true } });
-    fake.diagnosis.value = { form: "no-requests", trigger: "auto", rejections: [] };
-    fake.state.value = "no-requests";
-    await nextTick();
-    await q("first-event-diagnosis-ask-ai-btn").trigger("click");
-    const prompt = askAi.mock.calls[0][0] as string;
-    expect(prompt).toContain(
-      "The first-event check says: nothing has arrived and no request was refused.",
-    );
-    expect(prompt).not.toContain("no requests reached");
-  });
-
-  it("hides Ask AI when the page provides no AI hand-off or AI is off", async () => {
-    awsConfig.isEnterprise = "true";
-    mountBar({}, { zoConfig: { ai_enabled: true } });
-    fake.diagnosis.value = { form: "no-requests", trigger: "auto", rejections: [] };
-    fake.state.value = "no-requests";
-    await nextTick();
-    expect(q("first-event-diagnosis-ask-ai-btn").exists()).toBe(false);
-    wrapper.unmount();
-    mountBar({}, { askAi: vi.fn(), zoConfig: { ai_enabled: false } });
-    fake.state.value = "no-requests";
-    await nextTick();
-    expect(q("first-event-diagnosis-ask-ai-btn").exists()).toBe(false);
-  });
-
   it("fires first_event_diagnosis_shown once per watch with reason and trigger", async () => {
     mountBar();
     fake.diagnosis.value = {
@@ -997,7 +948,7 @@ describe("FirstEventStatus — assistant door (WP-07)", () => {
   const waitForDoor = () =>
     vi.waitFor(() => expect(q("ai-entry-ingestion-troubleshoot").exists()).toBe(true), DOOR_WAIT);
   beforeEach(() => {
-    assistant.v2 = true;
+    assistant.gate = { value: "available" };
     vi.useRealTimers();
   });
 

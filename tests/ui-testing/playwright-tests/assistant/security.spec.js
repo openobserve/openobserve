@@ -24,7 +24,6 @@ test.describe("assistant security", () => {
 
   test.beforeEach(async ({ context, page }) => {
     harness = await loadHarness();
-    await harness.setFlag(context, true);
     await harness.installMocks(context, harness.createMockState());
     beacons.length = 0;
     await context.route(/evil\.example/, (route) => {

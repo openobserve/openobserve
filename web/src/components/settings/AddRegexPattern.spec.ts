@@ -50,15 +50,6 @@ vi.mock("@/components/functions/FullViewContainer.vue", () => ({
   },
 }));
 
-vi.mock("@/components/O2AIChat.vue", () => ({
-  default: {
-    name: "O2AIChat",
-    template: "<div data-test='o2-ai-chat'></div>",
-    props: ["aiChatInputContext", "is-open"],
-    emits: ["close"],
-  },
-}));
-
 // Use real store from test helpers
 import store from "@/test/unit/helpers/store";
 
@@ -72,7 +63,6 @@ const setupStoreForTest = () => {
     label: "default Organization",
   };
   mockStore.state.theme = "light";
-  mockStore.state.isAiChatEnabled = false;
   mockStore.state.organizationData = {
     regexPatternPrompt: "",
     regexPatternTestValue: "",
@@ -200,11 +190,6 @@ const lightStubs = {
     props: ["name", "isExpanded", "label", "labelClass"],
     emits: ["update:isExpanded"],
   },
-  O2AIChat: {
-    template: "<div data-test-stub='o2-ai-chat'></div>",
-    props: ["aiChatInputContext", "isOpen"],
-    emits: ["close"],
-  },
 };
 
 const createWrapper = (props = {}, options = {}) => {
@@ -249,7 +234,6 @@ const createRealFormWrapper = (props = {}) => {
       },
       stubs: {
         ODrawer: ODrawerStub,
-        O2AIChat: lightStubs.O2AIChat,
         FullViewContainer: lightStubs.FullViewContainer,
         // OForm, OFormInput, OFormTextarea, OInput, OButton, OIcon are REAL.
       },
@@ -263,7 +247,6 @@ describe("AddRegexPattern", () => {
     vi.clearAllMocks();
     setupStoreForTest();
     mockStore.state.theme = "light";
-    mockStore.state.isAiChatEnabled = false;
     mockStore.state.organizationData.regexPatternPrompt = "";
     mockStore.state.organizationData.regexPatternTestValue = "";
     mockRouter.currentRoute.value.query = {};
@@ -410,19 +393,6 @@ describe("AddRegexPattern", () => {
       await nextTick();
       expect(wrapper.vm.isFullScreen).toBe(!initialValue);
     });
-
-    it("should toggle AI chat when AI button is clicked", async () => {
-      mockStore.state.zoConfig.ai_enabled = true;
-      mockStore.state.isAiChatEnabled = false;
-      const wrapper = createWrapper();
-      const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
-
-      if (aiBtn.exists()) {
-        await aiBtn.trigger("click");
-        expect(mockStore.state.isAiChatEnabled).toBe(true);
-      }
-      wrapper.unmount();
-    });
   });
 
   describe("Form submission", () => {
@@ -549,25 +519,6 @@ describe("AddRegexPattern", () => {
   });
 
   describe("Conditional rendering", () => {
-    it("should show AI button when enterprise and AI is enabled", async () => {
-      mockStore.state.zoConfig.ai_enabled = true;
-
-      const wrapper = createWrapper();
-      await nextTick();
-
-      expect(wrapper.vm.config.isEnterprise).toBe("true");
-      expect(wrapper.vm.store.state.zoConfig.ai_enabled).toBe(true);
-
-      const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
-      const allBtns = wrapper.findAll("button[data-o2-btn]");
-
-      if (aiBtn.exists()) {
-        expect(aiBtn.exists()).toBe(true);
-      } else {
-        expect(allBtns.length).toBeGreaterThanOrEqual(0);
-      }
-    });
-
     it("should hide AI button when AI is disabled", async () => {
       mockStore.state.zoConfig.ai_enabled = false;
 
@@ -579,20 +530,6 @@ describe("AddRegexPattern", () => {
 
       const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
       expect(aiBtn.exists()).toBe(false);
-    });
-
-    it("should show AI chat component when enabled", async () => {
-      mockStore.state.isAiChatEnabled = true;
-      const wrapper = createWrapper();
-      const aiChat = wrapper.find('[data-test-stub="o2-ai-chat"]');
-      expect(aiChat.exists()).toBe(true);
-    });
-
-    it("should hide AI chat component when disabled", () => {
-      mockStore.state.isAiChatEnabled = false;
-      const wrapper = createWrapper();
-      const aiChat = wrapper.find('[data-test-stub="o2-ai-chat"]');
-      expect(aiChat.exists()).toBe(false);
     });
   });
 
@@ -657,15 +594,7 @@ describe("AddRegexPattern", () => {
       await wrapper.vm.$nextTick();
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(wrapper.vm.inputContext).toBe("Test prompt");
       expect(wrapper.vm.testStringValue).toBe("Test value");
-    });
-
-    it("should widen the drawer to a size preset when AI chat is open", async () => {
-      mockStore.state.isAiChatEnabled = true;
-      const wrapper = createWrapper();
-      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
-      expect(drawer.attributes("data-size")).toBe("xxl");
     });
 
     it("should handle full screen mode", async () => {

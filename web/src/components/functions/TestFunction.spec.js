@@ -129,7 +129,6 @@ describe("TestFunction Component", () => {
           },
           DateTime: true,
           FullViewContainer: true,
-          O2AIContextAddBtn: true,
         },
       },
       props: {
@@ -321,17 +320,6 @@ describe("TestFunction Component", () => {
       await nextTick();
       expect(wrapper.vm.outputEventsErrorMsg).toBe("Error while transforming results");
       expect(wrapper.vm.outputEvents).toBe("Error in testing function");
-    });
-  });
-
-  describe("AI Chat Integration", () => {
-    it("emits sendToAiChat event with correct data", async () => {
-      const testData = { test: "data" };
-      wrapper.vm.sendToAiChat(testData);
-      await flushPromises();
-      await nextTick();
-      expect(wrapper.emitted()["sendToAiChat"]).toBeTruthy();
-      expect(wrapper.emitted()["sendToAiChat"][0]).toEqual([testData]);
     });
   });
 });

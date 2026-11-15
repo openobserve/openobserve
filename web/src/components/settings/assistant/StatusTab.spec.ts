@@ -20,8 +20,6 @@ import { fakeAssistant } from "@/components/ai-assistant/__tests__/fakeAssistant
 import assistant, { CAPABILITIES_NOT_ENTITLED } from "@/services/assistant";
 import assistantSettings from "@/services/assistant_settings";
 
-import { ASSISTANT_V2_STORAGE_KEY, resetAssistantV2ForTests } from "@/composables/assistant/flags";
-
 import StatusTab from "./StatusTab.vue";
 import { ORG_SETTINGS, settingsHarness } from "./assistantSettings.test-helpers";
 
@@ -74,13 +72,9 @@ beforeEach(() => {
     health: { status: "ok", checked_at: Date.now() },
   });
   vi.mocked(assistantSettings.get).mockResolvedValue({ ...ORG_SETTINGS });
-  localStorage.removeItem(ASSISTANT_V2_STORAGE_KEY);
-  resetAssistantV2ForTests();
 });
 
 afterEach(() => {
-  delete window.__O2_ASSISTANT_V2__;
-  resetAssistantV2ForTests();
   wrapper?.unmount();
   wrapper = null;
   vi.clearAllMocks();
@@ -181,36 +175,5 @@ describe("StatusTab", () => {
     wrapper = w;
     expect(assistant.capabilities).not.toHaveBeenCalled();
     expect(w.find('[data-test="settings-assistant-setup-card"]').exists()).toBe(true);
-  });
-
-  it("binds the admin-only preview switch to this browser's opt-in", async () => {
-    localStorage.setItem(ASSISTANT_V2_STORAGE_KEY, "1");
-    const { w } = await mountTab();
-    wrapper = w;
-    const sw = w.find('[data-test="settings-assistant-v2-optin-switch"]').find('[role="switch"]');
-    expect(sw.attributes("aria-checked")).toBe("true");
-    await sw.trigger("click");
-    expect(localStorage.getItem(ASSISTANT_V2_STORAGE_KEY)).toBeNull();
-    await sw.trigger("click");
-    expect(localStorage.getItem(ASSISTANT_V2_STORAGE_KEY)).toBe("1");
-  });
-
-  it("shows the preview on and locked when the deployment turned it on", async () => {
-    window.__O2_ASSISTANT_V2__ = true;
-    const { w } = await mountTab();
-    wrapper = w;
-    const sw = w.find('[data-test="settings-assistant-v2-optin-switch"]').find('[role="switch"]');
-    expect(sw.attributes("aria-checked")).toBe("true");
-    expect(sw.attributes("disabled")).toBeDefined();
-    expect(w.find('[data-test="settings-assistant-v2-optin"]').text()).toContain(
-      "Turned on for this deployment",
-    );
-  });
-
-  it("hides the preview switch from members", async () => {
-    fake.current = fakeAssistant("available", { isAdmin: false });
-    const { w } = await mountTab();
-    wrapper = w;
-    expect(w.find('[data-test="settings-assistant-v2-optin"]').exists()).toBe(false);
   });
 });

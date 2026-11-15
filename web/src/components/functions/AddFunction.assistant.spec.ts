@@ -25,12 +25,6 @@ import { resetEditorProposalsForTests } from "@/composables/assistant/useEditorP
 import { contextRegistry } from "@/composables/contextProviders/registry";
 import i18n from "@/locales";
 
-const { flag } = vi.hoisted(() => ({ flag: { on: true } }));
-
-vi.mock("@/composables/assistant/flags", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/composables/assistant/flags")>()),
-  isAssistantV2: () => flag.on,
-}));
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", () =>
@@ -52,12 +46,11 @@ const vuex = () =>
   createStore({
     state: {
       theme: "light",
-      isAiChatEnabled: false,
       zoConfig: { ai_enabled: true },
       selectedOrganization: { identifier: "org1" },
       userInfo: { email: "ada@example.com" },
     },
-    actions: { setIsAiChatEnabled: vi.fn() },
+    actions: {},
   });
 
 async function setup(dockHost: boolean, path = "/pipeline/pipelines/edit") {
@@ -83,7 +76,6 @@ async function setup(dockHost: boolean, path = "/pipeline/pipelines/edit") {
       stubs: {
         UnifiedQueryEditor: { template: "<div><textarea /></div>", methods: { replaceValue() {} } },
         TestFunction: { template: "<div />", methods: { testFunction: vi.fn() } },
-        O2AIChat: { template: '<div data-test="legacy-chat" />' },
       },
     },
     attachTo: document.body,
@@ -93,7 +85,6 @@ async function setup(dockHost: boolean, path = "/pipeline/pipelines/edit") {
 }
 
 beforeEach(() => {
-  flag.on = true;
   sessionStorage.clear();
   contextRegistry.cleanup();
 });
@@ -153,12 +144,5 @@ describe("AddFunction with the revamped assistant", () => {
     const fits = await setup(true);
     expect(fits.wrapper.find(`.-mt-2 ${toggle}`).exists()).toBe(false);
     rects.mockRestore();
-  });
-
-  it("keeps the route-substring legacy toggle with the revamp off", async () => {
-    flag.on = false;
-    const { wrapper, runtime } = await setup(true);
-    expect(wrapper.find('[data-test="ai-entry-function-ask"]').exists()).toBe(false);
-    expect(runtime.hosts.has("function")).toBe(false);
   });
 });

@@ -126,7 +126,7 @@ export interface ChatHistoryServer {
   removeAll: (orgId: string) => Promise<unknown>;
 }
 
-// Module scope: the list (HomeChatHistory) and the chat that opens an entry (O2AIChat) share only the numeric id.
+// Module scope: the list and the chat that opens an entry share only the numeric id.
 const listedSessions = new Map<number, string>();
 const listedTitles = new Map<number, string>();
 

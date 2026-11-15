@@ -33,12 +33,6 @@ import { contextRegistry } from "@/composables/contextProviders/registry";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-const { flag } = vi.hoisted(() => ({ flag: { on: true } }));
-
-vi.mock("@/composables/assistant/flags", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/composables/assistant/flags")>()),
-  isAssistantV2: () => flag.on,
-}));
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true" } }));
 vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", () =>
   import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiEntryButtonStub),
@@ -52,10 +46,6 @@ vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () =>
 vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
   import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
 );
-vi.mock("@/components/O2AIChat.vue", () => ({
-  default: { name: "O2AIChat", template: "<div data-test='o2-ai-chat'></div>" },
-}));
-
 import AddRegexPattern from "./AddRegexPattern.vue";
 
 const drawer = {
@@ -102,7 +92,6 @@ async function setup() {
 }
 
 beforeEach(() => {
-  flag.on = true;
   sessionStorage.clear();
   contextRegistry.cleanup();
   store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
@@ -185,13 +174,5 @@ describe("AddRegexPattern with the revamped assistant", () => {
     useLifecycleQuestion().value!.answer("keep");
     await expect(leaving).resolves.toBe(false);
     off();
-  });
-
-  it("keeps both legacy controls with the revamp off", async () => {
-    flag.on = false;
-    const { wrapper, runtime } = await setup();
-    expect(wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="ai-entry-regex-ask"]').exists()).toBe(false);
-    expect(runtime.hosts.has("regex")).toBe(false);
   });
 });

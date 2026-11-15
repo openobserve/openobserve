@@ -26,7 +26,6 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
-import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { FIRST_EVENT_BUDGET, cadenceAt } from "@/composables/firstEvent/firstEventBudget";
@@ -46,13 +45,7 @@ import {
 import FirstEventStillStuck from "./FirstEventStillStuck.vue";
 import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
 import { HEARD_FROM_ASKED_BY_HOST } from "@/components/login/heardFrom";
-import {
-  FIRST_EVENT_ASK_AI,
-  REJECTION_REASON_KEYS,
-  askAiQuery,
-  type AskAiContext,
-} from "./firstEventAskAi";
-import { isAssistantV2 } from "@/composables/assistant/flags";
+import { REJECTION_REASON_KEYS, type AskAiContext } from "./firstEventAskAi";
 
 const props = withDefaults(
   defineProps<{
@@ -107,7 +100,6 @@ const emit = defineEmits<{
 const { t, locale } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
-const askAiFn = inject(FIRST_EVENT_ASK_AI, null);
 const hostAsksHeardFrom = inject(HEARD_FROM_ASKED_BY_HOST, false);
 const hostShowsSuccess = inject(FIRST_EVENT_SUCCESS_BY_HOST, false);
 // Attached in setup, not on mount: a keyed swap then never leaves the host counting zero statuses.
@@ -405,21 +397,15 @@ const copyLabel = computed(() => {
     : t("ingestion.firstEvent.copyCommand");
 });
 
-const aiEnabled = computed(
-  () => config.isEnterprise === "true" && !!store.state.zoConfig?.ai_enabled,
-);
-// With the assistant on the door gates itself and is offered on every page, not only under /ingestion.
-const assistantV2 = isAssistantV2();
 // The pill never diagnoses, so once its watch stops the door asks with no known cause.
 const pillDiagnosis = computed((): FirstEventDiagnosis | null =>
-  assistantV2 && props.display === "pill" && state.value === "stopped"
+  props.display === "pill" && state.value === "stopped"
     ? { form: "unavailable", trigger: "auto", rejections: [] }
     : null,
 );
 const stillStuckContext = computed((): AskAiContext | undefined => {
   const found = diagnosis.value ?? pillDiagnosis.value;
   if (!found) return undefined;
-  if (!assistantV2 && (!askAiFn || !aiEnabled.value)) return undefined;
   return {
     guideName: props.guideName,
     diagnosis: { ...found, form: diagnosisForm.value },
@@ -427,9 +413,6 @@ const stillStuckContext = computed((): AskAiContext | undefined => {
     endpoint: endpoint.value,
   };
 });
-const stillStuckQuery = computed(() =>
-  stillStuckContext.value ? askAiQuery(stillStuckContext.value, t) : undefined,
-);
 // The door hides itself on some gates, and a step with nothing after "Still stuck?" is a dead end.
 const DOOR_GATES: ReadonlySet<string> = new Set([
   "available",
@@ -438,18 +421,13 @@ const DOOR_GATES: ReadonlySet<string> = new Set([
   "off_for_org",
 ]);
 const doorGate = shallowRef<{ readonly value: string } | null>(null);
-if (assistantV2)
-  void import("@/composables/assistant").then(
-    (assistant) => (doorGate.value = assistant.useAssistantCapability().gate),
-  );
+void import("@/composables/assistant").then(
+  (assistant) => (doorGate.value = assistant.useAssistantCapability().gate),
+);
 const doorShown = computed(
   () => !!stillStuckContext.value && !!doorGate.value && DOOR_GATES.has(doorGate.value.value),
 );
-const stillStuckShown = computed(() =>
-  assistantV2
-    ? !!props.docUrl || doorShown.value
-    : !!props.docUrl || (!!askAiFn && !!stillStuckQuery.value),
-);
+const stillStuckShown = computed(() => !!props.docUrl || doorShown.value);
 
 const hint = computed((): I18nText | undefined => {
   if (state.value === "idle") return undefined;
@@ -592,7 +570,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
         {{ t("ingestion.firstEvent.checkAgain") }}
       </OButton>
       <FirstEventStillStuck
-        v-if="assistantV2 && doorShown"
+        v-if="doorShown"
         :guide-name="guideName"
         :ask-ai-context="stillStuckContext"
         door-shown
@@ -905,8 +883,8 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
         <FirstEventStillStuck
           :guide-name="guideName"
           :doc-url="docUrl"
-          :ask-ai-query="stillStuckQuery"
-          v-bind="assistantV2 ? { askAiContext: stillStuckContext, doorShown } : {}"
+          :ask-ai-context="stillStuckContext"
+          :door-shown="doorShown"
         />
       </div>
     </div>

@@ -21,7 +21,6 @@ import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { getManager, resetManager } from "@/lib/vue-shortcut-manager";
 import config from "@/aws-exports";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -34,9 +33,6 @@ vi.mock("@openobserve/browser-rum", () => ({
 import MainLayout from "./MainLayout.vue";
 
 const StubDiv = defineComponent({ setup: () => () => h("div") });
-// Any page but Home, where Ctrl+B switches Home's tab instead. The real Logs page is a lazy import
-// heavy enough to outlast the test timeout on a busy machine.
-router.addRoute({ path: "/not-home", name: "notHome", component: StubDiv });
 
 function mountMainLayout() {
   return mount(MainLayout, {
@@ -45,7 +41,6 @@ function mountMainLayout() {
       stubs: {
         AppHeader: StubDiv,
         ONavbar: StubDiv,
-        O2AIChat: StubDiv,
         WebinarBanner: StubDiv,
         AnnouncementBanner: StubDiv,
         ShortcutCheatsheet: StubDiv,
@@ -69,66 +64,26 @@ describe("MainLayout — AI chat shortcut gate", () => {
   let wrapper: VueWrapper | undefined;
   const originalIsEnterprise = config.isEnterprise;
 
-  // Ctrl+B is the legacy chat's binding; a local `.env` may turn v2 on for the whole run.
   beforeEach(() => {
-    window.__O2_ASSISTANT_V2__ = false;
-    resetAssistantV2ForTests();
     resetManager();
   });
 
   afterEach(() => {
-    delete window.__O2_ASSISTANT_V2__;
-    resetAssistantV2ForTests();
     wrapper?.unmount();
     wrapper = undefined;
     config.isEnterprise = originalIsEnterprise;
     store.state.zoConfig.ai_enabled = false;
-    store.state.isAiChatEnabled = false;
     resetManager();
   });
 
-  const ctrlB = () => getManager()?.getById("aiChatToggle");
-
-  it("should not register ctrl+b on OSS builds", async () => {
-    config.isEnterprise = "false";
-    store.state.zoConfig.ai_enabled = true;
-
-    wrapper = mountMainLayout();
-    await flushPromises();
-
-    expect(ctrlB()).toBeUndefined();
-  });
-
-  it("should register ctrl+b on enterprise builds", async () => {
-    config.isEnterprise = "true";
-
-    wrapper = mountMainLayout();
-    await flushPromises();
-
-    expect(ctrlB()?.key).toBe("ctrl+b");
-  });
-
-  it("should not open the chat while ai_enabled is off", async () => {
-    config.isEnterprise = "true";
-    store.state.zoConfig.ai_enabled = false;
-
-    wrapper = mountMainLayout();
-    await router.push({ name: "notHome" });
-    await flushPromises();
-
-    ctrlB()!.handler();
-    expect(store.state.isAiChatEnabled).toBe(false);
-  });
-
-  it("should open the chat when ai_enabled is on", async () => {
+  // The assistant owns its own shortcuts, so the layout binds no Ctrl+B chat toggle.
+  it("registers no ctrl+b chat toggle, even on enterprise with AI on", async () => {
     config.isEnterprise = "true";
     store.state.zoConfig.ai_enabled = true;
 
     wrapper = mountMainLayout();
-    await router.push({ name: "notHome" });
     await flushPromises();
 
-    ctrlB()!.handler();
-    expect(store.state.isAiChatEnabled).toBe(true);
+    expect(getManager()?.getById("aiChatToggle")).toBeUndefined();
   });
 });

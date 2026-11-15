@@ -13,14 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { queryClient } from "@/composables/query/queryClient";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 const getOrgSettings = vi.fn();
 const getConfigFull = vi.fn((): Promise<unknown> => new Promise(() => {}));
@@ -64,7 +63,6 @@ const mountLayout = async (meta: Record<string, unknown> = {}) => {
       stubs: {
         AppHeader: StubDiv,
         ONavbar: StubDiv,
-        O2AIChat: StubDiv,
         AssistantSidebarHost: StubDiv,
         AssistantWindowLayer: StubDiv,
         AssistantSkipLink: StubDiv,
@@ -88,15 +86,10 @@ const mountLayout = async (meta: Record<string, unknown> = {}) => {
 const pageShown = (w: VueWrapper) => w.find('[data-test="assistant-gates-page"]').exists();
 const pendingShown = (w: VueWrapper) => w.find('[data-test="main-content-pending"]').exists();
 
-describe("MainLayout — page gates with the assistant flag on", () => {
+describe("MainLayout — page gates", () => {
   let wrapper: VueWrapper | undefined;
   let savedConfig: Record<string, unknown>;
   const savedOrgs = store.state.organizations;
-
-  beforeAll(() => {
-    window.__O2_ASSISTANT_V2__ = true;
-    resetAssistantV2ForTests();
-  });
 
   beforeEach(() => {
     localStorage.clear();

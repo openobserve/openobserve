@@ -35,7 +35,6 @@ const mountState = (relativeTimePeriod: string) =>
       editorValue: "",
       relativeTimePeriod,
       dateType: "relative",
-      aiEnabled: false,
     },
     global: { plugins: [i18n, store], stubs: { OEmptyState: OEmptyStateStub } },
   });

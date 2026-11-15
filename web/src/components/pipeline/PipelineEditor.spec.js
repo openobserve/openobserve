@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import PipelineEditor from "./PipelineEditor.vue";
 
 import { flushPromises, mount } from "@vue/test-utils";
@@ -127,6 +128,7 @@ const ODrawerStub = {
       :data-show-close="String(!!showClose)"
     >
       <slot name="header" />
+      <slot name="header-right" />
       <slot />
       <slot name="footer" />
       <button
@@ -285,9 +287,16 @@ describe("PipelineEditor", () => {
   describe("Enterprise gating — locked, not hidden", () => {
     // Test env is OSS (isEnterprise=false, isCloud=false, see web/.env) —
     // neither entitlement applies, so both surfaces below should be locked.
-    it("shows the JSON-editor AI button locked instead of hiding it", () => {
+    it("shows the JSON-editor AI button locked, with the upgrade dialog behind it, and no assistant door", async () => {
+      const { isOpen, close } = useEnterpriseUpgradeDialog();
       expect(wrapper.vm.aiAccess.allowed).toBe(false);
-      expect(wrapper.vm.jsonEditorAiButtonVisible).toBe(true);
+      const btn = document.querySelector('[data-test="menu-link-ai-item"]');
+      expect(btn).not.toBeNull();
+      expect(document.querySelector('[data-test="ai-entry-json-editor-ask"]')).toBeNull();
+      expect(isOpen.value).toBe(false);
+      btn.click();
+      expect(isOpen.value).toBe(true);
+      close();
     });
 
     it("adds the Remote Destination node to the palette locked instead of omitting it", () => {

@@ -164,10 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @detected="onFirstDataDetected"
                     >
                       <TracesNoDataState
-                        :ai-enabled="isAiEnabled"
                         :alternatives-only="layout === 'panel'"
                         data-test="traces-no-streams-in-org-text"
-                        @ask-ai="onAskAiSetupTracing"
                       >
                         <template v-if="layout === 'status'" #status>
                           <component :is="statusLine" />
@@ -183,13 +181,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error-code="tracesErrorCode"
                         :error-msg="searchObj.data.errorMsg"
                         :error-detail="searchObj.data.errorDetail"
-                        :ai-enabled="isAiEnabled"
                         :resource-name="searchObj.data.stream.selectedStream.value"
                         size="hero"
-                        @ask-ai="onAskAiTracing"
                         @configure-resource="onConfigureTracesStream"
                       >
-                        <template v-if="assistantV2" #ai-door>
+                        <template #ai-door>
                           <AiEntryButton v-bind="tracesErrorDoor" appearance="chip" />
                         </template>
                       </QueryErrorState>
@@ -246,7 +242,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @remove-filter="onRemoveTracesFilter"
                         @jump-to-stream-data="onJumpToTracesStreamData"
                         @error-only-toggled="onErrorOnlyToggled"
-                        @ask-ai="onAskAiTracing"
                         @send-to-ai-chat="sendToAiChat"
                         @open-mobile-fields="mobileFieldsOpen = true"
                       />
@@ -319,7 +314,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { tracesDoorBase, tracingQueryBuild } from "@/plugins/traces/tracesDoors";
 import { useRouter } from "vue-router";
 import {
@@ -350,7 +344,6 @@ import { logsErrorMessage } from "@/utils/common";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
-import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
@@ -433,7 +426,7 @@ const assistantSet = ref<Set<AssistantSetField>>(new Set());
 const initialService = ref<string | null>(null);
 // Bumped per URL read that names a service, so a kept-alive catalog re-applies a second link, even to the same name.
 const serviceHandoff = ref(0);
-// Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
+// Bubbles Ask AI requests up to MainLayout, which opens the assistant.
 const emit = defineEmits(["sendToAiChat"]);
 const {
   searchObj,
@@ -1636,7 +1629,7 @@ const sortNeedsSchema = () => {
 };
 
 // An assistant link applies its stream, window and filter but never runs them.
-const fromAssistant = () => assistantV2 && router.currentRoute.value.query.type === "ai_chat_query";
+const fromAssistant = () => router.currentRoute.value.query.type === "ai_chat_query";
 
 // A service link lands on the catalog, which loads its own rows once the stream and handoff change.
 const serviceLinked = () => typeof router.currentRoute.value.query.service === "string";
@@ -2233,46 +2226,12 @@ const queryWindowUs = computed<{ start: number; end: number } | undefined>(() =>
   return undefined;
 });
 
-// Relay AI-chat requests from row cell actions (carrying an explicit message)
-// straight up to MainLayout's O2AIChat panel.
+// Relay the metrics dashboard's Ask AI up to MainLayout, which opens the assistant.
 const sendToAiChat = (value: any, append: boolean = true) => {
   emit("sendToAiChat", value, append);
 };
 
-// "Ask AI" from the no-events / error empty state: build a natural-language
-// prompt describing the failed traces query, then open the AI chat with it.
-// Mirrors the logs page's onAskAiFixQuery.
-const onAskAiTracing = () => {
-  const filter = searchObj.data.editorValue?.trim() || "(none)";
-
-  // errorMsg may contain HTML (e.g. a <br><span>TraceID…</span>) — strip to text.
-  const el = document.createElement("div");
-  el.innerHTML = searchObj.data.errorMsg || "";
-  const errorText = (el.textContent ?? "").trim();
-  const errorContext = errorText ? ` Error: ${errorText}.` : "";
-
-  // Model input, not screen copy — kept English so the assistant reads the same
-  // wording regardless of the user's locale.
-  const outcome = errorContext
-    ? raw(`The traces query produced an error.${errorContext}`)
-    : raw(`The traces query ran successfully but returned no results.`);
-
-  const mode = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
-  const stream = searchObj.data.stream.selectedStream?.value || "unknown";
-  const period = searchObj.data.datetime.relativeTimePeriod;
-  const timeRange = period ? describePeriod(period) : "custom";
-
-  emit(
-    "sendToAiChat",
-    raw(
-      `${outcome} I am searching ${mode}. The filter expression is: ${filter}. This is a WHERE-clause filter — not a full SQL query. Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust the filter to get results?`,
-    ),
-    false,
-  );
-};
-
 // The traces error state's door: the error goes in a chip, the range is absolute.
-const assistantV2 = isAssistantV2();
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
@@ -2299,18 +2258,6 @@ const firstDataArrival = ref<FirstEventResult | null>(null);
 const onFirstDataDetected = async (result: FirstEventResult) => {
   firstDataArrival.value = result;
   await loadPageData();
-};
-
-// "Ask AI" from the no-streams empty state: open the AI chat asking how to
-// start sending traces, instead of navigating away to the ingestion page.
-const onAskAiSetupTracing = () => {
-  emit(
-    "sendToAiChat",
-    raw(
-      `I don't have any trace streams in OpenObserve yet and want to start sending traces. How do I instrument my services to send traces (e.g. via OpenTelemetry / OTLP)?`,
-    ),
-    false,
-  );
 };
 
 /**

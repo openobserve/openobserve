@@ -25,12 +25,12 @@ vi.mock("@/components/ai-assistant/shell/rcaFollow", () => ({ useRcaFollow: () =
 import { rcaSummary } from "@/test/unit/fixtures/rcaThread";
 import { useAlertRcaFollow } from "./useAlertRcaFollow";
 
-const host = (enabled: boolean) => {
+const host = () => {
   let api!: ReturnType<typeof useAlertRcaFollow>;
   mount(
     defineComponent({
       setup() {
-        api = useAlertRcaFollow("default", enabled);
+        api = useAlertRcaFollow("default");
         return () => h("div");
       },
     }),
@@ -54,7 +54,7 @@ describe("useAlertRcaFollow", () => {
         ],
       },
     });
-    const api = host(true);
+    const api = host();
     await flushPromises();
 
     expect(list).toHaveBeenCalledWith("default", "open", 50, 0);
@@ -67,14 +67,5 @@ describe("useAlertRcaFollow", () => {
     );
     api().followAlert("a2");
     expect(follow).toHaveBeenCalledTimes(1);
-  });
-
-  it("reads nothing when the assistant is off", async () => {
-    list.mockClear();
-    const api = host(false);
-    await flushPromises();
-
-    expect(list).not.toHaveBeenCalled();
-    expect(api().runFor("a1")).toBeNull();
   });
 });

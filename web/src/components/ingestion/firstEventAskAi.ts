@@ -12,13 +12,9 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import type { InjectionKey } from "vue";
 
 export {
   REJECTION_REASON_KEYS,
   askAiQuery,
   type AskAiContext,
 } from "@/utils/assistant/prompts/ingestion";
-
-/** Provided by the Ingestion page; opens the AI chat prefilled with the query and does not send it. */
-export const FIRST_EVENT_ASK_AI: InjectionKey<(query: string) => void> = Symbol("firstEventAskAi");

@@ -17,7 +17,6 @@ test.describe("assistant settings tools", () => {
   async function start(context, page, overrides = {}) {
     harness = await loadHarness();
     state = harness.createMockState(typeof overrides === "function" ? overrides() : overrides);
-    await harness.setFlag(context, true);
     await harness.installMocks(context, state);
     await harness.login(page);
     assistant = new AssistantPage(page);

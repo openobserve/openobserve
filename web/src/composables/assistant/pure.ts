@@ -29,7 +29,6 @@ import type {
 } from "./assistantStore.types";
 export type { CreditMode, GateCode } from "./assistantStore.types";
 
-export { isAssistantV2 } from "./flags";
 export { ASSISTANT_SURFACES_SELECTOR } from "./surfaces";
 export {
   ASSISTANT_SET_QUERY_KEY,

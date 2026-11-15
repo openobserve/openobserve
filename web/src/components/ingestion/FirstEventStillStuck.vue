@@ -15,16 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, inject } from "vue";
-import { isAssistantV2 } from "@/composables/assistant/flags";
-import OButton from "@/lib/core/Button/OButton.vue";
+import { computed, defineAsyncComponent } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { FIRST_EVENT_ASK_AI, type AskAiContext } from "./firstEventAskAi";
+import type { AskAiContext } from "./firstEventAskAi";
 
 const props = defineProps<{
   guideName: string;
   docUrl?: string;
-  askAiQuery?: string;
   askAiContext?: AskAiContext;
   doorShown?: boolean;
 }>();
@@ -33,11 +30,6 @@ const props = defineProps<{
 const SEPARATOR = raw(" · ");
 
 const { t } = useI18nTyped();
-const askAi = inject(FIRST_EVENT_ASK_AI, null);
-
-const showAskAi = computed(() => !!askAi && !!props.askAiQuery);
-
-const assistantV2 = isAssistantV2();
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
@@ -60,29 +52,13 @@ const docsLabel = computed(() =>
     ? t("ingestion.firstEvent.guideDocs", { guide: raw(props.guideName) })
     : t("ingestion.firstEvent.setupDocs"),
 );
-
-const onAskAi = () => {
-  if (props.askAiQuery) askAi?.(props.askAiQuery);
-};
 </script>
 
 <template>
   <span class="text-text-secondary" data-test="first-event-diagnosis-still-stuck">
     {{ t("ingestion.firstEvent.stillStuck") }}
-    <template v-if="assistantV2 && askAiContext && doorShown">
+    <template v-if="askAiContext && doorShown">
       <AiEntryButton v-bind="ingestionDoor" appearance="chip" />
-      <span v-if="docUrl" aria-hidden="true">{{ SEPARATOR }}</span>
-    </template>
-    <template v-else-if="!assistantV2 && showAskAi">
-      <OButton
-        variant="ghost-primary"
-        size="xs"
-        class="text-text-link inline-flex"
-        data-test="first-event-diagnosis-ask-ai-btn"
-        @click="onAskAi"
-      >
-        {{ t("ingestion.firstEvent.askAi") }}
-      </OButton>
       <span v-if="docUrl" aria-hidden="true">{{ SEPARATOR }}</span>
     </template>
     <a

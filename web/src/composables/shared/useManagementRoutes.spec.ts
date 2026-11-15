@@ -19,7 +19,6 @@ import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import enLocale from "@/locales/languages/en-US.json";
 import store from "@/stores";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 /** Every `meta.titleKey` in a route tree, children included. */
 const collectTitleKeys = (routes: any[]): string[] =>
@@ -209,7 +208,6 @@ describe("useManagementRoutes", () => {
     });
 
     it.each([
-      ["aiToolsets", "ai_toolsets"],
       ["query_management", "query_management"],
       ["storageSettings", "byob"],
       ["syntheticsLocations", "synthetics"],
@@ -575,9 +573,9 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 26 children routes when enterprise is enabled", () => {
+    it("should have exactly 27 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(26); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings)
+      expect(routes[0].children).toHaveLength(27); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings)
     });
 
     it("should have the announcement banner list and editor routes when enterprise", () => {
@@ -648,9 +646,9 @@ describe("useManagementRoutes", () => {
       expect(orgMgmtRoute.component).toBeDefined();
     });
 
-    it("should have exactly 14 children routes when cloud is enabled", () => {
+    it("should have exactly 15 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(14); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 2 cloud
+      expect(routes[0].children).toHaveLength(15); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 2 cloud
     });
   });
 
@@ -665,9 +663,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 28 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 29 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(28); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings) + 2 cloud
+      expect(routes[0].children).toHaveLength(29); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings) + 2 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
@@ -857,63 +855,63 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(24); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(25); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isCloud as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(24); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(25); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isEnterprise as undefined", () => {
       (config as any).isEnterprise = undefined;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(24); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(25); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isCloud as undefined", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(24); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(25); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle both config values as undefined", () => {
       (config as any).isEnterprise = undefined;
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(24); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(25); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isEnterprise as non-string truthy value", () => {
       (config as any).isEnterprise = true;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(24); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud, since config comparison is strict
+      expect(routes[0].children).toHaveLength(25); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud, since config comparison is strict
     });
 
     it("should handle isCloud as non-string truthy value", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = true;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(24); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud, since config comparison is strict
+      expect(routes[0].children).toHaveLength(25); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud, since config comparison is strict
     });
 
     it("should handle empty string for isEnterprise", () => {
       config.isEnterprise = "";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(24); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(25); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle empty string for isCloud", () => {
       config.isEnterprise = "false";
       config.isCloud = "";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(24); // 7 base (incl. alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(25); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should return the same structure on multiple calls", () => {
@@ -989,20 +987,7 @@ describe("useManagementRoutes assistant settings", () => {
     config.isCloud = "false";
   });
 
-  afterEach(() => {
-    delete window.__O2_ASSISTANT_V2__;
-    resetAssistantV2ForTests();
-  });
-
-  it("registers nothing with the flag off", () => {
-    window.__O2_ASSISTANT_V2__ = false;
-    resetAssistantV2ForTests();
-    expect(findChild()).toBeUndefined();
-  });
-
-  it("registers the tab route with the flag on, its tab passed as a prop", () => {
-    window.__O2_ASSISTANT_V2__ = true;
-    resetAssistantV2ForTests();
+  it("registers the tab route, its tab passed as a prop", () => {
     const route = findChild();
     expect(route.path).toBe("assistant/:tab?");
     expect(route.props).toBe(true);
@@ -1010,8 +995,6 @@ describe("useManagementRoutes assistant settings", () => {
   });
 
   it("sends an OSS build to the enterprise-locked page", () => {
-    window.__O2_ASSISTANT_V2__ = true;
-    resetAssistantV2ForTests();
     const next = vi.fn();
     findChild().beforeEnter({ fullPath: "/settings/assistant/status", query: {} }, {}, next);
     expect(next).toHaveBeenCalledWith(
@@ -1022,17 +1005,7 @@ describe("useManagementRoutes assistant settings", () => {
     );
   });
 
-  it("keeps the legacy toolsets page with the flag off", () => {
-    window.__O2_ASSISTANT_V2__ = false;
-    resetAssistantV2ForTests();
-    const legacy = useManagementRoutes()[0].children.find((r: any) => r.name === "aiToolsets");
-    expect(legacy.component).toBeTypeOf("function");
-    expect(legacy.redirect).toBeUndefined();
-  });
-
-  it("redirects the legacy toolsets page to the tab, keeping its query", () => {
-    window.__O2_ASSISTANT_V2__ = true;
-    resetAssistantV2ForTests();
+  it("redirects the old toolsets page to the tab, keeping its query", () => {
     const legacy = useManagementRoutes()[0].children.find((r: any) => r.name === "aiToolsets");
     expect(legacy.component).toBeUndefined();
     expect(
@@ -1045,8 +1018,6 @@ describe("useManagementRoutes assistant settings", () => {
   });
 
   it("lets an enterprise build through to the route guard", () => {
-    window.__O2_ASSISTANT_V2__ = true;
-    resetAssistantV2ForTests();
     config.isEnterprise = "true";
     const next = vi.fn();
     findChild().beforeEnter({ fullPath: "/settings/assistant/status", query: {} }, {}, next);

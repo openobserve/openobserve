@@ -19,9 +19,6 @@ import { defineComponent, h, ref } from "vue";
 
 import i18n from "@/locales";
 
-const { v2 } = vi.hoisted(() => ({ v2: { value: true } }));
-vi.mock("@/composables/assistant/flags", () => ({ isAssistantV2: () => v2.value }));
-
 import { useFilterHint } from "@/composables/metrics/useFilterHint";
 import { useJsPlaceholder, useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 
@@ -40,7 +37,6 @@ function run<T>(fn: () => T): T {
 }
 
 afterEach(() => {
-  v2.value = true;
   vi.useRealTimers();
 });
 
@@ -57,16 +53,9 @@ describe("static editor placeholders on the v2 path", () => {
 
   it("uses the org's first real label name in the metrics filter hint", () => {
     const names = ref(["__name__", "_o2_id", "pod"]);
-    const hint = run(() => useFilterHint(names, ref(true)));
+    const hint = run(() => useFilterHint(names));
     expect(hint.placeholder.value).toBe('Filter, for example: pod =~ "500|503"');
     names.value = [];
     expect(hint.placeholder.value).toBe("Filter metrics by label");
-  });
-
-  it("keeps the typed-out placeholder on the legacy path", () => {
-    v2.value = false;
-    vi.useFakeTimers();
-    const vrl = run(() => useVrlPlaceholder());
-    expect(vrl.placeholder.value).toBe("");
   });
 });

@@ -163,7 +163,6 @@ import {
   WINDOW_DEFAULT_W_REM,
   defaultWidthRem,
   openWindowCap,
-  readSidebar,
   registerContainerCloser,
   sidebarWidthFor,
   useAssistantCapability,
@@ -354,14 +353,6 @@ function onViewport(): void {
   viewportRem.value = window.innerWidth / 16;
 }
 
-// The legacy expanded chat was half the window; the first v2 open keeps that width once.
-function adoptLegacyWidth(): void {
-  const key = store.state.userOrgKey;
-  if (!key || vuex.state.isAiChatExpanded !== true) return;
-  if (typeof readSidebar(key).widthRem === "number") return;
-  store.setSidebarWidth(viewportRem.value / 2);
-}
-
 function writeInsetEnd(): void {
   const el = column.value;
   // A pinned panel keeps a page drawer beside it, so a door that opens both leaves both usable.
@@ -476,12 +467,6 @@ watch(column, (el, old) => {
   if (old) columnSize?.unobserve(old);
   if (el) columnSize?.observe(el);
 });
-watch(
-  () => store.state.userOrgKey,
-  () => adoptLegacyWidth(),
-  { immediate: true },
-);
-
 onMounted(() => {
   window.addEventListener("resize", onViewport, { passive: true });
 });

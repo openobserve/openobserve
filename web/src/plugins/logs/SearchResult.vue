@@ -528,7 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTable
                   v-show="!showTableSkeleton"
                   ref="searchTableRef"
-                  v-bind="assistantV2 ? LOGS_V2_TABLE : {}"
+                  v-bind="LOGS_V2_TABLE"
                   :columns="tableColumns"
                   :data="tableRows"
                   :wrap="searchObj.meta.toggleSourceWrap"
@@ -611,69 +611,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Per-cell hover actions: AI button on the timestamp cell; copy /
                  add-search-term on closable field cells. -->
                   <template #cell-hover-actions="{ row, column, value, active, menu }">
-                    <template v-if="assistantV2">
-                      <ODropdown v-if="menu">
-                        <template #trigger>
-                          <OButton
-                            variant="ghost"
-                            size="icon-sm"
-                            class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                            :aria-label="t('assistant.entry.rowActions')"
-                            data-test="logs-search-result-row-menu"
-                          >
-                            <OIcon name="more-vert" size="sm" />
-                          </OButton>
-                        </template>
-                        <ODropdownItem
-                          icon-left="content-copy"
-                          class="max-md:min-h-11 pointer-coarse:min-h-11"
-                          data-test="logs-search-result-row-menu-copy"
-                          @select="copyLogToClipboard(row)"
+                    <ODropdown v-if="menu">
+                      <template #trigger>
+                        <OButton
+                          variant="ghost"
+                          size="icon-sm"
+                          class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                          :aria-label="t('assistant.entry.rowActions')"
+                          data-test="logs-search-result-row-menu"
                         >
-                          {{ t("logs.cellActions.copy") }}
-                        </ODropdownItem>
-                        <AiEntryButton v-bind="logRowDoor(row, 'explain')" appearance="menu-item" />
-                        <AiEntryButton
-                          v-bind="logRowDoor(row, 'add_to_chat')"
-                          appearance="menu-item"
-                        />
-                      </ODropdown>
-                      <template v-else-if="active && !contextMenuOpen">
-                        <CellActions
-                          v-if="showLogCellActions(column, row)"
-                          :bound-org="doorBoundOrg"
-                          :column="column"
-                          :row="row"
-                          :value="value"
-                          :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
-                          :hide-search-term-actions="false"
-                          :hide-ai="column.id === 'source'"
-                          copy-in-place
-                          @add-search-term="addSearchTerm"
-                        />
-                        <OSeparator
-                          v-if="showLogCellActions(column, row) && column.id !== 'source'"
-                          vertical
-                          class="mx-0.5 h-4"
-                        />
-                        <AiEntryButton
-                          v-bind="logRowDoor(row, 'explain')"
-                          appearance="toolbar-icon"
-                        />
-                        <AiEntryButton
-                          v-bind="logRowDoor(row, 'add_to_chat')"
-                          appearance="toolbar-icon"
-                        />
+                          <OIcon name="more-vert" size="sm" />
+                        </OButton>
                       </template>
-                    </template>
-                    <template v-else>
-                      <O2AIContextAddBtn
-                        v-if="active && !contextMenuOpen && column.id === logsTimestampCol"
-                        data-test="logs-search-result-ai-btn"
-                        @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
+                      <ODropdownItem
+                        icon-left="content-copy"
+                        class="max-md:min-h-11 pointer-coarse:min-h-11"
+                        data-test="logs-search-result-row-menu-copy"
+                        @select="copyLogToClipboard(row)"
+                      >
+                        {{ t("logs.cellActions.copy") }}
+                      </ODropdownItem>
+                      <AiEntryButton v-bind="logRowDoor(row, 'explain')" appearance="menu-item" />
+                      <AiEntryButton
+                        v-bind="logRowDoor(row, 'add_to_chat')"
+                        appearance="menu-item"
                       />
+                    </ODropdown>
+                    <template v-else-if="active && !contextMenuOpen">
                       <CellActions
-                        v-else-if="active && !contextMenuOpen && showLogCellActions(column, row)"
+                        v-if="showLogCellActions(column, row)"
+                        :bound-org="doorBoundOrg"
                         :column="column"
                         :row="row"
                         :value="value"
@@ -682,7 +649,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :hide-ai="column.id === 'source'"
                         copy-in-place
                         @add-search-term="addSearchTerm"
-                        @send-to-ai-chat="sendToAiChat"
+                      />
+                      <OSeparator
+                        v-if="showLogCellActions(column, row) && column.id !== 'source'"
+                        vertical
+                        class="mx-0.5 h-4"
+                      />
+                      <AiEntryButton
+                        v-bind="logRowDoor(row, 'explain')"
+                        appearance="toolbar-icon"
+                      />
+                      <AiEntryButton
+                        v-bind="logRowDoor(row, 'add_to_chat')"
+                        appearance="toolbar-icon"
                       />
                     </template>
                   </template>
@@ -713,7 +692,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <JsonPreview
                       :value="row"
-                      v-bind="assistantV2 ? { boundOrg: doorBoundOrg } : {}"
+                      :bound-org="doorBoundOrg"
                       :index="logsRowIndex(row)"
                       class="px-2 py-1.5"
                       mode="expanded"
@@ -724,7 +703,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @add-search-term="addSearchTerm"
                       @view-trace="redirectToTraces(row)"
                       @show-correlation="openLogDetailsWithCorrelation"
-                      @send-to-ai-chat="sendToAiChat"
                     />
                   </template>
                 </OTable>
@@ -811,49 +789,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OContextMenuItem>
               </template>
 
-              <template v-if="assistantV2">
-                <OContextMenuSeparator />
-                <template v-if="contextCellIsStreamField">
-                  <AiEntryButton
-                    v-bind="logFieldDoor(contextCell, 'explain')"
-                    appearance="menu-item"
-                  />
-                  <AiEntryButton
-                    v-bind="logFieldDoor(contextCell, 'add_to_chat')"
-                    appearance="menu-item"
-                  />
-                </template>
+              <OContextMenuSeparator />
+              <template v-if="contextCellIsStreamField">
                 <AiEntryButton
-                  v-bind="logRowDoor(contextCell.row, 'explain')"
+                  v-bind="logFieldDoor(contextCell, 'explain')"
                   appearance="menu-item"
                 />
                 <AiEntryButton
-                  v-bind="logRowDoor(contextCell.row, 'add_to_chat')"
+                  v-bind="logFieldDoor(contextCell, 'add_to_chat')"
                   appearance="menu-item"
                 />
               </template>
-              <template v-else-if="aiEnabled">
-                <OContextMenuSeparator />
-                <OContextMenuItem
-                  icon-left="auto-awesome"
-                  data-test="log-context-menu-ai-value"
-                  @select="sendToAiChat(JSON.stringify(contextCell.value))"
-                >
-                  {{ t("logs.cellActions.sendValueToAi") }}
-                </OContextMenuItem>
-                <OContextMenuItem
-                  icon-left="auto-awesome"
-                  data-test="log-context-menu-ai-row"
-                  @select="sendToAiChat(JSON.stringify(contextCell.row), true)"
-                >
-                  {{ t("logs.cellActions.sendRowToAi") }}
-                </OContextMenuItem>
-              </template>
+              <AiEntryButton
+                v-bind="logRowDoor(contextCell.row, 'explain')"
+                appearance="menu-item"
+              />
+              <AiEntryButton
+                v-bind="logRowDoor(contextCell.row, 'add_to_chat')"
+                appearance="menu-item"
+              />
             </template>
           </OContextMenu>
           <!-- After the table and sticky, so selecting the first row never shifts the rows under the pointer. -->
           <div
-            v-if="assistantV2 && selectedLogRows.length > 0"
+            v-if="selectedLogRows.length > 0"
             role="toolbar"
             :aria-label="t('components.table.selectedCount', { selected: selectedLogRows.length })"
             class="border-border-default bg-surface-panel rounded-default sticky bottom-2 z-10 mx-2 flex w-fit flex-wrap items-center gap-2 border px-2 py-1 shadow-lg"
@@ -905,7 +864,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end combined scroll area -->
 
       <ODrawer
-        :inset-beside="assistantV2"
+        inset-beside
         bleed
         lazy
         data-test="logs-search-result-detail-dialog"
@@ -920,7 +879,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DetailTable
           v-if="detailRow"
           :key="'dialog_' + detailOpenSeq"
-          v-bind="assistantV2 ? { boundOrg: doorBoundOrg } : {}"
+          :bound-org="doorBoundOrg"
           :model-value="detailRow"
           :stream-type="searchObj.data.stream.streamType"
           :correlation-props="correlationDashboardProps"
@@ -947,7 +906,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @add:table="addFieldToTable"
           @close="onDetailUserClose"
           @view-trace="redirectToTraces(detailRow)"
-          @sendToAiChat="sendToAiChat"
           @closeTable="closeTable"
           @load-correlation="openCorrelationFromLog"
         />
@@ -1085,7 +1043,6 @@ import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import {
   logFieldBuild,
@@ -1123,7 +1080,6 @@ import {
   noFtsRecoveryTerm as recoveryTerm,
 } from "@/composables/useLogs/freeTextSearch";
 import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
-import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import {
   severityFieldTextClass,
@@ -1169,7 +1125,6 @@ export default defineComponent({
     OSeparator,
     LogsMissingStreamBanner,
     LogsTableSkeleton,
-    O2AIContextAddBtn,
     AiEntryButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
     ),
@@ -1198,7 +1153,6 @@ export default defineComponent({
     "expandlog",
     "update:recordsPerPage",
     "update:columnSizes",
-    "sendToAiChat",
     "run-query",
     "jump-to-stream-data",
     "open-mobile-fields",
@@ -2821,10 +2775,6 @@ export default defineComponent({
       pct: SKELETON_HEIGHTS[i % SKELETON_HEIGHTS.length],
     }));
 
-    const sendToAiChat = (value: any, append: boolean = true) => {
-      emit("sendToAiChat", value, append);
-    };
-
     const closeTable = () => {
       searchObj.meta.showDetailTab = false;
       endSharedDetail();
@@ -3067,20 +3017,11 @@ export default defineComponent({
       return isFilterableLogField(columnId, searchObj.data.stream.selectedStreamFields);
     });
 
-    // Mirrors O2AIContextAddBtn's own gate — the AI actions only exist on
-    // enterprise builds with AI turned on in the backend config.
-    const aiEnabled = computed(
-      () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+    const loadedOrg = useLoadedOrg(
+      () => searchObj.data.queryResults?.hits,
+      () => store.state.selectedOrganization?.identifier ?? "",
     );
-
-    const assistantV2 = isAssistantV2();
-    const loadedOrg = assistantV2
-      ? useLoadedOrg(
-          () => searchObj.data.queryResults?.hits,
-          () => store.state.selectedOrganization?.identifier ?? "",
-        )
-      : null;
-    const doorBoundOrg = computed(() => loadedOrg?.value);
+    const doorBoundOrg = computed(() => loadedOrg.value);
     const LOGS_V2_TABLE = {
       focusToolbar: true,
       selection: "multiple",
@@ -3088,9 +3029,7 @@ export default defineComponent({
     } as const;
     const coarsePointer =
       typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)")?.matches;
-    const logsRowHeight = computed(() =>
-      assistantV2 && (coarsePointer || isMobile.value) ? 44 : 20,
-    );
+    const logsRowHeight = computed(() => (coarsePointer || isMobile.value ? 44 : 20));
     const selectedLogRows = shallowRef<Record<string, unknown>[]>([]);
     const doorBase = (row?: Record<string, unknown>) => () =>
       logsDoorBase(searchObj, store.state, row);
@@ -3098,7 +3037,7 @@ export default defineComponent({
     const logRowDoor = (row: Record<string, unknown>, verb: "explain" | "add_to_chat") => ({
       verb,
       entryKind: "object_verb" as const,
-      boundOrg: loadedOrg?.value,
+      boundOrg: loadedOrg.value,
       objectKind: "log_row" as const,
       label: t(verb === "explain" ? "assistant.entry.explainLogRow" : "assistant.entry.addLogRow"),
       tooltip: t(
@@ -3115,7 +3054,7 @@ export default defineComponent({
     const logFieldDoor = (cell: ContextCell, verb: "explain" | "add_to_chat") => ({
       verb,
       entryKind: "object_verb" as const,
-      boundOrg: loadedOrg?.value,
+      boundOrg: loadedOrg.value,
       objectKind: "log_field" as const,
       label: t(verb === "explain" ? "assistant.entry.explainField" : "assistant.entry.addField"),
       tooltip: t(
@@ -3136,7 +3075,7 @@ export default defineComponent({
       return {
         verb: "explain" as const,
         entryKind: "object_verb" as const,
-        boundOrg: loadedOrg?.value,
+        boundOrg: loadedOrg.value,
         objectKind: "log_row" as const,
         count: rows.length,
         tooltip: t("assistant.entry.tooltip.explainRows", { count: rows.length }, rows.length),
@@ -3158,13 +3097,12 @@ export default defineComponent({
     };
 
     // A new search replaces the rows a selection pointed at.
-    if (assistantV2)
-      watch(
-        () => searchObj.data.queryResults?.hits,
-        () => {
-          if (selectedLogRows.value.length) clearLogSelection();
-        },
-      );
+    watch(
+      () => searchObj.data.queryResults?.hits,
+      () => {
+        if (selectedLogRows.value.length) clearLogSelection();
+      },
+    );
 
     const toSearchTermValue = (value: unknown): string | number | boolean => {
       if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
@@ -3339,7 +3277,6 @@ export default defineComponent({
 
     return {
       doorBoundOrg,
-      assistantV2,
       LOGS_V2_TABLE,
       logsRowHeight,
       selectedLogRows,
@@ -3425,7 +3362,6 @@ export default defineComponent({
       isFunctionErrorOpen,
       contextCell,
       contextCellIsStreamField,
-      aiEnabled,
       toSearchTermValue,
       handleTableContextMenu,
       handleCellContextMenu,
@@ -3479,7 +3415,6 @@ export default defineComponent({
       refreshPagination,
       refreshJobPagination,
       skeletonBarHeights,
-      sendToAiChat,
       closeTable,
       getPartitionPaginations,
       getSocketPaginations,

@@ -17,7 +17,6 @@ test.describe("assistant history", () => {
 
   async function start(context, page, overrides = {}) {
     harness = await loadHarness();
-    await harness.setFlag(context, true);
     state = harness.createMockState(overrides);
     await harness.installMocks(context, state);
     await harness.login(page);
@@ -327,7 +326,6 @@ test.describe("assistant history", () => {
     await expect.poll(() => state.chats.find((chat) => chat.title === "VRL to parse nginx logs")?.pinned).toBe(true);
     expect(state.log.some((line) => /^PATCH \/api\/[^/]+\/ai\/chats\//.test(line))).toBe(true);
     const device = await browser.newContext();
-    await harness.setFlag(device, true);
     await harness.installMocks(device, state);
     const other = await device.newPage();
     await harness.login(other);

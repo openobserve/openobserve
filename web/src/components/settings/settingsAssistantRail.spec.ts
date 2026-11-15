@@ -19,7 +19,6 @@ import { createI18n } from "vue-i18n";
 import { createStore } from "vuex";
 
 import config from "@/aws-exports";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import enLocale from "@/locales/languages/en-US.json";
 
 import SettingsIndex from "./index.vue";
@@ -36,15 +35,13 @@ vi.mock("vue-router", () => ({
   useRoute: () => route.value,
 }));
 
-function mountIndex(v2: boolean, routeName = "general") {
-  window.__O2_ASSISTANT_V2__ = v2;
-  resetAssistantV2ForTests();
+function mountIndex(routeName = "general", features?: Record<string, string>) {
   route.value = { name: routeName, path: "/settings", query: {} };
   const store = createStore({
     state: {
       selectedOrganization: { identifier: "acme", name: "Acme" },
       theme: "light",
-      zoConfig: { service_streams_enabled: true },
+      zoConfig: { service_streams_enabled: true, features },
       organizationData: { organizationSettings: { org_storage_enabled: false } },
     },
   });
@@ -67,23 +64,13 @@ const assistantItem = (w: ReturnType<typeof mountIndex>) =>
   (w.vm as any).sectionGroups.flatMap((g: any) => g.items).find((i: any) => i.key === "assistant");
 
 afterEach(() => {
-  delete window.__O2_ASSISTANT_V2__;
-  resetAssistantV2ForTests();
   config.isEnterprise = "false";
 });
 
 describe("Settings rail: Assistant", () => {
-  it("has no Assistant item or group with the flag off", () => {
-    const w = mountIndex(false);
-    expect(assistantItem(w)).toBeUndefined();
-    const labels = (w.vm as any).sectionGroups.map((g: any) => g.label);
-    expect(labels).not.toContain("Assistant");
-    expect(labels).toContain("Data");
-  });
-
   it("adds the Assistant group before Data with one item", () => {
     config.isEnterprise = "true";
-    const w = mountIndex(true);
+    const w = mountIndex();
     const labels = (w.vm as any).sectionGroups.map((g: any) => g.label);
     expect(labels.indexOf("Assistant")).toBeGreaterThan(-1);
     expect(labels.indexOf("Assistant")).toBeLessThan(labels.indexOf("Data"));
@@ -99,14 +86,25 @@ describe("Settings rail: Assistant", () => {
   });
 
   it("selects the Assistant item on every assistant settings route", () => {
-    const w = mountIndex(true, "assistantSettings");
+    const w = mountIndex("assistantSettings");
     expect((w.vm as any).activeSection).toBe("assistant");
   });
 
   it("locks the item with the pitch on an OSS build", () => {
-    const w = mountIndex(true);
+    const w = mountIndex();
     const item = assistantItem(w);
     expect(item.locked).toBe(true);
     expect(item.lockedMessage).toBe(enLocale.enterpriseFeature.pitch.aiAssistant);
+  });
+
+  it("hides the item when the license map hides ai_assistant, and shows the license lock when locked", () => {
+    config.isEnterprise = "true";
+    expect(assistantItem(mountIndex("general", { ai_assistant: "hidden" })).visible).toBe(false);
+    const locked = assistantItem(mountIndex("general", { ai_assistant: "locked" }));
+    expect(locked.visible).toBe(true);
+    expect(locked.licenseLocked).toBe(true);
+    const enabled = assistantItem(mountIndex("general", { ai_assistant: "enabled" }));
+    expect(enabled.visible).toBe(true);
+    expect(enabled.licenseLocked).toBe(false);
   });
 });

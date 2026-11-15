@@ -386,10 +386,7 @@ const FALLBACK_ICON: IconName = "category";
 export const moduleIcon = (key: string): IconName => ICON_OF[key] ?? FALLBACK_ICON;
 
 /** Rail modules from the catalogue, one per resource; children open from inside their parent. */
-export const buildRoleModules = (
-  resources: CatalogResource[],
-  options: { assistantV2?: boolean } = {},
-): RoleModule[] => {
+export const buildRoleModules = (resources: CatalogResource[]): RoleModule[] => {
   const visible = resources
     .filter((resource) => resource.visible !== false)
     .slice()
@@ -399,12 +396,11 @@ export const buildRoleModules = (
     visible.filter((child) => child.parent === key).map((child) => child.key);
   const groupOf = (key: string): ModuleGroupId | undefined => {
     const group = GROUP_OF[key];
-    if (!options.assistantV2 || group !== "ai") return group;
+    if (group !== "ai") return group;
     return ASSISTANT_KEYS.has(key) ? "assistant" : "llmObservability";
   };
-  const iconOf = (key: string): IconName | undefined =>
-    (options.assistantV2 ? ASSISTANT_ICON_OF[key] : undefined) ?? ICON_OF[key];
-  const order = options.assistantV2 ? GROUP_ORDER_V2 : GROUP_ORDER;
+  const iconOf = (key: string): IconName | undefined => ASSISTANT_ICON_OF[key] ?? ICON_OF[key];
+  const order = GROUP_ORDER_V2;
 
   const modules: RoleModule[] = visible
     // A child whose parent is listed is reached by opening that parent, like a folder.

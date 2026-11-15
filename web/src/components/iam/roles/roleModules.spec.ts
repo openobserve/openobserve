@@ -114,15 +114,15 @@ describe("buildRoleModules - grouping", () => {
   });
 
   // Synthetic Environments arrived after the group map was written; unmapped, it would sit under Other.
-  it("groups prompt protected labels with AI", () => {
+  it("groups prompt protected labels with LLM observability", () => {
     const modules = buildRoleModules([{ key: "prompt_label", parent: "", has_entities: false }]);
-    expect(modules[0].group).toBe("ai");
+    expect(modules[0].group).toBe("llmObservability");
     expect(modules[0].icon).toBe("label");
   });
 
-  it("groups prompts with AI", () => {
+  it("groups prompts with LLM observability", () => {
     const modules = buildRoleModules([{ key: "prompt", parent: "", has_entities: false }]);
-    expect(modules[0].group).toBe("ai");
+    expect(modules[0].group).toBe("llmObservability");
     expect(modules[0].icon).toBe("edit-note");
   });
 
@@ -143,13 +143,13 @@ describe("buildRoleModules - grouping", () => {
 
   it("orders modules by group", () => {
     const modules = buildRoleModules(catalogue);
-    const groupIndexes = modules.map((module) => GROUP_ORDER.indexOf(module.group));
+    const groupIndexes = modules.map((module) => GROUP_ORDER_V2.indexOf(module.group));
 
     expect(groupIndexes).toEqual([...groupIndexes].sort((a, b) => a - b));
   });
 });
 
-describe("buildRoleModules - assistant v2 groups", () => {
+describe("buildRoleModules - assistant groups", () => {
   const ASSISTANT = ["ai", "ai_chat_share", "ai_toolsets", "mcp"];
   const LLM = [
     "provider",
@@ -172,14 +172,8 @@ describe("buildRoleModules - assistant v2 groups", () => {
     }),
   );
 
-  it("keeps one AI group with the flag off", () => {
-    const groups = new Set(buildRoleModules(resources).map((module) => module.group));
-    expect(groups.has("ai")).toBe(true);
-    expect(groups.has("assistant")).toBe(false);
-  });
-
   it("splits Assistant and LLM observability, Assistant right after Alerting", () => {
-    const modules = buildRoleModules(resources, { assistantV2: true });
+    const modules = buildRoleModules(resources);
     const groupOf = (key: string) => modules.find((module) => module.key === key)?.group;
     expect(ASSISTANT.map(groupOf)).toEqual(ASSISTANT.map(() => "assistant"));
     expect(LLM.map(groupOf)).toEqual(LLM.map(() => "llmObservability"));
@@ -188,13 +182,13 @@ describe("buildRoleModules - assistant v2 groups", () => {
     expect(Object.keys(MODULE_COPY).sort()).toEqual([...ASSISTANT].sort());
   });
 
-  it("starts the flag-on order with Data and keeps Fleet before Access", () => {
+  it("starts the order with Data and keeps Fleet before Access", () => {
     const withFleet = [
       { key: "fleets", has_entities: true, order: 0 },
       ...resources,
       { key: "stream", has_entities: true, order: 99 },
     ];
-    const groups = buildRoleModules(withFleet, { assistantV2: true }).map((module) => module.group);
+    const groups = buildRoleModules(withFleet).map((module) => module.group);
     expect(groups[0]).toBe("data");
     expect(groups.indexOf("fleet")).toBeGreaterThan(groups.lastIndexOf("llmObservability"));
     expect(groups.indexOf("fleet")).toBeLessThan(groups.indexOf("access"));
@@ -207,7 +201,7 @@ describe("buildRoleModules - assistant v2 groups", () => {
   });
 
   it("never reuses an Assistant icon in LLM observability", () => {
-    const modules = buildRoleModules(resources, { assistantV2: true });
+    const modules = buildRoleModules(resources);
     const icons = (group: string) =>
       new Set(modules.filter((module) => module.group === group).map((module) => module.icon));
     const shared = [...icons("assistant")].filter((icon) => icons("llmObservability").has(icon));

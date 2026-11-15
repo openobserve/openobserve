@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent, h, KeepAlive, nextTick, reactive, ref } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
@@ -904,14 +903,10 @@ describe("Index.vue (Main Traces Page)", () => {
 
   describe("assistant links", () => {
     afterEach(() => {
-      delete window.__O2_ASSISTANT_V2__;
-      resetAssistantV2ForTests();
       delete store.state.zoConfig.auto_query_enabled;
     });
 
     const mountAssistantLink = (query: Record<string, string>) => {
-      window.__O2_ASSISTANT_V2__ = true;
-      resetAssistantV2ForTests();
       mockSearchObj.meta.liveMode = false;
       routerCurrentRouteSpy.mockReturnValue({
         value: { query, name: "traces", path: "/traces" },
@@ -958,8 +953,6 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("applies an assistant link's stream and window without running it", async () => {
-      window.__O2_ASSISTANT_V2__ = true;
-      resetAssistantV2ForTests();
       store.state.zoConfig.auto_query_enabled = true;
       mockSearchObj.meta.liveMode = false;
       routerCurrentRouteSpy.mockReturnValue({
@@ -991,8 +984,6 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("re-applies a second assistant link on the open page from its nonce, still without running", async () => {
-      window.__O2_ASSISTANT_V2__ = true;
-      resetAssistantV2ForTests();
       mockSearchObj.meta.liveMode = false;
       const current = ref({
         query: { stream: "default", type: "ai_chat_query", t: "1", from: "1", to: "2" } as Record<
@@ -1037,8 +1028,6 @@ describe("Index.vue (Main Traces Page)", () => {
       });
 
       async function mountCached() {
-        window.__O2_ASSISTANT_V2__ = true;
-        resetAssistantV2ForTests();
         mockSearchObj.meta.liveMode = false;
         const current = ref(assistantRoute("traces", "1"));
         routerCurrentRouteSpy.mockReturnValue(current as any);

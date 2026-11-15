@@ -160,11 +160,6 @@ vi.mock("vue-router", () => ({
     fullPath: "/metrics",
   }),
 }));
-const assistantFlag = vi.hoisted(() => ({ on: false }));
-vi.mock("@/composables/assistant/flags", async (importOriginal) => ({
-  ...(await importOriginal<any>()),
-  isAssistantV2: () => assistantFlag.on,
-}));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
 const showErrorNotification = vi.hoisted(() => vi.fn());
 vi.mock("@/composables/useNotifications", () => ({
@@ -1273,11 +1268,7 @@ describe("MetricsExplorer wiring", () => {
         };
 
         beforeEach(() => {
-          assistantFlag.on = true;
           routerState.replace.mockClear();
-        });
-        afterEach(() => {
-          assistantFlag.on = false;
         });
 
         it("translates a link opened on the page into Visualize", () => {
@@ -1432,20 +1423,6 @@ describe("MetricsExplorer wiring", () => {
             expect(vm.visualizeMount).toBe(mounted);
             expect(vm.visualizeSeed).toBeNull();
           });
-        });
-
-        it("leaves a link alone with the flag off", () => {
-          assistantFlag.on = false;
-          routerState.query = {};
-          const vm = mountExplorer().vm as any;
-          routerState.replace.mockClear();
-
-          routerState.query = link;
-          vm.onRouteQueryChange();
-
-          expect(routerState.replace.mock.calls.some(([r]: any[]) => r.query?.metrics_data)).toBe(
-            false,
-          );
         });
       });
 

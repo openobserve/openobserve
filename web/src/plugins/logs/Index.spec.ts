@@ -1072,11 +1072,6 @@ describe("Logs Index", async () => {
     });
   });
 
-  it("Should emit sendToAiChat event with payload", async () => {
-    wrapper.vm.sendToAiChat({ foo: "bar" });
-    expect(wrapper.emitted("sendToAiChat")?.[0]?.[0]).toEqual({ foo: "bar" });
-  });
-
   it("removeFieldByName should remove matching column_ref and aggr_func entries", () => {
     const cols = [
       { expr: { type: "column_ref", column: "*" } },

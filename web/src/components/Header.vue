@@ -246,43 +246,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="header-utility-icons flex items-center gap-x-2 *:shrink-0 md:min-w-0 md:shrink!"
           data-test="header-utility-icons"
         >
-          <!-- AI CHAT TOGGLE: Enterprise/Cloud feature to toggle AI chat panel.
-           Leads the utility-icon cluster, set off by a separator from the
-           org selector so it reads as the primary action in this group.
-           Shown locked (not hidden) in builds that don't unlock it. -->
-          <AssistantHeaderButton v-if="assistantV2" />
-          <template v-else-if="aiButtonVisible || aiLicenseLocked">
-            <OButton
-              variant="ghost"
-              size="icon-toolbar"
-              @click="aiLicenseLocked ? openLockedAiAssistant() : toggleAIChat()"
-              :data-test="aiLicenseLocked ? 'menu-link-ai-locked' : 'menu-link-ai-item'"
-              :aria-label="aiButtonLabel"
-              class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
-              :class="store.state.isAiChatEnabled && !aiLicenseLocked ? 'ai-btn-active' : ''"
-              @mouseenter="handleMouseEnter"
-              @mouseleave="handleMouseLeave"
-            >
-              <img
-                alt=""
-                :src="getBtnLogo"
-                class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
-              />
-              <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
-              <OTooltip
-                side="bottom"
-                align="center"
-                :content="aiButtonLabel"
-                :shortcut-id="aiAccess.allowed && !aiLicenseLocked ? 'aiChatToggle' : undefined"
-              />
-            </OButton>
-          </template>
-          <span
-            v-else-if="aiSlotPending"
-            aria-hidden="true"
-            class="size-[1.875rem] shrink-0"
-            data-test="header-ai-slot-placeholder"
-          />
+          <!-- AI ASSISTANT: leads the utility-icon cluster; a license that lacks it shows the lock. -->
+          <OButton
+            v-if="aiLicenseLocked"
+            variant="ghost"
+            size="icon-toolbar"
+            @click="openLockedAiAssistant"
+            data-test="menu-link-ai-locked"
+            :aria-label="aiButtonLabel"
+            class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
+            @mouseenter="handleMouseEnter"
+            @mouseleave="handleMouseLeave"
+          >
+            <img
+              alt=""
+              :src="getBtnLogo"
+              class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
+            />
+            <OLockBadge class="-end-2! -top-1!" />
+            <OTooltip side="bottom" align="center" :content="aiButtonLabel" />
+          </OButton>
+          <AssistantHeaderButton v-else-if="aiAssistantShown" />
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
@@ -535,12 +519,11 @@ import { getImageURL } from "@/utils/zincutils";
 import { featureLockedPath, menuState } from "@/utils/featureGate";
 import { useFeatureNames } from "@/composables/useFeatureLock";
 import { chartColor } from "@/utils/chartTheme";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 
 export default defineComponent({
   name: "HeaderComponent",
   components: {
-    // Async, so the flag-off build never loads the assistant chunk.
+    // Async, so the header's chunk does not carry the assistant.
     AssistantHeaderButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/shell/AssistantHeaderButton.vue"),
     ),
@@ -633,7 +616,6 @@ export default defineComponent({
     "updateOrganization",
     "goToHome",
     "goToAbout",
-    "toggleAIChat",
     "openSlack",
     "navigateToOpenAPI",
     "navigateToDocs",
@@ -669,7 +651,6 @@ export default defineComponent({
     const showLanguageSubmenu = ref(false);
     const languageListRef = ref<HTMLElement | null>(null);
     const { lgUp } = useBreakpoint();
-    const assistantV2 = isAssistantV2();
 
     const languageItems = (): HTMLElement[] =>
       Array.from(
@@ -735,11 +716,6 @@ export default defineComponent({
       event.stopPropagation();
     };
 
-    // AI chat toggle — shown locked (not hidden) in builds that don't unlock
-    // it. Same `ai_enabled`-is-an-admin-preference-not-an-upsell-target
-    // reasoning as QueryEditor.vue's floating AI icon: an entitled org that's
-    // turned AI off still never sees the button at all.
-    //
     // NOT `buildFeatureGateContext()` — that reads the `@/aws-exports`
     // singleton directly, but this component takes edition info as its own
     // `config` PROP (so a host can inject it / tests can override it) rather
@@ -761,23 +737,19 @@ export default defineComponent({
         Boolean(props.store.state.zoConfig.ai_enabled),
       ),
     );
-    const aiButtonLabel = computed(() => {
-      if (!aiAccess.value.allowed) {
-        return t("featureLock.availableInEnterprise", { feature: t("menu.aiAssistant") });
-      }
-      if (!aiLicenseLocked.value) return t("menu.aiAssistant");
-      return t("featureLock.headerLocked", {
+    const aiButtonLabel = computed(() =>
+      t("featureLock.headerLocked", {
         feature: featureName("ai_assistant") ?? t("featureLock.thisFeature"),
-      });
-    });
-    const aiButtonVisible = computed(
-      () => !focusMode.value && (!aiAccess.value.allowed || aiAssistantState.value === "enabled"),
-    );
-    const aiSlotPending = computed(
-      () => aiAccess.value.allowed && !props.store.state.zoConfig?.version,
+      }),
     );
     const aiLicenseLocked = computed(
       () => !focusMode.value && aiAccess.value.allowed && aiAssistantState.value === "locked",
+    );
+    // With AI off the assistant's own gate shows admins its setup card, so only a menu hidden while AI is on hides it.
+    const aiAssistantShown = computed(
+      () =>
+        !focusMode.value &&
+        !(aiAssistantState.value === "hidden" && props.store.state.zoConfig?.ai_enabled === true),
     );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
@@ -828,14 +800,6 @@ export default defineComponent({
 
     const goToAbout = () => {
       emit("goToAbout");
-    };
-
-    const toggleAIChat = () => {
-      if (!aiAccess.value.allowed) {
-        openEnterpriseDialog();
-        return;
-      }
-      emit("toggleAIChat");
     };
 
     const openLockedAiAssistant = () => {
@@ -890,14 +854,12 @@ export default defineComponent({
 
     return {
       securityAccess,
-      assistantV2,
       isDark,
       t,
       raw,
       featureName,
       getImageURL,
       enterpriseButtonText,
-      aiSlotPending,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,
@@ -910,14 +872,11 @@ export default defineComponent({
       goToHome,
       homeUrl,
       goToAbout,
-      toggleAIChat,
-      aiAssistantState,
       openLockedAiAssistant,
-      aiAccess,
       aiButtonLabel,
-      aiButtonVisible,
       focusMode,
       aiLicenseLocked,
+      aiAssistantShown,
       linkedAccountsVisible,
       showLinkedAccounts,
       openSlack,

@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   │  20008 Execute error    → Fix query card  + Ask AI                      │
   │  20014 Protected stream → Open Alert Calibration card                   │
   │  10001 Server error     → (informational)                               │
-  │  0 / other              → (informational) + Ask AI (if aiEnabled)       │
+  │  0 / other              → (informational)                          │
   └─────────────────────────────────────────────────────────────────────────┘
 
   ┌─ Customisation ──────────────────────────────────────────────────────────┐
@@ -63,9 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :error-code="searchObj.data.errorCode"
       :error-msg="searchObj.data.errorMsg"
       :error-detail="searchObj.data.errorDetail"
-      :ai-enabled="isAiEnabled"
       size="hero"
-      @ask-ai="onAskAi"
       @fix-query="onFixQuery"
       @configure-resource="onConfigureStream"
       @widen-range="onWidenRange"
@@ -82,8 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <QueryErrorState
       :error-msg="testResult.error"
       size="block"
-      :ai-enabled="isAiEnabled"
-      @ask-ai="onAskAi"
     />
 -->
 <template>
@@ -193,41 +189,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ copied ? t("queryError.copied") : t("queryError.copyError") }}
         </OButton>
-        <slot v-if="assistantV2 && showAiDoor" name="ai-door" />
-        <OButton
-          v-else-if="showAiDoor"
-          variant="ghost"
-          size="sm"
-          class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
-          data-test="query-error-ask-ai-btn"
-          @click="emit('ask-ai')"
-        >
-          <template #icon-left>
-            <img
-              :src="aiIconSrc"
-              class="h-4 w-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
-              alt=""
-            />
-          </template>
-          {{ t("queryError.askAi") }}
-        </OButton>
+        <slot v-if="showAiDoor" name="ai-door" />
       </div>
     </div>
 
     <!-- AI button when there's nothing to show in the detail panel -->
     <div v-else-if="showAiDoor" class="mt-2 flex justify-center">
-      <slot v-if="assistantV2" name="ai-door" />
-      <OButton
-        v-else
-        variant="ghost"
-        size="sm"
-        icon-left="bolt"
-        class="text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
-        data-test="query-error-ask-ai-btn"
-        @click="emit('ask-ai')"
-      >
-        {{ t("queryError.askAi") }}
-      </OButton>
+      <slot name="ai-door" />
     </div>
 
     <!-- Caller-supplied extra content (below everything) -->
@@ -331,18 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ copied ? t("queryError.copied") : t("queryError.copyError") }}
       </OButton>
-      <slot v-if="assistantV2 && showAiDoor" name="ai-door" />
-      <OButton
-        v-else-if="showAiDoor"
-        variant="ghost"
-        size="sm"
-        icon-left="bolt"
-        class="text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
-        data-test="query-error-ask-ai-btn"
-        @click="emit('ask-ai')"
-      >
-        {{ t("queryError.askAi") }}
-      </OButton>
+      <slot v-if="showAiDoor" name="ai-door" />
     </div>
   </div>
 </template>
@@ -352,8 +309,6 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { computed, ref, useSlots } from "vue";
 import { useRouter } from "vue-router";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
-import { useAiIcon } from "@/composables/useAiIcon";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -373,8 +328,6 @@ const props = withDefaults(
     errorMsg?: string;
     /** Raw SQL parse position or DataFusion execution detail. */
     errorDetail?: string;
-    /** Show the "Ask AI" ghost button (enterprise + ai_enabled). */
-    aiEnabled?: boolean;
     /** Resource name (stream, metric) for the 20003 configure CTA. */
     resourceName?: string;
     /**
@@ -393,14 +346,12 @@ const props = withDefaults(
     /** The SQL the error was raised for, so the plain-language reading can name what is missing. */
     query?: string;
   }>(),
-  { size: "hero", aiEnabled: false },
+  { size: "hero" },
 );
 
 // ── Emits ──────────────────────────────────────────────────────────────────
 
 const emit = defineEmits<{
-  /** User clicked "Ask AI to fix my query". */
-  "ask-ai": [];
   /** User clicked "Fix the query" — parent should focus the editor. */
   "fix-query": [];
   /** User clicked "Configure resource" (FTS error 20003). */
@@ -437,13 +388,10 @@ const {
   streamName: () => props.resourceName,
 });
 
-const assistantV2 = isAssistantV2();
 const slots = useSlots();
-// With the assistant on the host's door gates itself; the legacy button keeps `aiEnabled`.
+// The host's door gates itself, so only its presence matters here.
 const showAiDoor = computed(
-  () =>
-    (assistantV2 ? !!slots["ai-door"] : props.aiEnabled) &&
-    (isQueryError.value || errorCode.value === 0),
+  () => !!slots["ai-door"] && (isQueryError.value || errorCode.value === 0),
 );
 
 // ── Resolved copy ──────────────────────────────────────────────────────────
@@ -488,6 +436,4 @@ const slotProps = computed(() => ({
   isQueryError: isQueryError.value,
   emit,
 }));
-
-const { aiIconSrc } = useAiIcon();
 </script>

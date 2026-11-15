@@ -41,7 +41,6 @@ import incidentsService from "@/services/incidents";
 import { formatTimestamp } from "@/utils/date";
 import { rcaThreadPlainText } from "@/utils/incidents/rcaThread";
 import type { RcaReadStatus } from "@/composables/useIncidentRca";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import {
   rcaBlindSpot,
   RCA_T0,
@@ -155,10 +154,16 @@ const completedProps = () => ({
   threadLive: false,
 });
 
-const setAssistantFlag = (on: boolean | undefined) => {
-  window.__O2_ASSISTANT_V2__ = on;
-  resetAssistantV2ForTests();
-};
+/** The latest run failed and the reader picked the completed run-1. */
+const pickedProps = () => ({
+  rca: rcaSummary({ state: "failed", current_run: rcaRun({ state: "failed" }) }),
+  error: { code: "x", reason: "Boom", details: null, trigger_type: null },
+  viewedRun: rcaRunItem(),
+  reportRun: rcaRunItem(),
+  history: [rcaRunItem({ run_id: "run-2", state: "failed" }), rcaRunItem()],
+  reportText: REPORT,
+  threadRunId: "run-1",
+});
 
 describe("IncidentRCAAnalysis", () => {
   let wrapper: VueWrapper;
@@ -166,8 +171,6 @@ describe("IncidentRCAAnalysis", () => {
   const writeText = vi.mocked(navigator.clipboard.writeText);
 
   // The incident page's confirm-gated controls ship behind the assistant flag.
-  beforeAll(() => setAssistantFlag(true));
-  afterAll(() => setAssistantFlag(undefined));
 
   beforeEach(() => {
     answers = {
@@ -1844,46 +1847,6 @@ describe("IncidentRCAAnalysis", () => {
 
         expect(byTest(wrapper, "rca-retry-btn").attributes("disabled")).toBeDefined();
       });
-    });
-  });
-
-  describe("W4: assistant flag off keeps the old incident-page controls", () => {
-    beforeAll(() => setAssistantFlag(false));
-    afterAll(() => setAssistantFlag(true));
-
-    it("a live run shows Cancel run on the bar, which cancels with no confirm", async () => {
-      wrapper = mountPanel(liveProps());
-      await flushPromises();
-
-      await byTest(wrapper, "rca-cancel-btn").trigger("click");
-      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
-      expect(document.body.textContent).not.toContain("Cancel run?");
-    });
-
-    it("the re-analyzing banner keeps its own Cancel", async () => {
-      wrapper = mountPanel(
-        liveProps({
-          rca: rcaSummary({ current_run: rcaRun({ mode: "build_on_previous" }) }),
-          reportRun: rcaRunItem(),
-          reportText: REPORT,
-        }),
-      );
-      await flushPromises();
-
-      await byTest(wrapper, "rca-banner-cancel-btn").trigger("click");
-      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
-    });
-
-    it("a finished run keeps Re-analyze on the bar and the old final note", async () => {
-      wrapper = mountPanel(completedProps());
-      await flushPromises();
-
-      expect(byTest(wrapper, "rca-thread-reanalyze").exists()).toBe(false);
-      expect(byTest(wrapper, "rca-thread-final-text").text()).toBe(
-        "This report is final and won't change. To redirect the agent, Re-analyze. It creates a new version in Report history.",
-      );
-      await byTest(wrapper, "rca-reanalyze-btn").trigger("click");
-      expect(wrapper.findComponent(RcaGuidanceDialog).props("open")).toBe(true);
     });
   });
 });

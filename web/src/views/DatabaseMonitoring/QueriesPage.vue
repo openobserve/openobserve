@@ -452,10 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-actions="{ row }">
-          <span
-            v-if="assistantV2 && !row.isOther && !row.isFold"
-            class="inline-flex items-center gap-1"
-          >
+          <span v-if="!row.isOther && !row.isFold" class="inline-flex items-center gap-1">
             <DbmRowActions
               :actions="rowActions"
               data-test="dbm-queries-row-actions"
@@ -463,12 +460,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <AiEntryButton v-bind="queryFixDoor(row)" appearance="toolbar-icon" />
           </span>
-          <DbmRowActions
-            v-else-if="!row.isOther && !row.isFold"
-            :actions="rowActions"
-            data-test="dbm-queries-row-actions"
-            @action="(id) => onRowAction(id, row)"
-          />
         </template>
 
         <template #cell-services="{ row }">
@@ -643,7 +634,6 @@ import dbMonitoringService, {
   type QuerySortKey,
   type ServerQueryRow,
 } from "@/services/db_monitoring";
-import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
@@ -655,8 +645,6 @@ import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
 import { useDbmOwnFilterSync } from "@/composables/dbm/useDbmScopeFilters";
 import { createDbmContextProvider } from "@/composables/contextProviders";
-import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { dbmFixDoor } from "@/components/dbm/dbmDoors";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
@@ -708,16 +696,7 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-// This page is a route root, so MainLayout's `@sendToAiChat` binding is on it
-// directly — no re-emit chain needed.
-const emit = defineEmits<{
-  (e: "sendToAiChat", value: { query: string; autoSend: boolean }): void;
-}>();
-
 const aiLock = useLicenseLock("ai_assistant");
-const aiEnabled = computed(
-  () => config.isEnterprise == "true" && Boolean(store.state.zoConfig?.ai_enabled),
-);
 
 // The shared list-page spine: scope from the URL, the request-sequence guard,
 // the shell's badge snapshot, refresh/date-change handlers and the load
@@ -1993,17 +1972,14 @@ const toggleInsightFilter = (insight: DbmInsight) => {
   activeInsightId.value = activeInsightId.value === insight.id ? null : insight.id;
 };
 
-// With the assistant on, the fix is its own door beside the row actions (`ai-entry-dbm-finding-fix`).
-const assistantV2 = isAssistantV2();
-
 /** The four things a reader does next, on the row they are already looking at. */
 const rowActions = computed<DbmRowAction[]>(() => [
   { id: "open", icon: "chevron-right", label: t("dbm.queries.actions.open") },
   { id: "traces", icon: "account-tree", label: t("dbm.queries.actions.traces") },
   { id: "copy", icon: "content-copy", label: t("dbm.queries.actions.copy") },
   { id: "alert", icon: "shield", label: t("dbm.queries.actions.alert") },
-  // Absent when AI is off or the assistant owns the fix, locked when the license lacks it.
-  ...(!assistantV2 && aiLock.locked.value
+  // Locked when the license lacks it; otherwise the fix is its own door beside the row actions.
+  ...(aiLock.locked.value
     ? [
         {
           id: "ai",
@@ -2012,19 +1988,13 @@ const rowActions = computed<DbmRowAction[]>(() => [
           lockedReason: aiLock.lockedReason.value,
         } as DbmRowAction,
       ]
-    : aiEnabled.value && !assistantV2
-      ? [{ id: "ai", icon: "brain-circuit", label: t("dbm.ai.rowSuggestFix") } as DbmRowAction]
-      : []),
+    : []),
 ]);
 
 const onRowAction = async (id: string, row: QueryRow) => {
   analytics.track("dbm_row_action_clicked", { page: "queries", action: id });
   if (id === "open" || id === "traces") {
     openQueryDetail(row, id === "traces" ? "samples" : undefined);
-    return;
-  }
-  if (id === "ai") {
-    askAiForFix(row);
     return;
   }
   if (id === "copy") {
@@ -2417,29 +2387,20 @@ const queryFixInput = (row: QueryRow) => ({
   callsPerTrace: row.callsPerTrace,
 });
 
-const askAiForFix = (row: QueryRow) => {
-  emit("sendToAiChat", {
-    query: buildQueryFixPrompt(queryFixInput(row)),
-    autoSend: true,
-  });
-};
-
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
 // The org the rows were loaded under, so a door left on screen after an org switch is refused.
-const loadedOrg = assistantV2
-  ? useLoadedOrg(
-      () => rows.value,
-      () => store.state.selectedOrganization?.identifier ?? "",
-    )
-  : null;
+const loadedOrg = useLoadedOrg(
+  () => rows.value,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
 const queryFixDoor = (row: QueryRow) =>
   dbmFixDoor(
     { label: t("dbm.ai.rowSuggestFix"), tooltip: t("dbm.ai.suggestFixHint") },
     () => ({ kind: "query", input: queryFixInput(row) }),
     store.state,
-    loadedOrg?.value,
+    loadedOrg.value,
   );
 
 // Registered/unregistered by useDbmListPage around this page's lifecycle.

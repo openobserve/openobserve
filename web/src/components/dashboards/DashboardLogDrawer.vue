@@ -7,7 +7,6 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent 
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import type { LogsDoorBase } from "@/plugins/logs/logsDoors";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -57,8 +56,6 @@ const props = defineProps<{
   panelTitle?: string;
 }>();
 
-const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
-
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
@@ -66,13 +63,10 @@ const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 // Doors open the assistant directly in every host, with no relay through ViewDashboard.
-const assistantV2 = isAssistantV2();
-const loadedOrg = assistantV2
-  ? useLoadedOrg(
-      () => props.value,
-      () => store.state.selectedOrganization?.identifier ?? "",
-    )
-  : null;
+const loadedOrg = useLoadedOrg(
+  () => props.value,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
 const cellDoorBase = (): LogsDoorBase => ({
   org: orgId.value,
   stream: props.stream,
@@ -86,7 +80,7 @@ const cellDoorBase = (): LogsDoorBase => ({
 const cellDoor = (verb: "explain" | "add_to_chat") => ({
   verb,
   entryKind: "object_verb" as const,
-  boundOrg: loadedOrg?.value,
+  boundOrg: loadedOrg.value,
   objectKind: "log_field" as const,
   label: t(verb === "explain" ? "assistant.entry.explainField" : "assistant.entry.addField"),
   tooltip: t(
@@ -840,10 +834,8 @@ function openInLogs() {
       <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
       <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">
         <div class="flex min-w-0 items-center gap-2 px-2 pt-3 pb-2">
-          <template v-if="assistantV2">
-            <AiEntryButton v-bind="cellDoor('explain')" />
-            <AiEntryButton v-bind="cellDoor('add_to_chat')" />
-          </template>
+          <AiEntryButton v-bind="cellDoor('explain')" />
+          <AiEntryButton v-bind="cellDoor('add_to_chat')" />
           <div class="flex-1" />
           <DateTime
             default-type="absolute"
@@ -1080,8 +1072,7 @@ function openInLogs() {
           @load-correlation="openCorrelationFromLog"
           @showPrevDetail="goPrev"
           @showNextDetail="goNext"
-          @sendToAiChat="(v: unknown, a?: boolean) => emit('sendToAiChat', v, a)"
-          v-bind="assistantV2 ? { doorContext: cellDoorBase } : {}"
+          :door-context="cellDoorBase"
         >
           <template #panel-insights>
             <!-- Global loading bar -->

@@ -13,10 +13,9 @@
 // limitations under the License.
 
 import { mount, config, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import i18n from "@/locales";
 import CellActions from "./CellActions.vue";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 const { clipboardMock } = vi.hoisted(() => ({ clipboardMock: vi.fn() }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: clipboardMock }));
@@ -27,8 +26,14 @@ config.global.plugins = [...(config.global.plugins ?? []), i18n];
 const mockStore = {
   state: {
     theme: "light",
+    selectedOrganization: { identifier: "org-a" },
+    timezone: "UTC",
   },
 };
+
+vi.mock("@/composables/useLogs/searchState", () => ({
+  searchState: () => ({ searchObj: { data: { stream: {}, datetime: {} }, meta: {} } }),
+}));
 
 vi.mock("vuex", () => ({
   useStore: () => mockStore,
@@ -38,11 +43,6 @@ vi.mock("vuex", () => ({
 const globalStubs = {
   EqualIcon: { template: "<svg />" },
   NotEqualIcon: { template: "<svg />" },
-  O2AIContextAddBtn: {
-    name: "O2AIContextAddBtn",
-    template: "<div @click=\"$emit('send-to-ai-chat', 'test')\" />",
-    emits: ["send-to-ai-chat"],
-  },
 };
 
 const defaultProps = {
@@ -59,17 +59,6 @@ const mountComponent = (propsOverrides = {}) =>
     global: { stubs: globalStubs },
     props: { ...defaultProps, ...propsOverrides },
   });
-
-// These cases cover the legacy AI buttons, so a local VITE_ASSISTANT_V2 must not swap in the doors.
-beforeEach(() => {
-  window.__O2_ASSISTANT_V2__ = false;
-  resetAssistantV2ForTests();
-});
-
-afterEach(() => {
-  delete window.__O2_ASSISTANT_V2__;
-  resetAssistantV2ForTests();
-});
 
 describe("CellActions", () => {
   afterEach(() => {
@@ -255,24 +244,6 @@ describe("CellActions", () => {
     });
   });
 
-  // ── sendToAiChat ──────────────────────────────────────────────────────────────
-  describe("sendToAiChat", () => {
-    it("emits 'sendToAiChat' with the value", () => {
-      const wrapper = mountComponent();
-      wrapper.vm.sendToAiChat(JSON.stringify("test value"));
-      const emitted = wrapper.emitted("sendToAiChat");
-      expect(emitted).toBeTruthy();
-      expect(emitted![0][0]).toBe('"test value"');
-    });
-
-    it("emits 'sendToAiChat' with JSON-stringified object", () => {
-      const wrapper = mountComponent();
-      const obj = { key: "value" };
-      wrapper.vm.sendToAiChat(JSON.stringify(obj));
-      expect(wrapper.emitted("sendToAiChat")![0][0]).toBe('{"key":"value"}');
-    });
-  });
-
   // ── Props defaults ────────────────────────────────────────────────────────────
   describe("value prop", () => {
     // Logs' `source` column is JSON.stringify(row): nothing sits under
@@ -312,16 +283,6 @@ describe("CellActions", () => {
     it("defaults selectedStreamFields to empty array when not provided", () => {
       const wrapper = mountComponent({ selectedStreamFields: [] });
       expect(wrapper.props("selectedStreamFields")).toEqual([]);
-    });
-  });
-
-  // ── O2AIContextAddBtn interaction ──────────────────────────────────────────────
-  describe("O2AIContextAddBtn interaction", () => {
-    it("renders O2AIContextAddBtn", () => {
-      const wrapper = mountComponent();
-      // O2AIContextAddBtn is always rendered
-      const btn = wrapper.findComponent({ name: "O2AIContextAddBtn" });
-      expect(btn.exists()).toBe(true);
     });
   });
 });

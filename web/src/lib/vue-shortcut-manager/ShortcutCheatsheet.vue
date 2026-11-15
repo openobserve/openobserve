@@ -233,7 +233,7 @@ import { SHORTCUT_REGISTRY, SHORTCUT_MODULES, platformDisplay } from "./shortcut
 import type { ShortcutEntry, ShortcutCapabilities } from "./shortcutRegistry";
 import { isMacOS } from "@/utils/keyboardShortcuts";
 import config from "@/aws-exports";
-import { isAssistantV2, useAssistantName } from "@/composables/assistant/pure";
+import { useAssistantName } from "@/composables/assistant/pure";
 
 const props = withDefaults(
   defineProps<{
@@ -252,17 +252,15 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
-// Loaded only with the flag on, so the legacy path neither builds nor downloads the assistant runtime.
+// Loaded on demand, so the cheatsheet does not pull in the assistant runtime eagerly.
 const assistantCanChat = shallowRef<(() => boolean) | null>(null);
 // A child of this component's scope, so the reader built after the import stops on unmount.
 const assistantScope = effectScope();
-if (isAssistantV2()) {
-  void import("@/composables/assistant").then(({ useAssistantCapability }) => {
-    if (!assistantScope.active) return;
-    const capability = assistantScope.run(() => useAssistantCapability());
-    if (capability) assistantCanChat.value = () => capability.assistantCanChat.value;
-  });
-}
+void import("@/composables/assistant").then(({ useAssistantCapability }) => {
+  if (!assistantScope.active) return;
+  const capability = assistantScope.run(() => useAssistantCapability());
+  if (capability) assistantCanChat.value = () => capability.assistantCanChat.value;
+});
 onUnmounted(() => assistantScope.stop());
 
 // Edition + `/config` flags that decide which feature pages the build can reach.

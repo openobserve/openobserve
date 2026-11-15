@@ -355,19 +355,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center justify-end gap-1">
             <!-- Root only. Every other row is a victim, and asking about a
                  victim gets advice aimed at the wrong session. -->
-            <AiEntryButton
-              v-if="assistantV2 && row.kind === 'root'"
-              v-bind="blockingDoor(row)"
-              size="sm"
-            />
+            <!-- Without the license the door hides, so the locked button keeps the feature in sight. -->
             <DbmSuggestFixButton
-              v-else-if="row.kind === 'root'"
+              v-if="row.kind === 'root' && aiLock.locked.value"
               :label="t('dbm.ai.blockingFix')"
-              :tooltip="t('dbm.ai.blockingFixHint')"
               size="xs"
               data-test="dbm-blocked-ask-ai"
-              @click="askAiForFix(row)"
             />
+            <AiEntryButton v-else-if="row.kind === 'root'" v-bind="blockingDoor(row)" size="sm" />
             <DbmTerminateSql
               v-if="row.kind === 'root' || perspective === 'blocking'"
               :db-system="row.db_system"
@@ -489,8 +484,7 @@ import { createDbmContextProvider } from "@/composables/contextProviders";
 import { copyToClipboard } from "@/utils/clipboard";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { buildDbmLockPrefill } from "@/utils/alerts/prefill/fromDbmLocks";
-import { buildBlockingFixPrompt } from "@/utils/dbm/aiPrompts";
-import { isAssistantV2 } from "@/composables/assistant/flags";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import { dbmFixDoor } from "@/components/dbm/dbmDoors";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import {
@@ -516,11 +510,7 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-// This page is a route root, so MainLayout's `@sendToAiChat` binding is on it
-// directly — no re-emit chain needed.
-const emit = defineEmits<{
-  (e: "sendToAiChat", value: { query: string; autoSend: boolean }): void;
-}>();
+const aiLock = useLicenseLock("ai_assistant");
 
 // The shared list-page spine: scope from the URL, the request-sequence guard,
 // the shell's badge snapshot, refresh/date-change handlers, the load envelope
@@ -1204,31 +1194,20 @@ const blockingInput = (row: BlockedRow) => ({
   longestWaitSeconds: longestWaitBehind(row.pid),
 });
 
-const askAiForFix = (row: BlockedRow) => {
-  analytics.track("dbm_ai_fix_requested", { page: "blocked" });
-  emit("sendToAiChat", {
-    query: buildBlockingFixPrompt(blockingInput(row)),
-    autoSend: true,
-  });
-};
-
-const assistantV2 = isAssistantV2();
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
 // The org the rows were loaded under, so a door left on screen after an org switch is refused.
-const loadedOrg = assistantV2
-  ? useLoadedOrg(
-      () => tableRows.value,
-      () => store.state.selectedOrganization?.identifier ?? "",
-    )
-  : null;
+const loadedOrg = useLoadedOrg(
+  () => tableRows.value,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
 const blockingDoor = (row: BlockedRow) =>
   dbmFixDoor(
     { label: t("dbm.ai.blockingFix"), tooltip: t("dbm.ai.blockingFixHint") },
     () => ({ kind: "blocking", input: blockingInput(row) }),
     store.state,
-    loadedOrg?.value,
+    loadedOrg.value,
   );
 
 // Registered/unregistered by useDbmListPage around this page's lifecycle.

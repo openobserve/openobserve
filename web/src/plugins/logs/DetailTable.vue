@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="searchdetaildialog flex h-full flex-col flex-nowrap"
-    :class="[severityBorderClass, assistantV2 ? 'max-w-full' : '']"
+    :class="[severityBorderClass, 'max-w-full']"
     data-test="dialog-box"
     data-no-autofocus
   >
     <!-- Single Tab Row -->
-    <div class="flex shrink-0 items-center justify-between" :class="assistantV2 ? 'flex-wrap' : ''">
+    <div class="flex shrink-0 flex-wrap items-center justify-between">
       <div class="-mb-0.75 flex items-center gap-2">
         <OTabs
           :model-value="tab"
@@ -54,13 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTabs>
       </div>
-      <div
-        :class="
-          assistantV2
-            ? 'ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2 pe-3'
-            : 'flex shrink-0 items-center gap-2 pe-3'
-        "
-      >
+      <div class="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2 pe-3">
         <OPopover v-if="!embedded" align="end" :aria-label="t('logs.severity.popoverAriaLabel')">
           <template #trigger>
             <OTag
@@ -146,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <LogLineLinkPopover source="drawer" />
         </div>
-        <span v-if="assistantV2" class="flex items-center gap-1 max-lg:order-first">
+        <span class="flex items-center gap-1 max-lg:order-first">
           <AiEntryButton
             v-bind="recordDoor('explain')"
             :appearance="lgUp ? 'button' : 'toolbar-icon'"
@@ -156,11 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :appearance="lgUp ? 'button' : 'toolbar-icon'"
           />
         </span>
-        <O2AIContextAddBtn
-          v-else
-          data-test="logs-detail-ai-context-btn"
-          @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
-        />
         <!-- Lives in the header rather than inside the JSON tab so the action
              stays reachable from every tab. JsonPreview is told to hide its own
              copy via `hide-view-trace`. -->
@@ -269,10 +258,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @add-field-to-table="addFieldToTable"
               @add-search-term="toggleIncludeSearchTerm"
               @view-trace="viewTrace"
-              @send-to-ai-chat="sendToAiChat"
+              :door-context="recordDoorBase"
+              :bound-org="doorBoundOrg"
               @closeTable="closeTable"
               @show-correlation="showCorrelation"
-              v-bind="assistantV2 ? { doorContext: recordDoorBase, boundOrg: doorBoundOrg } : {}"
             />
           </OCardSection>
         </OTabPanel>
@@ -398,41 +387,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ crossLink.name }}
                         </ODropdownItem>
                       </template>
-                      <template v-if="assistantV2">
-                        <AiEntryButton
-                          v-bind="fieldDoor(row.field, row.value, 'explain')"
-                          appearance="menu-item"
-                        />
-                        <AiEntryButton
-                          v-bind="fieldDoor(row.field, row.value, 'add_to_chat')"
-                          appearance="menu-item"
-                        />
-                      </template>
-                      <ODropdownItem
-                        v-else-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                        data-test="log-details-table-send-to-ai-chat-btn"
-                        @select="sendToAiChat(JSON.stringify({ [row.field]: row.value }))"
-                      >
-                        <template #icon-left>
-                          <img :src="getBtnLogo" width="14" height="14" alt="" />
-                        </template>
-                        {{ t("logs.detailTable.sendToAiChat") }}
-                      </ODropdownItem>
                       <AiEntryButton
-                        v-if="assistantV2"
+                        v-bind="fieldDoor(row.field, row.value, 'explain')"
+                        appearance="menu-item"
+                      />
+                      <AiEntryButton
+                        v-bind="fieldDoor(row.field, row.value, 'add_to_chat')"
+                        appearance="menu-item"
+                      />
+                      <AiEntryButton
                         v-bind="regexDoor(row.field, row.value)"
                         appearance="menu-item"
                       />
-                      <ODropdownItem
-                        v-else-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                        data-test="log-details-table-redirect-to-regex-pattern-btn"
-                        @select="createRegexPatternFromLogs(row.field, row.value)"
-                      >
-                        <template #icon-left>
-                          <img :src="regexIcon" width="14" height="14" alt="" />
-                        </template>
-                        {{ t("regex_patterns.create_regex_pattern_field") }}
-                      </ODropdownItem>
                     </ODropdown>
                     <pre
                       :data-test="`log-detail-${row.field}-value`"
@@ -455,7 +421,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :query-string="scopeHighlightQuery(highlightQuery, row.field)"
                     /></pre>
                     <AiEntryButton
-                      v-if="assistantV2"
                       v-bind="fieldDoor(row.field, row.value, 'add_to_chat')"
                       appearance="toolbar-icon"
                     />
@@ -488,7 +453,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :hide-search-term-actions="false"
             :hide-dimension-filters="true"
             :hide-reset-filters-button="true"
-            @sendToAiChat="sendToAiChat"
             @addSearchTerm="addSearchTerm"
           />
           <!-- Loading/Empty state when no data -->
@@ -701,13 +665,11 @@ import {
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import JsonPreview from "./JsonPreview.vue";
-import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { resolveLogSeverity, type KnownLogSeverityLevel } from "@/utils/logs/statusParser";
@@ -729,16 +691,8 @@ import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrel
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import CorrelationServiceHeader from "@/plugins/correlation/CorrelationServiceHeader.vue";
 import { useCorrelationScope } from "@/plugins/correlation/useCorrelationVersions";
-import { useLocationDimensions } from "@/plugins/correlation/correlationHeader";
-import { enrichStreamsWithOverlap } from "@/utils/streamTimeOverlap";
-import {
-  appliedFilterSql,
-  correlationInstance,
-  placeFromDimensions,
-  rankCorrelatedStreams,
-  semanticRecordDimensions,
-} from "@/plugins/correlation/correlationVersions";
-import config from "@/aws-exports";
+import { enrichStreamsWithOverlap, sortStreamsByOverlap } from "@/utils/streamTimeOverlap";
+import { placeFromDimensions } from "@/plugins/correlation/correlationVersions";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -756,7 +710,6 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
@@ -799,7 +752,6 @@ export default defineComponent({
     EqualIcon,
     NotEqualIcon,
     JsonPreview,
-    O2AIContextAddBtn,
     AiEntryButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
     ),
@@ -833,7 +785,6 @@ export default defineComponent({
     "search:timeboxed",
     "add:table",
     "view-trace",
-    "sendToAiChat",
     "closeTable",
     "show-correlation",
     "load-correlation", // New event for lazy loading correlation data
@@ -956,7 +907,6 @@ export default defineComponent({
     const rowData: any = ref({});
     const router = useRouter();
     const store = useStore();
-    const { isDark } = useTheme();
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
     const tab = ref(props.initialTab || "json");
     // Must precede the immediate initialTab watcher, which reads it during setup.
@@ -1484,19 +1434,11 @@ export default defineComponent({
       emit("view-trace");
     };
 
-    const sendToAiChat = (value: any, append: boolean = true) => {
-      emit("sendToAiChat", value, append);
-      emit("closeTable");
-    };
-
-    const assistantV2 = isAssistantV2();
-    const loadedOrg = assistantV2
-      ? useLoadedOrg(
-          () => props.modelValue,
-          () => store.state.selectedOrganization?.identifier ?? "",
-        )
-      : null;
-    const doorBoundOrg = computed(() => props.boundOrg ?? loadedOrg?.value);
+    const loadedOrg = useLoadedOrg(
+      () => props.modelValue,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
+    const doorBoundOrg = computed(() => props.boundOrg ?? loadedOrg.value);
     const { lgUp } = useBreakpoint();
     const recordDoorBase = (): LogsDoorBase =>
       props.doorContext?.() ?? logsDoorBase(searchObj, store.state, rowData.value);
@@ -1504,7 +1446,7 @@ export default defineComponent({
     const recordDoor = (verb: "explain" | "add_to_chat") => ({
       verb,
       entryKind: "object_verb" as const,
-      boundOrg: props.boundOrg ?? loadedOrg?.value,
+      boundOrg: props.boundOrg ?? loadedOrg.value,
       objectKind: "log_row" as const,
       label: t(verb === "explain" ? "assistant.entry.explainRecord" : "assistant.entry.addRecord"),
       tooltip: t(
@@ -1522,7 +1464,7 @@ export default defineComponent({
     const fieldDoor = (field: string, value: unknown, verb: "explain" | "add_to_chat") => ({
       verb,
       entryKind: "object_verb" as const,
-      boundOrg: props.boundOrg ?? loadedOrg?.value,
+      boundOrg: props.boundOrg ?? loadedOrg.value,
       objectKind: "log_field" as const,
       label: t(verb === "explain" ? "assistant.entry.explainField" : "assistant.entry.addField"),
       tooltip: t(
@@ -1540,7 +1482,7 @@ export default defineComponent({
     const regexDoor = (field: string, value: unknown) => ({
       verb: "ask" as const,
       entryKind: "object_verb" as const,
-      boundOrg: props.boundOrg ?? loadedOrg?.value,
+      boundOrg: props.boundOrg ?? loadedOrg.value,
       objectKind: "log_field" as const,
       label: t("assistant.entry.createRegex"),
       tooltip: t("assistant.entry.tooltip.createRegex"),
@@ -1560,38 +1502,6 @@ export default defineComponent({
 
     const closeTable = () => {
       emit("closeTable");
-    };
-
-    const getBtnLogo = computed(() => {
-      return isDark.value
-        ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon_gradient.svg");
-    });
-
-    const regexIcon = computed(() => {
-      return getImageURL(
-        isDark.value
-          ? "images/regex_pattern/regex_icon_dark.svg"
-          : "images/regex_pattern/regex_icon_light.svg",
-      );
-    });
-
-    const createRegexPatternFromLogs = (key: string, value: any) => {
-      emit("closeTable");
-      // Prompt text handed to the assistant — model input, deliberately English.
-      const promptToBeAdded = raw(
-        `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`,
-      );
-      router.push({
-        path: "/settings/regex_patterns",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          from: "logs",
-        },
-      });
-      store.state.organizationData.regexPatternPrompt = promptToBeAdded;
-      store.state.organizationData.regexPatternTestValue = value;
-      emit("sendToAiChat", promptToBeAdded);
     };
 
     const showCorrelation = () => {
@@ -1670,8 +1580,6 @@ export default defineComponent({
       hasAggregationQuery,
       canSearchAroundStream,
       scopeHighlightQuery,
-      sendToAiChat,
-      assistantV2,
       doorBoundOrg,
       lgUp,
       recordDoorBase,
@@ -1698,12 +1606,8 @@ export default defineComponent({
       onTabChange,
       tabOrder,
       onTabReorder,
-      config,
       getContentSize,
       getDisplayValue,
-      getBtnLogo,
-      regexIcon,
-      createRegexPatternFromLogs,
       regexDoor,
     };
   },

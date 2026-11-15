@@ -63,7 +63,6 @@ test.describe("assistant doors", () => {
 
   test.beforeEach(async ({ context, page }) => {
     harness = await loadHarness();
-    await harness.setFlag(context, true);
     await harness.installMocks(context, harness.createMockState());
     await harness.login(page);
     assistant = new AssistantPage(page);

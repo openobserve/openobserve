@@ -201,24 +201,6 @@ describe("RcaAnalysisBar (contract E5)", () => {
     expect(byTest(wrapper, "rca-cancel-dialog").exists()).toBe(false);
   });
 
-  it("W4: legacy keeps Cancel run and Re-analyze as visible bar buttons", async () => {
-    const live = mountBar({ legacy: true });
-    const cancel = byTest(live, "rca-cancel-btn");
-    expect(cancel.element.tagName).toBe("BUTTON");
-    expect(cancel.text()).toBe("Cancel run");
-    await cancel.trigger("click");
-    expect(live.emitted("cancel")).toHaveLength(1);
-
-    const done = mountBar({
-      legacy: true,
-      live: false,
-      latestRunId: "run-1",
-      selectedRunId: "run-1",
-    });
-    await byTest(done, "rca-reanalyze-btn").trigger("click");
-    expect(done.emitted("reanalyze")).toHaveLength(1);
-  });
-
   it("has no plain Cancel or Re-analyze button: a finished run offers Re-analyze in its closed line", () => {
     const live = mountBar();
     const done = mountBar({ live: false, latestRunId: "run-1", selectedRunId: "run-1" });

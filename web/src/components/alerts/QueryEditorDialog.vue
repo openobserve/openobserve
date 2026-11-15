@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Right: AI -->
       <div class="flex items-center gap-3">
         <AiEntryButton
-          v-if="assistantV2 && docked"
+          v-if="docked"
           appearance="toggle"
           verb="ask"
           entry-kind="editor_toggle"
@@ -88,26 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="ai-entry-alert-query-ask"
           @closed="docked.dock.close"
         />
-        <!-- AI button -->
-        <OButton
-          v-else-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          :ripple="false"
-          @click="toggleAIChat"
-          data-test="menu-link-ai-item"
-          :aria-label="t('menu.aiAssistant')"
-          variant="ghost"
-          size="icon-toolbar"
-          class="group hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-md hover:[background:var(--color-gradient-ai)]!"
-          @mouseenter="isHovered = true"
-          @mouseleave="isHovered = false"
-        >
-          <img
-            alt=""
-            :src="getBtnLogo"
-            class="transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180"
-            style="width: 1.125rem; height: 1.125rem"
-          />
-        </OButton>
       </div>
     </template>
     <div
@@ -234,21 +214,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :suggestions="effectiveSuggestions"
                         :field-value-resolver="resolveFieldValues"
                         :assistant="dialogAssistant"
-                        :placeholder="dialogAssistant ? fullEditorPlaceholder : undefined"
+                        :placeholder="fullEditorPlaceholder"
                       />
-                      <div
-                        v-if="
-                          !dialogAssistant &&
-                          (localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) &&
-                          queryEditorPlaceholderFlag
-                        "
-                        class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
-                      >
-                        <span
-                          class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
-                          >{{ fullEditorPlaceholder }}</span
-                        >
-                      </div>
                     </div>
                   </div>
 
@@ -537,18 +504,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <AssistantDock v-if="docked" :host="docked.adapter" />
-      <!-- AI Chat Panel -->
-      <div
-        class="bg-surface-base ms-2 w-[24.5vw] max-w-full min-w-18.75"
-        v-else-if="store.state.isAiChatEnabled"
-      >
-        <O2AIChat
-          :header-height="48"
-          :is-open="store.state.isAiChatEnabled"
-          @close="store.state.isAiChatEnabled = false"
-          class="h-[calc(100vh-3.5rem)]!"
-        />
-      </div>
     </div>
   </ODrawer>
 </template>
@@ -567,11 +522,10 @@ import {
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import useTheme from "@/composables/useTheme";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { debounce } from "lodash-es";
-import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
@@ -587,9 +541,7 @@ const AssistantDock = defineAsyncComponent(
   () => import("@/components/ai-assistant/shell/AssistantDock.vue"),
 );
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
-import O2AIChat from "@/components/O2AIChat.vue";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
-import config from "@/aws-exports";
 import useQuery from "@/composables/useQuery";
 import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts/alertSqlUtils";
 import useParser from "@/composables/useParser";
@@ -606,7 +558,6 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   assistantObjectNameKey,
-  isAssistantV2,
   useAssistantPanelWidth,
   useDockedEditor,
   type DockedEditor,
@@ -674,7 +625,6 @@ const emit = defineEmits([
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { isDark } = useTheme();
 const { buildQueryPayload } = useQuery();
 const { sqlParser } = useParser();
 
@@ -756,7 +706,6 @@ const sqlEditorMaximized = ref(false);
 // restoring from maximized so Monaco mounts AFTER the flex container has
 // already reached its final size (no automaticLayout animation).
 const vrlContentMounted = ref(true);
-const isHovered = ref(false);
 
 // DOM refs
 const fnEditorRef = ref<any>(null);
@@ -777,7 +726,6 @@ const restoreVrlEditor = () => {
 };
 
 // Editor state
-const queryEditorPlaceholderFlag = ref(true);
 const functionEditorPlaceholderFlag = ref(true);
 const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 
@@ -877,8 +825,6 @@ const updateVrlFunction = (value: string) => {
 };
 
 const onBlurQueryEditor = debounce(async () => {
-  queryEditorPlaceholderFlag.value =
-    localTab.value === "sql" ? localSqlQuery.value === "" : localPromqlQuery.value === "";
   if (localTab.value === "sql") {
     await _sqlOnBlur();
     emit("validate-sql");
@@ -1139,7 +1085,6 @@ const {
 });
 
 const onQueryEditorFocus = () => {
-  queryEditorPlaceholderFlag.value = false;
   _sqlOnFocus();
 };
 
@@ -1245,15 +1190,12 @@ const availableLanguages = computed<("sql" | "promql")[]>(() => {
   return ["sql", "promql"];
 });
 
-const assistantV2 = isAssistantV2();
 const editorArea = ref<HTMLElement | null>(null);
 const alertName = inject(assistantObjectNameKey, ref(""));
 let openedWith = { sql: props.sqlQuery, promql: props.promqlQuery };
-const docked: DockedEditor | null = assistantV2 ? alertQueryHost() : null;
-const panelWidth = assistantV2 ? useAssistantPanelWidth() : null;
-const dockOpen = computed(
-  () => !!docked?.dock.isOpen.value && (panelWidth?.panelWidthRem.value ?? 0) > 0,
-);
+const docked: DockedEditor = alertQueryHost();
+const panelWidth = useAssistantPanelWidth();
+const dockOpen = computed(() => !!docked?.dock.isOpen.value && panelWidth.panelWidthRem.value > 0);
 
 watch(
   () => props.modelValue,
@@ -1357,22 +1299,6 @@ const handleRunQuery = (language: "sql" | "promql") => {
     runPromqlQuery();
   }
 };
-
-// AI Chat
-const toggleAIChat = () => {
-  const isEnabled = !store.state.isAiChatEnabled;
-  store.dispatch("setIsAiChatEnabled", isEnabled);
-};
-
-const getBtnLogo = computed(() => {
-  if (isHovered.value || store.state.isAiChatEnabled) {
-    return getImageURL("images/common/ai_icon_dark.svg");
-  }
-
-  return isDark.value
-    ? getImageURL("images/common/ai_icon_dark.svg")
-    : getImageURL("images/common/ai_icon_gradient.svg");
-});
 </script>
 
 <style scoped>

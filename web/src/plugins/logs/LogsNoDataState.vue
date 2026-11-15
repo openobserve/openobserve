@@ -120,16 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           {{ raw("Windows") }}
         </EmptyStateIngestionChip>
-        <slot v-if="assistantV2" name="ai-door" />
-        <EmptyStateIngestionChip
-          v-else-if="aiEnabled"
-          variant="ai"
-          data-test="logs-no-data-ask-ai-btn"
-          @click="emit('ask-ai')"
-        >
-          <img :src="aiIconSrc" class="h-3.5 w-3.5 shrink-0" alt="" />
-          {{ t("logs.noData.askAi") }}
-        </EmptyStateIngestionChip>
+        <slot name="ai-door" />
       </div>
     </template>
   </OEmptyState>
@@ -143,12 +134,9 @@ import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
-import { useAiIcon } from "@/composables/useAiIcon";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps<{
-  aiEnabled: boolean;
   /** Under FirstDataPanel's card: only the cards and chips, under an "Or start another way" caption. */
   alternativesOnly?: boolean;
 }>();
@@ -156,19 +144,13 @@ const props = defineProps<{
 defineSlots<{
   /** A line between the description and the cards. */
   status?(): unknown;
-  /** With the assistant on: the page's own door in place of the legacy Ask AI chip. */
+  /** The page's own AI door. */
   "ai-door"?(): unknown;
-}>();
-
-const emit = defineEmits<{
-  "ask-ai": [];
 }>();
 
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
-const { aiIconSrc } = useAiIcon();
-const assistantV2 = isAssistantV2();
 
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization.identifier,

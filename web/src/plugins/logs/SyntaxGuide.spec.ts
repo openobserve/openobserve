@@ -115,24 +115,6 @@ describe("SyntaxGuide.vue", () => {
     expect(button.classes()).not.toContain("normal-mode");
   });
 
-  // Test 10: Button exists when AI chat is disabled
-  it("should render button when AI chat is disabled", () => {
-    store.state.isAiChatEnabled = false;
-    wrapper = createWrapper();
-    const button = wrapper.findComponent({ name: "OButton" });
-    expect(button.exists()).toBe(true);
-    // syntax-guide-button class was removed in OButton migration
-  });
-
-  // Test 11: Button exists when AI chat is enabled
-  it("should render button when AI chat is enabled", () => {
-    store.state.isAiChatEnabled = true;
-    wrapper = createWrapper();
-    const button = wrapper.findComponent({ name: "OButton" });
-    expect(button.exists()).toBe(true);
-    // syntax-guide-button class was removed in OButton migration
-  });
-
   // Test 12: Menu has correct theme class for dark theme
   it("should have theme-dark class when store theme is dark", () => {
     store.state.theme = "dark";
@@ -248,27 +230,22 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper();
     expect(wrapper.vm.store.state).toBeDefined();
     expect(wrapper.vm.store.state.theme).toBeDefined();
-    expect(wrapper.vm.store.state.isAiChatEnabled).toBeDefined();
   });
 
   // Test 24: Component renders with different store states
   it("should render correctly with different store states", () => {
     const originalTheme = store.state.theme;
-    const originalAiChat = store.state.isAiChatEnabled;
 
     store.state.theme = "dark";
-    store.state.isAiChatEnabled = false;
     wrapper = createWrapper();
     expect(wrapper.exists()).toBe(true);
 
     store.state.theme = "light";
-    store.state.isAiChatEnabled = true;
     wrapper = createWrapper();
     expect(wrapper.exists()).toBe(true);
 
     // Restore original state
     store.state.theme = originalTheme;
-    store.state.isAiChatEnabled = originalAiChat;
   });
 
   // Test 25: Component has conditional rendering logic
@@ -282,7 +259,6 @@ describe("SyntaxGuide.vue", () => {
 
   // Test 26: CSS classes application
   it("should apply correct CSS classes based on props and state", () => {
-    store.state.isAiChatEnabled = false;
     wrapper = createWrapper({ sqlmode: false });
     const button = wrapper.findComponent({ name: "OButton" });
 

@@ -27,12 +27,6 @@ import { contextRegistry } from "@/composables/contextProviders/registry";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-const { flag } = vi.hoisted(() => ({ flag: { on: true } }));
-
-vi.mock("@/composables/assistant/flags", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/composables/assistant/flags")>()),
-  isAssistantV2: () => flag.on,
-}));
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true" } }));
 vi.mock("@/components/ai-assistant/shell/AssistantDock.vue", () =>
   import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.assistantDockStub),
@@ -67,7 +61,6 @@ function setup(type: "alerts" | "pipelines" = "alerts") {
           template: '<div data-test="common-json-editor"><textarea /></div>',
           methods: { replaceValue },
         },
-        O2AIChat: { template: '<div data-test="legacy-chat" />' },
       },
     },
     attachTo: document.body,
@@ -76,7 +69,6 @@ function setup(type: "alerts" | "pipelines" = "alerts") {
 }
 
 beforeEach(() => {
-  flag.on = true;
   sessionStorage.clear();
   contextRegistry.cleanup();
   replaceValue.mockClear();
@@ -127,16 +119,5 @@ describe("JsonEditor with the revamped assistant", () => {
     expect(wrapper.find('[data-test="assistant-dock-stub"]').attributes("data-host")).toBe(
       "json_editor",
     );
-    expect(wrapper.find('[data-test="legacy-chat"]').exists()).toBe(false);
-  });
-
-  it("keeps the legacy chat with the revamp off", async () => {
-    flag.on = false;
-    store.state.isAiChatEnabled = true;
-    const { wrapper, runtime } = setup();
-    await settleAsyncParts();
-    expect(runtime.hosts.has("json_editor")).toBe(false);
-    expect(wrapper.find('[data-test="legacy-chat"]').exists()).toBe(true);
-    store.state.isAiChatEnabled = false;
   });
 });

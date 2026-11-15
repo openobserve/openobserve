@@ -312,13 +312,6 @@ describe("JsonPreview Component", () => {
       expect(wrapper.emitted("view-trace")).toBeTruthy();
       expect(wrapper.emitted("view-trace")[0]).toEqual([mockValue]);
     });
-
-    it("should emit sendToAiChat event", () => {
-      wrapper.vm.sendToAiChat("test data");
-      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
-      expect(wrapper.emitted("sendToAiChat")[0]).toEqual(["test data", true]); // includes append parameter
-      expect(wrapper.emitted("closeTable")).toBeTruthy();
-    });
   });
 
   describe("Tab Functionality", () => {
@@ -577,6 +570,34 @@ describe("JsonPreview Component", () => {
   });
 
   describe("Context Menu", () => {
+    it("offers Create regex pattern for a field and a selection without the assistant", async () => {
+      const slotted = { template: "<div><slot /></div>" };
+      const w = mount(JsonPreview, {
+        props: { value: mockValue, mode: "sidebar", streamName: "test-stream" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            ODropdown: slotted,
+            ODropdownItem: slotted,
+            OButton: true,
+            OIcon: true,
+            OTooltip: true,
+            LogsHighLighting: true,
+            ChunkedContent: true,
+            EqualIcon: true,
+            NotEqualIcon: true,
+          },
+        },
+      });
+      expect((w.vm as any).regexDoorShown).toBe(false);
+      expect(w.find('[data-test="redirect-to-regex-pattern-btn"]').exists()).toBe(true);
+      (w.vm as any).showMenu = true;
+      await w.vm.$nextTick();
+      expect(w.find('[data-test="ai-entry-regex-field-ask-menu"]').exists()).toBe(true);
+      w.unmount();
+    });
+
     it("should copy selected text successfully", async () => {
       wrapper.vm.selectedText = "test text";
       vi.mocked(navigator.clipboard.writeText).mockResolvedValue(undefined);
@@ -605,50 +626,6 @@ describe("JsonPreview Component", () => {
 
       expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
     });
-
-    it("should handle create regex from context menu", () => {
-      wrapper.vm.handleCreateRegex();
-
-      expect(wrapper.vm.showMenu).toBe(false);
-      expect(wrapper.vm.typeOfRegexPattern).toBe(true);
-    });
-  });
-
-  describe("Regex Pattern Creation", () => {
-    it("should create regex pattern from logs", () => {
-      const field = "email";
-      const value = "test@example.com";
-
-      wrapper.vm.createRegexPatternFromLogs(field, value);
-
-      expect(wrapper.emitted("closeTable")).toBeTruthy();
-      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/settings/regex_patterns",
-        query: {
-          org_identifier: "test-org",
-          from: "logs",
-        },
-      });
-    });
-
-    it("should confirm regex pattern type", () => {
-      wrapper.vm.selectedText = "test@email.com";
-      wrapper.vm.regexPatternType = "email";
-
-      wrapper.vm.confirmRegexPatternType();
-
-      expect(wrapper.vm.typeOfRegexPattern).toBe(false);
-      expect(wrapper.emitted("closeTable")).toBeTruthy();
-      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/settings/regex_patterns",
-        query: {
-          org_identifier: "test-org",
-          from: "logs",
-        },
-      });
-    });
   });
 
   describe("Event Listeners", () => {
@@ -672,83 +649,6 @@ describe("JsonPreview Component", () => {
       wrapper.vm.filterStreamFn("test");
 
       expect(wrapper.vm.filteredTracesStreamOptions).toEqual([]);
-    });
-  });
-
-  describe("Regex Pattern ODialog", () => {
-    it("renders ODialog when enterprise is enabled", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.exists()).toBe(true);
-    });
-
-    it("forwards size 'lg' to ODialog", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("size")).toBe("lg");
-    });
-
-    it("forwards the title prop to ODialog", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("What is the type of regex pattern you want to create?");
-    });
-
-    it("forwards localized primary and secondary button labels to ODialog", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBeTruthy();
-      expect(dialog.props("secondaryButtonLabel")).toBeTruthy();
-    });
-
-    it("forwards typeOfRegexPattern false to the open prop initially", () => {
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(false);
-    });
-
-    it("forwards typeOfRegexPattern true to the open prop after toggle", async () => {
-      wrapper.vm.typeOfRegexPattern = true;
-      await nextTick();
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(true);
-    });
-
-    it("closes the dialog on click:secondary", async () => {
-      wrapper.vm.typeOfRegexPattern = true;
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:secondary");
-      await nextTick();
-
-      expect(wrapper.vm.typeOfRegexPattern).toBe(false);
-    });
-
-    it("invokes confirmRegexPatternType on click:primary", async () => {
-      wrapper.vm.typeOfRegexPattern = true;
-      wrapper.vm.selectedText = "user@example.com";
-      wrapper.vm.regexPatternType = "email";
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:primary");
-      await nextTick();
-
-      expect(wrapper.vm.typeOfRegexPattern).toBe(false);
-      expect(wrapper.emitted("closeTable")).toBeTruthy();
-      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/settings/regex_patterns",
-        query: {
-          org_identifier: "test-org",
-          from: "logs",
-        },
-      });
-    });
-
-    it("opens the regex dialog after handleCreateRegex via context menu", async () => {
-      wrapper.vm.handleCreateRegex();
-      await nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(true);
-      expect(wrapper.vm.showMenu).toBe(false);
     });
   });
 

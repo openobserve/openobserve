@@ -13,17 +13,6 @@ function notYet(wp) {
 export class AssistantPage {
   constructor(page) {
     this.page = page;
-    this.legacy = {
-      headerButton: page.locator('[data-test="menu-link-ai-item"]').first(),
-      chat: page.locator(".chat-container").filter({ visible: true }).last(),
-      composer: page.locator(".chat-container [contenteditable=true]").filter({ visible: true }).last(),
-      regexToggle: page.locator('[data-test="add-regex-pattern-open-close-ai-btn"]'),
-      // Logs opens the filter builder by default, which hides the editor's toggle and shows its own AI button.
-      nlToggle: page
-        .locator('[data-test="logs-search-bar-filter-builder-ai-btn"], [data-test="logs-search-bar-ai-toggle-btn"]')
-        .filter({ visible: true }),
-      nlInput: page.locator('[data-test="logs-search-bar-ai-input-field-field"]'),
-    };
     this.headerButton = page.locator('[data-test="menu-link-ai-item"]');
     this.sidebar = page.locator('[data-test="assistant-shell-sidebar"]').filter({ visible: true });
     this.full = page.locator('[data-test="assistant-shell-full"]');
@@ -39,20 +28,9 @@ export class AssistantPage {
     return this.page.locator("[data-assistant-root]").filter({ visible: true });
   }
 
-  /** Every v2 assistant id in the DOM; the legacy smoke asserts there are none with the flag off. */
+  /** Every v2 assistant id in the DOM; gates asserts there are none where the assistant is locked. */
   v2Ids() {
     return this.page.locator('[data-test^="assistant-"]');
-  }
-
-  async openLegacy() {
-    await this.legacy.headerButton.click();
-    await this.legacy.composer.waitFor({ state: "visible" });
-  }
-
-  async sendLegacy(text) {
-    await this.legacy.composer.click();
-    await this.legacy.composer.fill(text);
-    await this.legacy.composer.press("Enter");
   }
 
   /** Opens the assistant by the header button or the chord and waits for its container. */

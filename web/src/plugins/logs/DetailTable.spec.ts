@@ -101,22 +101,7 @@ vi.mock("./JsonPreview.vue", () => ({
       hideViewTrace: { type: Boolean, default: false },
       copyInPlace: { type: Boolean, default: false },
     },
-    emits: [
-      "copy",
-      "add-field-to-table",
-      "add-search-term",
-      "view-trace",
-      "send-to-ai-chat",
-      "closeTable",
-    ],
-  },
-}));
-
-vi.mock("@/components/common/O2AIContextAddBtn.vue", () => ({
-  default: {
-    name: "O2AIContextAddBtn",
-    template: "<div data-test='o2ai-context-btn'><slot /></div>",
-    emits: ["sendToAiChat"],
+    emits: ["copy", "add-field-to-table", "add-search-term", "view-trace", "closeTable"],
   },
 }));
 
@@ -226,11 +211,6 @@ describe("DetailTable Component", () => {
       OChunkedContent: true,
       OTelemetryCorrelationDashboard: true,
       OCorrelatedLogsTable: true,
-      O2AIContextAddBtn: {
-        template:
-          '<div data-test="o2ai-context-btn" @click="$emit(\'sendToAiChat\')"><slot /></div>',
-        emits: ["sendToAiChat"],
-      },
     },
   };
 
@@ -470,15 +450,6 @@ describe("DetailTable Component", () => {
 
     expect(wrapper.emitted()["add:table"]).toBeTruthy();
     expect(wrapper.emitted()["add:table"][0]).toEqual(["test_field"]);
-  });
-
-  it("should emit sendToAiChat and closeTable when sendToAiChat called", () => {
-    const testValue = "test message";
-    wrapper.vm.sendToAiChat(testValue);
-
-    expect(wrapper.emitted().sendToAiChat).toBeTruthy();
-    expect(wrapper.emitted().sendToAiChat[0]).toEqual([testValue, true]); // includes append parameter
-    expect(wrapper.emitted().closeTable).toBeTruthy();
   });
 
   // Test 46-50: Computed Properties and Reactive Behavior

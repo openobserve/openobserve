@@ -2,7 +2,6 @@
 
 import { shallowRef } from "vue";
 
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { isMacOS } from "@/utils/keyboardShortcuts";
 import type { I18nKey } from "@/types/i18n";
 /**
@@ -75,7 +74,7 @@ export interface ShortcutCapabilities {
   rbacEnabled: boolean;
   aiEnabled: boolean;
   downtimesEnabled: boolean;
-  /** `useAssistantCapability().assistantCanChat` with the v2 flag on, else false. */
+  /** `useAssistantCapability().assistantCanChat`. */
   assistantCanChat: boolean;
 }
 
@@ -100,17 +99,12 @@ const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.inciden
 const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
 const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
 const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
-// The legacy chat binding is registered only while the v2 assistant is off.
-const aiChat = (c: ShortcutCapabilities) => !isAssistantV2() && c.isEnterprise && c.aiEnabled;
 const downtimes = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.downtimesEnabled;
-// Every assistant row is gated on the flag too, so the cheatsheet is unchanged with it off.
-const assistantChat = (c: ShortcutCapabilities) =>
-  isAssistantV2() && c.aiEnabled && c.assistantCanChat;
+const assistantChat = (c: ShortcutCapabilities) => c.aiEnabled && c.assistantCanChat;
 const dictationReady = shallowRef(false);
 // Cluster-scoped admin surfaces only render inside the _meta org.
 const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
 const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
-const assistantV2Only = () => isAssistantV2();
 
 /**
  * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
@@ -263,13 +257,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { id: "openCheatsheet", key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
       { id: "closeDialog", key: "escape", descriptionKey: "shortcuts.actions.closeDialog" },
       {
-        id: "aiChatToggle",
-        keyForWindows: "ctrl+b",
-        keyForMac: "meta+b",
-        descriptionKey: "shortcuts.actions.aiChatToggle",
-        visible: aiChat,
-      },
-      {
         id: "assistantOpen",
         keyForWindows: "ctrl+i",
         keyForMac: "meta+i",
@@ -308,7 +295,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "homeFocusAsk",
         key: "/",
         descriptionKey: "shortcuts.actions.homeFocusAsk",
-        visible: assistantV2Only,
       },
     ],
   },
@@ -1326,18 +1312,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "ai-toolsets",
     visible: enterprise,
     shortcuts: [
-      {
-        id: "aiToolsetsRefresh",
-        key: "r",
-        descriptionKey: "shortcuts.actions.aiToolsetsRefresh",
-        visible: () => !isAssistantV2(),
-      },
-      {
-        id: "assistantToolsetsRefresh",
-        key: "r",
-        descriptionKey: "shortcuts.actions.assistantToolsetsRefresh",
-        visible: () => isAssistantV2(),
-      },
+      { id: "aiToolsetsRefresh", key: "r", descriptionKey: "shortcuts.actions.aiToolsetsRefresh" },
     ],
   },
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import config from "@/aws-exports";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
@@ -25,7 +25,7 @@ import { groupNavLinks, NAV_GROUPS } from "@/lib/core/Navbar/navGroups";
 import type { NavItem, RailEntry } from "@/lib/core/Navbar/ONavbar.types";
 import { toastRecords, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { addLicenseDeniedError, clearLicenseDenials } from "@/composables/useLicenseDenials";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import { readLocaleMessages } from "@/test/unit/helpers/localeFiles";
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -55,7 +55,10 @@ describe("MainLayout — Product Analytics menu entry", () => {
         stubs: {
           AppHeader: StubDiv,
           ONavbar: NavbarStub,
-          O2AIChat: StubDiv,
+          AssistantSidebarHost: StubDiv,
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+          HomeReturnBar: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,
@@ -216,15 +219,12 @@ describe("MainLayout — Product Analytics menu entry", () => {
   describe("license-gated entries", () => {
     // The license map only applies on an enterprise or cloud build, and CI runs with neither set.
     const edition = config.isEnterprise;
-    // The lock boundary wraps the legacy layout's page; a local `.env` may turn v2 on for the whole run.
+    // These tests end on `/`, whose lazy Home page is heavy enough on first import to outlast the test timeout.
+    beforeAll(() => import("@/views/HomeView.vue"), 60_000);
     beforeEach(() => {
       config.isEnterprise = "true";
-      window.__O2_ASSISTANT_V2__ = false;
-      resetAssistantV2ForTests();
     });
     afterEach(() => {
-      delete window.__O2_ASSISTANT_V2__;
-      resetAssistantV2ForTests();
       config.isEnterprise = edition;
       delete store.state.zoConfig.features;
       dismissAll();
@@ -442,7 +442,10 @@ describe("MainLayout — rail while the config loads", () => {
         stubs: {
           AppHeader: StubDiv,
           ONavbar: NavbarStub,
-          O2AIChat: StubDiv,
+          AssistantSidebarHost: StubDiv,
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+          HomeReturnBar: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,

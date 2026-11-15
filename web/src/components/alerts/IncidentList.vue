@@ -389,7 +389,6 @@ import { formatToReadable } from "@/utils/date";
 import { type Incident } from "@/services/incidents";
 import IncidentAiAnalysisCell from "@/components/alerts/IncidentAiAnalysisCell.vue";
 import { isLiveRca } from "@/utils/incidents/rcaCell";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useListViewState } from "@/composables/useListViewState";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -603,8 +602,8 @@ export default defineComponent({
         header: t("alerts.incidents.aiAnalysis.column"),
         resizable: true,
         hideable: true,
-        // The revamped cell holds state, detail and the follow door on one line.
-        size: isAssistantV2() ? 320 : 220,
+        // The cell holds state, detail and the follow door on one line.
+        size: 320,
         meta: { align: "left" },
       },
       {

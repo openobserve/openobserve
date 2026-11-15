@@ -130,16 +130,6 @@ vi.mock("@/composables/assistant", async () => {
 vi.mock("@/views/UsageTab.vue", () => ({
   default: { name: "UsageTab", template: '<div data-test="usage-tab-stub" />' },
 }));
-vi.mock("@/components/O2AIChat.vue", () => ({
-  default: {
-    name: "O2AIChat",
-    props: { aiChatPayload: { type: Object, default: null } },
-    template: '<div data-test="ai-chat-stub" />',
-  },
-}));
-vi.mock("@/views/HomeChatHistory.vue", () => ({
-  default: { name: "HomeChatHistory", template: "<div />" },
-}));
 vi.mock("@/views/PinnedDashboardTab.vue", () => ({
   default: { name: "PinnedDashboardTab", template: '<div data-test="pinned-tab-stub" />' },
 }));
@@ -180,7 +170,6 @@ vi.mock("@/composables/useOrgHasUserData", async () => {
 import config from "@/aws-exports";
 import analytics from "@/services/product_analytics";
 import settings from "@/services/settings";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import { readHome, resetPrefsForTests } from "@/composables/assistant/prefs";
 import { contextRegistry } from "@/composables/contextProviders/registry";
 import { timeRangeShortText, timeWindowOf } from "@/composables/assistant/context/contextChips";
@@ -203,13 +192,14 @@ describe("HomeView", () => {
 
   const setFlag = (on: boolean) =>
     store.commit("setConfig", { ...originalZoConfig, restricted_routes_on_empty_data: on });
+  // The saved tab under the old unscoped key, which Home's prefs migrate once the user+org key resolves.
   const openTab = (tab: string) => localStorage.setItem("o2_home_active_tab", tab);
   const has = (testId: string) => wrapper.find(`[data-test="${testId}"]`).exists();
 
   beforeEach(() => {
-    // The local .env may turn v2 on for the build, and these tests pin the v2-off Home.
-    window.__O2_ASSISTANT_V2__ = false;
-    resetAssistantV2ForTests();
+    assistant.userOrgKey = "k1";
+    reactive(gate).value = "available";
+    resetPrefsForTests();
     originalZoConfig = { ...store.state.zoConfig, ai_enabled: false };
     originalFlags = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
     config.isEnterprise = "true";
@@ -224,9 +214,7 @@ describe("HomeView", () => {
     store.commit("setConfig", originalZoConfig);
     config.isEnterprise = originalFlags.isEnterprise;
     config.isCloud = originalFlags.isCloud;
-    localStorage.removeItem("o2_home_active_tab");
-    delete window.__O2_ASSISTANT_V2__;
-    resetAssistantV2ForTests();
+    localStorage.clear();
     vi.restoreAllMocks();
   });
 
@@ -311,7 +299,7 @@ describe("HomeView", () => {
       expect(has("home-tab-ai")).toBe(true);
       expect(has("home-tab-lock-ai")).toBe(true);
       expect(has("home-ai-locked")).toBe(true);
-      expect(has("ai-chat-stub")).toBe(false);
+      expect(has("home-ai-panel")).toBe(false);
     });
 
     it("should be absent when ai_assistant is not offered", async () => {
@@ -333,7 +321,7 @@ describe("HomeView", () => {
       await flushPromises();
 
       expect(has("home-tab-lock-ai")).toBe(false);
-      expect(has("ai-chat-stub")).toBe(true);
+      expect(has("home-ai-panel")).toBe(true);
     });
   });
 
@@ -345,36 +333,7 @@ describe("HomeView", () => {
       autoSend: false,
       context: { currentPage: "Alerts", org_id: "default" },
     };
-    const sendFromOverview = async () => {
-      setFlag(false);
-      store.commit("setConfig", {
-        ...store.state.zoConfig,
-        ai_enabled: true,
-        features: { ai_assistant: "enabled" },
-      });
-      openTab("overview");
-      wrapper = mountHome();
-      await flushPromises();
-      wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
-      await flushPromises();
-    };
     const tab = () => (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab;
-    const chat = () => wrapper.findComponent({ name: "O2AIChat" });
-
-    it("switches to the AI tab and passes the chip payload with a unique id", async () => {
-      await sendFromOverview();
-
-      expect(tab()).toBe("ai");
-      expect(chat().exists()).toBe(true);
-      expect(chat().props("aiChatPayload")).toMatchObject({
-        text: handoff.query,
-        chipName: "Firing alerts",
-        newChat: true,
-        autoSend: false,
-        context: handoff.context,
-      });
-      expect(typeof chat().props("aiChatPayload").id).toBe("number");
-    });
 
     it("ignores a hand-off while the AI tab is locked", async () => {
       setFlag(false);
@@ -384,53 +343,41 @@ describe("HomeView", () => {
         features: { ai_assistant: "locked" },
       });
       openTab("overview");
+      assistantDoor.open.mockClear();
       wrapper = mountHome();
       await flushPromises();
       wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
       await flushPromises();
 
       expect(tab()).toBe("overview");
-      expect((wrapper.vm as unknown as { aiChatPayload: unknown }).aiChatPayload).toBeNull();
-    });
-
-    it("gives a second hand-off a fresh id so the chat watcher fires again", async () => {
-      vi.useFakeTimers({ toFake: ["Date"] });
-      try {
-        await sendFromOverview();
-        const first = chat().props("aiChatPayload").id;
-        vi.setSystemTime(Date.now() + 5);
-        (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab = "overview";
-        await flushPromises();
-        wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
-        await flushPromises();
-        expect(chat().props("aiChatPayload").id).toBeGreaterThan(first);
-      } finally {
-        vi.useRealTimers();
-      }
+      expect(assistantDoor.open).not.toHaveBeenCalled();
     });
   });
 
   describe("with the empty-data flag off", () => {
     beforeEach(() => setFlag(false));
 
-    it("should render Overview as at BASE with no first-data panel around it", () => {
+    it("should render Overview as at BASE with no first-data panel around it", async () => {
       wrapper = mountHome();
+      await flushPromises();
 
       expect(has("overview-tab-stub")).toBe(true);
       expect(has("first-data-panel-stub")).toBe(false);
       expect(has("first-data-panel")).toBe(false);
     });
 
-    it("should run the Overview panel edge to edge by cancelling the body inset", () => {
+    it("should run the Overview panel edge to edge by cancelling the body inset", async () => {
       wrapper = mountHome();
+      await flushPromises();
       expect(wrapper.get('[data-test="home-overview-panel"]').classes()).toEqual(
         expect.arrayContaining(["-mx-2.5", "-mb-2.5", "flex-1"]),
       );
     });
 
-    it("should render Usage as at BASE with no first-data panel around it", () => {
+    it("should render Usage as at BASE with no first-data panel around it", async () => {
       openTab("usage");
       wrapper = mountHome();
+      await flushPromises();
 
       expect(has("usage-tab-stub")).toBe(true);
       expect(has("first-data-panel-stub")).toBe(false);
@@ -441,17 +388,19 @@ describe("HomeView", () => {
   describe("with the empty-data flag on", () => {
     beforeEach(() => setFlag(true));
 
-    it("should hold the skeleton and never mount Overview while the lists are unknown", () => {
+    it("should hold the skeleton and never mount Overview while the lists are unknown", async () => {
       panel.layout = "pending";
       wrapper = mountHome();
+      await flushPromises();
 
       expect(has("home-skeleton-stub")).toBe(true);
       expect(has("overview-tab-stub")).toBe(false);
     });
 
-    it("should show the no-pick hero with the status line inside and no Overview", () => {
+    it("should show the no-pick hero with the status line inside and no Overview", async () => {
       panel.layout = "status";
       wrapper = mountHome();
+      await flushPromises();
 
       const hero = wrapper.find('[data-test="home-first-data-hero"]');
       expect(hero.exists()).toBe(true);
@@ -465,7 +414,7 @@ describe("HomeView", () => {
       );
     });
 
-    it("should name the org by its name, not its identifier, in the hero sentence", () => {
+    it("should name the org by its name, not its identifier, in the hero sentence", async () => {
       panel.layout = "status";
       store.commit("setSelectedOrganization", {
         ...store.state.selectedOrganization,
@@ -473,15 +422,17 @@ describe("HomeView", () => {
         label: "onboarding_test",
       });
       wrapper = mountHome();
+      await flushPromises();
 
       const text = wrapper.find('[data-test="home-no-data-description"]').text();
       expect(text).toContain("onboarding_test");
       expect(text).not.toContain("3KPKhisT86rLZBaFRKbdvi1TIsm");
     });
 
-    it("should put the alternatives block under the card when a pick is known", () => {
+    it("should put the alternatives block under the card when a pick is known", async () => {
       panel.layout = "card";
       wrapper = mountHome();
+      await flushPromises();
 
       const alternatives = wrapper.find('[data-test="home-first-data-alternatives"]');
       expect(alternatives.exists()).toBe(true);
@@ -490,10 +441,11 @@ describe("HomeView", () => {
       expect(has("overview-tab-stub")).toBe(false);
     });
 
-    it("should put the trial strip with the usage actions above the Usage block", () => {
+    it("should put the trial strip with the usage actions above the Usage block", async () => {
       panel.layout = "status";
       openTab("usage");
       wrapper = mountHome();
+      await flushPromises();
 
       const trial = wrapper.find('[data-test="trial-period-container"]');
       expect(trial.attributes("data-page")).toBe("usage");
@@ -506,9 +458,10 @@ describe("HomeView", () => {
       );
     });
 
-    it("should show the no-access state alone on Overview when the stream lists answer 403", () => {
+    it("should show the no-access state alone on Overview when the stream lists answer 403", async () => {
       panel.layout = "forbidden";
       wrapper = mountHome();
+      await flushPromises();
 
       expect(has("home-no-access-empty-state")).toBe(true);
       expect(has("home-first-data-hero")).toBe(false);
@@ -516,18 +469,20 @@ describe("HomeView", () => {
       expect(has("trial-period-container")).toBe(false);
     });
 
-    it("should keep the trial strip above the no-access state on Usage", () => {
+    it("should keep the trial strip above the no-access state on Usage", async () => {
       panel.layout = "forbidden";
       openTab("usage");
       wrapper = mountHome();
+      await flushPromises();
 
       expect(has("trial-period-container")).toBe(true);
       expect(has("home-no-access-empty-state")).toBe(true);
       expect(has("usage-tab-stub")).toBe(false);
     });
 
-    it("should mount the tab itself once the org is not empty", () => {
+    it("should mount the tab itself once the org is not empty", async () => {
       wrapper = mountHome();
+      await flushPromises();
 
       expect(has("overview-tab-stub")).toBe(true);
       expect(has("home-first-data-hero")).toBe(false);
@@ -536,6 +491,7 @@ describe("HomeView", () => {
     it("should show the arrival strip and mount Overview in place when the first record arrives", async () => {
       panel.layout = "status";
       wrapper = mountHome();
+      await flushPromises();
       const result = {
         streamName: "default",
         streamType: "logs",
@@ -555,6 +511,7 @@ describe("HomeView", () => {
     it("should open the arrived stream in Logs from the arrival strip", async () => {
       const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
       wrapper = mountHome();
+      await flushPromises();
       wrapper.findComponent({ name: "FirstDataPanel" }).vm.$emit("detected", {
         streamName: "default",
         streamType: "logs",
@@ -581,6 +538,7 @@ describe("HomeView", () => {
     it("should not wrap a pinned dashboard tab in the first-data panel", async () => {
       panel.layout = "status";
       wrapper = mountHome();
+      await flushPromises();
       (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab = "dash:default:abc";
       await flushPromises();
 
@@ -600,17 +558,19 @@ describe("HomeView", () => {
       orgData.initial = true;
       orgData.ownStreamsOnly = false;
     });
-    const savedTab = () => localStorage.getItem("o2_home_active_tab");
+    const savedTab = () => readHome("k1").active;
     const activeTab = () => (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab;
 
     it("opens Overview instead of the assistant, without saving that as the user's tab", async () => {
+      // The saved tab applies after the data check, so only the default landing moves.
+      localStorage.removeItem("o2_home_active_tab");
       orgData.initial = false;
       wrapper = mountHome();
       await flushPromises();
 
       expect(has("overview-tab-stub")).toBe(true);
-      expect(has("ai-chat-stub")).toBe(false);
-      expect(savedTab()).toBe("ai");
+      expect(has("home-ai-panel")).toBe(false);
+      expect(savedTab() ?? null).toBeNull();
     });
 
     it("saves the next tab the user picks", async () => {
@@ -641,7 +601,7 @@ describe("HomeView", () => {
       wrapper = mountHome();
       await flushPromises();
 
-      expect(has("ai-chat-stub")).toBe(true);
+      expect(has("home-ai-panel")).toBe(true);
       expect(savedTab()).toBe("ai");
     });
 
@@ -652,7 +612,8 @@ describe("HomeView", () => {
       await flushPromises();
 
       expect(activeTab()).toBe("ai");
-      expect(has("ai-chat-stub")).toBe(true);
+      // No user data yet, so the kept AI tab shows its first-run state.
+      expect(has("home-ai-first-run")).toBe(true);
     });
 
     it("leaves a saved Usage tab alone", async () => {
@@ -665,11 +626,6 @@ describe("HomeView", () => {
     });
   });
   describe("assistant v2", () => {
-    const flagged = (on: boolean) => {
-      window.__O2_ASSISTANT_V2__ = on;
-      resetAssistantV2ForTests();
-    };
-
     // The tab bodies are async components, so a render waits for their chunks.
     const settleAsync = async () => {
       await flushPromises();
@@ -691,24 +647,10 @@ describe("HomeView", () => {
     });
 
     afterEach(() => {
-      delete window.__O2_ASSISTANT_V2__;
-      resetAssistantV2ForTests();
       localStorage.clear();
     });
 
-    it("keeps today's AI tab, chat and unscoped keys with the flag off", async () => {
-      flagged(false);
-      openTab("ai");
-      wrapper = mountHome();
-      await flushPromises();
-      expect(has("home-tab-ai")).toBe(true);
-      expect(has("ai-chat-stub")).toBe(true);
-      expect(has("assistant-launcher-stub")).toBe(false);
-      expect(localStorage.getItem("o2_home_active_tab")).toBe("ai");
-    });
-
-    it("puts the redesigned AI tab first and opens on it with the flag on", async () => {
-      flagged(true);
+    it("puts the AI tab first and opens on it", async () => {
       localStorage.removeItem("o2_home_active_tab");
       assistant.userOrgKey = "k1";
       wrapper = mountHome();
@@ -716,12 +658,27 @@ describe("HomeView", () => {
       expect(tabIds()).toEqual(["home-tab-ai", "home-tab-overview", "home-tab-usage"]);
       expect(wrapper.get('[data-test="home-tab-overview"]').text()).toContain("Overview");
       expect(has("assistant-home-tab-stub")).toBe(true);
-      expect(has("ai-chat-stub")).toBe(false);
       expect(has("overview-tab-stub")).toBe(false);
     });
 
+    it("hands an Overview Ask AI to the assistant's door, staying on Overview", async () => {
+      assistant.userOrgKey = "k1";
+      assistantDoor.open.mockClear();
+      wrapper = mountHome();
+      await settleAsync();
+      (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab = "overview";
+      await settleAsync();
+      const handoff = { query: "Why is checkout slow?", chipName: "Checkout", newChat: true };
+      wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
+      await settleAsync();
+      expect(assistantDoor.open).toHaveBeenCalledWith({
+        entryKind: "legacy_relay",
+        relayed: handoff,
+      });
+      expect((wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab).toBe("overview");
+    });
+
     it("hides the AI tab and opens on Overview when AI is off for the org", async () => {
-      flagged(true);
       setGate("off_for_org");
       assistant.userOrgKey = "k1";
       wrapper = mountHome();
@@ -731,7 +688,6 @@ describe("HomeView", () => {
     });
 
     it("hands Home to Overview when the gate settles on no permission", async () => {
-      flagged(true);
       localStorage.removeItem("o2_home_active_tab");
       setGate("loading");
       assistant.userOrgKey = "k1";
@@ -749,7 +705,6 @@ describe("HomeView", () => {
     });
 
     it("never shows the AI tab while the gate loads when the loaded config says AI is off", async () => {
-      flagged(true);
       localStorage.removeItem("o2_home_active_tab");
       store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false });
       setGate("loading");
@@ -767,7 +722,6 @@ describe("HomeView", () => {
     });
 
     it("opens a thread link once the late config turns AI on", async () => {
-      flagged(true);
       localStorage.removeItem("o2_home_active_tab");
       const { version, ...arriving } = store.state.zoConfig;
       store.commit("setConfig", { ...arriving, ai_enabled: false });
@@ -787,7 +741,6 @@ describe("HomeView", () => {
     });
 
     it("applies a saved AI tab once the late config turns AI on", async () => {
-      flagged(true);
       localStorage.removeItem("o2_home_active_tab");
       localStorage.setItem(
         "o2.assistant.home:k1",
@@ -806,7 +759,6 @@ describe("HomeView", () => {
     });
 
     it("drops ?tab=ai from the URL when the user picks another tab", async () => {
-      flagged(true);
       await router.replace({ name: "home", query: { tab: "ai", org_identifier: "default" } });
       assistant.userOrgKey = "k1";
       wrapper = mountHome();
@@ -819,7 +771,6 @@ describe("HomeView", () => {
     });
 
     it("hides the AI tab on Open Source and opens Home on Overview", async () => {
-      flagged(true);
       config.isEnterprise = "false";
       setGate("not_entitled");
       assistant.userOrgKey = "k1";
@@ -831,7 +782,6 @@ describe("HomeView", () => {
     });
 
     it("drops a ?tab=ai link on Open Source at once and opens the saved tab", async () => {
-      flagged(true);
       config.isEnterprise = "false";
       setGate("not_entitled");
       localStorage.setItem(
@@ -851,7 +801,6 @@ describe("HomeView", () => {
     });
 
     it("drops a ?tab=ai link at once when the loaded config hides AI, even while the gate loads", async () => {
-      flagged(true);
       store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false });
       setGate("loading");
       localStorage.setItem(
@@ -868,7 +817,6 @@ describe("HomeView", () => {
     });
 
     it("drops a ?tab=ai link when the feature map hides AI though the gate is available", async () => {
-      flagged(true);
       store.commit("setConfig", {
         ...store.state.zoConfig,
         ai_enabled: true,
@@ -885,7 +833,6 @@ describe("HomeView", () => {
     });
 
     it("keeps a saved pinned dashboard a refused link held back until its pin loads", async () => {
-      flagged(true);
       setGate("loading");
       pinRead.controlled = true;
       pinRead.answered = false;
@@ -928,7 +875,6 @@ describe("HomeView", () => {
       };
 
       beforeEach(() => {
-        flagged(true);
         localStorage.removeItem("o2_home_active_tab");
         resetManager();
       });
@@ -1000,7 +946,6 @@ describe("HomeView", () => {
       });
 
       it("shows ?tab=ai&thread= as that thread inside the AI tab, and goes back to the briefing without it", async () => {
-        flagged(true);
         localStorage.setItem(
           "o2.assistant.home:k1",
           JSON.stringify({ active: "usage", migratedFromUnscoped: true }),
@@ -1029,7 +974,6 @@ describe("HomeView", () => {
 
       it("settles a thread opened from the AI tab's page in once, and lands a thread link still", async () => {
         const settle = "motion-safe:animate-[assistant-fade-up_0.25s_ease-out_both]";
-        flagged(true);
         await router.replace({ name: "home", query: { tab: "ai", thread: "abc" } });
         wrapper = mountHome();
         await resolveKey("k1");
@@ -1046,7 +990,6 @@ describe("HomeView", () => {
       });
 
       it("draws the thread in Home's own layout: the hero's one rail beside a bare chat", async () => {
-        flagged(true);
         await router.replace({ name: "home", query: { tab: "ai", thread: "abc" } });
         wrapper = mountHome();
         await resolveKey("k1");
@@ -1064,7 +1007,6 @@ describe("HomeView", () => {
       });
 
       it("draws no rail beside the chat where the hero draws none", async () => {
-        flagged(true);
         reactive(wide).value = false;
         await router.replace({ name: "home", query: { tab: "ai", thread: "abc" } });
         wrapper = mountHome();
@@ -1077,7 +1019,6 @@ describe("HomeView", () => {
       });
 
       it("drops the thread when the user leaves the AI tab", async () => {
-        flagged(true);
         await router.replace({ name: "home", query: { tab: "ai", thread: "abc" } });
         wrapper = mountHome();
         await resolveKey("k1");
@@ -1088,7 +1029,6 @@ describe("HomeView", () => {
       });
 
       it("gives a chat asked from Home's Ask box no Home range, so its chip keeps the window it asked over", async () => {
-        flagged(true);
         // The mocked store's state is this object, read when the thread's page is read.
         Object.assign(assistant, {
           shell: { activeSid: null },
@@ -1124,22 +1064,12 @@ describe("HomeView", () => {
           contextRegistry.cleanup();
         }
       });
-
-      it("ignores ?thread= with the flag off", async () => {
-        flagged(false);
-        await router.replace({ name: "home", query: { thread: "abc" } });
-        wrapper = mountHome();
-        await flushPromises();
-        expect(has("home-full-thread")).toBe(false);
-        expect(has("home-page")).toBe(true);
-      });
     });
 
     describe("Back to Home", () => {
       const activeTab = () => (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab;
 
       beforeEach(() => {
-        flagged(true);
         localStorage.setItem(
           "o2.assistant.home:k1",
           JSON.stringify({ active: "usage", migratedFromUnscoped: true }),
@@ -1173,7 +1103,6 @@ describe("HomeView", () => {
       afterEach(() => contextRegistry.cleanup());
 
       it("shows the first-run state above the hero in the AI tab and tells the assistant there is no data", async () => {
-        flagged(true);
         localStorage.removeItem("o2_home_active_tab");
         setFlag(true);
         store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
@@ -1192,7 +1121,6 @@ describe("HomeView", () => {
       });
 
       it("C-09: the first-run state gives a question no Home range, so it goes over the chip's window", async () => {
-        flagged(true);
         localStorage.removeItem("o2_home_active_tab");
         setFlag(true);
         store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
@@ -1209,7 +1137,6 @@ describe("HomeView", () => {
       });
 
       it("shows the first-run state in the AI tab of an empty org without the takeover flag", async () => {
-        flagged(true);
         localStorage.removeItem("o2_home_active_tab");
         setFlag(false);
         store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
@@ -1231,7 +1158,6 @@ describe("HomeView", () => {
       });
 
       it("keeps the normal AI tab for an org with data when the takeover flag is off", async () => {
-        flagged(true);
         localStorage.removeItem("o2_home_active_tab");
         setFlag(false);
         store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
@@ -1239,16 +1165,6 @@ describe("HomeView", () => {
         await resolveKey("k1");
         await settleAsync();
         expect(has("home-ai-first-run")).toBe(false);
-        expect(has("agent-home-first-run-stub")).toBe(false);
-      });
-
-      it("keeps the launcher out of the v2-off hero", async () => {
-        flagged(false);
-        setFlag(true);
-        panel.layout = "status";
-        wrapper = mountHome();
-        await flushPromises();
-        expect(wrapper.findAllComponents({ name: "AssistantLauncher" })).toHaveLength(0);
         expect(has("agent-home-first-run-stub")).toBe(false);
       });
     });
@@ -1271,7 +1187,6 @@ describe("HomeView", () => {
       const { homeDashboard } = useHomeDashboard((key: string) => key);
 
       beforeEach(() => {
-        flagged(true);
         localStorage.setItem(
           "o2.assistant.home:k1",
           JSON.stringify({ active: PINNED, migratedFromUnscoped: true }),
@@ -1307,7 +1222,6 @@ describe("HomeView", () => {
     });
 
     it("holds the tabs and body behind the skeleton until the saved order applies (IW-07 AC 1)", async () => {
-      flagged(true);
       localStorage.setItem(
         "o2.assistant.home:k1",
         JSON.stringify({ order: ["usage", "overview"] }),
@@ -1324,7 +1238,6 @@ describe("HomeView", () => {
 
     it("never reorders the tabs once shown, when the key resolves after the wait", async () => {
       vi.useFakeTimers();
-      flagged(true);
       localStorage.setItem(
         "o2.assistant.home:k1",
         JSON.stringify({ order: ["usage", "overview"] }),
@@ -1341,7 +1254,6 @@ describe("HomeView", () => {
     });
 
     it("stops reading the prefs once Home unmounts (F6)", async () => {
-      flagged(true);
       wrapper = mountHome();
       await flushPromises();
       wrapper.unmount();
@@ -1351,7 +1263,6 @@ describe("HomeView", () => {
     });
 
     it("keeps a saved AI tab once, under the user+org key, and leaves the old keys alone", async () => {
-      flagged(true);
       openTab("ai");
       localStorage.setItem("o2_home_tab_order", JSON.stringify(["usage", "ai", "overview"]));
       wrapper = mountHome();

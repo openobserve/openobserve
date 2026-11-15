@@ -19,13 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════════════════ Empty State ════════════════════ -->
     <TracesNoEventsState
       v-if="noResults"
-      :ai-enabled="aiEnabled"
       :stream-doc-time-range="streamDocTimeRange"
       :query-window-us="queryWindowUs"
       data-test="traces-search-result-not-found-text"
       @remove-filter="emit('remove-filter')"
       @jump-to-stream-data="(from, to) => emit('jump-to-stream-data', from, to)"
-      @ask-ai="emit('ask-ai')"
     />
 
     <!-- ════════════════════ Traces List Section ════════════════════ -->
@@ -75,12 +73,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @column-order-change="onColumnReorder"
                 @close-column="onCloseColumn"
                 @cell-contextmenu="handleCellContextMenu"
-                v-bind="assistantV2 ? { focusToolbar: true } : {}"
+                focus-toolbar
               >
                 <!-- `column` is the OTableColumnDef, so `column.meta` (not
                `column.columnDef.meta`) holds disableCellAction. -->
                 <template #cell-hover-actions="{ row, column, active, menu }">
-                  <ODropdown v-if="assistantV2 && menu">
+                  <ODropdown v-if="menu">
                     <template #trigger>
                       <OButton
                         variant="ghost"
@@ -98,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       appearance="menu-item"
                     />
                   </ODropdown>
-                  <template v-else-if="assistantV2 && active && !contextMenuOpen">
+                  <template v-else-if="active && !contextMenuOpen">
                     <CellActions
                       v-if="showCellActions && !column.meta?.disableCellAction"
                       :column="column"
@@ -120,25 +118,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       appearance="toolbar-icon"
                     />
                   </template>
-                  <CellActions
-                    v-else-if="
-                      !assistantV2 &&
-                      showCellActions &&
-                      active &&
-                      !contextMenuOpen &&
-                      !column.meta?.disableCellAction
-                    "
-                    :column="column"
-                    :row="row"
-                    :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
-                    :hide-search-term-actions="false"
-                    :hide-ai="true"
-                    @copy="copyToClipboard(column.id, row[column.id])"
-                    @add-search-term="
-                      (field, value, action) => addSearchTerm(field, value, action, row)
-                    "
-                    @send-to-ai-chat="sendToAiChat"
-                  />
                 </template>
 
                 <template #[`cell-${store.state.zoConfig.timestamp_column}`]="{ value }">
@@ -320,17 +299,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("logs.cellActions.excludeTerm") }}
               </OContextMenuItem>
             </template>
-            <template v-if="assistantV2">
-              <OContextMenuSeparator />
-              <AiEntryButton
-                v-bind="traceRowDoor(contextCell.row, 'explain')"
-                appearance="menu-item"
-              />
-              <AiEntryButton
-                v-bind="traceRowDoor(contextCell.row, 'add_to_chat')"
-                appearance="menu-item"
-              />
-            </template>
+            <OContextMenuSeparator />
+            <AiEntryButton
+              v-bind="traceRowDoor(contextCell.row, 'explain')"
+              appearance="menu-item"
+            />
+            <AiEntryButton
+              v-bind="traceRowDoor(contextCell.row, 'add_to_chat')"
+              appearance="menu-item"
+            />
           </template>
         </OContextMenu>
       </div>
@@ -382,7 +359,6 @@ import OContextMenuSeparator from "@/lib/overlay/ContextMenu/OContextMenuSeparat
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TracesNoEventsState from "@/plugins/traces/TracesNoEventsState.vue";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import { traceRowBuild, tracesDoorBase } from "@/plugins/traces/tracesDoors";
 
@@ -413,8 +389,6 @@ interface Props {
   showCellActions?: boolean;
   /** Wrap long cell content instead of clipping it. Default: false. */
   wrap?: boolean;
-  /** Whether the AI copilot is enabled — gates the "Ask AI" empty-state button. */
-  aiEnabled?: boolean;
   /** Authoritative stream doc time range (µs) for the empty-state jump card. */
   streamDocTimeRange?: { min: number; max: number };
   /** Resolved query window (µs) for empty-state overlap detection. */
@@ -444,7 +418,6 @@ const props = withDefaults(defineProps<Props>(), {
   searchMode: "traces",
   showCellActions: true,
   wrap: false,
-  aiEnabled: false,
   streamDocTimeRange: undefined,
   queryWindowUs: undefined,
   scrollEl: null,
@@ -460,10 +433,8 @@ const emit = defineEmits<{
   "rows-per-page-change": [rowsPerPage: number];
   "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
   copy: [value: any];
-  "send-to-ai-chat": [value: string];
   "remove-filter": [];
   "jump-to-stream-data": [fromUs: number, toUs: number];
-  "ask-ai": [];
 }>();
 
 const copyToClipboard = (field: string, value: any) =>
@@ -518,8 +489,6 @@ const onRowLinkClick = (event: MouseEvent, row: any) => {
   event.preventDefault();
   emit("row-click", row);
 };
-
-const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 
 // ── Right-click cell actions ──────────────────────────────────────────────
 // Mirrors the logs table: the menu is anchored to the pointer so every cell can
@@ -604,20 +573,17 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
 
 const { searchObj, updatedLocalLogFilterField, loadLocalLogFilterField } = useTraces();
 
-const assistantV2 = isAssistantV2();
-const loadedOrg = assistantV2
-  ? useLoadedOrg(
-      () => props.hits,
-      () => store.state.selectedOrganization?.identifier ?? "",
-    )
-  : null;
+const loadedOrg = useLoadedOrg(
+  () => props.hits,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
 const traceRowDoor = (row: Record<string, unknown>, verb: "explain" | "add_to_chat") => ({
   verb,
   entryKind: "object_verb" as const,
-  boundOrg: loadedOrg?.value,
+  boundOrg: loadedOrg.value,
   objectKind: "trace" as const,
   label: t(verb === "explain" ? "assistant.entry.explainTrace" : "assistant.entry.addTrace"),
   tooltip: t(

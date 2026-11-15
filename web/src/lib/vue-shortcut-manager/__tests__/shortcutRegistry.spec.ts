@@ -1,8 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { computed, onScopeDispose } from "vue";
 
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -229,24 +228,6 @@ describe("shortcut cheatsheet OSS gating", () => {
   });
 });
 
-describe("aiChatToggle entry visibility", () => {
-  it("is hidden on OSS (the shortcut is never registered there)", () => {
-    expect(entryVisible("aiChatToggle", OSS)).toBe(false);
-  });
-
-  it("is hidden on cloud — the AI chat shortcut is enterprise-only", () => {
-    expect(entryVisible("aiChatToggle", CLOUD)).toBe(false);
-  });
-
-  it("is hidden on enterprise when ai_enabled is off (the handler no-ops)", () => {
-    expect(entryVisible("aiChatToggle", { ...ENTERPRISE, aiEnabled: false })).toBe(false);
-  });
-
-  it("is shown only on enterprise with ai_enabled on", () => {
-    expect(entryVisible("aiChatToggle", ENTERPRISE)).toBe(true);
-  });
-});
-
 describe("synthetics journey search shortcut", () => {
   it("registers syntheticsJourneyFocusSearch on /", () => {
     expect(getShortcutDef("syntheticsJourneyFocusSearch")).toMatchObject({
@@ -307,44 +288,7 @@ describe("row navigation entries (item 4a)", () => {
 });
 
 describe("assistant entries", () => {
-  const ASSISTANT_IDS = [
-    "assistantOpen",
-    "assistantClose",
-    "assistantHistory",
-    "assistantComposerSend",
-    "assistantComposerNewline",
-    "assistantComposerRecall",
-    "assistantGoToAnswer",
-    "editorTabFocusMode",
-  ];
-  const assistantPages = [
-    "shortcuts.pages.assistant",
-    "shortcuts.pages.assistantComposer",
-    "shortcuts.pages.queryEditor",
-  ];
-
-  // Earlier suites resolve the cached flag, so each case starts uncached.
-  beforeEach(() => {
-    resetAssistantV2ForTests();
-  });
-
-  afterEach(() => {
-    delete window.__O2_ASSISTANT_V2__;
-    resetAssistantV2ForTests();
-  });
-
-  it("leaves the cheatsheet unchanged with the flag off, on every edition", () => {
-    window.__O2_ASSISTANT_V2__ = false;
-    for (const caps of [OSS, ENTERPRISE, CLOUD]) {
-      for (const id of ASSISTANT_IDS) expect(entryVisible(id, caps), id).toBe(false);
-      for (const page of assistantPages) expect(visiblePages(caps).has(page), page).toBe(false);
-      expect(visibleModuleTitles(caps)).not.toContain("shortcuts.modules.assistant");
-    }
-    expect(entryVisible("aiChatToggle", ENTERPRISE)).toBe(true);
-  });
-
   it("shows the rows only while the assistant can chat, and never assistantClose", () => {
-    window.__O2_ASSISTANT_V2__ = true;
     expect(entryVisible("assistantOpen", ENTERPRISE)).toBe(true);
     expect(entryVisible("assistantOpen", { ...ENTERPRISE, assistantCanChat: false })).toBe(false);
     expect(entryVisible("assistantOpen", { ...ENTERPRISE, aiEnabled: false })).toBe(false);
@@ -405,15 +349,12 @@ describe("getShortcutDisplay (K1)", () => {
   });
 });
 
-describe("cheatsheet with the assistant flag on", () => {
+describe("cheatsheet with the assistant", () => {
   afterEach(() => {
-    delete window.__O2_ASSISTANT_V2__;
-    resetAssistantV2ForTests();
     document.body.innerHTML = "";
   });
 
   it("names the product through {product} and stops its capability reader on unmount", async () => {
-    window.__O2_ASSISTANT_V2__ = true;
     store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
     const wrapper = mount(ShortcutCheatsheet, {
       props: { open: true },
@@ -429,13 +370,7 @@ describe("cheatsheet with the assistant flag on", () => {
     expect(capabilityDisposed).toHaveBeenCalledTimes(1);
   });
 
-  it("hides the legacy AI chat toggle, which v2 never registers", () => {
-    window.__O2_ASSISTANT_V2__ = true;
-    expect(entryVisible("aiChatToggle", ENTERPRISE)).toBe(false);
-  });
-
   it("renders the Threads bar chord as modifiers plus a period, not a sequence", async () => {
-    window.__O2_ASSISTANT_V2__ = true;
     store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
     const wrapper = mount(ShortcutCheatsheet, {
       props: { open: true },

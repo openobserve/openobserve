@@ -27,6 +27,7 @@ vi.mock("@/composables/useCorrelatedLogs", () => ({
     loading: { value: false },
     error: { value: null },
     searchResults: { value: [] },
+    pagedResults: { value: [] },
     totalHits: { value: 0 },
     took: { value: 0 },
     currentFilters: { value: {} },

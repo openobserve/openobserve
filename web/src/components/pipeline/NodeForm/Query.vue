@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-right>
       <AiEntryButton
-        v-if="queryDock"
         appearance="toggle"
         verb="ask"
         entry-kind="editor_toggle"
@@ -40,23 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="ai-entry-scheduled-query-ask"
         @closed="queryDock.close"
       />
-      <OButton
-        v-else-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-        variant="ghost"
-        size="icon-toolbar"
-        @click="scheduledPipelineRef?.toggleAIChat()"
-        data-test="menu-link-ai-item"
-        :aria-label="t('menu.aiAssistant')"
-        class="bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 hover:shadow-md"
-        :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-gradient-ai-subtle!' : ''"
-      >
-        <img
-          alt=""
-          :src="scheduledPipelineRef?.getBtnLogo"
-          class="header-icon ai-icon opacity-70 transition-[transform] duration-[0.6s] ease-[ease]"
-          :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''"
-        />
-      </OButton>
       <div class="app-tabs-container flex items-center">
         <AppTabs
           data-test="scheduled-pipeline-tabs"
@@ -171,7 +153,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import DateTime from "@/components/DateTime.vue";
-import config from "@/aws-exports";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -184,7 +165,7 @@ import { makeQuerySchema, type QueryForm } from "./Query.schema";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { isAssistantV2, useAssistantDockToggle } from "@/composables/assistant/pure";
+import { useAssistantDockToggle } from "@/composables/assistant/pure";
 
 interface RouteCondition {
   column: string;
@@ -249,11 +230,10 @@ const props = defineProps({
 });
 
 const { t } = useI18nTyped();
-// The assistant's door loads only where the revamp renders it, never in the flag-off chunk.
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
-const queryDock = isAssistantV2() ? useAssistantDockToggle("scheduled_query") : null;
+const queryDock = useAssistantDockToggle("scheduled_query");
 
 const store = useStore();
 

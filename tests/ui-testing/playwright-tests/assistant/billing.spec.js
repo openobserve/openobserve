@@ -45,7 +45,6 @@ test.describe("assistant billing @edition", () => {
     test.skip(!process.env.O2_VITE_DEV, "edition rewrite needs the Vite dev server");
     harness = await loadHarness();
     state = harness.createMockState(overrides());
-    await harness.setFlag(context, true);
     await harness.installMocks(context, state);
     await mockBilling(context);
     await harness.login(page);

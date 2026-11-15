@@ -25,7 +25,6 @@ const store = vi.hoisted(() => ({
   state: { theme: "light", selectedOrganization: { identifier: "org-b" }, timezone: "UTC" },
 }));
 vi.mock("vuex", () => ({ useStore: () => store }));
-vi.mock("@/composables/assistant/flags", () => ({ isAssistantV2: () => true }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn().mockResolvedValue(true) }));
 vi.mock("@/composables/useLogs/searchState", () => ({
   searchState: () => ({ searchObj: { data: { stream: {}, datetime: {} }, meta: {} } }),

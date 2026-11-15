@@ -21,15 +21,12 @@ import { incidentsQuery } from "@/services/incidents.queries";
 import { alertRcaRuns } from "@/utils/incidents/rcaCell";
 
 /** The alert list's Follow in thread: which alerts fired into an open incident that has a run. */
-export function useAlertRcaFollow(
-  org: MaybeRefOrGetter<string>,
-  enabled: MaybeRefOrGetter<boolean>,
-) {
+export function useAlertRcaFollow(org: MaybeRefOrGetter<string>) {
   // The same first page of open incidents the threads bar reads, so both share one cached read.
   const open = useQuery(
     computed(() => ({
       ...incidentsQuery(toValue(org), "open", INCIDENT_PAGE, 0),
-      enabled: toValue(enabled) && !!toValue(org),
+      enabled: !!toValue(org),
     })),
   );
   const runs = computed(() => alertRcaRuns(open.data.value?.incidents ?? []));

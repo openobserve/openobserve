@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @close-column="handleCloseColumn"
             @column-order-change="handleColumnOrderChange"
             @update:expandedIds="onCorrelatedExpandedIdsChange"
-            v-bind="assistantV2 ? { focusToolbar: true } : {}"
+            focus-toolbar
           >
             <template
               v-for="col in tableColumns"
@@ -229,66 +229,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-hover-actions="{ row, column, active, menu }">
-              <template v-if="assistantV2">
-                <ODropdown v-if="menu">
-                  <template #trigger>
-                    <OButton
-                      variant="ghost"
-                      size="icon-sm"
-                      class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                      :aria-label="t('assistant.entry.rowActions')"
-                      data-test="correlated-logs-row-menu"
-                    >
-                      <OIcon name="more-vert" size="sm" />
-                    </OButton>
-                  </template>
-                  <AiEntryButton
-                    v-bind="correlatedRowDoor(row, 'explain')"
-                    appearance="menu-item"
-                  />
-                  <AiEntryButton
-                    v-bind="correlatedRowDoor(row, 'add_to_chat')"
-                    appearance="menu-item"
-                  />
-                </ODropdown>
-                <template v-else-if="active">
-                  <CellActions
-                    v-if="column.meta?.closable && row[column.id] != null"
-                    :column="column"
-                    :row="row"
-                    :selected-stream-fields="selectedFields"
-                    :hide-search-term-actions="hideSearchTermActions"
-                    :door-context="() => correlatedDoorBase(row)"
-                    @copy="handleCopy"
-                    @add-search-term="handleAddSearchTerm"
-                  />
-                  <AiEntryButton
-                    v-bind="correlatedRowDoor(row, 'explain')"
-                    appearance="toolbar-icon"
-                  />
-                  <AiEntryButton
-                    v-bind="correlatedRowDoor(row, 'add_to_chat')"
-                    appearance="toolbar-icon"
-                  />
+              <ODropdown v-if="menu">
+                <template #trigger>
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                    :aria-label="t('assistant.entry.rowActions')"
+                    data-test="correlated-logs-row-menu"
+                  >
+                    <OIcon name="more-vert" size="sm" />
+                  </OButton>
                 </template>
-              </template>
-              <template v-else>
-                <O2AIContextAddBtn
-                  v-if="active && column.id === correlatedTimestampCol"
-                  class="size-6!"
-                  :imageHeight="'14'"
-                  :imageWidth="'14'"
-                  @send-to-ai-chat="handleSendToAiChat(JSON.stringify(row))"
+                <AiEntryButton v-bind="correlatedRowDoor(row, 'explain')" appearance="menu-item" />
+                <AiEntryButton
+                  v-bind="correlatedRowDoor(row, 'add_to_chat')"
+                  appearance="menu-item"
                 />
+              </ODropdown>
+              <template v-else-if="active">
                 <CellActions
-                  v-else-if="active && column.meta?.closable && row[column.id] != null"
+                  v-if="column.meta?.closable && row[column.id] != null"
                   :column="column"
                   :row="row"
                   :selected-stream-fields="selectedFields"
                   :hide-search-term-actions="hideSearchTermActions"
+                  :door-context="() => correlatedDoorBase(row)"
                   @copy="handleCopy"
                   @add-search-term="handleAddSearchTerm"
-                  @send-to-ai-chat="handleSendToAiChat"
+                />
+                <AiEntryButton
+                  v-bind="correlatedRowDoor(row, 'explain')"
+                  appearance="toolbar-icon"
+                />
+                <AiEntryButton
+                  v-bind="correlatedRowDoor(row, 'add_to_chat')"
+                  appearance="toolbar-icon"
                 />
               </template>
             </template>
@@ -306,7 +282,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @add-search-term="handleAddSearchTerm"
                 @view-trace="handleViewTrace(row)"
                 @show-correlation="handleNestedCorrelation"
-                @send-to-ai-chat="handleSendToAiChat"
               />
             </template>
           </OTable>
@@ -405,8 +380,6 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OTable from "@/lib/core/Table/OTable.vue";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
-import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import { logRowBuild, rowKeyOf, type LogsDoorBase } from "@/plugins/logs/logsDoors";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
@@ -432,7 +405,6 @@ const props = defineProps<CorrelatedLogsProps>();
 
 // Emits
 const emit = defineEmits<{
-  sendToAiChat: [value: any];
   addSearchTerm: [field: string | number, fieldValue: string | number | boolean, action: string];
 }>();
 
@@ -1064,17 +1036,10 @@ const handleCopy = (log: any, copyAsJson: boolean = true) => {
   });
 };
 
-const handleSendToAiChat = (value: any) => {
-  emit("sendToAiChat", value);
-};
-
-const assistantV2 = isAssistantV2();
-const loadedOrg = assistantV2
-  ? useLoadedOrg(
-      () => pagedResults.value,
-      () => store.state.selectedOrganization?.identifier ?? "",
-    )
-  : null;
+const loadedOrg = useLoadedOrg(
+  () => pagedResults.value,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
@@ -1097,7 +1062,7 @@ const correlatedDoorBase = (row: Record<string, unknown>): LogsDoorBase => ({
 const correlatedRowDoor = (row: Record<string, unknown>, verb: "explain" | "add_to_chat") => ({
   verb,
   entryKind: "object_verb" as const,
-  boundOrg: loadedOrg?.value,
+  boundOrg: loadedOrg.value,
   objectKind: "log_row" as const,
   label: t(verb === "explain" ? "assistant.entry.explainLogRow" : "assistant.entry.addLogRow"),
   tooltip: t(

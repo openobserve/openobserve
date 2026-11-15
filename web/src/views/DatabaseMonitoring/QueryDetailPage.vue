@@ -149,14 +149,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Beside the statement, not in the page actions: the question is
                about THIS query, and the button has to sit where the artifact is
                for that to be obvious. -->
-          <AiEntryButton v-if="assistantV2" v-bind="queryFixDoor" />
+          <!-- Without the license the door hides, so the locked button keeps the feature in sight. -->
           <DbmSuggestFixButton
-            v-else
+            v-if="aiLock.locked.value"
             :label="t('dbm.ai.suggestFix')"
-            :tooltip="t('dbm.ai.suggestFixHint')"
             data-test="dbm-detail-suggest-fix"
-            @click="askAiForFix"
           />
+          <AiEntryButton v-else v-bind="queryFixDoor" />
         </div>
 
         <DbmQueryText
@@ -1302,8 +1301,6 @@ import {
   createDbmContextProvider,
   DBM_CONTEXT_KEY,
 } from "@/composables/contextProviders";
-import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { dbmFixDoor } from "@/components/dbm/dbmDoors";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import { DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
@@ -1392,13 +1389,8 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const tracesLock = useLicenseLock("traces");
+const aiLock = useLicenseLock("ai_assistant");
 const { getStreams } = useStreams(t);
-
-// This page is a route root, so MainLayout's `@sendToAiChat` binding is on it
-// directly — no re-emit chain needed.
-const emit = defineEmits<{
-  (e: "sendToAiChat", value: { query: string; autoSend: boolean }): void;
-}>();
 
 const { range, current, previous, refresh, setRange, queryParams } = useDbmScope(route.query);
 
@@ -3281,28 +3273,20 @@ const queryFixInput = () => {
   };
 };
 
-const askAiForFix = () => {
-  analytics.track("dbm_ai_fix_requested", { page: "query_detail" });
-  emit("sendToAiChat", { query: buildQueryFixPrompt(queryFixInput()), autoSend: true });
-};
-
-const assistantV2 = isAssistantV2();
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
 // The org the rows were loaded under, so a door left on screen after an org switch is refused.
-const loadedOrg = assistantV2
-  ? useLoadedOrg(
-      () => row.value,
-      () => store.state.selectedOrganization?.identifier ?? "",
-    )
-  : null;
+const loadedOrg = useLoadedOrg(
+  () => row.value,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
 const queryFixDoor = computed(() =>
   dbmFixDoor(
     { label: t("dbm.ai.suggestFix"), tooltip: t("dbm.ai.suggestFixHint") },
     () => ({ kind: "query", input: queryFixInput() }),
     store.state,
-    loadedOrg?.value,
+    loadedOrg.value,
   ),
 );
 

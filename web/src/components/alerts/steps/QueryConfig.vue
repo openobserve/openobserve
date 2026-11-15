@@ -1097,7 +1097,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query="localTab === 'sql' ? localSqlQuery : editorPromqlQuery"
                         editor-height="100%"
                         :disable-ai="!streamName"
-                        :placeholder="assistantV2 ? inlineEditorPlaceholder : undefined"
+                        :placeholder="inlineEditorPlaceholder"
                         :keywords="effectiveKeywords"
                         :suggestions="effectiveSuggestions"
                         :field-value-resolver="resolveFieldValues"
@@ -1105,18 +1105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @blur="onBlurInlineSqlEditor"
                         @update:query="handleInlineQueryUpdate"
                       />
-                    </div>
-                    <div
-                      v-if="
-                        !assistantV2 &&
-                        (localTab === 'sql' ? !localSqlQuery : !editorPromqlQuery) &&
-                        queryEditorPlaceholderFlag
-                      "
-                      class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
-                    >
-                      <span class="query-editor-placeholder-typewriter">{{
-                        inlineEditorPlaceholder
-                      }}</span>
                     </div>
                   </div>
 
@@ -1841,12 +1829,10 @@ import {
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { savedBrowserTimezone } from "@/utils/timezoneAliases";
-import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
@@ -2124,7 +2110,6 @@ export default defineComponent({
     });
 
     const onQueryEditorFocus = () => {
-      queryEditorPlaceholderFlag.value = false;
       _sqlOnFocus();
     };
 
@@ -2192,7 +2177,6 @@ export default defineComponent({
     );
 
     // Placeholder flags for inline editors (show image when empty + not focused)
-    const queryEditorPlaceholderFlag = ref(true);
     const vrlEditorPlaceholderFlag = ref(true);
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 
@@ -2248,24 +2232,12 @@ export default defineComponent({
           })
         : [],
     );
-    const promqlPlaceholderEnabled = computed(
-      () => localTab.value === "promql" && promqlSamples.value.length > 0,
+    // One static line names the language instead of typing samples out.
+    const inlineEditorPlaceholder = computed(() =>
+      localTab.value === "promql"
+        ? t("assistant.helper.editorPlaceholder.promql")
+        : sqlEditorPlaceholder.value,
     );
-    // The v2 path never types samples out: one static line names the language instead.
-    const { placeholder: promqlEditorPlaceholder } = isAssistantV2()
-      ? { placeholder: computed<string>(() => t("assistant.helper.editorPlaceholder.promql")) }
-      : useTypewriterPlaceholder(
-          computed(() => promqlSamples.value.map((s) => s.query)),
-          { enabled: promqlPlaceholderEnabled },
-        );
-    const inlineEditorPlaceholder = computed(() => {
-      if (isAssistantV2() && localTab.value === "promql") return promqlEditorPlaceholder.value;
-      return localTab.value === "promql" && promqlSamples.value.length
-        ? promqlEditorPlaceholder.value
-        : sqlEditorPlaceholder.value;
-    });
-
-    const assistantV2 = isAssistantV2();
 
     // Chips insert only into an EMPTY editor — silently replacing a
     // half-written query is the one way this feature makes someone angry.
@@ -2273,12 +2245,9 @@ export default defineComponent({
     const insertPromqlSample = (sample: { query: string }) => {
       if (!canInsertPromqlSample.value) return;
       onEditorPromqlUpdate(sample.query);
-      queryEditorPlaceholderFlag.value = false;
     };
 
     const onBlurInlineSqlEditor = async () => {
-      queryEditorPlaceholderFlag.value =
-        localTab.value === "sql" ? localSqlQuery.value === "" : editorPromqlQuery.value === "";
       if (localTab.value === "sql") {
         await _sqlOnBlur();
         emit("validate-sql");
@@ -3887,7 +3856,6 @@ export default defineComponent({
     // re-homed in useAlertForm.runImperativeQueryChecks (same messages).
 
     return {
-      assistantV2,
       raw,
       t,
       store,
@@ -4006,7 +3974,6 @@ export default defineComponent({
       filterCount,
       emitTriggerUpdate,
       getImageURL,
-      queryEditorPlaceholderFlag,
       vrlEditorPlaceholderFlag,
       vrlPlaceholder,
       onQueryEditorFocus,

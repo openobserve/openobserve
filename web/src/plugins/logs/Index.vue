@@ -65,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @showSearchHistory="showSearchHistoryfn"
               @extractPatterns="extractPatternsForCurrentQuery"
               @buildModeToggle="onBuildModeToggle"
-              @sendToAiChat="sendToAiChat"
               @filter-builder-growth="filterBuilderGrowth = $event"
             />
           </div>
@@ -136,15 +135,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @detected="onFirstDataDetected"
                       >
                         <LogsNoDataState
-                          :ai-enabled="isAiEnabled"
                           :alternatives-only="layout === 'panel'"
                           data-test="logs-search-no-streams-in-org-text"
-                          @ask-ai="onAskAiFixQuery"
                         >
                           <template v-if="layout === 'status'" #status>
                             <component :is="statusLine" />
                           </template>
-                          <template v-if="assistantV2" #ai-door>
+                          <template #ai-door>
                             <AiEntryButton v-bind="noStreamDoor" appearance="chip" />
                           </template>
                         </LogsNoDataState>
@@ -203,13 +200,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <LogsErrorState
                         :error-code="0"
                         :error-msg="searchObj.data.filterErrMsg"
-                        :ai-enabled="isAiEnabled"
-                        @ask-ai="onAskAiFixQuery"
                         @fix-query="onFixQuery"
                         @configure-stream="onConfigureStream"
                         @widen-range="onWidenRange"
                       >
-                        <template v-if="assistantV2" #ai-door>
+                        <template #ai-door>
                           <AiEntryButton v-bind="queryErrorDoor" appearance="chip" />
                         </template>
                       </LogsErrorState>
@@ -254,20 +249,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error-code="shownError.code"
                         :error-msg="shownError.msg"
                         :error-detail="shownError.detail"
-                        :ai-enabled="isAiEnabled"
                         :stream-name="searchObj.data.stream.selectedStream[0]"
                         :free-text-candidate="recoveryCards.freeTextCandidate"
                         :run-suggestion="recoveryCards.runSuggestion"
                         :filter-mode="!searchObj.meta.sqlMode"
                         :query="shownError.query"
-                        @ask-ai="onAskAiFixQuery"
                         @fix-query="onFixQuery"
                         @configure-stream="onConfigureStream"
                         @widen-range="onWidenRange"
                         @search-text="onSearchText"
                         @run-suggestion="onRunSuggestion"
                       >
-                        <template v-if="assistantV2" #ai-door>
+                        <template #ai-door>
                           <AiEntryButton v-bind="queryErrorDoor" appearance="chip" />
                         </template>
                       </LogsErrorState>
@@ -342,15 +335,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :editor-value="searchObj.data.editorValue"
                         :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
                         :date-type="searchObj.data.datetime.type || 'relative'"
-                        :ai-enabled="isAiEnabled"
                         :stream-doc-time-range="streamDocTimeRange"
                         :query-window-us="queryWindowUs"
                         :timezone="store.state.timezone"
                         @jump-to-stream-data="onJumpToStreamData"
                         @open-history="openSearchHistory"
-                        @ask-ai="onAskAiFixQuery"
                       >
-                        <template v-if="assistantV2" #ai-door>
+                        <template #ai-door>
                           <AiEntryButton v-bind="emptyResultDoor" appearance="chip" />
                         </template>
                       </LogsNoEventsState>
@@ -445,7 +436,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @update:scroll="getMoreData"
                           @update:recordsPerPage="getMoreDataRecordsPerPage"
                           @expandlog="toggleExpandLog"
-                          @send-to-ai-chat="sendToAiChat"
                           @run-query="searchData"
                           @jump-to-stream-data="onJumpToStreamData"
                           @open-mobile-fields="mobileFieldsOpen = true"
@@ -528,9 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.data.stream.streamLists.length == 0 &&
                   searchObj.loading == false
                 "
-                :ai-enabled="isAiEnabled"
                 data-test="logs-drill-down-no-streams-in-org-text"
-                @ask-ai="onAskAiFixQuery"
               />
               <LogsNoStreamState
                 v-else-if="
@@ -550,13 +538,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-drill-down-filter-error-message"
                 :error-code="0"
                 :error-msg="searchObj.data.filterErrMsg"
-                :ai-enabled="isAiEnabled"
-                @ask-ai="onAskAiFixQuery"
                 @fix-query="onFixQuery"
                 @configure-stream="onConfigureStream"
                 @widen-range="onWidenRange"
               >
-                <template v-if="assistantV2" #ai-door>
+                <template #ai-door>
                   <AiEntryButton v-bind="queryErrorDoor" appearance="chip" />
                 </template>
               </LogsErrorState>
@@ -566,14 +552,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :error-code="parseInt(searchObj.data.errorCode) || 0"
                 :error-msg="searchObj.data.errorMsg"
                 :error-detail="searchObj.data.errorDetail"
-                :ai-enabled="isAiEnabled"
                 :stream-name="searchObj.data.stream.selectedStream[0]"
-                @ask-ai="onAskAiFixQuery"
                 @fix-query="onFixQuery"
                 @configure-stream="onConfigureStream"
                 @widen-range="onWidenRange"
               >
-                <template v-if="assistantV2" #ai-door>
+                <template #ai-door>
                   <AiEntryButton v-bind="queryErrorDoor" appearance="chip" />
                 </template>
               </LogsErrorState>
@@ -627,15 +611,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :editor-value="searchObj.data.editorValue"
                 :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
                 :date-type="searchObj.data.datetime.type || 'relative'"
-                :ai-enabled="isAiEnabled"
                 :stream-doc-time-range="streamDocTimeRange"
                 :query-window-us="queryWindowUs"
                 :timezone="store.state.timezone"
                 @jump-to-stream-data="onJumpToStreamData"
                 @open-history="openSearchHistory"
-                @ask-ai="onAskAiFixQuery"
               >
-                <template v-if="assistantV2" #ai-door>
+                <template #ai-door>
                   <AiEntryButton v-bind="emptyResultDoor" appearance="chip" />
                 </template>
               </LogsNoEventsState>
@@ -697,7 +679,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LogsPermalinkDrawer
       @search-around="runSearchAround"
       @add-search-term="onPermalinkAddSearchTerm"
-      @send-to-ai-chat="sendToAiChat"
     />
   </div>
 </template>
@@ -722,7 +703,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
@@ -736,7 +717,6 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
-import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep, debounce } from "lodash-es";
 import {
   isSimpleSelectAllQuery,
@@ -855,7 +835,6 @@ import {
   resetRowSelection,
 } from "@/composables/useLogs/logsRowNav";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useAssistantPanelWidth } from "@/composables/assistant/pure";
 import {
   emptyResultBuild,
@@ -901,7 +880,6 @@ export default defineComponent({
     OBadge,
   },
   mixins: [MainLayoutCloudMixin],
-  emits: ["sendToAiChat"],
   methods: {
     setHistogramDate(date: any) {
       this.searchBarRef?.markZoom?.(date);
@@ -993,7 +971,7 @@ export default defineComponent({
       }
     },
   },
-  setup(props: any, { emit }: any) {
+  setup() {
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
@@ -1291,7 +1269,7 @@ export default defineComponent({
       [
         () => router.currentRoute.value.query.type,
         () => logsReapplyRequest.value.seq,
-        () => (isAssistantV2() ? router.currentRoute.value.query.t : undefined),
+        () => router.currentRoute.value.query.t,
       ],
       async ([type, seq, nonce], [prevType, prevSeq, prevNonce]) => {
         const requested = seq !== prevSeq;
@@ -2207,12 +2185,7 @@ export default defineComponent({
       onJumpToStreamData(result.rangeStart, result.rangeEnd);
     };
 
-    const isAiEnabled = computed(
-      () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
-    );
-
-    // Empty and error states get their own honest door; the legacy Ask AI stays in v-else.
-    const assistantV2 = isAssistantV2();
+    // Empty and error states get their own honest door.
     const doorBase = () => logsDoorBase(searchObj, store.state);
     const doorStreams = () => [...(searchObj.data.stream.selectedStream ?? [])];
     const noStreamDoor = computed(() => ({
@@ -2317,36 +2290,6 @@ export default defineComponent({
       searchObj.data.query = "";
       searchBarRef.value?.updateQuery?.();
       autoRun.engine.requestRun("run");
-    };
-
-    const onAskAiFixQuery = () => {
-      const sqlMode = searchObj.meta.sqlMode;
-      const queryContext = sqlMode ? searchObj.data.editorValue : searchObj.data.query;
-      const errorContext = searchObj.data.errorMsg
-        ? (() => {
-            const el = document.createElement("div");
-            el.innerHTML = searchObj.data.errorMsg;
-            const text = (el.textContent ?? "").trim();
-            return text ? ` Error: ${text}.` : "";
-          })()
-        : "";
-      // The prompt is model input, not screen copy — it stays English so the
-      // assistant reads the same wording regardless of the user's locale.
-      const modeContext = sqlMode
-        ? raw(`I am using SQL mode. Full query: ${queryContext || "(none)"}.`)
-        : raw(
-            `I am using filter mode (not SQL). The filter expression is: ${queryContext || "(none)"}. This is a WHERE-clause filter — not a full SQL query.`,
-          );
-      const outcome = errorContext
-        ? raw(`The query produced an error.${errorContext}`)
-        : raw(`The query ran successfully but returned no results.`);
-      emit(
-        "sendToAiChat",
-        raw(
-          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod ? describePeriod(searchObj.data.datetime.relativeTimePeriod) : "custom"}. Can you help me adjust the filter to get results?`,
-        ),
-        false,
-      );
     };
 
     const onFixQuery = () => {
@@ -4026,10 +3969,6 @@ export default defineComponent({
 
     // [END] Context Provider Setup
 
-    const sendToAiChat = (value: any, append: boolean = true) => {
-      emit("sendToAiChat", value, append);
-    };
-
     const clearAllTimeouts = () => {
       if (chartRedrawTimeout.value) {
         clearTimeout(chartRedrawTimeout.value);
@@ -4363,8 +4302,6 @@ export default defineComponent({
       onAutoIntervalTrigger,
       showSearchHistoryfn,
       openSearchHistory,
-      isAiEnabled,
-      assistantV2,
       noStreamDoor,
       emptyResultDoor,
       queryErrorDoor,
@@ -4376,7 +4313,6 @@ export default defineComponent({
       onDrillDownStreamChange,
       onWidenRange,
       onRemoveFilter,
-      onAskAiFixQuery,
       streamDocTimeRange,
       queryWindowUs,
       onJumpToStreamData,
@@ -4404,7 +4340,6 @@ export default defineComponent({
       isWithQuery,
       isStreamingEnabled,
       setCommunicationMethod,
-      sendToAiChat,
       processInterestingFiledInSQLQuery,
       removeFieldByName,
       dashboardPanelData,

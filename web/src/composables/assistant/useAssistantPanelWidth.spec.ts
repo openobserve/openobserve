@@ -16,7 +16,6 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, nextTick } from "vue";
-import { createStore } from "vuex";
 
 import * as breakpoint from "@/composables/useBreakpoint";
 
@@ -31,13 +30,11 @@ import {
   type AssistantPanelWidth,
 } from "./useAssistantPanelWidth";
 
-const { flag, runtime, lg } = vi.hoisted(() => ({
-  flag: { on: false },
+const { runtime, lg } = vi.hoisted(() => ({
   runtime: { current: null as any },
   lg: { value: true },
 }));
 
-vi.mock("./flags", () => ({ isAssistantV2: () => flag.on }));
 vi.mock("@/composables/useBreakpoint", async () => {
   const { computed, reactive } = await import("vue");
   const state = reactive(lg);
@@ -47,7 +44,7 @@ vi.mock("@/composables/useBreakpoint", async () => {
   };
 });
 
-function read(vuexState: Record<string, unknown> = {}): AssistantPanelWidth {
+function read(): AssistantPanelWidth {
   let width: AssistantPanelWidth | null = null;
   mount(
     defineComponent({
@@ -56,7 +53,6 @@ function read(vuexState: Record<string, unknown> = {}): AssistantPanelWidth {
         return () => h("div");
       },
     }),
-    { global: { plugins: [createStore({ state: () => vuexState })] } },
   );
   return width!;
 }
@@ -64,9 +60,9 @@ function read(vuexState: Record<string, unknown> = {}): AssistantPanelWidth {
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
+  // The widths below are worked out for a 64 rem (1024 px) window.
+  vi.stubGlobal("innerWidth", 1024);
   resetPanelWidthForTests();
-  vi.stubGlobal("innerWidth", 1280);
-  flag.on = false;
   (breakpoint as unknown as { __state: { value: boolean } }).__state.value = true;
 });
 
@@ -75,19 +71,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("useAssistantPanelWidth with the revamp off", () => {
-  it("returns the legacy flag-derived width, so the readers migrate once", () => {
-    expect(read({ isAiChatEnabled: false }).panelWidthRem.value).toBe(0);
-    const open = read({ isAiChatEnabled: true, isAiChatExpanded: false });
-    expect(open.panelWidthRem.value).toBe(20);
-    expect(open.placement.value).toBe("sidebar");
-    expect(read({ isAiChatEnabled: true, isAiChatExpanded: true }).panelWidthRem.value).toBe(40);
-  });
-});
-
-describe("useAssistantPanelWidth with the revamp on", () => {
+describe("useAssistantPanelWidth", () => {
   beforeEach(() => {
-    flag.on = true;
     runtime.current = fakeRuntime();
     setRuntimeHandle(runtime.current);
   });

@@ -760,23 +760,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`alert-list-${row.name}-more-options`"
                       />
                     </template>
-                    <template v-if="assistantV2">
-                      <AiEntryButton v-bind="alertDoor(row, 'explain')" appearance="menu-item" />
-                      <!-- An open incident of this alert already has a run: follow it rather than start another. -->
-                      <ODropdownItem
-                        v-if="alertRca.runFor(row.alert_id)"
-                        :icon-left="assistantGlyph.thread"
-                        :data-test="`alert-list-${row.name}-follow-in-thread`"
-                        @select="alertRca.followAlert(row.alert_id)"
-                      >
-                        {{ t("alerts.incidents.rcaRun.followInThread") }}
-                      </ODropdownItem>
-                      <AiEntryButton
-                        v-else
-                        v-bind="alertDoor(row, 'troubleshoot')"
-                        appearance="menu-item"
-                      />
-                    </template>
+                    <AiEntryButton v-bind="alertDoor(row, 'explain')" appearance="menu-item" />
+                    <!-- An open incident of this alert already has a run: follow it rather than start another. -->
+                    <ODropdownItem
+                      v-if="alertRca.runFor(row.alert_id)"
+                      :icon-left="assistantGlyph.thread"
+                      :data-test="`alert-list-${row.name}-follow-in-thread`"
+                      @select="alertRca.followAlert(row.alert_id)"
+                    >
+                      {{ t("alerts.incidents.rcaRun.followInThread") }}
+                    </ODropdownItem>
+                    <AiEntryButton
+                      v-else
+                      v-bind="alertDoor(row, 'troubleshoot')"
+                      appearance="menu-item"
+                    />
                     <ODropdownItem
                       class="md:hidden"
                       :disabled="!!alertStateLoadingMap[row.uuid] || anomalyRowLocked(row)"
@@ -1367,7 +1365,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { alertDetailQuery } from "@/services/alerts.queries";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import { alertBuild } from "@/components/alerts/alertDoors";
 import { alertsListQuery } from "@/services/alerts.queries";
@@ -1611,11 +1608,10 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18nTyped();
 
-    const assistantV2 = isAssistantV2();
     const alertDoor = (row: Record<string, any>, verb: "explain" | "troubleshoot") => ({
       verb,
       entryKind: "object_verb" as const,
-      boundOrg: loadedOrg?.value,
+      boundOrg: loadedOrg.value,
       objectKind: "alert" as const,
       label: t(
         verb === "explain" ? "assistant.entry.explainAlert" : "assistant.entry.troubleshootAlert",
@@ -1631,10 +1627,7 @@ export default defineComponent({
           : ("ai-entry-alert-troubleshoot" as const),
       build: alertBuild(() => ({ ...row, id: row.alert_id ?? row.id }), verb, store.state),
     });
-    const alertRca = useAlertRcaFollow(
-      () => store.state.selectedOrganization?.identifier ?? "",
-      assistantV2,
-    );
+    const alertRca = useAlertRcaFollow(() => store.state.selectedOrganization?.identifier ?? "");
     const { lgUp } = useBreakpoint();
 
     // On-call is separately gated, so the column and its lookup vanish with it
@@ -1746,18 +1739,10 @@ export default defineComponent({
     const isSubmitting = ref(false);
 
     // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
-    const windowWidth = ref(window.innerWidth);
-    const onWindowResize = () => {
-      windowWidth.value = window.innerWidth;
-    };
-    // Pinned beside the list, the panel takes width; the revamp measures `<main>` instead of guessing from the window.
+    // Pinned beside the list, the panel takes width; measure `<main>`, not the window.
     const { panelWidthRem, mainWidthPx } = useAssistantPanelWidth();
     const isCompactToolbar = computed(
-      () =>
-        panelWidthRem.value > 0 &&
-        (assistantV2
-          ? mainWidthPx.value / 16 <= COMPACT_TOOLBAR_MAIN_REM
-          : windowWidth.value <= 1440),
+      () => panelWidthRem.value > 0 && mainWidthPx.value / 16 <= COMPACT_TOOLBAR_MAIN_REM,
     );
 
     const showImportAlertDialog = ref(false);
@@ -1848,12 +1833,7 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      window.addEventListener("resize", onWindowResize);
       void fetchOnCallTeams();
-    });
-
-    onBeforeUnmount(() => {
-      window.removeEventListener("resize", onWindowResize);
     });
 
     // Anomaly detection needs BOTH an entitled build (backend compiled with
@@ -2364,12 +2344,21 @@ export default defineComponent({
             return write && write.seq >= requestStart ? { ...r, enabled: write.enabled } : r;
           })
         : rows;
-    const loadedOrg = assistantV2
-      ? useLoadedOrg(
-          () => displayedAlerts.value,
-          () => store.state.selectedOrganization?.identifier ?? "",
-        )
-      : null;
+    const loadedOrg = useLoadedOrg(
+      () => displayedAlerts.value,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
+    const levelFilterLabel = computed<I18nText>(() =>
+      t("alerts.levelFilter", {
+        level: (levelFilter.value === "critical"
+          ? t("alerts.levelCritical")
+          : t("alerts.levelWarning")
+        ).toLowerCase(),
+      }),
+    );
+    const clearLevelFilter = () => {
+      levelFilter.value = null;
+    };
     const onStatSelect = (key: string) => {
       levelFilter.value = null;
       stateFilters.value = toggleFilterKey(stateFilters.value, key, "total");
@@ -5036,7 +5025,6 @@ export default defineComponent({
     ]);
 
     return {
-      assistantV2,
       alertDoor,
       alertRca,
       assistantGlyph,

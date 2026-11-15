@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="
       isEdit ? t('regex_patterns.edit_regex_pattern') : t('regex_patterns.create_regex_pattern')
     "
-    :width="isFullScreen ? 100 : store.state.isAiChatEnabled || dockOpen ? 70 : 40"
+    :size="isFullScreen ? 'full' : dockOpen ? 'xxl' : 'lg'"
     :primary-button-label="
       isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')
     "
@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div class="flex items-center gap-2">
         <AiEntryButton
-          v-if="docked"
           appearance="toggle"
           verb="ask"
           entry-kind="editor_toggle"
@@ -49,24 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @closed="docked.dock.close"
         />
         <OButton
-          v-else-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-          variant="ghost"
-          size="icon-toolbar"
-          @click="toggleAIChat"
-          data-test="add-regex-pattern-open-close-ai-btn"
-          :aria-label="t('menu.aiAssistant')"
-          class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
-          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          @mouseenter="isHovered = true"
-          @mouseleave="isHovered = false"
-        >
-          <img
-            alt=""
-            :src="getBtnLogo"
-            class="header-icon [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
-          />
-        </OButton>
-        <OButton
           :aria-label="isFullScreen ? t('common.exitFullscreen') : t('common.fullscreen')"
           data-test="add-regex-pattern-fullscreen-btn"
           variant="ghost"
@@ -78,13 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <!-- form inputs starts here -->
-    <div :ref="docked ? docked.dockSlot : undefined" class="flex h-full w-full">
-      <div
-        :class="[
-          store.state.isAiChatEnabled ? (isFullScreen ? 'w-[75%] ps-2' : 'w-[65%] ps-2') : 'w-full',
-          dockOpen ? 'min-h-0 min-w-0 overflow-y-auto pe-2' : '',
-        ]"
-      >
+    <div :ref="docked.dockSlot" class="flex h-full w-full">
+      <div class="w-full" :class="dockOpen ? 'min-h-0 min-w-0 overflow-y-auto pe-2' : ''">
         <OForm
           id="add-regex-pattern-form"
           ref="addRegexPatternForm"
@@ -131,27 +107,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("settings.addRegexPattern.regexPatternLabel")
                 }}</span>
                 <AiLabel
-                  v-if="docked?.proposal.label.value"
+                  v-if="docked.proposal.label.value"
                   :state="docked.proposal.label.value"
                   @revert="docked.proposal.revert"
                   @ask-again="docked.dock.askAgain"
                 />
-                <OButton
-                  v-else-if="
-                    !docked && config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
-                  "
-                  variant="ghost"
-                  size="sm"
-                  @click="toggleAIChat"
-                >
-                  <img alt="" :src="goToAILogo" class="me-1 h-5 w-5" />
-                  <span class="text-brand-indigo flex items-center gap-1 text-sm">
-                    {{ t("settings.addRegexPattern.tryAiAssistant") }}
-                  </span>
-                  <OIcon size="sm" name="arrow-right-alt" class="text-brand-indigo ms-1 h-5 w-5" />
-                </OButton>
               </div>
-              <div ref="editorArea" :class="['regex-pattern-input', docked ? 'relative' : '']">
+              <div ref="editorArea" :class="['regex-pattern-input', 'relative']">
                 <AssistantDiffBlock
                   v-if="docked?.proposal.pending.value"
                   :key="docked.proposal.pending.value.id"
@@ -254,21 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OForm>
       </div>
-      <AssistantDock v-if="docked" :host="docked.adapter" />
-      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-      <div
-        class="ms-2 max-w-full"
-        v-else-if="store.state.isAiChatEnabled"
-        style="width: 35%; min-width: 4.6875rem; height: calc(100vh - 90px) !important"
-      >
-        <O2AIChat
-          :aiChatInputContext="inputContext"
-          style="height: calc(100vh - 90px) !important"
-          :is-open="store.state.isAiChatEnabled"
-          @close="store.state.isAiChatEnabled = false"
-        />
-        <!-- eslint-enable local/no-hardcoded-px -->
-      </div>
+      <AssistantDock :host="docked.adapter" />
     </div>
     <EditorDraftDialogs :draft="regexDraft" />
   </ODrawer>
@@ -278,9 +226,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineAsyncComponent, defineComponent, ref, watch, computed, nextTick } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
-import useTheme from "@/composables/useTheme";
-import config from "@/aws-exports";
-import { getImageURL } from "@/utils/zincutils";
 import FullViewContainer from "../functions/FullViewContainer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -289,7 +234,6 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import regexPatternService from "@/services/regex_pattern";
-import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -299,7 +243,6 @@ import { makeAddRegexPatternSchema, type AddRegexPatternForm } from "./AddRegexP
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import {
-  isAssistantV2,
   useAssistantLeaveGuard,
   useDockedEditor,
   type DockedEditor,
@@ -340,7 +283,6 @@ export default defineComponent({
     OSeparator,
     OBanner,
     FullViewContainer,
-    O2AIChat,
     OButton,
     ODrawer,
     OSpinner,
@@ -354,9 +296,6 @@ export default defineComponent({
     const { t } = useI18nTyped();
 
     const store = useStore();
-    const { isDark } = useTheme();
-
-    const isHovered = ref(false);
 
     const isFullScreen = ref(false);
 
@@ -367,8 +306,6 @@ export default defineComponent({
     const isPatternValid = ref(false);
 
     const queryEditorRef = ref<any>(null);
-
-    const inputContext = ref("");
 
     // Ref to the <OForm>; used to read its live values (the form owns name/pattern).
     const addRegexPatternForm = ref<any>(null);
@@ -516,49 +453,12 @@ export default defineComponent({
       outputString: false,
     });
 
-    const seedFromProps = () => {
-      // name/pattern/description are form-owned — seeded by `:default-values`
-      // (addRegexPatternDefaults) when the drawer body remounts on open. Here we
-      // only handle the "from logs" prefill of the non-form test string.
-      if (
-        store.state.organizationData.regexPatternPrompt &&
-        router.currentRoute.value.query.from == "logs"
-      ) {
-        inputContext.value = store.state.organizationData.regexPatternPrompt;
-      }
-    };
-
-    watch(
-      () => props.open,
-      (v) => {
-        if (v) seedFromProps();
-      },
-      { immediate: true },
-    );
-
     // Watch for pattern changes to update highlighting
     watch(patternValue, (newPattern) => {
       if (testStringValue.value && queryEditorRef.value) {
         queryEditorRef.value.highlightRegexMatches(newPattern?.trim());
       }
     });
-
-    const getBtnLogo = computed(() => {
-      if (isHovered.value || store.state.isAiChatEnabled) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-      return isDark.value
-        ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon_gradient.svg");
-    });
-    const goToAILogo = computed(() => {
-      return getImageURL("images/common/ai_icon_primary.svg");
-    });
-    const toggleAIChat = () => {
-      const isEnabled = !store.state.isAiChatEnabled;
-      store.dispatch("setIsAiChatEnabled", isEnabled);
-      window.dispatchEvent(new Event("resize"));
-    };
 
     // The validated `value` from @submit is the source of truth for name/pattern
     // (the schema already gated it). `description` is the non-form local. OForm
@@ -641,48 +541,44 @@ export default defineComponent({
       props.open &&
       (patternValue.value !== addRegexPatternDefaults.value.pattern ||
         testStringValue.value !== (addRegexPatternDefaults.value.testString ?? ""));
-    const docked: DockedEditor | null = isAssistantV2()
-      ? useDockedEditor(
-          {
-            id: "regex",
-            objectKind: "regex",
-            objectTitle: () =>
-              patternName()
-                ? t("assistant.editor.title.regex", { name: raw(patternName()) })
-                : t("assistant.editor.title.regexNew"),
-            language: () => "regex",
-            getBuffer: () => patternValue.value ?? "",
-            getContext: () => ({
-              currentQuery: patternValue.value ?? "",
-              ...(testStringValue.value && {
-                regexTestInput: testStringValue.value.slice(0, 2000),
-              }),
-            }),
-            isDirty: regexDirty,
-            run: () => void testStringOutput(),
-            focusEditor: () => editorArea.value?.querySelector<HTMLElement>("textarea")?.focus(),
-            write(text) {
-              addRegexPatternForm.value?.form?.setFieldValue("pattern", text);
-              patternValue.value = text;
-            },
-            area: () => editorArea.value,
-            dockRowRem: () => (window.innerWidth * (isFullScreen.value ? 1 : 0.7)) / 16,
-          },
-          { active: () => props.open },
-        )
-      : null;
-    const dockOpen = computed(() => !!docked?.dock.isOpen.value);
+    const docked: DockedEditor = useDockedEditor(
+      {
+        id: "regex",
+        objectKind: "regex",
+        objectTitle: () =>
+          patternName()
+            ? t("assistant.editor.title.regex", { name: raw(patternName()) })
+            : t("assistant.editor.title.regexNew"),
+        language: () => "regex",
+        getBuffer: () => patternValue.value ?? "",
+        getContext: () => ({
+          currentQuery: patternValue.value ?? "",
+          ...(testStringValue.value && {
+            regexTestInput: testStringValue.value.slice(0, 2000),
+          }),
+        }),
+        isDirty: regexDirty,
+        run: () => void testStringOutput(),
+        focusEditor: () => editorArea.value?.querySelector<HTMLElement>("textarea")?.focus(),
+        write(text) {
+          addRegexPatternForm.value?.form?.setFieldValue("pattern", text);
+          patternValue.value = text;
+        },
+        area: () => editorArea.value,
+        dockRowRem: () => (window.innerWidth * (isFullScreen.value ? 1 : 0.7)) / 16,
+      },
+      { active: () => props.open },
+    );
+    const dockOpen = computed(() => !!docked.dock.isOpen.value);
     watch(
       () => props.open,
-      (open) => !open && docked?.proposal.clear(),
+      (open) => !open && docked.proposal.clear(),
     );
-    if (docked)
-      useAssistantLeaveGuard({
-        host: "regex",
-        isDirty: regexDirty,
-        name: () =>
-          patternName() ? raw(patternName()) : t("assistant.shell.leaveGuardThisPattern"),
-      });
+    useAssistantLeaveGuard({
+      host: "regex",
+      isDirty: regexDirty,
+      name: () => (patternName() ? raw(patternName()) : t("assistant.shell.leaveGuardThisPattern")),
+    });
 
     const closeAddRegexPatternDialog = () => {
       emit("close");
@@ -710,10 +606,6 @@ export default defineComponent({
       raw,
       t,
       store,
-      config,
-      getBtnLogo,
-      isHovered,
-      toggleAIChat,
       isFullScreen,
       expandState,
       testStringValue,
@@ -725,8 +617,6 @@ export default defineComponent({
       testStringOutput,
       outlinedLightbulb: "lightbulb",
       testLoading,
-      goToAILogo,
-      inputContext,
       closeAddRegexPatternDialog,
       handleClose,
       guardClose,

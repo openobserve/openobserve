@@ -1004,7 +1004,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :hide-search-term-actions="true"
                     :hide-dimension-filters="true"
                     :hide-reset-filters-button="true"
-                    @sendToAiChat="handleSendToAiChat"
                   />
                 </div>
               </div>
@@ -2395,10 +2394,6 @@ export default defineComponent({
       window.removeEventListener("keydown", handleEscapeKey);
     });
 
-    const handleSendToAiChat = (value: any, append: boolean = true) => {
-      emit("sendToAiChat", value, append);
-    };
-
     /** The one ack's toast for an acknowledge or unacknowledge; `null` for any other change. */
     const statusToastOf = (
       status: "open" | "acknowledged" | "resolved",
@@ -2875,7 +2870,6 @@ export default defineComponent({
       correlationLockedReason,
       isCorrelationTab,
       close,
-      handleSendToAiChat,
       acknowledgeIncident,
       resolveIncident,
       reopenIncident,

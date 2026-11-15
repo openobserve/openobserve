@@ -14,12 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, effectScope, ref, watch, type ComputedRef, type EffectScope } from "vue";
-import { useStore } from "vuex";
 
 import useBreakpoint from "@/composables/useBreakpoint";
 
 import type { Placement } from "./assistantStore.types";
-import { isAssistantV2 } from "./flags";
 import { openDockWidthRem } from "./hostAdapter";
 import { ensureRuntime, runtimeHandle } from "./runtimeHandle";
 import { sidebarWidthFor } from "./sidebarWidth";
@@ -54,11 +52,10 @@ export interface AssistantPanelWidth {
   placement: ComputedRef<Placement["kind"]>;
 }
 
-/** The width the assistant takes from the page; the legacy flag-derived width while the revamp is off. */
+/** The width the assistant takes from the page. */
 export function useAssistantPanelWidth(): AssistantPanelWidth {
   observeMain();
   const mainWidthPx = computed(() => mainWidth.value);
-  if (!isAssistantV2()) return legacyWidth(mainWidthPx);
   const handle = runtimeHandle();
   // A width reader shown before any assistant surface builds the runtime, out of its own chunk.
   if (!handle.value) void ensureRuntime();
@@ -119,19 +116,6 @@ export function resetPanelWidthForTests(): void {
   signalScope = null;
   pendingSignal = false;
   viewportWidth.value = typeof window === "undefined" ? 0 : window.innerWidth;
-}
-
-// Flag off: `AlertList`, `FilterGroup` and the Logs splitter keep reading the flag's 25 % / 50 % until cutover.
-function legacyWidth(mainWidthPx: ComputedRef<number>): AssistantPanelWidth {
-  const vuex = useStore();
-  const enabled = computed(() => !!vuex?.state.isAiChatEnabled);
-  return {
-    panelWidthRem: computed(() =>
-      enabled.value ? viewportRem() * (vuex.state.isAiChatExpanded ? 0.5 : 0.25) : 0,
-    ),
-    mainWidthPx,
-    placement: computed(() => (enabled.value ? "sidebar" : "hidden")),
-  };
 }
 
 // One watcher per page, however many readers: a change of the panel's width signals once.

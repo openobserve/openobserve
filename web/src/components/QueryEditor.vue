@@ -175,7 +175,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { assistantFocusCard, focusDockComposer } from "@/composables/assistant";
 import type { QueryEditorAssistant } from "@/composables/assistant/pure";
 
@@ -300,13 +299,12 @@ const editorRef = ref<any>(null);
 const editorFocused = ref(false);
 
 // Monaco keeps Ctrl+I from the global chord, so a pending card or open dock is focused here; otherwise Monaco suggests.
-const assistantChord =
-  isAssistantV2() && props.assistant
-    ? () => {
-        const id = props.assistant?.id;
-        return assistantFocusCard() || (!!id && focusDockComposer(id));
-      }
-    : undefined;
+const assistantChord = props.assistant
+  ? () => {
+      const id = props.assistant?.id;
+      return assistantFocusCard() || (!!id && focusDockComposer(id));
+    }
+  : undefined;
 
 // AI Input Bar state
 const aiInputText = ref("");
@@ -317,7 +315,7 @@ const aiStatusText = ref("");
 const currentSessionId = ref<string | null>(null);
 const currentAbortController = ref<AbortController | null>(null);
 
-// Chat history tracking (shared IndexedDB with O2AIChat)
+// Chat history tracking (shared IndexedDB with the assistant)
 const { saveToHistory } = useChatHistory(
   () => store.state.userInfo.email ?? "",
   () => store.state.selectedOrganization.identifier ?? "",
@@ -472,7 +470,7 @@ const handleAIGenerate = async () => {
       const generatedQuery = editorRef.value.refusalNotice || editorRef.value.getValue?.() || "";
       chatMessages.value.push({ role: "assistant", content: generatedQuery });
 
-      // Save to IndexedDB (shared with O2AIChat history)
+      // Save to IndexedDB (shared with the assistant's history)
       const savedId = await saveToHistory(
         chatMessages.value,
         currentSessionId.value!,

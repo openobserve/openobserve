@@ -18,11 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      cell opens the incident on its Analysis tab; "Analyze" starts a run instead. -->
 <template>
   <div
-    :class="[
-      'group flex min-w-0 cursor-pointer items-center',
-      assistantV2 ? 'flex-nowrap gap-1' : 'gap-1.5',
-    ]"
-    :data-o-tooltip-off="assistantV2 || undefined"
+    class="group flex min-w-0 cursor-pointer flex-nowrap items-center gap-1"
+    data-o-tooltip-off
     data-test="incident-ai-analysis-cell"
     @click.stop="emit('open')"
   >
@@ -40,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
     <template v-else>
       <OTag
-        v-if="assistantV2"
         :variant="CHIP_VARIANT[model.tone]"
         size="sm"
         :dot="!model.spinner && !model.locked"
@@ -66,44 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <OTooltip overflow-only :content="chipText" />
       </OTag>
-      <template v-else>
-        <OBadge
-          :variant="RCA_BADGE_VARIANT[model.tone]"
-          size="sm"
-          :dot="!model.spinner && !model.locked"
-          clickable
-          :aria-describedby="model.detail || model.rerunNote ? detailId : undefined"
-          class="max-w-full min-w-0"
-          :data-tone="model.tone"
-          data-test="incident-ai-analysis-label"
-          @click.stop="emit('open')"
-        >
-          <template v-if="model.spinner" #icon>
-            <OSpinner size="xs" data-test="incident-ai-analysis-spinner" />
-          </template>
-          <template v-else-if="model.locked" #icon>
-            <OIcon name="lock" size="xs" class="lock-chip" data-test="incident-ai-analysis-lock" />
-          </template>
-          {{ model.label }}
-        </OBadge>
-        <span
-          v-if="model.detail || model.rerunNote"
-          :id="detailId"
-          class="text-text-secondary flex max-w-full min-w-0 gap-1 truncate text-xs"
-          :title="detailTitle"
-          data-test="incident-ai-analysis-detail"
-        >
-          <OTruncatedText v-if="model.detail">{{ model.detail }}</OTruncatedText>
-          <span v-if="model.detail && model.rerunNote" aria-hidden="true">·</span>
-          <!-- A newer run did not finish; the result shown is the earlier one. -->
-          <span
-            v-if="model.rerunNote"
-            class="text-status-warning-text truncate"
-            data-test="incident-ai-analysis-rerun-note"
-            >{{ model.rerunNote }}</span
-          >
-        </span>
-      </template>
       <OButton
         v-if="model.showAnalyzeOnHover"
         variant="ghost-primary"
@@ -131,30 +89,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, useId, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { isAxiosError } from "axios";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Incident } from "@/services/incidents";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRcaTrigger } from "@/composables/useRcaTrigger";
-import {
-  RCA_BADGE_VARIANT,
-  rcaCellModel,
-  rcaFollowTarget,
-  type RcaCellTone,
-} from "@/utils/incidents/rcaCell";
+import { rcaCellModel, rcaFollowTarget, type RcaCellTone } from "@/utils/incidents/rcaCell";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { useRcaFollow } from "@/components/ai-assistant/shell/rcaFollow";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
@@ -191,9 +141,6 @@ const { requestRca } = useRcaTrigger();
 const timezone = useViewerTimezone();
 const aiLock = useLicenseLock("ai_assistant");
 
-// Only the revamped assistant mounts a host that can follow a run.
-const assistantV2 = isAssistantV2();
-
 // The list clock ticks every 30 s, too coarse for a seconds label, so a stage-less live run ticks its own.
 const ownNow = ref(0);
 let ownTimer: ReturnType<typeof setInterval> | undefined;
@@ -202,10 +149,7 @@ const stopOwnClock = () => {
   ownTimer = undefined;
 };
 watch(
-  () =>
-    assistantV2 &&
-    props.incident.rca?.state === "running" &&
-    !props.incident.rca.summary.stage_index,
+  () => props.incident.rca?.state === "running" && !props.incident.rca.summary.stage_index,
   (ticking) => {
     stopOwnClock();
     if (!ticking) return;
@@ -222,7 +166,7 @@ const model = computed(() =>
     lockedReason: aiLock.locked.value ? aiLock.lockedReason.value : undefined,
     now: Math.max(props.now, ownNow.value),
     timezone: timezone.value,
-    namedBand: assistantV2,
+    namedBand: true,
   }),
 );
 
@@ -233,21 +177,13 @@ const chipText = computed(() =>
 const starting = ref(false);
 
 const followTarget = computed(() =>
-  assistantV2 ? rcaFollowTarget(props.incident, store.state.selectedOrganization.identifier) : null,
+  rcaFollowTarget(props.incident, store.state.selectedOrganization.identifier),
 );
 const follow = (event: MouseEvent) => {
   const target = followTarget.value;
   // The assistant runtime is built on first use, so a list that never follows a run never builds it.
   if (target) useRcaFollow().follow(target, event.currentTarget as HTMLElement | null);
 };
-
-// The badge's accessible name is its visible label; the detail describes it.
-// The detail truncates in a narrow column; its full words, spaced, stay one hover away.
-const detailTitle = computed(
-  () => [model.value.detail, model.value.rerunNote].filter(Boolean).join(" · ") || undefined,
-);
-
-const detailId = `${useId()}-rca-detail`;
 
 // Spawned path (`reanalysis=true`, 202): the run continues on the server.
 const analyze = async () => {

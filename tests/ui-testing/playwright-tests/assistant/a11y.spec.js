@@ -35,7 +35,6 @@ test.describe("assistant accessibility", () => {
     harness = await loadHarness();
     a11y = await loadA11y();
     state = harness.createMockState(overrides);
-    await harness.setFlag(context, true);
     // Once per tab, so a flow that switches the theme and reloads keeps the new one.
     await context.addInitScript((value) => {
       if (sessionStorage.getItem("o2-a11y-theme-set")) return;

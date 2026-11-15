@@ -33,7 +33,6 @@ test.describe("assistant gates", () => {
     state = harness.createMockState(
       typeof overrides === "function" ? overrides() : overrides,
     );
-    await harness.setFlag(context, true);
     await harness.installMocks(context, state);
     await harness.login(page);
     assistant = new AssistantPage(page);

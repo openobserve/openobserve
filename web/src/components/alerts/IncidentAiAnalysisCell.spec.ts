@@ -40,7 +40,6 @@ import { aiCreditsNotice } from "@/utils/aiCredits";
 import type { TranslateFn } from "@/types/i18n";
 import IncidentAiAnalysisCell from "./IncidentAiAnalysisCell.vue";
 import { rcaSummary } from "@/test/unit/fixtures/rcaThread";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 
 const triggerRca = vi.mocked(incidentsService.triggerRca);
 
@@ -224,17 +223,11 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
       global: { plugins: [store] },
     });
     const badge = wrapper.get('[data-test="incident-ai-analysis-label"]');
-    expect(badge.text()).toBe("Not analyzed");
+    expect(badge.text()).toContain("Not analyzed");
     expect(badge.attributes("data-tone")).toBe("warn");
     expect(wrapper.get('[data-test="incident-ai-analysis-detail"]').text()).toBe(
-      "The organization had reached its AI analysis limit.",
+      "· The organization had reached its AI analysis limit.",
     );
-    // The cell is narrow, so a cut detail must still be readable in full.
-    expect(
-      wrapper
-        .find('[data-test="incident-ai-analysis-detail"] [data-test="o-truncated-text"]')
-        .exists(),
-    ).toBe(true);
     expect(wrapper.find('[data-test="incident-ai-analysis-hover-analyze-btn"]').exists()).toBe(
       true,
     );
@@ -242,46 +235,7 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
     expect(wrapper.text()).not.toContain("quota_exceeded");
   });
 
-  it("the state badge is named by its visible label and described by the detail", () => {
-    const now = Date.now();
-    const failedRerun = {
-      ...incident,
-      rca: {
-        run_id: "run-2",
-        state: "failed",
-        stale: false,
-        started_at: (now - 120_000) * 1000,
-        updated_at: (now - 60_000) * 1000,
-        outcome: null,
-        confidence: null,
-        summary: {
-          detail: "Agent unavailable",
-          previous: { run_id: "run-1", outcome: null, confidence: null, ended_at: 0 },
-        },
-      },
-    } as unknown as Incident; // only the summary fields the cell reads
-    const wrapper = mount(IncidentAiAnalysisCell, {
-      props: { incident: failedRerun, rcaEnabled: true, now },
-      global: { plugins: [store] },
-    });
-
-    const badge = wrapper.get('[data-test="incident-ai-analysis-label"]');
-    // No fixed aria-label: the accessible name is the visible state label.
-    expect(badge.attributes("aria-label")).toBeUndefined();
-    expect(badge.text()).toContain("Analyzed");
-    const detail = wrapper.get('[data-test="incident-ai-analysis-detail"]');
-    expect(badge.attributes("aria-describedby")).toBe(detail.attributes("id"));
-    expect(detail.text()).toContain("re-run failed");
-  });
-
   describe("v7: Follow in thread", () => {
-    const setAssistantFlag = (on: boolean | undefined) => {
-      window.__O2_ASSISTANT_V2__ = on;
-      resetAssistantV2ForTests();
-    };
-    beforeEach(() => setAssistantFlag(true));
-    afterEach(() => setAssistantFlag(undefined));
-
     const mountWith = (rca: Incident["rca"]) =>
       mount(IncidentAiAnalysisCell, {
         props: { incident: { ...incident, rca }, rcaEnabled: true, now: Date.now() },
@@ -407,35 +361,7 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
         expect(chip()).toContain("re-run · 8s");
         wrapper.unmount();
       });
-
-      it("with the flag off, follows only the list's clock, as before", async () => {
-        setAssistantFlag(false);
-        const wrapper = mount(IncidentAiAnalysisCell, {
-          props: {
-            incident: { ...incident, rca: runningRerun(5_000) },
-            rcaEnabled: true,
-            now: Date.now(),
-          },
-          global: { plugins: [store, i18n] },
-        });
-        const detail = () => wrapper.get('[data-test="incident-ai-analysis-detail"]').text();
-
-        expect(detail()).toBe("re-run · 5s");
-        await vi.advanceTimersByTimeAsync(3_000);
-        expect(detail()).toBe("re-run · 5s");
-      });
     });
-
-    it.each(["running", "completed"] as const)(
-      "with the assistant flag off, a %s run has no Follow in thread, since no assistant host is mounted to follow it",
-      (state) => {
-        setAssistantFlag(false);
-        const wrapper = mountWith(rcaSummary({ run_id: "run-7", state }));
-
-        expect(wrapper.find('[data-test="incident-ai-analysis-follow-btn"]').exists()).toBe(false);
-        expect(wrapper.find('[data-test="incident-ai-analysis-label"]').exists()).toBe(true);
-      },
-    );
 
     it("an incident with no run keeps Analyze and has no Follow in thread", () => {
       const wrapper = mountWith(null);

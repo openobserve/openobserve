@@ -25,7 +25,6 @@ const { focusCard, focusDock } = vi.hoisted(() => ({
   focusDock: vi.fn((_id: string) => false),
 }));
 
-vi.mock("@/composables/assistant/flags", () => ({ isAssistantV2: () => true }));
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 vi.mock("@/composables/assistant", () => ({
   assistantFocusCard: focusCard,

@@ -145,7 +145,6 @@ import { SharedComponentsFormValidationPage } from "./generalPages/sharedCompone
 import { SettingsFormValidationPage } from "./generalPages/settingsFormValidationPage.js";
 import { PasswordPolicyPage } from "./generalPages/passwordPolicyPage.js";
 import { AiToolsetsFormValidationPage } from "./generalPages/aiToolsetsFormValidationPage.js";
-import { AiAssistantCreditsPage } from "./generalPages/aiAssistantCreditsPage.js";
 import { RumFormValidationPage } from "./generalPages/rumFormValidationPage.js";
 import { QuickFilterCardsPage } from "./generalPages/quickFilterCardsPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
@@ -390,7 +389,6 @@ class PageManager {
     // ===== DOWNTIMES PAGE OBJECTS =====
     this.downtimesPage = new DowntimesPage(page);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
-    this.aiAssistantCreditsPage = new AiAssistantCreditsPage(page);
 
     // ===== ONLINE EVALS PAGE OBJECTS =====
     this.llmProvidersPage = new LlmProvidersPage(page);

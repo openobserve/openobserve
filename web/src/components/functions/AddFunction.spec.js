@@ -84,7 +84,6 @@ describe("AddFunction Component", () => {
           email: "test@example.com",
         },
         theme: "light",
-        isAiChatEnabled: false,
         zoConfig: {
           ai_enabled: false,
         },
@@ -125,7 +124,6 @@ describe("AddFunction Component", () => {
           TestFunction: true,
           ConfirmDialog: true,
           EditorDraftDialogs: true,
-          O2AIChat: true,
           "query-editor": true,
         },
       },
@@ -243,33 +241,6 @@ describe("AddFunction Component", () => {
     });
   });
 
-  describe("AI Chat Integration", () => {
-    it("enables AI chat", () => {
-      wrapper.vm.openChat(true);
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-    });
-
-    it("disables AI chat", () => {
-      wrapper.vm.openChat(false);
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", false);
-    });
-
-    it("sends message to AI chat", async () => {
-      const testMessage = "test message";
-      wrapper.vm.sendToAiChat(testMessage);
-      await nextTick();
-      expect(wrapper.vm.aiChatInputContext).toBe(testMessage);
-    });
-
-    it("resets AI chat input context", async () => {
-      wrapper.vm.aiChatInputContext = "old message";
-      wrapper.vm.sendToAiChat("new message");
-      expect(wrapper.vm.aiChatInputContext).toBe("");
-      await nextTick();
-      expect(wrapper.vm.aiChatInputContext).toBe("new message");
-    });
-  });
-
   describe("Navigation Guards", () => {
     // Simulate beforeunload event instead of calling unexposed internals
     it("warns on window unload with unsaved changes", async () => {
@@ -365,13 +336,6 @@ describe("AddFunction Component", () => {
       await wrapper.vm.closeAddFunction();
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
     });
-
-    it("emits sendToAiChat event", async () => {
-      const message = "test message";
-      await wrapper.vm.sendToAiChat(message);
-      expect(wrapper.emitted()["sendToAiChat"]).toBeTruthy();
-      expect(wrapper.emitted()["sendToAiChat"][0]).toEqual([message]);
-    });
   });
 
   describe("Cancel Function Tests", () => {
@@ -423,7 +387,7 @@ describe("AddFunction Component", () => {
         global: {
           plugins: [i18n],
           provide: { store: mockStore, router: mockRouter },
-          stubs: { FunctionsToolbar: true, TestFunction: true, O2AIChat: true },
+          stubs: { FunctionsToolbar: true, TestFunction: true },
         },
         props: { modelValue: { name: "", function: "", params: "row", transType: "0" } },
       });

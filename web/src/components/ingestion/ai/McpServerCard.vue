@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
-import { isAssistantV2, useAssistantName } from "@/composables/assistant";
+import { useAssistantName } from "@/composables/assistant";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -68,7 +68,6 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { generate, generating, error: genError, credential } = useMcpCredential();
-const assistantV2 = isAssistantV2();
 const assistantName = useAssistantName();
 const deepLinkNoteId = useId();
 const { locked: mcpLocked, lockedReason: mcpLockedReason } = useLicenseLock("mcp");
@@ -95,7 +94,6 @@ const authSettled = computed(() => authMode.value === "oauth" || !!credential.va
 
 // Not [BASIC_PASSCODE]: CopyContent expands it to the user's real credential, which
 // then renders in cleartext because maskText is a no-op.
-const TOKEN_PLACEHOLDER = "Basic <base64 of service-account-email:token>";
 const YOUR_TOKEN = "<your-token>";
 const MASKED_AUTH = "Basic ••••••••••••••••";
 
@@ -109,9 +107,7 @@ const SKILLS_INSTALL_CMD = "npx @openobserve/skills add --all";
 const tokenAuthValue = computed(() =>
   credential.value
     ? `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`
-    : assistantV2
-      ? `Basic ${YOUR_TOKEN}`
-      : TOKEN_PLACEHOLDER,
+    : `Basic ${YOUR_TOKEN}`,
 );
 const authValue = computed(() => (authMode.value === "oauth" ? null : tokenAuthValue.value));
 
@@ -421,9 +417,7 @@ const content = computed<RichCardContent>(() => ({
     {
       id: "skills",
       title: t("ingestion.mcp.skillsLabel", { brand: raw("OpenObserve") }),
-      description: assistantV2
-        ? t("assistant.mcp.skillsHint", { brand: raw("OpenObserve") })
-        : t("ingestion.mcp.skillsHint", { brand: raw("OpenObserve") }),
+      description: t("assistant.mcp.skillsHint", { brand: raw("OpenObserve") }),
       chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
       code: {
         lang: "bash",
@@ -453,9 +447,7 @@ const openDeepLink = () => {
 };
 
 // The JSON snippet is the safe default in token mode; the deep link carries the token into an OS handler.
-const copyFirst = computed(
-  () => assistantV2 && authMode.value === "token" && !!activeDeepLink.value,
-);
+const copyFirst = computed(() => authMode.value === "token" && !!activeDeepLink.value);
 const copyConfiguration = () => copyToClipboard(activeConfig.value, t);
 
 const onGenerate = () => generate();
@@ -663,7 +655,6 @@ const openSkillsRepo = () => {
     <template #step-configure-controls>
       <div class="flex flex-col gap-3">
         <i18n-t
-          v-if="assistantV2"
           keypath="assistant.mcp.parityLine"
           tag="p"
           class="text-text-body text-sm"
@@ -735,7 +726,7 @@ const openSkillsRepo = () => {
       </div>
     </template>
 
-    <template v-if="assistantV2 && authMode === 'token' && !credential" #step-configure>
+    <template v-if="authMode === 'token' && !credential" #step-configure>
       <OText variant="meta" as="p" data-test="ai-integrations-mcp-token-placeholder-note">
         {{ t("assistant.mcp.replaceToken", { token: raw(YOUR_TOKEN) }) }}
       </OText>

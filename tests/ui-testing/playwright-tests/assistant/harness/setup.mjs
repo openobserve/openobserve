@@ -647,13 +647,6 @@ export async function forceEnterpriseBuild(context) {
   await rewriteEdition(context, [[/isEnterprise: [^,]+,/, 'isEnterprise: "true",']], "stack-ee");
 }
 
-/** Sets the assistant_v2 flag for every page of the context (`window.__O2_ASSISTANT_V2__`, read by flags.ts). */
-export async function setFlag(context, on) {
-  await context.addInitScript((value) => {
-    window.__O2_ASSISTANT_V2__ = value;
-  }, !!on);
-}
-
 export async function setOnline(page, online) {
   await page.context().setOffline(!online);
 }

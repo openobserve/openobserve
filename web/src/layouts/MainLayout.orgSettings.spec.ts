@@ -23,6 +23,14 @@ import { queryClient } from "@/composables/query/queryClient";
 
 const getOrgSettings = vi.fn();
 
+// No answer is running, so the assistant lets the org switch through at once.
+vi.mock("@/composables/assistant", () => ({
+  assistantLifecycle: { onOrgSwitch: async () => "proceed" },
+}));
+// The real key hashes off the microtask queue, which a flush does not wait for.
+vi.mock("@/utils/userOrgKey", () => ({
+  computeUserOrgKey: async (email: string, org: string) => `${email}:${org}`,
+}));
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
 }));
@@ -60,7 +68,10 @@ const mountLayout = async () => {
       stubs: {
         AppHeader: StubDiv,
         ONavbar: StubDiv,
-        O2AIChat: StubDiv,
+        AssistantSidebarHost: StubDiv,
+        AssistantWindowLayer: StubDiv,
+        AssistantSkipLink: StubDiv,
+        HomeReturnBar: StubDiv,
         WebinarBanner: StubDiv,
         AnnouncementBanner: StubDiv,
         ShortcutCheatsheet: StubDiv,

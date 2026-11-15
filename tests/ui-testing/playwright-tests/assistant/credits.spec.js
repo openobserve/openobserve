@@ -45,7 +45,6 @@ test.describe("assistant credits", () => {
   test.beforeEach(async ({ context, page }) => {
     harness = await loadHarness();
     mocks = await loadMocks();
-    await harness.setFlag(context, true);
     state = harness.createMockState();
     await harness.installMocks(context, state);
     await harness.login(page);

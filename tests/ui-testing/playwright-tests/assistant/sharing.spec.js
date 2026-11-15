@@ -63,7 +63,6 @@ test.describe("assistant sharing", () => {
     harness = await loadHarness();
     state = harness.createMockState(typeof overrides === "function" ? overrides() : overrides);
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    await harness.setFlag(context, true);
     await harness.installMocks(context, state);
     await harness.login(page);
     assistant = new AssistantPage(page);
@@ -302,7 +301,6 @@ test.describe("assistant sharing", () => {
     harness = await loadHarness();
     state = harness.createMockState();
     const reader = await browser.newContext();
-    await harness.setFlag(reader, true);
     await harness.installMocks(reader, state);
     const page = await reader.newPage();
     const loaded = [];

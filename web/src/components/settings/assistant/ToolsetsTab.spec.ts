@@ -211,7 +211,7 @@ describe("ToolsetsTab", () => {
     viewport.mdUp = true;
     wrapper = w;
     expect(w.find('[data-test="ai-toolsets-list-refresh-btn"]').attributes("aria-label")).toBe(
-      "Refresh toolsets",
+      "Refresh list",
     );
     expect(w.find('[data-test="o2-table-row-0"]').html()).not.toMatch(/primary-soft|success-soft/);
   });

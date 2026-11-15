@@ -137,10 +137,7 @@ watch(
   },
 );
 
-const { placeholder: filterHint } = useFilterHint(
-  computed(() => props.labelNames ?? []),
-  computed(() => !focused.value && !props.filters.length),
-);
+const { placeholder: filterHint } = useFilterHint(computed(() => props.labelNames ?? []));
 
 // A new loader is what tells the open value step its sample moved, so it reloads.
 const loadValues = computed(() => {

@@ -122,7 +122,6 @@ describe("SearchResult Component", () => {
           ChartRenderer: true,
           SanitizedHtmlRenderer: true,
           CellActions: true,
-          O2AIContextAddBtn: true,
           PatternDetailsDialog: true,
           ODrawer: oDrawerStub,
         },
@@ -293,14 +292,6 @@ describe("SearchResult Component", () => {
       await wrapper.vm.toggleErrorDetails();
 
       expect(wrapper.vm.disableMoreErrorDetails).toBe(true);
-    });
-
-    it("should send to AI chat", async () => {
-      const testValue = { message: "test message" };
-
-      await wrapper.vm.sendToAiChat(testValue);
-
-      expect(wrapper.emitted()["sendToAiChat"]).toEqual([[testValue, true]]); // includes append parameter
     });
   });
 
@@ -1567,7 +1558,6 @@ describe("SearchResult rows while a search re-runs", () => {
           ChartRenderer: true,
           SanitizedHtmlRenderer: true,
           CellActions: true,
-          O2AIContextAddBtn: true,
           PatternDetailsDialog: true,
           ODrawer: oDrawerStub,
         },

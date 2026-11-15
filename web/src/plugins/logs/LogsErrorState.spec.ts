@@ -22,7 +22,7 @@ import LogsErrorState from "./LogsErrorState.vue";
 describe("LogsErrorState recovery cards (J5)", () => {
   const mountError = (props: Record<string, unknown>) =>
     mount(LogsErrorState, {
-      props: { errorCode: 20004, errorMsg: "Unknown field 'timeout'", aiEnabled: false, ...props },
+      props: { errorCode: 20004, errorMsg: "Unknown field 'timeout'", ...props },
       global: { plugins: [i18n], provide: { store } },
     });
 

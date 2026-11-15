@@ -151,7 +151,7 @@
 
     <template #cell-actions="{ row }">
       <div class="flex items-center">
-        <template v-if="assistantV2 && alert && row.level">
+        <template v-if="alert && row.level">
           <AiEntryButton v-bind="firingDoor(row, 'troubleshoot')" appearance="toolbar-icon" />
           <AiEntryButton v-bind="firingDoor(row, 'add_to_chat')" appearance="toolbar-icon" />
         </template>
@@ -274,7 +274,6 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from "vue";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import { alertFiringBuild } from "@/components/alerts/alertDoors";
 import type { AlertRecord } from "@/utils/assistant/prompts";
@@ -463,20 +462,17 @@ const openMuteDialog = (row: AlertGroup) => {
   muteDialogOpen.value = true;
 };
 
-const assistantV2 = isAssistantV2();
-const loadedOrg = assistantV2
-  ? useLoadedOrg(
-      () => props.groups,
-      () => store.state.selectedOrganization?.identifier ?? "",
-    )
-  : null;
+const loadedOrg = useLoadedOrg(
+  () => props.groups,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
 const firingDoor = (row: AlertGroup, verb: "troubleshoot" | "add_to_chat") => ({
   verb,
   entryKind: "object_verb" as const,
-  boundOrg: loadedOrg?.value,
+  boundOrg: loadedOrg.value,
   objectKind: "alert_firing" as const,
   label: t(
     verb === "troubleshoot" ? "assistant.entry.troubleshootAlert" : "assistant.entry.addFiring",
@@ -591,7 +587,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: raw(""),
     cell: " ",
     isAction: true,
-    size: assistantV2 ? 158 : 88,
+    size: 158,
     meta: { align: "center" },
   },
 ]);

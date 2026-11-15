@@ -1,5 +1,4 @@
 import config from "@/aws-exports";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { routeGuard } from "@/utils/zincutils";
 import { withFeatureGate } from "@/utils/enterpriseFeatures";
 import { withLicenseFeature } from "@/utils/featureGate";
@@ -96,16 +95,14 @@ const useManagementRoutes = () => {
   ];
 
   // Every edition registers it so OSS reaches the locked page; writes are gated inside the view.
-  if (isAssistantV2()) {
-    routes[0].children.push({
-      path: "assistant/:tab?",
-      name: "assistantSettings",
-      component: () => import("@/components/settings/assistant/AssistantSettingsView.vue"),
-      props: true,
-      meta: { titleKey: "assistant.settings.title" },
-      beforeEnter: withFeatureGate("aiAssistant", routeGuard),
-    });
-  }
+  routes[0].children.push({
+    path: "assistant/:tab?",
+    name: "assistantSettings",
+    component: () => import("@/components/settings/assistant/AssistantSettingsView.vue"),
+    props: true,
+    meta: { titleKey: "assistant.settings.title" },
+    beforeEnter: withFeatureGate("aiAssistant", routeGuard),
+  });
 
   // Shared stand-in page for any enterprise/cloud-only route this build
   // doesn't unlock — every `withFeatureGate` redirect lands here.
@@ -196,16 +193,16 @@ const useManagementRoutes = () => {
           },
           beforeEnter: withFeatureGate("cipherKeys", routeGuard),
         },
-        withLicenseFeature("ai_toolsets", {
+        {
+          // Old links and bookmarks keep working; `?action=` and `?id=` open the same form in the tab.
           path: "ai_toolsets",
           name: "aiToolsets",
-          component: () => import("@/components/settings/AiToolsets.vue"),
-          meta: {
-            keepAlive: true,
-            titleKey: "aiToolset.header",
-          },
-          beforeEnter: withFeatureGate("aiToolsets", routeGuard),
-        }),
+          redirect: (to: any) => ({
+            name: "assistantSettings",
+            params: { tab: "toolsets" },
+            query: to.query,
+          }),
+        },
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
@@ -353,19 +350,6 @@ const useManagementRoutes = () => {
       ],
     );
   }
-  // The legacy page's links and bookmarks keep working; `?action=` and `?id=` open the same form in the tab.
-  const toolsets = routes[0].children.find((route: any) => route.name === "aiToolsets");
-  if (isAssistantV2() && toolsets) {
-    delete toolsets.component;
-    delete toolsets.meta;
-    delete toolsets.beforeEnter;
-    toolsets.redirect = (to: any) => ({
-      name: "assistantSettings",
-      params: { tab: "toolsets" },
-      query: to.query,
-    });
-  }
-
   return routes;
 };
 

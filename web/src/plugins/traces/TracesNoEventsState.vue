@@ -63,25 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #extra>
       <div class="flex flex-wrap items-center justify-center gap-2">
-        <template v-if="assistantV2">
-          <AiEntryButton
-            v-if="windowHasStreamData && !jumpTarget"
-            v-bind="emptyResultDoor"
-            appearance="chip"
-          />
-        </template>
-        <OButton
-          v-else-if="aiEnabled && windowHasStreamData && !jumpTarget"
-          variant="ghost"
-          size="sm"
-          data-test="traces-no-events-ask-ai-btn"
-          @click="emit('ask-ai')"
-        >
-          <template #icon-left>
-            <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
-          </template>
-          {{ t("traces.noEvents.askAi") }}
-        </OButton>
+        <AiEntryButton
+          v-if="windowHasStreamData && !jumpTarget"
+          v-bind="emptyResultDoor"
+          appearance="chip"
+        />
       </div>
     </template>
   </OEmptyState>
@@ -90,16 +76,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { tracesDoorBase, tracingQueryBuild } from "@/plugins/traces/tracesDoors";
 import { useStore } from "vuex";
 import { DateTime } from "luxon";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import useTraces from "@/composables/useTraces";
 import useWidenRange from "@/composables/useWidenRange";
-import { useAiIcon } from "@/composables/useAiIcon";
 import { getConsumableRelativeTime } from "@/utils/date";
 import DOMPurify from "dompurify";
 
@@ -107,8 +90,6 @@ const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 const END_NUDGE_US = 1_000_000;
 
 const props = defineProps<{
-  /** Whether the AI copilot is enabled — gates the "Ask AI" button. */
-  aiEnabled?: boolean;
   /**
    * Authoritative stream doc time range (µs), provided by the parent (traces
    * Index) from the same getStream() the query uses. When present it takes
@@ -121,18 +102,12 @@ const props = defineProps<{
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { aiIconSrc } = useAiIcon();
 const emit = defineEmits<{
   "jump-to-stream-data": [fromUs: number, toUs: number];
-  "ask-ai": [];
 }>();
-
-// `aiEnabled` is consumed via props in the template; alias avoids an unused warning.
-const aiEnabled = computed(() => !!props.aiEnabled);
 
 const { searchObj } = useTraces();
 
-const assistantV2 = isAssistantV2();
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );

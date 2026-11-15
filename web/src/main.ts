@@ -40,7 +40,6 @@ import { queryClient, setMutationNotifier } from "./composables/query/queryClien
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { bindAccess } from "@/composables/useAccessStore";
 import { installFetchLicenseReceiver } from "@/services/licenseDenialReceiver";
 
@@ -53,14 +52,13 @@ bootstrapTheme();
 const activeLocale = getLocale();
 applyDocumentLocale(activeLocale);
 
-// Only the assistant's sheet needs the keyboard to resize the layout; with the flag off every page keeps the default viewport.
-if (isAssistantV2())
-  document
-    .querySelector('meta[name="viewport"]')
-    ?.setAttribute(
-      "content",
-      "width=device-width, initial-scale=1.0, interactive-widget=resizes-content",
-    );
+// The assistant's sheet needs the on-screen keyboard to resize the layout.
+document
+  .querySelector('meta[name="viewport"]')
+  ?.setAttribute(
+    "content",
+    "width=device-width, initial-scale=1.0, interactive-widget=resizes-content",
+  );
 
 const app = createApp(App);
 const router = createRouter(store);
@@ -126,7 +124,6 @@ let assistantStarted = false;
 
 // A public shared page never loads the runtime; leaving it for the app starts it then.
 function startAssistantOffPublicShare(uiVersion: string) {
-  if (!isAssistantV2()) return;
   const start = () => {
     if (assistantStarted) return;
     assistantStarted = true;
@@ -141,7 +138,7 @@ function startAssistantOffPublicShare(uiVersion: string) {
   });
 }
 
-// Dynamic imports only: with the flag off nothing of the assistant runtime is loaded.
+// Dynamic imports keep the assistant runtime out of the entry chunk.
 async function initAssistant(uiVersion: string) {
   const [{ assistantStore }, { setAssistantTelemetryContext }, share] = await Promise.all([
     import("@/composables/assistant"),

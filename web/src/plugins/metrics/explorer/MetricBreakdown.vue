@@ -347,13 +347,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-actions="{ row }">
               <div class="flex items-center justify-end gap-1">
-                <template v-if="assistantV2">
-                  <AiEntryButton v-bind="seriesDoor(row, 'explain')" appearance="toolbar-icon" />
-                  <AiEntryButton
-                    v-bind="seriesDoor(row, 'add_to_chat')"
-                    appearance="toolbar-icon"
-                  />
-                </template>
+                <AiEntryButton v-bind="seriesDoor(row, 'explain')" appearance="toolbar-icon" />
+                <AiEntryButton v-bind="seriesDoor(row, 'add_to_chat')" appearance="toolbar-icon" />
                 <OButton
                   variant="ghost"
                   size="icon-xs"
@@ -500,7 +495,6 @@ import {
 import { getInstanceByDom, type ECharts } from "echarts/core";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import MetricChartTile, {
   type TileCompare,
@@ -734,20 +728,17 @@ export default defineComponent({
       useLicenseLock("dashboards");
 
     // Each breakdown row is one series: the metric with the active label set to that value.
-    const assistantV2 = isAssistantV2();
-    const loadedOrg = assistantV2
-      ? useLoadedOrg(
-          () => [props.card, props.timeRange],
-          () => store.state.selectedOrganization?.identifier ?? "",
-        )
-      : null;
+    const loadedOrg = useLoadedOrg(
+      () => [props.card, props.timeRange],
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
     const seriesDoor = (
       row: { value: string; latest?: string | null },
       verb: "explain" | "add_to_chat",
     ) => ({
       verb,
       entryKind: "object_verb" as const,
-      boundOrg: loadedOrg?.value,
+      boundOrg: loadedOrg.value,
       objectKind: "metric_series" as const,
       label: t(verb === "explain" ? "assistant.entry.explainSeries" : "assistant.entry.addSeries"),
       tooltip: t(
@@ -1469,7 +1460,6 @@ export default defineComponent({
       focusedBusy,
       statsFailed,
       chartsLoadingLabel,
-      assistantV2,
       seriesDoor,
       t,
       raw,

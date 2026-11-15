@@ -24,7 +24,6 @@ test.describe("assistant on a real server", () => {
 
   test.beforeEach(async ({ context, page }) => {
     harness = await loadHarness();
-    await harness.setFlag(context, true);
     await harness.installMocks(context);
     streamCalls.length = 0;
     config = undefined;

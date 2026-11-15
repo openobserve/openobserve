@@ -331,7 +331,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @participant-action="(id, p) => onParticipantAction(id, p, row)"
                 @copy-summary="copySummary(row)"
                 :ai-door="deadlockDoor(row)"
-                @ask-ai="askAiForFix(row)"
               />
 
               <!-- The repeats as a two-lane timeline rather than N rows: the
@@ -471,10 +470,8 @@ import { createDbmContextProvider } from "@/composables/contextProviders";
 import { copyToClipboard } from "@/utils/clipboard";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { buildDbmLockPrefill } from "@/utils/alerts/prefill/fromDbmLocks";
-import { buildDeadlockFixPrompt } from "@/utils/dbm/aiPrompts";
 import { dbmFixDoor } from "@/components/dbm/dbmDoors";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import {
   deadlockCadenceSeconds,
   groupDeadlocks,
@@ -500,12 +497,6 @@ const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
-
-// This page is a route root, so MainLayout's `@sendToAiChat` binding is on it
-// directly — no re-emit chain needed.
-const emit = defineEmits<{
-  (e: "sendToAiChat", value: { query: string; autoSend: boolean }): void;
-}>();
 
 // The shared list-page spine: scope from the URL, the request-sequence guard,
 // the shell's badge snapshot, refresh/date-change handlers, the load envelope
@@ -1270,27 +1261,17 @@ const deadlockInput = (row: DeadlockRow) => {
   };
 };
 
-const askAiForFix = (row: DeadlockRow) => {
-  analytics.track("dbm_ai_fix_requested", { page: "deadlocks" });
-  emit("sendToAiChat", {
-    query: buildDeadlockFixPrompt(deadlockInput(row)),
-    autoSend: true,
-  });
-};
-
 // The org the rows were loaded under, so a door left on screen after an org switch is refused.
-const loadedOrg = isAssistantV2()
-  ? useLoadedOrg(
-      () => tableRows.value,
-      () => store.state.selectedOrganization?.identifier ?? "",
-    )
-  : null;
+const loadedOrg = useLoadedOrg(
+  () => tableRows.value,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
 const deadlockDoor = (row: DeadlockRow) =>
   dbmFixDoor(
     { label: t("dbm.ai.deadlockFix"), tooltip: t("dbm.ai.deadlockFixHint") },
     () => ({ kind: "deadlock", input: deadlockInput(row) }),
     store.state,
-    loadedOrg?.value,
+    loadedOrg.value,
   );
 
 /** The pair's recurrence gap, when the pair grouping produced one. */

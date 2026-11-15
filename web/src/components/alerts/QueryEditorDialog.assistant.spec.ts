@@ -28,12 +28,6 @@ import { contextRegistry } from "@/composables/contextProviders/registry";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-const { flag } = vi.hoisted(() => ({ flag: { on: true } }));
-
-vi.mock("@/composables/assistant/flags", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/composables/assistant/flags")>()),
-  isAssistantV2: () => flag.on,
-}));
 vi.mock("@/services/search", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -118,7 +112,6 @@ function setup(modelValue = true) {
           methods: { replaceValue },
         },
         FullViewContainer: { template: "<div><slot /></div>" },
-        O2AIChat: { template: '<div data-test="legacy-chat" />' },
       },
     },
     attachTo: document.body,
@@ -127,7 +120,6 @@ function setup(modelValue = true) {
 }
 
 beforeEach(() => {
-  flag.on = true;
   store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
   sessionStorage.clear();
   localStorage.clear();
@@ -258,14 +250,5 @@ describe("QueryEditorDialog with the revamped assistant", () => {
     (wrapper.vm as unknown as { localTab: string }).localTab = "promql";
     await settleAsyncParts();
     expect(document.querySelector('[data-test="ai-label-editor"]')).toBeNull();
-  });
-
-  it("keeps the legacy toggle and chat with the revamp off", async () => {
-    flag.on = false;
-    const { runtime } = setup();
-    await settleAsyncParts();
-    expect(document.querySelector('[data-test="menu-link-ai-item"]')).not.toBeNull();
-    expect(document.querySelector('[data-test="ai-entry-alert-query-ask"]')).toBeNull();
-    expect(runtime.hosts.has("alert_query")).toBe(false);
   });
 });

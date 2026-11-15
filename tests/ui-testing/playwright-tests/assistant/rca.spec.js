@@ -162,7 +162,6 @@ test.describe("assistant incident chat", () => {
 
   test.beforeEach(async ({ context, page }) => {
     harness = await loadHarness();
-    await harness.setFlag(context, true);
     reads = [];
   });
 

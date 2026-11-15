@@ -784,9 +784,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="trace-details-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
                   :logs-at-us="logsAtUs"
-                  v-bind="
-                    assistantV2 ? { parentOperation: parentOperationOf(effectiveSpanId) } : {}
-                  "
+                  :parent-operation="parentOperationOf(effectiveSpanId)"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
@@ -855,9 +853,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <TraceDetailsSidebar
                   data-test="trace-details-dag-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
-                  v-bind="
-                    assistantV2 ? { parentOperation: parentOperationOf(effectiveSpanId) } : {}
-                  "
+                  :parent-operation="parentOperationOf(effectiveSpanId)"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
@@ -1242,7 +1238,6 @@ import {
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 import { useServiceCorrelation, type KeyFieldsConfig } from "@/composables/useServiceCorrelation";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import ChartZoomControls from "@/components/traces/ChartZoomControls.vue";
 import useChartZoom from "@/composables/traces/useChartZoom";
 
@@ -2615,7 +2610,6 @@ export default defineComponent({
 
     const hoveredSpanId = ref("");
     const effectiveSpanId = computed(() => hoveredSpanId.value || selectedSpanId.value);
-    const assistantV2 = isAssistantV2();
     const parentOperationOf = (spanId: string | null | undefined): string | undefined => {
       const parentId = spanId ? spanMap.value[spanId]?.reference_parent_span_id : undefined;
       const parent = parentId ? spanMap.value[parentId] : undefined;
@@ -3749,7 +3743,6 @@ export default defineComponent({
       { active: toRef(props, "shortcutsActive") },
     );
     return {
-      assistantV2,
       parentOperationOf,
       router,
       t,

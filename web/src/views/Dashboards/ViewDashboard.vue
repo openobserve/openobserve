@@ -622,7 +622,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @searchRequestTraceIds="searchRequestTraceIds"
           :runId="runId"
           @update:runId="updateRunId"
-          @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
         />
         <DashboardSettings
           v-model:open="showDashboardSettingsDialog"
@@ -863,7 +862,7 @@ const DeployMarkersUnavailable = defineAsyncComponent(
 
 export default defineComponent({
   name: "ViewDashboard",
-  emits: ["onDeletePanel", "sendToAiChat"],
+  emits: ["onDeletePanel"],
   components: {
     OBanner,
     OPageLayout,

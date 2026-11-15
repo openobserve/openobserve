@@ -14,12 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import i18n from "@/locales";
 
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
@@ -67,16 +66,6 @@ async function mountCard(ssoEnabled: boolean) {
   await flushPromises();
   return w;
 }
-
-beforeEach(() => {
-  window.__O2_ASSISTANT_V2__ = true;
-  resetAssistantV2ForTests();
-});
-
-afterEach(() => {
-  delete window.__O2_ASSISTANT_V2__;
-  resetAssistantV2ForTests();
-});
 
 describe("McpServerCard with the assistant", () => {
   it("names the assistant and links to its toolsets", async () => {

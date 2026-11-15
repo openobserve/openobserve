@@ -14,7 +14,7 @@ export function uuidv7(ms, salt = 0) {
 
 // Config gating: fields flipped on /config and /api/{org}/config responses.
 export const CONFIG_PATCH = {
-  ai_enabled: true, // gates every AI affordance (Header.vue:693, HomeView.vue:268, O2AIContextAddBtn.vue:4 ...)
+  ai_enabled: true, // gates every AI affordance (Header.vue, HomeView.vue ...)
   ai_chat_persistence_enabled: true, // server history + sharing (useAiChat.ts chatHistoryServer, chatShare.ts:103)
   public_ai_chat_enabled: true, // public link option in the share dialog (chatShare.ts:106)
   public_ai_chat_max_expiry_days: 30,

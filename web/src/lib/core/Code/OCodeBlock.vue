@@ -264,7 +264,7 @@ const onNativeCopy = () => {
       </div>
     </div>
     <!-- `text-syntax-text!` — the `!` is load-bearing.
-         `highlight.js/styles/github-dark.css` is imported globally (by O2AIChat)
+         `highlight.js/styles/github-dark.css` is imported globally (by AlertQueryPreview)
          and its unlayered `.hljs { color }` beats anything in @layer utilities,
          so without it every token hljs leaves unclassed renders in the dark
          theme's pale grey, unreadable on the light syntax surface.

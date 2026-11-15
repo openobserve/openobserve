@@ -18,7 +18,6 @@ import { defineComponent, reactive } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import assistantService, { parseAiUsage } from "@/services/assistant";
 import { assistantKeys } from "@/services/assistant.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
@@ -416,8 +415,12 @@ describe("UsageView AI credits warning", () => {
 });
 
 describe("UsageView load failures", () => {
+  // Scoped to the bill's error: the credit meter above it has a Retry of its own.
   const retryButton = (wrapper: ReturnType<typeof mount>) =>
-    wrapper.findAll("button").find((button) => button.text() === "Retry");
+    wrapper
+      .find('[data-test="billings-usageview-error"]')
+      .findAll("button")
+      .find((button) => button.text() === "Retry");
 
   it("shows a retryable error in plain words, not the raw message, when the bill cannot load", async () => {
     metering.mockRejectedValueOnce(new Error("Network Error")).mockResolvedValue(bill);
@@ -487,16 +490,7 @@ describe("UsageView AI credits summary", () => {
       '[data-test="billings-usage-ai-summary"] [data-test="assistant-credit-meter-mode"]',
     );
 
-  const v2 = (on: boolean) => {
-    if (on) window.__O2_ASSISTANT_V2__ = true;
-    else delete window.__O2_ASSISTANT_V2__;
-    resetAssistantV2ForTests();
-  };
-
-  afterEach(() => v2(false));
-
-  it("shows the Plans card's meter text and mode with the new assistant on", async () => {
-    v2(true);
+  it("shows the Plans card's meter text and mode", async () => {
     const wrapper = await mountView(PAYG);
     expect(assistantService.usage).toHaveBeenCalledWith("default");
     expect(meterText(wrapper)).toBe("1,000 included credits used · 200 billed · paid usage on");
@@ -504,7 +498,6 @@ describe("UsageView AI credits summary", () => {
   });
 
   it("reads the shared usage, so an invalidation after a turn shows the new numbers", async () => {
-    v2(true);
     const wrapper = await mountView({ mode: "free", credits_used: 100, credits_limit: 1000 });
     expect(meterText(wrapper)).toBe("100 of 1,000 included credits · they don't renew");
     vi.mocked(assistantService.usage).mockResolvedValue(
@@ -516,23 +509,14 @@ describe("UsageView AI credits summary", () => {
   });
 
   it("gives free usage no mode badge, as on Plans", async () => {
-    v2(true);
     const wrapper = await mountView({ mode: "free", credits_used: 100, credits_limit: 1000 });
     expect(modeTag(wrapper).exists()).toBe(false);
     expect(wrapper.get('[data-test="billings-usage-ai-summary"]').text()).not.toContain("Free");
   });
 
   it("says No included credits for a zero limit, never 0 of 0", async () => {
-    v2(true);
     const wrapper = await mountView({ mode: "pay_as_you_go", credits_used: 0, credits_limit: 0 });
     expect(meterText(wrapper)).toBe("No included credits");
     expect(wrapper.get('[data-test="billings-usage-ai-summary"]').text()).not.toContain("0 of 0");
-  });
-
-  it("leaves the page unchanged and reads nothing extra with the new assistant off", async () => {
-    v2(false);
-    const wrapper = await mountView(PAYG);
-    expect(wrapper.find('[data-test="billings-usage-ai-summary"]').exists()).toBe(false);
-    expect(assistantService.usage).not.toHaveBeenCalled();
   });
 });

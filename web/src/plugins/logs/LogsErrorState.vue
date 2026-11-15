@@ -27,13 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :error-code="effectiveCode"
     :error-msg="errorMsg"
     :error-detail="errorDetail"
-    :ai-enabled="aiEnabled"
     :resource-name="streamName"
     :free-text-candidate="freeTextCandidate ?? undefined"
     :run-suggestion="runSuggestion ?? undefined"
     :query="filterMode ? undefined : query"
     size="hero"
-    @ask-ai="emit('ask-ai')"
     @fix-query="emit('fix-query')"
     @configure-resource="emit('configure-stream')"
     @widen-range="emit('widen-range')"
@@ -54,7 +52,6 @@ const props = defineProps<{
   errorCode: number;
   errorMsg: string;
   errorDetail?: string;
-  aiEnabled: boolean;
   streamName?: string;
   freeTextCandidate?: string | null;
   runSuggestion?: string | null;
@@ -63,7 +60,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "ask-ai": [];
   "fix-query": [];
   "configure-stream": [];
   "widen-range": [];

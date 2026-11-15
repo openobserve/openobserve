@@ -25,15 +25,10 @@ const SRC = join(WEB, "src");
 // Frozen allow-lists: legacy code that predates the assistant rules. They only shrink (to zero at cutover, WP-15/WP-16).
 const LEGACY_AI_EVENT_FILES = [
   "composables/useAiChat.ts",
-  "composables/useChatStream.ts",
   "composables/useNLQuery.ts",
   "services/ai_toolsets.ts",
 ];
-const LEGACY_ASSISTANT_UI = [
-  /^components\/ai-assistant\/chat\//,
-  /^components\/ai-assistant\/welcome\//,
-  /^components\/ai-assistant\/share\/AiChat(ShareDialog|SharedByMe|ShareRow)\.vue$/,
-];
+const LEGACY_ASSISTANT_UI = [/^components\/ai-assistant\/welcome\//];
 const AUTO_AWESOME_CALL_SITES = [
   "components/ai-assistant/common/glyphs.ts",
   "components/alerts/AlertsDestinationList.vue",
@@ -74,7 +69,6 @@ const AUTO_AWESOME_CALL_SITES = [
 const AI_TOKEN_OWNERS = [
   /^components\/ai-assistant\//,
   /^components\/O2AIChat/,
-  /^components\/common\/O2AIContextAddBtn\.vue$/,
   /^components\/Header\.vue$/,
   /^lib\/styles\/tokens\//,
   /^styles\/utilities\.css$/,

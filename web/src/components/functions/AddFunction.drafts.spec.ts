@@ -69,13 +69,12 @@ const emitted: { list: unknown[]; cancel: number } = { list: [], cancel: 0 };
 const store = createStore({
   state: {
     theme: "light",
-    isAiChatEnabled: false,
     zoConfig: { ai_enabled: false },
     selectedOrganization: { identifier: "test-org" },
     userInfo: { email: "me@x.io" },
     timezone: "UTC",
   },
-  actions: { setIsAiChatEnabled: vi.fn() },
+  actions: {},
 });
 
 const EditorRoute = defineComponent({
@@ -111,7 +110,6 @@ const mountEditor = async (props: Record<string, unknown> = {}, realToolbar = fa
           TestFunction: true,
           FunctionsToolbar: !realToolbar,
           FullViewContainer: true,
-          O2AIChat: true,
         },
       },
     },

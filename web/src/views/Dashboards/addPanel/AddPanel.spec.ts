@@ -184,7 +184,6 @@ vi.mock("vue-router", async () => {
 const createMockStore = () => {
   return createStore({
     state: {
-      isAiChatEnabled: false,
       selectedOrganization: {
         identifier: "test-org",
       },

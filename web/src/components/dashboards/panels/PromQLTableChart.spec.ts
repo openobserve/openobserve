@@ -49,10 +49,6 @@ vi.mock("@/plugins/logs/data-table/CellActions.vue", () => ({
   default: { template: "<div />" },
 }));
 
-vi.mock("@/components/common/O2AIContextAddBtn.vue", () => ({
-  default: { template: "<div />" },
-}));
-
 vi.mock("@/utils/logs/statusParser", () => ({
   extractStatusFromLog: () => ({ color: "" }),
 }));

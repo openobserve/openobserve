@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-import { isAssistantV2, resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import { describe, expect, it } from "vitest";
 
 import {
   SHORTCUT_REGISTRY,
@@ -56,15 +54,6 @@ function visibleBindings(mac: boolean): string[] {
       });
   });
 }
-
-beforeEach(() => {
-  window.__O2_ASSISTANT_V2__ = true;
-});
-
-afterEach(() => {
-  delete window.__O2_ASSISTANT_V2__;
-  resetAssistantV2ForTests();
-});
 
 describe("shortcut conflict audit (10 §6.4)", () => {
   it.each([false, true])("no two visible entries share keys and scope (mac: %s)", (mac) => {
@@ -107,7 +96,7 @@ describe("shortcut conflict audit (10 §6.4)", () => {
     )!;
     expect(entry.visible!(ALL_ON)).toBe(false);
     setDictationReady(true);
-    expect(entry.visible!(ALL_ON)).toBe(isAssistantV2());
+    expect(entry.visible!(ALL_ON)).toBe(true);
     setDictationReady(false);
   });
 

@@ -25,7 +25,6 @@ import {
 } from "@/lib/vue-shortcut-manager/shortcutRegistry";
 
 import type { GateCode } from "./assistantStore.types";
-import { resetAssistantV2ForTests } from "./flags";
 import {
   ESCAPE_RUNGS,
   onAssistantOpen,
@@ -122,10 +121,8 @@ beforeEach(() => {
 afterEach(() => {
   resetManager();
   document.body.innerHTML = "";
-  delete window.__O2_ASSISTANT_V2__;
   delete window.__O2_TELEMETRY_SINK__;
   delete window.__o2telemetry;
-  resetAssistantV2ForTests();
   placement.kind = "hidden";
   openAssistant.mockClear();
 });
@@ -224,14 +221,7 @@ describe("assistantHistory beside page scopes", () => {
 });
 
 describe("cheatsheet visibility", () => {
-  it("hides every assistant row with the flag off", () => {
-    window.__O2_ASSISTANT_V2__ = false;
-    for (const id of ["assistantOpen", "assistantHistory", "assistantComposerSend"])
-      expect(visible(id, CAPS)).toBe(false);
-  });
-
-  it("hides the chord row on G2 and shows it on available with the flag on", () => {
-    window.__O2_ASSISTANT_V2__ = true;
+  it("hides the chord row on G2 and shows it on available", () => {
     expect(visible("assistantOpen", { ...CAPS, assistantCanChat: false })).toBe(false);
     expect(visible("assistantOpen", CAPS)).toBe(true);
     expect(visible("assistantClose", CAPS)).toBe(false);

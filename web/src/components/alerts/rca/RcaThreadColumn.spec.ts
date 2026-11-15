@@ -495,22 +495,7 @@ describe("RcaThreadColumn", () => {
       expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(false);
     });
 
-    it("assistant flag off (legacy) keeps the original composer: Ctrl/Cmd+Enter sends, plain Enter does not", async () => {
-      send.mockClear();
-      const wrapper = mountColumn({ ...STEERABLE, legacy: true });
-
-      expect(byTest(wrapper, "rca-steer-sending-as").text()).toContain("a.rao@acme.io");
-      const textarea = wrapper.get('[data-test="rca-steer-composer"] textarea');
-      await textarea.setValue("check the pool");
-      await textarea.trigger("keydown", { key: "Enter" });
-      await flushPromises();
-      expect(send).not.toHaveBeenCalled();
-      await textarea.trigger("keydown", { key: "Enter", ctrlKey: true });
-      await flushPromises();
-      expect(send).toHaveBeenCalledWith("check the pool");
-    });
-
-    it("assistant flag on keeps the new composer, where plain Enter sends", async () => {
+    it("the composer sends on plain Enter", async () => {
       send.mockClear();
       const wrapper = mountColumn(STEERABLE);
 

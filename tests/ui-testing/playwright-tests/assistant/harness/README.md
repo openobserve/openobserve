@@ -217,8 +217,7 @@ Declared with a no-op default, filled in by the WP that owns the behaviour:
 
 | Helper | Does |
 |---|---|
-| `setFlag(context, on)` | `window.__O2_ASSISTANT_V2__ = on` on every page (init script), so a spec runs either path |
-| `forceCloudBuild(context)`, `forceOssBuild(context)` | Rewrite the served `/web/src/aws-exports.ts`; it exists only on the Vite dev server, so they skip unless `O2_VITE_DEV` is set. Flows that use them carry `@edition` in their title and run in the `assistant_editions` CI job (`legacy-smoke.spec.js` holds the first two: OSS locks the header button, Cloud opens the sidebar) |
+| `forceCloudBuild(context)`, `forceOssBuild(context)` | Rewrite the served `/web/src/aws-exports.ts`; it exists only on the Vite dev server, so they skip unless `O2_VITE_DEV` is set. Flows that use them carry `@edition` in their title and run in the `assistant_editions` CI job |
 | `setOnline(page, online)` | `context.setOffline(!online)` |
 | `setKnobs(page, knobs)` | Changes the browser-side knobs above on a loaded page |
 | `expireSession(state)` | The next AI request answers 401 once |

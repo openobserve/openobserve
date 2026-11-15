@@ -24,7 +24,7 @@ import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import i18n from "@/locales";
 import { ref } from "vue";
 
 const assistantGate = ref("available");
@@ -1977,11 +1977,6 @@ describe("useRoutes (router.ts)", () => {
   });
 
   describe("assistant full view route", () => {
-    const flagged = (on: boolean) => {
-      window.__O2_ASSISTANT_V2__ = on;
-      resetAssistantV2ForTests();
-      return useRoutes();
-    };
     const resolveIn = (homeChildRoutes: any[], path: string) => {
       const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
       const router = createRouter({
@@ -1999,19 +1994,11 @@ describe("useRoutes (router.ts)", () => {
     };
 
     afterEach(() => {
-      delete window.__O2_ASSISTANT_V2__;
-      resetAssistantV2ForTests();
       assistantGate.value = "available";
     });
 
-    it("is not registered with the flag off, so /assistant stays not found", () => {
-      const { homeChildRoutes } = flagged(false);
-      expect(findRoute(homeChildRoutes, "assistant")).toBeUndefined();
-      expect(resolveIn(homeChildRoutes, "/assistant").name).toBeUndefined();
-    });
-
-    it("redirects /assistant/:chatId? to the thread in Home's AI tab, keeping the query, with the flag on", () => {
-      const { homeChildRoutes } = flagged(true);
+    it("redirects /assistant/:chatId? to the thread in Home's AI tab, keeping the query", () => {
+      const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "assistant");
       expect(route.path).toBe("assistant/:chatId?");
       expect(route.component).toBeUndefined();
@@ -2037,7 +2024,7 @@ describe("useRoutes (router.ts)", () => {
     });
 
     it("lands a pushed /assistant/:id on Home with ?tab=ai&thread=", async () => {
-      const { homeChildRoutes } = flagged(true);
+      const { homeChildRoutes } = useRoutes();
       const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
       const router = createRouter({
         history: createMemoryHistory(),
@@ -2060,7 +2047,7 @@ describe("useRoutes (router.ts)", () => {
     });
 
     it("leaves the /ai namespace and the share routes untouched", () => {
-      const { homeChildRoutes } = flagged(true);
+      const { homeChildRoutes } = useRoutes();
       expect(resolveIn(homeChildRoutes, "/ai/shared/t1").name).toBe("sharedChat");
       const others = homeChildRoutes.filter(
         (r: any) => r.name !== "assistant" && /^\/?assistant/.test(r.path ?? ""),
@@ -2068,9 +2055,8 @@ describe("useRoutes (router.ts)", () => {
       expect(others).toEqual([]);
     });
 
-    it("registers /close-tab outside the layout, authenticated, only with the flag on", () => {
-      expect(flagged(false).parentRoutes.find((r: any) => r.name === "closeTab")).toBeUndefined();
-      const route = flagged(true).parentRoutes.find((r: any) => r.name === "closeTab");
+    it("registers /close-tab outside the layout, authenticated", () => {
+      const route = useRoutes().parentRoutes.find((r: any) => r.name === "closeTab");
       expect(route.path).toBe("/close-tab");
       expect(route.meta.public).toBeUndefined();
       expect(enTitle(route.meta.titleKey)).toBe("You're signed in");
@@ -2649,7 +2635,7 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly these 10 parentRoutes, the anonymous public pages included", () => {
+    it("should have exactly these 11 parentRoutes, the anonymous public pages included", () => {
       const { parentRoutes } = useRoutes();
       expect(parentRoutes.map((r: any) => r.path)).toEqual([
         "/login",
@@ -2657,6 +2643,7 @@ describe("useRoutes (router.ts)", () => {
         "/logout",
         "/cb",
         "/ai/public/:token",
+        "/close-tab",
         "/slack/oauth/callback",
         "/slack/link",
         "/slack/link/callback",

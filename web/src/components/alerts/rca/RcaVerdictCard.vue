@@ -293,16 +293,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("alerts.incidents.rcaRun.followInThread") }}
         </OButton>
-        <OButton
-          v-if="legacy"
-          data-test="rca-banner-cancel-btn"
-          variant="outline"
-          size="sm"
-          :loading="cancelling"
-          @click="$emit('cancel')"
-        >
-          {{ t("alerts.incidents.rcaCancel") }}
-        </OButton>
       </template>
     </OBanner>
 
@@ -525,8 +515,6 @@ const props = withDefaults(
     startLockedReason?: I18nText;
     /** Shown inside the assistant's thread, which is already the thread to follow. */
     inThread?: boolean;
-    /** Assistant flag off: the live banner keeps its own Cancel, with no confirm. */
-    legacy?: boolean;
   }>(),
   {
     waitingInput: false,
@@ -560,7 +548,6 @@ const props = withDefaults(
     timezone: "UTC",
     startLockedReason: undefined,
     inThread: false,
-    legacy: false,
   },
 );
 

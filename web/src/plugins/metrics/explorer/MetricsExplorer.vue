@@ -934,7 +934,6 @@ import {
   decodeMetricsConfig,
   legacyLinkToVisualizeQuery,
 } from "@/composables/metrics/metricsUrlState";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { AI_CHAT_QUERY } from "@/utils/assistant/explorerRoutes";
 import { hasMetricsOverrideParams } from "@/utils/metrics/metricsEditorParams";
 import { PANEL_PERCENTILE_WINDOW, PANEL_RATE_WINDOW } from "@/utils/metrics/metricDefaults";
@@ -1700,7 +1699,7 @@ export default defineComponent({
     const visualizeSeedHeld = ref(false);
     const visualizeMount = ref(0);
     // An assistant link applies its query and window but never runs them.
-    const isAssistantLink = (q: Record<string, any>) => isAssistantV2() && q.type === AI_CHAT_QUERY;
+    const isAssistantLink = (q: Record<string, any>) => q.type === AI_CHAT_QUERY;
     // `type` is also the grid's filter key, so the sync must carry the marker or a reload and Back would auto-run.
     const linkMarker = (q: Record<string, any>) =>
       isAssistantLink(q) ? { type: AI_CHAT_QUERY } : {};

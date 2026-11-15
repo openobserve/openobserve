@@ -190,7 +190,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import AssistantCreditMeter from "@/components/ai-assistant/credits/AssistantCreditMeter.vue";
 import config from "@/aws-exports";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useAssistantCreditMeter } from "../useAssistantCreditMeter";
 import { siteURL } from "@/constants/config";
 import BillingService, { type AiUsage } from "@/services/billings";
@@ -357,8 +356,8 @@ const loadAiUsage = async (loadId: number) => {
   }
 };
 
-// The Plans card's meter on the shared reads, so a turn or a consent change shows here too; Cloud and v2 only.
-const creditMeter = config.isCloud === "true" && isAssistantV2() ? useAssistantCreditMeter() : null;
+// The Plans card's meter on the shared reads, so a turn or a consent change shows here too; Cloud only.
+const creditMeter = config.isCloud === "true" ? useAssistantCreditMeter() : null;
 
 /** Why AI stopped, for a contract, a billing-group member, or an org that pays by subscription. */
 const aiCreditsMessage = computed(() => {

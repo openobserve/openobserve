@@ -50,7 +50,6 @@ test.describe("assistant approval cards", () => {
 
   test.beforeEach(async ({ context, page }) => {
     harness = await loadHarness();
-    await harness.setFlag(context, true);
     // A server without split budgets gates every card to Deny only (PO A14), so this one advertises them.
     state = harness.createMockState({ capabilitiesEnabled: true, capabilities: { approval_extend_budgets: true } });
     await harness.installMocks(context, state);

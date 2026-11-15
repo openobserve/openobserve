@@ -245,23 +245,6 @@ describe("AssistantSidebarHost", () => {
     expect(column()!.hasAttribute("data-dragging")).toBe(false);
   });
 
-  it("keeps the legacy expanded width once on the first revamped open", async () => {
-    window.innerWidth = 1280;
-    const vuexWithLegacy = fakeVuex();
-    (vuexWithLegacy.state as Record<string, unknown>).isAiChatExpanded = true;
-    fake.current = fakeAssistant();
-    fake.current.store.setIdentity(null);
-    const router = fakeRouter();
-    await router.push("/logs");
-    mount(AssistantSidebarHost, {
-      global: { plugins: [router, vuexWithLegacy] },
-      attachTo: document.body,
-    });
-    fake.current.store.setIdentity({ userOrgKey: "k1", org: "default" });
-    await flushPromises();
-    expect(fake.current.store.state.shell.sidebarWidthRem).toBe(40);
-  });
-
   it("renders the same session as the sheet at half below lg", async () => {
     lg.value = false;
     const { open, store } = await setup();

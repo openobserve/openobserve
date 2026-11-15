@@ -22,7 +22,6 @@ import {
   buildFeatureGateContext,
 } from "@/utils/enterpriseFeatures";
 import { oncallRouteGuard } from "./oncallRouteGuard";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { autoObserveAllowed, type ConfigSource } from "@/components/autoobserve/autoObserveGate";
 import { queryClient } from "@/composables/query/queryClient";
 import { configFullQuery } from "@/services/config.queries";
@@ -414,10 +413,6 @@ const useEnterpriseRoutes = () => {
       // Home, coverage, issues and What I've changed share this route but read different things.
       meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true, accessScopeQuery: ["page"] },
       beforeEnter(to: any, from: any, next: any) {
-        if (!isAssistantV2()) {
-          routeGuard(to, from, next);
-          return;
-        }
         const org = to.query?.org_identifier ?? store.state.selectedOrganization?.identifier;
         // routeGuard reads the store through inject, which is gone after the first await.
         routeGuard(to, from, (target?: unknown) => {

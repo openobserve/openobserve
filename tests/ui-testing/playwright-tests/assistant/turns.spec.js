@@ -49,7 +49,6 @@ test.describe("assistant honest turns", () => {
 
   test.beforeEach(async ({ context, page }) => {
     harness = await loadHarness();
-    await harness.setFlag(context, true);
     state = harness.createMockState();
     await harness.installMocks(context, state);
     await harness.login(page);

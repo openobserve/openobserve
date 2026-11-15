@@ -16,6 +16,7 @@
 import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
 import { computed, nextTick } from "vue";
+import { routerKey } from "vue-router";
 import i18n from "@/locales";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import Header from "@/components/Header.vue";
@@ -57,6 +58,8 @@ vi.mock("@/utils/cookies", () => ({
   removeToken: vi.fn(),
 }));
 
+const ASSISTANT_BUTTON = '[data-test="assistant-header-button-stub"]';
+
 describe("Header Component", () => {
   let wrapper: any;
   let mockStore: any;
@@ -73,6 +76,7 @@ describe("Header Component", () => {
       configOverrides?: any;
       propsOverrides?: any;
       stubsOverrides?: any;
+      globalProvide?: Record<symbol | string, unknown>;
     } = {},
   ) => {
     const {
@@ -81,6 +85,7 @@ describe("Header Component", () => {
       configOverrides = {},
       propsOverrides = {},
       stubsOverrides = {},
+      globalProvide = {},
     } = options;
 
     const store = {
@@ -112,7 +117,7 @@ describe("Header Component", () => {
       // Header renders useTheme(), whose useStore() resolves via vuex's `store`
       // injection key — the store prop alone does not satisfy it. Provide the
       // same per-test store so storeOverrides still drive theme-dependent logic.
-      provide: { store },
+      provide: { store, ...globalProvide },
       stubs: {
         ...defaultGlobalConfig.stubs,
         ...stubsOverrides,
@@ -149,7 +154,6 @@ describe("Header Component", () => {
         organizationData: {
           quotaThresholdMsg: "",
         },
-        isAiChatEnabled: false,
         selectedOrganization: {
           identifier: "test-org",
           label: "Test Organization",
@@ -203,6 +207,7 @@ describe("Header Component", () => {
       plugins: [i18n],
       stubs: {
         ThemeSwitcher: true,
+        AssistantHeaderButton: { template: '<div data-test="assistant-header-button-stub" />' },
       },
     };
 
@@ -500,7 +505,8 @@ describe("Header Component", () => {
       await focusWrapper.vm.$nextTick();
 
       expect(focusWrapper.find('[data-test="header-mobile-nav-toggle"]').exists()).toBe(false);
-      expect(focusWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(false);
+      expect(focusWrapper.find(ASSISTANT_BUTTON).exists()).toBe(false);
+      expect(focusWrapper.find('[data-test="menu-link-ai-locked"]').exists()).toBe(false);
       // nothing teleports into the old header slot any more
       expect(focusWrapper.find("#o2-header-actions").exists()).toBe(false);
 
@@ -508,116 +514,36 @@ describe("Header Component", () => {
     });
   });
 
-  describe("AI Chat Button", () => {
-    it("holds the AI button's place until the config says whether it shows", async () => {
-      const aiWrapper = createWrapper({
+  describe("AI Assistant button", () => {
+    const aiWrapperFor = (zoConfig: Record<string, unknown>, isEnterprise = "true") =>
+      createWrapper({
         mountType: "mount",
-        storeOverrides: { state: { zoConfig: { version: "" } } },
-        configOverrides: { isEnterprise: "true" },
+        storeOverrides: { state: { zoConfig } },
+        configOverrides: { isEnterprise },
         stubsOverrides: {},
       });
-      await aiWrapper.vm.$nextTick();
 
-      expect(aiWrapper.find('[data-test="header-ai-slot-placeholder"]').exists()).toBe(true);
-      expect(aiWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(false);
+    it("shows the assistant's own button when AI is on and licensed", async () => {
+      const aiWrapper = aiWrapperFor({ ai_enabled: true, features: { ai_assistant: "enabled" } });
+      await aiWrapper.vm.$nextTick();
+      expect(aiWrapper.find(ASSISTANT_BUTTON).exists()).toBe(true);
+      expect(aiWrapper.find('[data-test="menu-link-ai-locked"]').exists()).toBe(false);
       aiWrapper.unmount();
     });
 
-    it("drops the held place once the config has loaded", async () => {
-      const aiWrapper = createWrapper({
-        mountType: "mount",
-        storeOverrides: { state: { zoConfig: { version: "v1", ai_enabled: true } } },
-        configOverrides: { isEnterprise: "true" },
-        stubsOverrides: {},
-      });
-      await aiWrapper.vm.$nextTick();
-
-      expect(aiWrapper.find('[data-test="header-ai-slot-placeholder"]').exists()).toBe(false);
-      expect(aiWrapper.find('[data-test="menu-link-ai-item"]').exists()).toBe(true);
-      aiWrapper.unmount();
-    });
-
-    it("should display AI chat button in enterprise mode with ai_enabled", async () => {
-      const aiWrapper = createWrapper({
-        mountType: "mount",
-        storeOverrides: {
-          state: {
-            zoConfig: {
-              ai_enabled: true,
-            },
-          },
-        },
-        configOverrides: {
-          isEnterprise: "true",
-        },
-        stubsOverrides: {},
-      });
-
-      await aiWrapper.vm.$nextTick();
-
-      // Verify AI chat button is rendered
-      const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
-      expect(aiButton.exists()).toBe(true);
-
-      aiWrapper.unmount();
-    });
-
-    it("should show the AI button locked (not hidden) if not enterprise", async () => {
-      const aiWrapper = createWrapper({
-        mountType: "mount",
-        storeOverrides: {
-          state: {
-            zoConfig: {
-              ai_enabled: true,
-            },
-          },
-        },
-        configOverrides: {
-          isEnterprise: "false",
-        },
-        stubsOverrides: {},
-      });
-
-      await aiWrapper.vm.$nextTick();
-
-      // Visible and clickable — upsell, not a hidden or disabled feature.
-      const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
-      expect(aiButton.exists()).toBe(true);
-      expect(aiButton.attributes("disabled")).toBeUndefined();
-
-      aiWrapper.unmount();
-    });
-
-    it("explains the edition lock on the AI button with a tooltip", async () => {
-      const aiWrapper = createWrapper({
-        mountType: "mount",
-        storeOverrides: { state: { zoConfig: { ai_enabled: true } } },
-        configOverrides: { isEnterprise: "false" },
-        stubsOverrides: {},
-      });
-      await aiWrapper.vm.$nextTick();
-
-      const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
-      const tooltip = aiButton.findComponent({ name: "OTooltip" });
-      expect(tooltip.exists()).toBe(true);
-      expect(String(tooltip.props("content"))).toBe(
-        "AI Assistant is available in OpenObserve Enterprise",
+    it("leaves the edition lock on OSS to the assistant's own button", async () => {
+      const aiWrapper = aiWrapperFor(
+        { ai_enabled: false, features: { ai_assistant: "locked" } },
+        "false",
       );
-      expect(aiButton.attributes("aria-label")).toBe(
-        "AI Assistant is available in OpenObserve Enterprise",
-      );
+      await aiWrapper.vm.$nextTick();
+      expect(aiWrapper.find(ASSISTANT_BUTTON).exists()).toBe(true);
+      expect(aiWrapper.find('[data-test="menu-link-ai-locked"]').exists()).toBe(false);
       aiWrapper.unmount();
     });
 
     it("keeps the AI logo with a lock badge and under a locked license", async () => {
-      const aiWrapper = createWrapper({
-        mountType: "mount",
-        storeOverrides: {
-          state: { zoConfig: { ai_enabled: true, features: { ai_assistant: "locked" } } },
-        },
-        configOverrides: { isEnterprise: "true" },
-        stubsOverrides: {},
-      });
+      const aiWrapper = aiWrapperFor({ ai_enabled: true, features: { ai_assistant: "locked" } });
       await aiWrapper.vm.$nextTick();
 
       const aiButton = aiWrapper.find('[data-test="menu-link-ai-locked"]');
@@ -628,175 +554,63 @@ describe("Header Component", () => {
       aiWrapper.unmount();
     });
 
-    it("should not display AI button if ai_enabled is false", async () => {
+    it("shows every user the license lock, which opens the locked-feature page, when the license lacks the assistant", async () => {
+      const push = vi.fn();
       const aiWrapper = createWrapper({
         mountType: "mount",
         storeOverrides: {
-          state: {
-            zoConfig: {
-              ai_enabled: false,
-            },
-          },
+          state: { zoConfig: { ai_enabled: false, features: { ai_assistant: "locked" } } },
         },
-        configOverrides: {
-          isEnterprise: "true",
+        configOverrides: { isEnterprise: "true" },
+        globalProvide: {
+          [routerKey as symbol]: { ...mockRouter, push, resolve: () => ({ href: "/" }) },
         },
-        stubsOverrides: {},
       });
-
       await aiWrapper.vm.$nextTick();
 
-      // Verify AI button is NOT rendered
-      const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
-      expect(aiButton.exists()).toBe(false);
-
+      expect(aiWrapper.find(ASSISTANT_BUTTON).exists()).toBe(false);
+      await aiWrapper.get('[data-test="menu-link-ai-locked"]').trigger("click");
+      expect(push).toHaveBeenCalledWith({
+        path: "/feature-locked/ai_assistant",
+        query: { org_identifier: "test-org" },
+      });
       aiWrapper.unmount();
     });
 
-    it("should apply active class when AI chat is enabled", async () => {
-      const aiWrapper = createWrapper({
-        mountType: "mount",
-        storeOverrides: {
-          state: {
-            zoConfig: {
-              ai_enabled: true,
-            },
-            isAiChatEnabled: true,
-          },
-        },
-        configOverrides: {
-          isEnterprise: "true",
-        },
-        stubsOverrides: {},
-      });
-
+    it("shows no AI button when the menu hides the assistant while AI is on", async () => {
+      const aiWrapper = aiWrapperFor({ ai_enabled: true, features: { ai_assistant: "hidden" } });
       await aiWrapper.vm.$nextTick();
-
-      // Verify AI button has active class
-      const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
-      expect(aiButton.exists()).toBe(true);
-      expect(aiButton.classes()).toContain("ai-btn-active");
-
+      expect(aiWrapper.find(ASSISTANT_BUTTON).exists()).toBe(false);
+      expect(aiWrapper.find('[data-test="menu-link-ai-locked"]').exists()).toBe(false);
       aiWrapper.unmount();
     });
 
-    it("should not have active class when AI chat is disabled", async () => {
-      const aiWrapper = createWrapper({
-        mountType: "mount",
-        storeOverrides: {
-          state: {
-            zoConfig: {
-              ai_enabled: true,
-            },
-            isAiChatEnabled: false,
-          },
-        },
-        configOverrides: {
-          isEnterprise: "true",
-        },
-        stubsOverrides: {},
-      });
-
+    it("leaves AI turned off to the assistant's own button, which offers admins the setup", async () => {
+      const aiWrapper = aiWrapperFor({ ai_enabled: false, features: { ai_assistant: "hidden" } });
       await aiWrapper.vm.$nextTick();
-
-      // Verify AI button does NOT have active class
-      const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
-      expect(aiButton.exists()).toBe(true);
-      expect(aiButton.classes()).not.toContain("ai-btn-active");
-
-      aiWrapper.unmount();
-    });
-
-    it("should emit toggleAIChat when AI button is clicked", async () => {
-      const aiWrapper = createWrapper({
-        mountType: "mount",
-        storeOverrides: {
-          state: {
-            zoConfig: {
-              ai_enabled: true,
-            },
-          },
-        },
-        configOverrides: {
-          isEnterprise: "true",
-        },
-        stubsOverrides: {},
-      });
-
-      await aiWrapper.vm.$nextTick();
-
-      // Click the AI button
-      const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
-      expect(aiButton.exists()).toBe(true);
-
-      await aiButton.trigger("click");
-
-      // Verify toggleAIChat event was emitted
-      expect(aiWrapper.emitted("toggleAIChat")).toBeTruthy();
-      expect(aiWrapper.emitted("toggleAIChat")).toHaveLength(1);
-
+      expect(aiWrapper.find(ASSISTANT_BUTTON).exists()).toBe(true);
       aiWrapper.unmount();
     });
 
     it("should emit update:isHovered true on mouse enter", async () => {
-      const aiWrapper = createWrapper({
-        mountType: "mount",
-        storeOverrides: {
-          state: {
-            zoConfig: {
-              ai_enabled: true,
-            },
-          },
-        },
-        configOverrides: {
-          isEnterprise: "true",
-        },
-        stubsOverrides: {},
-      });
-
+      const aiWrapper = aiWrapperFor({ ai_enabled: true, features: { ai_assistant: "locked" } });
       await aiWrapper.vm.$nextTick();
 
-      // Hover over the AI button
-      const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
-      expect(aiButton.exists()).toBe(true);
+      await aiWrapper.get('[data-test="menu-link-ai-locked"]').trigger("mouseenter");
 
-      await aiButton.trigger("mouseenter");
-
-      // Verify update:isHovered event was emitted with true
       expect(aiWrapper.emitted("update:isHovered")).toBeTruthy();
       expect(aiWrapper.emitted("update:isHovered")[0]).toEqual([true]);
-
       aiWrapper.unmount();
     });
 
     it("should emit update:isHovered false on mouse leave", async () => {
-      const aiWrapper = createWrapper({
-        mountType: "mount",
-        storeOverrides: {
-          state: {
-            zoConfig: {
-              ai_enabled: true,
-            },
-          },
-        },
-        configOverrides: {
-          isEnterprise: "true",
-        },
-        stubsOverrides: {},
-      });
-
+      const aiWrapper = aiWrapperFor({ ai_enabled: true, features: { ai_assistant: "locked" } });
       await aiWrapper.vm.$nextTick();
 
-      // Hover and then leave the AI button
-      const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
-      expect(aiButton.exists()).toBe(true);
+      await aiWrapper.get('[data-test="menu-link-ai-locked"]').trigger("mouseleave");
 
-      await aiButton.trigger("mouseleave");
-
-      // Verify update:isHovered event was emitted with false
       expect(aiWrapper.emitted("update:isHovered")).toBeTruthy();
       expect(aiWrapper.emitted("update:isHovered")[0]).toEqual([false]);
-
       aiWrapper.unmount();
     });
 
@@ -888,25 +702,6 @@ describe("Header Component", () => {
       wrapper.vm.goToHome();
 
       expect(wrapper.emitted("goToHome")).toBeTruthy();
-    });
-
-    it("should emit toggleAIChat when toggleAIChat is called on an entitled build", () => {
-      const aiWrapper = createWrapper({
-        configOverrides: { isEnterprise: "true" },
-      });
-
-      aiWrapper.vm.toggleAIChat();
-
-      expect(aiWrapper.emitted("toggleAIChat")).toBeTruthy();
-    });
-
-    it("should NOT emit toggleAIChat when called on a build that doesn't unlock AI (defense in depth)", () => {
-      // Default wrapper is OSS (isEnterprise: "false") — the guard inside
-      // toggleAIChat must block this even if some other path called it
-      // directly, bypassing the button's own `disabled`.
-      wrapper.vm.toggleAIChat();
-
-      expect(wrapper.emitted("toggleAIChat")).toBeFalsy();
     });
 
     it("should emit openSlack when openSlack is called", () => {
@@ -1481,7 +1276,9 @@ describe("Header Component", () => {
       const named = createWrapper({
         mountType: "mount",
         configOverrides: { isEnterprise: "true" },
-        storeOverrides: { state: { zoConfig: { ai_enabled: true } } },
+        storeOverrides: {
+          state: { zoConfig: { ai_enabled: true, features: { ai_assistant: "locked" } } },
+        },
       });
 
       const tooltipByHost = new Map<string, string>();
@@ -1492,7 +1289,7 @@ describe("Header Component", () => {
       }
 
       const buttons = [
-        "menu-link-ai-item",
+        "menu-link-ai-locked",
         "menu-link-slack-item",
         "menu-link-help-item",
         "header-my-account-profile-icon",

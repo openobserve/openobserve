@@ -72,7 +72,10 @@ const mountLayout = async () => {
       stubs: {
         AppHeader: StubDiv,
         ONavbar: StubDiv,
-        O2AIChat: StubDiv,
+        AssistantSidebarHost: StubDiv,
+        AssistantWindowLayer: StubDiv,
+        AssistantSkipLink: StubDiv,
+        HomeReturnBar: StubDiv,
         WebinarBanner: StubDiv,
         AnnouncementBanner: StubDiv,
         ShortcutCheatsheet: StubDiv,

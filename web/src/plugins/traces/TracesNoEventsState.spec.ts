@@ -19,6 +19,17 @@ import { reactive, defineComponent, h } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
+vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", async () => {
+  const { defineComponent, h } = await import("vue");
+  return {
+    __esModule: true,
+    default: defineComponent({
+      props: { dataTest: String },
+      setup: (props) => () => h("button", { "data-test": props.dataTest }),
+    }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Reactive mock — mutated directly in tests; vi.mock factory closes over it.
 // ---------------------------------------------------------------------------
@@ -110,8 +121,7 @@ function mountComponent() {
 }
 
 /** Used by jump-to-stream-data and ask-ai tests: the store is required because
- *  jumpTargetSublabel reads store.state.timezone and useAiIcon reads
- *  store.state.theme via useStore(). */
+ *  jumpTargetSublabel reads store.state.timezone. */
 function mountComponentWithStore(props: Record<string, unknown> = {}) {
   return mount(TracesNoEventsState, {
     props,
@@ -184,34 +194,20 @@ describe("TracesNoEventsState", () => {
   });
 
   // -------------------------------------------------------------------------
-  // 2. Ask AI button (gated by aiEnabled)
+  // 2. Ask AI door
   // -------------------------------------------------------------------------
-  describe("ask-ai button", () => {
-    it("should NOT render the Ask AI button when aiEnabled is false", () => {
-      const localWrapper = mountComponentWithStore({ aiEnabled: false });
+  describe("ask-ai door", () => {
+    const DOOR = '[data-test="ai-entry-empty-result-troubleshoot"]';
 
-      expect(localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists()).toBe(false);
-
-      localWrapper.unmount();
-    });
-
-    it("should render the Ask AI button when aiEnabled is true and the window overlaps data", () => {
-      // streamResults.list is empty → streamDocTimeRange undefined →
-      // windowHasStreamData true and jumpTarget null, so the button shows.
-      const localWrapper = mountComponentWithStore({ aiEnabled: true });
-
-      expect(localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists()).toBe(true);
-
-      localWrapper.unmount();
-    });
-
-    it("should emit ask-ai with no payload when the Ask AI button is clicked", async () => {
-      const localWrapper = mountComponentWithStore({ aiEnabled: true });
-
-      await localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').trigger("click");
-
-      expect(localWrapper.emitted("ask-ai")).toBeTruthy();
-      expect(localWrapper.emitted("ask-ai")![0]).toEqual([]);
+    it("should render the door when the window overlaps data", async () => {
+      // streamResults.list is empty -> streamDocTimeRange undefined ->
+      // windowHasStreamData true and jumpTarget null, so the door shows.
+      const localWrapper = mountComponentWithStore();
+      for (let i = 0; i < 3; i++) {
+        await vi.dynamicImportSettled();
+        await flushPromises();
+      }
+      expect(localWrapper.find(DOOR).exists()).toBe(true);
 
       localWrapper.unmount();
     });
@@ -229,13 +225,13 @@ describe("TracesNoEventsState", () => {
         endTime: 200_000_000,
         relativeTimePeriod: "",
       };
-      const localWrapper = mountComponentWithStore({ aiEnabled: true });
+      const localWrapper = mountComponentWithStore();
       await flushPromises();
 
       expect(localWrapper.find('[data-test="traces-no-events-jump-to-data-card"]').exists()).toBe(
         true,
       );
-      expect(localWrapper.find('[data-test="traces-no-events-ask-ai-btn"]').exists()).toBe(false);
+      expect(localWrapper.find(DOOR).exists()).toBe(false);
 
       localWrapper.unmount();
     });

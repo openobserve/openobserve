@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { routeGuard, getPath } from "@/utils/zincutils";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 // eslint-disable-next-line no-restricted-imports -- the pure barrel's side-effect imports would land in the entry chunk
 import { fullThreadLocation } from "@/composables/assistant/fullThreadRoute";
 import type {
@@ -252,7 +251,7 @@ const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
 const ImportPipeline = () => import("@/components/pipeline/ImportPipeline.vue");
 
-/** The old full view; registered only with the flag on, it now opens the thread on Home at Full density. */
+/** The old full view; it now opens the thread on Home at Full density. */
 function assistantRoute() {
   return {
     path: "assistant/:chatId?",
@@ -332,16 +331,12 @@ const useRoutes = () => {
       },
     },
     // The new-tab sign-in of `80` §2.3 lands here; it is authenticated, so a signed-out visit goes through login first.
-    ...(isAssistantV2()
-      ? [
-          {
-            path: "/close-tab",
-            name: "closeTab",
-            component: () => import("@/views/CloseTabView.vue"),
-            meta: { titleKey: "assistant.closeTab.title" },
-          },
-        ]
-      : []),
+    {
+      path: "/close-tab",
+      name: "closeTab",
+      component: () => import("@/views/CloseTabView.vue"),
+      meta: { titleKey: "assistant.closeTab.title" },
+    },
     {
       path: "/slack/oauth/callback",
       name: "slackOAuthCallback",
@@ -1634,7 +1629,7 @@ const useRoutes = () => {
         ]
       : []),
 
-    ...(isAssistantV2() ? [assistantRoute()] : []),
+    assistantRoute(),
     {
       path: "/:catchAll(.*)*",
       component: Error404,

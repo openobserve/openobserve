@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import config from "@/aws-exports";
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -31,17 +31,12 @@ vi.mock("@openobserve/browser-rum", () => ({
 import MainLayout from "./MainLayout.vue";
 
 const StubDiv = defineComponent({ setup: () => () => h("div") });
-const SidebarHost = defineComponent({
-  setup: () => () => h("div", { "data-test": "assistant-sidebar-host" }),
-});
+const tagged = (test: string) =>
+  defineComponent({ setup: () => () => h("div", { "data-test": test }) });
+const SidebarHost = tagged("assistant-sidebar-host");
 
-describe("MainLayout — assistant v2 in kiosk mode", () => {
+describe("MainLayout — the assistant shell in kiosk and focus mode", () => {
   let wrapper: VueWrapper | undefined;
-
-  beforeAll(() => {
-    window.__O2_ASSISTANT_V2__ = true;
-    resetAssistantV2ForTests();
-  });
 
   afterEach(() => {
     wrapper?.unmount();
@@ -49,11 +44,11 @@ describe("MainLayout — assistant v2 in kiosk mode", () => {
     store.state.kioskMode = false;
   });
 
-  const mountLayout = async (kioskMode: boolean) => {
+  const mountLayout = async (kioskMode: boolean, meta: Record<string, unknown> = {}) => {
     store.state.kioskMode = kioskMode;
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: "/", component: StubDiv }],
+      routes: [{ path: "/", component: StubDiv, meta }],
     });
     await router.push("/");
     wrapper = mount(MainLayout, {
@@ -62,8 +57,8 @@ describe("MainLayout — assistant v2 in kiosk mode", () => {
         stubs: {
           AppHeader: StubDiv,
           ONavbar: StubDiv,
-          O2AIChat: StubDiv,
           AssistantSidebarHost: SidebarHost,
+          AssistantWindowLayer: tagged("assistant-window-layer"),
           AssistantSkipLink: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
@@ -75,7 +70,7 @@ describe("MainLayout — assistant v2 in kiosk mode", () => {
           SlackIcon: StubDiv,
           ManagementIcon: StubDiv,
           ODialog: StubDiv,
-          PaidOverageConsentDialog: StubDiv,
+          PaidOverageConsentDialog: tagged("paid-overage-consent"),
         },
       },
     });
@@ -97,5 +92,69 @@ describe("MainLayout — assistant v2 in kiosk mode", () => {
     expect(main.classes()).toContain("pe-2");
     expect(main.find("div").classes()).toContain("shadow-md");
     expect(layout.find('[data-test="assistant-sidebar-host"]').exists()).toBe(true);
+  });
+
+  it("mounts no assistant sidebar or window on a focus-mode route", async () => {
+    const layout = await mountLayout(false, { focusMode: true });
+    expect(layout.find('[data-test="assistant-sidebar-host"]').exists()).toBe(false);
+    expect(layout.find('[data-test="assistant-window-layer"]').exists()).toBe(false);
+  });
+});
+
+describe("MainLayout — the paid overage consent dialog", () => {
+  let wrapper: VueWrapper | undefined;
+  const savedCloud = config.isCloud;
+  const savedConfig = store.state.zoConfig;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = undefined;
+    config.isCloud = savedCloud;
+    store.state.zoConfig = savedConfig;
+  });
+
+  const mountLayout = async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", component: StubDiv }],
+    });
+    await router.push("/");
+    wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: StubDiv,
+          ONavbar: StubDiv,
+          AssistantSidebarHost: StubDiv,
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+          WebinarBanner: StubDiv,
+          AnnouncementBanner: StubDiv,
+          ShortcutCheatsheet: StubDiv,
+          CommunitySlackInvite: StubDiv,
+          ThemeSwitcher: StubDiv,
+          PredefinedThemes: StubDiv,
+          SlackIcon: StubDiv,
+          ManagementIcon: StubDiv,
+          ODialog: StubDiv,
+          PaidOverageConsentDialog: tagged("paid-overage-consent"),
+        },
+      },
+    });
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("stays off a self-hosted build that bills", async () => {
+    config.isCloud = "false";
+    store.state.zoConfig = { ...savedConfig, billing_enabled: true };
+    const layout = await mountLayout();
+    expect(layout.find('[data-test="paid-overage-consent"]').exists()).toBe(false);
+  });
+
+  it("mounts on cloud", async () => {
+    config.isCloud = "true";
+    const layout = await mountLayout();
+    expect(layout.find('[data-test="paid-overage-consent"]').exists()).toBe(true);
   });
 });

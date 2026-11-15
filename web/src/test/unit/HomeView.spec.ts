@@ -23,6 +23,7 @@ import { nextTick } from "vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { queryClient } from "@/composables/query/queryClient";
 import { settingKeys } from "@/services/settings.querykeys";
+import { readHome, resetPrefsForTests } from "@/composables/assistant/prefs";
 
 vi.mock("../../aws-exports", () => ({
   default: {
@@ -48,6 +49,20 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import settingsService from "@/services/settings";
+
+// The signed-in user+org key is known at once, so Home's saved tab state applies on the first flush.
+vi.mock("@/composables/assistant", async () => {
+  const { computed, reactive } = await import("vue");
+  const prefs = await import("@/composables/assistant/prefs");
+  return {
+    assistantStore: { state: reactive({ userOrgKey: "k1" }) },
+    useAssistantCapability: () => ({ gate: computed(() => "available") }),
+    migrateHome: prefs.migrateHome,
+    writeHome: prefs.writeHome,
+    openAssistant: vi.fn(),
+    legacyRelayArgs: (value: unknown) => value,
+  };
+});
 
 const { mockRouter, mockRoute } = vi.hoisted(() => ({
   mockRouter: {
@@ -79,10 +94,10 @@ describe("HomeView.vue", () => {
       subscription_type: "premium",
     };
     store.state.theme = "dark";
-    store.state.isAiChatEnabled = false;
     store.state.zoConfig = { ai_enabled: false };
 
     localStorage.clear();
+    resetPrefsForTests();
   });
 
   afterEach(() => {
@@ -119,12 +134,6 @@ describe("HomeView.vue", () => {
           },
           UsageTab: {
             template: '<div data-test="usage-tab">UsageTab</div>',
-          },
-          O2AIChat: {
-            template: '<div data-test="o2-ai-chat">O2AIChat</div>',
-          },
-          HomeChatHistory: {
-            template: '<div data-test="home-chat-history">HomeChatHistory</div>',
           },
           PinnedDashboardTab: {
             name: "PinnedDashboardTab",
@@ -165,9 +174,10 @@ describe("HomeView.vue", () => {
       expect(wrapper.vm.tabOrder.length).toBeGreaterThan(0);
     });
 
-    it("should set activeHomeTab from localStorage if saved", () => {
+    it("should set activeHomeTab from the saved tab", async () => {
       localStorage.setItem("o2_home_active_tab", "usage");
       wrapper = createWrapper();
+      await flushPromises();
       expect(wrapper.vm.activeHomeTab).toBe("usage");
     });
   });
@@ -186,15 +196,16 @@ describe("HomeView.vue", () => {
       expect(wrapper.vm.activeHomeTab).toBe(wrapper.vm.tabOrder[0].id);
     });
 
-    it("should persist active tab to localStorage on change", async () => {
+    it("should persist active tab to the user's prefs on change", async () => {
       wrapper = createWrapper();
+      await flushPromises();
       const initialTab = wrapper.vm.activeHomeTab;
       const tabs = wrapper.vm.tabOrder.map((t: any) => t.id);
       const otherTab = tabs.find((id: string) => id !== initialTab);
       if (otherTab) {
         wrapper.vm.activeHomeTab = otherTab;
         await nextTick();
-        expect(localStorage.getItem("o2_home_active_tab")).toBe(otherTab);
+        expect(readHome("k1").active).toBe(otherTab);
       }
     });
 
@@ -218,12 +229,13 @@ describe("HomeView.vue", () => {
         "overview",
         "usage",
       ]);
-      expect(localStorage.getItem("o2_home_active_tab")).toBe("ai");
+      expect(readHome("k1").active).toBe("ai");
     });
 
-    it("should restore saved tab order from localStorage", () => {
+    it("should restore the saved tab order", async () => {
       localStorage.setItem("o2_home_tab_order", JSON.stringify(["usage", "overview"]));
       wrapper = createWrapper();
+      await flushPromises();
       const ids = wrapper.vm.tabOrder.map((t: any) => t.id);
       expect(ids[0]).toBe("usage");
     });
@@ -239,6 +251,7 @@ describe("HomeView.vue", () => {
       // Re-create wrapper with enterprise config
       wrapper.unmount();
       wrapper = createWrapper();
+      await flushPromises();
       // Find overview in tabOrder
       const overviewTab = wrapper.vm.tabOrder.find((t: any) => t.id === "overview");
       if (overviewTab) {
@@ -250,6 +263,7 @@ describe("HomeView.vue", () => {
 
     it("should render UsageTab when usage tab is active", async () => {
       wrapper = createWrapper();
+      await flushPromises();
       wrapper.vm.activeHomeTab = "usage";
       await nextTick();
       expect(wrapper.find('[data-test="usage-tab"]').exists()).toBe(true);
@@ -286,13 +300,14 @@ describe("HomeView.vue", () => {
       { id: "c", label: "C" },
     ];
 
-    it("moves a tab after the target when before=false, and persists", () => {
+    it("moves a tab after the target when before=false, and persists", async () => {
       wrapper = createWrapper();
+      await flushPromises();
       wrapper.vm.tabOrder = seed();
       wrapper.vm.onTabReorder({ from: "a", to: "b", before: false });
       const newOrder = wrapper.vm.tabOrder.map((t: any) => t.id);
       expect(newOrder).toEqual(["b", "a", "c"]);
-      expect(localStorage.getItem("o2_home_tab_order")).toBe(JSON.stringify(["b", "a", "c"]));
+      expect(readHome("k1").order).toEqual(["b", "a", "c"]);
     });
 
     it("inserts a tab before the target when before=true", () => {
@@ -307,28 +322,6 @@ describe("HomeView.vue", () => {
       wrapper.vm.tabOrder = seed();
       wrapper.vm.onTabReorder({ from: "a", to: "a", before: true });
       expect(wrapper.vm.tabOrder.map((t: any) => t.id)).toEqual(["a", "b", "c"]);
-    });
-  });
-
-  // ── Event Listener ───────────────────────────────────────────────────────
-
-  describe("o2:home-switch-tab event", () => {
-    it("should switch tab when valid tab is dispatched", () => {
-      wrapper = createWrapper();
-      const initialTab = wrapper.vm.activeHomeTab;
-      const tabs = wrapper.vm.tabOrder.map((t: any) => t.id);
-      const targetTab = tabs.find((id: string) => id !== initialTab);
-      if (targetTab) {
-        window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: targetTab }));
-        expect(wrapper.vm.activeHomeTab).toBe(targetTab);
-      }
-    });
-
-    it("should not switch tab when invalid tab is dispatched", () => {
-      wrapper = createWrapper();
-      const initialTab = wrapper.vm.activeHomeTab;
-      window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "nonexistent" }));
-      expect(wrapper.vm.activeHomeTab).toBe(initialTab);
     });
   });
 
@@ -360,9 +353,9 @@ describe("HomeView org home dashboard tab", () => {
       subscription_type: "premium",
     };
     store.state.theme = "dark";
-    store.state.isAiChatEnabled = false;
     store.state.zoConfig = { ai_enabled: false };
     localStorage.clear();
+    resetPrefsForTests();
     useHomeDashboard(gt).homeDashboard.value = null;
   });
 
@@ -402,12 +395,6 @@ describe("HomeView org home dashboard tab", () => {
           },
           UsageTab: {
             template: '<div data-test="usage-tab">UsageTab</div>',
-          },
-          O2AIChat: {
-            template: '<div data-test="o2-ai-chat">O2AIChat</div>',
-          },
-          HomeChatHistory: {
-            template: '<div data-test="home-chat-history">HomeChatHistory</div>',
           },
           PinnedDashboardTab: {
             name: "PinnedDashboardTab",

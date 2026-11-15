@@ -168,11 +168,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-left="forum"
         @click="$emit('open-thread')"
       >
-        {{ t("alerts.incidents.rcaThread.copy") }}
-      </ODropdownItem>
-      <!-- Cancel stops the run for everyone on the incident, so it sits here behind a confirm. -->
-      <template v-if="live && !legacy">
-        <ODropdownSeparator />
+        {{ t("alerts.incidents.rcaLight.openThread") }}
+      </OButton>
+    </template>
+
+    <template v-else>
+      <OButton
+        v-if="!live && canAsk"
+        data-test="rca-ask-btn"
+        variant="outline"
+        size="sm"
+        class="shrink-0"
+        icon-left="auto-awesome"
+        @click="$emit('ask')"
+      >
+        <span class="sr-only @2xl:not-sr-only">{{ t("alerts.incidents.rcaAsk.button") }}</span>
+      </OButton>
+
+      <ODropdown align="end" content-class="w-55">
+        <template #trigger>
+          <OButton
+            data-test="rca-more-btn"
+            variant="outline"
+            size="icon-toolbar"
+            class="shrink-0"
+            :aria-label="t('alerts.incidents.rcaRun.more')"
+          >
+            <OIcon name="more-horiz" size="sm" />
+          </OButton>
+        </template>
         <ODropdownItem
           data-test="rca-cancel-btn"
           variant="destructive"
@@ -182,8 +206,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("alerts.incidents.rcaRun.cancelRun") }}
         </ODropdownItem>
-      </template>
-    </ODropdown>
+        <ODropdownItem
+          data-test="rca-download-btn"
+          icon-left="download"
+          :disabled="!hasReport"
+          @select="$emit('download-report')"
+        >
+          {{ t("alerts.incidents.rcaDownload") }}
+        </ODropdownItem>
+        <ODropdownItem
+          data-test="rca-copy-thread-btn"
+          icon-left="forum"
+          :disabled="!hasThread"
+          @select="$emit('copy-thread')"
+        >
+          {{ t("alerts.incidents.rcaThread.copy") }}
+        </ODropdownItem>
+        <!-- Cancel stops the run for everyone on the incident, so it sits here behind a confirm. -->
+        <template v-if="live">
+          <ODropdownSeparator />
+          <ODropdownItem
+            data-test="rca-cancel-btn"
+            variant="destructive"
+            icon-left="stop-circle"
+            :disabled="cancelling"
+            @select="$emit('cancel')"
+          >
+            {{ t("alerts.incidents.rcaRun.cancelRun") }}
+          </ODropdownItem>
+        </template>
+      </ODropdown>
+    </template>
   </div>
 </template>
 
@@ -195,7 +248,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { RcaRunItem } from "@/services/incidents";
 import { formatTimestampInTimezone } from "@/utils/date";
@@ -220,13 +273,12 @@ const props = withDefaults(
     /** The shown run has a report or a record and AI chat is available (J5). */
     canAsk?: boolean;
     cancelling?: boolean;
-    /** Assistant flag off: Cancel and Re-analyze stay as visible buttons, Cancel with no confirm. */
-    legacy?: boolean;
-    triggering?: boolean;
-    /** A resume is in flight: Re-analyze waits for it. */
-    resuming?: boolean;
-    /** Why no new run can start: Re-analyze stays visible, disabled, with this reason. */
-    startLockedReason?: I18nText;
+    /** `report`: the Report tab's bar, with Copy report and Download as Markdown as buttons. */
+    variant?: "analysis" | "report";
+    /** The app's time zone for run times. */
+    timezone?: string;
+    /** The Markdown Copy report just put on the clipboard; null hides the preview. */
+    copyPreview?: string | null;
   }>(),
   {
     variant: "analysis",
@@ -234,19 +286,13 @@ const props = withDefaults(
     copyPreview: null,
     canAsk: false,
     cancelling: false,
-    legacy: false,
-    triggering: false,
-    resuming: false,
-    startLockedReason: undefined,
   },
 );
 
 defineEmits<{
   "select-run": [runId: string | null];
-  /** Asks to cancel; the page confirms it unless `legacy`. */
+  /** Asks to cancel; the page confirms it. */
   cancel: [];
-  /** Legacy Re-analyze: open the re-analysis dialog. */
-  reanalyze: [];
   "copy-report": [];
   "download-report": [];
   "copy-thread": [];

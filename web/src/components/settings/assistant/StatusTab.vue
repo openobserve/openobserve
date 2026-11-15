@@ -27,39 +27,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @retry="refresh"
       @open-access="openAccess"
     />
-    <div
-      v-if="page.isAdmin.value"
-      class="flex flex-col gap-1"
-      data-test="settings-assistant-v2-optin"
-    >
-      <OSwitch
-        :model-value="optInLocked || optedIn"
-        :label="t('assistant.settings.v2Optin')"
-        :disabled="optInLocked"
-        :aria-describedby="optinHelpId"
-        data-test="settings-assistant-v2-optin-switch"
-        @update:model-value="setOptIn"
-      />
-      <p :id="optinHelpId" class="text-text-secondary text-xs">
-        {{
-          optInLocked
-            ? t("assistant.settings.v2OptinDeployment")
-            : t("assistant.settings.v2OptinHelp")
-        }}
-      </p>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useMutation, useQuery } from "@tanstack/vue-query";
-import { computed, ref, useId } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { toAssistantError, useAssistantName } from "@/composables/assistant";
-import { ASSISTANT_V2_STORAGE_KEY, assistantV2Source } from "@/composables/assistant/flags";
 import { errorTitle } from "@/composables/assistant/pure";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { capabilitiesQuery } from "@/services/assistant.queries";
 import {
   assistantSettingsQuery,
@@ -74,9 +51,6 @@ const { t } = useI18nTyped();
 const router = useRouter();
 const page = useAssistantSettingsPage();
 const name = useAssistantName();
-const optinHelpId = useId();
-// Only a browser opt-in can be undone here; a deployment or harness flag wins over it.
-const optInLocked = assistantV2Source() !== "local";
 
 const capabilities = useQuery(
   computed(() => capabilitiesQuery(page.org.value, page.aiEnabled.value)),
@@ -85,7 +59,6 @@ const settings = useQuery(computed(() => assistantSettingsQuery(page.org.value))
 const test = useMutation(() => testCapabilitiesMutation(page.org.value));
 
 const testState = ref<AssistantTestState>("idle");
-const optedIn = ref(readOptIn());
 
 const status = computed(() => {
   if (capabilities.isPending.value && capabilities.fetchStatus.value !== "idle") return "loading";
@@ -144,25 +117,6 @@ function openAccess() {
     params: { tab: "access" },
     query: { org_identifier: page.org.value },
   });
-}
-
-function readOptIn(): boolean {
-  try {
-    return localStorage.getItem(ASSISTANT_V2_STORAGE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function setOptIn(value: unknown) {
-  const on = value === true;
-  try {
-    if (on) localStorage.setItem(ASSISTANT_V2_STORAGE_KEY, "1");
-    else localStorage.removeItem(ASSISTANT_V2_STORAGE_KEY);
-    optedIn.value = on;
-  } catch {
-    optedIn.value = readOptIn();
-  }
 }
 
 defineExpose({ refresh });

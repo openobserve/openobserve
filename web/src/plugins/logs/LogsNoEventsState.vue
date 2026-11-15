@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        → generic message (no action card; Ask AI / history below)
 
   Emits action IDs to the parent rather than mutating state directly.
-  The "Ask AI" ghost button is only shown when aiEnabled is true.
 -->
 <template>
   <OEmptyState illustration="logs" size="hero" :hide-action="true">
@@ -75,21 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("logs.noEvents.openHistory") }}
         </OButton>
-        <template v-if="assistantV2">
-          <slot v-if="windowHasStreamData && !jumpTarget" name="ai-door" />
-        </template>
-        <OButton
-          v-else-if="aiEnabled && windowHasStreamData && !jumpTarget"
-          variant="ghost"
-          size="sm"
-          data-test="logs-no-events-ask-ai-btn"
-          @click="emit('ask-ai')"
-        >
-          <template #icon-left>
-            <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
-          </template>
-          {{ t("logs.noEvents.askAi") }}
-        </OButton>
+        <slot v-if="windowHasStreamData && !jumpTarget" name="ai-door" />
       </div>
     </template>
   </OEmptyState>
@@ -101,8 +86,6 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { useAiIcon } from "@/composables/useAiIcon";
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { DateTime } from "luxon";
 import { periodToLabel } from "@/composables/useWidenRange";
 import DOMPurify from "dompurify";
@@ -117,7 +100,6 @@ const props = defineProps<{
   editorValue: string;
   relativeTimePeriod: string;
   dateType: string;
-  aiEnabled: boolean;
   /** doc_time_min/max from stream stats, in microseconds. */
   streamDocTimeRange?: { min: number; max: number };
   /** Resolved microsecond bounds of the active query window. */
@@ -129,15 +111,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   "jump-to-stream-data": [fromUs: number, toUs: number];
   "open-history": [];
-  "ask-ai": [];
 }>();
 
 const { t } = useI18nTyped();
-const { aiIconSrc } = useAiIcon();
-const assistantV2 = isAssistantV2();
 
 defineSlots<{
-  /** With the assistant on: the page's own door in place of the legacy Ask AI button. */
+  /** The page's own AI door. */
   "ai-door"?(): unknown;
 }>();
 

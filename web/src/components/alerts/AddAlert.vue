@@ -665,7 +665,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('alerts.editJson')"
     persistent
   >
-    <template v-if="jsonDock" #header-right>
+    <template #header-right>
       <AiEntryButton
         appearance="toggle"
         verb="ask"
@@ -796,7 +796,6 @@ import { unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget"
 import { useOnCallSetup } from "@/composables/useOnCallSetup";
 import {
   assistantObjectNameKey,
-  isAssistantV2,
   useAssistantDockToggle,
   useAssistantLeaveGuard,
 } from "@/composables/assistant/pure";
@@ -857,14 +856,12 @@ export default defineComponent({
     OTruncatedText,
     CompositeAlertForm,
     EditorDraftDialogs,
-    // The assistant's door loads only where the revamp renders it, never in the flag-off chunk.
     AiEntryButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
     ),
   },
   setup(props, { emit }) {
     const store = useStore();
-    const assistantV2 = isAssistantV2();
     let saved = false;
     // Bound once the draft exists; a save reports to the draft first, which decides whether the host navigates.
     let onFormSaved: ((folderId?: string) => void) | null = null;
@@ -903,20 +900,16 @@ export default defineComponent({
     const cancelEditor = async () => {
       if (await alertEditorDraft.draft.confirmLeave()) emit("cancel:hideform");
     };
-    const jsonDock = assistantV2 ? useAssistantDockToggle("json_editor") : null;
-    if (assistantV2) {
-      const userEdited = alertForm.form.useStore((s: { isDirty: boolean }) => s.isDirty);
-      const alertName = computed(() => String(alertForm.formData.value?.name ?? ""));
-      provide(assistantObjectNameKey, alertName);
-      useAssistantLeaveGuard({
-        host: "alert",
-        isDirty: () => !saved && !!userEdited.value,
-        name: () =>
-          alertName.value
-            ? raw(alertName.value)
-            : alertForm.t("assistant.shell.leaveGuardThisAlert"),
-      });
-    }
+    const jsonDock = useAssistantDockToggle("json_editor");
+    const userEdited = alertForm.form.useStore((s: { isDirty: boolean }) => s.isDirty);
+    const alertName = computed(() => String(alertForm.formData.value?.name ?? ""));
+    provide(assistantObjectNameKey, alertName);
+    useAssistantLeaveGuard({
+      host: "alert",
+      isDirty: () => !saved && !!userEdited.value,
+      name: () =>
+        alertName.value ? raw(alertName.value) : alertForm.t("assistant.shell.leaveGuardThisAlert"),
+    });
 
     // Share server SQL-validation squiggle ranges with the descendant query
     // editors (QueryEditorDialog / QueryConfig) via inject.

@@ -77,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           :last-run-at="list.dataUpdatedAt.value"
           :loading="list.isFetching.value"
-          v-bind="mdUp ? {} : { 'aria-label': t('shortcuts.actions.assistantToolsetsRefresh') }"
-          shortcut-id="assistantToolsetsRefresh"
+          v-bind="mdUp ? {} : { 'aria-label': t('shortcuts.actions.aiToolsetsRefresh') }"
+          shortcut-id="aiToolsetsRefresh"
           data-test="ai-toolsets-list-refresh-btn"
           @click="refresh"
         />
@@ -316,7 +316,7 @@ const state = computed(() => readStateOf(list));
 const rows = computed(() => parseToolsetRows(list.data.value));
 const health = computed(() => hasToolsetHealth(rows.value));
 const clashes = computed(() => clashingNames(rows.value));
-// The server enforces the Toolsets permission; a refused write turns the page read-only, as on the legacy page.
+// The server enforces the Toolsets permission; a refused write turns the page read-only.
 const writeForbidden = ref(false);
 const canEdit = computed(() => !writeForbidden.value && state.value !== "forbidden");
 const visibleRows = computed(() =>
@@ -397,9 +397,7 @@ watch(
   },
 );
 
-useShortcuts([
-  { id: "assistantToolsetsRefresh", handler: () => !isInputFocused() && void refresh() },
-]);
+useShortcuts([{ id: "aiToolsetsRefresh", handler: () => !isInputFocused() && void refresh() }]);
 
 function statusOf(err: unknown): number | undefined {
   return (err as { response?: { status?: number } })?.response?.status;

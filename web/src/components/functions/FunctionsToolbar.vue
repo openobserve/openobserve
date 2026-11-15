@@ -199,31 +199,6 @@
           @closed="assistant.dock.close"
         />
         <OButton
-          v-else-if="
-            !assistant &&
-            config.isEnterprise == 'true' &&
-            !isAddFunctionComponent &&
-            store.state.zoConfig.ai_enabled &&
-            !hideChat
-          "
-          variant="ghost"
-          size="icon-sm"
-          @click="emit('open:chat', !store.state.isAiChatEnabled)"
-          data-test="menu-link-ai-item"
-          :aria-label="t('menu.aiAssistant')"
-          class="rounded-default hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-in-out ![background:var(--color-gradient-ai-subtle)] hover:shadow-md hover:![background:var(--color-gradient-ai)]"
-          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          :disabled="isSubmitting"
-          @mouseenter="isHovered = true"
-          @mouseleave="isHovered = false"
-        >
-          <img
-            alt=""
-            :src="getBtnLogo"
-            class="opacity-70 transition-transform duration-600 [.ai-btn-active_&]:!opacity-100"
-          />
-        </OButton>
-        <OButton
           v-if="!embedded"
           data-test="add-function-fullscreen-btn"
           v-close-popup="true"
@@ -273,11 +248,6 @@
 import { ref, computed, type PropType, inject, defineAsyncComponent } from "vue";
 import { useResizeObserver } from "@vueuse/core";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useRouter } from "vue-router";
-import { useStore } from "vuex";
-import { useTheme } from "@/composables/useTheme";
-import config from "../../aws-exports";
-import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
@@ -291,16 +261,11 @@ import { toggleFullscreen } from "@/utils/dom";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import type { DockedEditor } from "@/composables/assistant/pure";
-// The assistant's door loads only where the revamp renders it, never in the flag-off chunk.
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
 const { t } = useI18nTyped();
 
-const router = useRouter();
-
-const store = useStore();
-const { isDark } = useTheme();
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 function onLockedJsClick(event: MouseEvent) {
@@ -347,7 +312,7 @@ defineProps({
     type: Boolean,
     default: false,
   },
-  /** The revamped assistant's host; `null` keeps the legacy chat toggle. */
+  /** The assistant's host; `null` hides the door. */
   assistant: {
     type: Object as PropType<DockedEditor | null>,
     default: null,
@@ -359,9 +324,7 @@ defineProps({
   },
 });
 
-const emit = defineEmits(["test", "back", "cancel", "open:chat"]);
-
-const isHovered = ref(false);
+const emit = defineEmits(["test", "back", "cancel"]);
 
 const toggleRef = ref<HTMLElement | null>(null);
 const actionsRef = ref<HTMLElement | null>(null);
@@ -397,7 +360,6 @@ const transTypeValue = form
   ? form.useStore((s: any) => String(s.values.transType ?? "0"))
   : ref("0");
 
-const isAddFunctionComponent = computed(() => router.currentRoute.value.path.includes("functions"));
 const handleFullScreen = () => {
   toggleFullscreen();
 };
@@ -405,14 +367,4 @@ const handleFullScreen = () => {
 const redirectToFunctions = () => {
   emit("back");
 };
-
-const getBtnLogo = computed(() => {
-  if (isHovered.value || store.state.isAiChatEnabled) {
-    return getImageURL("images/common/ai_icon_dark.svg");
-  }
-
-  return isDark.value
-    ? getImageURL("images/common/ai_icon_dark.svg")
-    : getImageURL("images/common/ai_icon_gradient.svg");
-});
 </script>

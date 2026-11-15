@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTruncatedText>{{ span.operation_name }}</OTruncatedText>
       </div>
 
-      <div v-if="assistantV2" class="flex shrink-0 items-center gap-0.5">
+      <div class="flex shrink-0 items-center gap-0.5">
         <AiEntryButton
           v-if="hasSpanError"
           v-bind="spanDoor('troubleshoot')"
@@ -1118,7 +1118,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { isAssistantV2 } from "@/composables/assistant/flags";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import { spanBuild } from "@/plugins/traces/tracesDoors";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -1445,7 +1444,6 @@ export default defineComponent({
     });
 
     // Span doors sit in the detail header, never on a bar's hover.
-    const assistantV2 = isAssistantV2();
     const spanDoor = (verb: "explain" | "troubleshoot" | "add_to_chat") => {
       const ids = {
         explain: "ai-entry-span-explain",
@@ -1465,7 +1463,7 @@ export default defineComponent({
       return {
         verb,
         entryKind: "object_verb" as const,
-        boundOrg: loadedOrg?.value,
+        boundOrg: loadedOrg.value,
         objectKind: "span" as const,
         label: t(labels[verb]),
         tooltip: t(tooltips[verb]),
@@ -1597,12 +1595,10 @@ export default defineComponent({
     };
 
     const store = useStore();
-    const loadedOrg = assistantV2
-      ? useLoadedOrg(
-          () => props.span,
-          () => store.state.selectedOrganization?.identifier ?? "",
-        )
-      : null;
+    const loadedOrg = useLoadedOrg(
+      () => props.span,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
     const promptAttributionTarget = ref<{
       entityId: string;
       version: number;
@@ -3094,7 +3090,6 @@ export default defineComponent({
       tags,
       hasExceptionEvents,
       hasSpanError,
-      assistantV2,
       spanDoor,
       spanHttpResendCount,
       navigateToError,

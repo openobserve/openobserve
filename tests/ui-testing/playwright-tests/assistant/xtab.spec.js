@@ -17,7 +17,6 @@ test.describe("assistant chats in two tabs", () => {
 
   async function start(context, page, overrides = {}) {
     harness = await loadHarness();
-    await harness.setFlag(context, true);
     state = harness.createMockState(overrides);
     await harness.installMocks(context, state);
     await harness.login(page);
@@ -214,7 +213,6 @@ test.describe("assistant chats in two tabs", () => {
     await expect(a.composerState()).toHaveAttribute("data-state", "empty", { timeout: 60_000 });
     const sid = await sessionOf(page);
     const device = await browser.newContext();
-    await harness.setFlag(device, true);
     await harness.installMocks(device, state);
     const tabB = await device.newPage();
     await harness.login(tabB);
@@ -275,68 +273,5 @@ test.describe("assistant chats in two tabs", () => {
     await tabB.clock.runFor(1_000);
     await expect.poll(() => reads(), { timeout: 10_000 }).toBeGreaterThan(hiddenAt);
     await page.evaluate(() => window.__o2mock.release?.());
-  });
-
-  test("XTAB-09 legacyTab: a flag-off tab writing the same browser chat keeps the database at version 2 and loses no turn", { tag: ["@mock"] }, async ({
-    context,
-    page,
-  }) => {
-    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
-    test.setTimeout(150_000);
-    await start(context, page, { persistence: false });
-    const a = await openOnLogs(page);
-    await harness.nextScenario(page, "complete");
-    await a.send("turn one");
-    await expect(a.composerState()).toHaveAttribute("data-state", "empty", { timeout: 60_000 });
-    const sid = await sessionOf(page);
-    await expect.poll(() => storedTurns(page, sid).then((row) => row.prompts.length), { timeout: 15_000 }).toBe(1);
-    const tabB = await context.newPage();
-    const errors = [];
-    tabB.on("console", (message) => message.type() === "error" && errors.push(message.text()));
-    await tabB.addInitScript(() => {
-      window.__O2_ASSISTANT_V2__ = false;
-    });
-    await tabB.goto(logsUrl(), { waitUntil: "domcontentloaded" });
-    await expect(new AssistantPage(tabB).legacy.headerButton).toBeVisible({ timeout: 30_000 });
-    const legacy = await tabB.evaluate(
-      async ([chat, email, org]) => {
-        const { useChatHistory } = await import("/web/src/composables/useChatHistory.ts");
-        const history = useChatHistory(() => email, () => org, (key) => key);
-        const row = (await history.loadHistory()).find((entry) => entry.sessionId === chat);
-        await history.saveToHistory(
-          [...row.messages, { role: "user", content: "turn two" }, { role: "assistant", content: "answer two" }],
-          chat,
-          row.title,
-          row.id,
-        );
-        const dbs = await indexedDB.databases();
-        return { version: dbs.find((db) => db.name === "o2ChatDB")?.version, found: !!row };
-      },
-      [sid, harness.ENV.user, harness.ENV.org],
-    );
-    expect(legacy).toEqual({ version: 2, found: true });
-    await page.goto(chatUrl(sid), { waitUntil: "domcontentloaded" });
-    await expect(a.transcript()).toContainText("turn two", { timeout: 30_000 });
-    await a.send("turn three", "complete");
-    await expect(a.composerState()).toHaveAttribute("data-state", "empty", { timeout: 60_000 });
-    const prompts = await page.evaluate(async (chat) => {
-      const index = await import("/web/src/composables/assistant/index.ts");
-      const { createIndexedDbHistory } = await import("/web/src/composables/assistant/historyDb.ts");
-      const rows = await createIndexedDbHistory().list(index.assistantStore.state.userOrgKey);
-      const row = rows.find((r) => r.sessionId === chat);
-      return row.messages.filter((m) => m.role === "user").map((m) => String(m.content));
-    }, sid);
-    expect(prompts).toEqual(["turn one", "turn two", "turn three"]);
-    const back = await tabB.evaluate(
-      async ([chat, email, org]) => {
-        const { useChatHistory } = await import("/web/src/composables/useChatHistory.ts");
-        const history = useChatHistory(() => email, () => org, (key) => key);
-        const row = (await history.loadHistory()).find((entry) => entry.sessionId === chat);
-        return row.messages.filter((m) => m.role === "user").map((m) => String(m.content));
-      },
-      [sid, harness.ENV.user, harness.ENV.org],
-    );
-    expect(back).toEqual(["turn one", "turn two", "turn three"]);
-    expect(errors.filter((text) => /VersionError/.test(text))).toEqual([]);
   });
 });

@@ -15,18 +15,13 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { flag, onSignOut } = vi.hoisted(() => ({
-  flag: { on: true },
-  onSignOut: vi.fn(),
-}));
+const { onSignOut } = vi.hoisted(() => ({ onSignOut: vi.fn() }));
 
-vi.mock("@/composables/assistant/flags", () => ({ isAssistantV2: () => flag.on }));
 vi.mock("@/composables/assistant", () => ({ assistantLifecycle: { onSignOut } }));
 
 import { assistantSignOut } from "./assistantSignOut";
 
 beforeEach(() => {
-  flag.on = true;
   onSignOut.mockReset();
 });
 
@@ -40,11 +35,5 @@ describe("assistantSignOut", () => {
   it("never blocks the sign-out when the assistant throws", async () => {
     onSignOut.mockRejectedValue(new Error("chunk failed"));
     await expect(assistantSignOut({ forced: true })).resolves.toBe("proceed");
-  });
-
-  it("asks nothing with the revamp off", async () => {
-    flag.on = false;
-    await expect(assistantSignOut()).resolves.toBe("proceed");
-    expect(onSignOut).not.toHaveBeenCalled();
   });
 });

@@ -86,7 +86,6 @@ import type {
 import { cancelConsentOnClose, createConsentRuntime, type ConsentRuntime } from "./consent";
 import { serialize } from "./context/serialize";
 import { createHintChannel, type AssistantHintChannel } from "./hints";
-import { isAssistantV2 } from "./flags";
 import { isFullThreadRoute, isHomeAskShown } from "./fullThreadRoute";
 import { createIndexedDbHistory } from "./historyDb";
 import { assistantClientId } from "./historyElsewhere";
@@ -440,7 +439,7 @@ function runsDeps(
     now: () => Date.now(),
     org: () => context.value?.getOrg()?.identifier ?? null,
     clientId: assistantClientId,
-    serverMode: () => isAssistantV2() && capability().capability.value.persistence,
+    serverMode: () => capability().capability.value.persistence,
     watchActive: watchActiveChats,
     invalidateActive: (org) =>
       void queryClient.invalidateQueries({ queryKey: assistantKeys.activeChats(org) }),
