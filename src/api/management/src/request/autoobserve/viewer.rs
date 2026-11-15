@@ -24,7 +24,11 @@ use o2_enterprise::enterprise::autoobserve::{
     contract::EntityRef,
     names::{dims, kinds},
 };
-use openobserve_core::{auth::check_permissions, background_access::rbac_enforced};
+use openobserve_core::{
+    auth::check_permissions,
+    authz::{active_checker, readable_service_records},
+    background_access::rbac_enforced,
+};
 
 use super::{readable_streams, readable_subjects};
 use crate::request::{organization::require_credential_access, security::security_allowed};
@@ -40,6 +44,8 @@ pub trait ReadRights: Send + Sync {
     async fn alerts(&self, subjects: Vec<EntityRef>) -> Vec<bool>;
     async fn pipeline(&self, pipeline_id: &str) -> bool;
     async fn ingestion_tokens(&self) -> bool;
+    /// One answer per service name.
+    async fn services(&self, names: Vec<String>) -> Vec<bool>;
     async fn security(&self) -> bool;
 }
 
@@ -99,6 +105,44 @@ impl ReadRights for LiveRights<'_> {
             .is_ok()
     }
 
+    /// The service list route: its org-wide check, then only services with a stream it can read.
+    async fn services(&self, names: Vec<String>) -> Vec<bool> {
+        let listed = check_permissions(
+            self.org_id,
+            self.org_id,
+            self.user_id,
+            "service_streams",
+            "GET",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await;
+        if !listed {
+            return vec![false; names.len()];
+        }
+        let records = match infra::table::service_streams::list(self.org_id).await {
+            Ok(records) => records,
+            Err(e) => {
+                log::warn!("[autoobserve] org {}: listing services: {e}", self.org_id);
+                return vec![false; names.len()];
+            }
+        };
+        let wanted = records
+            .into_iter()
+            .filter(|r| names.contains(&r.service_name))
+            .collect();
+        let checker = active_checker();
+        let readable: BTreeSet<String> =
+            readable_service_records(checker.as_ref(), self.user_id, self.org_id, wanted)
+                .await
+                .into_iter()
+                .map(|r| r.service_name)
+                .collect();
+        names.iter().map(|n| readable.contains(n)).collect()
+    }
+
     async fn security(&self) -> bool {
         security_allowed(self.org_id, self.user_id, "GET").await
     }
@@ -109,6 +153,7 @@ pub async fn resolve_with<R: ReadRights>(rights: &R, subjects: &[EntityRef]) -> 
     let distinct: BTreeSet<&EntityRef> = subjects.iter().take(PROVIDER_RECORDS).collect();
     let dim = |s: &EntityRef, k: &str| s.key_dims.get(k).cloned();
     let (mut streams, mut alerts, mut pipelines, mut tokens) = (vec![], vec![], vec![], vec![]);
+    let mut services = vec![];
     for s in distinct {
         match s.kind.as_str() {
             kinds::STREAM => {
@@ -123,6 +168,11 @@ pub async fn resolve_with<R: ReadRights>(rights: &R, subjects: &[EntityRef]) -> 
                 }
             }
             kinds::INGESTION_TOKEN => tokens.push(s.clone()),
+            kinds::SERVICE => {
+                if let Some(name) = dim(s, dims::SERVICE_NAME) {
+                    services.push((s.clone(), name));
+                }
+            }
             // L4 replaces this with the fleet routes' own check.
             kinds::FLEET => {}
             _ => {}
@@ -138,6 +188,10 @@ pub async fn resolve_with<R: ReadRights>(rights: &R, subjects: &[EntityRef]) -> 
         .collect()
         .await;
     readable.extend(pipelines.into_iter().filter_map(|(s, ok)| ok.then_some(s)));
+    if !services.is_empty() {
+        let (subjects, names): (Vec<_>, Vec<_>) = services.into_iter().unzip();
+        keep(&mut readable, subjects, rights.services(names).await);
+    }
     if !tokens.is_empty() && rights.ingestion_tokens().await {
         readable.extend(tokens);
     }
@@ -201,6 +255,10 @@ mod tests {
             self.grants("tokens")
         }
 
+        async fn services(&self, names: Vec<String>) -> Vec<bool> {
+            names.iter().map(|n| self.grants(n)).collect()
+        }
+
         async fn security(&self) -> bool {
             self.security
         }
@@ -213,6 +271,10 @@ mod tests {
         )
     }
 
+    fn service(name: &str) -> EntityRef {
+        EntityRef::new(kinds::SERVICE, &[(dims::SERVICE_NAME, name)])
+    }
+
     fn by_id(kind: &str, id: &str) -> EntityRef {
         EntityRef::new(kind, &[(dims::ENTITY_ID, id)])
     }
@@ -220,7 +282,10 @@ mod tests {
     #[tokio::test]
     async fn each_subject_is_readable_only_through_its_own_kinds_check() {
         let rights = FakeRights {
-            allowed: ["logs/app", "a1", "p1", "tokens", "f1", "d1", "app"].into(),
+            allowed: [
+                "logs/app", "a1", "p1", "tokens", "f1", "d1", "app", "checkout",
+            ]
+            .into(),
             security: true,
             ..Default::default()
         };
@@ -238,6 +303,13 @@ mod tests {
             ("unreadable pipeline", by_id(kinds::PIPELINE, "p2"), false),
             ("ingestion token", by_id(kinds::INGESTION_TOKEN, "ci"), true),
             ("fleet stub", by_id(kinds::FLEET, "f1"), false),
+            ("readable service", service("checkout"), true),
+            ("unreadable service", service("billing"), false),
+            (
+                "service without a name",
+                by_id(kinds::SERVICE, "checkout"),
+                false,
+            ),
             ("unknown kind", by_id(kinds::DASHBOARD, "d1"), false),
         ];
         let subjects: Vec<EntityRef> = cases.iter().map(|(_, s, _)| s.clone()).collect();

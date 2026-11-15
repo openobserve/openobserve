@@ -431,12 +431,12 @@ pub struct ContextReads;
 
 #[async_trait]
 impl ContextReadPort for ContextReads {
-    async fn changes(&self, source: OssSource, _ask: &ChangeAsk) -> (Checked, Vec<ChangeRecord>) {
+    async fn changes(&self, source: OssSource, ask: &ChangeAsk) -> (Checked, Vec<ChangeRecord>) {
         match source {
-            OssSource::PipelineErrors => (Checked::NotRecorded, Vec::new()),
+            OssSource::PipelineErrors => super::causes::pipeline::read(ask).await,
             OssSource::IngestRefusals => (Checked::NotRecorded, Vec::new()),
-            OssSource::AuditTrail => (Checked::NotRecorded, Vec::new()),
-            OssSource::Deploys => (Checked::NotRecorded, Vec::new()),
+            OssSource::AuditTrail => super::causes::audit::read(ask).await,
+            OssSource::Deploys => super::causes::deploy::read(ask).await,
         }
     }
 
