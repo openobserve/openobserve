@@ -85,7 +85,13 @@ afterEach(() => {
 
 async function openPopover(
   shared = false,
-  extra: { props?: object; slots?: object; chips?: ContextChip[]; noSession?: boolean } = {},
+  extra: {
+    props?: object;
+    slots?: object;
+    chips?: ContextChip[];
+    noSession?: boolean;
+    provide?: Record<string, number>;
+  } = {},
 ) {
   fake.current = fakeAssistant();
   const store = fake.current.store;
@@ -107,7 +113,7 @@ async function openPopover(
   const wrapper = mount(AssistantContextSeesPopover, {
     props: { sid, ...extra.props },
     slots: extra.slots,
-    global: { plugins: [fakeRouter(), fakeVuex()] },
+    global: { plugins: [fakeRouter(), fakeVuex()], provide: extra.provide },
     attachTo: document.body,
   });
   await flushPromises();
@@ -233,6 +239,21 @@ describe("AssistantContextSeesPopover", () => {
     expect(trigger.attributes("data-size")).toBe("sm");
     expect(trigger.classes()).toContain("max-md:min-h-11");
     expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
+  });
+
+  it("never runs past the side panel or the viewport: its width caps at the room it has (T-03-02)", async () => {
+    const { panel } = await openPopover();
+    const content = panel()!.closest<HTMLElement>("[data-o-popover-content]")!;
+    expect(content.className).toContain(
+      "max-w-[min(26rem,calc(100vw-1.5rem),var(--reka-popper-available-width,100vw))]",
+    );
+  });
+
+  it("is masked, in assistant colours, and stacks above the dock sheet it opens in", async () => {
+    const { panel } = await openPopover(false, { provide: { o2DialogDepth: 1 } });
+    expect(panel()!.getAttribute("data-dd-privacy")).toBe("mask");
+    expect(panel()!.hasAttribute("data-assistant-surface")).toBe(true);
+    expect(panel()!.closest<HTMLElement>("[data-o-popover-content]")?.style.zIndex).toBe("7000");
   });
 
   it("opens above its trigger and carries a detail slot", async () => {

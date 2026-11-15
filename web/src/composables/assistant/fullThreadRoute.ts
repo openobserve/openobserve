@@ -81,6 +81,13 @@ export function withoutThread(query: LocationQuery): LocationQuery {
   return next;
 }
 
+/** The query a push to Home's full view carries: Home keeps its own keys; any other page passes only its org, so its own filters never leak into Home. */
+export function homeQueryFrom(route: RouteLike | null | undefined): LocationQuery {
+  const query = (route?.query ?? {}) as LocationQuery;
+  if (route?.name === "home") return withoutThread(query);
+  return query.org_identifier === undefined ? {} : { org_identifier: query.org_identifier };
+}
+
 /** The chat a link out of the full view is moving; the full view closes before the chat floats. */
 export const leavingThread = /* @__PURE__ */ shallowRef<string | null>(null);
 

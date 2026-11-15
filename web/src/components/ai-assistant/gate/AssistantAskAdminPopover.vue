@@ -32,7 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </template>
-    <div class="flex flex-col gap-3 p-4" data-test="assistant-ask-admin">
+    <div
+      class="flex flex-col gap-3 p-4"
+      data-dd-privacy="mask"
+      data-assistant-surface
+      data-test="assistant-ask-admin"
+    >
       <h3 class="text-text-heading text-sm font-medium">{{ t("assistant.askAdmin.title") }}</h3>
       <div v-if="admins.length" class="flex flex-col gap-1" data-test="assistant-ask-admin-admins">
         <p class="text-text-secondary text-xs">
@@ -156,6 +161,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
+import { usePopoverZIndex } from "@/components/ai-assistant/common/anchoredPopover";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { hostOrgName, useAssistantName } from "@/composables/assistant/pure";
@@ -188,6 +194,7 @@ defineSlots<{ trigger?: () => unknown }>();
 const { t } = useI18nTyped();
 const { product } = useAssistantName();
 const { isMobile } = useBreakpoint();
+const zIndex = usePopoverZIndex();
 const router = useRouter();
 const open = ref(false);
 const includePrompt = ref(false);
@@ -262,7 +269,7 @@ const wrapperProps = computed<Record<string, unknown>>(() =>
         align: "start",
         ariaLabel: t("assistant.askAdmin.title"),
         contentClass: "w-[min(24rem,calc(100vw-1.5rem))]",
-        privacy: "mask",
+        zIndex,
       },
 );
 

@@ -10748,7 +10748,6 @@
       "regexRedact": "Tạo mẫu regex để ẩn email",
       "mapStreamSchema": "Ánh xạ lược đồ stream \"default\" của tôi",
       "promqlCpu": "Viết PromQL cho các pods sử dụng > 80% CPU",
-      "datadogToO2": "Chuyển đổi truy vấn Datadog này thành SQL OpenObserve",
       "lastAlertFired": "Tại sao cảnh báo cuối cùng của tôi lại kích hoạt?"
     },
     "placeholderRotation": {

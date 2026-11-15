@@ -10748,7 +10748,6 @@
       "regexRedact": "正規表現パターンを生成してメールを編集する",
       "mapStreamSchema": "「default」ストリームのスキーマをマップする",
       "promqlCpu": "80% 以上の CPU を使用するポッド用の PromQL を記述する",
-      "datadogToO2": "このデータドッグクエリを OpenObserve SQL に変換",
       "lastAlertFired": "前回のアラートはなぜ起動されたのですか？"
     },
     "placeholderRotation": {

@@ -46,12 +46,25 @@ describe("leaveFullThreadRoute", () => {
     const router = await onChat("/?thread=a");
     leaveFullThreadRoute(router, router.currentRoute.value);
     expect(router.back).not.toHaveBeenCalled();
-    expect(router.replace).toHaveBeenCalledWith("/");
+    expect(router.replace).toHaveBeenCalledWith(expect.objectContaining({ name: "home" }));
+  });
+
+  it("C-06: keeps Home's query and drops only the thread", async () => {
+    const router = fakeRouter();
+    await router.push("/?thread=b&period=7d&org_identifier=acme");
+    await router.isReady();
+    window.history.replaceState({ back: "/?thread=a" }, "");
+    vi.spyOn(router, "replace");
+    leaveFullThreadRoute(router, router.currentRoute.value);
+    expect(router.replace).toHaveBeenCalledWith({
+      name: "home",
+      query: { period: "7d", org_identifier: "acme" },
+    });
   });
 
   it("goes to Home when there is no entry before", async () => {
     const router = await onChat(undefined);
     leaveFullThreadRoute(router, router.currentRoute.value);
-    expect(router.push).toHaveBeenCalledWith("/");
+    expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ name: "home" }));
   });
 });

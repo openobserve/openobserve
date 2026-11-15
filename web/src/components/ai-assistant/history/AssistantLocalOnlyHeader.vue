@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OText>
     <OPopover
       v-model:open="infoOpen"
-      privacy="mask"
       side="bottom"
       align="start"
       :aria-label="t('assistant.history.localOnly.info')"
@@ -48,33 +47,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</span>
         </OButton>
       </template>
-      <OText variant="meta" as="p" data-test="assistant-local-info-help">
-        {{ t("assistant.history.localOnly.help") }}
-      </OText>
-      <OCheckbox
-        :model-value="clearOnSignOut"
-        :label="t('assistant.history.clearOnSignOut')"
-        data-test="assistant-local-clear-on-signout"
-        @update:model-value="(value) => emit('update:clearOnSignOut', value === true)"
-      />
-      <template v-if="isAdmin">
-        <OText variant="meta" as="p" data-test="assistant-local-info-admin">
-          {{ t("assistant.history.localOnly.adminHelp") }}
+      <div class="flex flex-col gap-2" data-dd-privacy="mask" data-assistant-surface>
+        <OText variant="meta" as="p" data-test="assistant-local-info-help">
+          {{ t("assistant.history.localOnly.help") }}
         </OText>
-        <OButton
-          variant="outline"
-          size="sm"
-          as="a"
-          :href="SETUP_DOCS_URL"
-          target="_blank"
-          rel="noopener noreferrer"
-          :icon-right="assistantGlyph.newTab"
-          class="self-start max-md:min-h-11 pointer-coarse:min-h-11"
-          data-test="assistant-local-info-admin-link"
-        >
-          {{ t("assistant.history.localOnly.adminLink") }}
-        </OButton>
-      </template>
+        <OCheckbox
+          :model-value="clearOnSignOut"
+          :label="t('assistant.history.clearOnSignOut')"
+          data-test="assistant-local-clear-on-signout"
+          @update:model-value="(value) => emit('update:clearOnSignOut', value === true)"
+        />
+        <template v-if="isAdmin">
+          <OText variant="meta" as="p" data-test="assistant-local-info-admin">
+            {{ t("assistant.history.localOnly.adminHelp") }}
+          </OText>
+          <OButton
+            variant="outline"
+            size="sm"
+            as="a"
+            :href="SETUP_DOCS_URL"
+            target="_blank"
+            rel="noopener noreferrer"
+            :icon-right="assistantGlyph.newTab"
+            class="self-start max-md:min-h-11 pointer-coarse:min-h-11"
+            data-test="assistant-local-info-admin-link"
+          >
+            {{ t("assistant.history.localOnly.adminLink") }}
+          </OButton>
+        </template>
+      </div>
     </OPopover>
   </div>
 </template>

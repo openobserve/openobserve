@@ -141,7 +141,6 @@
   "stream",
   "streamPrefix",
   "suggestion",
-  "suggestions.datadogToO2",
   "suggestions.lastAlertFired",
   "suggestions.mapStreamSchema",
   "suggestions.promqlCpu",

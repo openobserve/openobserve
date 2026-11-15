@@ -165,6 +165,13 @@ describe("runsList", () => {
     expect(rows[0].status).toBe("reconnecting");
   });
 
+  it("keeps an approval lapsed in the browser cache out of Needs You after a reload (C-08)", () => {
+    const chats = [chat("waits", { pending_approval: true })];
+    const cachedLapsedAt = (sid: string) => (sid === "waits" ? NOW : null);
+    expect(runsList(input({ chats })).map((row) => row.group)).toEqual(["needs_you"]);
+    expect(runsList(input({ chats, cachedLapsedAt }))).toEqual([]);
+  });
+
   it("builds rows from the server for chats this tab never opened", () => {
     const rows = runsList(
       input({
@@ -347,6 +354,7 @@ describe("createRuns", () => {
       focusCard: vi.fn(() => true),
       stopElsewhere: vi.fn(async () => undefined),
       approvalElsewhere: vi.fn(() => false),
+      cachedLapsedAt: () => null,
       ...over,
     };
     const runs = createRuns(deps as RunsDeps);

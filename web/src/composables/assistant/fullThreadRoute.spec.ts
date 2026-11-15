@@ -21,7 +21,7 @@ import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
 
 import { makeEnv } from "./actions/__tests__/actionEnv";
 import { cancelConsentOnClose } from "./consent";
-import { isHomeAskShown, pushFromThread } from "./fullThreadRoute";
+import { homeQueryFrom, isHomeAskShown, pushFromThread } from "./fullThreadRoute";
 
 describe("pushFromThread", () => {
   // The full view closes itself on the way out, as AssistantView's leave guard does.
@@ -107,5 +107,17 @@ describe("isHomeAskShown", () => {
       stop();
     }
     expect(isHomeAskShown(home)).toBe(false);
+  });
+});
+
+describe("homeQueryFrom", () => {
+  it("passes only the org from another page and keeps Home's own keys minus the thread", () => {
+    expect(
+      homeQueryFrom({ name: "logs", query: { org_identifier: "acme", stream: "a", sql: "b" } }),
+    ).toEqual({ org_identifier: "acme" });
+    expect(homeQueryFrom({ name: "logs", query: { stream: "a" } })).toEqual({});
+    expect(
+      homeQueryFrom({ name: "home", query: { period: "7d", org_identifier: "acme", thread: "x" } }),
+    ).toEqual({ period: "7d", org_identifier: "acme" });
   });
 });

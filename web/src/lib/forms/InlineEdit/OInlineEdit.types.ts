@@ -21,11 +21,8 @@ export type InlineEditSize = "sm" | "md" | "lg";
  * - `"title"` (default) — heading weight and colour, sized by `size`.
  * - `"meta"` — the description/subtitle line: small, regular weight, secondary
  *   colour. `size` is ignored; the meta line has one size.
- * - `"bar"` — a title in a compact toolbar (a panel's 2.5rem bar): small, medium
- *   weight, heading colour, and the pencil shows only on hover or focus so the
- *   bar stays quiet. `size` is ignored.
  */
-export type InlineEditTone = "title" | "meta" | "bar";
+export type InlineEditTone = "title" | "meta";
 
 export interface InlineEditProps {
   /** Current value. Emitted back live while the user types. */

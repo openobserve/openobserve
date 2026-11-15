@@ -297,6 +297,40 @@ describe("rows (§1, S1)", () => {
     resetVoiceForTests();
   });
 
+  it("lets a long time chip shrink and cut its text, so the agent pill keeps its place beside it (T-03-01)", async () => {
+    // jsdom has no ResizeObserver for the chip's tooltip.
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    onTestFinished(() => vi.unstubAllGlobals());
+    const { wrapper, store, sid } = setup();
+    store.setTimeOverride(sid, { from: Date.UTC(2026, 10, 10), to: Date.UTC(2026, 10, 13) });
+    await flushPromises();
+    const chip = wrapper.get('[data-test="assistant-context-chip-time"]');
+    const pill = wrapper.get('[data-test="assistant-agent-pill"]');
+    const range = chip.get(".truncate");
+    expect(range.text().length).toBeGreaterThan(10);
+    expect(chip.classes()).toContain("min-w-0");
+    expect(chip.classes()).not.toContain("shrink-0");
+    expect(pill.classes()).toContain("shrink-0");
+    // The span that holds both chips may shrink, or the pill is pushed under mic and Send.
+    const row = pill.element.parentElement!;
+    expect(row.contains(chip.element)).toBe(true);
+    expect(row.classList).toContain("min-w-0");
+    expect(row.classList).not.toContain("shrink-0");
+    // The cut text stays readable in the chip's tooltip.
+    await chip.trigger("focus");
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="o-tooltip-content"]')?.textContent).toContain(
+      range.text(),
+    );
+  });
+
   it("shows the ⓘ in the frame's top-end corner with no chips, the text padded clear of it, never in the strip", async () => {
     const { wrapper, store, sid, textarea } = setup();
     const sees = () => wrapper.findAll('[data-test="assistant-context-sees"]');

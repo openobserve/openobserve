@@ -47,6 +47,8 @@ export interface LocalRecord {
   cachedSeed?: ChatDetail["seed"];
   cachedApprovals?: ChatApproval[];
   cachedStateVersion?: string;
+  /** When a read found the server's pending flag stale, so a reload does not list the chat under Needs You again. */
+  cachedLapsedAt?: number | null;
   cachedTurnSpans?: TurnSpan[];
   /** `CACHED_TURNS_SCHEMA` when `turns` were stored; absent on a copy stored before agents were kept. */
   cachedTurnsSchema?: number;

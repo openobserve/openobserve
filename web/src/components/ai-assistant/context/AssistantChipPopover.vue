@@ -17,22 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPopover
     :open="open"
-    privacy="mask"
+    :anchor="anchor"
     side="top"
     align="start"
     :collision-padding="8"
+    :z-index="zIndex"
     :aria-label="chip.label"
     content-class="flex w-[min(28rem,calc(100vw-1.5rem))] max-h-[min(32rem,70vh)] flex-col gap-3 overflow-y-auto p-3"
-    @update:open="(value) => emit('update:open', value)"
+    @pointer-down-outside="focusReturn.onPointerDownOutside"
+    @update:open="(value) => (value ? emit('update:open', true) : close())"
   >
-    <template #anchor>
-      <slot name="anchor" />
-    </template>
-
     <div
       ref="body"
       data-test="assistant-chip-popover"
       data-dd-privacy="mask"
+      data-assistant-surface
       class="flex min-w-0 flex-col gap-3"
     >
       <header class="flex min-w-0 items-start gap-2">
@@ -152,6 +151,8 @@ import type { ContextChip } from "@/composables/assistant";
 export interface AssistantChipPopoverProps {
   chip: ContextChip;
   open: boolean;
+  /** The chip the popover sits on; focus returns to its first control on close. */
+  anchor?: Element | null;
   readonly?: boolean;
   /** `data:` URL of an image chip. */
   imageSrc?: string;
@@ -179,6 +180,10 @@ import { computed, nextTick, ref, watch } from "vue";
 
 import { assistantGlyph, chipGlyph } from "@/components/ai-assistant/common/glyphs";
 import { INTERNAL_FIELDS } from "@/composables/assistant";
+import {
+  useAnchorFocusReturn,
+  usePopoverZIndex,
+} from "@/components/ai-assistant/common/anchoredPopover";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
@@ -195,6 +200,7 @@ const TABBABLE =
   "button:not([disabled]), [href], input:not([disabled]), [role='switch'], [tabindex='0']";
 
 const props = withDefaults(defineProps<AssistantChipPopoverProps>(), {
+  anchor: null,
   readonly: false,
   imageSrc: undefined,
   openLabel: null,
@@ -202,10 +208,15 @@ const props = withDefaults(defineProps<AssistantChipPopoverProps>(), {
 
 const emit = defineEmits<AssistantChipPopoverEmits>();
 
-defineSlots<{ anchor: () => unknown }>();
-
 const { t } = useI18nTyped();
 const body = ref<HTMLElement | null>(null);
+const zIndex = usePopoverZIndex();
+const focusReturn = useAnchorFocusReturn(() => props.anchor);
+
+function close(): void {
+  focusReturn.onClose();
+  emit("update:open", false);
+}
 
 // The body mounts with the open popover; focus then lands on the first action, not a scroll box.
 watch(body, async (el, _old, onCleanup) => {
@@ -230,7 +241,7 @@ function onTab(event: KeyboardEvent): void {
   const active = document.activeElement;
   if (event.shiftKey && active === items[0]) {
     event.preventDefault();
-    emit("update:open", false);
+    close();
   } else if (!event.shiftKey && active === items[items.length - 1]) {
     event.preventDefault();
     emit("update:open", false);

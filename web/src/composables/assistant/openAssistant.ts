@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { RouteLocationRaw } from "vue-router";
+import type { LocationQuery, RouteLocationRaw } from "vue-router";
+
+import { homeQueryFrom } from "./fullThreadRoute";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -128,6 +130,8 @@ export interface OpenAssistantEnv {
   hosts: HostRegistry;
   routeName(): string;
   pushRoute(to: RouteLocationRaw): void;
+  /** The current route's query, so the full view keeps `org_identifier` and Home's other keys. */
+  routeQuery?(): LocationQuery;
   lgUp(): boolean;
   currentOrg(): string | null;
   now(): number;
@@ -228,7 +232,11 @@ function runDoor(env: OpenAssistantEnv, args: OpenAssistantCall): OpenAssistantR
   });
   if (stored) void store.openSession({ sid: stored.sid }, { focus: true }).catch(() => undefined);
   if (plan.target.kind === "full" && env.routeName() !== "assistant")
-    env.pushRoute({ name: "assistant", params: { chatId: sid } });
+    env.pushRoute({
+      name: "assistant",
+      params: { chatId: sid },
+      query: homeQueryFrom({ name: env.routeName(), query: env.routeQuery?.() ?? {} }),
+    });
   if (lock) notify(env, turnLockKey(lock));
   if (sends) void store.send(sid, args.mode ? { mode: args.mode } : undefined);
   if (plan.carded && args.payload) notify(env, "assistant.entry.addedBehindCard", OPEN_ACTION);

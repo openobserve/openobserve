@@ -57,9 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="toolbar"
         role="heading"
         :aria-level="1"
+        :aria-labelledby="headingTitleId"
         class="min-w-0 flex-1"
         data-test="assistant-thread-heading"
       >
+        <span :id="headingTitleId" class="sr-only">{{ titleText }}</span>
         <OInlineEdit
           :model-value="String(titleText)"
           size="lg"
@@ -88,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="renameInput"
           v-model="draft"
           size="sm"
-          tone="bar"
+          tone="title"
           :aria-label="t('assistant.thread.renameLabel')"
           :maxlength="MAX_TITLE"
           @commit="commitRename"
@@ -343,6 +345,7 @@ import {
   ref,
   useId,
   useSlots,
+  watch,
   type ComponentPublicInstance,
 } from "vue";
 import { useStore } from "vuex";
@@ -413,6 +416,7 @@ const titleEl = ref<HTMLElement | null>(null);
 const titleCut = ref(false);
 const deleteOpen = ref(false);
 const widthRem = ref(Number.POSITIVE_INFINITY);
+const headingTitleId = `assistant-thread-${useId()}-title`;
 const saveTagId = `assistant-thread-${useId()}-save`;
 let sizes: ResizeObserver | null = null;
 
@@ -540,11 +544,22 @@ function focusTitle(): void {
   (heading.value?.$el as HTMLElement | undefined)?.focus();
 }
 
+// A rename typed while one is saving waits for it, then saves.
+let queuedTitle = "";
+
 function saveTitle(value: string): void {
   const next = value.trim().slice(0, MAX_TITLE);
-  if (props.sid && !renamePending.value && next && next !== String(titleText.value))
-    void history.rename(props.sid, next);
+  if (!props.sid || !next) return;
+  if (renamePending.value) queuedTitle = next;
+  else if (next !== String(titleText.value)) void history.rename(props.sid, next);
 }
+
+watch(renamePending, (pending) => {
+  const next = queuedTitle;
+  queuedTitle = "";
+  if (!pending && next && props.sid && next !== String(titleText.value))
+    void history.rename(props.sid, next);
+});
 
 function togglePin(): void {
   if (props.sid) void history.pin(props.sid, !pinned.value);

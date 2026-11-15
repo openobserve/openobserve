@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { ContextChip } from "@/composables/assistant";
+import { DIALOG_DEPTH_KEY } from "@/lib/overlay/Dialog/dialogStacking";
 import { raw } from "@/types/i18n";
 
 import AssistantChipPopover from "./AssistantChipPopover.vue";
@@ -34,16 +35,20 @@ const ROW: ContextChip = {
   sent: "serialized",
 };
 
-async function open(props: Record<string, unknown> = {}) {
+async function open(props: Record<string, unknown> = {}, provide: Record<string, number> = {}) {
+  const anchor = document.createElement("span");
+  anchor.innerHTML = '<button data-test="anchor">chip</button><button>remove</button>';
+  document.body.append(anchor);
   const wrapper = mount(AssistantChipPopover, {
-    props: { chip: ROW, open: true, ...props },
-    slots: { anchor: '<button data-test="anchor">chip</button>' },
+    props: { chip: ROW, open: true, anchor, ...props },
+    global: { provide },
     attachTo: document.body,
   });
   await flushPromises();
   const popover = () =>
     document.body.querySelector<HTMLElement>('[data-test="assistant-chip-popover"]');
-  return { wrapper, popover };
+  const chipButton = anchor.querySelector<HTMLElement>('[data-test="anchor"]')!;
+  return { wrapper, popover, anchor, chipButton };
 }
 
 afterEach(() => {
@@ -118,6 +123,43 @@ describe("AssistantChipPopover", () => {
       "_original",
     ]);
     expect(popover()!.getAttribute("data-dd-privacy")).toBe("mask");
+    expect(popover()!.hasAttribute("data-assistant-surface")).toBe(true);
+  });
+
+  it("positions by the chip it is given and leaves the chip's own popup semantics alone", async () => {
+    const { anchor } = await open();
+    expect(anchor.querySelector("[aria-haspopup]")).toBeNull();
+    expect(anchor.hasAttribute("aria-haspopup")).toBe(false);
+  });
+
+  it("returns focus to the chip on Escape (U2)", async () => {
+    const { wrapper, chipButton } = await open();
+    (document.activeElement as HTMLElement).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    await flushPromises();
+    expect(wrapper.emitted("update:open")?.[0]).toEqual([false]);
+    expect(document.activeElement).toBe(chipButton);
+  });
+
+  it("keeps the focus a click outside gave, never pulling it back to the chip", async () => {
+    const { wrapper, chipButton } = await open();
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    outside.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    await flushPromises();
+    expect(wrapper.emitted("update:open")).toEqual([[false]]);
+    expect(document.activeElement).not.toBe(chipButton);
+  });
+
+  it("stacks above the sheet or dialog it opens in", async () => {
+    await open();
+    const page = document.body.querySelector<HTMLElement>("[data-o-popover-content]")!;
+    expect(page.style.zIndex).toBe("6000");
+    document.body.innerHTML = "";
+    await open({}, { [DIALOG_DEPTH_KEY]: 1 });
+    const sheet = document.body.querySelector<HTMLElement>("[data-o-popover-content]")!;
+    expect(sheet.style.zIndex).toBe("7000");
   });
 
   it("draws the provenance line in body text, which keeps AA on the popover surface", async () => {
@@ -164,7 +206,7 @@ describe("AssistantChipPopover", () => {
 
   it("opens on its first action, and Tab at either edge hands focus back to the tray (CT-03 AC 5, U3)", async () => {
     const big = { ...ROW, data: { message: "z".repeat(2_000), _o2_id: "1" } };
-    const { wrapper } = await open({ chip: big });
+    const { wrapper, chipButton } = await open({ chip: big });
     const actions = document.body.querySelector("[data-chip-actions]")!;
     expect(actions.contains(document.activeElement)).toBe(true);
     const tabbable = [
@@ -177,6 +219,7 @@ describe("AssistantChipPopover", () => {
       new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }),
     );
     expect(wrapper.emitted("update:open")).toEqual([[false]]);
+    expect(document.activeElement).toBe(chipButton);
     tabbable.at(-1)!.focus();
     tabbable.at(-1)!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
     expect(wrapper.emitted("tab-out")).toHaveLength(1);

@@ -78,8 +78,9 @@ export function isRunning(turn: TurnState): boolean {
 export function lapsedHere(
   session: { record?: { lapsedAt?: number | null } } | undefined,
   updatedAt: number,
+  stored?: number | null,
 ): boolean {
-  const at = session?.record?.lapsedAt;
+  const at = session?.record?.lapsedAt ?? stored;
   return typeof at === "number" && updatedAt <= at;
 }
 

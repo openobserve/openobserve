@@ -17,9 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <AssistantChipTray ref="tray" :items="shownChips" :hidden="hiddenChips">
     <template #chip="{ item }">
+      <AssistantContextChip
+        :chip="item"
+        compact
+        :short-label="item.short"
+        :image-src="imageSrcOf(item)"
+        :expanded="openId === item.id"
+        @open="openChip(item)"
+        @remove="remove(item)"
+        @move="(direction) => move(item.id, direction)"
+      />
       <AssistantChipPopover
         :chip="item"
         :open="openId === item.id"
+        :anchor="openId === item.id ? openAnchor : null"
         :image-src="imageSrcOf(item)"
         :open-label="openLabelOf(item)"
         @update:open="(open) => (openId = open ? item.id : null)"
@@ -29,20 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @remove-row="(index) => removeRow(item, index)"
         @trim="(include) => trim(item, include)"
         @tab-out="tabOut(item.id)"
-      >
-        <template #anchor>
-          <AssistantContextChip
-            :chip="item"
-            compact
-            :short-label="item.short"
-            :image-src="imageSrcOf(item)"
-            :expanded="openId === item.id"
-            @open="openChip(item)"
-            @remove="remove(item)"
-            @move="(direction) => move(item.id, direction)"
-          />
-        </template>
-      </AssistantChipPopover>
+      />
     </template>
     <template #hidden-item="{ item }">
       <AssistantHiddenChipRow :chip="item" :image-src="imageSrcOf(item)" @remove="remove(item)" />
@@ -61,7 +59,7 @@ export { trayChipLimit } from "./AssistantChipTray.vue";
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, type ComponentPublicInstance } from "vue";
+import { computed, nextTick, ref, shallowRef, type ComponentPublicInstance } from "vue";
 import { useRoute } from "vue-router";
 
 import { imageChipOf } from "@/components/ai-assistant/composer/composerImages";
@@ -95,6 +93,8 @@ const context = useAssistantContext(() => props.sid, { store });
 const tray = ref<ComponentPublicInstance | null>(null);
 const root = computed<HTMLElement | null>(() => tray.value?.$el ?? null);
 const openId = ref<string | null>(null);
+// The open chip's element, which its popover sits on and returns focus to.
+const openAnchor = shallowRef<Element | null>(null);
 
 // Another user+org's chat is never shown or edited here (D21, F8).
 const session = computed(() => {
@@ -120,7 +120,10 @@ function changed(
 
 function openChip(chip: ContextChip): void {
   openId.value = openId.value === chip.id ? null : chip.id;
-  if (openId.value) trackAssistant("ai_context_inspected", { target: "chip", kind: chip.kind });
+  if (!openId.value) return;
+  const index = shownChips.value.findIndex((c) => c.id === chip.id);
+  openAnchor.value = chipButtons()[index]?.closest("[data-assistant-chip]") ?? null;
+  trackAssistant("ai_context_inspected", { target: "chip", kind: chip.kind });
 }
 
 async function remove(chip: ContextChip): Promise<void> {

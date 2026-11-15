@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { parseDate } from "@internationalized/date";
-import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import {
+  DOMWrapper,
+  enableAutoUnmount,
+  flushPromises,
+  mount,
+  type VueWrapper,
+} from "@vue/test-utils";
 import { RangeCalendarRoot } from "reka-ui";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -28,13 +34,41 @@ import AssistantTimePrefix from "./AssistantTimePrefix.vue";
 const DEFAULT: TimeWindow = { from: 0, to: 900_000, period: "15m", source: "default" };
 const PAGE: TimeWindow = { from: 0, to: 3_600_000, period: "1h", source: "page" };
 
-async function open(props: { window: TimeWindow; pageWindow?: TimeWindow | null }) {
+async function open(props: {
+  window: TimeWindow;
+  pageWindow?: TimeWindow | null;
+  timezone?: string;
+}) {
   const wrapper = mount(AssistantTimePrefix, { props, attachTo: document.body });
   await wrapper.get('[data-test="assistant-context-chip-time"]').trigger("click");
   await flushPromises();
   const row = (id: string) =>
     document.body.querySelector<HTMLElement>(`[data-test="assistant-context-time-${id}"]`);
   return { wrapper, row };
+}
+
+/** Opens Custom Range… on the window given; a window with no period opens on Absolute. */
+async function openRange(props: Parameters<typeof open>[0]) {
+  const opened = await open(props);
+  opened.row("custom")!.click();
+  await flushPromises();
+  return opened;
+}
+
+const inPicker = (test: string) =>
+  new DOMWrapper(document.body.querySelector<HTMLElement>(`[data-test="${test}"]`)!);
+
+const pickDates = (wrapper: VueWrapper, start: string, end?: string) =>
+  wrapper.findComponent(RangeCalendarRoot).vm.$emit("update:modelValue", {
+    start: parseDate(start),
+    end: end ? parseDate(end) : undefined,
+  });
+
+// OTime emits both on every edit the user makes, a clock pick included.
+function setTime(wrapper: VueWrapper, which: 0 | 1, value: string): void {
+  const field = wrapper.findAllComponents(OTime)[which];
+  field.vm.$emit("update:modelValue", value);
+  field.vm.$emit("change", value);
 }
 
 enableAutoUnmount(afterEach);
@@ -179,7 +213,7 @@ describe("AssistantTimePrefix", () => {
       end: parseDate("2026-11-14"),
     });
     const { from, to } = wrapper.emitted("change")![0][0] as { from: number; to: number };
-    expect(to - from).toBe((2 * 24 * 60 - 1) * 60_000);
+    expect(to - from).toBe(2 * 24 * 60 * 60_000);
     // The host swaps in the picked range in the same tick, which redraws the chip with its ✕.
     await wrapper.setProps({ window: { from, to, source: "custom" } });
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -230,6 +264,156 @@ describe("AssistantTimePrefix", () => {
     await flushPromises();
     expect(row("15m")).not.toBeNull();
     expect(wrapper.findComponent(OPopover).props("contentClass")).not.toContain("w-80");
+  });
+
+  it("applies a time picked from the clock at once, and stays open for the next pick (C-01)", async () => {
+    const from = Date.UTC(2026, 10, 10);
+    const { wrapper } = await openRange({
+      window: { from, to: Date.UTC(2026, 10, 12, 23, 59), source: "custom" },
+    });
+    setTime(wrapper, 1, "11:59");
+    await flushPromises();
+    expect(wrapper.emitted("change")).toEqual([[{ from, to: Date.UTC(2026, 10, 12, 11, 59) }]]);
+    expect(
+      document.body.querySelector('[data-test="assistant-context-time-range"]'),
+    ).not.toBeNull();
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([true]);
+  });
+
+  it("has no time zone row and no Apply button on either tab, as the chip's own zone is the one applied (C-02)", async () => {
+    await openRange({ window: { from: 1_000, to: 2_000, source: "custom" } });
+    const extras = () =>
+      document.body.querySelectorAll(
+        '[data-test="datetimerange-timezone-trigger"], [data-test$="apply"], [data-test$="apply-btn"]',
+      );
+    expect(
+      document.body.querySelector('[data-test="datetimerange-absolute-panel"]'),
+    ).not.toBeNull();
+    expect(extras()).toHaveLength(0);
+    await inPicker("datetimerange-tab-relative").trigger("click");
+    expect(
+      document.body.querySelector('[data-test="datetimerange-relative-panel"]'),
+    ).not.toBeNull();
+    expect(extras()).toHaveLength(0);
+  });
+
+  it("applies two picked dates as whole days in the chip's zone, over a range that had times (C-07)", async () => {
+    // 14:32 to 14:47 in Kolkata.
+    const from = Date.UTC(2026, 10, 13, 9, 2);
+    const { wrapper } = await openRange({
+      window: { from, to: from + 15 * 60_000, source: "custom" },
+      timezone: "Asia/Kolkata",
+    });
+    pickDates(wrapper, "2026-11-10", "2026-11-12");
+    await flushPromises();
+    expect(wrapper.emitted("change")).toEqual([
+      [{ from: Date.UTC(2026, 10, 9, 18, 30), to: Date.UTC(2026, 10, 12, 18, 30) }],
+    ]);
+  });
+
+  it("keeps a time the user set when two dates are then picked; the end left alone is a whole day (C-07)", async () => {
+    const from = Date.UTC(2026, 10, 13, 9, 2);
+    const { wrapper } = await openRange({
+      window: { from, to: from + 15 * 60_000, source: "custom" },
+      timezone: "Asia/Kolkata",
+    });
+    setTime(wrapper, 0, "09:00");
+    pickDates(wrapper, "2026-11-10", "2026-11-12");
+    await flushPromises();
+    expect(wrapper.emitted("change")?.at(-1)).toEqual([
+      { from: Date.UTC(2026, 10, 10, 3, 30), to: Date.UTC(2026, 10, 12, 18, 30) },
+    ]);
+  });
+
+  it("applies nothing on half an entry: one date, a time while the range waits for its end, or a reversed range", async () => {
+    const { wrapper } = await openRange({
+      window: { from: Date.UTC(2026, 10, 13, 9), to: Date.UTC(2026, 10, 13, 18), source: "custom" },
+    });
+    setTime(wrapper, 1, "08:00");
+    await flushPromises();
+    expect(wrapper.emitted("change")).toBeUndefined();
+    expect(
+      document.body.querySelector('[data-test="assistant-context-time-reversed"]'),
+    ).not.toBeNull();
+    pickDates(wrapper, "2026-11-10");
+    setTime(wrapper, 1, "19:00");
+    await flushPromises();
+    expect(wrapper.emitted("change")).toBeUndefined();
+    pickDates(wrapper, "2026-11-10", "2026-11-10");
+    await flushPromises();
+    expect(wrapper.emitted("change")).toEqual([
+      [{ from: Date.UTC(2026, 10, 10), to: Date.UTC(2026, 10, 10, 19) }],
+    ]);
+  });
+
+  it("applies the custom relative row on a unit pick after a typed amount, never while the amount is typed", async () => {
+    const { wrapper } = await openRange({ window: DEFAULT });
+    expect(document.body.querySelector('[data-test="datetimerange-relative-apply"]')).toBeNull();
+    const amount = inPicker("datetimerange-custom-amount");
+    await amount.setValue("7");
+    await amount.trigger("change");
+    await amount.trigger("blur");
+    expect(wrapper.emitted("change")).toBeUndefined();
+    await inPicker("datetimerange-custom-unit").setValue("h");
+    expect(wrapper.emitted("change")?.[0]?.[0]).toMatchObject({ period: "7h" });
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+  });
+
+  it("stages a unit picked before the amount, then applies the custom row when the amount is left", async () => {
+    const { wrapper } = await openRange({ window: DEFAULT });
+    await inPicker("datetimerange-custom-unit").setValue("h");
+    expect(wrapper.emitted("change")).toBeUndefined();
+    const amount = inPicker("datetimerange-custom-amount");
+    await amount.setValue("7");
+    await amount.trigger("blur");
+    expect(wrapper.emitted("change")?.[0]?.[0]).toMatchObject({ period: "7h" });
+  });
+
+  it("applies a typed amount on Enter, and not when focus moves on to the unit list", async () => {
+    const { wrapper } = await openRange({ window: DEFAULT });
+    const amount = inPicker("datetimerange-custom-amount");
+    const unit = inPicker("datetimerange-custom-unit");
+    await unit.setValue("h");
+    await amount.setValue("9");
+    await amount.trigger("blur", { relatedTarget: unit.element });
+    expect(wrapper.emitted("change")).toBeUndefined();
+    await amount.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("change")?.[0]?.[0]).toMatchObject({ period: "9h" });
+  });
+
+  it("hands focus back to the chip on Escape, and leaves it alone after a click outside", async () => {
+    const { wrapper } = await open({ window: DEFAULT });
+    const chip = () => wrapper.get('[data-test="assistant-context-chip-time"]').element;
+    const picker = () => document.body.querySelector('[data-test="assistant-context-time-picker"]');
+    expect(picker()?.contains(document.activeElement)).toBe(true);
+    document.activeElement!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    await flushPromises();
+    expect(picker()).toBeNull();
+    expect(document.activeElement).toBe(chip());
+    await wrapper.get('[data-test="assistant-context-chip-time"]').trigger("click");
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    await flushPromises();
+    expect(picker()).toBeNull();
+    expect(document.activeElement).not.toBe(chip());
+  });
+
+  it("masks the portalled picker for session replay and keeps the assistant's colour roles on it", async () => {
+    await open({ window: DEFAULT });
+    const picker = document.body.querySelector('[data-test="assistant-context-time-picker"]')!;
+    expect(picker.closest('[data-dd-privacy="mask"]')).not.toBeNull();
+    expect(picker.closest("[data-assistant-surface]")).not.toBeNull();
+  });
+
+  it("stacks its popup above the dialog it opens in", async () => {
+    const wrapper = mount(AssistantTimePrefix, {
+      props: { window: DEFAULT },
+      global: { provide: { o2DialogDepth: 1 } },
+    });
+    expect(wrapper.findComponent(OPopover).props("zIndex")).toBe(7000);
   });
 
   it("shows a chip-sized skeleton, not a stale range, while the page range loads", () => {

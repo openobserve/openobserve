@@ -25,7 +25,7 @@ import {
   type DockHostId,
   type Sid,
 } from "@/composables/assistant";
-import { isFullThreadRoute } from "@/composables/assistant/pure";
+import { homeQueryFrom, isFullThreadRoute, withoutThread } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { trackAssistant, type PlacementMode } from "@/services/assistantAnalytics";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -59,8 +59,10 @@ export function placementMode(placement: AssistantPlacementName, sheet: boolean)
 export function leaveFullThreadRoute(router: Router, route: RouteLocationNormalizedLoaded): void {
   if (!isFullThreadRoute(route)) return;
   const back = window.history.state?.back;
-  if (typeof back !== "string") return void router.push("/");
-  if (isFullThreadRoute(router.resolve(back))) void router.replace("/");
+  // Home's own query (period, org) stays; only the thread key goes.
+  const home = { name: "home", query: withoutThread(route.query) };
+  if (typeof back !== "string") return void router.push(home);
+  if (isFullThreadRoute(router.resolve(back))) void router.replace(home);
   else router.back();
 }
 
@@ -200,7 +202,11 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
     const sid = input().sid ?? store.state.shell.activeSid;
     if (sid && store.windowOf(sid)) store.open({ kind: "full" }, { sid, focus: "composer" });
     else store.moveTo({ kind: "full" });
-    void router.push({ name: "assistant", params: sid ? { chatId: sid } : {} });
+    void router.push({
+      name: "assistant",
+      params: sid ? { chatId: sid } : {},
+      query: homeQueryFrom(route),
+    });
   }
 
   function toFreshFull(): void {
@@ -209,7 +215,7 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
       origin: { entryKind: "thread_new", objectKind: "none", container: "full_view" },
     });
     store.open({ kind: "full" }, { sid, focus: "composer" });
-    void router.push({ name: "assistant" });
+    void router.push({ name: "assistant", query: homeQueryFrom(route) });
   }
 
   function toDock(): void {

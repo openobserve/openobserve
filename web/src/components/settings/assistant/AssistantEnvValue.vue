@@ -35,8 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`settings-assistant-env-${envName}-info`"
         />
       </template>
-      <p class="text-text-body text-sm">{{ help ?? t("assistant.settings.env.help") }}</p>
-      <OCode>{{ envName }}</OCode>
+      <div class="flex flex-col gap-2" data-dd-privacy="mask" data-assistant-surface>
+        <p class="text-text-body text-sm">{{ help ?? t("assistant.settings.env.help") }}</p>
+        <OCode>{{ envName }}</OCode>
+      </div>
     </OPopover>
   </div>
 </template>

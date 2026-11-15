@@ -10748,7 +10748,6 @@
       "regexRedact": "Сгенерировать регулярное выражение для удаления email-адресов",
       "mapStreamSchema": "Сопоставить схему моего потока \"default\"",
       "promqlCpu": "Написать PromQL для подов, использующих > 80% CPU",
-      "datadogToO2": "Преобразовать этот запрос Datadog в SQL OpenObserve",
       "lastAlertFired": "Почему сработало мое последнее оповещение?"
     },
     "placeholderRotation": {

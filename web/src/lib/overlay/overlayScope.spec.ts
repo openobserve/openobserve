@@ -46,14 +46,6 @@ const popover = (inner?: () => ReturnType<typeof h>) =>
   );
 
 describe("overlay scope", () => {
-  it("puts the provided attributes on teleported popover content, nested popovers included", async () => {
-    under(true, () => popover(() => popover()));
-    await flushPromises();
-    const contents = document.body.querySelectorAll("[data-o-popover-content]");
-    expect(contents.length).toBe(2);
-    contents.forEach((content) => expect(content.hasAttribute("data-test-scope")).toBe(true));
-  });
-
   it("leaves overlays outside a scope untouched", async () => {
     under(false, () => popover());
     await flushPromises();

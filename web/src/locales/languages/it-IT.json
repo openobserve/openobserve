@@ -10748,7 +10748,6 @@
       "regexRedact": "Genera un pattern regex per oscurare le email",
       "mapStreamSchema": "Mappa lo schema del mio stream \"default\"",
       "promqlCpu": "Scrivi PromQL per pod utilizzando una CPU > 80%",
-      "datadogToO2": "Converti questa query Datadog in OpenObserve SQL",
       "lastAlertFired": "Perché è stato attivato il mio ultimo avviso?"
     },
     "placeholderRotation": {

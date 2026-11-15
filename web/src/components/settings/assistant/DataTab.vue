@@ -76,15 +76,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="settings-assistant-data-about"
               />
             </template>
-            <p class="text-text-heading text-sm font-semibold">
-              {{ t("assistant.settings.data.about") }}
-            </p>
-            <p v-if="provider" class="text-text-body text-sm">
-              {{ t("assistant.settings.data.aboutProvider", { provider: raw(provider) }) }}
-            </p>
-            <p v-if="redaction" class="text-text-body text-sm">
-              {{ t("assistant.settings.data.aboutRedaction") }}
-            </p>
+            <div class="flex flex-col gap-2" data-dd-privacy="mask" data-assistant-surface>
+              <p class="text-text-heading text-sm font-semibold">
+                {{ t("assistant.settings.data.about") }}
+              </p>
+              <p v-if="provider" class="text-text-body text-sm">
+                {{ t("assistant.settings.data.aboutProvider", { provider: raw(provider) }) }}
+              </p>
+              <p v-if="redaction" class="text-text-body text-sm">
+                {{ t("assistant.settings.data.aboutRedaction") }}
+              </p>
+            </div>
           </OPopover>
         </div>
         <p :id="lineId" class="text-text-secondary text-xs">{{ levelLine }}</p>

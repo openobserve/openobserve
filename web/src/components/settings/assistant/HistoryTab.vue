@@ -35,7 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-2">
         <AssistantEnvValue
           :label="t('assistant.settings.history.persistence')"
-          :value="raw(String(persistence))"
+          :value="
+            persistence ? t('assistant.settings.history.on') : t('assistant.settings.history.off')
+          "
           env-name="O2_AI_CHAT_PERSISTENCE_ENABLED"
           :help="persistence ? undefined : t('assistant.settings.history.persistenceHelp')"
         />
@@ -82,7 +84,7 @@ import AssistantImportCard from "@/components/ai-assistant/history/AssistantImpo
 import { useAssistantHistory, useChatExport } from "@/composables/assistant";
 import OCard from "@/lib/core/Card/OCard.vue";
 import { capabilitiesQuery } from "@/services/assistant.queries";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 import AssistantEnvValue from "./AssistantEnvValue.vue";
 import { useAssistantSettingsPage } from "./useAssistantSettingsPage";

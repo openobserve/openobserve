@@ -22,7 +22,9 @@ import http from "@/services/http";
 
 import { useBranchChat, type BranchChat } from "./useBranchChat";
 
-const { openSession, toast, track } = vi.hoisted(() => ({
+const { openSession, toast, track, expireSession, recordForbidden } = vi.hoisted(() => ({
+  expireSession: vi.fn(),
+  recordForbidden: vi.fn(),
   openSession: vi.fn(),
   toast: vi.fn(),
   track: vi.fn(),
@@ -34,6 +36,9 @@ vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
 }));
 
 vi.mock("@/services/http", () => ({ default: vi.fn() }));
+vi.mock("@/utils/sessionServices", () => ({ expireSession }));
+vi.mock("@/composables/useAccessStore", () => ({ recordForbidden }));
+vi.mock("@/stores", () => ({ default: {} }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
 vi.mock("@/composables/assistant", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/assistant")>()),
@@ -71,6 +76,26 @@ describe("useBranchChat", () => {
     openSession.mockReset().mockResolvedValue("new-1");
     toast.mockReset();
     track.mockReset();
+    expireSession.mockReset();
+    recordForbidden.mockReset();
+  });
+
+  it("C-03: a 401 starts the normal sign-in flow, with no generic toast", async () => {
+    post.mockRejectedValue({ response: { status: 401 } });
+    await withBranch().branch({ sid: "s1", turnId: "t2" });
+    expect(expireSession).toHaveBeenCalledTimes(1);
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("C-03: a 403 shows the access message that names the missing permission", async () => {
+    const err = {
+      response: { status: 403 },
+      config: { url: "/api/default/ai/chats/s1/branch", method: "post" },
+    };
+    post.mockRejectedValue(err);
+    await withBranch().branch({ sid: "s1", turnId: "t2" });
+    expect(recordForbidden).toHaveBeenCalledWith(expect.objectContaining({ method: "post" }));
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it("B-conversation-16: the Full view's `?thread=` moves to the new branch, so a reload opens it", async () => {

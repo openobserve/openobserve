@@ -10748,7 +10748,6 @@
       "regexRedact": "إنشاء نمط regex لتنقيب الرسائل الإلكترونية",
       "mapStreamSchema": "ارسم مخطط التدفق \"default\" الخاص بي",
       "promqlCpu": "كتابة PromQL للكبسولات باستخدام معالج > 80٪",
-      "datadogToO2": "حول هذا Datadog الاستعلام إلى OpenObserve SQL",
       "lastAlertFired": "لماذا تم إطلاق آخر تنبيه لي؟"
     },
     "placeholderRotation": {

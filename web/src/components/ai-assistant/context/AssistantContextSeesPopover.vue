@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPopover
     v-model:open="open"
-    privacy="mask"
     side="top"
     align="end"
     :aria-label="title"
     :collision-padding="inset"
+    :z-index="zIndex"
     :content-class="`${widthClass} max-h-[min(32rem,70vh)] overflow-y-auto p-3`"
   >
     <template #trigger>
@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <section
       data-test="assistant-context-sees-popover"
       data-dd-privacy="mask"
+      data-assistant-surface
       :aria-labelledby="headingId"
       class="flex flex-col gap-2"
     >
@@ -220,6 +221,7 @@ import { assistantGlyph, chipGlyph } from "@/components/ai-assistant/common/glyp
 import { useComposerLayout } from "@/components/ai-assistant/composer/composerUi";
 import { useVoiceAvailability } from "@/components/ai-assistant/composer/useAssistantVoice";
 import { useAssistantContext, useAssistantName, useAssistantStore } from "@/composables/assistant";
+import { usePopoverZIndex } from "@/components/ai-assistant/common/anchoredPopover";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -244,6 +246,7 @@ const headingId = `assistant-sees-${useId()}`;
 const heading = ref<InstanceType<typeof OText> | null>(null);
 const open = ref(false);
 const inset = ref<{ left: number; right: number } | undefined>(undefined);
+const zIndex = usePopoverZIndex();
 
 const title = computed(() => t("assistant.context.seesTitle", { product }));
 const disclosure = computed(() =>
@@ -251,10 +254,11 @@ const disclosure = computed(() =>
     ? context.disclosure.value
     : t("assistant.context.seesDisclosure"),
 );
+// The panel inset can leave less room than the width cap; the popper's available width keeps it inside (T-03-02).
 const widthClass = computed(() =>
   layout.value.tight
-    ? "w-max max-w-[calc(20rem-0.375rem)]"
-    : "w-max max-w-[min(26rem,calc(100vw-1.5rem))]",
+    ? "w-max max-w-[min(calc(20rem-0.375rem),var(--reka-popper-available-width,100vw))]"
+    : "w-max max-w-[min(26rem,calc(100vw-1.5rem),var(--reka-popper-available-width,100vw))]",
 );
 
 const split = computed(() => {

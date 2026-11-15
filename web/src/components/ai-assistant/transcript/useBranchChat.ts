@@ -22,6 +22,9 @@ import { fullThreadLocation, isFullThreadRoute } from "@/composables/assistant/p
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { branchChatMutation, type BranchChatResponse } from "@/services/ai_chat_branch";
 import { trackAssistant } from "@/services/assistantAnalytics";
+import { recordForbidden } from "@/composables/useAccessStore";
+import appStore from "@/stores";
+import { expireSession } from "@/utils/sessionServices";
 import { useI18nTyped } from "@/types/i18n";
 import { getUUID } from "@/utils/uuid";
 
@@ -94,7 +97,19 @@ export function useBranchChat(org: () => string): BranchChat {
         result: "failed",
         ...(typeof status === "number" && { status }),
       });
-      toast({ variant: "error", message: t("assistant.message.branchFailed") });
+      // The request opts out of http.ts's global 401/403 handling, so both are routed here.
+      if (status === 401) expireSession(appStore);
+      else if (status === 403) {
+        const { config, request } = err as {
+          config?: { url?: string; method?: string; accessRouteKey?: string };
+          request?: { responseURL?: string };
+        };
+        recordForbidden({
+          url: request?.responseURL || config?.url || "",
+          method: config?.method,
+          routeKey: config?.accessRouteKey,
+        });
+      } else toast({ variant: "error", message: t("assistant.message.branchFailed") });
       return null;
     } finally {
       pending.value = false;

@@ -16,7 +16,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { AssistantError, AssistantSession } from "./assistantStore.types";
-import { isTerminal, type TurnState } from "./turnStates";
+import { isTerminal, lapsedHere, type TurnState } from "./turnStates";
 
 const error: AssistantError = {
   code: "unknown",
@@ -42,6 +42,15 @@ const table: [TurnState, boolean][] = [
   [{ state: "done", saved: "server" }, true],
   [{ state: "done", saved: "not_saved" }, true],
 ];
+
+describe("lapsedHere", () => {
+  it("keeps an expired approval off Needs You after a reload, from the stored time", () => {
+    expect(lapsedHere(undefined, 100)).toBe(false);
+    expect(lapsedHere(undefined, 100, 100)).toBe(true);
+    expect(lapsedHere(undefined, 101, 100)).toBe(false);
+    expect(lapsedHere({ record: { lapsedAt: 50 } }, 40, 100)).toBe(true);
+  });
+});
 
 describe("isTerminal", () => {
   it.each(table)("%o → %s", (turn, terminal) => {

@@ -153,7 +153,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="fieldLoading"
                   @select="onPlus"
                 />
-                <span class="flex shrink-0 items-center gap-2">
+                <!-- Shrinks so a long time range cuts its own text, not the agent pill under mic and Send -->
+                <span class="flex min-w-0 items-center gap-2">
                   <AssistantTimePrefix
                     v-model:open="timeOpen"
                     :window="window"
@@ -377,6 +378,7 @@ export function launcherState(gate: string): "loading" | "gate" | "ready" | null
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { homeQueryFrom } from "@/composables/assistant/pure";
 import { useStore } from "vuex";
 
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
@@ -878,11 +880,13 @@ function pickStarter(starter: Starter, index: number): void {
 }
 
 function openFull(): void {
-  void router.push({ name: "assistant" }).catch(() => undefined);
+  void router.push({ name: "assistant", query: homeQueryFrom(route) }).catch(() => undefined);
 }
 
 function openChat(sid: string): void {
-  void router.push({ name: "assistant", params: { chatId: sid } }).catch(() => undefined);
+  void router
+    .push({ name: "assistant", params: { chatId: sid }, query: homeQueryFrom(route) })
+    .catch(() => undefined);
 }
 
 function openBilling(): void {

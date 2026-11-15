@@ -10743,7 +10743,6 @@
       "regexRedact": "產生用於遮蔽電子郵件的 regex 模式",
       "mapStreamSchema": "對應我的「default」串流結構描述",
       "promqlCpu": "為 CPU 使用率 > 80% 的 Pod 撰寫 PromQL",
-      "datadogToO2": "將此 Datadog 查詢轉換為 OpenObserve SQL",
       "lastAlertFired": "為什麼我的上一個警示會觸發？"
     },
     "placeholderRotation": {

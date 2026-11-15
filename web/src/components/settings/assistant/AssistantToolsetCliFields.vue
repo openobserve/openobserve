@@ -98,6 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <p
           class="text-text-body max-w-80 p-3 text-sm break-words"
+          data-dd-privacy="mask"
+          data-assistant-surface
           data-test="ai-toolset-cli-about-body"
         >
           {{ t("assistant.toolsets.form.aboutCli", { timeout: cliTimeout, bytes: cliBytes }) }}

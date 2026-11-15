@@ -79,7 +79,7 @@ describe("HistoryTab", () => {
     expect(w.text()).toContain("are capped at 100 per member per organization");
     expect(
       w.find('[data-test="settings-assistant-env-O2_AI_CHAT_PERSISTENCE_ENABLED-value"]').text(),
-    ).toBe("false");
+    ).toBe("Off");
     expect(w.find('[data-test="settings-assistant-env-O2_AI_CHAT_RETENTION_DAYS"]').exists()).toBe(
       false,
     );
@@ -92,6 +92,9 @@ describe("HistoryTab", () => {
     fake.current = fakeAssistant("available", { retentionDays: 30, publicMaxExpiryDays: 7 });
     const w = await mountTab({ ai_chat_persistence_enabled: true, public_ai_chat_enabled: true });
     expect(w.text()).toContain("Saved to the server");
+    expect(
+      w.find('[data-test="settings-assistant-env-O2_AI_CHAT_PERSISTENCE_ENABLED-value"]').text(),
+    ).toBe("On");
     expect(
       w.find('[data-test="settings-assistant-env-O2_AI_CHAT_RETENTION_DAYS-value"]').text(),
     ).toBe("30 days");

@@ -312,6 +312,14 @@ describe("AssistantLauncher", () => {
     expect(router.currentRoute.value.name).toBe("assistant");
   });
 
+  it("keeps the route query when an empty Enter opens the full view (T-02-02)", async () => {
+    const { wrapper, router } = setup();
+    await router.replace({ name: "home", query: { org_identifier: "org1", period: "7d" } });
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(router.currentRoute.value.query).toEqual({ org_identifier: "org1", period: "7d" });
+  });
+
   it("keeps the text on Escape and draws no clear button in the bar (HOME-03, round 1 X-20)", async () => {
     const { wrapper } = setup();
     await input(wrapper).setValue("keep me");
@@ -422,6 +430,14 @@ describe("AssistantLauncher", () => {
     await input(wrapper).setValue("why?");
     await input(wrapper).trigger("keydown", { key: "Enter" });
     expect(open.mock.calls[0][0].payload.timeOverride).toMatchObject({ period: "1h" });
+  });
+
+  it("lets the chip row shrink, so a long time chip cannot push the agent pill under mic and Send (T-03-01)", () => {
+    const { wrapper } = setup();
+    const chip = wrapper.get('[data-test="assistant-context-chip-time"]').element;
+    const row = chip.closest("span.gap-2")!;
+    expect(row.classList).toContain("min-w-0");
+    expect(row.classList).not.toContain("shrink-0");
   });
 
   it("is the composer everywhere else is: no strip while empty, + and the time chip left, Send right", () => {

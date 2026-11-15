@@ -93,7 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="inertKind !== null"
                 @select="onPlus"
               />
-              <span class="flex min-w-0 shrink-0 items-center gap-2">
+              <!-- Shrinks so a long time range cuts its own text, not the agent pill under mic and Send -->
+              <span class="flex min-w-0 items-center gap-2">
                 <AssistantSessionTime :sid="sid" :disabled="inertKind !== null || accessLost" />
                 <AssistantAgentPicker :sid="sid" :disabled="inertKind !== null || accessLost" />
               </span>

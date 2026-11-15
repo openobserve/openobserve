@@ -297,7 +297,7 @@ export function boundedChartSeries(value: unknown): ChartSeries | null {
         Number.isFinite(point[0]) &&
         Number.isFinite(point[1]),
     );
-    const points = evenly(valid, MAX_CHART_POINTS).map(([x, y]) => [x, y] as [number, number]);
+    const points = downsample(valid, MAX_CHART_POINTS).map(([x, y]) => [x, y] as [number, number]);
     if (!points.length) return [];
     const name = typeof line.name === "string" && line.name ? line.name : "value";
     if (isNonMeasure(name, points)) return [];
@@ -306,11 +306,20 @@ export function boundedChartSeries(value: unknown): ChartSeries | null {
   return series.some((line) => line.points.length >= 2) ? { xUnit: "us", series } : null;
 }
 
-// Even picks keep the first and the last point, so a capped series still spans its whole range.
-function evenly<T>(items: T[], cap: number): T[] {
+// Each bucket keeps its min and max, so a one-point spike survives; the first and last points keep the whole range.
+function downsample(items: [number, number][], cap: number): [number, number][] {
   if (items.length <= cap) return items;
-  const step = (items.length - 1) / (cap - 1);
-  return Array.from({ length: cap }, (_, i) => items[Math.round(i * step)]);
+  const middle = items.slice(1, -1);
+  const size = Math.ceil(middle.length / ((cap - 2) / 2));
+  const kept: [number, number][] = [items[0]];
+  for (let i = 0; i < middle.length; i += size) {
+    const bucket = middle.slice(i, i + size);
+    const lo = bucket.reduce((a, p) => (p[1] < a[1] ? p : a));
+    const hi = bucket.reduce((a, p) => (p[1] > a[1] ? p : a));
+    kept.push(...(lo === hi ? [lo] : lo[0] < hi[0] ? [lo, hi] : [hi, lo]));
+  }
+  kept.push(items.at(-1)!);
+  return kept;
 }
 
 /** A findings frame as the card reads it; `null` when it is not a usable payload. */

@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       side="bottom"
       align="start"
       :aria-label="t('assistant.label.provenance')"
-      privacy="mask"
     >
       <template #trigger>
         <OTag
@@ -41,7 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="ai-label-tag"
         />
       </template>
-      <div class="flex max-w-80 min-w-0 flex-col gap-2 p-3" data-test="ai-label-popover">
+      <div
+        class="flex max-w-80 min-w-0 flex-col gap-2 p-3"
+        data-dd-privacy="mask"
+        data-assistant-surface
+        data-test="ai-label-popover"
+      >
         <OText variant="label" as="p">{{ labelText }}</OText>
         <OText
           v-if="state.provenance.prompt"

@@ -15,124 +15,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPopover
-    v-if="state !== 'hidden'"
-    privacy="mask"
-    :open="gateOpen"
-    side="bottom"
-    align="start"
-    :aria-label="
-      gate === 'off_for_org'
-        ? t('assistant.gate.offForOrg.title', { product })
-        : t('assistant.gate.noPermission.title', { product })
-    "
-    @update:open="onGateOpen"
-  >
-    <template #anchor>
-      <ODropdownItem
-        v-if="appearance === 'menu-item'"
-        :data-test="dataTest"
-        :data-door-state="viewState"
-        :aria-disabled="locked || unavailable || undefined"
-        :aria-label="locked || added ? name : undefined"
-        :description="touch ? raw(tooltipLines.join(' ')) : undefined"
-        class="max-md:min-h-11 pointer-coarse:min-h-11"
-        @select="onSelect"
+  <template v-if="state !== 'hidden'">
+    <ODropdownItem
+      v-if="appearance === 'menu-item'"
+      ref="control"
+      :data-test="dataTest"
+      :data-door-state="viewState"
+      :aria-disabled="locked || unavailable || undefined"
+      :aria-label="locked || added ? name : undefined"
+      :description="touch ? raw(tooltipLines.join(' ')) : undefined"
+      class="max-md:min-h-11 pointer-coarse:min-h-11"
+      @select="onSelect"
+    >
+      <template #icon-left>
+        <OIcon :name="glyph" size="sm" :class="glyphClass" />
+        <OIcon v-if="locked" :name="assistantGlyph.locked" size="xs" class="text-text-secondary" />
+      </template>
+      <span ref="menuLabel">{{ visibleLabel }}</span>
+      <OTooltip v-if="!touch" side="right">
+        <template #content
+          ><span v-for="line in tooltipLines" :key="line" class="block">{{ line }}</span></template
+        >
+      </OTooltip>
+    </ODropdownItem>
+    <AssistantIconButton
+      v-else-if="appearance === 'toolbar-icon'"
+      ref="control"
+      :label="name"
+      :icon="glyph"
+      :badge="locked ? assistantGlyph.locked : undefined"
+      :no-tooltip="touch"
+      :size="size === 'md' ? 'toolbar' : 'sm'"
+      :data-test="dataTest"
+      :data-door-state="viewState"
+      :aria-disabled="locked || unavailable || undefined"
+      :class="locked ? 'text-text-secondary!' : 'text-ai-accent!'"
+      @click="onClick"
+    >
+      <template #tooltip
+        ><span v-for="line in tooltipLines" :key="line" class="block">{{ line }}</span></template
       >
-        <template #icon-left>
-          <OIcon :name="glyph" size="sm" :class="glyphClass" />
-          <OIcon
-            v-if="locked"
-            :name="assistantGlyph.locked"
-            size="xs"
-            class="text-text-secondary"
-          />
-        </template>
-        <span ref="menuLabel">{{ visibleLabel }}</span>
-        <OTooltip v-if="!touch" side="right">
+    </AssistantIconButton>
+    <OButton
+      v-else
+      ref="control"
+      :variant="appearance === 'toggle' ? 'outline' : 'ghost'"
+      :size="size"
+      :data-test="dataTest"
+      :data-door-state="viewState"
+      :aria-disabled="locked || unavailable || undefined"
+      :aria-pressed="appearance === 'toggle' ? !!pressed : undefined"
+      :aria-label="locked || added ? name : undefined"
+      :class="[
+        'focus-visible:ring-ai-accent/40 focus-visible:ring-2 max-md:min-h-11 pointer-coarse:min-h-11',
+        appearance === 'chip' ? 'max-md:h-auto max-md:py-1 max-md:whitespace-normal' : '',
+        appearance === 'toggle' && pressed ? 'border-border-strong' : '',
+        narrowIconOnly ? 'max-md:min-w-11 max-md:gap-0' : '',
+      ]"
+      @click="onClick"
+    >
+      <template #icon-left>
+        <!-- First in the button, so it anchors to the whole button: an icon-only door's label has no box to hover -->
+        <OTooltip v-if="!touch || (narrowIconOnly && !coarse)" :shortcut-id="shortcutId">
           <template #content
             ><span v-for="line in tooltipLines" :key="line" class="block">{{
               line
             }}</span></template
           >
         </OTooltip>
-      </ODropdownItem>
-      <AssistantIconButton
-        v-else-if="appearance === 'toolbar-icon'"
-        ref="control"
-        :label="name"
-        :icon="glyph"
-        :badge="locked ? assistantGlyph.locked : undefined"
-        :no-tooltip="touch"
-        :size="size === 'md' ? 'toolbar' : 'sm'"
-        :data-test="dataTest"
-        :data-door-state="viewState"
-        :aria-disabled="locked || unavailable || undefined"
-        :class="locked ? 'text-text-secondary!' : 'text-ai-accent!'"
-        @click="onClick"
-      >
-        <template #tooltip
-          ><span v-for="line in tooltipLines" :key="line" class="block">{{ line }}</span></template
+        <OIcon :name="glyph" size="sm" :class="glyphClass" />
+        <OIcon v-if="locked" :name="assistantGlyph.locked" size="xs" class="text-text-secondary" />
+      </template>
+      <span class="flex min-w-0 flex-col items-start text-start">
+        <span :class="appearance === 'toggle' || narrowIconOnly ? 'max-md:sr-only' : ''">{{
+          visibleLabel
+        }}</span>
+        <span
+          v-if="appearance === 'chip'"
+          class="text-text-secondary hidden text-xs font-normal max-md:block"
+          data-test="ai-entry-secondary"
+          >{{ tooltipLines.join(" ") }}</span
         >
-      </AssistantIconButton>
-      <OButton
-        v-else
-        ref="control"
-        :variant="appearance === 'toggle' ? 'outline' : 'ghost'"
-        :size="size"
-        :data-test="dataTest"
-        :data-door-state="viewState"
-        :aria-disabled="locked || unavailable || undefined"
-        :aria-pressed="appearance === 'toggle' ? !!pressed : undefined"
-        :aria-label="locked || added ? name : undefined"
-        :class="[
-          'focus-visible:ring-ai-accent/40 focus-visible:ring-2 max-md:min-h-11 pointer-coarse:min-h-11',
-          appearance === 'chip' ? 'max-md:h-auto max-md:py-1 max-md:whitespace-normal' : '',
-          appearance === 'toggle' && pressed ? 'border-border-strong' : '',
-          narrowIconOnly ? 'max-md:min-w-11 max-md:gap-0' : '',
-        ]"
-        @click="onClick"
-      >
-        <template #icon-left>
-          <!-- First in the button, so it anchors to the whole button: an icon-only door's label has no box to hover -->
-          <OTooltip v-if="!touch || (narrowIconOnly && !coarse)" :shortcut-id="shortcutId">
-            <template #content
-              ><span v-for="line in tooltipLines" :key="line" class="block">{{
-                line
-              }}</span></template
-            >
-          </OTooltip>
-          <OIcon :name="glyph" size="sm" :class="glyphClass" />
-          <OIcon
-            v-if="locked"
-            :name="assistantGlyph.locked"
-            size="xs"
-            class="text-text-secondary"
-          />
-        </template>
-        <span class="flex min-w-0 flex-col items-start text-start">
-          <span :class="appearance === 'toggle' || narrowIconOnly ? 'max-md:sr-only' : ''">{{
-            visibleLabel
-          }}</span>
-          <span
-            v-if="appearance === 'chip'"
-            class="text-text-secondary hidden text-xs font-normal max-md:block"
-            data-test="ai-entry-secondary"
-            >{{ tooltipLines.join(" ") }}</span
-          >
-        </span>
-      </OButton>
-    </template>
-    <AssistantGateState
-      v-if="gateOpen"
-      :reason="gate === 'off_for_org' ? 'off_for_org' : 'no_permission'"
-      size="popover"
-      :is-admin="capability.isAdmin"
-      :context="{ org: org }"
-      focus-on-mount
-      @action="onGateAction"
-    />
-  </OPopover>
+      </span>
+    </OButton>
+    <OPopover
+      :open="gateOpen"
+      :anchor="gateOpen ? anchorEl() : null"
+      side="bottom"
+      align="start"
+      :z-index="zIndex"
+      :aria-label="
+        gate === 'off_for_org'
+          ? t('assistant.gate.offForOrg.title', { product })
+          : t('assistant.gate.noPermission.title', { product })
+      "
+      @pointer-down-outside="focusReturn.onPointerDownOutside"
+      @update:open="onGateOpen"
+    >
+      <AssistantGateState
+        v-if="gateOpen"
+        data-dd-privacy="mask"
+        :reason="gate === 'off_for_org' ? 'off_for_org' : 'no_permission'"
+        size="popover"
+        :is-admin="capability.isAdmin"
+        :context="{ org: org }"
+        focus-on-mount
+        @action="onGateAction"
+      />
+    </OPopover>
+  </template>
   <OTooltip
     v-if="errorAnchor"
     :anchor="errorAnchor"
@@ -493,6 +484,10 @@ import {
   type ContextChip,
   type OpenAssistantCall,
 } from "@/composables/assistant";
+import {
+  useAnchorFocusReturn,
+  usePopoverZIndex,
+} from "@/components/ai-assistant/common/anchoredPopover";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -550,6 +545,8 @@ const coarse = ref(matchesCoarse());
 const boundKey = ref<string | null>(store.state.userOrgKey);
 let errorTimer: ReturnType<typeof setTimeout> | null = null;
 let busy = false;
+const zIndex = usePopoverZIndex();
+const focusReturn = useAnchorFocusReturn(anchorEl);
 
 const objectId = computed(() => (props.objectKey ? `${props.dataTest}|${props.objectKey}` : null));
 const built = computed(
@@ -669,6 +666,12 @@ function verbLabel(): I18nText {
 function controlEl(): HTMLElement | null {
   const el = props.appearance === "menu-item" ? menuLabel.value : control.value?.$el;
   return el instanceof HTMLElement ? el : null;
+}
+
+// The gate popover sits on the whole door: the menu item or the button.
+function anchorEl(): Element | null {
+  const el = control.value?.$el;
+  return el instanceof Element ? el : null;
 }
 
 function onSelect(event: Event): void {
@@ -883,12 +886,13 @@ function openGate(): void {
 }
 
 function onGateOpen(open: boolean): void {
+  if (!open) focusReturn.onClose();
   gateOpen.value = open;
 }
 
 function onGateAction(cta: GateCta): void {
   if (cta === "close" || cta === "see_plans" || cta === "learn_more" || cta === "open_settings")
-    gateOpen.value = false;
+    onGateOpen(false);
 }
 
 function toastAdded(): void {

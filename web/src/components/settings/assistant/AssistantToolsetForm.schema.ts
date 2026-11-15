@@ -45,8 +45,9 @@ export type SecretRow = z.infer<typeof secretRow>;
 
 type Translate = (key: string, params?: Record<string, unknown>) => string;
 
-export const makeToolsetFormSchema = (t: Translate, options: ToolsetSchemaOptions) =>
-  z
+export const makeToolsetFormSchema = (t: Translate, options: ToolsetSchemaOptions) => {
+  const whole = t("assistant.toolsets.form.wholeNumber");
+  return z
     .object({
       name: z
         .string()
@@ -57,14 +58,14 @@ export const makeToolsetFormSchema = (t: Translate, options: ToolsetSchemaOption
       description: z.string(),
       mcp: z.object({
         url: z.string(),
-        timeout_seconds: z.coerce.number().int().positive(),
+        timeout_seconds: z.coerce.number().int(whole).positive(whole),
         headers: z.array(secretRow),
       }),
       cli: z.object({
         command: z.string(),
         allowed_subcommands_raw: z.string(),
-        timeout_seconds: z.coerce.number().int().positive(),
-        max_output_bytes: z.coerce.number().int().positive(),
+        timeout_seconds: z.coerce.number().int(whole).positive(whole),
+        max_output_bytes: z.coerce.number().int(whole).positive(whole),
         requires_confirmation: z.boolean(),
         blocked: z.array(z.string()).nullable(),
         env: z.array(secretRow),
@@ -99,6 +100,7 @@ export const makeToolsetFormSchema = (t: Translate, options: ToolsetSchemaOption
             issue([group, field, i, "value"], t("assistant.toolsets.form.maskValue"));
         });
     });
+};
 
 export type ToolsetFormValues = z.infer<ReturnType<typeof makeToolsetFormSchema>>;
 

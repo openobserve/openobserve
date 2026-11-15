@@ -544,10 +544,20 @@ describe("boundedChartSeries: non-measure columns", () => {
     const ys = Array.from({ length: 270 }, (_, i) => (i >= 10 && i < 25 ? 950 : 420));
     const points = boundedChartSeries({ x_unit: "us", series: [line("mem", ys)] })!.series[0]
       .points;
-    expect(points).toHaveLength(MAX_CHART_POINTS);
+    expect(points.length).toBeLessThanOrEqual(MAX_CHART_POINTS);
     expect(points[0][0]).toBe(us);
     expect(points.at(-1)![0]).toBe(us + 269 * 60_000_000);
     expect(points.some(([, y]) => y === 950)).toBe(true);
+  });
+
+  it("keeps a one-point spike in a long series", () => {
+    const ys = Array.from({ length: 1000 }, (_, i) => (i === 990 ? 1000 : 10));
+    const points = boundedChartSeries({ x_unit: "us", series: [line("cpu", ys)] })!.series[0]
+      .points;
+    expect(points.length).toBeLessThanOrEqual(MAX_CHART_POINTS);
+    expect(points.some(([x, y]) => y === 1000 && x === us + 990 * 60_000_000)).toBe(true);
+    expect(points.at(-1)![0]).toBe(us + 999 * 60_000_000);
+    expect(points.map((p) => p[0])).toEqual([...points.map((p) => p[0])].sort((a, b) => a - b));
   });
 
   it("drops epoch values under a neutral name, and the whole chart when nothing is left", () => {

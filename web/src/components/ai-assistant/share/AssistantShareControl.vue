@@ -25,34 +25,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @select="onMenuSelect"
     >{{ t("assistant.share.share") }}</ODropdownItem
   >
-  <OPopover
-    v-else-if="variant === 'quick' && state.kind !== 'absent'"
-    v-model:open="open"
-    side="bottom"
-    align="start"
-    privacy="mask"
-    :aria-label="t('assistant.share.title')"
-    :content-class="quickWidth"
-  >
-    <template #anchor>
-      <span aria-hidden="true" class="absolute start-0 bottom-0 size-0" />
-    </template>
-    <AssistantShareQuick
-      v-if="open"
-      :org="org"
-      :sid="sid"
-      :share="current"
-      :running="running"
-      :public-links="capability.publicLinks"
-      :public-max-expiry-days="capability.publicMaxExpiryDays"
-      :redact-attachments="redactAttachments"
-      :has-attachments="attachments"
-      @created="onCreated"
-      @settings="emit('settings')"
-      @announce="announce"
-      @keydown.esc="escaped = true"
-    />
-  </OPopover>
+  <template v-else-if="variant === 'quick' && state.kind !== 'absent'">
+    <span ref="quickAnchor" aria-hidden="true" class="absolute start-0 bottom-0 size-0" />
+    <OPopover
+      v-model:open="open"
+      :anchor="quickAnchor"
+      side="bottom"
+      align="start"
+      :z-index="zIndex"
+      :aria-label="t('assistant.share.title')"
+      :content-class="quickWidth"
+    >
+      <AssistantShareQuick
+        v-if="open"
+        data-dd-privacy="mask"
+        data-assistant-surface
+        :org="org"
+        :sid="sid"
+        :share="current"
+        :running="running"
+        :public-links="capability.publicLinks"
+        :public-max-expiry-days="capability.publicMaxExpiryDays"
+        :redact-attachments="redactAttachments"
+        :has-attachments="attachments"
+        @created="onCreated"
+        @settings="emit('settings')"
+        @announce="announce"
+        @keydown.esc="escaped = true"
+      />
+    </OPopover>
+  </template>
   <ODrawer
     v-else-if="variant === 'drawer' && state.kind !== 'absent'"
     v-model:open="open"
@@ -109,6 +111,7 @@ import {
   useAssistantSession,
   useAssistantStore,
 } from "@/composables/assistant";
+import { usePopoverZIndex } from "@/components/ai-assistant/common/anchoredPopover";
 import { isTerminal } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -138,6 +141,8 @@ const view = useAssistantSession(() => props.sid);
 const { mdUp } = useBreakpoint();
 
 const settings = ref<InstanceType<typeof AssistantShareSettings> | null>(null);
+const quickAnchor = ref<HTMLElement | null>(null);
+const zIndex = usePopoverZIndex();
 // A just-created link shows in the popover before the list re-reads.
 const created = ref<ShareView | null>(null);
 // Create mode beside an existing link, so a second audience never needs a revoke first.

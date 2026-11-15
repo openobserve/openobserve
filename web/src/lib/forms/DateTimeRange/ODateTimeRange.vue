@@ -10,7 +10,7 @@ import type {
   RelativeUnit,
   DateTimeMode,
 } from "./ODateTimeRange.types";
-import { computed, inject, onBeforeUnmount, ref, useAttrs, watch, type Ref } from "vue";
+import { computed, ref, useAttrs, watch, type Ref } from "vue";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
 import {
   PopoverRoot,
@@ -34,16 +34,9 @@ import OTime from "@/lib/forms/Time/OTime.vue";
 import { parseDate } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import {
-  O_DROPDOWN_NESTED_KEY,
-  type DropdownNestedRegistry,
-} from "@/lib/overlay/Dropdown/ODropdown.context";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();
-
-// Inline, the host popover scrolls the panel, so Apply stays pinned to its bottom edge.
-const STICKY_APPLY_CLASS = "bg-datepicker-popup-bg sticky bottom-0 py-2";
 
 const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   startDate: "",
@@ -58,7 +51,6 @@ const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   disableRelative: false,
   hideTime: false,
   showTimezone: false,
-  inline: false,
   disabled: false,
   // No default here: t() cannot run at module scope, so the English fallback is
   // resolved reactively below (see `placeholderText`).
@@ -85,23 +77,6 @@ const popoverOpen = computed({
     if (!isDisabled.value) _popoverOpen.value = val;
   },
 });
-
-// The trigger is a `div role="button"` and reka binds only click, so Enter and Space open it here (CT-01 AC 11).
-function toggleFromKeyboard() {
-  popoverOpen.value = !popoverOpen.value;
-}
-
-// Inside an OPopover the picker's own popup is a nested overlay, so a click in the calendar never dismisses the parent.
-const parentOverlay = inject<DropdownNestedRegistry | null>(O_DROPDOWN_NESTED_KEY, null);
-let closeNested: (() => void) | null = null;
-watch(_popoverOpen, (open) => {
-  if (open && parentOverlay && !closeNested) closeNested = parentOverlay.open();
-  else if (!open && closeNested) {
-    closeNested();
-    closeNested = null;
-  }
-});
-onBeforeUnmount(() => closeNested?.());
 
 // ── Staged state ───────────────────────────────────────────────
 const activeTab = ref<DateTimeMode>(props.disableRelative ? "absolute" : props.mode);
@@ -256,40 +231,7 @@ const rangeLabel = computed((): string | null => {
 function handleRangeChange(value: DateRange | undefined) {
   if (!value) return;
   stagedRange.value = value as DateRange;
-  if (!value.start || !value.end) return;
-  // Picked dates alone cover whole days, so a two-date pick applies with no time typed.
-  if (props.autoApply && !props.hideTime) {
-    stagedStartTime.value ||= props.withSeconds ? "00:00:00" : "00:00";
-    stagedEndTime.value ||= props.withSeconds ? "23:59:59" : "23:59";
-  }
-  autoApplyAbsolute();
-}
-
-const absoluteReady = computed(() => {
-  const start = stagedRange.value.start?.toString();
-  const end = stagedRange.value.end?.toString();
-  if (!start || !end) return false;
-  if (props.hideTime) return end >= start;
-  if (!stagedStartTime.value || !stagedEndTime.value) return false;
-  return `${end}T${stagedEndTime.value}` > `${start}T${stagedStartTime.value}`;
-});
-
-const timeRow = ref<HTMLElement | null>(null);
-let autoApplied = "";
-
-function autoApplyAbsolute() {
-  if (!props.autoApply || !absoluteReady.value) return;
-  const { start, end } = stagedRange.value;
-  // The panel unmounting under a focused time blurs it again, which must not apply the same range twice.
-  const key = `${start}|${end}|${stagedStartTime.value}|${stagedEndTime.value}|${stagedTimezone.value}`;
-  if (key === autoApplied) return;
-  autoApplied = key;
-  emitAbsolute();
-}
-
-// Moving between the two time fields, or to a field's own clock, is still entering the range.
-function onTimeBlur(event: FocusEvent) {
-  if (!timeRow.value?.contains(event.relatedTarget as Node | null)) autoApplyAbsolute();
+  if (props.autoApply && value.start && value.end) emitAbsolute();
 }
 
 // ── Apply actions ──────────────────────────────────────────────
@@ -315,26 +257,10 @@ function commitRelative() {
   _popoverOpen.value = false;
 }
 
-// Auto-apply never closes on a half entry: the custom row applies on Enter, a unit pick after a typed amount, or leaving the amount after a unit pick; a complete, valid absolute range applies on the date pick that completes it, Enter in a time, or leaving the times (blur, not change, so 17:30 never applies at 17:03).
-const amountTyped = ref(false);
-const unitPicked = ref(false);
-const unitSelect = ref<HTMLSelectElement | null>(null);
-
 function applyCustomRelative() {
   const amount = parseInt(customAmount.value, 10);
   if (isNaN(amount) || amount <= 0) return;
-  amountTyped.value = unitPicked.value = false;
   selectRelative(customUnit.value, amount);
-}
-
-function onCustomUnit() {
-  unitPicked.value = true;
-  if (props.autoApply && amountTyped.value) applyCustomRelative();
-}
-
-function onCustomAmountBlur(event: FocusEvent) {
-  if (props.autoApply && unitPicked.value && event.relatedTarget !== unitSelect.value)
-    applyCustomRelative();
 }
 
 function emitAbsolute() {
@@ -398,7 +324,7 @@ const triggerClasses = computed(() => [
 
     <!-- Trigger + Popover -->
     <PopoverRoot v-model:open="popoverOpen">
-      <PopoverTrigger v-if="!inline" as-child>
+      <PopoverTrigger as-child>
         <div
           :class="triggerClasses"
           role="button"
@@ -407,8 +333,6 @@ const triggerClasses = computed(() => [
           :aria-disabled="isDisabled || undefined"
           :tabindex="inputTabindex"
           data-test="datetimerange-trigger"
-          @keydown.enter.prevent="toggleFromKeyboard"
-          @keydown.space.prevent="toggleFromKeyboard"
         >
           <!-- Clock icon -->
           <svg
@@ -447,16 +371,11 @@ const triggerClasses = computed(() => [
         </div>
       </PopoverTrigger>
 
-      <!-- Inline, the same panel renders in place so a host popover stays the one surface. -->
-      <component
-        :is="inline ? 'div' : PopoverContent"
-        v-bind="inline ? {} : { sideOffset: 4, align: 'start' }"
-        :class="
-          inline
-            ? 'flex flex-col'
-            : 'rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto'
-        "
-        :data-test="inline ? 'datetimerange-inline' : 'datetimerange-popup'"
+      <PopoverContent
+        :side-offset="4"
+        align="start"
+        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
+        data-test="datetimerange-popup"
       >
         <!-- Tab bar -->
         <div
@@ -538,25 +457,21 @@ const triggerClasses = computed(() => [
               :disabled="isDisabled"
               class="rounded-default border-datepicker-border bg-datepicker-bg text-datepicker-text focus:border-datepicker-focus-border h-7 w-16 border px-2 text-xs tabular-nums outline-none disabled:opacity-50"
               data-test="datetimerange-custom-amount"
-              @input="amountTyped = true"
-              @blur="onCustomAmountBlur"
               @keydown.enter="applyCustomRelative"
             />
             <select
-              ref="unitSelect"
               v-model="customUnit"
               :disabled="isDisabled"
               class="rounded-default border-datepicker-border bg-datepicker-bg text-datepicker-text focus:border-datepicker-focus-border h-7 flex-1 border px-2 text-xs outline-none disabled:opacity-50"
               data-test="datetimerange-custom-unit"
-              @change="onCustomUnit"
             >
               <option v-for="u in RELATIVE_UNITS" :key="u" :value="u">{{ UNIT_LABELS[u] }}</option>
             </select>
           </div>
 
-          <!-- Timezone row: an auto-applied relative range is the same in every zone, so it has none -->
+          <!-- Timezone row -->
           <div
-            v-if="showTimezone && !autoApply"
+            v-if="showTimezone"
             class="border-datepicker-popup-border flex flex-col gap-1 border-t pt-2"
           >
             <span class="text-datepicker-relative-label text-xs">{{ t("common.timezone") }}</span>
@@ -623,10 +538,7 @@ const triggerClasses = computed(() => [
           <!-- Apply -->
           <div
             v-if="!autoApply"
-            :class="[
-              'border-datepicker-popup-border flex justify-end border-t pt-2',
-              inline && STICKY_APPLY_CLASS,
-            ]"
+            class="border-datepicker-popup-border flex justify-end border-t pt-2"
           >
             <button
               type="button"
@@ -643,10 +555,7 @@ const triggerClasses = computed(() => [
         <!-- ── ABSOLUTE TAB ──────────────────────────────────── -->
         <div
           v-if="activeTab === 'absolute'"
-          :class="[
-            'flex flex-col gap-3 p-3',
-            !inline && 'max-h-[70vh] overflow-y-auto max-lg:max-h-none max-lg:overflow-visible',
-          ]"
+          class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3 max-lg:max-h-none max-lg:overflow-visible"
           data-test="datetimerange-absolute-panel"
         >
           <!-- Range calendar -->
@@ -745,9 +654,7 @@ const triggerClasses = computed(() => [
           <!-- Start / End time -->
           <div
             v-if="!hideTime"
-            ref="timeRow"
             class="flex gap-3 [--color-datepicker-border:var(--color-datepicker-inner-border)]"
-            @keydown.enter="autoApplyAbsolute"
           >
             <OTime
               v-model="stagedStartTime"
@@ -755,7 +662,7 @@ const triggerClasses = computed(() => [
               :with-seconds="withSeconds"
               :disabled="isDisabled"
               data-test="datetimerange-start-time"
-              @blur="onTimeBlur"
+              @change="autoApply && emitAbsolute()"
             />
             <OTime
               v-model="stagedEndTime"
@@ -763,7 +670,7 @@ const triggerClasses = computed(() => [
               :with-seconds="withSeconds"
               :disabled="isDisabled"
               data-test="datetimerange-end-time"
-              @blur="onTimeBlur"
+              @change="autoApply && emitAbsolute()"
             />
           </div>
 
@@ -831,7 +738,7 @@ const triggerClasses = computed(() => [
           </div>
 
           <!-- Apply -->
-          <div v-if="!autoApply" :class="['flex justify-end', inline && STICKY_APPLY_CLASS]">
+          <div v-if="!autoApply" class="flex justify-end">
             <button
               type="button"
               :disabled="isDisabled"
@@ -843,7 +750,7 @@ const triggerClasses = computed(() => [
             </button>
           </div>
         </div>
-      </component>
+      </PopoverContent>
     </PopoverRoot>
 
     <!-- Error / help text -->

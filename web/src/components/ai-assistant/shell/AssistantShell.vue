@@ -701,6 +701,7 @@ import {
   assistantTranscriptHostKey,
   pushFromThread,
   recordedLedger,
+  homeQueryFrom,
   type AssistantEvidenceHost,
   type AssistantTranscriptHost,
 } from "@/composables/assistant/pure";
@@ -1681,13 +1682,17 @@ function sheetToFull(): void {
     turn_running: !!session.value && isRunning(session.value.turn),
   });
   store.moveTo({ kind: "full" });
-  void router.push({ name: "assistant", params: sid ? { chatId: sid } : {} });
+  void router.push({
+    name: "assistant",
+    params: sid ? { chatId: sid } : {},
+    query: homeQueryFrom(route),
+  });
 }
 
 // The locked sidebar has no placement to move, so its full view is the route's hero gate.
 function openInFullView(): void {
   closeLockedPanel("move");
-  void router.push({ name: "assistant" });
+  void router.push({ name: "assistant", query: homeQueryFrom(route) });
 }
 
 function closeContainer(): void {
@@ -1823,6 +1828,8 @@ watch(
   },
 );
 
+const MIN_SHEET_TRANSCRIPT_PX = 240;
+
 // A half sheet whose composer area no longer fits grows to full, so no chip, cap line or control hides in a scroll box (V5).
 watch(lower, (el, _was, onCleanup) => {
   if (!el || !props.sheet || typeof ResizeObserver === "undefined") return;
@@ -1833,9 +1840,12 @@ watch(lower, (el, _was, onCleanup) => {
     if (!el.clientHeight) return;
     const grew = el.scrollHeight > lastContent + 1;
     lastContent = el.scrollHeight;
-    if (!grew) return;
     const shell = root.value;
+    // On a short phone the full composer leaves too little for the transcript, so the sheet opens taller; this holds even when the content did not grow.
+    const cramped = (el.previousElementSibling?.clientHeight ?? Infinity) < MIN_SHEET_TRANSCRIPT_PX;
+    if (!grew && !cramped) return;
     const overflows =
+      cramped ||
       el.scrollHeight > el.clientHeight + 1 ||
       (!!shell && shell.scrollHeight > shell.clientHeight + 1);
     if (!overflows || store.state.shell.sheetSnap !== "half") return;
@@ -1846,6 +1856,7 @@ watch(lower, (el, _was, onCleanup) => {
   const watchChildren = () => {
     sizes.disconnect();
     sizes.observe(el);
+    if (el.previousElementSibling) sizes.observe(el.previousElementSibling);
     for (const child of Array.from(el.children)) sizes.observe(child);
   };
   const children = new MutationObserver(watchChildren);

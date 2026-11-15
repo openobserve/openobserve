@@ -528,7 +528,7 @@ type FlatEntry = { kind: "group"; id: GroupId } | { kind: "row"; id: string; row
 <script setup lang="ts">
 import { useQuery } from "@tanstack/vue-query";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AssistantErrorDetails from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
@@ -549,7 +549,7 @@ import {
   useChatExport,
   type RunRow,
 } from "@/composables/assistant";
-import { rosterOffersChoice } from "@/composables/assistant/pure";
+import { rosterOffersChoice, homeQueryFrom } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -597,6 +597,7 @@ const runs = useAssistantRuns();
 const { lgUp } = useBreakpoint();
 const exporter = useChatExport();
 const router = useRouter();
+const route = useRoute();
 const vuex = useStore();
 const root = ref<HTMLElement | null>(null);
 const scroller = ref<HTMLElement | null>(null);
@@ -1014,7 +1015,7 @@ async function openRow(sid: Sid): Promise<void> {
     await router.push({
       name: "assistant",
       params: { chatId: sid },
-      query: { org_identifier: org.value },
+      query: { ...homeQueryFrom(route), org_identifier: org.value },
     });
     emit("opened", sid);
     return;

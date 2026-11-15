@@ -49,6 +49,7 @@ export {
   pushFromThread,
   threadParam,
   withoutThread,
+  homeQueryFrom,
 } from "./fullThreadRoute";
 export { INLINE_HOST_IDS, isDockHostId } from "./hostIds";
 export { openTabWithoutOpener } from "./openTab";

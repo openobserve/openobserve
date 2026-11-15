@@ -29,7 +29,7 @@ export interface DateTimeRangeProps {
   // ── Behaviour ─────────────────────────────────────────────────
   /** Show seconds segments in time fields */
   withSeconds?: boolean;
-  /** No Apply button: a pick applies once its entry is finished (a preset, Enter, leaving a field, or the date that completes a valid range); the relative tab drops its time zone row */
+  /** Emit immediately on every change (no Apply button needed) */
   autoApply?: boolean;
   /** Hide the Relative tab; force absolute-only mode */
   disableRelative?: boolean;
@@ -37,8 +37,6 @@ export interface DateTimeRangeProps {
   hideTime?: boolean;
   /** Show the timezone selector (hidden by default) */
   showTimezone?: boolean;
-  /** Render the picker panel in place, with no trigger or popup of its own (for a host popover). */
-  inline?: boolean;
 
   // ── Restrictions ──────────────────────────────────────────────
   /** Minimum selectable date `YYYY-MM-DD` */

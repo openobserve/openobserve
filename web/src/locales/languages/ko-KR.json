@@ -10748,7 +10748,6 @@
       "regexRedact": "이메일을 교정하기 위한 정규식 패턴 생성",
       "mapStreamSchema": "내 \"default\" 스트림 스키마 매핑",
       "promqlCpu": "80% 이상의 CPU를 사용하는 파드용 PromQL을 작성하십시오.",
-      "datadogToO2": "이 데이터독 쿼리를 OpenObserve SQL로 변환",
       "lastAlertFired": "내 마지막 알림은 왜 발생했나요?"
     },
     "placeholderRotation": {

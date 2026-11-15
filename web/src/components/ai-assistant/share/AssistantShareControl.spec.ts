@@ -216,13 +216,17 @@ describe("AssistantShareControl across a chat switch", () => {
 });
 
 describe("AssistantShareControl quick popover", () => {
-  async function quick(shares: ShareView[] = [], over: Partial<AssistantCapability> = {}) {
+  async function quick(
+    shares: ShareView[] = [],
+    over: Partial<AssistantCapability> = {},
+    provide: Record<string, number> = {},
+  ) {
     fake.current = fakeAssistant("available", over);
     api.listForChat.mockResolvedValue({ data: { shares } });
     const sid = chat();
     const wrapper = mount(AssistantShareControl, {
       props: { sid, variant: "quick", open: true },
-      global: { plugins: [vuex()] },
+      global: { plugins: [vuex()], provide },
       attachTo: document.body,
     });
     await flushPromises();
@@ -230,6 +234,19 @@ describe("AssistantShareControl quick popover", () => {
   }
   const q = (id: string) =>
     document.querySelector<HTMLElement>(`[data-test="assistant-share-quick-${id}"]`);
+
+  it("opens from a hidden point under the title, masked and in assistant colours, above a sheet", async () => {
+    const { wrapper } = await quick([], {}, { o2DialogDepth: 1 });
+    const point = wrapper.element.parentElement!.querySelector<HTMLElement>(
+      "span.absolute[aria-hidden='true']",
+    );
+    expect(point).not.toBeNull();
+    expect(wrapper.findComponent({ name: "OPopover" }).props("anchor")).toBe(point);
+    const body = document.querySelector<HTMLElement>('[data-test="assistant-share-quick"]')!;
+    expect(body.getAttribute("data-dd-privacy")).toBe("mask");
+    expect(body.hasAttribute("data-assistant-surface")).toBe(true);
+    expect(body.closest<HTMLElement>("[data-o-popover-content]")?.style.zIndex).toBe("7000");
+  });
 
   it("offers the scope, one help line and the primary, and creates only on the primary", async () => {
     await quick([], { publicLinks: true, publicMaxExpiryDays: 30 });
@@ -246,6 +263,43 @@ describe("AssistantShareControl quick popover", () => {
       redact_tools: true,
       expires_in_secs: 90 * 86_400,
     });
+  });
+
+  it("names a chat with no stored messages and offers no Retry, as the server says (T-08-01)", async () => {
+    await quick();
+    // `AiErrorEnvelope::body` for `invalid_request` (shares.rs: last_committed_seq == NO_SEQ).
+    const message = "A conversation with no stored messages cannot be shared";
+    api.create.mockRejectedValue({
+      response: {
+        status: 400,
+        data: {
+          code: "invalid_request",
+          message,
+          retryable: false,
+          error: message,
+          recoverable: false,
+        },
+      },
+    });
+    q("create")?.click();
+    await flushPromises();
+    expect(toast).toHaveBeenCalledWith({
+      variant: "error",
+      message: "This chat has no saved messages yet, so it can't be shared.",
+    });
+  });
+
+  it("keeps Retry for a failure the server calls retryable", async () => {
+    await quick();
+    api.create.mockRejectedValue({ response: { status: 500, data: {} } });
+    q("create")?.click();
+    await flushPromises();
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Couldn't create the link",
+        action: expect.objectContaining({ label: "Retry" }),
+      }),
+    );
   });
 
   it("shows the link with Copied and hands the rest to Change settings", async () => {
@@ -596,5 +650,28 @@ describe("AssistantShareSettings", () => {
     expect(String(toast.mock.calls[0][0].message)).toBe(
       "You don't have permission to share chats.",
     );
+  });
+
+  it("names a chat with no stored messages and offers no Retry in Manage link (T-08-01)", async () => {
+    const message = "A conversation with no stored messages cannot be shared";
+    api.create.mockRejectedValue({
+      response: {
+        status: 400,
+        data: {
+          code: "invalid_request",
+          message,
+          retryable: false,
+          error: message,
+          recoverable: false,
+        },
+      },
+    });
+    const wrapper = mountSettings({ share: null });
+    await at(wrapper, "assistant-share-create").trigger("click");
+    await flushPromises();
+    expect(toast).toHaveBeenCalledWith({
+      variant: "error",
+      message: "This chat has no saved messages yet, so it can't be shared.",
+    });
   });
 });

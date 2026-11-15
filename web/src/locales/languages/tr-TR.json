@@ -10748,7 +10748,6 @@
       "regexRedact": "E-postaları düzenlemek için bir regex kalıbı oluşturun",
       "mapStreamSchema": "\"default\" akış şemamı eşle",
       "promqlCpu": "> %80 CPU kullanan bölmeler için PromQL yazın",
-      "datadogToO2": "Bu Datadog sorgusunu OpenObserve SQL'e dönüştürün",
       "lastAlertFired": "Son uyarım neden tetiklendi?"
     },
     "placeholderRotation": {

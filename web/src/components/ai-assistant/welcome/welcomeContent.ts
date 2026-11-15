@@ -2,6 +2,8 @@
  * Static content for the O2 Assistant home-tab welcome screen.
  */
 
+import type { I18nKey } from "@/types/i18n";
+
 export interface CapabilityCard {
   /** i18n key — under aiAssistant.capabilities.<id>.{title,description,prompt} */
   id: "query" | "incident" | "dashboard" | "alert";
@@ -41,8 +43,9 @@ export const CAPABILITY_CARDS: CapabilityCard[] = [
 ];
 
 export interface PromptSuggestion {
-  /** i18n key — under aiAssistant.suggestions.<id> */
+  /** i18n key — under aiAssistant.suggestions.<id>, unless `key` names another */
   id: string;
+  key?: I18nKey;
   /** OIcon name */
   icon: string;
 }
@@ -52,6 +55,6 @@ export const PROMPT_SUGGESTIONS: PromptSuggestion[] = [
   { id: "regexRedact", icon: "code" },
   { id: "mapStreamSchema", icon: "data-object" },
   { id: "promqlCpu", icon: "trending-up" },
-  { id: "datadogToO2", icon: "swap-horiz" },
+  { id: "otherToolToO2", key: "assistant.welcome.starter.otherToolToO2", icon: "swap-horiz" },
   { id: "lastAlertFired", icon: "history" },
 ];

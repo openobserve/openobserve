@@ -10748,7 +10748,6 @@
       "regexRedact": "Generieren Sie ein Regex-Muster, um E-Mails zu redigieren",
       "mapStreamSchema": "Mein \"default\"-Stream-Schema zuordnen",
       "promqlCpu": "Schreiben Sie PromQL für Pods mit > 80% CPU",
-      "datadogToO2": "Diese Datadog-Abfrage in OpenObserve SQL konvertieren",
       "lastAlertFired": "Warum wurde mein letzter Alarm ausgelöst?"
     },
     "placeholderRotation": {

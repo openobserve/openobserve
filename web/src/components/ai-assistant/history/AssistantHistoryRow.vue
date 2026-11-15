@@ -411,14 +411,19 @@ const counter = computed(() => t("assistant.thread.titleCounter", { count: draft
 // A browser-only row in server mode can still be read and removed, nothing more.
 const actions = computed<RowMenuAction[]>(() => {
   if (props.org) return [];
-  if (status.value === "draft")
+  if (status.value === "draft") {
+    const drop: RowMenuAction = {
+      id: "deleteDraft",
+      label: t("assistant.history.deleteDraft"),
+      icon: assistantGlyph.remove,
+    };
+    // A draft on top of a saved chat keeps the saved chat deletable too.
+    if (props.row.local || props.readonly) return [drop];
     return [
-      {
-        id: "deleteDraft",
-        label: t("assistant.history.deleteDraft"),
-        icon: assistantGlyph.remove,
-      },
+      drop,
+      { id: "delete", label: t("assistant.history.deleteChat"), icon: assistantGlyph.remove },
     ];
+  }
   const browserOnly = props.serverMode && props.row.local;
   const list: RowMenuAction[] = [];
   if (!browserOnly)

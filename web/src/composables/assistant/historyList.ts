@@ -358,7 +358,13 @@ function listLightOf(rows: ComputedRef<HistoryRow[]>, ctx: HistoryCtx) {
     const sessions = ctx.deps.store().state.sessions;
     const remote = rows.value.filter((row) => !sessions[row.sid]?.turnMeta.ownedByThisTab);
     const waiting = remote.find(
-      (row) => row.pendingApproval && !lapsedHere(sessions[row.sid], row.updatedAt),
+      (row) =>
+        row.pendingApproval &&
+        !lapsedHere(
+          sessions[row.sid],
+          row.updatedAt,
+          ctx.localBySid.value.get(row.sid)?.cachedLapsedAt,
+        ),
     );
     if (waiting) return { state: "needs_you", sid: waiting.sid };
     const working = remote.find((row) => row.activeTurn);
@@ -431,7 +437,9 @@ function withLiveSessions(rows: HistoryRow[], ctx: HistoryCtx): HistoryRow[] {
       activeTurn: running || (row.activeTurn && !settled),
       pendingApproval:
         !!session.pendingApproval ||
-        (row.pendingApproval && !settled && !lapsedHere(session, row.updatedAt)),
+        (row.pendingApproval &&
+          !settled &&
+          !lapsedHere(session, row.updatedAt, ctx.localBySid.value.get(row.sid)?.cachedLapsedAt)),
       share: session.share ?? row.share,
     };
   });

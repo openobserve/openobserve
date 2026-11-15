@@ -2,14 +2,16 @@
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { PROMPT_SUGGESTIONS } from "./welcomeContent";
+import { PROMPT_SUGGESTIONS, type PromptSuggestion } from "./welcomeContent";
 
 const { t } = useI18nTyped();
 
 const emit = defineEmits<{ (e: "select", prompt: string): void }>();
 
-function selectPrompt(id: string) {
-  emit("select", t(`aiAssistant.suggestions.${id}`));
+const keyOf = (s: PromptSuggestion) => s.key ?? `aiAssistant.suggestions.${s.id}`;
+
+function selectPrompt(s: PromptSuggestion) {
+  emit("select", t(keyOf(s)));
 }
 </script>
 
@@ -28,7 +30,7 @@ function selectPrompt(id: string) {
         :key="s.id"
         type="button"
         class="suggestion-chip group rounded-default border-border-default text-text-secondary hover:text-text-body hover:shadow-ai-accent/30 focus-visible:ring-ai-accent/40 relative inline-flex cursor-pointer items-center gap-2 overflow-hidden border bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-card-bg)_100%,transparent),color-mix(in_srgb,var(--color-card-bg)_92%,transparent))] px-2.5 py-2 ps-3 text-left text-xs leading-tight [transition:border-color_0.15s_ease,background_0.15s_ease,color_0.15s_ease,transform_0.15s_ease,box-shadow_0.15s_ease] hover:-translate-y-px hover:border-[rgba(123,97,255,0.5)] hover:shadow-md focus-visible:border-[rgba(123,97,255,0.7)] focus-visible:ring-2 focus-visible:outline-none"
-        @click="selectPrompt(s.id)"
+        @click="selectPrompt(s)"
       >
         <span
           class="suggestion-chip__icon rounded-default text-typography-meta group-hover:text-ai-accent bg-border-default/40 inline-flex h-5.5 w-5.5 shrink-0 items-center justify-center [transition:background_0.15s_ease,color_0.15s_ease] group-hover:bg-[rgba(123,97,255,0.15)]"
@@ -36,7 +38,7 @@ function selectPrompt(id: string) {
           <OIcon :name="s.icon" size="sm" />
         </span>
         <OTruncatedText class="flex-1">
-          {{ t(`aiAssistant.suggestions.${s.id}`) }}
+          {{ t(keyOf(s)) }}
         </OTruncatedText>
         <span
           class="suggestion-chip__arrow text-typography-meta group-hover:text-ai-accent inline-flex shrink-0 -translate-x-1 items-center justify-center opacity-0 [transition:opacity_0.15s_ease,transform_0.15s_ease,color_0.15s_ease] group-hover:translate-x-0 group-hover:opacity-100"

@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="assistant-message-images"
     >
       <li v-for="(image, index) in images" :key="image.id ?? `${image.filename}-${index}`">
-        <OPopover :aria-label="image.filename" privacy="mask">
+        <OPopover :aria-label="image.filename">
           <template #trigger>
             <OButton
               variant="ghost"
@@ -63,6 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :src="dataUrl(image)"
             :alt="image.filename"
             class="rounded-default block max-h-80 max-w-80 p-2"
+            data-dd-privacy="mask"
+            data-assistant-surface
             data-test="assistant-message-image-preview"
           />
         </OPopover>

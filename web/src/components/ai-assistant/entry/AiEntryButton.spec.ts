@@ -196,12 +196,11 @@ describe("AiEntryButton gate table (`60` §3.7)", () => {
       await el.trigger("click");
       await flushPromises();
       expect(openAssistant).not.toHaveBeenCalled();
-      expect(
-        document.body
-          .querySelector('[data-test="assistant-gate-state"][data-size="popover"]')
-          ?.closest("[data-o-popover-content]")
-          ?.getAttribute("data-dd-privacy"),
-      ).toBe("mask");
+      const gatePopover = document.body.querySelector(
+        '[data-test="assistant-gate-state"][data-size="popover"]',
+      );
+      expect(gatePopover?.closest("[data-o-popover-content]")).not.toBeNull();
+      expect(gatePopover?.getAttribute("data-dd-privacy")).toBe("mask");
       expect(track).toHaveBeenCalledWith("ai_entry_clicked", {
         entry_kind: "object_verb",
         entry_verb: "explain",
@@ -214,6 +213,33 @@ describe("AiEntryButton gate table (`60` §3.7)", () => {
       wrapper.unmount();
     },
   );
+
+  it("sits on the locked door above a drawer, and Escape hands focus back to the door", async () => {
+    fake.current = fakeAssistant("no_permission");
+    const wrapper = mount(AiEntryButton, {
+      props: explain,
+      global: {
+        plugins: [fakeRouter(), fakeVuex()],
+        stubs: { OTooltip: TooltipStub },
+        provide: { o2DrawerDepth: 1 },
+      },
+      attachTo: document.body,
+    });
+    const el = door(wrapper);
+    await el.trigger("click");
+    await flushPromises();
+    const content = document.body.querySelector<HTMLElement>("[data-o-popover-content]")!;
+    expect(content.style.zIndex).toBe("7000");
+    expect(content.querySelector("[data-assistant-surface]")).not.toBeNull();
+    expect(el.attributes("aria-haspopup")).toBeUndefined();
+    (document.activeElement as HTMLElement).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="assistant-gate-state"]')).toBeNull();
+    expect(document.activeElement).toBe(el.element);
+    wrapper.unmount();
+  });
 
   it("names the locked reason in the tooltip", () => {
     expect(tooltipText(setup({}, "no_permission").wrapper)).toBe("Ask an admin for AI access");

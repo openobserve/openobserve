@@ -165,6 +165,7 @@ function setup(options: Setup = {}) {
     capability: () => ({ ...capability, gate }),
     hosts,
     routeName: () => options.route ?? "logs",
+    routeQuery: () => ({ org_identifier: "org1", period: "15m", thread: "x" }),
     pushRoute,
     lgUp: () => options.lgUp ?? true,
     currentOrg: () => "org1",
@@ -442,7 +443,11 @@ describe("container resolution (10 §3.3)", () => {
       }),
     );
     expect(result.container).toBe("full_view");
-    expect(pushRoute).toHaveBeenCalledWith({ name: "assistant", params: { chatId: result.sid } });
+    expect(pushRoute).toHaveBeenCalledWith({
+      name: "assistant",
+      params: { chatId: result.sid },
+      query: { org_identifier: "org1" },
+    });
   });
 
   it("writes payload.removedPageKeys to the new chat before the send, so the wire omits them", async () => {
@@ -687,7 +692,11 @@ describe("Home's Ask box takes the sidebar's doors", () => {
     expect(result.sent).toBe(true);
     expect(send).toHaveBeenCalledOnce();
     expect(store.state.shell.placement).toEqual({ kind: "full" });
-    expect(pushRoute).toHaveBeenCalledWith({ name: "assistant", params: { chatId: result.sid } });
+    expect(pushRoute).toHaveBeenCalledWith({
+      name: "assistant",
+      params: { chatId: result.sid },
+      query: { org_identifier: "org1" },
+    });
     expect(focusHomeAsk).not.toHaveBeenCalled();
   });
 
@@ -699,7 +708,11 @@ describe("Home's Ask box takes the sidebar's doors", () => {
     store.state.sessions[sid].unread = true;
     const result = ok(await open({ ...headerOpen, thread: "current" }));
     expect(result.sid).toBe(sid);
-    expect(pushRoute).toHaveBeenCalledWith({ name: "assistant", params: { chatId: sid } });
+    expect(pushRoute).toHaveBeenCalledWith({
+      name: "assistant",
+      params: { chatId: sid },
+      query: { org_identifier: "org1" },
+    });
   });
 
   it("leaves an open sidebar and every other page as they were", async () => {

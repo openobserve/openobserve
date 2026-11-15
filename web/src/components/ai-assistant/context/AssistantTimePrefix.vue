@@ -23,23 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OSkeleton type="rect" class="h-6 w-24" />
   </span>
-  <OPopover
-    v-else
-    :open="open"
-    privacy="mask"
-    side="top"
-    :align="align"
-    :aria-label="t('assistant.context.time.swap')"
-    :collision-padding="COLLISION_PADDING"
-    :content-class="contentClass"
-    @update:open="setOpen"
-    @pointer-down-outside="keepOnChip"
-  >
-    <!-- An anchor, not a trigger: a set range carries a ✕, and focus must return to the label beside it -->
-    <template #anchor>
-      <OTooltip :content="t('assistant.context.time.hint')">
+  <template v-else>
+    <!-- The popover positions on this, not on a trigger: a set range carries a ✕ beside its label -->
+    <span ref="anchor" class="flex min-w-0">
+      <OTooltip>
         <OTag
-          ref="chip"
           type="assistantContext"
           :label="text"
           :icon="assistantGlyph.chipTime"
@@ -52,76 +40,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="name"
           aria-haspopup="dialog"
           :aria-expanded="open"
-          :class="['h-7 shrink-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
+          :class="['h-7 min-w-0 motion-safe:transition-colors', CHIP_HIT_AREA_CLASS]"
           data-test="assistant-context-chip-time"
           @click="setOpen(!open)"
           @remove="pick(null)"
         >
-          {{ text }}<OIcon :name="assistantGlyph.expand" size="xs" />
+          <span class="truncate">{{ text }}</span
+          ><OIcon :name="assistantGlyph.expand" size="xs" />
         </OTag>
+        <!-- A long range is cut in a narrow composer, so the tooltip carries it in full -->
+        <template #content>
+          <span class="block">{{ text }}</span
+          >{{ t("assistant.context.time.hint") }}
+        </template>
       </OTooltip>
-    </template>
-    <div class="flex flex-col gap-0.5" data-test="assistant-context-time-picker">
-      <!-- Custom Range… swaps the presets for the range picker, so only one surface is ever open. -->
-      <div v-if="ranging" ref="range" data-test="assistant-context-time-range">
-        <ODateTimeRange
-          v-bind="pickerValue"
-          inline
-          :timezone="timezone"
-          show-timezone
-          auto-apply
-          @change="onPick"
-        />
-        <OText
-          v-if="reversed"
-          variant="meta"
-          as="p"
-          role="alert"
-          class="text-status-error-text px-3 pb-2"
-          data-test="assistant-context-time-reversed"
-        >
-          {{ t("assistant.context.time.reversed") }}
-        </OText>
-      </div>
+    </span>
+    <OPopover
+      :open="open"
+      :anchor="anchor"
+      side="top"
+      :align="align"
+      :aria-label="t('assistant.context.time.swap')"
+      :collision-padding="COLLISION_PADDING"
+      :content-class="contentClass"
+      :z-index="zIndex"
+      @update:open="onOpenChange"
+      @pointer-down-outside="onPointerOutside"
+    >
+      <!-- The content is portalled out of the assistant root, so it carries the root's masking and colour roles itself -->
       <div
-        v-else
-        ref="group"
-        role="radiogroup"
-        tabindex="-1"
-        :aria-label="t('assistant.context.time.swap')"
+        ref="picker"
         class="flex flex-col gap-0.5"
-        @keydown="onGroupKeydown"
+        data-dd-privacy="mask"
+        data-assistant-surface
+        data-test="assistant-context-time-picker"
       >
-        <AssistantMenuRow
-          v-if="pageWindow"
-          :label="t('assistant.composer.mention.pageTime')"
-          :meta="textOf(pageWindow)"
-          :selected="window.source === 'page'"
-          :tabbable="tabbableId === 'page'"
-          data-test="assistant-context-time-page"
-          @click="pick(null)"
-        />
-        <AssistantMenuRow
-          v-for="period in PERIODS"
-          :key="period"
-          :label="periodLabel(period)"
-          :selected="isSelected(period)"
-          :tabbable="tabbableId === period"
-          :data-test="`assistant-context-time-${period}`"
-          @click="pickPeriod(period)"
-        />
-        <div class="border-border-default mt-0.5 border-t pt-0.5">
-          <AssistantMenuRow
-            :label="t('assistant.context.time.customRange')"
-            :selected="customSelected"
-            :tabbable="tabbableId === 'custom'"
-            data-test="assistant-context-time-custom"
-            @click="openRange"
+        <!-- Custom Range… swaps the presets for the range picker, so only one surface is ever open. -->
+        <div v-if="ranging" ref="range" data-test="assistant-context-time-range">
+          <AssistantTimeRangePanel
+            :window="window"
+            :timezone="timezone"
+            @period="pickPeriod"
+            @range="onRange"
           />
         </div>
+        <div
+          v-else
+          ref="group"
+          role="radiogroup"
+          tabindex="-1"
+          :aria-label="t('assistant.context.time.swap')"
+          class="flex flex-col gap-0.5"
+          @keydown="onGroupKeydown"
+        >
+          <AssistantMenuRow
+            v-if="pageWindow"
+            :label="t('assistant.composer.mention.pageTime')"
+            :meta="textOf(pageWindow)"
+            :selected="window.source === 'page'"
+            :tabbable="tabbableId === 'page'"
+            data-test="assistant-context-time-page"
+            @click="pick(null)"
+          />
+          <AssistantMenuRow
+            v-for="period in PERIODS"
+            :key="period"
+            :label="periodLabel(period)"
+            :selected="isSelected(period)"
+            :tabbable="tabbableId === period"
+            :data-test="`assistant-context-time-${period}`"
+            @click="pickPeriod(period)"
+          />
+          <div class="border-border-default mt-0.5 border-t pt-0.5">
+            <AssistantMenuRow
+              :label="t('assistant.context.time.customRange')"
+              :selected="customSelected"
+              :tabbable="tabbableId === 'custom'"
+              data-test="assistant-context-time-custom"
+              @click="openRange"
+            />
+          </div>
+        </div>
       </div>
-    </div>
-  </OPopover>
+    </OPopover>
+  </template>
 </template>
 
 <script lang="ts">
@@ -154,27 +156,13 @@ const FIT_CLASS =
 
 const DEFAULT_PERIOD = "15m";
 
-const UNIT_OF: Record<string, RelativeUnit> = {
-  s: "seconds",
-  m: "minutes",
-  h: "hours",
-  d: "days",
-  w: "weeks",
-  M: "months",
-};
-
-const LETTER_OF: Record<RelativeUnit, string> = {
-  seconds: "s",
-  minutes: "m",
-  hours: "h",
-  days: "d",
-  weeks: "w",
-  months: "M",
-};
+// The popup takes the top layer of the dialog or sheet it opens in, on ODialog's ladder.
+const LAYER_BASE = 6000;
+const LAYER_STEP = 1000;
 </script>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch, type ComponentPublicInstance } from "vue";
+import { computed, inject, nextTick, ref, watch } from "vue";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import {
@@ -185,19 +173,14 @@ import {
 import { periodMs, timeRangeShortText } from "@/composables/assistant";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
-import type {
-  DateTimeRangeValue,
-  RelativeUnit,
-} from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
+import { DIALOG_DEPTH_KEY } from "@/lib/overlay/Dialog/dialogStacking";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { convertDateToTimestamp, formatTimestampInTimezone } from "@/utils/date";
 
 import AssistantMenuRow from "./AssistantMenuRow.vue";
+import AssistantTimeRangePanel from "./AssistantTimeRangePanel.vue";
 
 const props = withDefaults(defineProps<AssistantTimePrefixProps>(), {
   pageWindow: null,
@@ -215,12 +198,15 @@ const open = defineModel<boolean>("open", { default: false });
 
 const { t } = useI18nTyped();
 const layout = useComposerLayout();
-const reversed = ref(false);
+const zIndex = LAYER_BASE + LAYER_STEP * inject<number>(DIALOG_DEPTH_KEY, 0);
 /** The popup shows the range picker in place of the presets. */
 const ranging = ref(false);
 const group = ref<HTMLElement | null>(null);
 const range = ref<HTMLElement | null>(null);
-const chip = ref<ComponentPublicInstance | null>(null);
+const anchor = ref<HTMLElement | null>(null);
+const picker = ref<HTMLElement | null>(null);
+/** The popup closed on a press elsewhere, which keeps focus where the user put it. */
+let pressedOutside = false;
 
 // Presets keep the composer's popup width; the range picker keeps its own so the relative grid never wraps.
 const contentClass = computed(() =>
@@ -233,7 +219,6 @@ const contentClass = computed(() =>
 watch(open, (value) => {
   if (!value) return;
   ranging.value = false;
-  reversed.value = false;
 });
 
 const text = computed(() => textOf(props.window));
@@ -247,26 +232,6 @@ const name = computed(() =>
     source: t(`assistant.context.time.source.${props.window.source}`),
   }),
 );
-
-// The picker opens on the window the prefix shows: relative stays relative, a range shows its ends in the org zone.
-const pickerValue = computed(() => {
-  const match = props.window.period ? /^(\d+)([smhdwM])$/.exec(props.window.period) : null;
-  if (match)
-    return {
-      mode: "relative" as const,
-      relativeAmount: Number(match[1]),
-      relativeUnit: UNIT_OF[match[2]],
-    };
-  const at = (ms: number, format: string) =>
-    formatTimestampInTimezone(ms * 1000, format, props.timezone);
-  return {
-    mode: "absolute" as const,
-    startDate: at(props.window.from, "YYYY-MM-DD"),
-    startTime: at(props.window.from, "HH:mm"),
-    endDate: at(props.window.to, "YYYY-MM-DD"),
-    endTime: at(props.window.to, "HH:mm"),
-  };
-});
 
 // A range the user set that no preset names: an absolute range, or a relative one picked in the range picker.
 const customSelected = computed(
@@ -308,15 +273,36 @@ async function openRange(): Promise<void> {
 }
 
 // A press on the chip toggles the picker itself, so it must not also count as a press outside.
-function keepOnChip(event: Event): void {
-  const el: unknown = chip.value?.$el;
-  if (el instanceof Element && event.target instanceof Node && el.contains(event.target))
-    event.preventDefault();
+function onPointerOutside(event: Event): void {
+  if (event.defaultPrevented) return;
+  if (event.target instanceof Node && anchor.value?.contains(event.target))
+    return event.preventDefault();
+  pressedOutside = true;
+}
+
+// The popover hands focus back only to a trigger, and the chip is an anchor, so it takes focus back here.
+async function returnFocus(): Promise<void> {
+  const inPicker = picker.value;
+  // After the host redraws the chip: a picked range swaps its button for one with a ✕.
+  await nextTick();
+  const active = document.activeElement;
+  const movedOn =
+    active &&
+    active !== document.body &&
+    !inPicker?.contains(active) &&
+    !anchor.value?.contains(active);
+  if (!movedOn) anchor.value?.querySelector<HTMLElement>("button")?.focus();
+}
+
+function onOpenChange(value: boolean): void {
+  setOpen(value);
+  if (!value && !pressedOutside) void returnFocus();
+  pressedOutside = false;
 }
 
 function pick(range: ComposerState["timeOverride"]): void {
   emit("change", range);
-  setOpen(false);
+  onOpenChange(false);
 }
 
 function pickPeriod(period: string): void {
@@ -325,22 +311,10 @@ function pickPeriod(period: string): void {
   pick({ from: to - periodMs(period), to, period });
 }
 
-function onPick(value: DateTimeRangeValue): void {
-  if (value.type === "relative") return pickPeriod(`${value.amount}${LETTER_OF[value.unit]}`);
-  const ms = (date: string, time: string) => {
-    const [year, month, day] = date.split("-");
-    return (
-      convertDateToTimestamp(
-        `${day}-${month}-${year}`,
-        time || "00:00",
-        value.timezone || props.timezone,
-      ).timestamp / 1000
-    );
-  };
-  const from = ms(value.startDate, value.startTime);
-  const to = ms(value.endDate, value.endTime);
-  reversed.value = !(from > 0 && to > from);
-  if (!reversed.value) pick({ from, to });
+// A time edit applies and leaves the picker open for the next one; two dates or Enter finish the entry.
+function onRange(value: { from: number; to: number }, done: boolean): void {
+  if (done) return pick(value);
+  emit("change", value);
 }
 
 // Arrows move focus only; picking a row applies it and closes the picker, so selection cannot follow focus.

@@ -42,7 +42,7 @@ describe("AssistantLocalOnlyHeader", () => {
     expect(
       document.body
         .querySelector('[data-test="assistant-local-info-help"]')
-        ?.closest("[data-o-popover-content]")
+        ?.closest("[data-o-popover-content] [data-dd-privacy]")
         ?.getAttribute("data-dd-privacy"),
     ).toBe("mask");
     wrapper.unmount();

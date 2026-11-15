@@ -46,6 +46,14 @@ const issuesOf = (values: unknown, options: Options = NONE) => {
 };
 
 describe("toolset form schema and payload", () => {
+  it("words a zero timeout in the form's own message, not zod's", () => {
+    const values = toolsetFormDefaults();
+    values.name = "pager";
+    values.mcp.url = "https://pd.example/mcp";
+    values.mcp.timeout_seconds = 0;
+    expect(issuesOf(values)).toEqual(["mcp.timeout_seconds=assistant.toolsets.form.wholeNumber"]);
+  });
+
   it("never loads a stored secret into the form", () => {
     const merged = toolsetFormOf(STORED, true);
     expect(merged.mcp.headers).toEqual([

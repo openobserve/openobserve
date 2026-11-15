@@ -32,6 +32,7 @@ import {
   shareLinkOf,
   statusOfError,
 } from "./chatShare";
+import { shareCreateRefusal } from "./shareRefusal";
 
 export interface QuickShareOptions {
   /** Named in the toast when the share starts outside the chat's own thread. */
@@ -143,10 +144,11 @@ export function useQuickShare(): QuickShare {
       denyShare(org);
       toast({ variant: "error", message: t("assistant.share.forbidden") });
     } else {
+      const refusal = shareCreateRefusal(err);
       toast({
         variant: "error",
-        message: t("assistant.share.createFailed"),
-        action: { label: t("common.retry"), handler: retry },
+        message: t(refusal.message),
+        ...(refusal.retry && { action: { label: t("common.retry"), handler: retry } }),
       });
     }
     return error;

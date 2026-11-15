@@ -205,6 +205,7 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
     const settled = !detail.active_turn && !turns.some((turn) => turn.status === "running");
     // The server keeps an expired card pending; this read found nothing to answer until the chat changes.
     const lapsed = detail.pending_approval === true && settled && !cards.length;
+    const lapsedAt = lapsed ? Math.floor(detail.updated_at / 1000) : null;
     ctx.deps.store().adoptSession(sid, {
       ...adoptBase(sid, detail.title, cached, detail),
       messages,
@@ -216,7 +217,7 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
         forkedFromShare: detail.forked_from_share ?? null,
         branchedFrom: branchedFromOf(detail.branched_from),
         pinned: detail.pinned ?? cached?.pinned ?? false,
-        lapsedAt: lapsed ? Math.floor(detail.updated_at / 1000) : null,
+        lapsedAt,
         ...forkSeedField(detail, cached),
       },
     });
@@ -227,6 +228,7 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
       ...(settled && { cachedLastSeq: detail.last_committed_seq }),
       ...(detail.state_version && { cachedStateVersion: detail.state_version }),
       turns,
+      cachedLapsedAt: lapsedAt,
       cachedTurnsSchema: CACHED_TURNS_SCHEMA,
       ...(detail.seed && { cachedSeed: detail.seed }),
       ...(detail.approvals && { cachedApprovals: detail.approvals }),

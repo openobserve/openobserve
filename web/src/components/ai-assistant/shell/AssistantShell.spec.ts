@@ -871,6 +871,43 @@ describe("WP-06 conversation wiring", () => {
     expect(store.state.shell.sheetSnap).toBe("full");
   });
 
+  it("T-01-01: a half sheet that leaves the transcript under 240px grows to full", async () => {
+    let notify: () => void = () => {};
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(cb: () => void) {
+          notify = cb;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const size = (el: Element, h: number, scroll = h) => {
+      Object.defineProperty(el, "clientHeight", { configurable: true, value: h });
+      Object.defineProperty(el, "scrollHeight", { configurable: true, value: scroll });
+    };
+    try {
+      const { wrapper, store } = live({ state: "idle" }, []);
+      await wrapper.setProps({ sheet: true });
+      store.setSheetSnap("half");
+      await flushPromises();
+      const lower = wrapper.get('[data-test="assistant-shell-lower"]').element;
+      // The first measure sees a roomy transcript and records the content height; the sheet then settles with the same content and a short transcript.
+      size(lower, 230);
+      size(lower.previousElementSibling as Element, 300);
+      notify();
+      await flushPromises();
+      expect(store.state.shell.sheetSnap).toBe("half");
+      size(lower.previousElementSibling as Element, 190);
+      notify();
+      await flushPromises();
+      expect(store.state.shell.sheetSnap).toBe("full");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("keeps the failure line when a real failed turn grows the half sheet (W4)", async () => {
     const { wrapper, store, sid } = live({ state: "connecting" }, [
       { role: "user", content: raw("why 5xx?"), sentAt: 0, turnId: "t1" },

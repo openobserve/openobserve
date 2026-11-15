@@ -325,6 +325,7 @@ function buildRuntime(): AssistantRuntime {
         () => capability,
         () => lifecycle,
         hints,
+        () => history,
       ),
     );
     const keepAlive = createApprovalKeepAlive({
@@ -346,6 +347,7 @@ function buildRuntime(): AssistantRuntime {
         const current = context.value?.router?.currentRoute.value;
         return isFullThreadRoute(current) ? "assistant" : String(current?.name ?? "");
       },
+      routeQuery: () => context.value?.router?.currentRoute.value.query ?? {},
       pushRoute: (to) => void context.value?.router?.push(to).catch(() => undefined),
       lgUp: () => lgUp.value,
       currentOrg: () => context.value?.getOrg()?.identifier ?? null,
@@ -429,6 +431,7 @@ function runsDeps(
   capability: () => AssistantCapabilityHandle,
   lifecycle: () => AssistantLifecycleRuntime,
   hints: AssistantHintChannel,
+  history: () => AssistantHistory,
 ): RunsDeps {
   return {
     store,
@@ -456,6 +459,10 @@ function runsDeps(
         .stopElsewhere(sid)
         .then(() => undefined),
     approvalElsewhere: (sid) => lifecycle().approvalElsewhere(sid),
+    cachedLapsedAt: (sid) =>
+      history()
+        .localRecords()
+        .find((record) => record.sessionId === sid)?.cachedLapsedAt,
   };
 }
 

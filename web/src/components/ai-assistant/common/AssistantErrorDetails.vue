@@ -30,7 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("assistant.errorDetails.title") }}
       </OButton>
     </template>
-    <div :class="['flex flex-col gap-2', variant === 'popover' ? 'w-80 max-w-full p-3' : 'pt-1']">
+    <div
+      data-dd-privacy="mask"
+      data-assistant-surface
+      :class="['flex flex-col gap-2', variant === 'popover' ? 'w-80 max-w-full p-3' : 'pt-1']"
+    >
       <ODescriptionList dense data-test="assistant-error-details-rows">
         <ODescriptionItem v-for="row in rows" :key="row.key" :label="row.label" stacked>
           <span
@@ -208,7 +212,7 @@ async function copyDetails(): Promise<void> {
 
 const wrapperProps = computed(() =>
   props.variant === "popover"
-    ? { ariaLabel: t("assistant.errorDetails.title"), privacy: "mask", collisionPadding: 8 }
+    ? { ariaLabel: t("assistant.errorDetails.title"), collisionPadding: 8 }
     : {
         modelValue: open.value,
         "onUpdate:modelValue": (value: boolean) => (open.value = value),

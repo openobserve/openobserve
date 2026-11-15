@@ -1191,6 +1191,23 @@ describe("HomeView", () => {
         expect((await contextRegistry.getActiveContext())?.homeNoData).toBeUndefined();
       });
 
+      it("C-09: the first-run state gives a question no Home range, so it goes over the chip's window", async () => {
+        flagged(true);
+        localStorage.removeItem("o2_home_active_tab");
+        setFlag(true);
+        store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+        panel.layout = "status";
+        await router.replace({ name: "home", query: { period: "7d" } });
+        wrapper = mountHome();
+        await resolveKey("k1");
+        await settleAsync();
+        const window = timeWindowOf(await contextRegistry.getActiveContext(), null);
+        expect(
+          String(gt("assistant.context.time.last", { period: timeRangeShortText(window) })),
+        ).toBe("Last 15 min");
+        await router.replace({ path: "/" }).catch(() => undefined);
+      });
+
       it("shows the first-run state in the AI tab of an empty org without the takeover flag", async () => {
         flagged(true);
         localStorage.removeItem("o2_home_active_tab");

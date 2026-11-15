@@ -23,45 +23,6 @@ describe("OInlineEdit", () => {
     expect(input(wrapper).exists()).toBe(false);
   });
 
-  it("names the display trigger by its value and describes it with the field label", () => {
-    const wrapper = mountInlineEdit({ ariaLabel: "Chat title" });
-    const btn = trigger(wrapper);
-
-    expect(btn.attributes("aria-label")).toBeUndefined();
-    const desc = wrapper.get(`#${btn.attributes("aria-describedby")}`);
-    expect(desc.text()).toBe("Chat title");
-  });
-
-  it("leaves the field label out of a wrapping heading's name", () => {
-    const wrapper = mount(
-      {
-        components: { OInlineEdit },
-        template: '<h1><OInlineEdit model-value="Panel one" aria-label="Chat title" /></h1>',
-      },
-      { global: { stubs: { OIcon: true } } },
-    );
-    // Name from content skips hidden subtrees, as browsers do.
-    const nameFromContent = (el: Element): string =>
-      Array.from(el.childNodes)
-        .map((n) =>
-          n.nodeType === Node.TEXT_NODE
-            ? (n.textContent ?? "")
-            : n instanceof HTMLElement && !n.hidden && n.getAttribute("aria-hidden") !== "true"
-              ? nameFromContent(n)
-              : "",
-        )
-        .join("");
-
-    expect(nameFromContent(wrapper.element).trim()).toBe("Panel one");
-  });
-
-  it("keeps the field label on the input while editing", async () => {
-    const wrapper = mountInlineEdit({ ariaLabel: "Chat title" });
-    await trigger(wrapper).trigger("click");
-
-    expect(input(wrapper).attributes("aria-label")).toBe("Chat title");
-  });
-
   it("falls back to the placeholder when the value is empty", () => {
     const wrapper = mountInlineEdit({ modelValue: "", placeholder: "Untitled panel" });
 
@@ -455,18 +416,5 @@ describe("OInlineEdit", () => {
     await trigger(wrapper).trigger("click");
 
     expect(wrapper.find('[data-test="auto-badge"]').exists()).toBe(false);
-  });
-
-  it("draws a bar title in medium weight with its pencil hidden until hover or focus", () => {
-    const bar = mountInlineEdit({ tone: "bar", size: "lg" });
-    const value = bar.get('[data-test="name-value"]');
-    expect(value.classes()).toEqual(expect.arrayContaining(["text-sm", "font-medium"]));
-    expect(value.classes()).not.toContain("font-semibold");
-    const pencil = trigger(bar).findComponent({ name: "OIcon" });
-    expect(pencil.classes()).toEqual(
-      expect.arrayContaining(["opacity-0", "group-focus-within/inline-edit:opacity-100"]),
-    );
-    const title = mountInlineEdit();
-    expect(trigger(title).findComponent({ name: "OIcon" }).classes()).toContain("opacity-50");
   });
 });

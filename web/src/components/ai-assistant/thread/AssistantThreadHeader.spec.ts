@@ -438,6 +438,39 @@ describe("AssistantThreadHeader", () => {
       expect(document.activeElement).toBe(wrapper.get(`${edit}-trigger"]`).element);
     });
 
+    it("names the heading by the chat title, not by the rename button", async () => {
+      const { wrapper } = await setup(toolbar);
+      const heading = wrapper.get('[data-test="assistant-thread-heading"]');
+      const label = wrapper.get(`#${heading.attributes("aria-labelledby")}`);
+      expect(label.text()).toBe("Checkout 5xx spike");
+    });
+
+    it("gives an empty inline edit the accessible name from its aria-label (C-05)", async () => {
+      const { default: OInlineEdit } = await import("@/lib/forms/InlineEdit/OInlineEdit.vue");
+      const w = mount(OInlineEdit, {
+        props: { modelValue: "", ariaLabel: raw("Rename incident") },
+      });
+      expect(w.get("button").attributes("aria-label")).toBe("Rename incident");
+      expect(w.get("button").attributes("aria-describedby")).toBeUndefined();
+    });
+
+    it("saves a rename typed while another rename is saving, once the first ends", async () => {
+      const { wrapper, sid, history } = await setup(toolbar);
+      const rename = vi.spyOn(history, "rename").mockResolvedValue(undefined as never);
+      const edit = '[data-test="assistant-thread-heading-edit';
+      await wrapper.get(`${edit}-trigger"]`).trigger("click");
+      await flushPromises();
+      history.pending[sid] = "rename";
+      const input = wrapper.get(`${edit}-input"]`);
+      await input.setValue("Second name");
+      await input.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(rename).not.toHaveBeenCalled();
+      delete history.pending[sid];
+      await flushPromises();
+      expect(rename).toHaveBeenCalledWith(sid, "Second name");
+    });
+
     it("shows the heading as plain text when the chat cannot be renamed", async () => {
       const { wrapper } = await setup(toolbar, { over: { canChat: "no" } });
       expect(wrapper.get('[data-test="assistant-thread-heading"]').text()).not.toBe("");

@@ -68,8 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           statusComponent ? 'md:@max-4xl/page:min-w-40' : '',
           hasBack() ? 'max-md:min-w-40' : 'max-md:min-w-24',
           hasTabs() && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
-          // Inline tabs cannot shrink, so a narrow page wraps the actions below them rather than over them.
-          hasTabs() && !tabsBelow ? '@max-4xl/page:min-w-fit' : '',
         ]"
       >
         <FeatureLockExempt v-if="ownsSidebarTrigger" as="span" class="contents">

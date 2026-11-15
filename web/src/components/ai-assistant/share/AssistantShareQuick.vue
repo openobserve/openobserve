@@ -153,6 +153,7 @@ import {
   switchVisibility,
   type ShareForm,
 } from "./chatShare";
+import { shareCreateRefusal } from "./shareRefusal";
 import { denyShare } from "./useQuickShare";
 
 const COPIED_MS = 2_000;
@@ -238,10 +239,11 @@ async function create(): Promise<void> {
       toast({ variant: "error", message: t("assistant.share.forbidden") });
       return;
     }
+    const refusal = shareCreateRefusal(err);
     toast({
       variant: "error",
-      message: t("assistant.share.createFailed"),
-      action: { label: t("common.retry"), handler: () => void create() },
+      message: t(refusal.message),
+      ...(refusal.retry && { action: { label: t("common.retry"), handler: () => void create() } }),
     });
   } finally {
     creating.value = false;

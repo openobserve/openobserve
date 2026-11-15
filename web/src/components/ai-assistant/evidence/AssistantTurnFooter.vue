@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OPopover
       v-if="credits"
-      privacy="mask"
       side="top"
       align="start"
       :aria-label="credits"
@@ -39,15 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ credits }}
         </OButton>
       </template>
-      <OText v-if="tokensLine" variant="meta" as="p" data-test="assistant-turn-footer-tokens">{{
-        tokensLine
-      }}</OText>
-      <OText v-else variant="meta" as="p">{{ t("assistant.footer.creditsCountedHint") }}</OText>
+      <div data-dd-privacy="mask" data-assistant-surface>
+        <OText v-if="tokensLine" variant="meta" as="p" data-test="assistant-turn-footer-tokens">{{
+          tokensLine
+        }}</OText>
+        <OText v-else variant="meta" as="p">{{ t("assistant.footer.creditsCountedHint") }}</OText>
+      </div>
     </OPopover>
     <template v-if="notSaved">
       <span v-if="credits" aria-hidden="true">·</span>
       <OPopover
-        privacy="mask"
         side="top"
         align="start"
         :aria-label="t('assistant.footer.notSaved')"
@@ -63,7 +63,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("assistant.footer.notSaved") }}
           </OButton>
         </template>
-        <OText variant="meta" as="p">{{ t("assistant.footer.notSavedHint") }}</OText>
+        <OText variant="meta" as="p" data-dd-privacy="mask" data-assistant-surface>{{
+          t("assistant.footer.notSavedHint")
+        }}</OText>
       </OPopover>
     </template>
   </div>

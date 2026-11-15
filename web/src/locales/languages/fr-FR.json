@@ -10748,7 +10748,6 @@
       "regexRedact": "Générez un motif regex pour expurger les e-mails",
       "mapStreamSchema": "Mapper mon schéma de flux « par défaut »",
       "promqlCpu": "Écrivez PromQL pour les pods utilisant > 80 % du processeur",
-      "datadogToO2": "Convertissez cette requête Datadog en OpenObserve SQL",
       "lastAlertFired": "Pourquoi ma dernière alerte a-t-elle été déclenchée ?"
     },
     "placeholderRotation": {

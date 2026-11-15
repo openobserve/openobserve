@@ -10748,7 +10748,6 @@
       "regexRedact": "生成用于编辑电子邮件的正则表达式模式",
       "mapStreamSchema": "映射我的 “默认” 数据流架构",
       "promqlCpu": "使用 > 80% 的 CPU 为 pod 编写 PromQL",
-      "datadogToO2": "将此 Datadog 查询转换为 OpenObserve SQL",
       "lastAlertFired": "为什么我上一个告警会触发？"
     },
     "placeholderRotation": {

@@ -158,11 +158,24 @@ describe("AssistantHistoryRow", () => {
     expect(wrapper.emitted("open")).toBeUndefined();
   });
 
-  it("offers a draft only Delete draft", async () => {
-    const wrapper = await armed({}, { status: "draft" });
+  it("offers a browser-only draft just Delete local draft", async () => {
+    const wrapper = await armed({ local: true }, { status: "draft" });
     await wrapper.get('[data-test="assistant-history-row-deleteDraft"]').trigger("click");
     expect(wrapper.emitted("delete-draft")).toHaveLength(1);
     expect(menuIds(wrapper)).toEqual(["assistant-history-row-deleteDraft"]);
+  });
+
+  it("keeps the saved chat deletable on a draft row", async () => {
+    const wrapper = await armed({ local: false }, { status: "draft" });
+    expect(menuIds(wrapper)).toEqual([
+      "assistant-history-row-deleteDraft",
+      "assistant-history-row-delete",
+    ]);
+    expect(wrapper.get('[data-test="assistant-history-row-deleteDraft"]').text()).toContain(
+      "Delete local draft",
+    );
+    await wrapper.get('[data-test="assistant-history-row-delete"]').trigger("click");
+    expect(wrapper.emitted("delete")).toHaveLength(1);
   });
 
   it("keeps the text tokens while a change is pending and disables the kebab with the reason", () => {

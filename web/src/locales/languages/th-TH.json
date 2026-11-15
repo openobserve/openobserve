@@ -10745,7 +10745,6 @@
       "regexRedact": "Generate a regex pattern to redact emails",
       "mapStreamSchema": "Map my \"default\" stream schema",
       "promqlCpu": "Write PromQL for pods using > 80% CPU",
-      "datadogToO2": "Convert this Datadog query to OpenObserve SQL",
       "lastAlertFired": "Why was my last alert fired?"
     },
     "placeholderRotation": {

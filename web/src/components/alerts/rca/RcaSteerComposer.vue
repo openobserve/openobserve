@@ -73,7 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OPopover
               side="top"
               align="end"
-              privacy="mask"
               :aria-label="t('assistant.context.title')"
               content-class="w-max max-w-[min(26rem,calc(100vw-1.5rem))] p-3"
             >
@@ -84,7 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="rca-steer-sees"
                 />
               </template>
-              <section class="flex flex-col gap-2" data-test="rca-steer-sees-popover">
+              <section
+                class="flex flex-col gap-2"
+                data-dd-privacy="mask"
+                data-assistant-surface
+                data-test="rca-steer-sees-popover"
+              >
                 <OText variant="card-title" as="h2">{{ t("assistant.context.title") }}</OText>
                 <OText variant="meta" as="p">
                   {{

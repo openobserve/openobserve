@@ -22,8 +22,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="assistant-header-skeleton"
   />
   <template v-else-if="view.state !== 'hidden'">
+    <OButton
+      ref="button"
+      variant="ghost"
+      size="icon-toolbar"
+      data-test="menu-link-ai-item"
+      data-entry="ai-entry-header-ask"
+      :data-state="view.state"
+      :aria-label="view.name"
+      :class="[
+        'group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md',
+        'relative max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
+        view.state === 'open' ? 'border-border-strong border' : '',
+      ]"
+      @click="onClick"
+    >
+      <span class="relative inline-flex">
+        <img
+          alt=""
+          :src="
+            getImageURL(
+              isDark ? 'images/common/ai_icon_dark.svg' : 'images/common/ai_icon_gradient.svg',
+            )
+          "
+          :class="[
+            'h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]',
+            view.state === 'off' ? 'opacity-50 grayscale' : '',
+          ]"
+        />
+        <span
+          v-if="view.badge"
+          aria-hidden="true"
+          class="rounded-default bg-surface-base text-text-secondary absolute -end-1.5 -top-1.5 inline-flex size-3.5 items-center justify-center"
+        >
+          <OIcon :name="assistantGlyph[view.badge]" size="xs" />
+        </span>
+      </span>
+      <!-- A visible container already says the state, and the bubble covered its bar; the name keeps it (D1) -->
+      <OTooltip
+        side="bottom"
+        :content="view.tooltip"
+        :shortcut-id="shortcutId"
+        :disabled="anyVisible"
+      />
+    </OButton>
     <OPopover
       :open="lockedOpen && mdUp"
+      :anchor="lockedOpen && mdUp ? buttonEl() : null"
       side="bottom"
       align="end"
       :aria-label="
@@ -33,52 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       @update:open="onLockedOpen"
     >
-      <template #anchor>
-        <OButton
-          ref="button"
-          variant="ghost"
-          size="icon-toolbar"
-          data-test="menu-link-ai-item"
-          data-entry="ai-entry-header-ask"
-          :data-state="view.state"
-          :aria-label="view.name"
-          :class="[
-            'group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md',
-            'relative max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
-            view.state === 'open' ? 'border-border-strong border' : '',
-          ]"
-          @click="onClick"
-        >
-          <span class="relative inline-flex">
-            <img
-              alt=""
-              :src="
-                getImageURL(
-                  isDark ? 'images/common/ai_icon_dark.svg' : 'images/common/ai_icon_gradient.svg',
-                )
-              "
-              :class="[
-                'h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]',
-                view.state === 'off' ? 'opacity-50 grayscale' : '',
-              ]"
-            />
-            <span
-              v-if="view.badge"
-              aria-hidden="true"
-              class="rounded-default bg-surface-base text-text-secondary absolute -end-1.5 -top-1.5 inline-flex size-3.5 items-center justify-center"
-            >
-              <OIcon :name="assistantGlyph[view.badge]" size="xs" />
-            </span>
-          </span>
-          <!-- A visible container already says the state, and the bubble covered its bar; the name keeps it (D1) -->
-          <OTooltip
-            side="bottom"
-            :content="view.tooltip"
-            :shortcut-id="shortcutId"
-            :disabled="anyVisible"
-          />
-        </OButton>
-      </template>
       <AssistantGateState
         v-if="lockedOpen && mdUp"
         :reason="lockedGate"
@@ -540,7 +539,7 @@ function onLockedOpen(open: boolean): void {
 
 // Ask an admin opens its own popover from the gate, so only the actions that leave close it.
 function onLockedAction(cta: GateCta): void {
-  if (cta === "learn_more" || cta === "open_settings") lockedOpen.value = false;
+  if (cta === "learn_more" || cta === "open_settings") onLockedOpen(false);
 }
 
 function closeLearn(): void {

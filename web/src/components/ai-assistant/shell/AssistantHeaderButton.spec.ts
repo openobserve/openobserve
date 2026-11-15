@@ -180,6 +180,22 @@ describe("AssistantHeaderButton gates", () => {
     );
   });
 
+  it("anchors the locked gate popover on the button and hands focus back on Escape", async () => {
+    const { wrapper } = setup("no_permission");
+    await button(wrapper).trigger("click");
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "OPopover" }).props("anchor")).toBe(
+      button(wrapper).element,
+    );
+    (document.activeElement as HTMLElement).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    await flushPromises();
+    expect(document.body.querySelector('[data-test="assistant-gate-state"]')).toBeNull();
+    expect(document.activeElement).toBe(button(wrapper).element);
+    wrapper.unmount();
+  });
+
   it("is locked on G2 and opens the gate popover, never an empty container (D7 decision 2)", async () => {
     const { wrapper } = setup("no_permission");
     const el = button(wrapper);

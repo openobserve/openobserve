@@ -10748,7 +10748,6 @@
       "regexRedact": "Wygeneruj wzorzec regex do maskowania adresów e-mail",
       "mapStreamSchema": "Zmapuj mój schemat strumienia \"default\"",
       "promqlCpu": "Napisz PromQL dla podów używających > 80% CPU",
-      "datadogToO2": "Przekonwertuj to zapytanie Datadog na SQL OpenObserve",
       "lastAlertFired": "Dlaczego mój ostatni alert został wywołany?"
     },
     "placeholderRotation": {

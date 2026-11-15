@@ -127,6 +127,34 @@ describe("AddFunction with the revamped assistant", () => {
     expect((await contextRegistry.getActiveContext())?.currentVRLQuery).toBe(".a = 1");
   });
 
+  it("moves the language toggle below the title only when it would touch the actions", async () => {
+    const toggle = '[data-test="function-transform-type-toggle"]';
+    const rects = vi.spyOn(Element.prototype, "getBoundingClientRect");
+    // One-row geometry: toggle 470-622, actions of `actionsW` px ending 15 px before the header edge.
+    const at = (headerW: number, actionsW: number) =>
+      rects.mockImplementation(function (this: Element) {
+        const box = (left: number, width: number) =>
+          ({ left, right: left + width, width, height: 60 }) as DOMRect;
+        const t = this.getAttribute("data-test");
+        if (
+          t === "function-toolbar-tabs" ||
+          this.parentElement?.dataset.test === "function-toolbar-tabs"
+        )
+          return box(470, 152);
+        if (t === "function-toolbar-actions") return box(headerW - 15 - actionsW, actionsW);
+        return this.classList.contains("app-page-header") ? box(0, headerW) : box(0, 0);
+      });
+    // 1100 px is wide enough for the old fixed 1024 cut-off but the actions are 500 px wide.
+    at(1100, 500);
+    const tight = await setup(true);
+    expect(tight.wrapper.find(`.-mt-2 ${toggle}`).exists()).toBe(true);
+    tight.wrapper.unmount();
+    at(1100, 200);
+    const fits = await setup(true);
+    expect(fits.wrapper.find(`.-mt-2 ${toggle}`).exists()).toBe(false);
+    rects.mockRestore();
+  });
+
   it("keeps the route-substring legacy toggle with the revamp off", async () => {
     flag.on = false;
     const { wrapper, runtime } = await setup(true);

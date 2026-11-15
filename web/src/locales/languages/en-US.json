@@ -10982,7 +10982,6 @@
       "regexRedact": "Generate a regex pattern to redact emails",
       "mapStreamSchema": "Map my \"default\" stream schema",
       "promqlCpu": "Write PromQL for pods using > 80% CPU",
-      "datadogToO2": "Convert this Datadog query to OpenObserve SQL",
       "lastAlertFired": "Why was my last alert fired?"
     },
     "placeholderRotation": {
@@ -12461,7 +12460,7 @@
         "title": "All chats"
       },
       "deleteChat": "Delete chat",
-      "deleteDraft": "Delete draft",
+      "deleteDraft": "Delete local draft",
       "floatNeedsRoom": "Needs a wider screen",
       "kept": "Kept {days} days",
       "lastTried": "Last tried {time}",
@@ -12735,6 +12734,8 @@
         "browserBody": "Chats live in the browser they were started in. They are not shared between devices, are capped at 100 per member per organization, and are cleared when the browser data is cleared.",
         "browserTitle": "Saved in each member's browser only",
         "deleteLine": "Deleting a chat is logical: it disappears from every device, stops running answers and revokes its links.",
+        "off": "Off",
+        "on": "On",
         "persistence": "Server history",
         "persistenceHelp": "Turn this on in the deployment to keep chats on the server and enable sharing.",
         "publicLinks": "Public links",
@@ -12887,6 +12888,7 @@
       "manage": "Manage link",
       "managerTitle": "Shared links",
       "never": "Never",
+      "noStoredMessages": "This chat has no saved messages yet, so it can't be shared.",
       "notSavedBlocked": "This chat's latest answer isn't saved, so it can't be shared yet.",
       "nothingToShare": "Send a message first",
       "offline": "You're offline",
@@ -13232,6 +13234,7 @@
         "descriptionLabel": "What the assistant should use this tool for",
         "editTitle": "Edit toolset",
         "enterAgain": "Enter the value again",
+        "wholeNumber": "Enter a whole number greater than 0",
         "insertTemplate": "Insert template",
         "kindLocked": "The kind can't change after creation; create a new toolset instead.",
         "leaveName": "changes to {name} in {org}",
@@ -13421,6 +13424,7 @@
         "replace": "Replace"
       },
       "starter": {
+        "otherToolToO2": "Convert a query from another tool to OpenObserve SQL",
         "alerts": {
           "1": "Which alerts fired most in the last 24 h?",
           "2": "Draft an alert for errors in `{stream}`",

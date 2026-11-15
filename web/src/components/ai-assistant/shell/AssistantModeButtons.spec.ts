@@ -275,6 +275,24 @@ describe("Open as", () => {
     expect(fake.current.store.state.shell.placement.kind).toBe("hidden");
     wrapper.unmount();
   });
+  it.each([
+    ["/logs?org_identifier=acme&stream=app&sql=x&from=1", { org_identifier: "acme" }],
+    ["/?org_identifier=acme&period=7d", { org_identifier: "acme", period: "7d" }],
+  ])("T-02-02: Full Page from %s keeps only the keys that belong on Home", async (url, query) => {
+    const router = fakeRouter();
+    await router.push(url);
+    const push = vi.spyOn(router, "push");
+    const wrapper = mount(AssistantModeButtons, {
+      props: { placement: "sidebar", sid: fake.current.store.state.shell.activeSid },
+      global: { plugins: [router, fakeVuex()] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await wrapper.get('[data-test="assistant-shell-place-full"]').trigger("click");
+    await flushPromises();
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "assistant", query }));
+    wrapper.unmount();
+  });
 });
 
 describe("placementMode", () => {

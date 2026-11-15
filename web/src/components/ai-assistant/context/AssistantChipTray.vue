@@ -40,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="open"
       side="top"
       align="start"
-      privacy="mask"
       :aria-label="t('assistant.context.trayLabel')"
       content-class="w-64"
     >
@@ -57,7 +56,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("assistant.context.more", { count: hidden.length }) }}
         </OButton>
       </template>
-      <ul class="flex flex-col gap-0.5 p-1" data-test="assistant-context-more-list">
+      <ul
+        class="flex flex-col gap-0.5 p-1"
+        data-dd-privacy="mask"
+        data-assistant-surface
+        data-test="assistant-context-more-list"
+      >
         <li v-for="item in hidden" :key="item.id" class="min-w-0">
           <slot name="hidden-item" :item="item" />
         </li>

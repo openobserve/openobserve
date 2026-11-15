@@ -10748,7 +10748,6 @@
       "regexRedact": "Genereer een regex-patroon om e-mails te redigeren",
       "mapStreamSchema": "Breng het schema van mijn stream \"default\" in kaart",
       "promqlCpu": "Schrijf PromQL voor pods met een CPU van > 80%",
-      "datadogToO2": "Converteer deze Datadog-query naar OpenObserve SQL",
       "lastAlertFired": "Waarom is mijn laatste alarm afgegaan?"
     },
     "placeholderRotation": {

@@ -97,6 +97,8 @@ export interface RunsInput {
   userOrgKey: string | null;
   clientId: string;
   now: number;
+  /** The lapse the browser cache kept for a chat, for a reload that lost the live session. */
+  cachedLapsedAt?: (sid: Sid) => number | null | undefined;
 }
 
 export interface RunsCounts {
@@ -122,6 +124,7 @@ export interface RunsDeps {
   focusCard(): boolean;
   stopElsewhere(sid: Sid): Promise<void>;
   approvalElsewhere(sid: Sid): boolean;
+  cachedLapsedAt(sid: Sid): number | null | undefined;
 }
 
 export interface AssistantRuns {
@@ -287,6 +290,7 @@ export function createRuns(deps: RunsDeps): AssistantRuns {
     userOrgKey: key.value,
     clientId: deps.clientId(),
     now: clock.value,
+    cachedLapsedAt: deps.cachedLapsedAt,
   });
 
   const all = computed(() => runsList(input()));
@@ -426,7 +430,11 @@ export function createRuns(deps: RunsDeps): AssistantRuns {
       const waiting = others.find(
         (chat) =>
           chat.pending_approval &&
-          !lapsedHere(sessions[chat.session_id], Math.floor(chat.updated_at / 1000)),
+          !lapsedHere(
+            sessions[chat.session_id],
+            Math.floor(chat.updated_at / 1000),
+            deps.cachedLapsedAt(chat.session_id),
+          ),
       );
       if (waiting) return { state: "needs_you", sid: waiting.session_id };
       const working = others.find((chat) => chat.active_turn);
@@ -599,7 +607,10 @@ function serverRow(
     startedAt,
     turnId: chat.active_turn_id ?? null,
   };
-  if (chat.pending_approval && !lapsedHere(session, startedAt ?? 0))
+  if (
+    chat.pending_approval &&
+    !lapsedHere(session, startedAt ?? 0, input.cachedLapsedAt?.(chat.session_id))
+  )
     return { ...base, group: "needs_you", status: "needsApproval", request: chat.session_id };
   if (chat.active_turn) {
     const other = !!chat.active_turn_client_id && chat.active_turn_client_id !== input.clientId;

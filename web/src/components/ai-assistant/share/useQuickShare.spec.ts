@@ -157,6 +157,27 @@ describe("useQuickShare", () => {
     expect(JSON.stringify(toast.mock.calls)).not.toContain("raw server words");
   });
 
+  it("names a chat with no stored messages and offers no Retry (T-08-01)", async () => {
+    const message = "A conversation with no stored messages cannot be shared";
+    api.create.mockRejectedValue({
+      response: {
+        status: 400,
+        data: {
+          code: "invalid_request",
+          message,
+          retryable: false,
+          error: message,
+          recoverable: false,
+        },
+      },
+    });
+    await setup().create("default", "c1");
+    expect(toast).toHaveBeenCalledWith({
+      variant: "error",
+      message: "This chat has no saved messages yet, so it can't be shared.",
+    });
+  });
+
   it("offers Retry on any other failure, once, and leaves the org shareable", async () => {
     api.create.mockRejectedValue({ response: { status: 500, data: {} } });
     await setup().create("default", "c1");

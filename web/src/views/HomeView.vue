@@ -392,11 +392,11 @@ export const NO_DATA_SNAPSHOT: OverviewNowSnapshot = {
 const HomeNoDataContext = defineComponent({
   name: "HomeNoDataContext",
   setup() {
-    const route = useRoute();
+    // Nothing was asked over Home's range here, so a question keeps the window its chip shows.
     useHomeContextProvider(
       () => NO_DATA_SNAPSHOT,
       useStore(),
-      () => homePeriodOfRoute(route),
+      () => null,
     );
     return () => null;
   },
