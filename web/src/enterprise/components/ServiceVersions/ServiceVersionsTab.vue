@@ -486,9 +486,12 @@ watch(
   { immediate: true },
 );
 const where = computed(() => panel.state.value.where || autoWhere.value);
-watch(where, (value) => emit("scope", { service: props.service, where: value }), {
-  immediate: true,
-});
+// A cached service can land on the same place, so the pair is re-announced when either half changes.
+watch(
+  [() => props.service, where] as const,
+  ([service, value]) => emit("scope", { service, where: value }),
+  { immediate: true },
+);
 const query = useQuery(
   computed(() => ({
     ...versionsQuery(org.value, user.value, {

@@ -292,6 +292,16 @@ it("keeps its picked place when discovery adds places", async () => {
   await flushPromises();
   expect(wrapper.findComponent({ name: "ServicePanelVerdictCard" }).props("where")).toBe("env:z");
 });
+it("announces its place for each service it shows, even when the place stays the same", async () => {
+  mocks.state.value.where = "";
+  mocks.discovery.data.value.versions = [version(1, { where_key: "env:z" })];
+  const wrapper = render();
+  for (const service of ["b", "svc"]) await wrapper.setProps({ service });
+  await flushPromises();
+  expect(wrapper.emitted("scope")).toEqual(
+    ["svc", "b", "svc"].map((service) => [{ service, where: "env:z" }]),
+  );
+});
 it("reads a recorded deploy that has no verdict yet as Not enough data, as the catalog does", async () => {
   mocks.query.data.value.versions = [
     version(2, {
