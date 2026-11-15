@@ -1958,6 +1958,8 @@ export class AlertsPage {
     }
 
     async verifyCloneAlertUIValidation(alertName) {
+        // Clone lives in the row's ⋯ menu.
+        await this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`).click();
         await this.page.locator(`[data-test="alert-list-${alertName}-clone-alert"]`).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
@@ -1994,6 +1996,8 @@ export class AlertsPage {
         await this.page.locator(this.locators.cloneCancelButton).click();
         await this.page.waitForTimeout(500);
 
+        // Clone lives in the row's ⋯ menu.
+        await this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`).click();
         await this.page.locator(`[data-test="alert-list-${alertName}-clone-alert"]`).click();
         await this.page.waitForTimeout(1000);
         await this.page.locator(this.locators.cloneCancelButton).click();

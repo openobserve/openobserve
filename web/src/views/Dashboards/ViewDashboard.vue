@@ -68,14 +68,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Add panel is the most-used action, so it leads the toolbar. -->
           <OButton
             v-if="!isFullscreen && !isEditingLayout"
-            icon-only
+            :icon-only="isMobile"
             v-show="store.state.printMode !== true"
-            variant="ghost"
+            variant="secondary"
             @click="addPanelData"
             data-test="dashboard-panel-add"
             icon="add"
             :aria-label="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
           >
+            <template v-if="!isMobile">{{ t("panel.add") }}</template>
             <OTooltip
               :content="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
               shortcut="dashboardAddPanel"
@@ -176,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-refresh-btn"
                 :icon="isAutoRunOn ? 'autorenew' : 'refresh'"
               >
-                <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
+                <template v-if="!isMobile">{{ refreshLabel }}</template>
               </OButton>
             </OTooltip>
             <ODropdown align="end" side="bottom">
@@ -605,7 +606,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :runId="runId"
           @update:runId="updateRunId"
           @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
-        />
+        >
+          <!-- Sits in the existing tab row, so the hint appearing never moves the panels. -->
+          <template #tab_end>
+            <span
+              v-if="showLastDataHint"
+              class="text-text-secondary flex items-center gap-1 text-xs"
+              data-test="dashboard-last-data-hint"
+            >
+              {{ t("dashboard.viewDashboard.lastDataSeen", { when: lastDataAgo }) }}
+              <OButton
+                variant="link"
+                size="sm"
+                data-test="dashboard-jump-to-latest"
+                @click="jumpToLatestData"
+              >
+                {{ t("dashboard.viewDashboard.jumpToLatest") }}
+              </OButton>
+            </span>
+          </template>
+        </RenderDashboardCharts>
         <DashboardSettings
           v-model:open="showDashboardSettingsDialog"
           @refresh="loadDashboard"
@@ -825,6 +845,16 @@ import { usePlaylistFrame, usePlaylistPage } from "@/composables/dashboard/usePl
 import PlaylistHoldingCard from "@/components/dashboards/kiosk/PlaylistHoldingCard.vue";
 import { pingBackend } from "@/services/health";
 import { raw } from "@/types/i18n";
+import { formatDistanceToNowStrict } from "date-fns";
+import {
+  PANEL_EMPTY_REGISTRY_KEY,
+  createPanelEmptyRegistry,
+} from "@/composables/dashboard/usePanelEmptyRegistry";
+import {
+  collectDashboardStreams,
+  latestDataWindow,
+  useDashboardLastData,
+} from "@/composables/dashboard/useDashboardLastData";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -1190,6 +1220,13 @@ export default defineComponent({
     );
     const isRefreshPending = computed(
       () => isVariablesChanged.value || timeGate.needsRefresh.value || zoneRefreshPending.value,
+    );
+
+    // With Auto Run off, a pending range or variable change waits for this button, so it says "Apply".
+    const refreshLabel = computed(() =>
+      isRefreshPending.value && !isAutoRunOn.value
+        ? t("dashboard.viewDashboard.apply")
+        : t("dashboard.viewDashboard.refresh"),
     );
 
     const refreshTooltip = computed(() => {
@@ -2069,6 +2106,40 @@ export default defineComponent({
       probe: pingBackend,
     });
     provide(KIOSK_PANEL_HEALTH_KEY, kioskRefresh.registry);
+
+    const panelEmptyRegistry = createPanelEmptyRegistry();
+    provide(PANEL_EMPTY_REGISTRY_KEY, panelEmptyRegistry);
+    const latestDataUs = useDashboardLastData(
+      () => store.state.selectedOrganization.identifier,
+      () => collectDashboardStreams(currentDashboardData.data?.tabs),
+      () => panelEmptyRegistry.allEmpty.value,
+    );
+    // Data inside the range means a filter emptied it, and jumping would not help.
+    const latestOutsideRange = computed(() => {
+      const range = getAppliedGlobalTime();
+      if (latestDataUs.value === null || !range) return false;
+      const latestMs = latestDataUs.value / 1000;
+      return latestMs < range.start_time.getTime() || latestMs > range.end_time.getTime();
+    });
+    const showLastDataHint = computed(
+      () =>
+        panelEmptyRegistry.allEmpty.value &&
+        !arePanelsLoading.value &&
+        !kioskMode.value &&
+        latestOutsideRange.value,
+    );
+    const lastDataAgo = computed(() =>
+      latestDataUs.value
+        ? raw(formatDistanceToNowStrict(new Date(latestDataUs.value / 1000), { addSuffix: true }))
+        : "",
+    );
+    const jumpToLatestData = async () => {
+      if (latestDataUs.value === null) return;
+      const next = { valueType: "absolute", ...latestDataWindow(latestDataUs.value) };
+      showRangeInPicker(next);
+      timeGate.onPick(next);
+      await runRefresh();
+    };
 
     const playlistFrame = usePlaylistFrame(playlistEmbed, {
       title: computed(() => currentDashboardData.data?.title),
@@ -2976,6 +3047,10 @@ export default defineComponent({
       refreshData,
       isAutoRunAvailable,
       isAutoRunOn,
+      refreshLabel,
+      showLastDataHint,
+      lastDataAgo,
+      jumpToLatestData,
       toggleAutoRun,
       refreshVariant,
       refreshOptionsVariant,

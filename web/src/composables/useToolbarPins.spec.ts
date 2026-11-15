@@ -55,9 +55,18 @@ describe("useToolbarPins defaults", () => {
     const { useToolbarPins } = await importFresh();
     const { togglePin, pinnedItems } = useToolbarPins();
     togglePin("syntaxGuide");
-    togglePin("sqlMode");
+    togglePin("quickMode");
     togglePin("histogram");
-    expect(pinnedItems.value).toEqual(["histogram", "sqlMode", "syntaxGuide"]);
+    expect(pinnedItems.value).toEqual(["histogram", "quickMode", "syntaxGuide"]);
+  });
+
+  it("ignores a stored sqlMode pin, which is no longer pinnable", async () => {
+    window.localStorage.setItem(
+      "logs_toolbar_pinned_items",
+      JSON.stringify(["sqlMode", "quickMode"]),
+    );
+    const { useToolbarPins } = await importFresh();
+    expect(useToolbarPins().pinnedItems.value).toEqual(["quickMode"]);
   });
 });
 
@@ -70,9 +79,9 @@ describe("useToolbarPins scopes", () => {
     const { useToolbarPins } = await importFresh();
     const { togglePin, pinnedItems } = useToolbarPins();
     expect(pinnedItems.value).toEqual([]);
-    togglePin("sqlMode");
+    togglePin("quickMode");
     expect(JSON.parse(window.localStorage.getItem("logs_toolbar_pinned_items")!)).toEqual([
-      "sqlMode",
+      "quickMode",
     ]);
     expect(window.localStorage.getItem("traces_toolbar_pinned_items")).toBeNull();
   });

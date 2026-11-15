@@ -94,6 +94,8 @@ const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddT
 // Default Builder Fields
 // ============================================================================
 
+const COUNT_FUNCTIONS = new Set(["count", "count-distinct"]);
+
 /** Default x-axis field: histogram(_timestamp) */
 const DEFAULT_X_AXIS_FIELD = () => ({
   label: "",
@@ -260,6 +262,18 @@ const restoreConfigFromUrl = (): {
 // Initialization
 // ============================================================================
 
+// A count is a whole number, so its ticks read 15000, not 15000.00; a saved decimals setting still wins.
+const preferWholeNumbers = (savedConfig?: { decimals?: unknown }) => {
+  if (savedConfig?.decimals !== undefined && savedConfig?.decimals !== null) return;
+  const yFields = dashboardPanelData.data.queries[0]?.fields?.y ?? [];
+  const allCounts =
+    yFields.length > 0 &&
+    yFields.every((field: { functionName?: string | null }) =>
+      COUNT_FUNCTIONS.has(String(field?.functionName ?? "").toLowerCase()),
+    );
+  if (allCounts) dashboardPanelData.data.config.decimals = 0;
+};
+
 const initializeFromQuery = async () => {
   const seq = ++initSeq;
   freeTextNotice.value = false;
@@ -340,6 +354,7 @@ const initializeFromQuery = async () => {
     }
 
     // Notify parent and run query
+    preferWholeNumbers(urlConfig.config);
     emit("initialized");
     await runQuery();
     return;
@@ -390,6 +405,7 @@ const initializeFromQuery = async () => {
     filterInitPending.value = false;
     holdGeneratedQuery.value = false;
 
+    preferWholeNumbers(urlConfig.config);
     emit("initialized");
 
     const generatedQuery = await makeAutoSQLQuery();
@@ -421,6 +437,7 @@ const initializeFromQuery = async () => {
     dashboardPanelData.data.queries[0].fields.x = [DEFAULT_X_AXIS_FIELD()];
     dashboardPanelData.data.queries[0].fields.y = [DEFAULT_Y_AXIS_FIELD()];
 
+    preferWholeNumbers(urlConfig.config);
     emit("initialized");
     const generatedQuery = await makeAutoSQLQuery();
     if (generatedQuery !== undefined) {
@@ -521,6 +538,7 @@ const initializeFromQuery = async () => {
 
   // Notify parent that initialization is complete
   // This marks the end of first toggle, so subsequent tab switches will auto-select chart type
+  preferWholeNumbers(urlConfig.config);
   emit("initialized");
 
   // Run the query after initialization

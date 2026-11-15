@@ -618,6 +618,55 @@ describe("AlertList - data fetching and columns", () => {
     expect(cell.text()).toContain("of 28 groups");
   });
 
+  it("shows the firing first in the State column, with a failed delivery beside it", async () => {
+    alertsDB = [
+      makeAlert(1, { name: "undelivered", enabled: true }),
+      makeAlert(2, { name: "stopped", enabled: false }),
+    ];
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.filteredResults = wrapper.vm.filteredResults.map((row: any) => ({
+      ...row,
+      last_outcome: row.name === "undelivered" ? "notify_failed" : "firing",
+      level: "critical",
+    }));
+    await flushPromises();
+
+    expect(wrapper.vm.columns.find((c: any) => c.id === "last_outcome").header).toBe("State");
+    expect(wrapper.find('[data-test="alert-list-undelivered-last-outcome"]').text()).toBe("Firing");
+    const delivery = wrapper.findComponent('[data-test="alert-list-undelivered-delivery-failed"]');
+    expect(delivery.text()).toBe("Delivery failed");
+    expect(delivery.props("tone")).toBe("warn");
+    // A paused alert keeps its old outcome, so it says Paused rather than Firing.
+    expect(wrapper.find('[data-test="alert-list-stopped-last-outcome"]').text()).toBe("Paused");
+    expect(wrapper.find('[data-test="alert-list-stopped-delivery-failed"]').exists()).toBe(false);
+  });
+
+  it("keeps two inline row icons, Pause and Edit, and puts Clone in the ⋯ (B7)", async () => {
+    alertsDB = [makeAlert(1, { name: "running", enabled: true })];
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const cell = wrapper
+      .find('[data-test="alert-list-running-update-alert"]')
+      .element.closest(".actions-container");
+    const inline = [...cell.querySelectorAll("[data-row-action]")]
+      .filter((el: any) => !el.classList.contains("hidden"))
+      .map((el: any) => el.getAttribute("data-row-action"));
+    expect(inline).toEqual(["pause", "edit"]);
+    const duplicate = cell.querySelector('[data-row-action="duplicate"]');
+    duplicate.click();
+    await flushPromises();
+    expect(wrapper.vm.showForm).toBe(true);
+  });
+
+  it("draws Pause as a plain ghost icon, not a red one (R9)", async () => {
+    alertsDB = [makeAlert(1, { name: "running", enabled: true })];
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const pause = wrapper.findComponent('[data-test="alert-list-running-pause-start-alert"]');
+    expect(pause.props("variant")).toBe("ghost");
+  });
+
   // Feature 2 (PT-3/PT-6): the columns that REPLACED them.
   it("renders the priority and tags columns", async () => {
     const wrapper: any = await mountAlertList();
@@ -709,8 +758,39 @@ describe("AlertList - data fetching and columns", () => {
     // The KpiCards inside must actually render their content — guards against
     // the components being imported but not registered (renders as empty
     // unknown elements, which the exists() check alone would not catch).
-    expect(wrapper.find('[data-test="alert-summary-active"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-summary-paused"]').exists()).toBe(true);
     expect(summary.text()).toContain(String(wrapper.vm.stateCounts.total));
+    // Running is the norm, so it has no chip; a failed anomaly brings its own.
+    expect(wrapper.find('[data-test="alert-summary-active"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-summary-failed"]').text()).toContain("Training failed");
+  });
+
+  it("drops the training chip where nothing trains, and colours delivery as a warning", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.filteredResults = [{ enabled: true, name: "a", is_real_time: false }];
+    await wrapper.vm.$nextTick();
+    const keys = wrapper.vm.summaryStats.map((s: any) => s.key);
+    expect(keys).not.toContain("failed");
+    expect(keys).not.toContain("active");
+    expect(keys.slice(0, 2)).toEqual(["firing", "acknowledged"]);
+    const delivery = wrapper.vm.summaryStats.find((s: any) => s.key === "notify_failed");
+    expect(delivery.tone).toBe("warning");
+  });
+
+  it("rails only the exceptions: a firing by its level, a pause in grey, a healthy row not at all", () => {
+    return mountAlertList().then(async (wrapper: any) => {
+      await waitData(wrapper);
+      const rail = (row: any) => wrapper.vm.alertRowStyle(row).boxShadow ?? "";
+      expect(rail({ enabled: true, last_outcome: "normal" })).toBe("");
+      expect(rail({ enabled: true, last_outcome: "firing", level: "critical" })).toContain(
+        "--color-error-500",
+      );
+      expect(rail({ enabled: true, last_outcome: "notify_failed", level: "warning" })).toContain(
+        "--color-warning-500",
+      );
+      expect(rail({ enabled: false, last_outcome: "firing" })).toContain("--color-grey-400");
+    });
   });
 
   it("counts and filters firing alerts the same way the Last outcome badge shows them", async () => {
@@ -880,8 +960,11 @@ describe("AlertList - row actions", () => {
     await waitData(wrapper);
 
     const row = wrapper.vm.filteredResults[0];
-    const btn = wrapper.find(`[data-test="alert-list-${row.name}-clone-alert"]`);
-    await btn.trigger("click");
+    // Clone lives in the row ⋯ (B7); its hidden proxy runs the same handler as the menu item.
+    const proxies = wrapper.findAll('[data-row-action="duplicate"]');
+    expect(proxies.length).toBeGreaterThan(0);
+    expect(wrapper.find(`[data-test="alert-list-${row.name}-clone-alert"]`).exists()).toBe(false);
+    wrapper.vm.duplicateAlert(row);
     await flushPromises();
 
     // The dialog should be visible through showForm
@@ -914,7 +997,7 @@ describe("AlertList - row actions", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     const row = wrapper.vm.filteredResults[0];
-    await wrapper.find(`[data-test="alert-list-${row.name}-clone-alert"]`).trigger("click");
+    wrapper.vm.duplicateAlert(row);
     await flushPromises();
     wrapper.vm.toBeCloneAlertName = `${row.name} - Copy`;
     wrapper.vm.toBeClonestreamType = "logs";
@@ -4151,13 +4234,15 @@ describe("AlertList - first run and the alert library", () => {
       .findAllComponents({ name: "OEmptyState" })
       .find((c: any) => c.attributes("data-test") === "o2-empty-state");
 
-  it("puts an Alert library button in the header that opens the library", async () => {
+  it("leaves the Alert library to its tab, so the header names it only once", async () => {
     const wrapper: any = await mountList();
-    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    expect(wrapper.find('[data-test="alert-list-alert-library-btn"]').exists()).toBe(false);
+  });
 
-    const button = wrapper.find('[data-test="alert-list-alert-library-btn"]');
-    expect(button.text()).toContain("Alert library");
-    await button.trigger("click");
+  it("opens the library from the first-run Alert library button", async () => {
+    const wrapper: any = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-alert-library"]').trigger("click");
 
     expect(push).toHaveBeenCalledWith({
       name: "alertLibrary",

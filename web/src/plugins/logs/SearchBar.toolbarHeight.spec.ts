@@ -69,7 +69,7 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
 
   beforeEach(() => {
     resetLogsAutoRunForTests(store);
-    for (const key of ["histogram", "sqlMode", "quickMode"] as ToolbarPinKey[]) {
+    for (const key of ["histogram", "quickMode"] as ToolbarPinKey[]) {
       if (!isPinned(key)) {
         togglePin(key);
         pinnedByTest.push(key);
@@ -92,7 +92,6 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
     expectToolbarHeight("logs-search-bar-reset-filters-btn");
     for (const dataTest of [
       "logs-search-bar-histogram-btn",
-      "logs-search-bar-sql-mode-pinned-btn",
       "logs-search-bar-quick-mode-pinned-btn",
       "logs-search-bar-utilities-menu-btn",
     ]) {

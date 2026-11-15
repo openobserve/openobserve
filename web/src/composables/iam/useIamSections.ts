@@ -22,7 +22,7 @@ import type { SectionHubGroup } from "@/components/common/SectionHub.vue";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, menuState } from "@/utils/featureGate";
 
-/** The IAM rail's sections and gates, as IdentityAccessManagement.vue lists them. */
+/** The IAM rail's sections and gates; the IAM shell and the Jump to palette both read them here. */
 export function useIamSections() {
   const { t } = useI18nTyped();
   const store = useStore();
@@ -91,6 +91,7 @@ export function useIamSections() {
             description: t("iam.mcpServerDesc", { product: raw("Model Context Protocol") }),
             icon: "mcp",
             to: { name: "mcpServer", query: orgQuery.value },
+            // No edition gate (every edition serves MCP); only a hidden license removes it.
             visible: mcpLicense !== "hidden",
             licenseLocked: mcpLicense === "locked",
             dataTest: "iam-mcp-server-tab",
@@ -118,6 +119,7 @@ export function useIamSections() {
             visible: rbacLicense !== "hidden",
             locked: !rbacAccess.allowed,
             lockedMessage: rbacAccess.message,
+            lockedShowUpgradeCta: rbacAccess.ctaRelevant,
             licenseLocked: rbacLicense === "locked",
             dataTest: "iam-groups-tab",
           },
@@ -130,6 +132,7 @@ export function useIamSections() {
             visible: rbacLicense !== "hidden",
             locked: !rbacAccess.allowed,
             lockedMessage: rbacAccess.message,
+            lockedShowUpgradeCta: rbacAccess.ctaRelevant,
             licenseLocked: rbacLicense === "locked",
             dataTest: "iam-roles-tab",
           },
@@ -139,9 +142,11 @@ export function useIamSections() {
             description: t("iam.quotaDesc"),
             icon: "speed",
             to: { name: "quota", query: orgQuery.value },
+            // Meta-org is a cluster-topology restriction, not an edition upsell, so it hides rather than locks.
             visible: meta && ratelimitLicense !== "hidden",
             locked: !rbacAccess.allowed,
             lockedMessage: rbacAccess.message,
+            lockedShowUpgradeCta: rbacAccess.ctaRelevant,
             licenseLocked: ratelimitLicense === "locked",
             dataTest: "iam-quota-tab",
           },

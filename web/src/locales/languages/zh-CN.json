@@ -11,7 +11,9 @@
     "bannerMessage": "此功能已锁定。您的许可证需要包含 {feature} 功能。",
     "bannerMessageGeneric": "此页面需要一项您的许可证中未包含的功能。",
     "headerLocked": "已锁定：需要 {feature}",
-    "availableInEnterprise": "{feature} 适用于 OpenObserve 企业版"
+    "availableInEnterprise": "{feature} 适用于 OpenObserve 企业版",
+    "turnedOffTitle": "已为此组织关闭",
+    "enterpriseTitle": "Enterprise 版可用"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "未找到模式",
       "description": "尝试增加时间范围或选择包含更多日志数据的其他流。对于至少 1,000 个日志，模式提取效果最佳。",
       "logsAnalyzed": "只分析了 {count} 个日志。"
-    },
-    "noStreamSelected": {
-      "title": "选择数据流开始",
-      "description": "选择一个数据流，然后运行查询来浏览其数据。使用筛选条件和自定义时间范围优化结果。"
     },
     "noQueryApplied": {
       "title": "运行查询以查看日志",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "连接源来创建你的第一个数据流",
       "description": "数据到达时会自动创建数据流。配置应用程序、代理或收集器的数据摄取即可开始使用。",
-      "action": "设置摄取",
       "actionDesc": "连接数据源",
       "createAction": "新数据流",
       "createActionDesc": "手动定义数据流架构"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "没有要保存的更改"
+    },
     "dismiss": "关闭",
     "exitFullscreen": "退出全屏",
     "moreActions": "更多操作",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "以前",
     "patternNavNext": "下一步",
     "patternNoValuesAvailable": "没有可用值",
-    "sqlModeLabel": "SQL 模式",
     "nlpModeLabel": "自然语言模式",
     "quickModeLabel": "快速模式",
     "menuMore": "更多",
-    "menuGroupSetOnce": "设置一次",
     "menuGroupHistory": "历史",
     "menuGroupDownloads": "下载",
     "menuGroupSchedule": "日程安排",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "视图已成功删除。",
     "viewCreatedSuccessfully": "视图已成功创建。",
     "viewUpdatedSuccessfully": "视图已成功更新。",
-    "linkCopiedSuccessfully": "链接复制成功！",
     "errorCopyingLink": "复制链接时出错。",
     "errorShorteningLink": "缩短链接时出错。",
     "webUrlNotConfigured": "在管理员配置 ZO_WEB_URL 之前，共享 URL 处于禁用状态。",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "所选数据流没有全文检索字段",
     "freeTextNoTextFields": "此数据流没有可搜索的文本字段。",
     "freeTextNoTextFieldsNamed": "未搜索：{streams}（无文本字段）。",
-    "freeTextBuildNotice": "此过滤器包含文本搜索；请在 SQL 中编辑。"
+    "freeTextBuildNotice": "此过滤器包含文本搜索；请在 SQL 中编辑。",
+    "queryModeLabel": "查询语言",
+    "queryModeFilter": "筛选",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "按字段和值缩小日志范围",
+    "queryModeSqlTooltip": "编写完整的 SQL 查询，可使用聚合和连接",
+    "sqlModeNeedsOneStream": "此视图中的 SQL 只能使用一个流",
+    "menuGroupViewOptions": "视图选项",
+    "histogramHiddenForAggregates": "此查询返回的是分组，而不是随时间分布的事件，因此没有直方图。可用可视化绘制结果。",
+    "linkCopied": "已复制链接",
+    "linkCopiedFixedTime": "已复制链接 · 固定时间 {from} – {to}",
+    "linkCopiedRelativeTime": "已复制链接 · {period}，从打开时起算",
+    "recordsChipRows": "{total} 行 | {total} 行",
+    "histogramTitleRows": "在 {took} 毫秒内显示 {total} 行。 | 在 {took} 毫秒内显示 {total} 行。",
+    "histogramTitleRowsWithScan": "在 {took} 毫秒内显示 {total} 行。（{scanLabel}：{scanSize}） | 在 {took} 毫秒内显示 {total} 行。（{scanLabel}：{scanSize}）",
+    "pickStreamFirst": "请先选择一个流"
   },
   "menu": {
     "alertCalibration": "告警校准",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "键盘快捷键",
     "searchOrJumpTo": "搜索或跳转到…",
     "jumpToTitle": "跳转到",
-    "jumpToPlaceholder": "搜索页面",
+    "addData": "添加数据",
+    "jumpToPlaceholder": "搜索页面和操作",
     "synthetic": "合成监控",
     "experience": "体验",
     "slos": "SLO",
@@ -4212,7 +4225,8 @@
     "revokeInvitationMsg": "你确定要撤销 {email} 的邀请吗？",
     "deleteUsersTitle": "删除用户",
     "deleteUsersMsg": "您确定要删除 {count} 个用户吗？ | 您确定要删除 {count} 个用户吗？",
-    "deleteUsersBlockNote": "其中 {count} 名用户通过您的已验证域名加入，将被阻止而不是删除。"
+    "deleteUsersBlockNote": "其中 {count} 名用户通过您的已验证域名加入，将被阻止而不是删除。",
+    "roleHint": "Admin 管理组织，Editor 可更改数据和设置，Viewer 只能查看。"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -5160,6 +5174,7 @@
     "timezone": "时区",
     "deleteActionMessage": "您确定要删除 {count} 个字段吗？此操作无法撤销。 | 您确定要删除 {count} 个字段吗？此操作无法撤销。",
     "deleteDatesMessage": "您确定要删除 {count} 个日期范围吗？此操作无法撤销。 | 您确定要删除 {count} 个日期范围吗？此操作无法撤销。",
+    "summaryAllTypes": "数据流（全部类型）",
     "labelLogs": "日志",
     "labelMetrics": "指标",
     "labelTraces": "追踪",
@@ -7757,7 +7772,8 @@
       "metricsSketch": "分布存储为直方图桶，百分位数根据这些桶估算。更高的 ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA 会带来更细的桶和更精确的百分位数，代价是存储更多行。"
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU 导出器"
+    "gpuExporter": "GPU 导出器",
+    "rotationNote": "令牌不会原地轮换。要轮换，请创建新令牌，将数据源切换到新令牌，然后停用旧令牌。"
   },
   "dashboard": {
     "panelDraft": {
@@ -9390,6 +9406,9 @@
       "addClause": "添加子句"
     },
     "viewDashboard": {
+      "apply": "应用",
+      "lastDataSeen": "最新数据 {when}",
+      "jumpToLatest": "跳转到最新",
       "refreshToApplyVariables": "刷新以应用最新的变量更改",
       "refresh": "刷新",
       "refreshCacheReload": "刷新缓存并重新加载",
@@ -10135,6 +10154,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "范围内无数据",
     "saveAndStay": "保存并继续编辑",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10577,6 +10597,38 @@
     },
     "timeRange": {
       "heading": "在所选时间范围内"
+    },
+    "firingNow": {
+      "title": "正在触发",
+      "byLevel": "严重 {critical} 个 · 警告 {warning} 个",
+      "allQuiet": "一切正常",
+      "watching": "已启用 {count} 条告警规则，均未触发 | 已启用 {count} 条告警规则，均未触发",
+      "noRules": "还没有告警规则",
+      "browseLibrary": "浏览告警库",
+      "notifyFailed": "通知失败",
+      "loadError": "无法加载触发中的告警",
+      "unavailable": "暂时无法读取告警状态"
+    },
+    "health": {
+      "subtitle": "按类型显示最近收到的数据",
+      "lastData": "最近数据：{age}前",
+      "justNow": "最近数据：刚刚",
+      "noDataIn": "过去 {range} 没有数据",
+      "noRecords": "还没有记录",
+      "loadError": "无法读取您的数据流"
+    },
+    "start": {
+      "text": "过去 {range} 没有收到数据。发送数据、查看已有数据，或设置告警。",
+      "addData": "添加数据",
+      "createAlert": "创建告警"
+    },
+    "summary": {
+      "loadError": "无法加载组织概要",
+      "denied": "无权访问组织概要。请联系组织管理员。"
+    },
+    "events": {
+      "runFailed": "运行失败",
+      "timesInRange": "在所选范围内 {count} 次 | 在所选范围内 {count} 次"
     }
   },
   "chatHistory": {
@@ -11551,6 +11603,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "在日志中打开",
+      "openInTraces": "在追踪中打开",
+      "openInMetrics": "在指标中打开",
+      "evidenceFiringTip": "使用此告警的过滤条件打开 {stream}，从本次触发开始到现在",
+      "evidenceWindowTip": "使用此告警的过滤条件打开 {stream}，范围为最近 {window}",
+      "threshold": "阈值",
+      "noIncident": "暂无事件",
+      "conditionLabel": "告警条件",
+      "allRows": "所有行"
+    },
+    "summaryTrainingFailed": "训练失败",
+    "startFromTemplate": "从模板开始",
     "firing": {
       "title": "触发中",
       "drawer": {
@@ -20569,7 +20634,6 @@
     },
     "noStream": {
       "title": "选择数据流开始探索",
-      "description": "选择一个数据流，然后按<strong>运行查询</strong>。结果出来后，您可以使用过滤器、VRL 函数和自定义时间范围进行优化。",
       "selectStream": "选择一个数据流",
       "selectStreamDesc": "浏览日志、追踪、指标和 RUM 数据流",
       "queryGuide": "阅读查询指南",
@@ -20621,7 +20685,16 @@
     "detailTable": {
       "noDataAvailable": "无可用数据。",
       "addIcon": "添加图标",
-      "sendToAiChat": "发送到AI聊天"
+      "sendToAiChat": "发送到AI聊天",
+      "openTrace": "打开追踪",
+      "noTraceTitle": "没有追踪与此日志关联",
+      "noRelatedLogsTitle": "未找到相关日志",
+      "noRelatedMetricsTitle": "未找到相关指标",
+      "noServiceText": "无法将任何服务与此日志匹配，因此无法自动找到相关数据。",
+      "searchTracesAround": "搜索此时间前后的追踪",
+      "searchAroundTip": "加载紧邻此事件之前和之后记录的事件。",
+      "noOfEventsTip": "围绕此事件加载的事件数量。",
+      "severityTip": "检测到的日志级别。选择即可查看检测方式。"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "可视化不支持SELECT * 查询。",
@@ -23160,7 +23233,7 @@
         "ok": "确定",
         "normal": "正常",
         "firing": "触发中",
-        "notifyfailed": "通知失败",
+        "notifyfailed": "投递失败",
         "flapping": "抖动",
         "anomaly": "异常",
         "succeeded": "成功",
@@ -30394,7 +30467,9 @@
     "validation": {
       "regexLength": "模式最多 {max} 个字符。",
       "regexInvalid": "此模式无效或不受支持。不能使用先行断言、后行断言和反向引用。"
-    }
+    },
+    "queryTooltip": "以文本编辑筛选条件",
+    "builderTooltip": "使用构建器编辑筛选条件"
   },
   "autoobserveLive": {
     "paging": {

@@ -11,7 +11,9 @@
     "bannerMessage": "이 기능은 잠겨 있습니다. 라이선스에 {feature} 기능이 필요합니다.",
     "bannerMessageGeneric": "이 페이지에는 라이선스에 없는 기능이 필요합니다.",
     "headerLocked": "잠김: {feature} 필요",
-    "availableInEnterprise": "{feature}은(는) OpenObserve 엔터프라이즈에서 사용할 수 있습니다"
+    "availableInEnterprise": "{feature}은(는) OpenObserve 엔터프라이즈에서 사용할 수 있습니다",
+    "turnedOffTitle": "이 조직에서는 꺼져 있음",
+    "enterpriseTitle": "Enterprise에서 사용 가능"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "패턴을 찾을 수 없음",
       "description": "시간 범위를 늘리거나 로그 데이터가 더 많은 다른 스트림을 선택해 보세요.패턴 추출은 최소 1,000개의 로그에서 가장 잘 작동합니다.",
       "logsAnalyzed": "{count} 개의 로그만 분석되었습니다."
-    },
-    "noStreamSelected": {
-      "title": "시작하려면 스트림을 선택하세요",
-      "description": "스트림을 선택한 다음 쿼리를 실행하여 데이터를 탐색합니다.필터와 사용자 지정 시간 범위로 결과를 세분화하세요."
     },
     "noQueryApplied": {
       "title": "쿼리를 실행하여 로그 보기",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "소스를 연결하여 첫 번째 스트림 만들기",
       "description": "스트림은 데이터가 도착하는 순간 자동으로 생성됩니다.앱, 에이전트 또는 컬렉터에서 수집을 설정하여 시작하세요.",
-      "action": "수집 설정",
       "actionDesc": "데이터 소스 연결",
       "createAction": "새 스트림",
       "createActionDesc": "스트림 스키마를 수동으로 정의"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "저장할 변경 사항 없음"
+    },
     "dismiss": "닫기",
     "exitFullscreen": "전체 화면 종료",
     "moreActions": "작업 더 보기",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "이전",
     "patternNavNext": "다음",
     "patternNoValuesAvailable": "사용할 수 있는 값 없음",
-    "sqlModeLabel": "SQL 모드",
     "nlpModeLabel": "자연어 모드",
     "quickModeLabel": "퀵 모드",
     "menuMore": "더 보기",
-    "menuGroupSetOnce": "한 번 설정",
     "menuGroupHistory": "기록",
     "menuGroupDownloads": "다운로드",
     "menuGroupSchedule": "스케줄",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "뷰가 성공적으로 삭제되었습니다.",
     "viewCreatedSuccessfully": "뷰가 성공적으로 생성되었습니다.",
     "viewUpdatedSuccessfully": "뷰가 성공적으로 업데이트되었습니다.",
-    "linkCopiedSuccessfully": "링크가 성공적으로 복사되었습니다!",
     "errorCopyingLink": "링크를 복사하는 중 오류가 발생했습니다.",
     "errorShorteningLink": "링크를 단축하는 중 오류가 발생했습니다.",
     "webUrlNotConfigured": "관리자가 ZO_WEB_URL을 구성할 때까지 URL 공유는 비활성화됩니다.",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "선택한 스트림에 전체 텍스트 필드가 없습니다",
     "freeTextNoTextFields": "이 스트림에는 검색할 텍스트 필드가 없습니다.",
     "freeTextNoTextFieldsNamed": "검색하지 않음: {streams}(텍스트 필드 없음).",
-    "freeTextBuildNotice": "이 필터에는 텍스트 검색이 있습니다. SQL에서 편집하세요."
+    "freeTextBuildNotice": "이 필터에는 텍스트 검색이 있습니다. SQL에서 편집하세요.",
+    "queryModeLabel": "쿼리 언어",
+    "queryModeFilter": "필터",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "필드와 값으로 로그를 좁힙니다",
+    "queryModeSqlTooltip": "집계와 조인을 포함한 전체 SQL 쿼리를 작성합니다",
+    "sqlModeNeedsOneStream": "이 보기의 SQL은 스트림 하나만 사용합니다",
+    "menuGroupViewOptions": "보기 옵션",
+    "histogramHiddenForAggregates": "이 쿼리는 시간별 이벤트가 아닌 그룹을 반환하므로 히스토그램이 없습니다. 시각화로 결과를 차트로 볼 수 있습니다.",
+    "linkCopied": "링크를 복사했습니다",
+    "linkCopiedFixedTime": "링크를 복사했습니다 · 고정 시간 {from} – {to}",
+    "linkCopiedRelativeTime": "링크를 복사했습니다 · {period}, 여는 시점 기준",
+    "recordsChipRows": "{total}개 행 | {total}개 행",
+    "histogramTitleRows": "{took}ms 동안 {total}개 행 표시. | {took}ms 동안 {total}개 행 표시.",
+    "histogramTitleRowsWithScan": "{took}ms 동안 {total}개 행 표시. ({scanLabel}: {scanSize}) | {took}ms 동안 {total}개 행 표시. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "먼저 스트림을 선택하세요"
   },
   "menu": {
     "alertCalibration": "알림 캘리브레이션",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "키보드 단축키",
     "searchOrJumpTo": "검색 또는 이동…",
     "jumpToTitle": "이동",
-    "jumpToPlaceholder": "페이지 검색",
+    "addData": "데이터 추가",
+    "jumpToPlaceholder": "페이지 및 액션 검색",
     "synthetic": "Synthetics",
     "experience": "경험",
     "slos": "SLO",
@@ -4212,7 +4225,8 @@
     "revokeInvitationMsg": "{email} 에 대한 초대를 정말로 취소하시겠습니까?",
     "deleteUsersTitle": "사용자 삭제",
     "deleteUsersMsg": "{count} 사용자를 삭제하시겠습니까? | {count} 사용자를 삭제하시겠습니까?",
-    "deleteUsersBlockNote": "이 중 {count}명은 확인된 도메인을 통해 참여했으며 삭제 대신 차단됩니다."
+    "deleteUsersBlockNote": "이 중 {count}명은 확인된 도메인을 통해 참여했으며 삭제 대신 차단됩니다.",
+    "roleHint": "Admin은 조직을 관리하고, Editor는 데이터와 설정을 변경하며, Viewer는 읽기만 할 수 있습니다."
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -5160,6 +5174,7 @@
     "timezone": "시간대",
     "deleteActionMessage": "필드 {count}개를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다. | 필드 {count}개를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
     "deleteDatesMessage": "날짜 범위 {count}개를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다. | 날짜 범위 {count}개를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+    "summaryAllTypes": "스트림 (모든 유형)",
     "labelLogs": "로그",
     "labelMetrics": "메트릭",
     "labelTraces": "트레이스",
@@ -7757,7 +7772,8 @@
       "metricsSketch": "분포는 히스토그램 버킷으로 저장되며, 백분위수는 해당 버킷에서 추정됩니다. ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA 값을 높이면 더 많은 저장 행을 대가로 더 세밀한 버킷과 더 정확한 백분위수를 얻을 수 있습니다."
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU 익스포터"
+    "gpuExporter": "GPU 익스포터",
+    "rotationNote": "토큰은 제자리에서 교체되지 않습니다. 교체하려면 새 토큰을 만들고 소스를 새 토큰으로 전환한 다음 이전 토큰을 비활성화하세요."
   },
   "dashboard": {
     "panelDraft": {
@@ -9390,6 +9406,9 @@
       "addClause": "절 추가"
     },
     "viewDashboard": {
+      "apply": "적용",
+      "lastDataSeen": "마지막 데이터 {when}",
+      "jumpToLatest": "최신으로 이동",
       "refreshToApplyVariables": "최신 변수 변경 사항을 적용하려면 새로고침하세요.",
       "refresh": "새로고침",
       "refreshCacheReload": "캐시 새로 고침 및 다시 로드",
@@ -10135,6 +10154,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "범위 내 데이터 없음",
     "saveAndStay": "저장 후 계속 편집",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10577,6 +10597,38 @@
     },
     "timeRange": {
       "heading": "선택한 시간 범위 내"
+    },
+    "firingNow": {
+      "title": "발생 중",
+      "byLevel": "심각 {critical}개 · 경고 {warning}개",
+      "allQuiet": "모두 정상",
+      "watching": "알림 규칙 {count}개 활성, 발생 없음 | 알림 규칙 {count}개 활성, 발생 없음",
+      "noRules": "아직 알림 규칙이 없습니다",
+      "browseLibrary": "알림 라이브러리 보기",
+      "notifyFailed": "알림 전송 실패",
+      "loadError": "발생 중인 알림을 불러오지 못했습니다",
+      "unavailable": "지금은 알림 상태를 읽을 수 없습니다"
+    },
+    "health": {
+      "subtitle": "유형별 마지막 수신 데이터",
+      "lastData": "마지막 데이터: {age} 전",
+      "justNow": "마지막 데이터: 방금",
+      "noDataIn": "지난 {range} 동안 데이터 없음",
+      "noRecords": "아직 레코드가 없습니다",
+      "loadError": "스트림을 읽지 못했습니다"
+    },
+    "start": {
+      "text": "지난 {range} 동안 들어온 데이터가 없습니다. 데이터를 보내거나, 있는 데이터를 살펴보거나, 알림을 설정하세요.",
+      "addData": "데이터 추가",
+      "createAlert": "알림 만들기"
+    },
+    "summary": {
+      "loadError": "조직 요약을 불러오지 못했습니다",
+      "denied": "조직 요약에 대한 접근 권한이 없습니다. 조직 관리자에게 요청하세요."
+    },
+    "events": {
+      "runFailed": "실행 실패",
+      "timesInRange": "선택한 범위에서 {count}회 | 선택한 범위에서 {count}회"
     }
   },
   "chatHistory": {
@@ -11551,6 +11603,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "로그에서 열기",
+      "openInTraces": "트레이스에서 열기",
+      "openInMetrics": "메트릭에서 열기",
+      "evidenceFiringTip": "이 알림의 필터로 {stream}을(를) 이번 발생 시작부터 지금까지 엽니다",
+      "evidenceWindowTip": "이 알림의 필터로 {stream}을(를) 최근 {window} 동안 엽니다",
+      "threshold": "임계값",
+      "noIncident": "아직 인시던트 없음",
+      "conditionLabel": "알림 조건",
+      "allRows": "모든 행"
+    },
+    "summaryTrainingFailed": "학습 실패",
+    "startFromTemplate": "템플릿에서 시작",
     "firing": {
       "title": "발생",
       "drawer": {
@@ -20569,7 +20634,6 @@
     },
     "noStream": {
       "title": "스트림을 선택하여 탐색을 시작하세요",
-      "description": "스트림을 선택한 다음 <strong>쿼리 실행을</strong> 누릅니다.결과가 들어오면 필터, VRL 함수, 사용자 지정 시간 범위를 사용하여 세분화할 수 있습니다.",
       "selectStream": "스트림 선택",
       "selectStreamDesc": "로그, 트레이스, 메트릭 및 RUM 스트림 찾아보기",
       "queryGuide": "쿼리 가이드 읽기",
@@ -20621,7 +20685,16 @@
     "detailTable": {
       "noDataAvailable": "사용 가능한 데이터가 없습니다.",
       "addIcon": "아이콘 추가",
-      "sendToAiChat": "AI 채팅으로 보내기"
+      "sendToAiChat": "AI 채팅으로 보내기",
+      "openTrace": "트레이스 열기",
+      "noTraceTitle": "이 로그에 연결된 트레이스가 없습니다",
+      "noRelatedLogsTitle": "관련 로그를 찾을 수 없습니다",
+      "noRelatedMetricsTitle": "관련 메트릭을 찾을 수 없습니다",
+      "noServiceText": "이 로그와 일치하는 서비스를 찾을 수 없어 관련 데이터를 자동으로 찾을 수 없습니다.",
+      "searchTracesAround": "이 시간 전후의 트레이스 검색",
+      "searchAroundTip": "이 이벤트 바로 전후에 기록된 이벤트를 불러옵니다.",
+      "noOfEventsTip": "이 이벤트 주변에서 불러올 이벤트 수입니다.",
+      "severityTip": "감지된 로그 수준입니다. 선택하면 감지 방법을 볼 수 있습니다."
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "시각화에 SELECT * 쿼리가 지원되지 않습니다.",
@@ -23160,7 +23233,7 @@
         "ok": "확인",
         "normal": "정상",
         "firing": "발생 중",
-        "notifyfailed": "알림 실패",
+        "notifyfailed": "전송 실패",
         "flapping": "플래핑",
         "anomaly": "이상",
         "succeeded": "성공",
@@ -30394,7 +30467,9 @@
     "validation": {
       "regexLength": "패턴은 {max}자 이하로 입력하세요.",
       "regexInvalid": "이 패턴은 잘못되었거나 지원되지 않습니다. 전방 탐색, 후방 탐색, 역참조는 사용할 수 없습니다."
-    }
+    },
+    "queryTooltip": "필터를 텍스트로 편집",
+    "builderTooltip": "빌더로 필터 편집"
   },
   "autoobserveLive": {
     "paging": {

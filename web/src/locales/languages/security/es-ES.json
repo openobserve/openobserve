@@ -20,7 +20,8 @@
       "close": "Cerrar",
       "mitre": "MITRE ATT&CK",
       "severity": "Severidad",
-      "viewAll": "Ver todo"
+      "viewAll": "Ver todo",
+      "moreActions": "Más acciones"
     },
     "caseStatus": {
       "open": "Nuevo",
@@ -161,7 +162,15 @@
       "explore": "Explorar",
       "noSources": "Aún no hay fuentes de seguridad",
       "noSourcesHint": "Ingiere CloudTrail, Okta, VPC Flow o syslog. Los streams con security, audit, auth o firewall en el nombre aparecen aquí automáticamente.",
-      "summaryPartial": "Esta ventana tiene más historial de alertas del que cabe en un resumen, así que los recuentos y los gráficos son un límite inferior; elige una ventana más corta para obtener cifras completas."
+      "summaryPartial": "Esta ventana tiene más historial de alertas del que cabe en un resumen, así que los recuentos y los gráficos son un límite inferior; elige una ventana más corta para obtener cifras completas.",
+      "autoRefresh": "Actualizar automáticamente cada minuto",
+      "whatDetections": "detecciones",
+      "rulesFailedHint": "No se pudieron leer las detecciones, así que no se pueden contar los disparos. Reintenta o revisa la página Detecciones.",
+      "historyFailedHint": "El historial de disparos no está disponible, así que no se cuentan. Reintenta o revisa la página Alertas.",
+      "whatFirings": "disparos",
+      "emptyTitle": "Aún no hay detecciones activadas",
+      "emptyHint": "Activa detecciones del catálogo Sigma para empezar a monitorizar. Comprueba en Fuentes que llegan tus datos de seguridad.",
+      "openSources": "Abrir fuentes"
     },
     "events": {
       "title": "Eventos de seguridad",
@@ -279,7 +288,8 @@
           "outcome": "Resultado",
           "message": "Mensaje"
         }
-      }
+      },
+      "openSources": "Abrir fuentes"
     },
     "drawer": {
       "event": "Evento de seguridad",
@@ -459,7 +469,9 @@
         "action": "Acción",
         "object": "Objeto",
         "host": "Host"
-      }
+      },
+      "whatAlerts": "alertas",
+      "loadFailedHint": "No se pudo leer el historial de disparos. Reintenta o comprueba en Detecciones que haya detecciones activadas."
     },
     "cases": {
       "title": "Casos",
@@ -708,7 +720,9 @@
         "showAll": "Mostrar todas las filas",
         "onlyEntity": "Solo las entidades de este caso",
         "noneForEntity": "Ninguna fila de esta activación menciona las entidades de este caso"
-      }
+      },
+      "whatCases": "casos",
+      "loadFailedHint": "No se pudieron leer los casos. Reintenta o comprueba que la gestión de casos esté activada para esta organización."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -771,7 +785,9 @@
       "manageDetections": "Gestionar detecciones",
       "historyNarrowed": "El rango máximo de consulta del historial de alertas limita los disparos a los ocurridos desde {from}; los disparos anteriores en esta ventana no se cuentan.",
       "cellNone": "Sin regla",
-      "coverageError": "No se pudo cargar la cobertura de ATT&CK: {reason}"
+      "coverageError": "No se pudo cargar la cobertura de ATT&CK: {reason}",
+      "whatCoverage": "la cobertura ATT&CK",
+      "loadFailedHint": "No se pudo calcular la cobertura, así que no se muestran recuentos. Reintenta o revisa la página Detecciones."
     },
     "detections": {
       "title": "Detecciones",
@@ -998,7 +1014,9 @@
           "in_cidr": "está en el rango (CIDR)",
           "in_list": "está en la lista de permitidos"
         }
-      }
+      },
+      "whatDetections": "detecciones",
+      "loadFailedHint": "No se pudieron leer las detecciones. Reintenta o comprueba que puedes ver alertas en esta organización."
     },
     "tuning": {
       "open": "Ajuste",
@@ -1215,7 +1233,9 @@
         "openAllowlists": "Abrir listas de permitidos"
       },
       "otherSourceOnly": "Solo otras fuentes",
-      "otherSourceOnlyHint": "Escrita para {logsource}. Solo compila en tus flujos mediante nombres de campo compartidos, así que no cuenta como lista para instalar."
+      "otherSourceOnlyHint": "Escrita para {logsource}. Solo compila en tus flujos mediante nombres de campo compartidos, así que no cuenta como lista para instalar.",
+      "whatRules": "el catálogo de detecciones",
+      "loadFailedHint": "El catálogo Sigma no se cargó, así que se desconocen los recuentos de reglas y fuentes. Reintenta en un momento."
     },
     "entities": {
       "title": "Entidades",
@@ -1335,7 +1355,9 @@
       "loadError": "No se pudieron cargar las fuentes de seguridad",
       "detailFailed": "No se pudieron leer algunos datos de esta entidad: {streams}.",
       "aliasCount": "+{n} grafía | +{n} grafías",
-      "aliasHint": "Registrada con esta grafía; es la misma identidad."
+      "aliasHint": "Registrada con esta grafía; es la misma identidad.",
+      "whatEntities": "entidades",
+      "loadFailedHint": "Las fuentes de seguridad no son accesibles. Comprueba en Fuentes que haya una fuente conectada y reintenta."
     },
     "ueba": {
       "title": "Análisis de comportamiento de usuarios",
@@ -1434,7 +1456,9 @@
       "volumeNotJudged": "El volumen no se evalúa para este usuario: las ventanas de menos de un día se comparan con las mismas horas del día en la línea base, lo que requiere al menos un día de historial.",
       "baselineBuilding": "Creando línea base",
       "baselineBuildingHint": "{span} de historial hasta ahora. La comparación con el pasado propio de este usuario empieza cuando exista un historial completo de {baseline}; mientras tanto se marcan los valores atípicos claros respecto a otros usuarios.",
-      "buildingNotice": "La línea base aún se está creando para {n} usuario: hasta que exista un historial completo de {baseline}, solo se marcan los valores atípicos claros respecto a otros usuarios. | La línea base aún se está creando para {n} usuarios: hasta que exista un historial completo de {baseline}, solo se marcan los valores atípicos claros respecto a otros usuarios."
+      "buildingNotice": "La línea base aún se está creando para {n} usuario: hasta que exista un historial completo de {baseline}, solo se marcan los valores atípicos claros respecto a otros usuarios. | La línea base aún se está creando para {n} usuarios: hasta que exista un historial completo de {baseline}, solo se marcan los valores atípicos claros respecto a otros usuarios.",
+      "whatUsers": "comportamiento de usuarios",
+      "loadFailedHint": "Las fuentes de seguridad no son accesibles. Comprueba en Fuentes que haya una fuente conectada y reintenta."
     },
     "intel": {
       "title": "Inteligencia de amenazas",
@@ -1602,7 +1626,11 @@
       },
       "partialChecked": "Resultado parcial: se comprobaron {checked} de {total} indicadores. Los recuentos del resto pueden ser bajos.",
       "partialCapped": "Resultado parcial: se comprobaron {checked} de {total} indicadores. El barrido se detiene en {n} consultas; no se comprobaron los indicadores menos graves.",
-      "inText": "{column} (en el texto)"
+      "inText": "{column} (en el texto)",
+      "runSweepDisabled": "Añade al menos un indicador para ejecutar un barrido.",
+      "whatIndicators": "inteligencia de amenazas",
+      "loadFailedHint": "No se pudieron leer las listas de indicadores. Reintenta o comprueba que puedes leer tablas de búsqueda en esta organización.",
+      "filterType": "Tipo"
     },
     "sources": {
       "title": "Fuentes de datos",
@@ -1667,7 +1695,9 @@
         "pipeline_missing": "ya no existe",
         "other_stream": "ahora lee otro stream",
         "other_pack": "ahora ejecuta otro paquete"
-      }
+      },
+      "whatSources": "fuentes de seguridad",
+      "loadFailedHint": "Las fuentes de seguridad no son accesibles. Comprueba la conexión o los permisos y vuelve a intentarlo."
     },
     "nav": {
       "overview": "Descripción general",
@@ -1735,6 +1765,10 @@
       "indicatorType": "Tipo de indicador",
       "severityFilter": "Filtro de gravedad",
       "stream": "Stream"
+    },
+    "loadError": {
+      "title": "No se pudo cargar {what}",
+      "hint": "El servidor no respondió para {what}. Comprueba la conexión o los permisos y vuelve a intentarlo."
     }
   }
 }

@@ -12,6 +12,10 @@ import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import SecurityTimeRange from "@/components/security/SecurityTimeRange.vue";
+import { useSecurityRange } from "@/composables/security/useSecurityRange";
+import type { DateTimeRangeChange } from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
+import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -67,21 +71,12 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "")
 // Enabling a rule creates a detection, which is authoring.
 const { canAuthor } = useSecurityAccess();
 
-const RANGES = [
-  { value: "1h", minutes: 60 },
-  { value: "24h", minutes: 1440 },
-  { value: "7d", minutes: 10080 },
-  { value: "30d", minutes: 43200 },
-] as const;
-type RangeKey = (typeof RANGES)[number]["value"];
-const range = ref<RangeKey>(
-  RANGES.some((r) => r.value === route.query.period) ? (route.query.period as RangeKey) : "7d",
-);
-function onRangeChange(value: unknown) {
-  if (!value || value === range.value) return;
-  range.value = value as RangeKey;
-  analytics.track("security_time_range_changed", { view: "mitre", range: range.value });
-  router.replace({ query: { ...route.query, period: range.value } });
+const range = useSecurityRange(route.query);
+function onRangeChange(change: DateTimeRangeChange) {
+  if (!range.apply(change)) return;
+  analytics.track("security_time_range_changed", { view: "mitre", range: range.text.value });
+  const { period: _p, from: _f, to: _t, ...rest } = route.query;
+  router.replace({ query: { ...rest, ...range.linkQuery.value } });
   void loadHistory();
 }
 
@@ -152,12 +147,13 @@ const notices = computed<SecurityNotice[]>(() => {
 async function loadHistory() {
   // The summary is scoped to SIEM alert ids, which are only known once detections land.
   await detectionsReady;
-  const end = Date.now();
-  const minutes = RANGES.find((r) => r.value === range.value)!.minutes;
+  range.touch();
+  const end = range.endMs.value;
+  const minutes = range.windowMs.value / 60_000;
   const alertIds = siemRows.value.map((row) => String(row.alert.id ?? "")).filter(Boolean);
   // Fine buckets keep each technique's "last fired" within minutes of the real firing.
   const bucketMs = Math.max(60_000, Math.ceil((minutes * 60_000) / 400));
-  await history.load(orgId.value, end - minutes * 60_000, end, { alertIds, bucketMs });
+  await history.load(orgId.value, range.startMs.value, end, { alertIds, bucketMs });
   lastRunAt.value = Date.now();
 }
 const coverageQuery = useQuery(() => ({
@@ -307,11 +303,17 @@ const order = computed(() => {
   return out;
 });
 
+// A failed coverage or rules load is one page error, never "0 of 0" (R8).
+const pageFailed = computed(
+  () => !!coverageQuery.error.value || (!!rulesError.value && !siemRows.value.length),
+);
+const firingDash = (n: number) => (history.error.value ? "—" : n);
+
 const stats = computed<StatItem[]>(() => [
   {
     key: "firing",
     label: t("siem.mitrePage.stat.firing"),
-    value: summary.value.techniquesFiring,
+    value: firingDash(summary.value.techniquesFiring),
     icon: "local-fire-department",
     tone: "error",
     dataTest: "security-mitre-stat-firing",
@@ -423,7 +425,7 @@ const drawerFacts = computed<RecordFact[]>(() => {
     { label: t("siem.mitrePage.fact.enabled"), value: cell.enabledCount },
     { label: t("siem.mitrePage.fact.catalog"), value: cell.catalogRules.length },
     {
-      label: t("siem.mitrePage.fact.firings", { range: t(`siem.range.${range.value}`) }),
+      label: t("siem.mitrePage.fact.firings", { range: range.text.value }),
       value: formatEventCount(cell.firings),
     },
   ];
@@ -467,20 +469,11 @@ function openDetections() {
   >
     <template #actions>
       <div class="flex items-center gap-2">
-        <OToggleGroup
-          :model-value="range"
+        <SecurityTimeRange
+          :picker-props="range.pickerProps.value"
           data-test="security-mitre-range"
-          @update:model-value="onRangeChange"
-        >
-          <OToggleGroupItem
-            v-for="r in RANGES"
-            :key="r.value"
-            :value="r.value"
-            :data-test="`security-mitre-range-${r.value}`"
-          >
-            {{ t(`siem.range.${r.value}`) }}
-          </OToggleGroupItem>
-        </OToggleGroup>
+          @change="onRangeChange"
+        />
         <ORefreshButton
           :last-run-at="lastRunAt"
           :loading="loading"
@@ -490,7 +483,14 @@ function openDetections() {
       </div>
     </template>
 
-    <div class="flex flex-col gap-4 pb-4">
+    <SecurityLoadError
+      v-if="pageFailed"
+      :what="t('siem.mitrePage.whatCoverage')"
+      :hint="t('siem.mitrePage.loadFailedHint')"
+      data-test="security-mitre-load-error"
+      @retry="refresh"
+    />
+    <div v-else class="flex flex-col gap-4 pb-4">
       <SecurityNotices :notices="notices" data-test="security-mitre-notices" />
 
       <OStatStrip
@@ -778,7 +778,7 @@ function openDetections() {
         <OEmptyState
           v-if="!recentFirings.length"
           icon="task-alt"
-          :title="t('siem.mitrePage.noFirings', { range: t(`siem.range.${range}`) })"
+          :title="t('siem.mitrePage.noFirings', { range: range.text.value })"
         />
         <div v-else class="border-border-default rounded-surface overflow-hidden border">
           <div

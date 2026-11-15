@@ -67,6 +67,8 @@ export class AlertManagement {
 
     /** Open the clone dialog from a row without submitting it. */
     async openCloneDialog(alertName) {
+        // Clone lives in the row's ⋯ menu.
+        await this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`).click();
         await this.page.locator(this.locators.alertCloneButton.replace('{alertName}', alertName)).click();
         await expect(this.cloneDialog()).toBeVisible({ timeout: 10000 });
     }
@@ -178,6 +180,8 @@ export class AlertManagement {
      *   are not unique); `folderId` routes it out of the current folder.
      */
     async cloneAlert(alertName, streamType, streamName, options = {}) {
+        // Clone lives in the row's ⋯ menu.
+        await this.page.locator(`[data-test="alert-list-${alertName}-more-options"]`).click();
         await this.page.locator(this.locators.alertCloneButton.replace('{alertName}', alertName)).click();
         // The clone ODialog has no dedicated title data-test; wait for the clone
         // name input (`to-be-clone-alert-name`) as the deterministic ready signal.

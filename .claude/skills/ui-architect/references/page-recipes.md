@@ -1,9 +1,29 @@
 # Page Recipes (standard layouts)
 
-How to lay out a whole page so every screen has the same anatomy. Two recipes
-cover almost everything: a **listing/table page** and a **detail/editor page**.
-Follow the recipe rather than improvising a layout — that's what makes the app
-feel like one product.
+How to lay out a whole page so every screen has the same anatomy. Most of this
+app is not CRUD: people explore data, watch health, investigate an incident and
+build pipelines. Pick the recipe by the **job the page does**, then follow it
+rather than improvising a layout — that's what makes the app feel like one
+product.
+
+## Which recipe?
+
+| The page's job | Recipe | Examples |
+| --- | --- | --- |
+| Find and manage a set of objects | [Listing](#recipe-listing--table-page) | Alerts, streams, pipelines, users, dashboards list |
+| Query data and read the results | [Explore](#recipe-explore-query--results) | Logs, traces, metrics, security events |
+| Answer "is anything wrong, and where?" | [Overview](#recipe-overview-status-first) | Home, Security overview, AI insights, DB overview, alert insights |
+| Understand one thing and act on it | [Investigation detail](#recipe-investigation-detail) | Alert detail, trace detail, service, entity, case |
+| Watch a fixed set of charts | [Dashboard](#recipe-dashboard) | A dashboard, a module's metrics tab |
+| Inspect one row without leaving the list | [Row drawer](#recipe-row-drawer) | Log row, span, stream settings |
+| Build or edit a multi-part object | [Builder](#recipe-builder-and-canvas) | Pipeline editor, workflow, alert form, panel editor |
+| Change saved settings | [Settings form](#recipe-settings-form-page) | General, organization parameters |
+| Create or edit an object as the page's main task | [Detail / editor](#recipe-detail--editor-page) | New report, edit destination |
+
+A module with its own section list (Settings, IAM, AI observability, database
+monitoring) uses these same recipes for its pages; the module rail replaces the
+tabs ([navigation-menus.md](navigation-menus.md), N2). Every recipe shares the
+[state matrix](#states-for-every-recipe) and the toolbar order (F1).
 
 ## Table of contents
 
@@ -18,6 +38,13 @@ feel like one product.
   - [States, actions, shortcuts, data](#states-actions-shortcuts-data)
 - [Recipe: detail / editor page](#recipe-detail--editor-page)
 - [Recipe: settings form page](#recipe-settings-form-page)
+- [Recipe: explore (query + results)](#recipe-explore-query--results)
+- [Recipe: overview (status first)](#recipe-overview-status-first)
+- [Recipe: investigation detail](#recipe-investigation-detail)
+- [Recipe: dashboard](#recipe-dashboard)
+- [Recipe: row drawer](#recipe-row-drawer)
+- [Recipe: builder and canvas](#recipe-builder-and-canvas)
+- [States for every recipe](#states-for-every-recipe)
 - [Listing-page checklist](#listing-page-checklist)
 
 ---
@@ -529,6 +556,190 @@ parameters, Password policy): no edit mode, no dialog, one Save for the page.
 
 Components: [forms-specialized.md](forms-specialized.md) § OSaveBar + useLeaveGuard,
 [core-display.md](core-display.md) § OSettingRow.
+
+---
+
+## Recipe: explore (query + results)
+
+For pages where the user writes a query and reads what comes back (Logs, Traces,
+Metrics, Security events). The user is a power user half the time: keep the
+query, the results and the keyboard first.
+
+**Bands, top to bottom**
+1. Header (H1): the title only; no actions that belong to the query.
+2. Toolbar (F1): mode switch (`OToggleGroup`, labelled: "Search · Visualize ·
+   Patterns", plus "Builder | SQL" when both exist, F6) → spacer → at most two
+   secondary text actions (Reset) → `ODateTimeRange` → **Run query** (the one
+   primary, split ▾ for run options) → `ORefreshButton` (age inside, auto-refresh
+   in its menu, F9) → one ghost ⋯ (share link, export, columns, toggles as
+   checkable items; O10).
+3. Query bar: one line that grows to at most five lines, then scrolls. Its hint
+   says exactly what runs it (KB2: Ctrl Enter; Enter only if Enter really runs).
+4. Body: facets on the left (F4, collapsible, the same width on every explorer),
+   results on the right: a histogram for time-series results only, then the
+   table. Non-time-series SQL renders as columns, never as one JSON blob.
+
+**Rules**
+- One way per job (P2): one stream picker, one Run, one Share. An empty page has
+  one call to action ("Select a stream"), not three.
+- Picking a stream runs the query. Changing the time range re-runs it.
+- Everything that defines the result is in the URL (F11): stream, query, mode,
+  time range, columns, selected row. Share link copies exactly that and its toast
+  says whether the time is relative or absolute.
+- `/` focuses the query bar, Ctrl Enter runs, J/K move rows in the drawer, Escape
+  closes it and returns focus to the row (KB1, KB2).
+- When the range has no data but older data exists, say when data was last seen
+  and offer "Jump to latest" instead of a bare "No results".
+- A row opens the [row drawer](#recipe-row-drawer). IDs that name another object
+  (trace_id, span_id, alert name) are links to it (N8).
+- Visualize starts from the user's own query and keeps their column names as
+  aliases and axis titles.
+
+---
+
+## Recipe: overview (status first)
+
+For pages whose job is "is anything wrong, and where?" (Home, Security overview,
+AI insights, database overview, alert insights). A first-week user lands here,
+so it also shows where to start.
+
+**Bands, top to bottom**
+1. Header: title; `ODateTimeRange` and `ORefreshButton` in the header actions
+   when the whole page shares one range (never a band holding only a time range,
+   L5).
+2. **Status band**: what needs attention now, highest severity first, each item a
+   link to the object ("2 critical alerts firing", "app_logs: no data for
+   3 h"). "All quiet" when nothing needs attention. This band answers the page's
+   question; everything below supports it.
+3. **KPI strip** (`OStatStrip`, no boxes, R4): 3 to 6 numbers that vary and that
+   someone acts on, compact format (98K, 1.2M), each a link to the filtered list.
+4. **Sections**: a 14 px heading, optional "View all", then a short list or one
+   chart, separated by 24 px. No card around a section, no card inside a card.
+5. **Getting started** (only when it helps, e.g. no data in any stream): three
+   actions at most: Add data, Explore logs, Create alert from a template.
+
+**Rules**
+- Each band loads on its own and keeps its final height while loading (K4, P3).
+- A failed request shows "—" for what it would have filled and a compact error
+  with Retry in that band (K5); one page-level error only when everything failed.
+- Severity uses one vocabulary and colour scale (C2, N7); red only for critical
+  (C9). Repeated event types are grouped with a count, not listed five times.
+
+---
+
+## Recipe: investigation detail
+
+For one object the user is trying to understand and act on: an alert, a trace, a
+service, an entity, a case. The question is "what happened, why, and what do I do
+next?".
+
+**Bands, top to bottom**
+1. Header: "‹ Parent" back link (H4), the object's name, its state chip in
+   `#status` ("Critical · firing for 1 h 6 min", H5). Actions: the main action
+   (Acknowledge, Edit), then up to two secondary actions that **take the evidence
+   elsewhere**: "Open in logs", "Open in traces" (N8), then ⋯.
+2. **Summary line**: the definition in one line of plain text: the condition,
+   threshold, window and frequency for an alert; service, duration and status for
+   a trace. Not boxed cards that repeat the header (R4).
+3. **Evidence**: the chart or timeline that shows the problem, at a fixed height.
+   With no data it collapses to a compact empty state (one line) so history stays
+   above the fold.
+4. **Tabs** for the rest (history, configuration, related objects), on their own
+   row (H8). The first tab is the one people open first during an incident.
+
+**Rules**
+- Links out carry the object's stream, filter and the relevant time window
+  (firing window, trace span), so the target opens on the same evidence (N8).
+- Related objects link both ways (alert ↔ incident ↔ case). When there is none,
+  one quiet line says so and offers to create it.
+- Repeated identical history rows collapse into one row with a count.
+
+---
+
+## Recipe: dashboard
+
+For a fixed grid of panels that the user watches.
+
+- Header: the dashboard name, the folder as the context line; actions: "Add
+  panel" (labelled, secondary), Share, then ⋯ (settings, export, duplicate,
+  delete last).
+- Toolbar: variables as filter selects (F3) → spacer → `ODateTimeRange` →
+  `ORefreshButton`. Changing the range or a variable re-runs every panel at once.
+  When the dashboard's Auto run setting is off, the refresh button reads "Apply"
+  while a change is pending; never only a silent "needs refresh" dot.
+- Panels are the one place a bordered card is right (R4): title 13 px / 500,
+  meta 12 px, ghost sm actions on hover (R6). A panel with no data shows a compact
+  empty state; a stat panel shows "—", never a big 0 (C4).
+- When every panel is empty for the range, one hint above the grid says when data
+  was last seen, with "Jump to latest".
+- Tabs ("Overview", "Errors") are peer pages on their own row; "Add tab" is a
+  distinct quiet control at the end of the tab row, never a second "+" that looks
+  like "Add panel".
+
+---
+
+## Recipe: row drawer
+
+For inspecting one row while keeping the list in view (log row, span, stream
+settings).
+
+- `ODrawer` at a fixed width (640, or 960 for wide JSON), header with the row's
+  identity and copy-link, footer only when it edits (O2, O3, O6).
+- Tabs inside the drawer for the views of the same row (Table, JSON, Related);
+  the open tab is in the URL (N6).
+- Keys are secondary text, values strong text; never red keys (C9). Long values
+  wrap; machine values are mono (T4).
+- Values that name another object are links (trace_id → trace, N8). A related
+  view with nothing to show uses an informational compact empty state ("No trace
+  linked to this log" + "Search traces around this time"), never a red error.
+- J/K step through rows, Escape closes and returns focus to the row (KB2, N4).
+
+---
+
+## Recipe: builder and canvas
+
+For objects with several parts that the user assembles (pipeline editor,
+workflow, alert form, dashboard panel editor).
+
+- A full page (O2) with "‹ Parent" back, the object's name as the title (editable
+  in place when it has one), and the save actions where the eye ends: the sticky
+  footer of the form column, or the header for a canvas (V2). Cancel, then the
+  primary.
+- Save is enabled only when the object is valid and something changed; Cancel and
+  Escape ask before discarding edits (V3, V5). A pristine form leaves without a
+  prompt.
+- Start points: a template or library link at the top of an empty builder ("Start
+  from a template"); defaults are the user's last choice or the most active
+  non-internal source, never an internal stream.
+- Picker grids (chart types, node types) show a tooltip with each item's name; a
+  long grid is grouped and searchable.
+- The canvas or preview keeps its size while side panels open (O4); the
+  configuration panel is a 640 drawer or a fixed right column.
+
+---
+
+## States for every recipe
+
+Every region of every recipe has these states. Build them with the shared
+components, not per page.
+
+| State | Looks like | Component |
+| --- | --- | --- |
+| Loading (first) | A skeleton of the final layout after 150 ms; final height reserved | `OSkeleton`, table `:loading` |
+| Loading (refresh) | Current content stays; thin progress bar; refresh button spins | `ORefreshButton :loading` |
+| First run | What this is, why you would use it, one primary ("New alert") | `OEmptyState kind="first-run"` |
+| Filtered | "No matches" + Clear filters | `OEmptyState kind="filtered"` |
+| No data in range | When data was last seen + "Jump to latest" | `OEmptyState` with the last-seen line |
+| Denied | You don't have access, and who can grant it | `OEmptyState kind="denied"` |
+| Locked (edition) | The feature's name, one line about it, the upgrade action, in place | inline upsell, never a redirect |
+| Error | What failed in plain words + Retry; counts show "—" (C4, K5, K6) | `OEmptyState kind="error"`, `ORegionStatus` |
+| Partial | The parts that loaded, plus a compact error where one failed | compact `OEmptyState` per region |
+| Whole page failed | One page-level error or banner, not one per panel | `OBanner` or one region error |
+
+Size rules: the region variant is top-aligned 64 px below the region's top (a
+20 px icon in a 40 px tile, 14 px / 600 title, 13 px text, md buttons); the
+compact variant is for regions 240 px tall or less (a 16 px icon inline with a
+13 px / 500 title, one sm action).
 
 ---
 

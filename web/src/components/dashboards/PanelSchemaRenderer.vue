@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="relative h-full" ref="chartPanelRef" :class="chartPanelClass">
       <div
-        v-if="!errorDetail?.message && !isAwaitingFirstLoad"
+        v-if="!errorDetail?.message && !isAwaitingFirstLoad && !statHasNoData"
         :style="{ height: chartPanelHeight, width: '100%' }"
       >
         <MapsRenderer
@@ -212,6 +212,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
+      <div
+        v-if="statHasNoData"
+        class="absolute inset-0 flex flex-col items-center justify-center"
+        data-test="dashboard-stat-no-data"
+      >
+        <span class="text-text-heading text-2xl leading-none font-semibold" aria-hidden="true"
+          >—</span
+        >
+        <span class="text-text-secondary text-xs">{{ t("panel.noDataInRange") }}</span>
+      </div>
       <PanelChartPlaceholder
         v-if="showsChartPlaceholder"
         class="absolute inset-0"
@@ -220,6 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-if="
           noData &&
+          !statHasNoData &&
           !isAwaitingFirstLoad &&
           !errorDetail?.message &&
           panelSchema.type != 'maps' &&
@@ -448,7 +459,7 @@ import ExemplarCard from "@/components/dashboards/exemplars/ExemplarCard.vue";
 import ExemplarMarkerList from "@/components/dashboards/exemplars/ExemplarMarkerList.vue";
 import type { ExemplarMarker, InjectedExemplars, TraceVerdict } from "@/ts/interfaces/exemplars";
 import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
-import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
+import { scannedNoRecords, type SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
 
@@ -2175,6 +2186,18 @@ export default defineComponent({
       );
     });
 
+    // An aggregate over zero scanned records returns a row of 0, which a stat must not present as a measurement.
+    const statHasNoData = computed(() => {
+      if (panelSchema.value?.type !== "metric" || loading.value || drawsMissingValue.value) {
+        return false;
+      }
+      const queries = panelDiagnostics?.value?.queries ?? [];
+      if (!queries.length || !queries.every(scannedNoRecords)) return false;
+      const firstRow = data.value?.[0]?.[0];
+      const yAliases = panelSchema.value?.queries?.[0]?.fields?.y?.map((it: any) => it.alias) ?? [];
+      return yAliases.every((y: any) => !Number(getDataValue(firstRow, y)));
+    });
+
     const noData = computed(() => {
       const type = panelSchema.value.type;
 
@@ -2759,6 +2782,7 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      statHasNoData,
       noDataTitle,
       customNoDataText,
       geoMapRendererData,

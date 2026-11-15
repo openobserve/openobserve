@@ -7,6 +7,7 @@ export { default as OTimeCell } from "./OTimeCell.vue";
 export { default as ONumberCell } from "./ONumberCell.vue";
 export { default as ODataBarCell } from "./ODataBarCell.vue";
 export { default as OCodeCell } from "./OCodeCell.vue";
+export { default as OSecretCell } from "./OSecretCell.vue";
 export { default as OUserCell } from "./OUserCell.vue";
 export { default as ONameLinkCell } from "./ONameLinkCell.vue";
 export {

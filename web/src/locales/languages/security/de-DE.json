@@ -20,7 +20,8 @@
       "close": "Schließen",
       "mitre": "MITRE ATT&CK",
       "severity": "Schweregrad",
-      "viewAll": "Alle anzeigen"
+      "viewAll": "Alle anzeigen",
+      "moreActions": "Weitere Aktionen"
     },
     "caseStatus": {
       "open": "Neu",
@@ -161,7 +162,15 @@
       "explore": "Erkunden",
       "noSources": "Noch keine Sicherheitsquellen",
       "noSourcesHint": "Erfassen Sie CloudTrail, Okta, VPC Flow oder Syslog. Streams mit security, audit, auth oder firewall im Namen erscheinen hier automatisch.",
-      "summaryPartial": "Dieses Zeitfenster enthält mehr Alarmhistorie, als eine Zusammenfassung aufnehmen kann, daher sind Zählungen und Diagramme eine Untergrenze; wählen Sie ein kürzeres Zeitfenster für vollständige Zahlen."
+      "summaryPartial": "Dieses Zeitfenster enthält mehr Alarmhistorie, als eine Zusammenfassung aufnehmen kann, daher sind Zählungen und Diagramme eine Untergrenze; wählen Sie ein kürzeres Zeitfenster für vollständige Zahlen.",
+      "autoRefresh": "Jede Minute automatisch aktualisieren",
+      "whatDetections": "Erkennungen",
+      "rulesFailedHint": "Erkennungen konnten nicht gelesen werden, daher lassen sich Auslösungen nicht zählen. Erneut versuchen oder die Seite Erkennungen prüfen.",
+      "historyFailedHint": "Der Auslösungsverlauf ist nicht verfügbar, daher werden Auslösungen nicht gezählt. Erneut versuchen oder die Seite Alarme prüfen.",
+      "whatFirings": "Auslösungen",
+      "emptyTitle": "Noch keine Erkennungen aktiviert",
+      "emptyHint": "Aktivieren Sie Erkennungen aus dem Sigma-Katalog, um die Überwachung zu starten. Prüfen Sie unter Datenquellen, ob Ihre Sicherheitsdaten eintreffen.",
+      "openSources": "Datenquellen öffnen"
     },
     "events": {
       "title": "Sicherheitsereignisse",
@@ -279,7 +288,8 @@
           "outcome": "Ergebnis",
           "message": "Nachricht"
         }
-      }
+      },
+      "openSources": "Datenquellen öffnen"
     },
     "drawer": {
       "event": "Sicherheitsereignis",
@@ -459,7 +469,9 @@
         "action": "Aktion",
         "object": "Objekt",
         "host": "Host"
-      }
+      },
+      "whatAlerts": "Alarme",
+      "loadFailedHint": "Der Auslösungsverlauf konnte nicht gelesen werden. Erneut versuchen oder unter Erkennungen prüfen, ob Erkennungen aktiviert sind."
     },
     "cases": {
       "title": "Fälle",
@@ -708,7 +720,9 @@
         "showAll": "Alle Zeilen anzeigen",
         "onlyEntity": "Nur Entitäten dieses Falls",
         "noneForEntity": "Keine Zeile dieser Auslösung nennt die Entitäten dieses Falls"
-      }
+      },
+      "whatCases": "Fälle",
+      "loadFailedHint": "Fälle konnten nicht gelesen werden. Erneut versuchen oder prüfen, ob die Fallverwaltung für diese Organisation aktiviert ist."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -771,7 +785,9 @@
       "manageDetections": "Erkennungen verwalten",
       "historyNarrowed": "Der maximale Abfragebereich der Alarmhistorie beschränkt Auslösungen auf diejenigen seit {from}; frühere Auslösungen in diesem Zeitfenster werden nicht gezählt.",
       "cellNone": "Keine Regel",
-      "coverageError": "Die ATT&CK-Abdeckung konnte nicht geladen werden: {reason}"
+      "coverageError": "Die ATT&CK-Abdeckung konnte nicht geladen werden: {reason}",
+      "whatCoverage": "ATT&CK-Abdeckung",
+      "loadFailedHint": "Die Abdeckung konnte nicht berechnet werden, daher werden keine Zahlen angezeigt. Erneut versuchen oder die Seite Erkennungen prüfen."
     },
     "detections": {
       "title": "Erkennungen",
@@ -998,7 +1014,9 @@
           "in_cidr": "liegt im Bereich (CIDR)",
           "in_list": "ist in Allowlist"
         }
-      }
+      },
+      "whatDetections": "Erkennungen",
+      "loadFailedHint": "Erkennungen konnten nicht gelesen werden. Erneut versuchen oder prüfen, ob Sie Alarme in dieser Organisation ansehen dürfen."
     },
     "tuning": {
       "open": "Feinabstimmung",
@@ -1215,7 +1233,9 @@
         "openAllowlists": "Allowlists öffnen"
       },
       "otherSourceOnly": "Nur andere Quellen",
-      "otherSourceOnlyHint": "Für {logsource} geschrieben. Sie lässt sich auf Ihren Streams nur über gemeinsame Feldnamen kompilieren und zählt daher nicht als installationsbereit."
+      "otherSourceOnlyHint": "Für {logsource} geschrieben. Sie lässt sich auf Ihren Streams nur über gemeinsame Feldnamen kompilieren und zählt daher nicht als installationsbereit.",
+      "whatRules": "der Erkennungskatalog",
+      "loadFailedHint": "Der Sigma-Katalog wurde nicht geladen, daher sind Regel- und Quellenzahlen unbekannt. In Kürze erneut versuchen."
     },
     "entities": {
       "title": "Entitäten",
@@ -1335,7 +1355,9 @@
       "loadError": "Sicherheitsquellen konnten nicht geladen werden",
       "detailFailed": "Einige Daten dieser Entität konnten nicht gelesen werden: {streams}.",
       "aliasCount": "+{n} Schreibweise | +{n} Schreibweisen",
-      "aliasHint": "Mit dieser Schreibweise protokolliert; es ist dieselbe Identität."
+      "aliasHint": "Mit dieser Schreibweise protokolliert; es ist dieselbe Identität.",
+      "whatEntities": "Entitäten",
+      "loadFailedHint": "Sicherheitsquellen sind nicht erreichbar. Prüfen Sie unter Datenquellen, ob eine Quelle verbunden ist, und versuchen Sie es erneut."
     },
     "ueba": {
       "title": "Benutzerverhaltensanalyse",
@@ -1434,7 +1456,9 @@
       "volumeNotJudged": "Das Volumen wird für diesen Benutzer nicht beurteilt: Fenster unter einem Tag werden mit denselben Tagesstunden in der Baseline verglichen, was mindestens einen Tag Historie erfordert.",
       "baselineBuilding": "Baseline wird aufgebaut",
       "baselineBuildingHint": "Bisher {span} Verlauf. Der Vergleich mit der eigenen Vergangenheit dieses Benutzers beginnt, sobald ein vollständiger Verlauf von {baseline} vorliegt; bis dahin werden nur deutliche Ausreißer gegenüber anderen Benutzern markiert.",
-      "buildingNotice": "Die Baseline wird für {n} Benutzer noch aufgebaut: Bis ein vollständiger Verlauf von {baseline} vorliegt, werden nur deutliche Ausreißer gegenüber anderen Benutzern markiert. | Die Baselines werden für {n} Benutzer noch aufgebaut: Bis ein vollständiger Verlauf von {baseline} vorliegt, werden nur deutliche Ausreißer gegenüber anderen Benutzern markiert."
+      "buildingNotice": "Die Baseline wird für {n} Benutzer noch aufgebaut: Bis ein vollständiger Verlauf von {baseline} vorliegt, werden nur deutliche Ausreißer gegenüber anderen Benutzern markiert. | Die Baselines werden für {n} Benutzer noch aufgebaut: Bis ein vollständiger Verlauf von {baseline} vorliegt, werden nur deutliche Ausreißer gegenüber anderen Benutzern markiert.",
+      "whatUsers": "Benutzerverhalten",
+      "loadFailedHint": "Sicherheitsquellen sind nicht erreichbar. Prüfen Sie unter Datenquellen, ob eine Quelle verbunden ist, und versuchen Sie es erneut."
     },
     "intel": {
       "title": "Threat Intelligence",
@@ -1602,7 +1626,11 @@
       },
       "partialChecked": "Teilergebnis: {checked} von {total} Indikatoren geprüft. Die Zählwerte für den Rest sind möglicherweise zu niedrig.",
       "partialCapped": "Teilergebnis: {checked} von {total} Indikatoren geprüft. Der Sweep endet bei {n} Abfragen; die am wenigsten schwerwiegenden Indikatoren wurden nicht geprüft.",
-      "inText": "{column} (im Text)"
+      "inText": "{column} (im Text)",
+      "runSweepDisabled": "Fügen Sie mindestens einen Indikator hinzu, um einen Sweep auszuführen.",
+      "whatIndicators": "Threat Intel",
+      "loadFailedHint": "Indikatorlisten konnten nicht gelesen werden. Erneut versuchen oder prüfen, ob Sie Lookup-Tabellen in dieser Organisation lesen dürfen.",
+      "filterType": "Typ"
     },
     "sources": {
       "title": "Datenquellen",
@@ -1667,7 +1695,9 @@
         "pipeline_missing": "sie existiert nicht mehr",
         "other_stream": "sie liest jetzt einen anderen Stream",
         "other_pack": "sie führt jetzt ein anderes Paket aus"
-      }
+      },
+      "whatSources": "Sicherheitsquellen",
+      "loadFailedHint": "Sicherheitsquellen sind nicht erreichbar. Prüfen Sie Verbindung oder Berechtigungen und versuchen Sie es erneut."
     },
     "nav": {
       "overview": "Übersicht",
@@ -1735,6 +1765,10 @@
       "indicatorType": "Indikatortyp",
       "severityFilter": "Schweregradfilter",
       "stream": "Stream"
+    },
+    "loadError": {
+      "title": "{what} konnte nicht geladen werden",
+      "hint": "Der Server hat für {what} nicht geantwortet. Prüfen Sie Verbindung oder Berechtigungen und versuchen Sie es erneut."
     }
   }
 }

@@ -133,16 +133,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.ack.takeOver") }}
           </OButton>
           <OButton
-            v-if="logsHref"
+            v-if="evidence"
             variant="secondary"
             size="sm"
             icon="open-in-new"
-            :href="logsHref"
+            :href="evidence.href"
             target="_blank"
             rel="noopener"
-            data-test="alerts-firing-drawer-logs"
+            data-test="alerts-firing-drawer-open-in"
           >
-            {{ t("alerts.firing.drawer.openInLogs") }}
+            {{ evidence.label }}
           </OButton>
           <OButton
             v-if="showMute"
@@ -283,11 +283,18 @@ import {
   type AlertRun,
 } from "@/utils/alerts/firingHistory";
 import { formatInZone } from "@/utils/oncall";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import {
+  ALERT_EVIDENCE_LABELS,
+  alertEvidenceFilter,
+  alertEvidencePage,
+  alertEvidenceRoute,
+  alertEvidenceWindow,
+  alertStoredSql,
+  type AlertEvidenceFilter,
+} from "@/utils/alerts/alertEvidenceRoute";
 
 const FLAP_WINDOW_US = 6 * 3_600_000_000;
 const HISTORY_SIZE = 1000;
-const MINUTE_US = 60_000_000;
 
 defineOptions({ name: "FiringAlertDrawer" });
 
@@ -532,46 +539,45 @@ const delivered = computed(() =>
 const confirmed = computed(() => reached.value.filter((name) => delivered.value.includes(name)));
 const unconfirmed = computed(() => reached.value.filter((name) => !delivered.value.includes(name)));
 
-const logsAlert = computed(() => {
-  const alert = detail.value;
-  const type = alert?.query_condition?.type;
-  return alert?.stream_name &&
-    alert?.stream_type === "logs" &&
-    (type === "sql" || type === "custom")
-    ? alert
-    : null;
-});
+// The same link as the alert page's Open in…: the alert's stream, the rows it reads and the firing window.
+const evidencePage = computed(() => alertEvidencePage(detail.value));
+const isBuilderAlert = computed(() => detail.value?.query_condition?.type === "custom");
 const sqlRead = useQuery(() =>
-  Object.assign(alertSqlQuery(orgId.value, props.alertId ?? "", logsAlert.value), {
-    enabled: logsAlert.value?.query_condition?.type === "custom",
-    retry: false,
-  }),
+  Object.assign(
+    alertSqlQuery(orgId.value, props.alertId ?? "", evidencePage.value ? detail.value : null),
+    { enabled: !!evidencePage.value && isBuilderAlert.value, retry: false },
+  ),
 );
-const logsSql = computed<string>(() =>
-  logsAlert.value?.query_condition?.type === "sql"
-    ? (logsAlert.value.query_condition.sql ?? "")
-    : (sqlRead.data.value ?? ""),
+const evidenceSql = computed(() => alertStoredSql(detail.value) || (sqlRead.data.value ?? ""));
+const evidenceFilter = ref<AlertEvidenceFilter | null>(null);
+const evidenceReady = ref(false);
+watch(
+  [evidencePage, evidenceSql],
+  async ([page, sql]) => {
+    evidenceReady.value = false;
+    if (!page) return;
+    const filter = await alertEvidenceFilter(detail.value, sql);
+    if (sql !== evidenceSql.value) return;
+    evidenceFilter.value = filter;
+    evidenceReady.value = true;
+  },
+  { immediate: true },
 );
-// The evaluation that fired read one period back, so the window opens there.
-const logsHref = computed(() => {
-  const alert = logsAlert.value;
-  if (!alert || !logsSql.value) return "";
-  const lookback = (alert.trigger_condition?.period ?? 0) * MINUTE_US;
-  const started = view.value?.firing_started_at ?? nowUs.value - 60 * MINUTE_US;
-  return router.resolve({
-    path: "/logs",
-    query: {
-      stream_type: "logs",
-      stream: alert.stream_name,
-      from: started - lookback,
-      to: nowUs.value,
-      sql_mode: "true",
-      query: b64EncodeUnicode(logsSql.value),
-      org_identifier: orgId.value,
-      // Logs reads an absent quick_mode as on, which drops every field but the trace ids.
-      quick_mode: "false",
-    },
-  }).href;
+const evidence = computed(() => {
+  const page = evidencePage.value;
+  const alert = detail.value;
+  if (!page || !alert || !evidenceReady.value) return null;
+  if (isBuilderAlert.value && sqlRead.isPending.value) return null;
+  const startedUs = firing.value ? view.value?.firing_started_at : null;
+  const window = alertEvidenceWindow(alert.trigger_condition?.period, startedUs, nowUs.value);
+  const route = alertEvidenceRoute({
+    page,
+    stream: String(alert.stream_name),
+    filter: evidenceFilter.value,
+    window,
+    org: orgId.value,
+  });
+  return { label: t(ALERT_EVIDENCE_LABELS[page]), href: router.resolve(route).href };
 });
 
 const viewAll = computed(() =>

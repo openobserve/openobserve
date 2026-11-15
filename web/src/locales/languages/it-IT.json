@@ -11,7 +11,9 @@
     "bannerMessage": "Questa funzionalità è bloccata. Richiede la funzionalità {feature} nella tua licenza.",
     "bannerMessageGeneric": "Questa pagina richiede una funzionalità non inclusa nella tua licenza.",
     "headerLocked": "Bloccata: richiede {feature}",
-    "availableInEnterprise": "Disponibile in OpenObserve Enterprise: {feature}"
+    "availableInEnterprise": "Disponibile in OpenObserve Enterprise: {feature}",
+    "turnedOffTitle": "Disattivato per questa organizzazione",
+    "enterpriseTitle": "Disponibile in Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "Nessun pattern trovato",
       "description": "Prova ad aumentare l'intervallo di tempo o a selezionare uno stream diverso con più dati di log. L'estrazione dei pattern funziona meglio con almeno 1.000 log.",
       "logsAnalyzed": "Sono stati analizzati solo {count} log."
-    },
-    "noStreamSelected": {
-      "title": "Seleziona uno stream per iniziare",
-      "description": "Scegli uno stream, quindi esegui la query per esplorarne i dati. Perfeziona i risultati con filtri e un intervallo di tempo personalizzato."
     },
     "noQueryApplied": {
       "title": "Esegui una query per visualizzare i risultati",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "Collega una fonte per creare il tuo primo stream",
       "description": "Gli stream vengono creati automaticamente nel momento in cui arrivano i dati. Configura l'inserimento dalla tua app, agente o raccoglitore per iniziare.",
-      "action": "Configura l'ingestione",
       "actionDesc": "Connetti una fonte di dati",
       "createAction": "Nuovo stream",
       "createActionDesc": "Definire manualmente uno schema di stream"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "Nessuna modifica da salvare"
+    },
     "dismiss": "Ignora",
     "exitFullscreen": "Esci da schermo intero",
     "moreActions": "Altre azioni",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "Precedente",
     "patternNavNext": "Prossimo",
     "patternNoValuesAvailable": "Nessun valore disponibile",
-    "sqlModeLabel": "Modalità SQL",
     "nlpModeLabel": "Modalità linguaggio naturale",
     "quickModeLabel": "Modalità rapida",
     "menuMore": "Altro",
-    "menuGroupSetOnce": "Imposta una volta",
     "menuGroupHistory": "Cronologia",
     "menuGroupDownloads": "Download",
     "menuGroupSchedule": "Pianificazione",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "Visualizzazione eliminata con successo.",
     "viewCreatedSuccessfully": "Visualizzazione creata con successo.",
     "viewUpdatedSuccessfully": "Visualizzazione aggiornata con successo.",
-    "linkCopiedSuccessfully": "Link copiato con successo!",
     "errorCopyingLink": "Errore durante la copia del link.",
     "errorShorteningLink": "Errore durante l'abbreviazione del link.",
     "webUrlNotConfigured": "L'URL di condivisione è disabilitato finché ZO_WEB_URL non viene configurato dall'amministratore.",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "Gli stream selezionati non hanno campi full-text",
     "freeTextNoTextFields": "Questo stream non ha campi di testo da cercare.",
     "freeTextNoTextFieldsNamed": "Non cercati: {streams} (nessun campo di testo).",
-    "freeTextBuildNotice": "Questo filtro contiene una ricerca testuale; modificalo in SQL."
+    "freeTextBuildNotice": "Questo filtro contiene una ricerca testuale; modificalo in SQL.",
+    "queryModeLabel": "Linguaggio di query",
+    "queryModeFilter": "Filtro",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Restringi i log per campo e valore",
+    "queryModeSqlTooltip": "Scrivi una query SQL completa, con aggregazioni e join",
+    "sqlModeNeedsOneStream": "L’SQL in questa vista accetta un solo stream",
+    "menuGroupViewOptions": "Opzioni di visualizzazione",
+    "histogramHiddenForAggregates": "Questa query restituisce gruppi, non eventi nel tempo, quindi non c’è un istogramma. Visualizza crea il grafico del risultato.",
+    "linkCopied": "Link copiato",
+    "linkCopiedFixedTime": "Link copiato · intervallo fisso {from} – {to}",
+    "linkCopiedRelativeTime": "Link copiato · {period}, a partire dall’apertura",
+    "recordsChipRows": "{total} riga | {total} righe",
+    "histogramTitleRows": "{total} riga in {took} ms. | {total} righe in {took} ms.",
+    "histogramTitleRowsWithScan": "{total} riga in {took} ms. ({scanLabel}: {scanSize}) | {total} righe in {took} ms. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "Scegli prima uno stream"
   },
   "menu": {
     "alertCalibration": "Calibrazione avvisi",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "Scelte rapide da tastiera",
     "searchOrJumpTo": "Cerca o vai a…",
     "jumpToTitle": "Vai a",
-    "jumpToPlaceholder": "Cerca pagine",
+    "addData": "Aggiungi dati",
+    "jumpToPlaceholder": "Cerca pagine e azioni",
     "synthetic": "Synthetics",
     "experience": "Esperienza",
     "slos": "SLO",
@@ -4212,7 +4225,8 @@
     "revokeInvitationMsg": "Sei sicuro di voler revocare l'invito per {email}?",
     "deleteUsersTitle": "Elimina utenti",
     "deleteUsersMsg": "Sei sicuro di voler eliminare {count} utente? | Sei sicuro di voler eliminare {count} utenti?",
-    "deleteUsersBlockNote": "Di questi, {count} hanno effettuato l'accesso tramite il tuo dominio verificato e verranno bloccati anziché eliminati."
+    "deleteUsersBlockNote": "Di questi, {count} hanno effettuato l'accesso tramite il tuo dominio verificato e verranno bloccati anziché eliminati.",
+    "roleHint": "Admin gestisce l'organizzazione, Editor modifica dati e impostazioni, Viewer può solo leggere."
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -5160,6 +5174,7 @@
     "timezone": "Fuso orario",
     "deleteActionMessage": "Sei sicuro di voler eliminare {count} campo? Questa azione non può essere annullata. | Sei sicuro di voler eliminare {count} campi? Questa azione non può essere annullata.",
     "deleteDatesMessage": "Sei sicuro di voler eliminare {count} intervallo di date? Questa azione non può essere annullata. | Sei sicuro di voler eliminare {count} intervalli di date? Questa azione non può essere annullata.",
+    "summaryAllTypes": "Stream (tutti i tipi)",
     "labelLogs": "Log",
     "labelMetrics": "Metriche",
     "labelTraces": "Tracce",
@@ -7757,7 +7772,8 @@
       "metricsSketch": "Le distribuzioni vengono memorizzate come bucket di istogramma e i percentili vengono stimati da questi bucket. Un valore più alto di ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA produce bucket più fini e percentili più precisi, al costo di più righe memorizzate."
     },
     "gpu": "GPU",
-    "gpuExporter": "Esportatore GPU"
+    "gpuExporter": "Esportatore GPU",
+    "rotationNote": "I token non vengono ruotati sul posto. Per ruotare, crea un nuovo token, sposta le tue sorgenti su di esso e poi disattiva quello vecchio."
   },
   "dashboard": {
     "panelDraft": {
@@ -9390,6 +9406,9 @@
       "addClause": "Aggiungi clausola"
     },
     "viewDashboard": {
+      "apply": "Applica",
+      "lastDataSeen": "Ultimi dati {when}",
+      "jumpToLatest": "Vai agli ultimi",
       "refreshToApplyVariables": "Aggiorna per applicare le ultime modifiche alle variabili",
       "refresh": "Aggiorna",
       "refreshCacheReload": "Aggiorna cache e ricarica",
@@ -10135,6 +10154,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "Nessun dato nell'intervallo",
     "saveAndStay": "Salva e continua a modificare",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10577,6 +10597,38 @@
     },
     "timeRange": {
       "heading": "Nell'intervallo di tempo selezionato"
+    },
+    "firingNow": {
+      "title": "Attivi ora",
+      "byLevel": "{critical} critici · {warning} avvertenze",
+      "allQuiet": "Tutto tranquillo",
+      "watching": "{count} regola di avviso attiva, nessuna scattata | {count} regole di avviso attive, nessuna scattata",
+      "noRules": "Ancora nessuna regola di avviso",
+      "browseLibrary": "Sfoglia la libreria degli avvisi",
+      "notifyFailed": "Notifica non riuscita",
+      "loadError": "Impossibile caricare gli avvisi attivi",
+      "unavailable": "Gli stati degli avvisi non sono leggibili al momento"
+    },
+    "health": {
+      "subtitle": "Ultimi dati ricevuti, per tipo",
+      "lastData": "Ultimi dati {age} fa",
+      "justNow": "Ultimi dati proprio ora",
+      "noDataIn": "Nessun dato nelle ultime {range}",
+      "noRecords": "Ancora nessun record",
+      "loadError": "Impossibile leggere i tuoi stream"
+    },
+    "start": {
+      "text": "Nessun dato è arrivato nelle ultime {range}. Invia dati, guarda quelli che hai o configura un avviso.",
+      "addData": "Aggiungi dati",
+      "createAlert": "Crea avviso"
+    },
+    "summary": {
+      "loadError": "Impossibile caricare il riepilogo dell'organizzazione",
+      "denied": "Nessun accesso al riepilogo dell'organizzazione. Chiedi a un amministratore."
+    },
+    "events": {
+      "runFailed": "Esecuzione non riuscita",
+      "timesInRange": "{count} volta nell'intervallo selezionato | {count} volte nell'intervallo selezionato"
     }
   },
   "chatHistory": {
@@ -11551,6 +11603,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "Apri nei log",
+      "openInTraces": "Apri nelle tracce",
+      "openInMetrics": "Apri nelle metriche",
+      "evidenceFiringTip": "Apre {stream} con il filtro di questo avviso, dall'inizio di questo scatto a ora",
+      "evidenceWindowTip": "Apre {stream} con il filtro di questo avviso negli ultimi {window}",
+      "threshold": "Soglia",
+      "noIncident": "Ancora nessun incidente",
+      "conditionLabel": "Condizione dell'avviso",
+      "allRows": "Ogni riga"
+    },
+    "summaryTrainingFailed": "Addestramento non riuscito",
+    "startFromTemplate": "Inizia da un modello",
     "firing": {
       "title": "Attivi",
       "drawer": {
@@ -20569,7 +20634,6 @@
     },
     "noStream": {
       "title": "Scegli uno stream per iniziare a esplorare",
-      "description": "Scegli uno stream, quindi premi <strong>Esegui query</strong>. Puoi perfezionare con filtri, una funzione VRL e un intervallo di tempo personalizzato una volta arrivati i risultati.",
       "selectStream": "Seleziona uno stream",
       "selectStreamDesc": "Sfoglia gli stream di log, tracce, metriche e RUM",
       "queryGuide": "Leggi la guida alle domande",
@@ -20621,7 +20685,16 @@
     "detailTable": {
       "noDataAvailable": "Nessun dato disponibile.",
       "addIcon": "Aggiungi icona",
-      "sendToAiChat": "Invia alla chat AI"
+      "sendToAiChat": "Invia alla chat AI",
+      "openTrace": "Apri traccia",
+      "noTraceTitle": "Nessuna traccia collegata a questo log",
+      "noRelatedLogsTitle": "Nessun log correlato trovato",
+      "noRelatedMetricsTitle": "Nessuna metrica correlata trovata",
+      "noServiceText": "Non è stato possibile associare alcun servizio a questo log, quindi i dati correlati non possono essere trovati automaticamente.",
+      "searchTracesAround": "Cerca tracce intorno a questo momento",
+      "searchAroundTip": "Carica gli eventi registrati subito prima e dopo questo.",
+      "noOfEventsTip": "Quanti eventi caricare intorno a questo.",
+      "severityTip": "Livello di log rilevato. Selezionalo per vedere come è stato rilevato."
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "La query SELECT * non è supportata per la visualizzazione.",
@@ -23160,7 +23233,7 @@
         "ok": "OK",
         "normal": "Normale",
         "firing": "Attivo",
-        "notifyfailed": "Notifica fallita",
+        "notifyfailed": "Consegna non riuscita",
         "flapping": "Oscillante",
         "anomaly": "Anomalia",
         "succeeded": "Riuscito",
@@ -30394,7 +30467,9 @@
     "validation": {
       "regexLength": "Usa al massimo {max} caratteri nel pattern.",
       "regexInvalid": "Questo pattern non è valido o non è supportato. Non è possibile usare lookahead, lookbehind e riferimenti all'indietro."
-    }
+    },
+    "queryTooltip": "Modifica il filtro come testo",
+    "builderTooltip": "Modifica il filtro con il builder"
   },
   "autoobserveLive": {
     "paging": {

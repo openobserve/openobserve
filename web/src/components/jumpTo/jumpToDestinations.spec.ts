@@ -16,6 +16,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { raw } from "@/types/i18n";
 import {
+  ACTIONS_AREA_KEY,
   areaForPath,
   rankDestinations,
   readAreaVisits,
@@ -88,6 +89,29 @@ describe("rankDestinations", () => {
 
   it("returns nothing when no label or area matches", () => {
     expect(rankDestinations(destinations, "zzz", {})).toEqual([]);
+  });
+
+  it("lists actions only for a query, ahead of pages that match as well", () => {
+    const action = {
+      ...dest("new-alert", "New alert", "Actions", "/alerts/add"),
+      areaKey: ACTIONS_AREA_KEY,
+      hint: raw("All alerts"),
+    };
+    const list = [...destinations, action];
+    expect(rankDestinations(list, "", {}).map((g) => g.areaKey)).not.toContain(ACTIONS_AREA_KEY);
+    expect(rankDestinations(list, "new", {}).map((g) => g.areaKey)).toEqual([ACTIONS_AREA_KEY]);
+    expect(rankDestinations(list, "al", {})[0].areaKey).toBe("reliability");
+    expect(rankDestinations(list, "all alerts", {}).map((g) => g.areaKey)).toEqual([
+      "reliability",
+      ACTIONS_AREA_KEY,
+    ]);
+  });
+
+  it("finds a destination by one of its keywords", () => {
+    const list = [
+      { ...dest("sources", "Data sources", "Data", "/ingestion"), keywords: ["ingestion"] },
+    ];
+    expect(labels(rankDestinations(list, "ingest", {}))).toEqual([["Data", ["Data sources"]]]);
   });
 
   it("leaves the destinations it ranks untouched", () => {

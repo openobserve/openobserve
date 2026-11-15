@@ -3,7 +3,7 @@
 // Page Object Model for the Settings Query Management navigation/gating feature.
 // Query Management ("Running queries") is an enterprise-only, meta-org-only
 // settings section. On an OSS build the sidebar tab is hidden and a direct URL
-// redirects to the enterprise-locked page.
+// shows the feature's lock in place.
 
 import { expect } from '@playwright/test';
 
@@ -20,7 +20,7 @@ export class QueryManagementPage {
     this.generalPageTitle = page.locator('[data-test="settings-general-page-title"]');
     // Query Management rail tab — filtered out on OSS (SectionRail drops `visible !== false` items), so count 0 rather than merely hidden.
     this.queryManagementTab = page.locator('[data-test="query-management-tab"]');
-    this.enterpriseLockedPage = page.locator('[data-test="enterprise-feature-locked"]');
+    this.enterpriseLockedPage = page.locator('[data-test="feature-lock-inline"]');
     this.queryListButton = page.locator('[data-test="queryList-btn"]');
     this.queryDetailsTable = page.locator('[data-test="queryList-table"]');
     this.tooltipBubble = page.locator('[data-test="o-tooltip-content"]');

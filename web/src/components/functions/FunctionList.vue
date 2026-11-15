@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineAsyncComponent, defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useListViewState } from "@/composables/useListViewState";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import { useI18nTyped, raw } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -417,13 +417,17 @@ export default defineComponent({
     const { searchObj } = searchState();
     const pipelineList = ref([]);
     const selectedPipeline = ref("");
-    const viewState = useListViewState("functions", {
-      filterQuery: "",
-      pageSize: 20,
-      currentPage: 1,
-      sortBy: "",
-      sortOrder: "asc" as "asc" | "desc",
-    });
+    const viewState = useListViewState(
+      "functions",
+      {
+        filterQuery: "",
+        pageSize: 20,
+        currentPage: 1,
+        sortBy: "",
+        sortOrder: "asc" as "asc" | "desc",
+      },
+      { url: LIST_URL_PARAMS },
+    );
     const filterQuery = ref(viewState.filterQuery);
     const { track } = useReo();
     const functionDrafts = useEditorDraftIds("function");

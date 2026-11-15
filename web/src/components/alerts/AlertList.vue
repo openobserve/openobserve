@@ -106,17 +106,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             shortcut="alertsImport"
           />
         </OButton>
-        <OButton
-          v-if="showAlertLibrary"
-          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
-          variant="secondary"
-          icon="menu-book"
-          data-test="alert-list-alert-library-btn"
-          @click="goToAlertLibrary"
-        >
-          <template v-if="!isCompactToolbar">{{ t("alerts.alertLibrary") }}</template>
-          <OTooltip v-if="isCompactToolbar" :content="t('alerts.alertLibrary')" side="bottom" />
-        </OButton>
       </template>
 
       <div data-test="alert-list-splitter" class="flex min-h-0 flex-1 max-md:flex-col">
@@ -566,15 +555,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </router-link>
                 </OTooltip>
-                <OTooltip v-else-if="isAckedFiring(row)" :content="runOutcomeTooltip(row)">
+                <span
+                  v-else-if="isFiringRow(row)"
+                  class="inline-flex min-w-0 items-center gap-1"
+                  :data-test="`alert-list-${row.name}-state`"
+                >
+                  <OTooltip v-if="isAckedFiring(row)" :content="runOutcomeTooltip(row)">
+                    <OTag
+                      tone="neutral"
+                      icon="person"
+                      size="sm"
+                      :label="t('alerts.ack.firingAcknowledged')"
+                      :data-test="`alert-list-${row.name}-last-outcome`"
+                    />
+                  </OTooltip>
+                  <OTooltip v-else :content="runOutcomeTooltip(row)">
+                    <OTag
+                      v-if="row.level === 'warning'"
+                      tone="warn"
+                      icon="error-outline"
+                      size="sm"
+                      :label="t('components.badge.alertState.firing')"
+                      :data-test="`alert-list-${row.name}-last-outcome`"
+                    />
+                    <OTag
+                      v-else
+                      type="alertState"
+                      value="firing"
+                      size="sm"
+                      :data-test="`alert-list-${row.name}-last-outcome`"
+                    />
+                  </OTooltip>
+                  <!-- Delivery is a second fact about a firing, so it never replaces the state (R9: not red). -->
                   <OTag
-                    tone="neutral"
-                    icon="person"
+                    v-if="isNotifyFailedOutcome(row.last_outcome)"
+                    tone="warn"
+                    icon="sync-problem"
                     size="sm"
-                    :label="t('alerts.ack.firingAcknowledged')"
-                    :data-test="`alert-list-${row.name}-last-outcome`"
+                    :label="t('alerts.summaryDeliveryFailed')"
+                    :data-test="`alert-list-${row.name}-delivery-failed`"
                   />
-                </OTooltip>
+                </span>
                 <OTooltip v-else-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
                   <OTag
                     type="alertState"
@@ -583,7 +604,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`alert-list-${row.name}-last-outcome`"
                   />
                 </OTooltip>
-                <span v-else class="text-text-body">—</span>
+                <OTag
+                  v-else-if="!row.enabled"
+                  tone="neutral"
+                  icon="pause"
+                  size="sm"
+                  :label="t('alerts.summaryPaused')"
+                  :data-test="`alert-list-${row.name}-last-outcome`"
+                />
+                <span v-else class="text-text-muted">—</span>
               </template>
 
               <template #cell-folder_name="{ row }">
@@ -594,117 +623,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #cell-actions="{ row }">
                 <div class="actions-container flex items-center">
-                  <OTooltip
-                    v-if="anomalyRowLocked(row)"
-                    side="bottom"
-                    :content="anomalyLockedReason"
+                  <!-- At rest a row shows only its ⋯; the inline icons come in on hover or focus (B7). -->
+                  <span
+                    class="inline-flex items-center transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 max-md:opacity-100 pointer-coarse:opacity-100"
+                    :class="alertStateLoadingMap[row.uuid] ? 'opacity-100' : 'opacity-0'"
                   >
-                    <span class="ms-1 inline-flex max-md:hidden">
-                      <OButton
-                        icon-only
-                        :data-row-action="row.enabled ? 'pause' : 'resume'"
-                        :data-test="`alert-list-${row.name}-pause-start-alert`"
-                        :aria-label="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                        variant="ghost"
-                        icon="lock"
-                        disabled
-                      />
-                    </span>
-                  </OTooltip>
-                  <OButton
-                    v-else
-                    icon-only
-                    :data-row-action="row.enabled ? 'pause' : 'resume'"
-                    :data-test="`alert-list-${row.name}-pause-start-alert`"
-                    class="ms-1 max-md:hidden"
-                    :variant="row.enabled ? 'danger-ghost' : 'ghost'"
-                    size="sm"
-                    :icon="row.enabled ? 'pause' : 'play-arrow'"
-                    :loading="!!alertStateLoadingMap[row.uuid]"
-                    @click.stop="toggleAlertState(row)"
-                  >
-                    <OTooltip
-                      side="bottom"
-                      exclusive
-                      :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                      :shortcut="row.enabled ? 'alertsRowPause' : undefined"
-                    />
-                  </OButton>
-                  <OTooltip
-                    v-if="rowAnomalyLocked(row)"
-                    side="bottom"
-                    :content="anomalyLockedReason"
-                  >
-                    <span class="inline-flex max-md:hidden">
-                      <OButton
-                        icon-only
-                        data-row-action="edit"
-                        :data-test="`alert-list-${row.name}-update-alert`"
-                        :aria-label="t('alerts.edit')"
-                        variant="ghost"
-                        icon="lock"
-                        disabled
-                      />
-                    </span>
-                  </OTooltip>
-                  <OButton
-                    v-else
-                    icon-only
-                    data-row-action="edit"
-                    :data-test="`alert-list-${row.name}-update-alert`"
-                    variant="ghost"
-                    size="sm"
-                    icon="edit"
-                    class="max-md:hidden"
-                    @click.stop="editAlert(row)"
-                  >
-                    <OTooltip
-                      side="bottom"
-                      exclusive
-                      :content="t('alerts.edit')"
-                      shortcut="alertsRowEdit"
-                    />
-                  </OButton>
-                  <!-- Clone is disabled for SLO alerts (D1). The explanation
-                       hangs off this WRAPPER, not off the button: a disabled
-                       button receives no pointer events, so a tooltip anchored
-                       to it would never open — leaving a greyed-out control
-                       with no way to find out why. -->
-                  <span class="inline-flex max-md:hidden">
                     <OTooltip
                       v-if="anomalyRowLocked(row)"
                       side="bottom"
                       :content="anomalyLockedReason"
-                    />
-                    <OTooltip
-                      v-else-if="isSloRow(row)"
-                      side="bottom"
-                      exclusive
-                      :content="t('alerts.sloCloneDisabled')"
-                    />
+                    >
+                      <span class="ms-1 inline-flex max-md:hidden">
+                        <OButton
+                          icon-only
+                          :data-row-action="row.enabled ? 'pause' : 'resume'"
+                          :data-test="`alert-list-${row.name}-pause-start-alert`"
+                          :aria-label="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                          variant="ghost"
+                          icon="lock"
+                          disabled
+                        />
+                      </span>
+                    </OTooltip>
                     <OButton
+                      v-else
                       icon-only
-                      data-row-action="duplicate"
+                      :data-row-action="row.enabled ? 'pause' : 'resume'"
+                      :data-test="`alert-list-${row.name}-pause-start-alert`"
+                      class="ms-1 max-md:hidden"
                       variant="ghost"
                       size="sm"
-                      :icon="anomalyRowLocked(row) ? 'lock' : 'content-copy'"
-                      :disabled="isSloRow(row) || anomalyRowLocked(row)"
-                      :aria-label="isSloRow(row) ? t('alerts.sloCloneDisabled') : t('alerts.clone')"
-                      @click.stop="duplicateAlert(row)"
-                      :data-test="`alert-list-${row.name}-clone-alert`"
+                      :icon="row.enabled ? 'pause' : 'play-arrow'"
+                      :loading="!!alertStateLoadingMap[row.uuid]"
+                      @click.stop="toggleAlertState(row)"
                     >
                       <OTooltip
-                        v-if="!isSloRow(row) && !anomalyRowLocked(row)"
                         side="bottom"
                         exclusive
-                        :content="t('alerts.clone')"
-                        shortcut="alertsRowDuplicate"
+                        :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                        :shortcut="row.enabled ? 'alertsRowPause' : undefined"
+                      />
+                    </OButton>
+                    <OTooltip
+                      v-if="rowAnomalyLocked(row)"
+                      side="bottom"
+                      :content="anomalyLockedReason"
+                    >
+                      <span class="inline-flex max-md:hidden">
+                        <OButton
+                          icon-only
+                          data-row-action="edit"
+                          :data-test="`alert-list-${row.name}-update-alert`"
+                          :aria-label="t('alerts.edit')"
+                          variant="ghost"
+                          icon="lock"
+                          disabled
+                        />
+                      </span>
+                    </OTooltip>
+                    <OButton
+                      v-else
+                      icon-only
+                      data-row-action="edit"
+                      :data-test="`alert-list-${row.name}-update-alert`"
+                      variant="ghost"
+                      size="sm"
+                      icon="edit"
+                      class="max-md:hidden"
+                      @click.stop="editAlert(row)"
+                    >
+                      <OTooltip
+                        side="bottom"
+                        exclusive
+                        :content="t('alerts.edit')"
+                        shortcut="alertsRowEdit"
                       />
                     </OButton>
                   </span>
                   <!-- Hidden proxies so the row-hover shortcuts work for
                          actions that live in the more-menu dropdown (which is
-                         teleported out of the row DOM): x = export, Del = delete. -->
+                         teleported out of the row DOM): duplicate, export, delete. -->
+                  <button
+                    type="button"
+                    data-row-action="duplicate"
+                    class="hidden"
+                    tabindex="-1"
+                    aria-hidden="true"
+                    @click.stop="!isSloRow(row) && !anomalyRowLocked(row) && duplicateAlert(row)"
+                  />
                   <button
                     type="button"
                     data-row-action="export"
@@ -767,11 +773,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       {{ t("alerts.edit") }}
                     </ODropdownItem>
+                    <!-- Clone is a third row action, so it lives here, not inline (B7); SLO alerts cannot clone (D1). -->
                     <ODropdownItem
-                      class="md:hidden"
                       :disabled="isSloRow(row) || anomalyRowLocked(row)"
-                      :disabled-reason="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
-                      :data-test="`alert-list-${row.name}-clone-alert-menu`"
+                      :disabled-reason="
+                        anomalyRowLocked(row)
+                          ? anomalyLockedReason
+                          : isSloRow(row)
+                            ? t('alerts.sloCloneDisabled')
+                            : undefined
+                      "
+                      shortcut="alertsRowDuplicate"
+                      :data-test="`alert-list-${row.name}-clone-alert`"
                       @select="duplicateAlert(row)"
                     >
                       <template #icon>
@@ -783,7 +796,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       {{ t("alerts.clone") }}
                     </ODropdownItem>
-                    <ODropdownSeparator class="md:hidden" />
+                    <ODropdownSeparator />
                     <ODropdownItem
                       :disabled="anomalyRowLocked(row)"
                       :disabled-reason="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
@@ -1831,17 +1844,16 @@ export default defineComponent({
     };
 
     // Extreme-left state rail — a full-height colour bar at the very start of the
-    // row (inset box-shadow so it paints regardless of border-collapse). rem width
-    // + token colour keep it theme-aware and hardcode-free.
+    // row (inset box-shadow so it paints regardless of border-collapse). Only the
+    // exceptions carry one (C3): a firing, a failure or a pause; a healthy row has none.
     const alertRowStyle = (row: any): Record<string, string> => {
       const s = alertState(row);
-      const color =
-        s === "failed"
-          ? "var(--color-error-500)"
-          : s === "paused"
-            ? "var(--color-grey-400)"
-            : "var(--color-success-500)";
-      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
+      let color = "";
+      if (s === "failed") color = "var(--color-error-500)";
+      else if (s === "paused") color = "var(--color-grey-400)";
+      else if (isFiringRow(row))
+        color = row?.level === "warning" ? "var(--color-warning-500)" : "var(--color-error-500)";
+      return color ? { boxShadow: `var(--shadow-rail-geom) ${color}` } : {};
     };
 
     // Type chip (the "left chip"): glyph + colour by alert type.
@@ -1881,7 +1893,9 @@ export default defineComponent({
       let recent = 0;
       let error = 0;
       let notify_failed = 0;
+      let anomalies = 0;
       for (const r of rows) {
+        if (r.is_real_time === "anomaly") anomalies += 1;
         // active = unpaused (enabled); paused = disabled. These two partition the
         // rows. `failed` is an orthogonal health overlay (a failed anomaly is still
         // active), so it is counted separately and may overlap with active/paused.
@@ -1904,6 +1918,7 @@ export default defineComponent({
         recent,
         error,
         notify_failed,
+        anomalies,
         total: rows.length,
       };
     });
@@ -1918,17 +1933,8 @@ export default defineComponent({
       const hasData = c.total > 0;
       const v = (n: number): string | number => (hasData ? n : "—");
       const share = hasData ? c.total : undefined;
-      // Severity-descending, matching the Incidents / Eval Jobs strips; Total stays last.
-      return [
-        {
-          key: "failed",
-          label: t("alerts.summaryFailed"),
-          value: v(c.failed),
-          icon: "error-outline",
-          tone: "error",
-          max: share,
-          dataTest: "alert-summary-failed",
-        },
+      // Attention first: the firing state, then what went wrong delivering or evaluating it.
+      const items: StatItem[] = [
         {
           key: "firing",
           label: t("alerts.summaryFiring"),
@@ -1948,6 +1954,15 @@ export default defineComponent({
           dataTest: "alert-summary-acknowledged",
         },
         {
+          key: "notify_failed",
+          label: t("alerts.summaryDeliveryFailed"),
+          value: v(c.notify_failed),
+          icon: "sync-problem",
+          tone: "warning",
+          max: share,
+          dataTest: "alert-summary-notify-failed",
+        },
+        {
           key: "error",
           label: t("alerts.summaryEvalError"),
           value: v(c.error),
@@ -1956,15 +1971,32 @@ export default defineComponent({
           max: share,
           dataTest: "alert-summary-error",
         },
-        {
-          key: "notify_failed",
-          label: t("alerts.summaryDeliveryFailed"),
-          value: v(c.notify_failed),
-          icon: "notifications-paused",
+      ];
+      // Only anomaly detection trains, so the chip shows where one can fail (or is already picked).
+      if (c.anomalies > 0 || stateFilters.value.includes("failed")) {
+        items.push({
+          key: "failed",
+          label: t("alerts.summaryTrainingFailed"),
+          value: v(c.failed),
+          icon: "error-outline",
           tone: "error",
           max: share,
-          dataTest: "alert-summary-notify-failed",
-        },
+          dataTest: "alert-summary-failed",
+        });
+      }
+      // Running is the norm, so it gets no chip of its own (C3); a link that picked it keeps it.
+      if (stateFilters.value.includes("active")) {
+        items.push({
+          key: "active",
+          label: t("alerts.summaryActive"),
+          value: v(c.active),
+          icon: "check-circle",
+          tone: "success",
+          max: share,
+          dataTest: "alert-summary-active",
+        });
+      }
+      items.push(
         {
           key: "recent",
           label: t("alerts.summaryRecent"),
@@ -1973,15 +2005,6 @@ export default defineComponent({
           tone: "warning",
           max: share,
           dataTest: "alert-summary-recent",
-        },
-        {
-          key: "active",
-          label: t("alerts.summaryActive"),
-          value: v(c.active),
-          icon: "check-circle",
-          tone: "success",
-          max: share,
-          dataTest: "alert-summary-active",
         },
         {
           key: "paused",
@@ -2003,7 +2026,8 @@ export default defineComponent({
           // share of itself is always 100%).
           dataTest: "alert-summary-total",
         },
-      ];
+      );
+      return items;
     });
 
     // ── Stat-tile quick filter ──────────────────────────────────────────────
@@ -2190,12 +2214,12 @@ export default defineComponent({
         {
           id: "last_outcome",
           accessorKey: "last_outcome",
-          header: t("alerts.lastOutcome"),
+          header: t("alerts.firing.columnState"),
           cell: " ",
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 176,
+          size: 232,
           minSize: 130,
           meta: { align: "left" },
         },
@@ -2330,7 +2354,7 @@ export default defineComponent({
           isAction: true,
           sortable: false,
           size: 160,
-          meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
         },
       ];
 
@@ -4849,6 +4873,8 @@ export default defineComponent({
       isMutedFiring,
       isAnomalyDataReadinessStatus,
       isAckedFiring,
+      isFiringRow,
+      isNotifyFailedOutcome,
       canAcknowledgeRow,
       acknowledgeRow,
       isAlertScopedMute,

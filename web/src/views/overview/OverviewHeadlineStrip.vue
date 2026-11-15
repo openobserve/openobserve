@@ -87,6 +87,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @ask="emit('askAi', item.ask)"
       />
     </li>
+    <!-- the sixth cell holds the strip's one load message; its height fits that message, so a failure never moves the page -->
+    <li class="flex min-h-23 min-w-0 flex-col" data-test="overview-summary-aside">
+      <slot name="aside" />
+    </li>
   </ul>
 </template>
 
@@ -97,15 +101,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { formatCompactCount } from "@/utils/formatters";
 import type { OrgOverview, OverviewSection } from "@/ts/interfaces/overview";
-import {
-  firingCount,
-  levelCount,
-  microsToMs,
-  oldestKnownFiring,
-  sectionView,
-} from "./overviewFormat";
-import { useOverviewTime } from "./useOverviewTime";
+import { sectionView } from "./overviewFormat";
 import OverviewAskAiButton from "./OverviewAskAiButton.vue";
 import type { OverviewAskAiTarget } from "./overviewAskAi";
 import { useOverviewAskAi } from "./useOverviewAskAi";
@@ -172,12 +170,13 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const uid = useId();
-const { formatElapsed } = useOverviewTime();
 const { visible: askVisible } = useOverviewAskAi();
 
 const DASH = raw("—");
 
+// a failed request is said once in the strip's last cell, so only a section's own refusal gets a note
 const unavailableNote = (view: ReturnType<typeof sectionView>): I18nText | undefined => {
+  if (props.failed) return undefined;
   if (view === "forbidden") return t("overview.state.tileForbidden");
   if (view === "locked") return t("overview.state.tileLocked");
   if (view === "error") return t("overview.state.tileError");
@@ -209,21 +208,6 @@ const noRulesNote = (): I18nText | undefined => {
   const alerts = props.overview?.alerts.data;
   if (!alerts || alerts.enabled > 0) return undefined;
   return alerts.total > 0 ? t("overview.cards.noEnabledRules") : t("overview.cards.noAlertRules");
-};
-
-const firingDetail = (count: number): TileDetail => {
-  const alerts = props.overview?.alerts.data;
-  if (count === 0) return { note: t("overview.cards.firingNone"), positive: true };
-  const critical = levelCount(alerts, "critical");
-  const oldest = oldestKnownFiring(alerts);
-  return {
-    unit: t("overview.cards.criticalUnit", { count: critical }),
-    note: oldest
-      ? t("overview.cards.oldestFiring", {
-          age: formatElapsed(Date.now() - microsToMs(oldest.since)),
-        })
-      : undefined,
-  };
 };
 
 // every alert tile reads "no rules" the same way
@@ -294,10 +278,6 @@ const noteToneOf = (tile: Tile): NoteTone => {
 
 const items = computed<TileItem[]>(() => {
   const o = props.overview;
-  const firing = alertTile(
-    sectionTile(o?.alerts, (d) => firingCount(d)),
-    firingDetail,
-  );
   const failing = alertTile(
     sectionTile(o?.alerts, (d) => d.failed_evaluation),
     (count) => ({
@@ -321,7 +301,7 @@ const items = computed<TileItem[]>(() => {
   ): TileItem => ({
     key,
     label,
-    value: data.value,
+    value: typeof data.value === "number" ? raw(formatCompactCount(data.value)) : data.value,
     unit: data.unit,
     note: data.note,
     noteTone: noteToneOf(data),
@@ -330,9 +310,9 @@ const items = computed<TileItem[]>(() => {
     selectable,
     ask: hasProblem(data) ? { kind: "count", topic: key, count: Number(data.value) } : undefined,
   });
+  // firing has its own band above the strip; red is kept for incidents and dropped data (R9)
   return [
-    tile("firing", t("overview.cards.firingAlerts"), firing, TONE.error, !firing.blocked),
-    tile("failing", t("overview.cards.failingRules"), failing, TONE.error, !failing.blocked),
+    tile("failing", t("overview.cards.failingRules"), failing, TONE.warning, !failing.blocked),
     tile(
       "incidents",
       t("overview.cards.openIncidents"),
@@ -347,7 +327,13 @@ const items = computed<TileItem[]>(() => {
       TONE.error,
       !pipelines.blocked,
     ),
-    tile("delivery", t("overview.cards.deliveryFailures"), delivery, TONE.error, !delivery.blocked),
+    tile(
+      "delivery",
+      t("overview.cards.deliveryFailures"),
+      delivery,
+      TONE.warning,
+      !delivery.blocked,
+    ),
     tile("quiet", t("overview.cards.quietStreams"), quiet, TONE.warning, !quiet.blocked),
   ];
 });

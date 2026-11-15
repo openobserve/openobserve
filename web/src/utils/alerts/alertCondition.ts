@@ -28,6 +28,7 @@ import {
   detectConditionsVersion,
 } from "@/utils/alerts/alertDataTransforms";
 import { buildConditionsString, isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 
 const EMPTY = "—";
 
@@ -76,6 +77,37 @@ function storedConditionsGroup(stored: any): any {
   if (String(stored.version) === "2") return stored.conditions ?? null;
   if (Array.isArray(stored)) return convertV0ToV2(stored);
   return detectConditionsVersion(stored) === 1 ? convertV1BEToV2(stored) : stored;
+}
+
+/** A Builder rule's filters as one line, or "" when it reads every row. */
+export function alertFilterText(alert: any): string {
+  const group = storedConditionsGroup(queryConditionOf(alert)?.conditions);
+  return group ? buildConditionsString(group) : "";
+}
+
+/** What the rule compares and against what: `avg(latency) > 500`, `count >= 1`, `> 5`; `—` when unset. */
+export function alertThresholdText(alert: any): string {
+  const qc = queryConditionOf(alert);
+  if (qc?.type === "promql") {
+    if (qc.promql_rule_mode) return EMPTY;
+    const pc = qc.promql_condition;
+    return isBlank(pc?.value) ? EMPTY : `${pc.operator || ""} ${pc.value}`.trim();
+  }
+  const agg = qc?.aggregation;
+  if (agg) {
+    return `${agg.function || ""}(${agg.having?.column || ""}) ${agg.having?.operator || ""} ${agg.having?.value}`;
+  }
+  const trigger = alert?.trigger_condition;
+  if (isBlank(trigger?.threshold)) return EMPTY;
+  return `count ${trigger.operator || ""} ${trigger.threshold}`.replace(/\s+/g, " ");
+}
+
+/** A whole-minutes duration with its unit: hours when it divides by 60; `—` when unset. */
+export function formatAlertMinutes(minutes: number | null | undefined, t: TranslateFn): I18nText {
+  if (minutes == null || Number.isNaN(minutes)) return raw(EMPTY);
+  if (minutes > 0 && minutes < 1) return t("common.secShort", { count: Math.round(minutes * 60) });
+  if (minutes >= 60 && minutes % 60 === 0) return t("common.hrShort", { count: minutes / 60 });
+  return t("common.minShort", { count: minutes });
 }
 
 /** True when the critical condition is a whole query (raw SQL, a PromQL rule, anomaly SQL or filters) rather than a threshold. */

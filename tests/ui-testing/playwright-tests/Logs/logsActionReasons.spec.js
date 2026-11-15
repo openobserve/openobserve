@@ -29,7 +29,6 @@ const baseAxeNodes = [
   { id: 'aria-required-children', target: '[role="menu"]:has([data-test="logs-search-bar-menu-list-saved-views-btn"])' },
   { id: 'aria-required-children', target: '[role="menu"]:has([data-test="logs-search-bar-menu-saved-views-content"])' },
   { id: 'aria-required-children', target: '[role="menu"]:has([data-test="logs-search-bar-saved-views-menu-content"])' },
-  { id: 'button-name', target: '[data-test="logs-search-bar-sql-mode-toggle-btn"]' },
   { id: 'button-name', target: '[data-test="logs-search-bar-show-histogram-toggle-btn-btn"]' },
   { id: 'button-name', target: '[data-test="logs-search-bar-quick-mode-switch-btn"]' },
   { id: 'button-name', target: '[data-test="logs-search-bar-show-query-toggle-btn-btn"]' },

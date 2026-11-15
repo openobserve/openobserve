@@ -321,23 +321,24 @@ describe("AlertGroupChart — loading", () => {
     await flushPromises();
   };
 
-  it("holds the chart's place with the placeholder and a line before the alert arrives", async () => {
+  // The chart-shaped skeleton is the first-load signal; a line on top of it would double it (R3).
+  it("holds the chart's place with the placeholder alone before the alert arrives", async () => {
     wrapper = await mountChart(null as any);
 
     expect(placeholder(wrapper).exists()).toBe(true);
-    expect(line(wrapper).props("active")).toBe(true);
+    expect(line(wrapper).props("active")).toBe(false);
     expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain(i18n.global.t("alerts.groups.chartUnavailable"));
     expect(alertsService.generate_sql).not.toHaveBeenCalled();
   });
 
-  it("keeps the placeholder and the line, not the unavailable text, while generate_sql runs", async () => {
+  it("keeps the placeholder, not the unavailable text, while generate_sql runs", async () => {
     const sql = deferred();
     vi.mocked(alertsService.generate_sql).mockReturnValue(sql.promise as any);
     wrapper = await mountChart(alert);
 
     expect(placeholder(wrapper).exists()).toBe(true);
-    expect(line(wrapper).props("active")).toBe(true);
+    expect(line(wrapper).props("active")).toBe(false);
     expect(wrapper.text()).not.toContain(i18n.global.t("alerts.groups.chartUnavailable"));
 
     sql.resolve(sqlResponse);
@@ -394,5 +395,56 @@ describe("AlertGroupChart — loading", () => {
     second.resolve(sqlResponse);
     await flushPromises();
     expect(line(wrapper).props("active")).toBe(false);
+  });
+});
+
+describe("AlertGroupChart — collapsing an empty range", () => {
+  const alert = {
+    stream_name: "logs",
+    stream_type: "logs",
+    query_condition: { type: "sql", sql: "SELECT 1" },
+    trigger_condition: { threshold: 1 },
+  };
+  // The renderer finishes one load and reports whether it drew any points.
+  const renderer = (noData: string) => ({
+    name: "PanelSchemaRenderer",
+    props: ["panelSchema", "selectedTimeObj", "height", "width", "variablesData", "searchType"],
+    emits: ["loading-state-change"],
+    data: () => ({ noData }),
+    mounted(this: any) {
+      this.$emit("loading-state-change", true);
+      this.$emit("loading-state-change", false);
+    },
+    template: '<div class="panel-stub" />',
+  });
+  const mountWith = async (noData: string, collapseEmpty = true) => {
+    wrapper = mount(AlertGroupChart, {
+      props: { alert, collapseEmpty },
+      global: { plugins: [i18n, store], stubs: { PanelSchemaRenderer: renderer(noData) } },
+    });
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("shrinks to one line saying the range has no data, once the load settles", async () => {
+    await mountWith("No data");
+    expect(wrapper.emitted("settled")).toEqual([[true]]);
+    expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').text()).toContain(
+      "No data in range",
+    );
+    // Still mounted, so a range change re-queries it without the page growing first.
+    expect(wrapper.find(".panel-stub").exists()).toBe(true);
+  });
+
+  it("keeps the full chart when the range has points", async () => {
+    await mountWith("");
+    expect(wrapper.emitted("settled")).toEqual([[false]]);
+    expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(false);
+  });
+
+  it("never collapses where the caller did not ask for it", async () => {
+    await mountWith("No data", false);
+    expect(wrapper.emitted("settled")).toEqual([[false]]);
+    expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(false);
   });
 });

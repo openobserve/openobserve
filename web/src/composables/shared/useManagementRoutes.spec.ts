@@ -774,7 +774,7 @@ describe("useManagementRoutes", () => {
     // Registered (redirects to the locked page) rather than absent now, so
     // the route exists and shows why instead of 404ing — see
     // utils/enterpriseFeatures.ts.
-    it("is registered, and redirects to the locked page, in an OSS build", () => {
+    it("is registered, and shows its lock in place, in an OSS build", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
 
@@ -782,10 +782,9 @@ describe("useManagementRoutes", () => {
       expect(route).toBeDefined();
       const mockNext = vi.fn();
       route.beforeEnter({ query: {} }, {}, mockNext);
-      expect(mockNext).toHaveBeenCalledWith({
-        name: "enterpriseFeatureLocked",
-        query: { feature: "passwordPolicy" },
-      });
+      expect(mockNext).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: "enterpriseFeatureLocked" }),
+      );
     });
 
     // This whole batch is self-hosted-only — Cloud never gets it, not even
@@ -826,15 +825,16 @@ describe("useManagementRoutes", () => {
       expect(typeof findRoute().component).toBe("function");
     });
 
-    it("is registered in an OSS build but sends the reader to the locked-feature page", () => {
+    it("is registered in an OSS build and shows its lock in place, never bouncing home", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const next = vi.fn();
       findRoute().beforeEnter({ query: {}, fullPath: "/settings/telephony" }, {}, next);
-      expect(next).toHaveBeenCalledWith(
+      expect(next).not.toHaveBeenCalledWith("/");
+      expect(next).not.toHaveBeenCalledWith(
         expect.objectContaining({ name: "enterpriseFeatureLocked" }),
       );
-      expect(vi.mocked(routeGuard)).not.toHaveBeenCalled();
+      expect(vi.mocked(routeGuard)).toHaveBeenCalled();
     });
 
     it.each([

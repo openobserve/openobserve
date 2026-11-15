@@ -19,14 +19,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="alert-list-page" class="h-full">
     <OPageLayout bleed :title="t('menu.index')" title-data-test="log-stream-title-text">
+      <template v-if="isSchemaUDSEnabled" #actions-overflow>
+        <OButton data-test="log-stream-add-stream-btn" variant="secondary" @click="addStream">
+          {{ t(`logStream.add`) }}
+        </OButton>
+      </template>
+      <!-- Streams appear when data arrives, so adding data is the page's main job (H6). -->
       <template #actions>
         <OButton
-          v-if="isSchemaUDSEnabled"
-          data-test="log-stream-add-stream-btn"
+          data-test="log-stream-add-data-btn"
           variant="primary"
-          @click="addStream"
+          @click="onStreamsEmptyStateAction('setup-ingestion')"
         >
-          {{ t(`logStream.add`) }}
+          {{ t("menu.addData") }}
         </OButton>
       </template>
 
@@ -263,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('emptyState.noStreams.description')
               "
               :icon="filterQuery ? undefined : 'link'"
-              :action-label="filterQuery ? undefined : t('emptyState.noStreams.action')"
+              :action-label="filterQuery ? undefined : t('menu.addData')"
               :secondary-action-label="
                 filterQuery || !isSchemaUDSEnabled
                   ? undefined
@@ -436,7 +441,7 @@ import { orgSummaryQuery } from "@/services/organizations.queries";
 import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useListViewState } from "@/composables/useListViewState";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -506,14 +511,18 @@ export default defineComponent({
     const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
     const previousOrgIdentifier = ref("");
-    const viewState = useListViewState("logStreams", {
-      filterQuery: "",
-      streamType: "logs",
-      pageSize: 20,
-      currentPage: 1,
-      sortBy: "name",
-      sortOrder: "asc" as "asc" | "desc",
-    });
+    const viewState = useListViewState(
+      "logStreams",
+      {
+        filterQuery: "",
+        streamType: "logs",
+        pageSize: 20,
+        currentPage: 1,
+        sortBy: "name",
+        sortOrder: "asc" as "asc" | "desc",
+      },
+      { url: { ...LIST_URL_PARAMS, streamType: "type" } },
+    );
     const { locked: profilesLocked, lockedReason: profilesLockedReason } =
       useLicenseLock("continuous_profiling");
     // a remembered profiles tab must not reopen a locked feature
@@ -956,9 +965,10 @@ export default defineComponent({
         return { direction: "down", label: raw(ratio), tone: "success" };
       };
       return [
+        // The one label that differs from Home: it sits above a one-type table, so it names its scope.
         {
           key: "streams",
-          label: t("home.streams"),
+          label: t("logStream.summaryAllTypes"),
           value: count(s?.num_streams),
           icon: "window",
           tone: "primary",

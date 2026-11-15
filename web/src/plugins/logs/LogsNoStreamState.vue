@@ -71,9 +71,8 @@ const props = withDefaults(
   defineProps<{
     orgId: string;
     streamType?: string;
-    autoRun?: boolean;
   }>(),
-  { streamType: "logs", autoRun: false },
+  { streamType: "logs" },
 );
 
 const emit = defineEmits<{
@@ -88,12 +87,8 @@ const recentStreams = computed<string[]>(() => {
   return restoreLogsSelectedStreams(props.orgId, props.streamType).slice(0, 3);
 });
 
-// Uses v-html — content is fully i18n-controlled, no user input.
-const description = computed(() =>
-  DOMPurify.sanitize(
-    t(props.autoRun ? "logs.noStream.descriptionAutoRun" : "logs.noStream.description"),
-  ),
-);
+// Picking a stream runs it, so the copy never sends the user to Run query.
+const description = computed(() => DOMPurify.sanitize(t("logs.noStream.descriptionAutoRun")));
 
 const openQueryGuide = () => {
   window.open("https://openobserve.ai/docs/example-queries/", "_blank", "noopener,noreferrer");

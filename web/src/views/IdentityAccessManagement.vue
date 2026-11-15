@@ -36,15 +36,12 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { providePageRailGroup } from "@/lib/core/PageHeader/pageContext";
 import SectionRail from "@/components/common/SectionRail.vue";
 import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
-import { type SectionHubGroup } from "@/components/common/SectionHub.vue";
 import { computed, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import config from "@/aws-exports";
 import { useRouter, useRoute, RouterView } from "vue-router";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
-import { featureState, menuState } from "@/utils/featureGate";
+import { useIamSections } from "@/composables/iam/useIamSections";
 
 const store = useStore();
 const { t } = useI18nTyped();
@@ -73,143 +70,7 @@ const routeToIamTab: Record<string, string> = {
 };
 const activeSection = computed(() => routeToIamTab[route.name as string] ?? "");
 
-const sectionGroups = computed<SectionHubGroup[]>(() => {
-  const isCloud = config.isCloud == "true";
-  const meta = isMetaOrg.value;
-  const svc = store.state.zoConfig.service_account_enabled ?? true;
-  const rbacAccess = checkFeatureAccess("rbac", buildFeatureGateContext(store.state.zoConfig));
-  const rbacLicense = featureState(store.state.zoConfig?.features, "rbac");
-  const syntheticsLicense = menuState(
-    store.state.zoConfig?.features,
-    "synthetics",
-    store.state.zoConfig?.synthetics_enabled !== false,
-  );
-  const mcpLicense = featureState(store.state.zoConfig?.features, "mcp");
-  const ratelimitLicense = featureState(store.state.zoConfig?.features, "ratelimit");
-
-  const groups: SectionHubGroup[] = [
-    {
-      label: t("iam.sectionAccess"),
-      items: [
-        {
-          key: "users",
-          label: t("iam.basicUsers"),
-          description: t("iam.usersDesc"),
-          icon: "person",
-          to: { name: "users", query: orgQuery.value },
-          dataTest: "iam-users-tab",
-        },
-        {
-          key: "serviceAccounts",
-          label: t("iam.serviceAccounts"),
-          description: t("iam.serviceAccountsDesc"),
-          icon: "manage-accounts",
-          to: { name: "serviceAccounts", query: orgQuery.value },
-          visible: svc,
-          dataTest: "iam-service-accounts-tab",
-        },
-        {
-          key: "ingestionTokens",
-          label: t("iam.ingestionTokens"),
-          description: t("iam.ingestionTokensDesc"),
-          icon: "key",
-          to: { name: "ingestionTokens", query: orgQuery.value },
-          dataTest: "iam-ingestion-tokens-tab",
-        },
-        {
-          key: "syntheticsTokens",
-          label: t("iam.syntheticsTokens"),
-          description: t("iam.syntheticsTokensDesc"),
-          icon: "key",
-          to: { name: "syntheticsTokens", query: orgQuery.value },
-          visible: syntheticsLicense !== "hidden",
-          licenseLocked: syntheticsLicense === "locked",
-          dataTest: "iam-synthetics-tokens-tab",
-        },
-        {
-          key: "mcpServer",
-          label: t("iam.mcpServerLabel"),
-          description: t("iam.mcpServerDesc", { product: raw("Model Context Protocol") }),
-          icon: "mcp",
-          to: { name: "mcpServer", query: orgQuery.value },
-          // No edition gate (every edition serves MCP); only a hidden license removes it.
-          visible: mcpLicense !== "hidden",
-          licenseLocked: mcpLicense === "locked",
-          dataTest: "iam-mcp-server-tab",
-        },
-        {
-          key: "invitations",
-          label: t("iam.invitations"),
-          description: t("iam.invitationsDesc"),
-          icon: "mail",
-          to: { name: "invitations", query: orgQuery.value },
-          visible: isCloud,
-          dataTest: "iam-invitations-tab",
-        },
-      ],
-    },
-    {
-      label: t("iam.sectionPermissions"),
-      items: [
-        {
-          key: "groups",
-          label: t("iam.groups"),
-          description: t("iam.groupsDesc"),
-          icon: "group",
-          to: { name: "groups", query: orgQuery.value },
-          visible: rbacLicense !== "hidden",
-          locked: !rbacAccess.allowed,
-          lockedMessage: rbacAccess.message,
-          lockedShowUpgradeCta: rbacAccess.ctaRelevant,
-          licenseLocked: rbacLicense === "locked",
-          dataTest: "iam-groups-tab",
-        },
-        {
-          key: "roles",
-          label: t("iam.roles"),
-          description: t("iam.rolesDesc"),
-          icon: "shield",
-          to: { name: "roles", query: orgQuery.value },
-          visible: rbacLicense !== "hidden",
-          locked: !rbacAccess.allowed,
-          lockedMessage: rbacAccess.message,
-          lockedShowUpgradeCta: rbacAccess.ctaRelevant,
-          licenseLocked: rbacLicense === "locked",
-          dataTest: "iam-roles-tab",
-        },
-        {
-          key: "quota",
-          label: t("iam.quota"),
-          description: t("iam.quotaDesc"),
-          icon: "speed",
-          to: { name: "quota", query: orgQuery.value },
-          // Meta-org is a cluster-topology restriction, not an edition
-          // upsell — stays a hide, not a lock.
-          visible: meta && ratelimitLicense !== "hidden",
-          locked: !rbacAccess.allowed,
-          lockedMessage: rbacAccess.message,
-          lockedShowUpgradeCta: rbacAccess.ctaRelevant,
-          licenseLocked: ratelimitLicense === "locked",
-          dataTest: "iam-quota-tab",
-        },
-      ],
-    },
-    {
-      label: t("iam.sectionOrganization"),
-      items: [
-        {
-          key: "organizations",
-          label: t("iam.organizations"),
-          description: t("iam.organizationsDesc"),
-          icon: "corporate-fare",
-          to: { name: "organizations", query: orgQuery.value },
-          dataTest: "iam-organizations-tab",
-        },
-      ],
-    },
-  ];
-  return groups;
-});
+const { sectionGroups } = useIamSections();
 providePageRailGroup(
   computed(
     () =>

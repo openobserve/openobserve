@@ -209,6 +209,22 @@ describe("useHistogram Composable", () => {
       expect(wrapper.vm.getHistogramTitle()).toBe("Showing 1 to 100 out of 250 events in 42 ms.");
     });
 
+    it("counts an SQL aggregate's result as rows, not events", () => {
+      mockState.searchObj.meta.logsVisualizeToggle = "visualize";
+      mockState.searchObj.meta.sqlMode = true;
+      mockState.searchObj.data.query = 'SELECT service, count(*) FROM "a" GROUP BY service';
+      mockState.searchObj.meta.resultGrid.showPagination = false;
+      mockState.searchObj.data.queryResults.hits = [{ service: "a" }, { service: "b" }];
+      try {
+        expect(wrapper.vm.getHistogramTitleParts()).toMatchObject({ rows: true, end: 2 });
+        expect(wrapper.vm.getHistogramTitle()).toBe("Showing 2 rows in 42 ms.");
+      } finally {
+        mockState.searchObj.meta.sqlMode = false;
+        mockState.searchObj.data.query = "";
+        mockState.searchObj.meta.resultGrid.showPagination = true;
+      }
+    });
+
     it("returns an empty title and sets a notification when it throws", () => {
       // resultGrid is read first inside the try block — removing it forces the catch.
       mockState.searchObj.data.resultGrid = undefined as any;

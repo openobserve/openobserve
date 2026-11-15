@@ -11,7 +11,9 @@
     "bannerMessage": "This feature is locked. It needs the {feature} feature in your license.",
     "bannerMessageGeneric": "This page needs a feature that is not in your license.",
     "headerLocked": "Locked: needs {feature}",
-    "availableInEnterprise": "{feature} is available in OpenObserve Enterprise"
+    "availableInEnterprise": "{feature} is available in OpenObserve Enterprise",
+    "turnedOffTitle": "Turned off for this organization",
+    "enterpriseTitle": "Available in Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -80,10 +82,6 @@
       "title": "No patterns found",
       "description": "Try increasing the time range or selecting a different stream with more log data. Pattern extraction works best with at least 1,000 logs.",
       "logsAnalyzed": "Only {count} logs were analyzed."
-    },
-    "noStreamSelected": {
-      "title": "Select a stream to get started",
-      "description": "Pick a stream, then run your query to explore its data. Refine results with filters and a custom time range."
     },
     "noQueryApplied": {
       "title": "Run a query to see results",
@@ -330,7 +328,6 @@
     "noStreams": {
       "title": "Connect a source to create your first stream",
       "description": "Streams are created automatically the moment data arrives. Set up ingestion from your app, agent, or collector to get started.",
-      "action": "Set up ingestion",
       "actionDesc": "Connect a data source",
       "createAction": "New stream",
       "createActionDesc": "Manually define a stream schema"
@@ -1324,8 +1321,8 @@
     "toggleConnector": "Switch between AND and OR",
     "selectedCount": "No values selected | {count} value selected | {count} values selected",
     "query": "Query",
-    "builderTooltip": "Build filters by picking fields, conditions and values",
-    "queryTooltip": "Write the query yourself",
+    "builderTooltip": "Edit the filter with the builder",
+    "queryTooltip": "Edit the filter as text",
     "queryNotParsableShort": "The builder can't show this query:",
     "clearAndBuild": "Clear and build",
     "where": "Where",
@@ -1499,11 +1496,9 @@
     "patternNavPrevious": "Previous",
     "patternNavNext": "Next",
     "patternNoValuesAvailable": "No values available",
-    "sqlModeLabel": "SQL mode",
     "nlpModeLabel": "Natural language mode",
     "quickModeLabel": "Quick mode",
     "menuMore": "More",
-    "menuGroupSetOnce": "Set once",
     "menuGroupHistory": "History",
     "menuGroupDownloads": "Downloads",
     "menuGroupSchedule": "Schedule",
@@ -1874,7 +1869,6 @@
     "viewDeletedSuccessfully": "View deleted successfully.",
     "viewCreatedSuccessfully": "View created successfully.",
     "viewUpdatedSuccessfully": "View updated successfully.",
-    "linkCopiedSuccessfully": "Link copied successfully!",
     "errorCopyingLink": "Error while copy link.",
     "errorShorteningLink": "Error while shortening link.",
     "webUrlNotConfigured": "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
@@ -2075,7 +2069,22 @@
     "freeTextNoFtsTitleMulti": "The selected streams have no full-text fields",
     "freeTextNoTextFields": "This stream has no text fields to search.",
     "freeTextNoTextFieldsNamed": "Not searched: {streams} (no text fields).",
-    "freeTextBuildNotice": "This filter has text search; edit it in SQL."
+    "freeTextBuildNotice": "This filter has text search; edit it in SQL.",
+    "queryModeLabel": "Query language",
+    "queryModeFilter": "Filter",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Narrow the logs by field and value",
+    "queryModeSqlTooltip": "Write a full SQL query, with aggregates and joins",
+    "sqlModeNeedsOneStream": "SQL in this view takes a single stream",
+    "menuGroupViewOptions": "View options",
+    "histogramHiddenForAggregates": "This query returns groups, not events over time, so there is no histogram. Visualize charts the result.",
+    "linkCopied": "Link copied",
+    "linkCopiedFixedTime": "Link copied · fixed time {from} – {to}",
+    "linkCopiedRelativeTime": "Link copied · {period}, counted from when it is opened",
+    "recordsChipRows": "{total} row | {total} rows",
+    "histogramTitleRows": "Showing {total} row in {took} ms. | Showing {total} rows in {took} ms.",
+    "histogramTitleRowsWithScan": "Showing {total} row in {took} ms. ({scanLabel}: {scanSize}) | Showing {total} rows in {took} ms. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "Pick a stream first"
   },
   "menu": {
     "alertCalibration": "Alert calibration",
@@ -2111,7 +2120,8 @@
     "keyboardShortcuts": "Keyboard shortcuts",
     "searchOrJumpTo": "Search or jump to…",
     "jumpToTitle": "Jump to",
-    "jumpToPlaceholder": "Search pages",
+    "addData": "Add data",
+    "jumpToPlaceholder": "Search pages and actions",
     "synthetic": "Synthetics",
     "experience": "Experience",
     "slos": "SLOs",
@@ -4362,7 +4372,8 @@
     "revokeInvitationMsg": "Are you sure you want to revoke the invitation for {email}?",
     "deleteUsersTitle": "Delete users",
     "deleteUsersMsg": "Are you sure you want to delete {count} user? | Are you sure you want to delete {count} users?",
-    "deleteUsersBlockNote": "{count} of them joined through your verified domain and will be blocked instead of deleted."
+    "deleteUsersBlockNote": "{count} of them joined through your verified domain and will be blocked instead of deleted.",
+    "roleHint": "Admin manages the organization, Editor changes data and settings, Viewer can only read."
   },
   "invitation": {
     "pendingInvitations": "Pending invitations",
@@ -5310,6 +5321,7 @@
     "timezone": "Timezone",
     "deleteActionMessage": "Are you sure you want to delete {count} field? This action cannot be undone. | Are you sure you want to delete {count} fields? This action cannot be undone.",
     "deleteDatesMessage": "Are you sure you want to delete {count} date range? This action cannot be undone. | Are you sure you want to delete {count} date ranges? This action cannot be undone.",
+    "summaryAllTypes": "Streams (all types)",
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
     "labelTraces": "Traces",
@@ -7911,7 +7923,8 @@
       "metricsSketch": "Distributions are stored as histogram buckets, and percentiles are estimated from those buckets. A higher ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA gives finer buckets and more precise percentiles, at the cost of more stored rows."
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU exporter"
+    "gpuExporter": "GPU exporter",
+    "rotationNote": "Tokens are not rotated in place. To rotate, create a new token, switch your sources to it, then disable the old one."
   },
   "dashboard": {
     "panelDraft": {
@@ -9548,6 +9561,9 @@
       "addClause": "Add clause"
     },
     "viewDashboard": {
+      "apply": "Apply",
+      "lastDataSeen": "Last data seen {when}",
+      "jumpToLatest": "Jump to latest",
       "refreshToApplyVariables": "Refresh to apply latest variable changes",
       "refresh": "Refresh",
       "refreshCacheReload": "Refresh cache & reload",
@@ -10293,6 +10309,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "No data in range",
     "saveAndStay": "Save and keep editing",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10735,6 +10752,38 @@
     },
     "timeRange": {
       "heading": "In the selected time range"
+    },
+    "firingNow": {
+      "title": "Firing now",
+      "byLevel": "{critical} critical · {warning} warning",
+      "allQuiet": "All quiet",
+      "watching": "{count} alert rule enabled, none firing | {count} alert rules enabled, none firing",
+      "noRules": "No alert rules yet",
+      "browseLibrary": "Browse alert library",
+      "notifyFailed": "Notify failed",
+      "loadError": "Couldn't load firing alerts",
+      "unavailable": "Alert states can't be read right now"
+    },
+    "health": {
+      "subtitle": "Last data received, by type",
+      "lastData": "Last data {age} ago",
+      "justNow": "Last data just now",
+      "noDataIn": "No data in the last {range}",
+      "noRecords": "No records yet",
+      "loadError": "Couldn't read your streams"
+    },
+    "start": {
+      "text": "No data arrived in the last {range}. Send data, look at what you have, or set up an alert.",
+      "addData": "Add data",
+      "createAlert": "Create alert"
+    },
+    "summary": {
+      "loadError": "Couldn't load the org summary",
+      "denied": "No access to the org summary. Ask an org admin."
+    },
+    "events": {
+      "runFailed": "Run failed",
+      "timesInRange": "{count} time in the selected range | {count} times in the selected range"
     }
   },
   "chatHistory": {
@@ -12026,6 +12075,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "Open in logs",
+      "openInTraces": "Open in traces",
+      "openInMetrics": "Open in metrics",
+      "evidenceFiringTip": "Opens {stream} with this alert's filter, from the start of this firing until now",
+      "evidenceWindowTip": "Opens {stream} with this alert's filter over the last {window}",
+      "threshold": "Threshold",
+      "noIncident": "No incident yet",
+      "conditionLabel": "Alert condition",
+      "allRows": "Every row"
+    },
+    "summaryTrainingFailed": "Training failed",
+    "startFromTemplate": "Start from a template",
     "rowAction": {
       "leftFilter": "No longer matches filter",
       "paused": "{name} paused | {count} alerts paused",
@@ -21485,7 +21547,6 @@
     },
     "noStream": {
       "title": "Pick a stream to start exploring",
-      "description": "Choose a stream, then press <strong>Run query</strong>. You can refine with filters, a VRL function, and a custom time range once results come in.",
       "selectStream": "Select a stream",
       "selectStreamDesc": "Browse logs, traces, metrics & RUM streams",
       "queryGuide": "Read the query guide",
@@ -21537,7 +21598,16 @@
     "detailTable": {
       "noDataAvailable": "No data available.",
       "addIcon": "Add icon",
-      "sendToAiChat": "Send to AI chat"
+      "sendToAiChat": "Send to AI chat",
+      "openTrace": "Open trace",
+      "noTraceTitle": "No trace linked to this log",
+      "noRelatedLogsTitle": "No related logs found",
+      "noRelatedMetricsTitle": "No related metrics found",
+      "noServiceText": "No service could be matched to this log, so related data cannot be found automatically.",
+      "searchTracesAround": "Search traces around this time",
+      "searchAroundTip": "Load the events logged just before and after this one.",
+      "noOfEventsTip": "How many events to load around this one.",
+      "severityTip": "Detected log level. Select to see how it was found."
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select * query is not supported for visualization.",
@@ -24303,7 +24373,7 @@
         "ok": "Ok",
         "normal": "Normal",
         "firing": "Firing",
-        "notifyfailed": "Notify failed",
+        "notifyfailed": "Delivery failed",
         "flapping": "Flapping",
         "anomaly": "Anomaly",
         "succeeded": "Succeeded",

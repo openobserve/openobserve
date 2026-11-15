@@ -13,6 +13,8 @@ const OVERVIEW_SECTIONS = [
     /\/api\/[^/]+\/anomaly_detection(\/history)?(\?.*)?$/,
     /\/api\/v2\/[^/]+\/alerts\/incidents/,
     /\/api\/[^/]+\/traces\/service_graph\/topology\/current/,
+    // the alert list feeds the Firing now band; it is last so the indexes above stay put
+    /\/api\/v2\/[^/]+\/alerts(\?.*)?$/,
 ];
 const OVERVIEW_ENDPOINT = /\/api\/[^/]+\/overview(\?.*)?$/;
 const FIRING_RULE = 'checkout_latency_p95';
@@ -113,6 +115,25 @@ async function answerSectionsEmpty(page) {
     await page.route(OVERVIEW_SECTIONS[1], (route) => route.fulfill({ json: [] }));
     await page.route(OVERVIEW_SECTIONS[2], (route) => route.fulfill({ json: { incidents: [], total: 0 } }));
     await page.route(OVERVIEW_SECTIONS[3], (route) => route.fulfill({ json: { nodes: [], edges: [] } }));
+}
+
+// one rule firing, as the alert list reports it, for the Firing now band
+async function stubFiringList(page) {
+    await page.route(OVERVIEW_SECTIONS[4], (route) => route.fulfill({
+        json: {
+            list: [{
+                alert_id: 'firing-rule-1',
+                folder_id: 'default',
+                folder_name: 'default',
+                name: FIRING_RULE,
+                alert_type: 'scheduled',
+                stream_name: 'checkout_traces',
+                enabled: true,
+                last_outcome: 'firing',
+                level: 'critical',
+            }],
+        },
+    }));
 }
 
 async function stubOverview(page, reply) {
@@ -365,6 +386,7 @@ const SCREENS = [
         async init({ page }) {
             await pinConfig(page, { restricted_routes_on_empty_data: false });
             await page.route(/\/api\/[^/]+\/streams\?/, (route) => route.fulfill({ status: 500, json: { code: 500, message: 'stubbed failure' } }));
+            await failSections(page, 500, [OVERVIEW_SECTIONS[4]]);
         },
         async run({ page, orgId }) {
             const streamReads = [];
@@ -422,6 +444,7 @@ const SCREENS = [
         async init({ page }) {
             await answerSectionsEmpty(page);
             await pinSummaryRules(page);
+            await stubFiringList(page);
             await stubOverview(page, { json: overviewWithGaps() });
         },
         async run({ page, orgId }) {
@@ -429,12 +452,10 @@ const SCREENS = [
             const tileValue = (key) => page.locator(`[data-test="overview-headline-${key}"] [data-test="overview-tile-value"]`);
             const tileNote = (key) => page.locator(`[data-test="overview-headline-${key}"] [data-test="overview-tile-note"]`);
 
-            await expect(tid(page, 'overview-status-danger')).toBeVisible({ timeout: 30000 });
-            await expect(tid(page, 'overview-status-text')).toHaveText('Needs attention');
-            await expect(page.locator('[data-test^="overview-status-item-"]')).toHaveText(['1 alert firing']);
-            await expect(tid(page, 'overview-status-clear')).toHaveCount(0);
+            await expect(tid(page, `overview-firing-now-row-${FIRING_RULE}`)).toBeVisible({ timeout: 30000 });
+            await expect(tid(page, `overview-firing-now-level-${FIRING_RULE}`)).toHaveText('Critical');
+            await expect(tid(page, 'overview-firing-now-error')).toHaveCount(0);
 
-            await expect(tileValue('firing')).toHaveText('1');
             await expect(tileValue('failing')).toHaveText('0');
             await expect(tileValue('delivery')).toHaveText('0');
             await expect(tileValue('pipelines')).toHaveText('—');
@@ -442,15 +463,7 @@ const SCREENS = [
             await expect(tileValue('quiet')).toHaveText('—');
             await expect(tileNote('quiet')).toHaveText('Could not load');
 
-            await expect(tid(page, `overview-alerts-firing-${FIRING_RULE}`)).toBeVisible();
-            await expect(tid(page, 'overview-alerts-error')).toHaveCount(0);
-            await expect(tid(page, 'overview-alerts-forbidden')).toHaveCount(0);
-
-            await expect(tid(page, 'overview-data-health-status-pipelines')).toHaveText('No access');
-            await expect(tid(page, 'overview-data-health-value-pipelines')).toHaveText('—');
-            await expect(tid(page, 'overview-data-health-status-quiet')).toHaveText('Could not load');
-            await expect(tid(page, 'overview-data-health-value-quiet')).toHaveText('—');
-            await expect(tid(page, 'overview-data-health-retry-btn')).toHaveCount(0);
+            await expect(tid(page, 'overview-summary-error')).toHaveCount(0);
 
             await expect(tid(page, 'overview-streams-error')).toBeVisible();
             await expect(tid(page, 'overview-streams-retry-btn')).toBeVisible();

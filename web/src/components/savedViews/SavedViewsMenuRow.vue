@@ -43,6 +43,10 @@ const { t } = useI18nTyped();
 
 const viewId = props.view.view_id;
 
+// Row actions stay out of sight until the row is hovered or reached by keyboard (B7, R9).
+const ON_ROW_INTENT =
+  "opacity-0 group-hover/item:opacity-100 group-data-[highlighted]/item:opacity-100 group-focus-within/item:opacity-100 max-md:opacity-100";
+
 // Arrow keys walk the row's inline actions, so star, edit and delete stay reachable without a mouse.
 const onRowKeydown = (event: KeyboardEvent) => {
   const step = horizontalStep(event.key);
@@ -87,6 +91,7 @@ const onRowKeydown = (event: KeyboardEvent) => {
           variant="ghost"
           size="sm"
           :aria-pressed="props.favorite"
+          :class="props.favorite ? undefined : ON_ROW_INTENT"
           :aria-label="t('search.favoriteViewNamed', { name: raw(props.view.view_name) })"
           :data-test="`${props.dataTestPrefix}-favorite-${viewId}`"
           @click.stop.prevent="emit('toggle-favorite')"
@@ -106,6 +111,7 @@ const onRowKeydown = (event: KeyboardEvent) => {
           variant="ghost"
           size="sm"
           icon="edit"
+          :class="ON_ROW_INTENT"
           :aria-label="t('search.overwriteSavedViewNamed', { name: raw(props.view.view_name) })"
           :disabled="!!props.updateReason"
           :data-test="`${props.dataTestPrefix}-update-${viewId}`"
@@ -123,6 +129,7 @@ const onRowKeydown = (event: KeyboardEvent) => {
           variant="ghost"
           size="sm"
           icon="delete"
+          :class="ON_ROW_INTENT"
           :aria-label="t('search.deleteViewNamed', { name: raw(props.view.view_name) })"
           :data-test="`${props.dataTestPrefix}-delete-${viewId}`"
           @click.stop.prevent="emit('delete')"

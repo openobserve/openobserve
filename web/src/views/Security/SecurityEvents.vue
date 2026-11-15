@@ -1123,6 +1123,10 @@ function onHuntQuery(q: HuntQuery) {
   if (mountComplete) syncUrl();
 }
 
+function openSources() {
+  router.push({ path: "/security/sources", query: { org_identifier: orgId.value } });
+}
+
 function openFromHunt(stream: string, ts: number) {
   huntJump = { stream, ts };
   selectedStream.value = stream;
@@ -1523,6 +1527,9 @@ function widenTo(period: string) {
         icon="manage-search"
         :title="t('siem.events.noStreamTitle')"
         :text="t('siem.events.noStreamHint')"
+        :action-label="t('siem.events.openSources')"
+        data-test="security-events-no-streams"
+        @action="openSources"
       />
       <SecurityEventsHunt
         v-else-if="isHunt"

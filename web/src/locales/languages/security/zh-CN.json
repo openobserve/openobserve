@@ -20,7 +20,8 @@
       "close": "关闭",
       "mitre": "MITRE ATT&CK",
       "severity": "严重程度",
-      "viewAll": "查看全部"
+      "viewAll": "查看全部",
+      "moreActions": "更多操作"
     },
     "caseStatus": {
       "open": "新建",
@@ -161,7 +162,15 @@
       "explore": "探索",
       "noSources": "尚无安全源",
       "noSourcesHint": "摄取 CloudTrail、Okta、VPC Flow 或 syslog。名称中包含 security、audit、auth 或 firewall 的数据流会自动显示在这里。",
-      "summaryPartial": "此窗口的告警历史超过单个摘要可容纳的范围，因此计数和图表仅为下限；请选择更短的时间窗口以获取完整数字。"
+      "summaryPartial": "此窗口的告警历史超过单个摘要可容纳的范围，因此计数和图表仅为下限；请选择更短的时间窗口以获取完整数字。",
+      "autoRefresh": "每分钟自动刷新",
+      "whatDetections": "检测",
+      "rulesFailedHint": "无法读取检测，因此无法统计触发次数。请重试，或检查“检测”页面。",
+      "historyFailedHint": "触发历史不可用，因此不统计触发次数。请重试，或检查“告警”页面。",
+      "whatFirings": "触发",
+      "emptyTitle": "尚未启用任何检测",
+      "emptyHint": "从 Sigma 目录启用检测即可开始监控。请在“数据源”中确认安全数据是否正在到达。",
+      "openSources": "打开数据源"
     },
     "events": {
       "title": "安全事件",
@@ -279,7 +288,8 @@
           "outcome": "结果",
           "message": "消息"
         }
-      }
+      },
+      "openSources": "打开数据源"
     },
     "drawer": {
       "event": "安全事件",
@@ -459,7 +469,9 @@
         "action": "操作",
         "object": "对象",
         "host": "主机"
-      }
+      },
+      "whatAlerts": "告警",
+      "loadFailedHint": "无法读取触发历史。请重试，或在“检测”中确认已启用检测。"
     },
     "cases": {
       "title": "案例",
@@ -708,7 +720,9 @@
         "showAll": "显示所有行",
         "onlyEntity": "仅此案例的实体",
         "noneForEntity": "此次触发中没有行指明此案例的实体"
-      }
+      },
+      "whatCases": "案例",
+      "loadFailedHint": "无法读取案例。请重试，或确认此组织已启用案例管理。"
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -771,7 +785,9 @@
       "manageDetections": "管理检测",
       "historyNarrowed": "告警历史的最大查询范围会将触发记录限制为 {from} 之后的记录；此窗口内更早的触发不计入。",
       "cellNone": "无规则",
-      "coverageError": "无法加载 ATT&CK 覆盖范围：{reason}"
+      "coverageError": "无法加载 ATT&CK 覆盖范围：{reason}",
+      "whatCoverage": "ATT&CK 覆盖率",
+      "loadFailedHint": "无法计算覆盖率，因此不显示数量。请重试，或检查“检测”页面。"
     },
     "detections": {
       "title": "检测",
@@ -998,7 +1014,9 @@
           "in_cidr": "在范围内 (CIDR)",
           "in_list": "在允许列表中"
         }
-      }
+      },
+      "whatDetections": "检测",
+      "loadFailedHint": "无法读取检测。请重试，或确认您有权查看此组织的告警。"
     },
     "tuning": {
       "open": "调优",
@@ -1215,7 +1233,9 @@
         "openAllowlists": "打开允许列表"
       },
       "otherSourceOnly": "仅其他来源",
-      "otherSourceOnlyHint": "为 {logsource} 编写。它只因共用字段名才能在你的数据流上编译，因此不计为可安装。"
+      "otherSourceOnlyHint": "为 {logsource} 编写。它只因共用字段名才能在你的数据流上编译，因此不计为可安装。",
+      "whatRules": "检测目录",
+      "loadFailedHint": "Sigma 目录未能加载，因此规则和数据源数量未知。请稍后重试。"
     },
     "entities": {
       "title": "实体",
@@ -1335,7 +1355,9 @@
       "loadError": "无法加载安全数据源",
       "detailFailed": "该实体的部分数据无法读取：{streams}。",
       "aliasCount": "+{n} 种拼写 | +{n} 种拼写",
-      "aliasHint": "以此拼写记录，属于同一身份。"
+      "aliasHint": "以此拼写记录，属于同一身份。",
+      "whatEntities": "实体",
+      "loadFailedHint": "无法连接安全数据源。请在“数据源”中确认已连接数据源，然后重试。"
     },
     "ueba": {
       "title": "用户行为分析",
@@ -1434,7 +1456,9 @@
       "volumeNotJudged": "未针对该用户判断数据量：不足一天的时间窗会与基线中同一时段进行比较，而这至少需要一天的历史数据。",
       "baselineBuilding": "基线建立中",
       "baselineBuildingHint": "目前已有 {span} 的历史。待积累满 {baseline} 的完整历史后，才会开始与该用户自身的过去比较；在此期间，仅标记相对其他用户的明显异常值。",
-      "buildingNotice": "{n} 位用户的基线仍在建立中：在积累满 {baseline} 的完整历史之前，仅标记相对其他用户的明显异常值。 | {n} 位用户的基线仍在建立中：在积累满 {baseline} 的完整历史之前，仅标记相对其他用户的明显异常值。"
+      "buildingNotice": "{n} 位用户的基线仍在建立中：在积累满 {baseline} 的完整历史之前，仅标记相对其他用户的明显异常值。 | {n} 位用户的基线仍在建立中：在积累满 {baseline} 的完整历史之前，仅标记相对其他用户的明显异常值。",
+      "whatUsers": "用户行为",
+      "loadFailedHint": "无法连接安全数据源。请在“数据源”中确认已连接数据源，然后重试。"
     },
     "intel": {
       "title": "威胁情报",
@@ -1602,7 +1626,11 @@
       },
       "partialChecked": "结果不完整：已检查 {total} 个指标中的 {checked} 个。其余指标的计数可能偏低。",
       "partialCapped": "结果不完整：已检查 {total} 个指标中的 {checked} 个。扫描在 {n} 个查询处停止；严重程度最低的指标未被检查。",
-      "inText": "{column}（文本中）"
+      "inText": "{column}（文本中）",
+      "runSweepDisabled": "至少添加一个指标才能运行扫描。",
+      "whatIndicators": "威胁情报",
+      "loadFailedHint": "无法读取指标列表。请重试，或确认您有权读取此组织的查找表。",
+      "filterType": "类型"
     },
     "sources": {
       "title": "数据源",
@@ -1667,7 +1695,9 @@
         "pipeline_missing": "已不存在",
         "other_stream": "现在读取的是另一个数据流",
         "other_pack": "现在运行的是另一个包"
-      }
+      },
+      "whatSources": "安全数据源",
+      "loadFailedHint": "无法连接安全数据源。请检查网络连接或权限后重试。"
     },
     "nav": {
       "overview": "概览",
@@ -1735,6 +1765,10 @@
       "indicatorType": "指标类型",
       "severityFilter": "严重性筛选",
       "stream": "数据流"
+    },
+    "loadError": {
+      "title": "无法加载{what}",
+      "hint": "服务器未对{what}作出响应。请检查网络连接或权限后重试。"
     }
   }
 }

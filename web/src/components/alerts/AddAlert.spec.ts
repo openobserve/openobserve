@@ -555,6 +555,29 @@ describe("AddAlert (OForm owner)", () => {
   // payload. Every other setter goes through setF(); updateWorkflows must too.
   // This merged CLEANLY (the two sides never touched the same lines), so nothing
   // but a test can catch it.
+  describe("Save on an empty form (V6)", () => {
+    it("stays enabled and, when clicked, flags the errors instead of saving", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const save = wrapper.findComponent('[data-test="add-alert-submit-btn"]');
+      expect(save.props("disabled")).toBe(false);
+
+      await wrapper.vm.handleSave();
+      await flushPromises();
+
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+    });
+
+    it("offers Start from a template on a new alert, pointing at the library", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.vm.showTemplateLink).toBe(true);
+      expect(wrapper.vm.alertLibraryRoute).toMatchObject({ name: "alertLibrary" });
+    });
+  });
+
   describe("workflows link survives to the payload (read-view write guard)", () => {
     it("updateWorkflows WRITES THROUGH to the form (not to the read-view)", async () => {
       wrapper = mountAlert();

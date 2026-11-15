@@ -11,7 +11,9 @@
     "bannerMessage": "Esta funcionalidade está bloqueada. Requer a funcionalidade {feature} na sua licença.",
     "bannerMessageGeneric": "Esta página requer uma funcionalidade que não está na sua licença.",
     "headerLocked": "Bloqueado: requer {feature}",
-    "availableInEnterprise": "Disponível no OpenObserve Enterprise: {feature}"
+    "availableInEnterprise": "Disponível no OpenObserve Enterprise: {feature}",
+    "turnedOffTitle": "Desativado para esta organização",
+    "enterpriseTitle": "Disponível no Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "Nenhum padrão encontrado",
       "description": "Tente aumentar o intervalo de tempo ou selecionar um stream diferente com mais dados de log. A extração de padrões funciona melhor com pelo menos 1.000 logs.",
       "logsAnalyzed": "Apenas {count} logs foram analisados."
-    },
-    "noStreamSelected": {
-      "title": "Selecione um stream para começar",
-      "description": "Escolha um stream e execute a sua consulta para explorar os seus dados. Refine os resultados com filtros e um intervalo de tempo personalizado."
     },
     "noQueryApplied": {
       "title": "Execute uma consulta para ver os resultados",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "Ligue uma fonte para criar o seu primeiro stream",
       "description": "Os streams são criados automaticamente no momento em que os dados chegam. Configure a ingestão da sua aplicação, agente ou coletor para começar.",
-      "action": "Configurar a ingestão",
       "actionDesc": "Ligar uma fonte de dados",
       "createAction": "Novo stream",
       "createActionDesc": "Definir manualmente um esquema de stream"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "Sem alterações para guardar"
+    },
     "dismiss": "Dispensar",
     "exitFullscreen": "Sair do ecrã inteiro",
     "moreActions": "Mais ações",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "Anterior",
     "patternNavNext": "Seguinte",
     "patternNoValuesAvailable": "Não há valores disponíveis",
-    "sqlModeLabel": "Modo SQL",
     "nlpModeLabel": "Modo de linguagem natural",
     "quickModeLabel": "Modo rápido",
     "menuMore": "Mais",
-    "menuGroupSetOnce": "Definir uma vez",
     "menuGroupHistory": "Histórico",
     "menuGroupDownloads": "Transferências",
     "menuGroupSchedule": "Agendamento",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "Visualização eliminada com sucesso.",
     "viewCreatedSuccessfully": "Visualização criada com sucesso.",
     "viewUpdatedSuccessfully": "Visualização atualizada com sucesso.",
-    "linkCopiedSuccessfully": "Link copiado com sucesso!",
     "errorCopyingLink": "Erro ao copiar o link.",
     "errorShorteningLink": "Erro ao encurtar o link.",
     "webUrlNotConfigured": "O URL de partilha está desativado até que ZO_WEB_URL seja configurado pelo administrador.",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "Os streams selecionados não têm campos de texto completo",
     "freeTextNoTextFields": "Este stream não tem campos de texto para pesquisar.",
     "freeTextNoTextFieldsNamed": "Não pesquisado: {streams} (sem campos de texto).",
-    "freeTextBuildNotice": "Este filtro tem pesquisa de texto; edite-o em SQL."
+    "freeTextBuildNotice": "Este filtro tem pesquisa de texto; edite-o em SQL.",
+    "queryModeLabel": "Linguagem de consulta",
+    "queryModeFilter": "Filtro",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Restringir os registos por campo e valor",
+    "queryModeSqlTooltip": "Escrever uma consulta SQL completa, com agregações e junções",
+    "sqlModeNeedsOneStream": "O SQL nesta vista aceita um único fluxo",
+    "menuGroupViewOptions": "Opções de visualização",
+    "histogramHiddenForAggregates": "Esta consulta devolve grupos, não eventos ao longo do tempo, por isso não há histograma. Visualizar apresenta o resultado num gráfico.",
+    "linkCopied": "Ligação copiada",
+    "linkCopiedFixedTime": "Ligação copiada · intervalo fixo {from} – {to}",
+    "linkCopiedRelativeTime": "Ligação copiada · {period}, contado a partir da abertura",
+    "recordsChipRows": "{total} linha | {total} linhas",
+    "histogramTitleRows": "A mostrar {total} linha em {took} ms. | A mostrar {total} linhas em {took} ms.",
+    "histogramTitleRowsWithScan": "A mostrar {total} linha em {took} ms. ({scanLabel}: {scanSize}) | A mostrar {total} linhas em {took} ms. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "Escolha primeiro um fluxo"
   },
   "menu": {
     "alertCalibration": "Calibração de alertas",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "Atalhos de teclado",
     "searchOrJumpTo": "Pesquisar ou ir para…",
     "jumpToTitle": "Ir para",
-    "jumpToPlaceholder": "Pesquisar páginas",
+    "addData": "Adicionar dados",
+    "jumpToPlaceholder": "Pesquisar páginas e ações",
     "synthetic": "Sintéticos",
     "experience": "Experiência",
     "slos": "SLOs",
@@ -4212,7 +4225,8 @@
     "revokeInvitationMsg": "Tem a certeza de que pretende revogar o convite para {email}?",
     "deleteUsersTitle": "Eliminar utilizadores",
     "deleteUsersMsg": "Tem a certeza de que pretende eliminar {count} utilizador? | Tem a certeza de que pretende eliminar {count} utilizadores?",
-    "deleteUsersBlockNote": "{count} deles entraram por meio do seu domínio verificado e serão bloqueados em vez de excluídos."
+    "deleteUsersBlockNote": "{count} deles entraram por meio do seu domínio verificado e serão bloqueados em vez de excluídos.",
+    "roleHint": "Admin gere a organização, Editor altera dados e definições, Viewer só pode ler."
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -5160,6 +5174,7 @@
     "timezone": "Fuso horário",
     "deleteActionMessage": "Tem a certeza de que pretende eliminar {count} campo? Esta ação não pode ser anulada. | Tem a certeza de que pretende eliminar {count} campos? Esta ação não pode ser anulada.",
     "deleteDatesMessage": "Tem a certeza de que pretende eliminar {count} intervalo de datas? Esta ação não pode ser anulada. | Tem a certeza de que pretende eliminar {count} intervalos de datas? Esta ação não pode ser anulada.",
+    "summaryAllTypes": "Streams (todos os tipos)",
     "labelLogs": "Logs",
     "labelMetrics": "Métricas",
     "labelTraces": "Traces",
@@ -7757,7 +7772,8 @@
       "metricsSketch": "As distribuições são armazenadas como buckets de histograma, e os percentis são estimados a partir desses buckets. Um valor mais elevado de ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA origina buckets mais finos e percentis mais precisos, à custa de mais linhas armazenadas."
     },
     "gpu": "GPU",
-    "gpuExporter": "Exportador de GPU"
+    "gpuExporter": "Exportador de GPU",
+    "rotationNote": "Os tokens não são rodados no local. Para rodar, crie um novo token, mude as suas origens para ele e depois desative o antigo."
   },
   "dashboard": {
     "panelDraft": {
@@ -9390,6 +9406,9 @@
       "addClause": "Adicionar cláusula"
     },
     "viewDashboard": {
+      "apply": "Aplicar",
+      "lastDataSeen": "Últimos dados {when}",
+      "jumpToLatest": "Ir para os mais recentes",
       "refreshToApplyVariables": "Atualize para aplicar as alterações mais recentes nas variáveis",
       "refresh": "Atualizar",
       "refreshCacheReload": "Atualizar cache e recarregar",
@@ -10135,6 +10154,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "Sem dados no intervalo",
     "saveAndStay": "Guardar e continuar a editar",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10577,6 +10597,38 @@
     },
     "timeRange": {
       "heading": "No intervalo de tempo selecionado"
+    },
+    "firingNow": {
+      "title": "A disparar agora",
+      "byLevel": "{critical} críticos · {warning} de aviso",
+      "allQuiet": "Tudo calmo",
+      "watching": "{count} regra de alerta ativa, nenhuma a disparar | {count} regras de alerta ativas, nenhuma a disparar",
+      "noRules": "Ainda não há regras de alerta",
+      "browseLibrary": "Ver biblioteca de alertas",
+      "notifyFailed": "Falha na notificação",
+      "loadError": "Não foi possível carregar os alertas disparados",
+      "unavailable": "Não é possível ler os estados dos alertas agora"
+    },
+    "health": {
+      "subtitle": "Últimos dados recebidos, por tipo",
+      "lastData": "Últimos dados há {age}",
+      "justNow": "Últimos dados agora mesmo",
+      "noDataIn": "Sem dados nas últimas {range}",
+      "noRecords": "Ainda não há registos",
+      "loadError": "Não foi possível ler os seus streams"
+    },
+    "start": {
+      "text": "Não chegaram dados nas últimas {range}. Envie dados, veja o que tem ou configure um alerta.",
+      "addData": "Adicionar dados",
+      "createAlert": "Criar alerta"
+    },
+    "summary": {
+      "loadError": "Não foi possível carregar o resumo da organização",
+      "denied": "Sem acesso ao resumo da organização. Peça a um administrador."
+    },
+    "events": {
+      "runFailed": "Execução falhada",
+      "timesInRange": "{count} vez no intervalo selecionado | {count} vezes no intervalo selecionado"
     }
   },
   "chatHistory": {
@@ -11551,6 +11603,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "Abrir em logs",
+      "openInTraces": "Abrir em traces",
+      "openInMetrics": "Abrir em métricas",
+      "evidenceFiringTip": "Abre {stream} com o filtro deste alerta, desde o início deste disparo até agora",
+      "evidenceWindowTip": "Abre {stream} com o filtro deste alerta nos últimos {window}",
+      "threshold": "Limiar",
+      "noIncident": "Ainda sem incidente",
+      "conditionLabel": "Condição do alerta",
+      "allRows": "Todas as linhas"
+    },
+    "summaryTrainingFailed": "Treino falhado",
+    "startFromTemplate": "Começar a partir de um modelo",
     "firing": {
       "title": "Disparados",
       "drawer": {
@@ -20569,7 +20634,6 @@
     },
     "noStream": {
       "title": "Escolha um stream para começar a explorar",
-      "description": "Escolha um stream e prima <strong>Executar consulta</strong>. Pode refinar com filtros, uma função VRL e um intervalo de tempo personalizado quando os resultados chegarem.",
       "selectStream": "Selecione um stream",
       "selectStreamDesc": "Navegue por streams de log, traces, métricas e RUM",
       "queryGuide": "Leia o guia de consulta",
@@ -20621,7 +20685,16 @@
     "detailTable": {
       "noDataAvailable": "Nenhum dado disponível.",
       "addIcon": "Adicionar ícone",
-      "sendToAiChat": "Enviar para o Chat de IA"
+      "sendToAiChat": "Enviar para o Chat de IA",
+      "openTrace": "Abrir rastreio",
+      "noTraceTitle": "Nenhum rastreio associado a este registo",
+      "noRelatedLogsTitle": "Nenhum registo relacionado encontrado",
+      "noRelatedMetricsTitle": "Nenhuma métrica relacionada encontrada",
+      "noServiceText": "Não foi possível associar nenhum serviço a este registo, pelo que os dados relacionados não podem ser encontrados automaticamente.",
+      "searchTracesAround": "Pesquisar rastreios em torno deste momento",
+      "searchAroundTip": "Carrega os eventos registados imediatamente antes e depois deste.",
+      "noOfEventsTip": "Quantos eventos carregar em torno deste.",
+      "severityTip": "Nível de registo detetado. Selecione para ver como foi detetado."
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Consulta Select * não é suportada para visualização.",
@@ -23160,7 +23233,7 @@
         "ok": "Ok",
         "normal": "Normal",
         "firing": "Disparado",
-        "notifyfailed": "Falha na Notificação",
+        "notifyfailed": "Entrega falhada",
         "flapping": "A oscilar",
         "anomaly": "Anomalia",
         "succeeded": "Sucesso",
@@ -30394,7 +30467,9 @@
     "validation": {
       "regexLength": "Use no máximo {max} caracteres no padrão.",
       "regexInvalid": "Este padrão é inválido ou não é suportado. Não é possível usar lookahead, lookbehind nem referências anteriores."
-    }
+    },
+    "queryTooltip": "Editar o filtro como texto",
+    "builderTooltip": "Editar o filtro com o construtor"
   },
   "autoobserveLive": {
     "paging": {

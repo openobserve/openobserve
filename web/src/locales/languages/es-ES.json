@@ -11,7 +11,9 @@
     "bannerMessage": "Esta función está bloqueada. Necesita la función {feature} en tu licencia.",
     "bannerMessageGeneric": "Esta página necesita una función que no está en tu licencia.",
     "headerLocked": "Bloqueada: necesita {feature}",
-    "availableInEnterprise": "Disponible en OpenObserve Enterprise: {feature}"
+    "availableInEnterprise": "Disponible en OpenObserve Enterprise: {feature}",
+    "turnedOffTitle": "Desactivado para esta organización",
+    "enterpriseTitle": "Disponible en Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "No se ha encontrado ningún patrón",
       "description": "Intente aumentar el intervalo de tiempo o seleccionar un stream diferente con más datos de logs. La extracción de patrones funciona mejor con al menos 1000 logs.",
       "logsAnalyzed": "Solo se analizaron {count} logs."
-    },
-    "noStreamSelected": {
-      "title": "Selecciona un stream para empezar",
-      "description": "Elige un stream y, a continuación, ejecuta la consulta para explorar sus datos. Refina los resultados con filtros y un intervalo de tiempo personalizado."
     },
     "noQueryApplied": {
       "title": "Ejecute una consulta para ver los resultados",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "Conecta una fuente para crear tu primer stream",
       "description": "Los streams se crean automáticamente en el momento en que llegan los datos. Configura la ingesta desde tu aplicación, agente o colector para empezar.",
-      "action": "Configurar la ingesta",
       "actionDesc": "Conectar una fuente de datos",
       "createAction": "Nuevo stream",
       "createActionDesc": "Definir manualmente un esquema de stream"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "No hay cambios que guardar"
+    },
     "dismiss": "Descartar",
     "exitFullscreen": "Salir de pantalla completa",
     "moreActions": "Más acciones",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "Anterior",
     "patternNavNext": "Próxima",
     "patternNoValuesAvailable": "No hay valores disponibles",
-    "sqlModeLabel": "Modo SQL",
     "nlpModeLabel": "Modo de lenguaje natural",
     "quickModeLabel": "Modo rápido",
     "menuMore": "Más",
-    "menuGroupSetOnce": "Establecer una vez",
     "menuGroupHistory": "Historia",
     "menuGroupDownloads": "Descargas",
     "menuGroupSchedule": "Programar",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "La vista se ha eliminado correctamente.",
     "viewCreatedSuccessfully": "La vista se creó correctamente.",
     "viewUpdatedSuccessfully": "La vista se actualizó correctamente.",
-    "linkCopiedSuccessfully": "¡El enlace se copió correctamente!",
     "errorCopyingLink": "Error al copiar el enlace.",
     "errorShorteningLink": "Error al acortar el enlace.",
     "webUrlNotConfigured": "La URL compartida está deshabilitada hasta que el administrador configure ZO_WEB_URL.",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "Los streams seleccionados no tienen campos de texto completo",
     "freeTextNoTextFields": "Este stream no tiene campos de texto que buscar.",
     "freeTextNoTextFieldsNamed": "No se buscó en: {streams} (sin campos de texto).",
-    "freeTextBuildNotice": "Este filtro tiene búsqueda de texto; edítalo en SQL."
+    "freeTextBuildNotice": "Este filtro tiene búsqueda de texto; edítalo en SQL.",
+    "queryModeLabel": "Lenguaje de consulta",
+    "queryModeFilter": "Filtro",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Acota los registros por campo y valor",
+    "queryModeSqlTooltip": "Escribe una consulta SQL completa, con agregaciones y uniones",
+    "sqlModeNeedsOneStream": "SQL en esta vista admite un solo flujo",
+    "menuGroupViewOptions": "Opciones de vista",
+    "histogramHiddenForAggregates": "Esta consulta devuelve grupos, no eventos en el tiempo, así que no hay histograma. Visualizar grafica el resultado.",
+    "linkCopied": "Enlace copiado",
+    "linkCopiedFixedTime": "Enlace copiado · hora fija {from} – {to}",
+    "linkCopiedRelativeTime": "Enlace copiado · {period}, contado desde que se abre",
+    "recordsChipRows": "{total} fila | {total} filas",
+    "histogramTitleRows": "Mostrando {total} fila en {took} ms. | Mostrando {total} filas en {took} ms.",
+    "histogramTitleRowsWithScan": "Mostrando {total} fila en {took} ms. ({scanLabel}: {scanSize}) | Mostrando {total} filas en {took} ms. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "Elige primero un flujo"
   },
   "menu": {
     "alertCalibration": "Calibración de alertas",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "Métodos abreviados de teclado",
     "searchOrJumpTo": "Buscar o ir a…",
     "jumpToTitle": "Ir a",
-    "jumpToPlaceholder": "Buscar páginas",
+    "addData": "Añadir datos",
+    "jumpToPlaceholder": "Buscar páginas y acciones",
     "synthetic": "Sintéticos",
     "experience": "Experiencia",
     "slos": "SLOs",
@@ -4212,7 +4225,8 @@
     "revokeInvitationMsg": "¿Estás seguro de que quieres revocar la invitación de {email}?",
     "deleteUsersTitle": "Eliminar usuarios",
     "deleteUsersMsg": "¿Estás seguro de que deseas eliminar {count} usuario? | ¿Estás seguro de que deseas eliminar {count} usuarios?",
-    "deleteUsersBlockNote": "{count} de ellos se unieron a través de tu dominio verificado y se bloquearán en lugar de eliminarse."
+    "deleteUsersBlockNote": "{count} de ellos se unieron a través de tu dominio verificado y se bloquearán en lugar de eliminarse.",
+    "roleHint": "Admin gestiona la organización, Editor cambia datos y ajustes, Viewer solo puede leer."
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -5160,6 +5174,7 @@
     "timezone": "Zona horaria",
     "deleteActionMessage": "¿Seguro que quieres eliminar {count} campo? Esta acción no se puede deshacer. | ¿Seguro que quieres eliminar {count} campos? Esta acción no se puede deshacer.",
     "deleteDatesMessage": "¿Seguro que quieres eliminar {count} rango de fechas? Esta acción no se puede deshacer. | ¿Seguro que quieres eliminar {count} rangos de fechas? Esta acción no se puede deshacer.",
+    "summaryAllTypes": "Streams (todos los tipos)",
     "labelLogs": "Logs",
     "labelMetrics": "Métricas",
     "labelTraces": "Trazas",
@@ -7757,7 +7772,8 @@
       "metricsSketch": "Las distribuciones se almacenan como buckets de histograma y los percentiles se estiman a partir de esos buckets. Un valor mayor de ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA proporciona buckets más finos y percentiles más precisos, a costa de almacenar más filas."
     },
     "gpu": "GPU",
-    "gpuExporter": "Exportador de GPU"
+    "gpuExporter": "Exportador de GPU",
+    "rotationNote": "Los tokens no se rotan en su sitio. Para rotar, cree un token nuevo, cambie sus fuentes a él y desactive el anterior."
   },
   "dashboard": {
     "panelDraft": {
@@ -9390,6 +9406,9 @@
       "addClause": "Agregar cláusula"
     },
     "viewDashboard": {
+      "apply": "Aplicar",
+      "lastDataSeen": "Últimos datos {when}",
+      "jumpToLatest": "Ir a lo más reciente",
       "refreshToApplyVariables": "Actualizar para aplicar los últimos cambios de variables",
       "refresh": "Actualizar",
       "refreshCacheReload": "Actualizar caché y recargar",
@@ -10135,6 +10154,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "Sin datos en el rango",
     "saveAndStay": "Guardar y seguir editando",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10577,6 +10597,38 @@
     },
     "timeRange": {
       "heading": "En el rango de tiempo seleccionado"
+    },
+    "firingNow": {
+      "title": "Disparando ahora",
+      "byLevel": "{critical} críticas · {warning} de advertencia",
+      "allQuiet": "Todo tranquilo",
+      "watching": "{count} regla de alerta activa, ninguna disparada | {count} reglas de alerta activas, ninguna disparada",
+      "noRules": "Aún no hay reglas de alerta",
+      "browseLibrary": "Ver biblioteca de alertas",
+      "notifyFailed": "Notificación fallida",
+      "loadError": "No se pudieron cargar las alertas disparadas",
+      "unavailable": "Ahora no se pueden leer los estados de las alertas"
+    },
+    "health": {
+      "subtitle": "Últimos datos recibidos, por tipo",
+      "lastData": "Últimos datos hace {age}",
+      "justNow": "Últimos datos ahora mismo",
+      "noDataIn": "Sin datos en las últimas {range}",
+      "noRecords": "Aún no hay registros",
+      "loadError": "No se pudieron leer tus streams"
+    },
+    "start": {
+      "text": "No han llegado datos en las últimas {range}. Envía datos, revisa lo que tienes o configura una alerta.",
+      "addData": "Añadir datos",
+      "createAlert": "Crear alerta"
+    },
+    "summary": {
+      "loadError": "No se pudo cargar el resumen de la organización",
+      "denied": "Sin acceso al resumen de la organización. Pídelo a un administrador."
+    },
+    "events": {
+      "runFailed": "Ejecución fallida",
+      "timesInRange": "{count} vez en el rango seleccionado | {count} veces en el rango seleccionado"
     }
   },
   "chatHistory": {
@@ -11551,6 +11603,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "Abrir en logs",
+      "openInTraces": "Abrir en trazas",
+      "openInMetrics": "Abrir en métricas",
+      "evidenceFiringTip": "Abre {stream} con el filtro de esta alerta, desde el inicio de este disparo hasta ahora",
+      "evidenceWindowTip": "Abre {stream} con el filtro de esta alerta en los últimos {window}",
+      "threshold": "Umbral",
+      "noIncident": "Aún no hay incidente",
+      "conditionLabel": "Condición de la alerta",
+      "allRows": "Todas las filas"
+    },
+    "summaryTrainingFailed": "Entrenamiento fallido",
+    "startFromTemplate": "Comenzar desde una plantilla",
     "firing": {
       "title": "Disparadas",
       "drawer": {
@@ -20569,7 +20634,6 @@
     },
     "noStream": {
       "title": "Elige un stream para empezar a explorar",
-      "description": "Elige un stream y, a continuación, pulsa <strong>Ejecutar consulta</strong>. Puedes refinarla con filtros, una función de VRL y un intervalo de tiempo personalizado una vez que recibas los resultados.",
       "selectStream": "Selecciona un stream",
       "selectStreamDesc": "Explora streams de logs, trazas, métricas y RUM",
       "queryGuide": "Lea la guía de consultas",
@@ -20621,7 +20685,16 @@
     "detailTable": {
       "noDataAvailable": "No hay datos disponibles.",
       "addIcon": "Agregar icono",
-      "sendToAiChat": "Enviar al chat de IA"
+      "sendToAiChat": "Enviar al chat de IA",
+      "openTrace": "Abrir traza",
+      "noTraceTitle": "Ninguna traza vinculada a este registro",
+      "noRelatedLogsTitle": "No se encontraron registros relacionados",
+      "noRelatedMetricsTitle": "No se encontraron métricas relacionadas",
+      "noServiceText": "No se pudo asociar ningún servicio a este registro, por lo que no se pueden encontrar datos relacionados automáticamente.",
+      "searchTracesAround": "Buscar trazas en torno a este momento",
+      "searchAroundTip": "Carga los eventos registrados justo antes y después de este.",
+      "noOfEventsTip": "Cuántos eventos cargar en torno a este.",
+      "severityTip": "Nivel de registro detectado. Selecciónalo para ver cómo se detectó."
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "La consulta SELECT * no es compatible con la visualización.",
@@ -23160,7 +23233,7 @@
         "ok": "OK",
         "normal": "Normal",
         "firing": "Disparada",
-        "notifyfailed": "Notificación fallida",
+        "notifyfailed": "Entrega fallida",
         "flapping": "Inestable",
         "anomaly": "Anomalía",
         "succeeded": "Exitoso",
@@ -30394,7 +30467,9 @@
     "validation": {
       "regexLength": "Usa como máximo {max} caracteres en el patrón.",
       "regexInvalid": "Este patrón no es válido o no es compatible. No se pueden usar lookahead, lookbehind ni referencias inversas."
-    }
+    },
+    "queryTooltip": "Editar el filtro como texto",
+    "builderTooltip": "Editar el filtro con el generador"
   },
   "autoobserveLive": {
     "paging": {

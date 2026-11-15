@@ -15,7 +15,6 @@ export default class DashboardCreate {
     this.submitBtn = this.page.locator(
       '[data-test="dashboard-add-dialog"] [data-test="o-dialog-primary-btn"]'
     );
-    this.deleteIcon = this.page.locator('[data-test="dashboard-delete"]');
     this.confirmDelete = this.page.locator(
       '[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]'
     );
@@ -486,7 +485,8 @@ export default class DashboardCreate {
       .waitFor({ state: "visible" });
     const dashboardRow = this.page.locator('[data-test="dashboard-table"]');
     await dashboardRow.waitFor({ state: "visible" });
-    await dashboardRow.locator('[data-test="dashboard-delete"]').first().click();
+    await dashboardRow.locator('[data-test="dashboard-row-more-actions"]').first().click();
+    await this.page.locator('[data-test="dashboard-delete-menu"]').click();
     const confirmDialog = this.page.locator(
       '[data-test="dashboard-confirm-dialog"]'
     );

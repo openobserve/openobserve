@@ -7,6 +7,7 @@
     :search="search"
     :search-class="searchClass"
     :search-placeholder="searchPlaceholder ?? t('search.searchField')"
+    :search-shortcut="searchShortcut"
     :current-page="currentPage"
     :page-size="pageSize"
     :page-size-options="[pageSize]"
@@ -100,6 +101,8 @@ interface Props {
   pageSize?: number;
   showPagination?: boolean;
   searchPlaceholder?: I18nText;
+  /** Off where the page sends "/" to its own query. */
+  searchShortcut?: boolean;
   /** Field that keys each row; set it when two rows can share a `name`. */
   rowKey?: string;
 }
@@ -113,6 +116,7 @@ const props = withDefaults(defineProps<Props>(), {
   pageSize: 50,
   showPagination: false,
   rowKey: "name",
+  searchShortcut: undefined,
 });
 
 defineEmits<{

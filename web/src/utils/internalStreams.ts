@@ -23,6 +23,17 @@ export const USER_SOURCED_STREAM_NAMES = [
   "synthetics_step_results",
 ] as const;
 
+/** Streams O2 writes for itself; some servers send no is_internal flag on them, so they are named here. */
+export const PLATFORM_STREAM_NAMES: ReadonlySet<string> = new Set([
+  "triggers",
+  "usage",
+  "errors",
+  "audit",
+  "stats",
+  "data_retention_usage",
+  "slo_slices",
+]);
+
 export const USER_DATA_STREAM_TYPES = ["logs", "metrics", "traces", "profiles"] as const;
 
 export type UserDataStreamType = (typeof USER_DATA_STREAM_TYPES)[number];

@@ -94,7 +94,7 @@ export class MetricsExplorerPage {
 
         // ===== SHARE TOASTS (OToast exposes variant + message as data-test attrs) =====
         this.shareSuccessToast = page.locator(
-            '[data-test-variant="success"][data-test-message*="Link Copied"]'
+            '[data-test-variant="success"][data-test-message*="Link copied"]'
         );
         this.shareErrorToast = page.locator(
             '[data-test-variant="error"][data-test-message*="shortening link"]'

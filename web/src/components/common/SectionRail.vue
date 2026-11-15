@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="item.locked ? `${item.dataTest}-locked` : item.dataTest"
               class="w-full"
               :class="collapsed ? 'justify-center!' : undefined"
-              @click="navigate(item.locked ? { name: 'enterpriseFeatures' } : item.to)"
+              @click="navigate(item.to)"
             >
               <template v-if="collapsed && (item.locked || item.licenseLocked)" #icon>
                 <span class="relative inline-flex shrink-0">

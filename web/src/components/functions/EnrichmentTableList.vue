@@ -488,7 +488,7 @@ import { enrichmentTableStatusesQuery } from "@/services/jstransform.queries";
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useListViewState } from "@/composables/useListViewState";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
@@ -562,14 +562,18 @@ export default defineComponent({
     const showEnrichmentSchema = ref<boolean>(false);
     const showUrlJobsDialogState = ref<boolean>(false);
     const selectedTableForUrlJobs = ref<any>(null);
-    const viewState = useListViewState("enrichmentTables", {
-      filterQuery: "",
-      filter: "all",
-      pageSize: 20,
-      currentPage: 1,
-      sortBy: "",
-      sortOrder: "asc" as "asc" | "desc",
-    });
+    const viewState = useListViewState(
+      "enrichmentTables",
+      {
+        filterQuery: "",
+        filter: "all",
+        pageSize: 20,
+        currentPage: 1,
+        sortBy: "",
+        sortOrder: "asc" as "asc" | "desc",
+      },
+      { url: { ...LIST_URL_PARAMS, filter: "filter" } },
+    );
     const filterQuery = ref(viewState.filterQuery);
     const loading = ref(false);
     // Request in flight with rows still on screen — the refresh button's

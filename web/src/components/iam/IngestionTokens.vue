@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :title="t('iam.ingestionTokens')"
     title-data-test="ingestion-tokens-title-text"
-    :about="t('ingestion.orgLevelExplanation')"
+    :about="aboutText"
     bleed
   >
     <template #actions>
@@ -107,23 +107,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="font-medium">{{ row.name }}</span>
           </template>
 
-          <!-- Copy yields a ready-to-paste "Basic base64(name:token)" credential
-               (OCodeCell copies exactly what it shows), so no manual email +
-               base64 step is needed. -->
+          <!-- Masked until revealed; Copy yields a ready-to-paste "Basic base64(name:token)". -->
           <template #cell-token="{ row }">
-            <OCodeCell
+            <OSecretCell
               :value="
                 isReservedIngestionTokenName(row.name) ? null : toBasicAuth(row.name, row.token)
               "
-              :tooltip="false"
+              mask="Basic ••••••••"
+              :data-test="`ingestion-token-${row.name}-auth`"
             />
           </template>
 
           <template #cell-splunk_token="{ row }">
-            <OCodeCell
+            <OSecretCell
               :value="row.splunk_token"
               :empty-label="t('ingestion.splunkTokenNone')"
-              :tooltip="false"
+              :data-test="`ingestion-token-${row.name}-splunk-value`"
             />
           </template>
 
@@ -260,7 +259,7 @@ import { ingestionTokensQuery } from "@/services/organizations.queries";
 import analytics from "@/services/product_analytics";
 import { ref, computed, defineComponent, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -273,7 +272,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
+import OSecretCell from "@/lib/core/Table/cells/OSecretCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import {
   makeCreateTokenSchema,
@@ -322,7 +321,7 @@ export default defineComponent({
     OFormCheckbox,
     OTable,
     OTag,
-    OCodeCell,
+    OSecretCell,
     OUserCell,
   },
   setup() {
@@ -333,6 +332,11 @@ export default defineComponent({
     // its defaults factory MUST be returned from setup() (Options-API), else
     // :schema/:default-values resolve to undefined.
     const createTokenSchema = makeCreateTokenSchema(t);
+
+    // Rotation is help, not a page condition, so it lives in the about popover.
+    const aboutText = computed(() =>
+      raw(`${t("ingestion.orgLevelExplanation")} ${t("ingestion.rotationNote")}`),
+    );
 
     const orgIdForList = useOrgId();
     const tokensList = useQuery(() =>
@@ -622,6 +626,7 @@ export default defineComponent({
     return {
       store,
       t,
+      aboutText,
       tokens,
       loading,
       fetching,

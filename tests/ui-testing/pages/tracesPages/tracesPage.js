@@ -310,7 +310,7 @@ export class TracesPage {
 
   async validateTracesPage() {
 
-    await expect(this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]')).toBeDefined();
+    await expect(this.page.locator('[data-test="traces-search-bar-filter-builder-toggle"]')).toBeDefined();
     await expect(this.page.locator('[data-test="logs-search-bar"]')).toBeDefined();
 
   }
@@ -2735,7 +2735,7 @@ export class TracesPage {
   getLogsQueryModeToggles() {
     return {
       quickMode: this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]'),
-      sqlMode: this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]'),
+      sqlMode: this.page.locator('[data-test="logs-search-bar-query-mode-sql"]'),
     };
   }
 

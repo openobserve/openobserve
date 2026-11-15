@@ -288,7 +288,7 @@ import { blockEmailsInConfig } from "@/components/settings/orgDomainRestrictions
 import { queryClient } from "@/composables/query/queryClient";
 import { useMutation } from "@tanstack/vue-query";
 import { defineComponent, ref, toRef, onActivated, onBeforeMount, watch, computed } from "vue";
-import { useListViewState } from "@/composables/useListViewState";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -371,7 +371,10 @@ export default defineComponent({
     const { usersState } = usePermissions();
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
-    const filterQuery = toRef(useListViewState("iam-users", { filterQuery: "" }), "filterQuery");
+    const filterQuery = toRef(
+      useListViewState("iam-users", { filterQuery: "" }, { url: LIST_URL_PARAMS }),
+      "filterQuery",
+    );
 
     const toCamelCase = (str: string) => {
       return str.charAt(0).toUpperCase() + str.slice(1);

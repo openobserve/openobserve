@@ -87,6 +87,8 @@ export interface HistogramTitleParts {
   scanLabel?: I18nText;
   /** Logs mode only — formatted size, may carry the same "+" suffix. */
   scanSize?: string;
+  /** An SQL aggregate counts result rows, not events. */
+  rows?: boolean;
 }
 
 export interface HistogramData {

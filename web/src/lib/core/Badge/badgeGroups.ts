@@ -569,7 +569,7 @@ export const BADGE_GROUPS = {
       error: { tone: "err", labelKey: "common.error" },
       // Shares the `alertState` wording so the same outcome reads identically in
       // pipeline history and alert history.
-      notifyfailed: { tone: "err", labelKey: "components.badge.alertState.notifyfailed" },
+      notifyfailed: { tone: "warn", labelKey: "components.badge.alertState.notifyfailed" },
       skipped: { tone: "warn", labelKey: "components.badge.pipelineRunOutcome.skipped" },
       // Legacy trigger status vocabulary and older UI aliases.
       completed: {
@@ -1553,10 +1553,10 @@ export const BADGE_GROUPS = {
         icon: "error-outline",
         labelKey: "components.badge.alertState.anomaly",
       },
-      // Condition matched but delivery failed — still a firing state, flagged
-      // distinctly so a broken destination is visible.
+      // Condition matched but delivery failed: amber, since red is kept for the
+      // firing itself and for destructive actions (R9).
       notifyfailed: {
-        tone: "err",
+        tone: "warn",
         icon: "sync-problem",
         labelKey: "components.badge.alertState.notifyfailed",
       },

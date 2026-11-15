@@ -39,7 +39,7 @@ test.describe("Settings Query Management Redirect testcases", () => {
     testLogger.info('Query Management tab correctly absent from the OSS Settings rail');
   });
 
-  test("should redirect to the enterprise-locked page when navigating directly to /settings/query_management on OSS", {
+  test("should show the Query Management lock in place when navigating directly to /settings/query_management on OSS", {
     tag: ['@query-management-redirect', '@all', '@oss', '@P0']
   }, async ({ page }) => {
     const edition = await pm.editionFeaturesPage.detectEdition();
@@ -48,7 +48,7 @@ test.describe("Settings Query Management Redirect testcases", () => {
     await pm.queryManagementPage.navigateToQueryManagement(orgId);
     await pm.queryManagementPage.expectEnterpriseLockedPage();
 
-    testLogger.info('Direct Query Management URL correctly redirects to the enterprise-locked page on OSS');
+    testLogger.info('Direct Query Management URL correctly shows the lock in place on OSS');
   });
 
   test("redirects Query Management back to General Settings outside the meta org (enterprise)", {

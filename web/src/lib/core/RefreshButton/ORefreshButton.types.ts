@@ -8,6 +8,8 @@ export interface RefreshButtonProps {
   loading?: boolean;
   /** Disables the button independently of loading (e.g. while the query is invalid). */
   disabled?: boolean;
+  /** With `disabled`, says why in the tooltip and keeps the button focusable (B9). */
+  disabledReason?: I18nText | null;
   /** Epoch ms of a failed refresh: a warn dot, "Failed", and the button reads Retry. */
   failedAt?: number | null;
   /** Auto-refresh interval in seconds, 0 for Off; omit to hide the menu segment. The page runs the timer. */

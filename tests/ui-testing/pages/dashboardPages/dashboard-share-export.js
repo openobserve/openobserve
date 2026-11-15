@@ -28,7 +28,7 @@ export default class DashboardShareExportPage {
     // attribute (set in `web/src/lib/feedback/Toast/OToast.vue`) to avoid the
     // strict-mode "resolves to 2 elements" error.
     this.toastSuccessShareLink = page.locator(
-      '[data-test-variant="success"][data-test-message*="Link Copied"]'
+      '[data-test-variant="success"][data-test-message*="Link copied"]'
     );
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
     this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');

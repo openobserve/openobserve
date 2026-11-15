@@ -11,7 +11,9 @@
     "bannerMessage": "Cette fonctionnalité est verrouillée. Elle nécessite la fonctionnalité {feature} dans votre licence.",
     "bannerMessageGeneric": "Cette page nécessite une fonctionnalité qui n'est pas incluse dans votre licence.",
     "headerLocked": "Verrouillé : nécessite {feature}",
-    "availableInEnterprise": "Disponible dans OpenObserve Enterprise : {feature}"
+    "availableInEnterprise": "Disponible dans OpenObserve Enterprise : {feature}",
+    "turnedOffTitle": "Désactivé pour cette organisation",
+    "enterpriseTitle": "Disponible dans Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "Aucun motif n'a été trouvé",
       "description": "Essayez d'augmenter la plage de temps ou de sélectionner un autre flux contenant davantage de données de journal. L'extraction de motifs fonctionne mieux avec au moins 1 000 journaux.",
       "logsAnalyzed": "Seuls {count} journaux ont été analysés."
-    },
-    "noStreamSelected": {
-      "title": "Sélectionnez un stream pour commencer",
-      "description": "Choisissez un flux, puis exécutez votre requête pour explorer ses données. Affinez les résultats à l'aide de filtres et d'une plage de temps personnalisée."
     },
     "noQueryApplied": {
       "title": "Exécutez une requête pour voir les résultats",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "Connectez une source pour créer votre premier flux",
       "description": "Les flux sont créés automatiquement au moment où les données arrivent. Configurez l'ingestion depuis votre application, votre agent ou votre collecteur pour commencer.",
-      "action": "Configurer l'ingestion",
       "actionDesc": "Connecter une source de données",
       "createAction": "Nouveau stream",
       "createActionDesc": "Définir manuellement un schéma de flux"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "Aucune modification à enregistrer"
+    },
     "dismiss": "Ignorer",
     "exitFullscreen": "Quitter le plein écran",
     "moreActions": "Plus d'actions",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "Précédent",
     "patternNavNext": "Suivant",
     "patternNoValuesAvailable": "Aucune valeur disponible",
-    "sqlModeLabel": "Mode SQL",
     "nlpModeLabel": "Mode langage naturel",
     "quickModeLabel": "Mode rapide",
     "menuMore": "Plus",
-    "menuGroupSetOnce": "Réglez une fois",
     "menuGroupHistory": "L'histoire",
     "menuGroupDownloads": "Téléchargements",
     "menuGroupSchedule": "Calendrier",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "La vue a été supprimée avec succès.",
     "viewCreatedSuccessfully": "La vue a été créée avec succès.",
     "viewUpdatedSuccessfully": "Affichage mis à jour avec succès.",
-    "linkCopiedSuccessfully": "Le lien a été copié avec succès !",
     "errorCopyingLink": "Erreur lors de la copie du lien.",
     "errorShorteningLink": "Erreur lors du raccourcissement du lien.",
     "webUrlNotConfigured": "L'URL de partage est désactivée jusqu'à ce que ZO_WEB_URL soit configuré par votre administrateur.",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "Les flux sélectionnés n'ont aucun champ en texte intégral",
     "freeTextNoTextFields": "Ce flux n'a aucun champ texte à rechercher.",
     "freeTextNoTextFieldsNamed": "Non recherché : {streams} (aucun champ texte).",
-    "freeTextBuildNotice": "Ce filtre comporte une recherche textuelle ; modifiez-le en SQL."
+    "freeTextBuildNotice": "Ce filtre comporte une recherche textuelle ; modifiez-le en SQL.",
+    "queryModeLabel": "Langage de requête",
+    "queryModeFilter": "Filtre",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Affinez les journaux par champ et valeur",
+    "queryModeSqlTooltip": "Écrivez une requête SQL complète, avec agrégations et jointures",
+    "sqlModeNeedsOneStream": "Le SQL de cette vue ne prend qu’un seul flux",
+    "menuGroupViewOptions": "Options d’affichage",
+    "histogramHiddenForAggregates": "Cette requête renvoie des groupes, pas des événements dans le temps : il n’y a donc pas d’histogramme. Visualiser trace le résultat.",
+    "linkCopied": "Lien copié",
+    "linkCopiedFixedTime": "Lien copié · période fixe {from} – {to}",
+    "linkCopiedRelativeTime": "Lien copié · {period}, compté à partir de l’ouverture",
+    "recordsChipRows": "{total} ligne | {total} lignes",
+    "histogramTitleRows": "{total} ligne affichée en {took} ms. | {total} lignes affichées en {took} ms.",
+    "histogramTitleRowsWithScan": "{total} ligne affichée en {took} ms. ({scanLabel} : {scanSize}) | {total} lignes affichées en {took} ms. ({scanLabel} : {scanSize})",
+    "pickStreamFirst": "Choisissez d’abord un flux"
   },
   "menu": {
     "alertCalibration": "Calibration des alertes",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "Raccourcis clavier",
     "searchOrJumpTo": "Rechercher ou aller à…",
     "jumpToTitle": "Aller à",
-    "jumpToPlaceholder": "Rechercher des pages",
+    "addData": "Ajouter des données",
+    "jumpToPlaceholder": "Rechercher des pages et des actions",
     "synthetic": "Synthétiques",
     "experience": "Expérience",
     "slos": "SLO",
@@ -4212,7 +4225,8 @@
     "revokeInvitationMsg": "Êtes-vous sûr de vouloir révoquer l'invitation pour {email} ?",
     "deleteUsersTitle": "Supprimer des utilisateurs",
     "deleteUsersMsg": "Êtes-vous sûr de vouloir supprimer {count} utilisateur ? | Êtes-vous sûr de vouloir supprimer {count} utilisateurs ?",
-    "deleteUsersBlockNote": "{count} d'entre eux ont rejoint via votre domaine vérifié et seront bloqués au lieu d'être supprimés."
+    "deleteUsersBlockNote": "{count} d'entre eux ont rejoint via votre domaine vérifié et seront bloqués au lieu d'être supprimés.",
+    "roleHint": "Admin gère l'organisation, Editor modifie les données et les paramètres, Viewer peut seulement lire."
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -5160,6 +5174,7 @@
     "timezone": "Fuseau horaire",
     "deleteActionMessage": "Voulez-vous vraiment supprimer {count} champ ? Cette action est irréversible. | Voulez-vous vraiment supprimer {count} champs ? Cette action est irréversible.",
     "deleteDatesMessage": "Voulez-vous vraiment supprimer {count} plage de dates ? Cette action est irréversible. | Voulez-vous vraiment supprimer {count} plages de dates ? Cette action est irréversible.",
+    "summaryAllTypes": "Streams (tous types)",
     "labelLogs": "Logs",
     "labelMetrics": "Métriques",
     "labelTraces": "Traces",
@@ -7757,7 +7772,8 @@
       "metricsSketch": "Les distributions sont stockées sous forme de buckets d’histogramme, et les centiles sont estimés à partir de ces buckets. Une valeur plus élevée de ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA donne des buckets plus fins et des centiles plus précis, au prix d’un plus grand nombre de lignes stockées."
     },
     "gpu": "GPU",
-    "gpuExporter": "Exportateur GPU"
+    "gpuExporter": "Exportateur GPU",
+    "rotationNote": "Les jetons ne sont pas renouvelés sur place. Pour en renouveler un, créez un nouveau jeton, basculez vos sources dessus, puis désactivez l'ancien."
   },
   "dashboard": {
     "panelDraft": {
@@ -9390,6 +9406,9 @@
       "addClause": "Ajouter une clause"
     },
     "viewDashboard": {
+      "apply": "Appliquer",
+      "lastDataSeen": "Dernières données {when}",
+      "jumpToLatest": "Aller aux plus récentes",
       "refreshToApplyVariables": "Actualiser pour appliquer les dernières modifications de variables",
       "refresh": "Actualiser",
       "refreshCacheReload": "Actualiser le cache et recharger",
@@ -10135,6 +10154,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "Aucune donnée sur la période",
     "saveAndStay": "Enregistrer et continuer la modification",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10577,6 +10597,38 @@
     },
     "timeRange": {
       "heading": "Dans la plage de temps sélectionnée"
+    },
+    "firingNow": {
+      "title": "En cours de déclenchement",
+      "byLevel": "{critical} critique(s) · {warning} avertissement(s)",
+      "allQuiet": "Tout est calme",
+      "watching": "{count} règle d'alerte active, aucune déclenchée | {count} règles d'alerte actives, aucune déclenchée",
+      "noRules": "Aucune règle d'alerte pour l'instant",
+      "browseLibrary": "Parcourir la bibliothèque d'alertes",
+      "notifyFailed": "Échec de la notification",
+      "loadError": "Impossible de charger les alertes déclenchées",
+      "unavailable": "Les états des alertes sont illisibles pour le moment"
+    },
+    "health": {
+      "subtitle": "Dernières données reçues, par type",
+      "lastData": "Dernières données il y a {age}",
+      "justNow": "Dernières données à l'instant",
+      "noDataIn": "Aucune donnée ces dernières {range}",
+      "noRecords": "Aucun enregistrement pour l'instant",
+      "loadError": "Impossible de lire vos flux"
+    },
+    "start": {
+      "text": "Aucune donnée n'est arrivée ces dernières {range}. Envoyez des données, consultez celles que vous avez ou configurez une alerte.",
+      "addData": "Ajouter des données",
+      "createAlert": "Créer une alerte"
+    },
+    "summary": {
+      "loadError": "Impossible de charger le résumé de l'organisation",
+      "denied": "Aucun accès au résumé de l'organisation. Demandez à un administrateur."
+    },
+    "events": {
+      "runFailed": "Échec de l'exécution",
+      "timesInRange": "{count} fois dans la plage sélectionnée | {count} fois dans la plage sélectionnée"
     }
   },
   "chatHistory": {
@@ -11551,6 +11603,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "Ouvrir dans les logs",
+      "openInTraces": "Ouvrir dans les traces",
+      "openInMetrics": "Ouvrir dans les métriques",
+      "evidenceFiringTip": "Ouvre {stream} avec le filtre de cette alerte, du début de ce déclenchement à maintenant",
+      "evidenceWindowTip": "Ouvre {stream} avec le filtre de cette alerte sur les dernières {window}",
+      "threshold": "Seuil",
+      "noIncident": "Aucun incident pour l'instant",
+      "conditionLabel": "Condition de l'alerte",
+      "allRows": "Toutes les lignes"
+    },
+    "summaryTrainingFailed": "Échec de l'entraînement",
+    "startFromTemplate": "Partir d'un modèle",
     "firing": {
       "title": "Déclenchées",
       "drawer": {
@@ -20569,7 +20634,6 @@
     },
     "noStream": {
       "title": "Choisissez un stream pour commencer à explorer",
-      "description": "Choisissez un flux, puis appuyez sur <strong>Exécuter la requête</strong>. Vous pouvez affiner à l'aide de filtres, d'une fonction VRL et d'une plage de temps personnalisée une fois les résultats obtenus.",
       "selectStream": "Sélectionnez un flux",
       "selectStreamDesc": "Parcourir les flux de logs, de traces, de métriques et de RUM",
       "queryGuide": "Lisez le guide des requêtes",
@@ -20621,7 +20685,16 @@
     "detailTable": {
       "noDataAvailable": "Aucune donnée disponible.",
       "addIcon": "Ajouter une icône",
-      "sendToAiChat": "Envoyer au chat IA"
+      "sendToAiChat": "Envoyer au chat IA",
+      "openTrace": "Ouvrir la trace",
+      "noTraceTitle": "Aucune trace liée à ce journal",
+      "noRelatedLogsTitle": "Aucun journal associé trouvé",
+      "noRelatedMetricsTitle": "Aucune métrique associée trouvée",
+      "noServiceText": "Aucun service n'a pu être associé à ce journal, les données associées ne peuvent donc pas être trouvées automatiquement.",
+      "searchTracesAround": "Rechercher des traces autour de ce moment",
+      "searchAroundTip": "Charge les événements consignés juste avant et après celui-ci.",
+      "noOfEventsTip": "Nombre d'événements à charger autour de celui-ci.",
+      "severityTip": "Niveau de journal détecté. Sélectionnez-le pour voir comment il a été détecté."
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "La requête SELECT * n'est pas prise en charge pour la visualisation.",
@@ -23160,7 +23233,7 @@
         "ok": "OK",
         "normal": "Normal",
         "firing": "Déclenché",
-        "notifyfailed": "Échec de la notification",
+        "notifyfailed": "Livraison échouée",
         "flapping": "Oscillant",
         "anomaly": "Anomalie",
         "succeeded": "Réussi",
@@ -30394,7 +30467,9 @@
     "validation": {
       "regexLength": "Limitez le motif à {max} caractères.",
       "regexInvalid": "Ce motif est invalide ou non pris en charge. Les assertions avant, les assertions arrière et les références arrière ne peuvent pas être utilisées."
-    }
+    },
+    "queryTooltip": "Modifier le filtre en texte",
+    "builderTooltip": "Modifier le filtre avec le générateur"
   },
   "autoobserveLive": {
     "paging": {

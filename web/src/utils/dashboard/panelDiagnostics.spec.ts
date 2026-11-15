@@ -17,6 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   omitFunctionErrorMessages,
   summarizePanelDiagnostics,
+  scannedNoRecords,
   summarizeQueryDiagnostics,
 } from "./panelDiagnostics";
 import { usePanelSearchHandlers } from "@/composables/dashboard/usePanelSearchHandlers";
@@ -236,5 +237,25 @@ describe("summarizePanelDiagnostics with sparse PromQL metadata", () => {
     expect(result.queries[0].partialReasons).toEqual([]);
     expect(result.queries[0].functionErrors).toEqual([]);
     expect(result.serverPartial).toBe(true);
+  });
+});
+
+describe("scannedNoRecords", () => {
+  it("is true when nothing was scanned and no cache answered", () => {
+    expect(scannedNoRecords(summarizeQueryDiagnostics([{ scan_records: 0 }]))).toBe(true);
+  });
+
+  it("is false for a cached zero, so a real 0 stays 0", () => {
+    expect(
+      scannedNoRecords(summarizeQueryDiagnostics([{ scan_records: 0, result_cache_ratio: 100 }])),
+    ).toBe(false);
+    expect(
+      scannedNoRecords(summarizeQueryDiagnostics([{ scan_records: 0, cached_ratio: 100 }])),
+    ).toBe(false);
+  });
+
+  it("is false when records were scanned or the count is unknown", () => {
+    expect(scannedNoRecords(summarizeQueryDiagnostics([{ scan_records: 5 }]))).toBe(false);
+    expect(scannedNoRecords(summarizeQueryDiagnostics([{}]))).toBe(false);
   });
 });

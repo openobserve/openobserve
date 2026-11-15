@@ -381,6 +381,16 @@ describe("AddDestination drafts", () => {
     expect(values.apiHeaders).toEqual([{ key: "X-Region", value: "eu-west" }]);
   });
 
+  it("keeps Save off on an untouched existing destination, and on once it is edited", async () => {
+    await mountEditor({ destination: { ...serviceNow } });
+    const save = () => wrapper!.findComponent('[data-test="add-destination-submit-btn"]') as any;
+    expect(save().props("disabled")).toBe(true);
+    expect(save().props("disabledReason")).toBe("No changes to save");
+
+    await edit({ apiHeaders: [{ key: "X-Region", value: "eu-west" }] });
+    expect(save().props("disabled")).toBe(false);
+  });
+
   it("drafts a name filled with no key or pointer event, and Cancel asks", async () => {
     await mountEditor();
     form().setFieldValue("destination_type", "custom");

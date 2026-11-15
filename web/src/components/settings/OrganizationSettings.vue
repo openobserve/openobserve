@@ -8,7 +8,7 @@
         data-test="organization-settings-section"
       >
         <OSettingRow
-          control-at="end"
+          control-at="below"
           name="traceIdFieldName"
           error-data-test="settings-org-trace-id-input-error"
           :label="t('settings.traceIdFieldName')"
@@ -25,7 +25,7 @@
         </OSettingRow>
 
         <OSettingRow
-          control-at="end"
+          control-at="below"
           name="spanIdFieldName"
           error-data-test="settings-org-span-id-input-error"
           :label="t('settings.spanIdFieldName')"

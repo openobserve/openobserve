@@ -88,6 +88,7 @@ const summary = computed(() => {
       :description="summary"
       @update:open="(open: boolean) => open && emit('open')"
     >
+      <template v-if="slots.icon" #icon><slot name="icon" /></template>
       <template v-if="slots.actions" #end>
         <span class="w-8 shrink-0" aria-hidden="true" />
       </template>

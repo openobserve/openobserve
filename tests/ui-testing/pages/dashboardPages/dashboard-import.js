@@ -330,20 +330,24 @@ export default class DashboardImport {
 
     // Walk up from the named cell to the OTable row via XPath ancestor that
     // matches `data-test^="o2-table-row-"`. Then resolve the delete button
-    // inside that row using its `data-test="dashboard-delete"` hook.
+    // inside that row using its row overflow menu.
     const dashboardRow = dashboardCell
       .first()
       .locator(
         'xpath=ancestor::*[starts-with(@data-test, "o2-table-row-")][1]'
       );
-    const deleteButton = dashboardRow.locator(
-      '[data-test="dashboard-delete"]'
+    const moreButton = dashboardRow.locator(
+      '[data-test="dashboard-row-more-actions"]'
+    );
+    const deleteButton = this.page.locator(
+      '[data-test="dashboard-delete-menu"]'
     );
 
     let deleteRetries = 3;
     while (deleteRetries > 0) {
       try {
         await dashboardRow.hover();
+        await moreButton.click({ timeout: 10000 });
         await deleteButton.waitFor({ state: "visible", timeout: 10000 });
         await deleteButton.click({ timeout: 10000 });
         await this.confirmDialog

@@ -25,7 +25,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import SecurityMoreMenu from "@/components/security/SecurityMoreMenu.vue";
+import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
@@ -382,7 +383,7 @@ const rowClass = (c: CaseRow) => {
 
 const filtersActive = computed(
   () =>
-    statusFilter.value !== null ||
+    (statusFilter.value !== null && statusFilter.value !== ALL_STATUSES) ||
     priorityFilter.value.length > 0 ||
     detectionFilter.value.length > 0 ||
     !!assigneeFilter.value ||
@@ -398,7 +399,12 @@ function onEmptyAction() {
   search.value = "";
 }
 
-const priorityFilterOptions = computed(() => PRIORITIES.map((p) => ({ label: raw(p), value: p })));
+const priorityFilterOptions = computed(() =>
+  PRIORITIES.map((p) => ({
+    label: t("siem.cases.priorityOption", { p, level: t(toneLabelKey(toneOfPriority(p))) }),
+    value: p,
+  })),
+);
 // Facets are counted without the detection filter, so picking one never hides the others.
 const detectionlessFilters = computed<CaseSearchFilters>(() => {
   const { alert_id: _alertId, ...rest } = filters.value;
@@ -1340,26 +1346,40 @@ onMounted(() => {
     bleed
     title-data-test="security-cases-title"
   >
-    <template v-if="canTriage || canAdmin" #actions>
-      <OButton
-        v-if="canTriage"
-        variant="secondary"
-        icon="notifications-paused"
-        data-test="security-cases-suppressions"
-        @click="suppressionsOpen = true"
-        >{{ t("siem.cases.activeSuppressions") }}</OButton
-      >
-      <OButton
-        v-if="canAdmin"
-        icon-only
-        variant="ghost"
-        icon="settings"
-        :aria-label="t('siem.cases.settings.open')"
-        data-test="security-cases-settings"
-        @click="settingsOpen = true"
-      >
-        <OTooltip side="bottom" :content="t('siem.cases.settings.open')" />
-      </OButton>
+    <template #actions>
+      <div class="flex items-center gap-2">
+        <OButton
+          v-if="canTriage"
+          variant="secondary"
+          icon="notifications-paused"
+          data-test="security-cases-suppressions"
+          @click="suppressionsOpen = true"
+          >{{ t("siem.cases.activeSuppressions") }}</OButton
+        >
+        <ORefreshButton
+          :last-run-at="list.dataUpdatedAt.value || null"
+          :loading="loading"
+          data-test="security-cases-refresh"
+          @click="refresh"
+        />
+        <SecurityMoreMenu data-test="security-cases-more">
+          <ODropdownItem
+            :checked="showingClosed"
+            data-test="security-cases-show-closed"
+            @select="toggleClosed"
+          >
+            {{ t("siem.cases.filter.showClosed") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="canAdmin"
+            icon="settings"
+            data-test="security-cases-settings"
+            @select="settingsOpen = true"
+          >
+            {{ t("siem.cases.settings.open") }}
+          </ODropdownItem>
+        </SecurityMoreMenu>
+      </div>
     </template>
     <div class="flex min-h-0 flex-1 flex-col">
       <SecurityNotices
@@ -1447,7 +1467,7 @@ onMounted(() => {
               data-test="security-cases-filter-assignee"
               @update:model-value="(v: unknown) => (assigneeFilter = v ? String(v) : null)"
             />
-            <div class="w-48 shrink-0 max-md:w-full">
+            <div v-if="entityFilter" class="w-48 shrink-0 max-md:w-full">
               <OSearchInput
                 v-model="entityFilter"
                 :placeholder="t('siem.cases.filter.entity')"
@@ -1455,13 +1475,6 @@ onMounted(() => {
                 data-test="security-cases-filter-entity"
               />
             </div>
-            <OSwitch
-              :model-value="showingClosed"
-              :label="t('siem.cases.filter.showClosed')"
-              class="shrink-0"
-              data-test="security-cases-show-closed"
-              @update:model-value="toggleClosed"
-            />
             <OStatStrip
               compact-values
               :items="stats"
@@ -1475,17 +1488,14 @@ onMounted(() => {
             />
           </div>
         </template>
-        <template #toolbar-trailing>
-          <ORefreshButton
-            :last-run-at="list.dataUpdatedAt.value || null"
-            :loading="loading"
-            data-test="security-cases-refresh"
-            @click="refresh"
-          />
-        </template>
 
         <template #cell-severity="{ row }">
-          <OTag type="severity" :value="row.severity.toLowerCase()" size="sm" />
+          <OTag
+            type="severity"
+            :value="row.severity.toLowerCase()"
+            :label="t(toneLabelKey(toneOfPriority(row.severity)))"
+            size="sm"
+          />
         </template>
         <template #cell-title="{ row }">
           <div class="flex min-w-0 flex-col">
@@ -1577,6 +1587,14 @@ onMounted(() => {
           <OTimeCell :value="row.last_alert_at" unit="us" />
         </template>
 
+        <template #error>
+          <SecurityLoadError
+            :what="t('siem.cases.whatCases')"
+            :hint="t('siem.cases.loadFailedHint')"
+            @retry="refetchCases"
+          />
+        </template>
+
         <template #empty>
           <SecurityAccessLock
             v-if="caseDenials.length"
@@ -1622,7 +1640,12 @@ onMounted(() => {
       @next="step(1)"
     >
       <template v-if="summary" #chips>
-        <OTag type="severity" :value="summary.severity.toLowerCase()" size="sm" />
+        <OTag
+          type="severity"
+          :value="summary.severity.toLowerCase()"
+          :label="t(toneLabelKey(toneOfPriority(summary.severity)))"
+          size="sm"
+        />
         <OTag :tone="STATUS_VARIANT[summary.status as CaseStatus]" size="sm">{{
           t(`siem.caseStatus.${summary.status}`)
         }}</OTag>

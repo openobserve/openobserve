@@ -18,7 +18,7 @@
 import { computed, ref, type Ref } from "vue";
 
 export type ToolbarPinKey =
-  "histogram" | "sqlMode" | "quickMode" | "functionEditor" | "savedViews" | "syntaxGuide";
+  "histogram" | "quickMode" | "functionEditor" | "savedViews" | "syntaxGuide";
 
 export type ToolbarPinScope = "logs" | "traces";
 
@@ -26,7 +26,6 @@ export type ToolbarPinScope = "logs" | "traces";
 // item's position — it only toggles whether the item is shown outside the menu.
 export const TOOLBAR_PIN_ORDER: ToolbarPinKey[] = [
   "histogram",
-  "sqlMode",
   "quickMode",
   "functionEditor",
   "savedViews",

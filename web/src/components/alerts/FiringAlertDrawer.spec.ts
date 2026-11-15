@@ -279,22 +279,44 @@ describe("FiringAlertDrawer", () => {
     expect(url.searchParams.get("folder")).toBe("ops");
   });
 
-  it("links to Logs in a new tab for the alert query and firing window", async () => {
+  it("links to Logs in a new tab on the rows the alert reads and the firing window", async () => {
+    getDetail.mockResolvedValue({
+      data: {
+        ...detail,
+        query_condition: {
+          type: "sql",
+          sql: 'SELECT count(*) FROM "nginx_logs" WHERE status >= 500',
+        },
+      },
+    });
     const wrapper = await mountDrawer(baseRow);
-    const link = wrapper.find('[data-test="alerts-firing-drawer-logs"]');
+    await vi.waitFor(() => expect(has(wrapper, "alerts-firing-drawer-open-in")).toBe(true));
+    const link = wrapper.find('[data-test="alerts-firing-drawer-open-in"]');
+    expect(link.text()).toBe("Open in logs");
     expect(link.attributes("target")).toBe("_blank");
     const url = new URL(link.attributes("href")!, "http://x");
     expect(url.searchParams.get("stream")).toBe("nginx_logs");
-    expect(url.searchParams.get("sql_mode")).toBe("true");
-    expect(b64DecodeUnicode(url.searchParams.get("query")!)).toContain("nginx_logs");
+    // Builder mode on the WHERE clause, the same link the alert page builds.
+    expect(url.searchParams.get("sql_mode")).toBe("false");
+    expect(b64DecodeUnicode(url.searchParams.get("query")!)).toMatch(/status"?\s*>=\s*500/);
     expect(Number(url.searchParams.get("from"))).toBe(baseRow.firing_started_at! - 5 * 60_000_000);
   });
 
-  it("omits Open in Logs for a PromQL alert", async () => {
+  it("opens a PromQL alert's query in Metrics", async () => {
     getDetail.mockResolvedValue({
-      data: { ...detail, query_condition: { type: "promql", promql: "up" } },
+      data: {
+        ...detail,
+        stream_type: "metrics",
+        query_condition: { type: "promql", promql: "up" },
+      },
     });
-    expect(has(await mountDrawer(baseRow), "alerts-firing-drawer-logs")).toBe(false);
+    const wrapper = await mountDrawer(baseRow);
+    await vi.waitFor(() => expect(has(wrapper, "alerts-firing-drawer-open-in")).toBe(true));
+    const link = wrapper.find('[data-test="alerts-firing-drawer-open-in"]');
+    expect(link.text()).toBe("Open in metrics");
+    const url = new URL(link.attributes("href")!, "http://x");
+    expect(url.searchParams.get("query_type")).toBe("promql");
+    expect(b64DecodeUnicode(url.searchParams.get("query")!)).toBe("up");
   });
 
   it("re-reads history on a refresh inside the same minute, whose key does not change", async () => {

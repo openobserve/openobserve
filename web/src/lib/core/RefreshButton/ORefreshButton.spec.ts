@@ -39,6 +39,13 @@ describe("ORefreshButton", () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it("says why it is disabled instead of its usual tooltip", () => {
+    const wrapper = mountButton({ disabled: true, disabledReason: raw("Pick a stream first") });
+    expect(button(wrapper).attributes("aria-disabled")).toBe("true");
+    expect(wrapper.text()).toContain("Pick a stream first");
+    expect(wrapper.text()).not.toContain("Not yet refreshed");
+  });
+
   it("is one bordered md button labelled Refresh before the first load", () => {
     const wrapper = mountButton();
     expect(button(wrapper).attributes("data-o2-variant")).toBe("secondary");

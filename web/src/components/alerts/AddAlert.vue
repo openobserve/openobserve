@@ -74,6 +74,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
 
+      <template v-if="showTemplateLink" #actions-overflow>
+        <OButton
+          variant="secondary"
+          :to="alertLibraryRoute"
+          data-test="add-alert-start-from-template"
+        >
+          {{ t("alerts.startFromTemplate") }}
+        </OButton>
+      </template>
+
       <template #actions>
         <template v-if="(beingUpdated || anomalyEditMode) && isAnomalyMode">
           <OTooltip v-if="anomalyConfig.status === 'failed'" :content="t('alerts.retryTraining')">
@@ -998,6 +1008,20 @@ export default defineComponent({
       },
     }));
 
+    // Only a new scheduled or real-time alert can start from the library, which holds no other kind.
+    const showTemplateLink = computed(
+      () =>
+        !alertForm.beingUpdated.value &&
+        !alertForm.anomalyEditMode.value &&
+        !alertForm.isAnomalyMode.value &&
+        !isCompositeMode.value &&
+        !(store.state.zoConfig?.custom_hide_menus ?? "").split(",").includes("alertLibrary"),
+    );
+    const alertLibraryRoute = computed(() => ({
+      name: "alertLibrary",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    }));
+
     const {
       openSetup: openOncallSetup,
       checkAgain: checkOncallAgain,
@@ -1147,6 +1171,8 @@ export default defineComponent({
       saveModeNote,
       activeEvaluationStatus,
       isCompositeMode,
+      showTemplateLink,
+      alertLibraryRoute,
       availableCompositeChildren,
       updateCompositeDraft,
       compositeSaveDisabled,

@@ -11,7 +11,9 @@
     "bannerMessage": "Tính năng này bị khóa. Cần có tính năng {feature} trong giấy phép của bạn.",
     "bannerMessageGeneric": "Trang này cần một tính năng không có trong giấy phép của bạn.",
     "headerLocked": "Đã khóa: cần {feature}",
-    "availableInEnterprise": "{feature} có trong OpenObserve Enterprise"
+    "availableInEnterprise": "{feature} có trong OpenObserve Enterprise",
+    "turnedOffTitle": "Đã tắt cho tổ chức này",
+    "enterpriseTitle": "Có trong Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "Không tìm thấy mẫu nào",
       "description": "Hãy thử tăng khoảng thời gian hoặc chọn một stream khác có nhiều dữ liệu nhật ký hơn. Việc trích xuất mẫu hoạt động tốt nhất với ít nhất 1.000 nhật ký.",
       "logsAnalyzed": "Chỉ {count} nhật ký được phân tích."
-    },
-    "noStreamSelected": {
-      "title": "Chọn một stream để bắt đầu",
-      "description": "Chọn một stream, sau đó chạy truy vấn để khám phá dữ liệu của nó. Tinh chỉnh kết quả bằng bộ lọc và khoảng thời gian tùy chỉnh."
     },
     "noQueryApplied": {
       "title": "Chạy truy vấn để xem kết quả",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "Kết nối một nguồn để tạo stream đầu tiên của bạn",
       "description": "Stream được tạo tự động ngay khi dữ liệu đến. Thiết lập nhập dữ liệu từ ứng dụng, agent hoặc collector của bạn để bắt đầu.",
-      "action": "Thiết lập nhập dữ liệu",
       "actionDesc": "Kết nối một nguồn dữ liệu",
       "createAction": "Stream mới",
       "createActionDesc": "Xác định thủ công lược đồ stream"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "Không có thay đổi để lưu"
+    },
     "dismiss": "Bỏ qua",
     "exitFullscreen": "Thoát toàn màn hình",
     "moreActions": "Thêm thao tác",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "Trước",
     "patternNavNext": "Tiếp",
     "patternNoValuesAvailable": "Không có giá trị nào",
-    "sqlModeLabel": "Chế độ SQL",
     "nlpModeLabel": "Chế độ Ngôn ngữ Tự nhiên",
     "quickModeLabel": "Chế độ Nhanh",
     "menuMore": "Thêm",
-    "menuGroupSetOnce": "Đặt một lần",
     "menuGroupHistory": "Lịch sử",
     "menuGroupDownloads": "Tải xuống",
     "menuGroupSchedule": "Lịch biểu",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "Đã xóa chế độ xem thành công.",
     "viewCreatedSuccessfully": "Đã tạo chế độ xem thành công.",
     "viewUpdatedSuccessfully": "Đã cập nhật chế độ xem thành công.",
-    "linkCopiedSuccessfully": "Đã sao chép liên kết thành công!",
     "errorCopyingLink": "Lỗi khi sao chép liên kết.",
     "errorShorteningLink": "Lỗi khi rút ngắn liên kết.",
     "webUrlNotConfigured": "Chia sẻ URL bị tắt cho đến khi quản trị viên cấu hình ZO_WEB_URL.",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "Các stream đã chọn không có trường toàn văn",
     "freeTextNoTextFields": "Stream này không có trường văn bản nào để tìm kiếm.",
     "freeTextNoTextFieldsNamed": "Không tìm kiếm: {streams} (không có trường văn bản).",
-    "freeTextBuildNotice": "Bộ lọc này có tìm kiếm văn bản; hãy chỉnh sửa trong SQL."
+    "freeTextBuildNotice": "Bộ lọc này có tìm kiếm văn bản; hãy chỉnh sửa trong SQL.",
+    "queryModeLabel": "Ngôn ngữ truy vấn",
+    "queryModeFilter": "Bộ lọc",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Thu hẹp nhật ký theo trường và giá trị",
+    "queryModeSqlTooltip": "Viết truy vấn SQL đầy đủ, có tổng hợp và kết nối",
+    "sqlModeNeedsOneStream": "SQL trong chế độ xem này chỉ dùng một luồng",
+    "menuGroupViewOptions": "Tùy chọn hiển thị",
+    "histogramHiddenForAggregates": "Truy vấn này trả về các nhóm, không phải sự kiện theo thời gian, nên không có biểu đồ tần suất. Trực quan hóa sẽ vẽ biểu đồ kết quả.",
+    "linkCopied": "Đã sao chép liên kết",
+    "linkCopiedFixedTime": "Đã sao chép liên kết · thời gian cố định {from} – {to}",
+    "linkCopiedRelativeTime": "Đã sao chép liên kết · {period}, tính từ lúc mở",
+    "recordsChipRows": "{total} hàng | {total} hàng",
+    "histogramTitleRows": "Hiển thị {total} hàng trong {took} ms. | Hiển thị {total} hàng trong {took} ms.",
+    "histogramTitleRowsWithScan": "Hiển thị {total} hàng trong {took} ms. ({scanLabel}: {scanSize}) | Hiển thị {total} hàng trong {took} ms. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "Hãy chọn một luồng trước"
   },
   "menu": {
     "alertCalibration": "Hiệu chỉnh cảnh báo",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "Phím tắt",
     "searchOrJumpTo": "Tìm kiếm hoặc chuyển đến…",
     "jumpToTitle": "Chuyển đến",
-    "jumpToPlaceholder": "Tìm trang",
+    "addData": "Thêm dữ liệu",
+    "jumpToPlaceholder": "Tìm trang và hành động",
     "synthetic": "Synthetics",
     "experience": "Trải nghiệm",
     "slos": "SLO",
@@ -4212,7 +4225,8 @@
     "revokeInvitationMsg": "Bạn có chắc muốn thu hồi lời mời cho {email}?",
     "deleteUsersTitle": "Xóa người dùng",
     "deleteUsersMsg": "Bạn có chắc chắn muốn xóa {count} người dùng? | Bạn có chắc chắn muốn xóa {count} người dùng?",
-    "deleteUsersBlockNote": "{count} trong số họ đã tham gia qua tên miền đã xác minh của bạn và sẽ bị chặn thay vì bị xóa."
+    "deleteUsersBlockNote": "{count} trong số họ đã tham gia qua tên miền đã xác minh của bạn và sẽ bị chặn thay vì bị xóa.",
+    "roleHint": "Admin quản lý tổ chức, Editor thay đổi dữ liệu và cài đặt, Viewer chỉ có thể đọc."
   },
   "invitation": {
     "pendingInvitations": "Lời mời đang chờ",
@@ -5160,6 +5174,7 @@
     "timezone": "Múi giờ",
     "deleteActionMessage": "Bạn có chắc chắn muốn xóa {count} trường? Thao tác này không thể hoàn tác. | Bạn có chắc chắn muốn xóa {count} trường? Thao tác này không thể hoàn tác.",
     "deleteDatesMessage": "Bạn có chắc chắn muốn xóa {count} khoảng thời gian? Thao tác này không thể hoàn tác. | Bạn có chắc chắn muốn xóa {count} khoảng thời gian? Thao tác này không thể hoàn tác.",
+    "summaryAllTypes": "Stream (mọi loại)",
     "labelLogs": "Nhật ký",
     "labelMetrics": "Chỉ số",
     "labelTraces": "Trace",
@@ -7757,7 +7772,8 @@
       "metricsSketch": "Phân phối được lưu dưới dạng các bucket histogram, và phân vị được ước tính từ các bucket đó. ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA cao hơn cho các bucket mịn hơn và phân vị chính xác hơn, đổi lại là nhiều dòng được lưu hơn."
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU exporter"
+    "gpuExporter": "GPU exporter",
+    "rotationNote": "Mã thông báo không được xoay vòng tại chỗ. Để xoay vòng, hãy tạo mã mới, chuyển các nguồn sang mã đó rồi vô hiệu hóa mã cũ."
   },
   "dashboard": {
     "panelDraft": {
@@ -9390,6 +9406,9 @@
       "addClause": "Thêm mệnh đề"
     },
     "viewDashboard": {
+      "apply": "Áp dụng",
+      "lastDataSeen": "Dữ liệu gần nhất {when}",
+      "jumpToLatest": "Chuyển đến mới nhất",
       "refreshToApplyVariables": "Làm mới để áp dụng các thay đổi biến mới nhất",
       "refresh": "Làm mới",
       "refreshCacheReload": "Làm mới cache & tải lại",
@@ -10135,6 +10154,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "Không có dữ liệu trong khoảng",
     "saveAndStay": "Lưu và tiếp tục chỉnh sửa",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10577,6 +10597,38 @@
     },
     "timeRange": {
       "heading": "Trong khoảng thời gian đã chọn"
+    },
+    "firingNow": {
+      "title": "Đang kích hoạt",
+      "byLevel": "{critical} nghiêm trọng · {warning} cảnh báo",
+      "allQuiet": "Mọi thứ yên ổn",
+      "watching": "{count} quy tắc cảnh báo đang bật, không có cái nào kích hoạt | {count} quy tắc cảnh báo đang bật, không có cái nào kích hoạt",
+      "noRules": "Chưa có quy tắc cảnh báo",
+      "browseLibrary": "Xem thư viện cảnh báo",
+      "notifyFailed": "Gửi thông báo thất bại",
+      "loadError": "Không tải được các cảnh báo đang kích hoạt",
+      "unavailable": "Hiện không đọc được trạng thái cảnh báo"
+    },
+    "health": {
+      "subtitle": "Dữ liệu nhận gần nhất, theo loại",
+      "lastData": "Dữ liệu gần nhất {age} trước",
+      "justNow": "Dữ liệu gần nhất vừa xong",
+      "noDataIn": "Không có dữ liệu trong {range} qua",
+      "noRecords": "Chưa có bản ghi",
+      "loadError": "Không đọc được các luồng của bạn"
+    },
+    "start": {
+      "text": "Không có dữ liệu nào đến trong {range} qua. Hãy gửi dữ liệu, xem những gì bạn có hoặc thiết lập cảnh báo.",
+      "addData": "Thêm dữ liệu",
+      "createAlert": "Tạo cảnh báo"
+    },
+    "summary": {
+      "loadError": "Không tải được tóm tắt tổ chức",
+      "denied": "Không có quyền truy cập tóm tắt tổ chức. Hãy hỏi quản trị viên."
+    },
+    "events": {
+      "runFailed": "Chạy thất bại",
+      "timesInRange": "{count} lần trong khoảng đã chọn | {count} lần trong khoảng đã chọn"
     }
   },
   "chatHistory": {
@@ -11551,6 +11603,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "Mở trong nhật ký",
+      "openInTraces": "Mở trong trace",
+      "openInMetrics": "Mở trong chỉ số",
+      "evidenceFiringTip": "Mở {stream} với bộ lọc của cảnh báo này, từ lúc bắt đầu kích hoạt đến hiện tại",
+      "evidenceWindowTip": "Mở {stream} với bộ lọc của cảnh báo này trong {window} gần nhất",
+      "threshold": "Ngưỡng",
+      "noIncident": "Chưa có sự cố",
+      "conditionLabel": "Điều kiện cảnh báo",
+      "allRows": "Mọi hàng"
+    },
+    "summaryTrainingFailed": "Huấn luyện thất bại",
+    "startFromTemplate": "Bắt đầu từ một mẫu",
     "firing": {
       "title": "Đang kích hoạt",
       "drawer": {
@@ -20569,7 +20634,6 @@
     },
     "noStream": {
       "title": "Chọn một stream để bắt đầu khám phá",
-      "description": "Chọn một stream, sau đó nhấn <strong>Chạy truy vấn</strong>. Bạn có thể tinh chỉnh với bộ lọc, hàm VRL và phạm vi thời gian tùy chỉnh khi có kết quả.",
       "selectStream": "Chọn một stream",
       "selectStreamDesc": "Duyệt các stream nhật ký, trace, chỉ số và RUM",
       "queryGuide": "Đọc hướng dẫn truy vấn",
@@ -20621,7 +20685,16 @@
     "detailTable": {
       "noDataAvailable": "Không có dữ liệu.",
       "addIcon": "Thêm biểu tượng",
-      "sendToAiChat": "Gửi đến AI Chat"
+      "sendToAiChat": "Gửi đến AI Chat",
+      "openTrace": "Mở trace",
+      "noTraceTitle": "Không có trace nào liên kết với nhật ký này",
+      "noRelatedLogsTitle": "Không tìm thấy nhật ký liên quan",
+      "noRelatedMetricsTitle": "Không tìm thấy chỉ số liên quan",
+      "noServiceText": "Không thể khớp dịch vụ nào với nhật ký này nên không thể tự động tìm dữ liệu liên quan.",
+      "searchTracesAround": "Tìm trace quanh thời điểm này",
+      "searchAroundTip": "Tải các sự kiện được ghi ngay trước và sau sự kiện này.",
+      "noOfEventsTip": "Số sự kiện cần tải quanh sự kiện này.",
+      "severityTip": "Mức nhật ký được phát hiện. Chọn để xem cách phát hiện."
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Truy vấn Select * không được hỗ trợ cho trực quan hóa.",
@@ -23160,7 +23233,7 @@
         "ok": "OK",
         "normal": "Bình thường",
         "firing": "Đang kích hoạt",
-        "notifyfailed": "Thông báo thất bại",
+        "notifyfailed": "Gửi thất bại",
         "flapping": "Dao động",
         "anomaly": "Bất thường",
         "succeeded": "Thành công",
@@ -30394,7 +30467,9 @@
     "validation": {
       "regexLength": "Giữ mẫu trong tối đa {max} ký tự.",
       "regexInvalid": "Mẫu này không hợp lệ hoặc không được hỗ trợ. Không thể dùng lookahead, lookbehind và tham chiếu ngược."
-    }
+    },
+    "queryTooltip": "Sửa bộ lọc dạng văn bản",
+    "builderTooltip": "Sửa bộ lọc bằng trình dựng"
   },
   "autoobserveLive": {
     "paging": {

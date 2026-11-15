@@ -16,7 +16,7 @@
 import { computed, inject, type ComputedRef } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { PAGE_NAV_CONTEXT_KEY } from "@/lib/core/PageHeader/pageContext";
 import { groupNavLinks, MODULE_RAILS } from "@/lib/core/Navbar/navGroups";
 import {
@@ -35,11 +35,34 @@ import {
   AI_OBSERVABILITY_TABBED_ITEMS,
   ONLINE_EVAL_FEATURE_KEYS,
 } from "@/composables/shared/useAIObservabilityRoutes";
-import type { JumpDestination } from "./jumpToDestinations";
+import { ACTIONS_AREA_KEY, type JumpDestination } from "./jumpToDestinations";
 
 type Section = Pick<JumpDestination, "key" | "label" | "icon" | "to">;
 
 const MODULE_NAMES = new Set(MODULE_RAILS.map((m) => m.name));
+
+/** Actions people look for by name; each lists only while the page it belongs to (`page`, a route name) does. */
+const JUMP_ACTIONS: {
+  key: string;
+  labelKey: I18nKey;
+  page: string;
+  to: { name: string; query?: Record<string, string> };
+}[] = [
+  { key: "addData", labelKey: "menu.addData", page: "ingestion", to: { name: "ingestion" } },
+  { key: "newAlert", labelKey: "alerts.add", page: "alertList", to: { name: "addAlert" } },
+  {
+    key: "newDashboard",
+    labelKey: "dashboard.add",
+    page: "dashboards",
+    to: { name: "dashboards", query: { action: "add" } },
+  },
+  {
+    key: "newPipeline",
+    labelKey: "pipeline.addPipeline",
+    page: "pipelines",
+    to: { name: "createPipeline" },
+  },
+];
 
 /** Every page the rails let the user reach, in rail order; a module rail lists its own sections. */
 export function useJumpToDestinations(): ComputedRef<JumpDestination[]> {
@@ -62,6 +85,39 @@ export function useJumpToDestinations(): ComputedRef<JumpDestination[]> {
       return false;
     }
   };
+
+  const resolved = (to: RouteLocationRaw) => {
+    try {
+      return router.resolve(to);
+    } catch {
+      return null;
+    }
+  };
+
+  // The path's last word finds a page by the name its URL uses, as "ingestion" finds Data sources.
+  const withPathKeyword = (page: JumpDestination): JumpDestination => {
+    const word = resolved(page.to)?.path.split("/").filter(Boolean).pop();
+    return word ? { ...page, keywords: [word] } : page;
+  };
+
+  const actionsFor = (pages: JumpDestination[]): JumpDestination[] =>
+    JUMP_ACTIONS.flatMap((action) => {
+      const page = pages.find((p) => resolved(p.to)?.name === action.page);
+      const to = { ...action.to, query: { ...orgQuery(), ...action.to.query } };
+      if (!page || !routable(to)) return [];
+      return [
+        {
+          key: `${ACTIONS_AREA_KEY}:${action.key}`,
+          label: t(action.labelKey),
+          icon: page.icon,
+          area: t("common.actions"),
+          areaKey: ACTIONS_AREA_KEY,
+          to,
+          hint: page.label,
+          keywords: page.keywords,
+        },
+      ];
+    });
 
   const reachable = (items: SectionHubItem[]): Section[] =>
     items
@@ -139,7 +195,8 @@ export function useJumpToDestinations(): ComputedRef<JumpDestination[]> {
         addGroup(entry.item.name, entry.item.title, entry.children);
       else addGroup(entry.key, entry.title, entry.children);
     }
-    return out;
+    const pages = out.map(withPathKeyword);
+    return [...pages, ...actionsFor(pages)];
   });
 }
 

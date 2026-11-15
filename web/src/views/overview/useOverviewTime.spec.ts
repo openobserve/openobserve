@@ -48,4 +48,12 @@ describe("useOverviewTime", () => {
     const resetsAt = (now + (9 * 60 + 40) * 60_000) * 1000;
     expect(formatCountdown(resetsAt, now)).toBe("9h 40m");
   });
+
+  it("names a range in hours below two days, as the picker does", () => {
+    const { formatRangeWords } = time();
+    expect(formatRangeWords(15 * 60)).toBe("15 minutes");
+    expect(formatRangeWords(3600)).toBe("1 hour");
+    expect(formatRangeWords(86_400)).toBe("24 hours");
+    expect(formatRangeWords(7 * 86_400)).toBe("7 days");
+  });
 });

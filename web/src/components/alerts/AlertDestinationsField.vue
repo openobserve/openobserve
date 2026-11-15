@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="tooltipText" side="right" />
       </template>
     </div>
-    <div class="flex min-w-0 flex-col max-md:w-full">
+    <div class="flex min-w-0 flex-1 flex-col max-md:w-full">
       <AlertTargetsSelect
         :destinations="destinations"
         :workflows="workflows"

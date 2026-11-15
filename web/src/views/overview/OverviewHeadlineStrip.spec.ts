@@ -56,8 +56,8 @@ const withAlerts = (over: Record<string, unknown>) => {
   } as typeof base;
 };
 
-const ALL = ["firing", "failing", "incidents", "pipelines", "delivery", "quiet"];
-const OVERVIEW_TILES = ["firing", "failing", "pipelines", "delivery", "quiet"];
+const ALL = ["failing", "incidents", "pipelines", "delivery", "quiet"];
+const OVERVIEW_TILES = ["failing", "pipelines", "delivery", "quiet"];
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -69,13 +69,45 @@ afterEach(() => {
 });
 
 describe("OverviewHeadlineStrip", () => {
-  it("shows exactly the six problem tiles, in order, with no streams total", () => {
+  it("shows exactly the five problem tiles, in order, with no firing or streams total", () => {
     const w = mountStrip();
     const keys = w
       .findAll('[data-test^="overview-headline-"]:not([data-test="overview-headline-strip"])')
       .map((el) => el.attributes("data-test")?.replace("overview-headline-", ""));
     expect(keys).toEqual(ALL);
     expect(w.find('[data-test="overview-headline-streams"]').exists()).toBe(false);
+    expect(w.find('[data-test="overview-headline-firing"]').exists()).toBe(false);
+  });
+
+  it("keeps a sixth cell for the strip's one load message", () => {
+    const w = mount(OverviewHeadlineStrip, {
+      props: {
+        overview: null,
+        pending: false,
+        failed: true,
+        incidentsState: "ok",
+        incidentsTotal: 0,
+      },
+      slots: { aside: '<p data-test="aside-probe">Could not load</p>' },
+      global: { plugins: [i18n, store] },
+    });
+    const aside = w.get('[data-test="overview-summary-aside"]');
+    expect(aside.find('[data-test="aside-probe"]').exists()).toBe(true);
+    expect(w.get('[data-test="overview-headline-strip"]').findAll(":scope > li")).toHaveLength(6);
+  });
+
+  it("formats every count compactly, as the rest of Home does", () => {
+    const base = buildOverview();
+    const overview = {
+      ...base,
+      streams: { status: "ok", data: { ...base.streams.data!, quiet_count: 98_213 } },
+    } as typeof base;
+    expect(valueOf(mountStrip({ overview, incidentsTotal: 1_250_000 }), "quiet").text()).toBe(
+      "98.2K",
+    );
+    expect(valueOf(mountStrip({ overview, incidentsTotal: 1_250_000 }), "incidents").text()).toBe(
+      "1.3M",
+    );
   });
 
   it("puts each value at the KPI size above its label", () => {
@@ -93,7 +125,6 @@ describe("OverviewHeadlineStrip", () => {
 
   it("shows the real value of every tile", () => {
     const w = mountStrip();
-    expect(valueOf(w, "firing").text()).toBe("3");
     expect(valueOf(w, "failing").text()).toBe("4");
     expect(valueOf(w, "incidents").text()).toBe("6");
     expect(valueOf(w, "pipelines").text()).toBe("2");
@@ -101,12 +132,14 @@ describe("OverviewHeadlineStrip", () => {
     expect(valueOf(w, "quiet").text()).toBe("3");
   });
 
-  it("tones a non-zero problem count as danger and quiet streams as warning", () => {
+  it("keeps red for incidents and pipeline errors, and tones the other problems as warning", () => {
     const w = mountStrip();
-    for (const key of ["firing", "failing", "incidents", "pipelines"]) {
+    for (const key of ["incidents", "pipelines"]) {
       expect(valueOf(w, key).classes()).toContain("text-status-negative");
     }
-    expect(valueOf(w, "quiet").classes()).toContain("text-status-warning-text");
+    for (const key of ["failing", "quiet"]) {
+      expect(valueOf(w, key).classes()).toContain("text-status-warning-text");
+    }
   });
 
   it("draws a zero in strong ink with no box, and only a dash muted", () => {
@@ -130,11 +163,11 @@ describe("OverviewHeadlineStrip", () => {
 
   it("colours a problem in its value and note, never with a tinted box", () => {
     const w = mountStrip();
-    for (const key of ["firing", "quiet"]) {
+    for (const key of ["failing", "quiet"]) {
       expect(card(w, key).classes()).not.toContain("bg-status-error-bg");
       expect(card(w, key).classes()).not.toContain("bg-status-warning-bg");
     }
-    expect(noteOf(w, "failing").classes()).toContain("text-status-negative");
+    expect(noteOf(w, "failing").classes()).toContain("text-status-warning-text");
     expect(noteOf(w, "quiet").classes()).toContain("text-status-warning-text");
   });
 
@@ -153,12 +186,11 @@ describe("OverviewHeadlineStrip", () => {
       },
       incidentsTotal: 0,
     });
-    for (const key of ["firing", "failing", "incidents", "pipelines"]) {
+    for (const key of ["failing", "incidents", "pipelines"]) {
       expect(noteOf(w, key).classes()).toContain("text-status-success-text");
       const icon = noteOf(w, key).element.previousElementSibling!;
       expect(icon.getAttribute("aria-hidden")).toBe("true");
     }
-    expect(noteOf(w, "firing").text()).toBe("None firing");
     expect(noteOf(w, "delivery").classes()).toContain("text-text-secondary");
   });
 
@@ -169,41 +201,7 @@ describe("OverviewHeadlineStrip", () => {
     }
   });
 
-  it("puts the critical count beside the value and the oldest firing age below it", () => {
-    const w = mountStrip();
-    expect(tile(w, "firing").get('[data-test="overview-tile-unit"]').text()).toBe(
-      "2 at critical level",
-    );
-    expect(noteOf(w, "firing").text()).toBe("Oldest firing for 1h 0m");
-    expect(tile(w, "firing").find('[data-test="overview-tile-unit"]').exists()).toBe(true);
-  });
-
-  it("says zero at critical level when nothing is critical", () => {
-    const overview = withAlerts({
-      firing_by_level: { ok: 0, warning: 3, critical: 0, no_data: 0, unclassified: 0 },
-    });
-    const w = mountStrip({ overview });
-    expect(tile(w, "firing").get('[data-test="overview-tile-unit"]').text()).toBe(
-      "0 at critical level",
-    );
-  });
-
-  it("leaves out the age note when no firing age is known", () => {
-    const [first] = buildOverview().alerts.data!.firing;
-    const overview = withAlerts({ firing: [{ ...first, since: 0 }] });
-    expect(noteOf(mountStrip({ overview }), "firing").exists()).toBe(false);
-  });
-
-  it("skips a firing row with an unknown since when picking the oldest age", () => {
-    const [first, second] = buildOverview().alerts.data!.firing;
-    const overview = withAlerts({
-      firing: [{ ...first, since: 0 }, second],
-      firing_by_level: { ok: 0, warning: 3, critical: 0, no_data: 0, unclassified: 0 },
-    });
-    expect(noteOf(mountStrip({ overview }), "firing").text()).toBe("Oldest firing for 16m");
-  });
-
-  it("says none firing and none failing at zero", () => {
+  it("says none failing and none open at zero", () => {
     const overview = withAlerts({
       by_state: {},
       failed_evaluation: 0,
@@ -211,8 +209,6 @@ describe("OverviewHeadlineStrip", () => {
       firing_by_level: { ok: 0, warning: 0, critical: 0, no_data: 0, unclassified: 0 },
     });
     const w = mountStrip({ overview, incidentsTotal: 0 });
-    expect(noteOf(w, "firing").text()).toBe("None firing");
-    expect(tile(w, "firing").find('[data-test="overview-tile-unit"]').exists()).toBe(false);
     expect(noteOf(w, "failing").text()).toBe("None failing");
     expect(noteOf(w, "incidents").text()).toBe("None open");
   });
@@ -230,7 +226,7 @@ describe("OverviewHeadlineStrip", () => {
       by_state: {},
     });
     const w = mountStrip({ overview });
-    for (const key of ["firing", "failing", "delivery"]) {
+    for (const key of ["failing", "delivery"]) {
       expect(valueOf(w, key).text()).toBe("—");
       expect(noteOf(w, key).text()).toBe("No alert rules");
     }
@@ -240,9 +236,9 @@ describe("OverviewHeadlineStrip", () => {
   it("says no enabled rules when every alert rule is disabled", () => {
     const overview = withAlerts({ total: 3, enabled: 0, disabled: 3 });
     const w = mountStrip({ overview });
-    expect(valueOf(w, "firing").text()).toBe("—");
-    expect(noteOf(w, "firing").text()).toBe("No enabled rules");
+    expect(valueOf(w, "failing").text()).toBe("—");
     expect(noteOf(w, "failing").text()).toBe("No enabled rules");
+    expect(noteOf(w, "delivery").text()).toBe("No enabled rules");
   });
 
   it("notes the enabled pipelines, or a dash and no pipelines when there are none", () => {
@@ -269,11 +265,6 @@ describe("OverviewHeadlineStrip", () => {
     expect(noteOf(w, "quiet").text()).toBe("No streams");
   });
 
-  it("counts a notify-failed rule as firing", () => {
-    const overview = withAlerts({ by_state: { firing: 2, notify_failed: 3 } });
-    expect(valueOf(mountStrip({ overview }), "firing").text()).toBe("5");
-  });
-
   it("shows no access on every overview tile for a forbidden request", () => {
     const w = mountStrip({ overview: null, forbidden: true });
     for (const key of OVERVIEW_TILES) {
@@ -289,8 +280,8 @@ describe("OverviewHeadlineStrip", () => {
 
   it("shows a skeleton, never a zero, and no unavailable note while the first load is pending", () => {
     const w = mountStrip({ overview: null, pending: true });
-    expect(w.findAll('[data-test="overview-tile-skeleton"]').length).toBe(5);
-    expect(tile(w, "firing").text()).not.toContain("0");
+    expect(w.findAll('[data-test="overview-tile-skeleton"]').length).toBe(4);
+    expect(tile(w, "failing").text()).not.toContain("0");
     expect(card(w, "quiet").text()).not.toContain("Could not load");
     expect(card(w, "quiet").text()).not.toContain("—");
   });
@@ -301,19 +292,19 @@ describe("OverviewHeadlineStrip", () => {
       pipelines: { status: "forbidden", reason: "nope" },
     });
     const w = mountStrip({ overview });
-    expect(valueOf(w, "firing").text()).toBe("—");
-    expect(noteOf(w, "firing").text()).toBe("Could not load");
+    expect(valueOf(w, "failing").text()).toBe("—");
+    expect(noteOf(w, "failing").text()).toBe("Could not load");
     expect(noteOf(w, "pipelines").text()).toBe("No access");
     expect(valueOf(w, "quiet").text()).toBe("3");
     expect(w.text()).not.toContain("db exploded");
     expect(w.text()).not.toContain("nope");
   });
 
-  it("shows every overview tile as unavailable when the whole request failed", () => {
+  it("shows a dash on every overview tile, with no note under each, when the whole request failed", () => {
     const w = mountStrip({ overview: null, failed: true });
     for (const key of OVERVIEW_TILES) {
       expect(valueOf(w, key).text()).toBe("—");
-      expect(noteOf(w, key).text()).toBe("Could not load");
+      expect(noteOf(w, key).exists()).toBe(false);
     }
   });
 
@@ -347,17 +338,17 @@ describe("OverviewHeadlineStrip", () => {
     expect(tile(w, "pipelines").element.tagName).not.toBe("BUTTON");
     await tile(w, "pipelines").trigger("click");
     expect(w.emitted("select")).toBeUndefined();
-    await tile(w, "firing").trigger("click");
+    await tile(w, "failing").trigger("click");
     await tile(w, "quiet").trigger("click");
-    expect(w.emitted("select")).toEqual([["firing"], ["quiet"]]);
+    expect(w.emitted("select")).toEqual([["failing"], ["quiet"]]);
   });
 
-  it("shows delivery failures from notify_failed with their meaning, toned as danger", () => {
+  it("shows delivery failures from notify_failed with their meaning, toned as a warning", () => {
     const overview = withAlerts({ by_state: { firing: 1, notify_failed: 2 } });
     const w = mountStrip({ overview });
     expect(card(w, "delivery").text()).toContain("Alert delivery failures");
     expect(valueOf(w, "delivery").text()).toBe("2");
-    expect(valueOf(w, "delivery").classes()).toContain("text-status-negative");
+    expect(valueOf(w, "delivery").classes()).toContain("text-status-warning-text");
     expect(noteOf(w, "delivery").text()).toBe("Alerts that fired but could not notify");
   });
 
@@ -370,12 +361,11 @@ describe("OverviewHeadlineStrip", () => {
 
   it("emits the tile key as a button click", async () => {
     const w = mountStrip();
-    expect(tile(w, "firing").element.tagName).toBe("BUTTON");
-    await tile(w, "firing").trigger("click");
+    expect(tile(w, "failing").element.tagName).toBe("BUTTON");
     await tile(w, "failing").trigger("click");
     await tile(w, "incidents").trigger("click");
     await tile(w, "delivery").trigger("click");
-    expect(w.emitted("select")).toEqual([["firing"], ["failing"], ["incidents"], ["delivery"]]);
+    expect(w.emitted("select")).toEqual([["failing"], ["incidents"], ["delivery"]]);
   });
 });
 
@@ -410,35 +400,34 @@ describe("OverviewHeadlineStrip Ask AI", () => {
 
   it("offers Ask AI on every tile in a problem state and not on a zero tile", () => {
     const w = mountAi();
-    for (const key of ["firing", "failing", "incidents", "pipelines", "quiet"])
+    for (const key of ["failing", "incidents", "pipelines", "quiet"])
       expect(askBtn(w, key).exists(), key).toBe(true);
     expect(askBtn(w, "delivery").exists()).toBe(false);
   });
 
   it("keeps the button a sibling of the clickable tile, never inside it", () => {
     const w = mountAi();
-    const btn = askBtn(w, "firing");
-    expect(btn.element.closest('[data-test="overview-headline-firing"]')).toBeNull();
-    expect(btn.element.closest('[data-test="overview-tile-card-firing"]')).not.toBeNull();
+    const btn = askBtn(w, "failing");
+    expect(btn.element.closest('[data-test="overview-headline-failing"]')).toBeNull();
+    expect(btn.element.closest('[data-test="overview-tile-card-failing"]')).not.toBeNull();
   });
 
   it("emits the count target without a level", async () => {
     const w = mountAi();
-    await askBtn(w, "firing").trigger("click");
+    await askBtn(w, "failing").trigger("click");
     await askBtn(w, "quiet").trigger("click");
     expect(w.emitted("askAi")).toEqual([
-      [{ kind: "count", topic: "firing", count: 3 }],
+      [{ kind: "count", topic: "failing", count: 4 }],
       [{ kind: "count", topic: "quiet", count: 3 }],
     ]);
-    await askBtn(w, "failing").trigger("click");
     expect(w.emitted("askAi")![0][0]).not.toHaveProperty("level");
-    expect(askBtn(w, "firing").attributes("aria-label")).toBe("Ask AI about Firing alerts");
+    expect(askBtn(w, "failing").attributes("aria-label")).toBe("Ask AI about Failing rules");
     expect(w.emitted("select")).toBeUndefined();
   });
 
   it("is hidden when AI is disabled", () => {
     store.commit("setConfig", { ...zo, ai_enabled: false, features: {} });
-    expect(askBtn(mountAi(), "firing").exists()).toBe(false);
+    expect(askBtn(mountAi(), "failing").exists()).toBe(false);
   });
 
   it.each([
@@ -447,7 +436,7 @@ describe("OverviewHeadlineStrip Ask AI", () => {
     ["forbidden", { forbidden: true }],
   ])("is hidden while the section is %s", (_name, props) => {
     const w = mountAi(props as Partial<Props>);
-    for (const key of ["firing", "failing", "pipelines", "quiet"])
+    for (const key of ["failing", "pipelines", "quiet"])
       expect(askBtn(w, key).exists(), key).toBe(false);
   });
 

@@ -438,6 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :debounce="200"
             :placeholder="t('metrics.explorer.searchPlaceholder')"
             data-test="metrics-explorer-search"
+            data-primary-query
             class="min-w-0 flex-1 max-md:basis-full"
             :scope="grid.hideEmptyPanels.value ? 'with-data' : 'all'"
             :scope-options="dataScopeOptions"
@@ -916,6 +917,7 @@ import type { ExplorerViewState } from "@/utils/metrics/explorerSavedView";
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { usePrimaryQueryFocus } from "@/composables/usePrimaryQueryFocus";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 /**
@@ -2576,6 +2578,8 @@ export default defineComponent({
     );
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
+    // Grid modes focus the metric search; Visualize, the PromQL editor.
+    usePrimaryQueryFocus("metricsFocusQuery", ['[data-test="dashboard-panel-query-editor"]']);
     // Keys and scope come from the "metrics" group in shortcutRegistry.ts.
     useShortcuts([
       {
@@ -2589,16 +2593,6 @@ export default defineComponent({
         handler: () => {
           if (isInputFocused()) return;
           onRefresh({ manual: true });
-        },
-      },
-      {
-        id: "metricsFocusQuery",
-        handler: () => {
-          // Grid modes: the metric search box. Visualize: the PromQL editor.
-          const el = document.querySelector<HTMLElement>(
-            '[data-test="metrics-explorer-search"] input, [data-test="metrics-explorer-search"] textarea, [data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea',
-          );
-          el?.focus();
         },
       },
       {

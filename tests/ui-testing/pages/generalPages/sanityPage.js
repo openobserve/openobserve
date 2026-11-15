@@ -16,7 +16,7 @@ export class SanityPage {
         this.quickModeToggleButton = page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
         this.allFieldsButton = page.locator('[data-test="logs-all-fields-btn"]');
         this.interestingJobFieldButton = page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]');
-        this.sqlModeToggleButton = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
+        this.sqlModeToggleButton = page.locator('[data-test="logs-search-bar-query-mode-sql"]');
         this.queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
 
         // ============================================================
@@ -324,6 +324,13 @@ export class SanityPage {
      */
     async _clickSqlModeToggle() {
         await expect(this.queryEditor).toBeVisible({ timeout: 10000 });
+        // Turn SQL on through the toolbar tray when it is shown; idempotent, so a second call is safe.
+        if (await this.sqlModeToggleButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            if ((await this.sqlModeToggleButton.getAttribute('data-state')) !== 'on') {
+                await this.sqlModeToggleButton.click();
+                await expect(this.sqlModeToggleButton).toHaveAttribute('data-state', 'on', { timeout: 10000 });
+            }
+        }
         const monacoHelper = new MonacoEditorHelper(this.page);
         await monacoHelper.setContentVerified(this.queryEditor, 'SELECT * FROM "e2e_automate"');
         await this.page.waitForTimeout(200);

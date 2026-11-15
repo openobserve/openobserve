@@ -317,7 +317,7 @@ describe("General", () => {
     it("counts theme colors with the form fields, and Discard restores both", async () => {
       const wrapper = createWrapper();
       const form = wrapper.findComponent({ name: "OForm" }).vm.form;
-      expect(bar(wrapper).attributes("data-state")).toBe("clean");
+      expect(bar(wrapper).exists()).toBe(false);
 
       await wrapper.find('[data-test="theme-light-chip"]').trigger("click");
       Object.assign(wrapper.vm, { tempColor: "#112233" });
@@ -333,7 +333,7 @@ describe("General", () => {
 
       expect((wrapper.vm as any).customLightColor).toBe("#3F7994");
       expect(form.state.values.scrape_interval).toBe("30");
-      expect(bar(wrapper).attributes("data-state")).toBe("clean");
+      expect(bar(wrapper).exists()).toBe(false);
     });
   });
 
@@ -1158,9 +1158,7 @@ describe("General", () => {
       expect(
         wrapper.find('[data-test="general-settings-scrape-interval-row"]').attributes("aria-busy"),
       ).toBe("true");
-      expect(wrapper.find('[data-test="general-settings-save-bar"]').attributes("data-state")).toBe(
-        "loading",
-      );
+      expect(wrapper.find('[data-test="general-settings-save-bar"]').exists()).toBe(false);
     });
   });
 });

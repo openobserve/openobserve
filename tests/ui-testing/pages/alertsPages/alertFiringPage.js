@@ -22,7 +22,7 @@ export class AlertFiringPage {
     this.viewAll = page.locator('[data-test="alerts-firing-history-view-all"]');
     this.takeOver = page.locator('[data-test="alerts-firing-drawer-take-over"]');
     this.drawerAck = page.locator('[data-test="alerts-firing-drawer-ack"]');
-    this.logs = page.locator('[data-test="alerts-firing-drawer-logs"]');
+    this.logs = page.locator('[data-test="alerts-firing-drawer-open-in"]');
     this.ackChip = page.locator('[data-test="alerts-firing-drawer-ack-chip"]');
     this.toast = page.locator('[data-test^="o-toast-"][data-test-message]');
   }

@@ -50,11 +50,13 @@ export class LogsPage {
         this.allFieldsToggleBtn = '[data-test="logs-page-all-fields-btn"], [data-test="logs-all-fields-btn"], [data-test="logs-page-user-defined-fields-btn-all_fields_slot"], [data-test="logs-user-defined-fields-btn-all_fields_slot"]';
         this.interestingFieldsToggleBtn = '[data-test="logs-page-interesting-fields-btn"], [data-test="logs-interesting-fields-btn"], [data-test="logs-page-user-defined-fields-btn-interesting_fields_slot"], [data-test="logs-user-defined-fields-btn-interesting_fields_slot"]';
         this.fieldListResetIcon = '[data-test="logs-page-fields-list-reset-icon"]';
-        this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
-        // OSwitch renders the wrapper data-test on a div and the toggle state on an inner
-        // <button data-state="checked|unchecked"> — drill into that button via data-state attr.
-        this.sqlModeToggleStateBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state]';
-        this.sqlModeSwitch = { role: 'switch', name: 'SQL mode' };
+        // The toolbar's "Filter | SQL" tray; each segment carries data-state="on|off" itself.
+        this.sqlModeToggle = '[data-test="logs-search-bar-query-mode-sql"]';
+        this.filterModeToggle = '[data-test="logs-search-bar-query-mode-filter"]';
+        this.sqlModeToggleStateBtn = '[data-test="logs-search-bar-query-mode-sql"]';
+        // Below the tray's width it folds into the toolbar ⋯ as a "Query language" group.
+        this.menuQueryModeSql = '[data-test="logs-search-bar-menu-query-mode-sql"]';
+        this.menuQueryModeFilter = '[data-test="logs-search-bar-menu-query-mode-filter"]';
         this.dateTimeButton = '[data-test="date-time-btn"]';
         this.indexDropDown = '[data-test="log-search-index-list-select-stream"]';
         // OSelect post-migration: the wrapper is a div (cannot be `.fill()`'d) — use the
@@ -138,8 +140,8 @@ export class LogsPage {
         this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
         this.menuCreateSavedViewBtn = '[data-test="logs-search-bar-menu-create-saved-view-btn"]';
         this.menuHistogramBtn = '[data-test="logs-search-bar-menu-histogram-btn"]';
-        this.menuSqlModeBtn = '[data-test="logs-search-bar-menu-sql-mode-btn"]';
-        this.menuSqlModeBtnState = '[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]';
+        this.menuSqlModeBtn = '[data-test="logs-search-bar-menu-query-mode-sql"]';
+        this.menuSqlModeBtnState = '[data-test="logs-search-bar-menu-query-mode-sql"][aria-checked]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
         this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
@@ -370,7 +372,7 @@ export class LogsPage {
         this.successNotification = '[data-test-variant="success"], [data-test-variant="error"], [data-test-variant="info"], [data-test-variant="warning"], [data-test-variant="loading"], [data-test-variant="default"]';
         // Success-only toast variant (e.g. saved view created)
         this.successToast = '[data-test-variant="success"]';
-        this.linkCopiedSuccessText = 'Link Copied Successfully';
+        this.linkCopiedSuccessText = 'Link copied';
         this.errorCopyingLinkText = 'Error while copy link';
 
         // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
@@ -435,16 +437,11 @@ export class LogsPage {
         this.dimensionCheckboxAny = '[data-test^="dimension-checkbox-"]';
         // Dashboard chart panel inside the analysis dashboard page (via data-test prefix)
         this.analysisDashboardChartPanel = '[data-test="traces-analysis-dashboard-page"] [data-test^="dashboard-panel-"]';
-        // SQL Mode toggle (OSwitch) — sourced from SearchBar.vue
-        this.sqlModeToggleBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
-        // Inner <button role="switch"> rendered by OSwitch — carries data-state="checked|unchecked"
-        // OSwitch's inner switch button does NOT receive a derived `-button` data-test in the
-        // current OSwitch.vue implementation (button is plain `role="switch"` with data-state).
-        // Drill into the wrapper and target the inner [data-state] attribute directly.
-        this.sqlModeToggleInnerBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state]';
-        // Pre-scoped checked/unchecked state filters — mirror histogramToggleCheckedBtn pattern.
-        this.sqlModeToggleCheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="checked"]';
-        this.sqlModeToggleUncheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="unchecked"]';
+        // SQL segment of the toolbar's "Filter | SQL" tray (SearchBar.vue); it carries data-state itself.
+        this.sqlModeToggleBtn = '[data-test="logs-search-bar-query-mode-sql"]';
+        this.sqlModeToggleInnerBtn = '[data-test="logs-search-bar-query-mode-sql"]';
+        this.sqlModeToggleCheckedBtn = '[data-test="logs-search-bar-query-mode-sql"][data-state="on"]';
+        this.sqlModeToggleUncheckedBtn = '[data-test="logs-search-bar-query-mode-sql"][data-state="off"]';
 
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
@@ -2588,9 +2585,9 @@ export class LogsPage {
     // Force the real flag here so every kubernetesContainerName*Join* helper is
     // deterministically SQL-mode regardless of caller or auto-detect timing.
     async _ensureSqlModeAfterJoinQuery() {
-        if (!(await this._isSqlModeEnabledViaVue())) {
-            await this._setSqlModeViaVue(true);
-        }
+        // Idempotent: the tray is clicked only while the app is still in Filter mode; an
+        // authored SELECT in the editor is kept as it is.
+        await this._setSqlModeViaTray(true);
     }
 
     /**
@@ -2668,10 +2665,10 @@ export class LogsPage {
         let previousValue = orderType === 'desc' ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
 
         for (const row of rows) {
-            const sourceCell = await row.locator('[data-test="o2-table-cell-source"]').textContent();
+            // Aggregate rows render one column per result key, so logcount has its own cell.
+            const sourceCell = await row.locator('[data-test="o2-table-cell-logcount"]').textContent();
             try {
-                const logcountMatch = sourceCell.match(/logcount":(\d+)/);
-                const currentValue = logcountMatch ? parseInt(logcountMatch[1]) : 0;
+                const currentValue = parseInt(sourceCell.trim(), 10) || 0;
 
                 if (orderType === 'desc') {
                     expect(currentValue).toBeLessThanOrEqual(previousValue);
@@ -3380,42 +3377,30 @@ export class LogsPage {
     }
 
     async clickSQLModeToggle() {
-        // Behaves as a true toggle:
-        //   SQL ON  → clear the editor (FTS mode, no SELECT)
-        //   SQL OFF → write SELECT query with current interesting fields (SQL mode)
-        //
-        // Uses setQueryEditorContent (Monaco executeEdits API) rather than keyboard input —
-        // keyboard typing is focus-sensitive and silently fails in headless CI when focus
-        // lands on another element.
-        const isSQL = await this.isSqlModeEnabled();
-        if (isSQL) {
-            // Toggle OFF: clear editor so auto-detection sets sqlMode = false
-            await this.setQueryEditorContent('');
-            await this.page.waitForTimeout(300);
-            testLogger.info('clickSQLModeToggle: toggled OFF (editor cleared)');
-            return;
-        }
+        // A true toggle through the toolbar's "Filter | SQL" tray, as a user does it: turning
+        // SQL on lets the app write the SELECT (with the interesting fields in quick mode);
+        // turning it off keeps the WHERE clause as the filter.
+        const wasSql = await this._readSqlMode();
+        await this._setSqlModeViaTray(!wasSql);
+        await this._waitForEditorSql(!wasSql);
+        testLogger.info(`clickSQLModeToggle: toggled ${wasSql ? 'OFF' : 'ON'} via the query mode tray`);
+    }
 
-        // Toggle ON: read interesting fields + stream from Vue state, build SELECT
-        const appState = await this._mutateSearchObj((searchObj) => ({
-            fields: [...(searchObj.data?.stream?.interestingFieldList || [])],
-            stream: searchObj.data?.stream?.selectedStream?.[0] || 'e2e_automate',
-        }));
-
-        const timestamp = '_timestamp';
-        const fields = appState?.fields || [];
-        const stream = appState?.stream || 'e2e_automate';
-        const allFields = fields.includes(timestamp) ? fields : [timestamp, ...fields];
-        // Always build an explicit field list — never fall back to SELECT * when we
-        // have at least _timestamp, so assertions like "includes(_timestamp,field)"
-        // work even when interestingFieldList had only one user field.
-        const sql = allFields.length > 0
-            ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
-            : `SELECT * FROM "${stream}"`;
-
-        await this.setQueryEditorContent(sql);
-        await this.page.waitForTimeout(300);
-        testLogger.info(`clickSQLModeToggle: toggled ON — set SQL="${sql.substring(0, 80)}"`);
+    /** Waits for the editor text to (not) read as SQL after a mode switch; resolves quietly on timeout. */
+    async _waitForEditorSql(expectSql, timeout = 5000) {
+        await this.page.waitForFunction(({ selector, want }) => {
+            const host = document.querySelector(selector);
+            if (!host) return !want;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            for (const ed of editors) {
+                const node = ed.getDomNode?.();
+                if (node && host.contains(node)) {
+                    const val = (ed.getValue() || '').toLowerCase();
+                    return (val.includes('select') && val.includes('from')) === want;
+                }
+            }
+            return !want;
+        }, { selector: this.queryEditor, want: expectSql }, { timeout, polling: 100 }).catch(() => {});
     }
 
     async clickShowQueryToggle() {
@@ -5357,7 +5342,7 @@ export class LogsPage {
      * column (full row as JSON). With the FTS default-column feature, a plain
      * (non-SQL, no-pin) view instead promotes the best-fill full-text "body"
      * field (e.g. "log"/"message"/"body") to its own column, so "source" is no
-     * longer guaranteed. Custom SQL queries and aggregates still render "source".
+     * longer guaranteed. Custom SQL queries still render "source"; aggregates render their own columns.
      *
      * This helper therefore passes when EITHER the "source" column OR any other
      * first-row column cell is visible — i.e. "results rendered", independent of
@@ -5377,11 +5362,9 @@ export class LogsPage {
 
     /**
      * Wait for a specific named column cell in the first result row to be visible.
-     * Only applicable when the user has pinned fields via selectedFields — those
-     * fields are rendered as individual columns with id equal to the field name.
-     * For aggregate CTEs or any query where no fields are pinned, the table shows
-     * a single "source" column (JSON.stringify of the row); use
-     * expectLogTableColumnSourceVisible() + expectInterestingFieldInTable() instead.
+     * Applies to fields pinned via selectedFields and to SQL aggregates, whose
+     * result keys render as their own columns (id = the key). Other unpinned
+     * queries show a single "source" column (JSON.stringify of the row).
      * @param {string} columnName - The column/field name (e.g. 'level', 'kubernetes_pod_name')
      * @param {number} rowIndex - Row index (default 0 = first row)
      */
@@ -8246,7 +8229,7 @@ export class LogsPage {
             return;
         }
         const stream = await this._getSelectedStream();
-        const set = await this._setSqlModeViaVue(true);
+        const set = await this._setSqlModeViaTray(true);
         if (!set) {
             // Vue state inaccessible — write SELECT directly to trigger auto-detection
             await this.setQueryEditorValue(`SELECT * FROM "${stream}"`);
@@ -8278,6 +8261,57 @@ export class LogsPage {
             return true;
         }, value);
         return result === true;
+    }
+
+    /**
+     * Current SQL mode as the user sees it: the real flag, else the tray segment's
+     * data-state, else the editor-text heuristic.
+     * @returns {Promise<boolean>}
+     */
+    async _readSqlMode() {
+        const flag = await this._isSqlModeEnabledViaVue();
+        if (flag !== null && flag !== undefined) return flag;
+        const segment = this.page.locator(this.sqlModeToggle);
+        if (await segment.isVisible({ timeout: 1000 }).catch(() => false)) {
+            return (await segment.getAttribute('data-state')) === 'on';
+        }
+        return await this.isSqlModeEnabled();
+    }
+
+    /**
+     * Switch the query language the way a user does: the toolbar's "Filter | SQL" tray,
+     * or its "Query language" group in ⋯ when the toolbar is too narrow. Idempotent: it
+     * clicks only when the mode differs. Falls back to the Vue flag when the segment is
+     * unavailable (e.g. SQL is disabled in Drill down).
+     * @param {boolean} on - true for SQL, false for Filter
+     * @returns {Promise<boolean>} true once the mode matches
+     */
+    async _setSqlModeViaTray(on) {
+        if ((await this._readSqlMode()) === on) return true;
+        const segment = this.page.locator(on ? this.sqlModeToggle : this.filterModeToggle);
+        const segmentUsable = await segment.isVisible({ timeout: 2000 }).catch(() => false)
+            && (await segment.getAttribute('aria-hidden')) !== 'true'
+            && await segment.isEnabled().catch(() => false);
+        if (segmentUsable) {
+            await segment.click();
+        } else {
+            const menuItem = this.page.locator(on ? this.menuQueryModeSql : this.menuQueryModeFilter);
+            const moreButton = this.page.locator(this.utilitiesMenuButton);
+            let picked = false;
+            if (await moreButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+                await moreButton.click();
+                if (await menuItem.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await menuItem.click();
+                    picked = true;
+                } else {
+                    await this.page.keyboard.press('Escape');
+                }
+            }
+            if (!picked) return await this._setSqlModeViaVue(on);
+        }
+        await expect.poll(() => this._readSqlMode(), { timeout: 10000 }).toBe(on);
+        testLogger.info(`_setSqlModeViaTray: query language set to ${on ? 'SQL' : 'Filter'}`);
+        return true;
     }
 
     /**
@@ -8725,8 +8759,7 @@ export class LogsPage {
      * @returns {Promise<string|null>}
      */
     async getSQLModeState() {
-        testLogger.info('getSQLModeState: SQL mode toggle removed from UI — returning null');
-        return null;
+        return String(await this._readSqlMode());
     }
 
     /**
@@ -9481,9 +9514,9 @@ export class LogsPage {
             testLogger.info('enableSqlModeIfNeeded: SQL mode already on — skipping');
             return;
         }
-        // Set the Vue flag first — in the build tab this triggers the sqlMode watcher
-        // which updates the editor with the full generated SQL query.
-        await this._setSqlModeViaVue(true);
+        // Switch through the "Filter | SQL" tray as a user does; the app then writes the SELECT
+        // (logs tab) or the builder's generated SQL (build tab) into the editor.
+        await this._setSqlModeViaTray(true);
 
         // Poll up to 2000ms for the Vue watcher chain to update the Monaco editor.
         // The watcher is async (reads buildDashboardPanelData, awaits onBuildQueryGenerated,
@@ -9553,15 +9586,14 @@ export class LogsPage {
      * (build tab auto mode) or the async watcher chain is too slow.
      */
     async disableSqlModeIfNeeded() {
-        const isSQL = await this.isSqlModeEnabled();
+        const isSQL = (await this._isSqlModeEnabledViaVue()) === true || (await this.isSqlModeEnabled());
         if (!isSQL) {
             testLogger.info('disableSqlModeIfNeeded: SQL mode already off — skipping');
             return;
         }
-        // Set sqlMode=false via Vue state — in build mode this triggers the Index.vue
-        // watcher which calls onBuildQueryGenerated() → extractWhereClause() (async) →
-        // searchObj.data.query = whereClause → QueryEditor prop watcher → Monaco setValue.
-        await this._setSqlModeViaVue(false);
+        // Switch to Filter through the tray; the app keeps the query's WHERE clause as the filter
+        // (in build mode via onBuildQueryGenerated() → extractWhereClause()).
+        await this._setSqlModeViaTray(false);
         // Wait for the watcher chain to strip the SELECT from the editor instead of a fixed
         // 600ms sleep — resolves as soon as the editor updates, falls through on timeout to
         // the isStillSQL fallback below (same recovery path as before).
@@ -10994,8 +11026,7 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if SQL mode is ON
      */
     async isSqlModeOn() {
-        // Opens the utilities dropdown to read the SQL mode OSwitch state, then closes it.
-        return await this.isSqlModeEnabled();
+        return await this._readSqlMode();
     }
 
     /**

@@ -134,11 +134,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           showAddTabDialog = true;
         }
       "
+      :aria-label="t('dashboard.newTab')"
       data-test="dashboard-tab-add-btn"
       icon="add"
     >
       <OTooltip :content="t('dashboard.newTab')" />
     </OButton>
+    <div class="ms-auto ps-3"><slot name="end" /></div>
     <AddTab
       v-model:open="showAddTabDialog"
       :dashboard-id="dashboardData?.dashboardId"

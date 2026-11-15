@@ -154,48 +154,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-actions="{ row }">
             <div class="actions-container flex items-center">
-              <OButton
-                icon-only
-                :data-test="`pipeline-list-${row.name}-pause-start-action`"
-                :data-row-action="row.enabled ? 'pause' : 'resume'"
-                :variant="row.enabled ? 'danger-ghost' : 'ghost'"
-                size="sm"
-                :icon="row.enabled ? 'pause' : 'play-arrow'"
-                class="max-md:hidden"
-                @click.stop="togglePipeline(row)"
+              <div
+                class="flex items-center opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 pointer-coarse:opacity-100"
               >
-                <OTooltip
-                  side="bottom"
-                  :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                  :shortcut="row.enabled ? 'pipelinesRowPause' : undefined"
-                />
-              </OButton>
-              <!-- Hover-only preview with no click action, so it has no menu counterpart below md. -->
-              <OButton
-                icon-only
-                :data-test="`pipeline-list-${row.name}-view-pipeline`"
-                variant="ghost"
-                size="sm"
-                :title="t('pipeline.view')"
-                class="max-md:hidden"
-                icon="visibility"
-              >
-                <OTooltip side="left">
-                  <template #content><PipelineView :pipeline="row" /></template>
-                </OTooltip>
-              </OButton>
-              <OButton
-                icon-only
-                :data-test="`pipeline-list-${row.name}-update-pipeline`"
-                data-row-action="edit"
-                variant="ghost"
-                size="sm"
-                class="max-md:hidden"
-                @click.stop="editPipeline(row)"
-                icon="edit"
-              >
-                <OTooltip side="bottom" :content="t('alerts.edit')" shortcut="pipelinesRowEdit" />
-              </OButton>
+                <OButton
+                  icon-only
+                  :data-test="`pipeline-list-${row.name}-pause-start-action`"
+                  :data-row-action="row.enabled ? 'pause' : 'resume'"
+                  variant="ghost"
+                  size="sm"
+                  :icon="row.enabled ? 'pause' : 'play-arrow'"
+                  class="max-md:hidden"
+                  @click.stop="togglePipeline(row)"
+                >
+                  <OTooltip
+                    side="bottom"
+                    :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                    :shortcut="row.enabled ? 'pipelinesRowPause' : undefined"
+                  />
+                </OButton>
+                <!-- Hover-only preview with no click action, so it has no menu counterpart below md. -->
+                <OButton
+                  icon-only
+                  :data-test="`pipeline-list-${row.name}-view-pipeline`"
+                  variant="ghost"
+                  size="sm"
+                  :title="t('pipeline.view')"
+                  class="max-md:hidden"
+                  icon="visibility"
+                >
+                  <OTooltip side="left">
+                    <template #content><PipelineView :pipeline="row" /></template>
+                  </OTooltip>
+                </OButton>
+                <OButton
+                  icon-only
+                  :data-test="`pipeline-list-${row.name}-update-pipeline`"
+                  data-row-action="edit"
+                  variant="ghost"
+                  size="sm"
+                  class="max-md:hidden"
+                  @click.stop="editPipeline(row)"
+                  icon="edit"
+                >
+                  <OTooltip side="bottom" :content="t('alerts.edit')" shortcut="pipelinesRowEdit" />
+                </OButton>
+              </div>
               <!-- Hidden proxies so the row-hover shortcuts reach the more-menu
                  actions (teleported out of the row): x = export, Del = delete. -->
               <button
@@ -530,7 +534,7 @@ import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
-import { useListViewState } from "@/composables/useListViewState";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
@@ -587,14 +591,6 @@ interface PipelineRow {
   sql_query?: string;
 }
 
-const viewState = useListViewState("pipelines", {
-  filterQuery: "",
-  tab: "all",
-  stateFilter: [] as PipelineStateKey[],
-  pageSize: 20,
-  sortBy: "",
-  sortOrder: "asc" as "asc" | "desc",
-});
 // A state link shows that state across every tab with no saved search, so its rows match the count behind it.
 const urlState = router.currentRoute.value.query.state;
 const urlPipelineStates = readFilterKeys(urlState, isPipelineStateKey);
@@ -602,6 +598,23 @@ if (urlState !== undefined) {
   const { state: _consumed, ...rest } = router.currentRoute.value.query;
   router.replace({ query: rest });
 }
+// That one-off view keeps the saved search for the next visit, so it stays out of the URL too.
+const viewState = useListViewState(
+  "pipelines",
+  {
+    filterQuery: "",
+    tab: "all",
+    stateFilter: [] as PipelineStateKey[],
+    pageSize: 20,
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
+  },
+  {
+    url: urlPipelineStates.length
+      ? undefined
+      : { ...LIST_URL_PARAMS, tab: "tab", stateFilter: "state" },
+  },
+);
 const filterQuery = ref(urlPipelineStates.length ? "" : viewState.filterQuery);
 const pageSize = ref(viewState.pageSize);
 const sortBy = ref(viewState.sortBy);

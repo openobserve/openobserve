@@ -28,8 +28,7 @@ const openGroupKey = moduleRef<string | null>(null);
  *
  *  • Link + subnav (`parentItem` provided) — the tile IS a navigating MenuLink
  *    (e.g. Data → /streams). Hovering reveals its sub-pages; clicking lands on
- *    the main page while the flyout stays open under the pointer (it closes on
- *    mouse-leave / outside click / Escape). No pinning.
+ *    the main page and closes the flyout until the pointer leaves the tile. No pinning.
  *
  *  • Pure group (no `parentItem`) — the tile is a non-navigating MenuLink
  *    trigger. Hover opens; clicking pins the flyout open until an outside
@@ -437,9 +436,12 @@ function close() {
 // Where the pointer last came to rest on the tile; the open timer counts from here.
 let restAnchor: Point | null = null;
 
+// Set by a tile click: the page under the pointer is the one just chosen, so hover waits until the pointer leaves.
+let hoverOpenSuppressed = false;
+
 function scheduleOpen(event?: MouseEvent) {
   // Some touch browsers emit a synthetic mouseenter, which would open a group the user only scrolled past.
-  if (isMobile.value) return;
+  if (isMobile.value || hoverOpenSuppressed) return;
   restAnchor = event ? { x: event.clientX, y: event.clientY } : null;
   clearTimers();
   // A neighbour whose flyout the pointer is still travelling towards keeps its turn.
@@ -482,6 +484,11 @@ function scheduleClose(event?: MouseEvent) {
   closeTimer = setTimeout(tryClose, CLOSE_DELAY);
 }
 
+function onTileMouseleave(event: MouseEvent) {
+  hoverOpenSuppressed = false;
+  scheduleClose(event);
+}
+
 function onTriggerClick() {
   if (isPinned.value) {
     close();
@@ -491,13 +498,10 @@ function onTriggerClick() {
   }
 }
 
-// detail 0 is a keyboard activation: Enter navigates, so nothing should stay open.
+// A click navigates to the group's page, so the flyout must not stay open over it (N1); Enter (detail 0) leaves no pointer to wait on.
 function onLinkClick(event?: MouseEvent) {
-  if (event?.detail === 0) {
-    close();
-    return;
-  }
-  open();
+  hoverOpenSuppressed = event?.detail !== 0;
+  close();
 }
 
 function isRtl(): boolean {
@@ -528,6 +532,14 @@ function onTileKeydown(event: KeyboardEvent) {
 watch(openGroupKey, (key) => {
   if (key !== props.groupKey && isOpen.value) close();
 });
+
+// Path, not query: a list page rewriting its own query must not shut a flyout the pointer is on.
+watch(
+  () => router.currentRoute.value.path,
+  () => {
+    if (isOpen.value && !isMobile.value) close();
+  },
+);
 
 function onDocumentPointerDown(event: PointerEvent) {
   const target = event.target as Node;
@@ -664,7 +676,7 @@ function onChildMouseenter(event: MouseEvent) {
     :data-test="`nav-group-${groupKey}`"
     class="nav-group relative shrink-0"
     @mouseenter="scheduleOpen"
-    @mouseleave="scheduleClose"
+    @mouseleave="onTileMouseleave"
     @mousemove="onTileMousemove"
   >
     <!-- Link mode: a navigating MenuLink that also reveals sub-pages on hover.

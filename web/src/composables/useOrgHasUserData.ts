@@ -112,7 +112,10 @@ export function useOrgHasUserData(org: MaybeRefOrGetter<string>) {
   });
   // a stale cached answer shows while it refetches; callers that decide once wait for this to clear
   const isFetching = computed(() => queries.some((q) => q.isFetching.value));
-  return { hasUserData, isFetching, hasAnyStream };
+  // the lists by type, in USER_DATA_STREAM_TYPES order; undefined until that type answers
+  const lists = computed(() => queries.map((q) => q.data.value as ListedStream[] | undefined));
+  const listFailed = computed(() => queries.map((q) => q.isError.value && !q.data.value));
+  return { hasUserData, isFetching, hasAnyStream, lists, listFailed };
 }
 
 /** `useOrgHasUserData`'s answer, read once outside a component; undefined when a list fails. */

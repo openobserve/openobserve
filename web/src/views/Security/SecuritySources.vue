@@ -7,6 +7,8 @@ import { useMutation, useQuery } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -242,6 +244,9 @@ function showRefusal(err: unknown, stream: string, fallback: I18nText) {
   };
 }
 
+const lastRunAt = ref<number | null>(null);
+const loadFailed = computed(() => !!secSources.error.value && !rows.value.length);
+
 async function reload() {
   if (!orgId.value) return;
   // Stale warnings must not survive a reload or an org switch.
@@ -249,6 +254,7 @@ async function reload() {
   await secSources.load(orgId.value);
   // Awaits the cached access answer, which a first load can reach before the reactive flag has it.
   await secSources.migrateIncludes((await loadSecurityAccess(orgId.value)).triage);
+  if (!secSources.error.value) lastRunAt.value = Date.now();
 }
 
 /** The stream whose attach plan is shown; nothing is written until it is confirmed. */
@@ -432,6 +438,14 @@ onMounted(reload);
     bleed
     data-test="security-sources"
   >
+    <template #actions>
+      <ORefreshButton
+        :last-run-at="lastRunAt"
+        :loading="secSources.loading.value"
+        data-test="security-sources-refresh"
+        @click="reload"
+      />
+    </template>
     <SecurityNotices
       :notices="notices"
       class="mx-page-edge mt-2"
@@ -444,6 +458,7 @@ onMounted(reload);
       :loading="secSources.loading.value && !rows.length"
       pagination="client"
       :global-filter="sourceSearch"
+      :error="loadFailed ? secSources.error.value || 'x' : null"
       class="min-h-0 flex-1"
       data-test="security-sources-table"
     >
@@ -532,6 +547,13 @@ onMounted(reload);
       </template>
       <template #cell-name="{ row }">
         <span class="text-text-heading truncate font-medium">{{ raw(row.name) }}</span>
+      </template>
+      <template #error>
+        <SecurityLoadError
+          :what="t('siem.sources.whatSources')"
+          :hint="t('siem.sources.loadFailedHint')"
+          @retry="reload"
+        />
       </template>
       <template #empty>
         <OEmptyState

@@ -18,75 +18,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="text-text-body px-page-edge flex h-full min-w-0 flex-col overflow-y-auto pb-6"
     data-test="overview-canvas"
   >
+    <!-- the range and refresh sit in the page header (R1, R5); alone, as in a spec, they stay here -->
+    <Teleport :to="actionsTarget || 'body'" :disabled="!actionsTarget" defer>
+      <ODateTimeRange
+        v-if="pageState !== 'forbidden' && !errorIsForbidden"
+        ref="dateTimeRef"
+        auto-apply
+        menu-align="end"
+        :default-type="dateTimeType"
+        :default-absolute-time="{
+          startTime: absoluteTime.startTime,
+          endTime: absoluteTime.endTime,
+        }"
+        :default-relative-time="relativeTime"
+        @on:date-change="onDateChange"
+      />
+      <ORefreshButton
+        v-if="pageState !== 'forbidden' && !errorIsForbidden"
+        :last-run-at="lastFetched ? lastFetched.getTime() : null"
+        :loading="isLoading || overviewState.loading"
+        :disabled="isLoading || overviewState.loading"
+        :tooltip="dataAsOf"
+        @click="() => loadAll(true)"
+      />
+    </Teleport>
+
+    <!-- the first steps need the stream lists, so the body waits for them behind the band's skeleton -->
     <div
-      v-if="pageState !== 'forbidden' && !errorIsForbidden"
-      class="flex min-h-12 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2"
+      v-if="showOverviewCards && pageShowsSections && !streamsSettled"
+      class="grid grid-cols-2 gap-x-8 gap-y-6 pt-2 pb-6 max-lg:grid-cols-1"
+      data-test="overview-sections-pending"
     >
-      <OverviewStatusLine v-if="showStatusLine" :status="status" />
-      <div class="ms-auto flex items-center gap-2">
-        <ODateTimeRange
-          ref="dateTimeRef"
-          auto-apply
-          menu-align="end"
-          :default-type="dateTimeType"
-          :default-absolute-time="{
-            startTime: absoluteTime.startTime,
-            endTime: absoluteTime.endTime,
-          }"
-          :default-relative-time="relativeTime"
-          @on:date-change="onDateChange"
-        />
-        <ORefreshButton
-          :last-run-at="lastFetched ? lastFetched.getTime() : null"
-          :loading="isLoading || overviewState.loading"
-          :disabled="isLoading || overviewState.loading"
-          :tooltip="dataAsOf"
-          @click="() => loadAll(true)"
-        />
-      </div>
+      <OverviewFiringNow
+        state="loading"
+        :rows="[]"
+        :enabled-rules="0"
+        :total-rules="0"
+        :now="clock"
+      />
+      <OverviewDataFreshness
+        state="loading"
+        :rows="[]"
+        :range="timeRange"
+        :range-words="rangeWords"
+        :now="clock"
+      />
     </div>
-
-    <OInlineNotice
-      v-if="showOverviewCards && overviewRefreshFailed"
-      tone="warn"
-      class="mb-4"
-      data-test="overview-stale-notice"
-    >
-      {{ t("overview.stale.message", { time: generatedAtLabel }) }}
-      <template #actions>
-        <OButton
-          variant="secondary"
-          icon="refresh"
-          data-test="overview-stale-retry-btn"
-          @click="() => loadOverview(true)"
-        >
-          {{ t("overview.stale.retry") }}
-        </OButton>
-      </template>
-    </OInlineNotice>
-
+    <!-- every panel keeps its final height while it loads or fails, so nothing below it moves -->
     <div
-      v-if="showOverviewCards && pageShowsSections && summarySettled"
+      v-else-if="showOverviewCards && pageShowsSections"
       class="divide-border-default flex flex-col divide-y"
       data-test="overview-sections"
     >
-      <!-- every summary panel reads the one /overview answer, so its failure is said once -->
-      <OEmptyState
-        v-if="summaryState === 'error'"
-        kind="error"
-        data-test="overview-summary-error"
-        @action="() => loadOverview(true)"
-      />
-      <OEmptyState
-        v-else-if="summaryState === 'denied'"
-        kind="denied"
-        :text="t('overview.state.sectionForbidden')"
-        data-test="overview-summary-forbidden"
+      <section
+        class="grid grid-cols-2 gap-x-8 gap-y-6 pt-2 pb-6 max-lg:grid-cols-1"
+        data-test="overview-status-band"
+      >
+        <OverviewFiringNow
+          :state="firingState"
+          :rows="firingRows"
+          :enabled-rules="enabledRules"
+          :total-rules="alertRows.length"
+          :locked-reason="alertsLocked ? alertsLock.lockedReason.value : undefined"
+          :now="clock"
+          @retry="() => firingRead.refetch()"
+          @ask-ai="onAskAi"
+        />
+        <OverviewDataFreshness
+          :state="freshnessState"
+          :rows="freshness"
+          :range="timeRange"
+          :range-words="rangeWords"
+          :now="clock"
+          @retry="retryStreamLists"
+        />
+      </section>
+
+      <OverviewGettingStarted
+        v-if="showGettingStarted"
+        class="py-6"
+        :rows="freshness"
+        :range-words="rangeWords"
+        :logs-locked="logsLock.locked.value"
+        :alerts-locked="alertsLocked"
       />
 
       <OverviewHeadlineStrip
-        v-if="showSummary"
-        class="pt-2 pb-6"
+        class="py-6"
         :overview="overview"
         :pending="overviewPending"
         :failed="overviewFailed"
@@ -95,160 +113,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :incidents-total="incidentsTotal"
         @select="onHeadlineSelect"
         @ask-ai="onAskAi"
-      />
-
-      <div
-        v-if="showSummary"
-        class="grid grid-cols-[1.15fr_1fr] gap-x-8 gap-y-6 py-6 max-lg:grid-cols-1"
-        data-test="overview-alerts-health-grid"
       >
-        <OverviewAlertsCard
-          :section="overview?.alerts"
-          :pending="overviewPending"
-          :failed="overviewFailed"
-          :forbidden="overviewForbidden"
-          :incidents-state="incidentsTile"
-          :incidents-total="incidentsTotal"
-          :locked-reason="alertsLocked ? alertsLock.lockedReason.value : undefined"
-          @retry="() => loadOverview(true)"
-          @open="() => openAlertList()"
-          @create="goToAddAlert"
-          @select="onAlertsSelect"
-          @ask-ai="onAskAi"
-        />
-        <OverviewDataHealthCard
-          :overview="overview"
-          :pending="overviewPending"
-          :failed="overviewFailed"
-          :forbidden="overviewForbidden"
-          @retry="() => loadOverview(true)"
-          @open="onHealthOpen"
-          @view-all="goToPipelines()"
-          @ask-ai="onAskAi"
-        />
-      </div>
-
-      <!-- ACTIVE INCIDENTS (enterprise / cloud only) -->
-      <section
-        v-if="isIncidentsEnabled && incidents.length > 0"
-        class="py-6"
-        data-test="overview-incidents-section"
-      >
-        <div class="mb-2 flex min-h-8 items-center gap-2">
-          <OText variant="card-title" as="h2" class="flex flex-wrap items-center gap-1.5">
-            {{ t("overview.activeIncidents") }}
-            <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
-            <OText
-              v-if="incidentsTotal > incidents.length"
-              variant="meta"
-              class="text-text-secondary"
-              >{{
-                t("overview.showingOf", { shown: incidents.length, total: incidentsTotal })
-              }}</OText
-            >
-          </OText>
-          <OButton
-            variant="accent-ghost"
-            size="sm"
-            class="ms-auto -me-2.5"
-            data-test="overview-incidents-view-all"
-            @click="goToAllIncidents"
+        <template #aside>
+          <OEmptyState
+            v-if="summaryState === 'error'"
+            size="compact"
+            kind="error"
+            :title="t('overview.summary.loadError')"
+            data-test="overview-summary-error"
           >
-            {{ t("overview.viewAll") }}
-          </OButton>
-        </div>
-        <div class="divide-border-subtle flex flex-col divide-y">
-          <div
-            v-for="inc in incidents"
-            :key="inc.id"
-            class="group flex min-h-10 items-center gap-3 border-s-[0.1875em] py-1 ps-3"
-            :class="incidentRowClass(inc.severity)"
-          >
-            <span class="flex shrink-0 items-center" :class="incidentIconClass(inc.severity)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
-                <path
-                  d="M12 8v4m0 4h.01"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                />
-              </svg>
-            </span>
-            <div class="min-w-0 flex-1">
-              <div class="text-text-body text-compact flex flex-wrap items-center gap-1">
-                <OTag type="severity" :value="(inc.severity || 'p4').toLowerCase()" />
-                {{ inc.title || t("overview.untitledIncident") }}
-                <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
-                  <ODimensionChip
-                    v-for="dim in incidentDimensions(inc.group_values)"
-                    :key="dim.key"
-                    :dim-key="dim.key"
-                    :key-label="dim.label"
-                    :value="dim.value"
-                    :tooltip="dim.rawTooltip"
-                  />
-                </template>
-              </div>
-            </div>
-            <div class="flex w-48 shrink-0 items-center gap-1.5 whitespace-nowrap">
-              <span class="text-text-secondary min-w-18 text-xs">{{
-                relativeTime_(inc.first_alert_at)
-              }}</span>
-              <span class="text-text-secondary text-xs">·</span>
-              <span class="text-text-secondary text-xs font-normal"
-                >{{ inc.alert_count }} {{ t("overview.alertsSuffix") }}</span
+            <template #actions>
+              <OButton
+                size="sm"
+                data-test="overview-summary-retry"
+                @click="() => loadOverview(true)"
               >
-            </div>
-            <span
-              class="shrink-0 whitespace-nowrap opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
-            >
-              <OverviewAskAiButton
-                kind="incident"
-                :item-key="inc.id"
-                :label="inc.title || t('overview.untitledIncident')"
-                @ask="
-                  onAskAi({
-                    kind: 'incident',
-                    incident: { ...inc, title: inc.title || t('overview.untitledIncident') },
-                  })
-                "
-              />
-              <OButton variant="accent-ghost" @click="goToIncident(inc)">
-                {{ t("overview.investigate") }}
+                {{ t("emptyState.loadError.action") }}
               </OButton>
-            </span>
-          </div>
-        </div>
-      </section>
-      <OverviewSkeleton
-        v-else-if="isIncidentsEnabled && isSectionPending('incidents')"
-        class="py-6"
-        section="incidents"
-      />
-      <OverviewSectionError
-        v-else-if="showSectionError('incidents')"
-        class="py-6"
-        section="incidents"
-        :title="t('overview.activeIncidents')"
-        @retry="() => loadAll(true)"
-      />
-      <OverviewSectionEmpty
-        v-else-if="showSectionForbidden('incidents')"
-        class="py-6"
-        section="incidents"
-        kind="forbidden"
-        :title="t('overview.activeIncidents')"
-      />
-      <OverviewSectionEmpty
-        v-else-if="showSectionEmpty('incidents')"
-        class="py-6"
-        section="incidents"
-        kind="empty"
-        :title="t('overview.activeIncidents')"
-      />
+            </template>
+          </OEmptyState>
+          <OEmptyState
+            v-else-if="summaryState === 'denied'"
+            size="compact"
+            kind="denied"
+            :title="t('overview.summary.denied')"
+            data-test="overview-summary-forbidden"
+          />
+          <OEmptyState
+            v-else-if="overviewRefreshFailed"
+            size="compact"
+            kind="error"
+            :title="t('overview.stale.message', { time: generatedAtLabel })"
+            data-test="overview-stale-notice"
+          >
+            <template #actions>
+              <OButton
+                size="sm"
+                data-test="overview-stale-retry-btn"
+                @click="() => loadOverview(true)"
+              >
+                {{ t("overview.stale.retry") }}
+              </OButton>
+            </template>
+          </OEmptyState>
+        </template>
+      </OverviewHeadlineStrip>
 
-      <!-- the upsell sits below the alerts grid so it never outranks live alert state -->
+      <!-- the upsell sits below the strip so it never outranks live alert state -->
       <section
         v-if="!incidentsAccess.allowed || incidentsLicenseLocked"
         class="py-6"
@@ -264,8 +175,616 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </section>
 
+      <!-- the sections below swap in together once all have answered, so one landing early moves none -->
+      <template v-if="legacySettled">
+        <!-- ACTIVE INCIDENTS (enterprise / cloud only) -->
+        <section
+          v-if="isIncidentsEnabled && incidents.length > 0"
+          class="py-6"
+          data-test="overview-incidents-section"
+        >
+          <div class="mb-2 flex min-h-8 items-center gap-2">
+            <OText variant="card-title" as="h2" class="flex flex-wrap items-center gap-1.5">
+              {{ t("overview.activeIncidents") }}
+              <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
+              <OText
+                v-if="incidentsTotal > incidents.length"
+                variant="meta"
+                class="text-text-secondary"
+                >{{
+                  t("overview.showingOf", { shown: incidents.length, total: incidentsTotal })
+                }}</OText
+              >
+            </OText>
+            <OButton
+              variant="accent-ghost"
+              size="sm"
+              class="ms-auto -me-2.5"
+              data-test="overview-incidents-view-all"
+              @click="goToAllIncidents"
+            >
+              {{ t("overview.viewAll") }}
+            </OButton>
+          </div>
+          <div class="divide-border-subtle flex flex-col divide-y">
+            <div
+              v-for="inc in incidents"
+              :key="inc.id"
+              class="group flex min-h-10 items-center gap-3 border-s-[0.1875em] py-1 ps-3"
+              :class="incidentRowClass(inc.severity)"
+            >
+              <span class="flex shrink-0 items-center" :class="incidentIconClass(inc.severity)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
+                  <path
+                    d="M12 8v4m0 4h.01"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="text-text-body text-compact flex flex-wrap items-center gap-1">
+                  <OTag type="severity" :value="(inc.severity || 'p4').toLowerCase()" />
+                  {{ inc.title || t("overview.untitledIncident") }}
+                  <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
+                    <ODimensionChip
+                      v-for="dim in incidentDimensions(inc.group_values)"
+                      :key="dim.key"
+                      :dim-key="dim.key"
+                      :key-label="dim.label"
+                      :value="dim.value"
+                      :tooltip="dim.rawTooltip"
+                    />
+                  </template>
+                </div>
+              </div>
+              <div class="flex w-48 shrink-0 items-center gap-1.5 whitespace-nowrap">
+                <span class="text-text-secondary min-w-18 text-xs">{{
+                  relativeTime_(inc.first_alert_at)
+                }}</span>
+                <span class="text-text-secondary text-xs">·</span>
+                <span class="text-text-secondary text-xs font-normal"
+                  >{{ inc.alert_count }} {{ t("overview.alertsSuffix") }}</span
+                >
+              </div>
+              <span
+                class="shrink-0 whitespace-nowrap opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
+              >
+                <OverviewAskAiButton
+                  kind="incident"
+                  :item-key="inc.id"
+                  :label="inc.title || t('overview.untitledIncident')"
+                  @ask="
+                    onAskAi({
+                      kind: 'incident',
+                      incident: { ...inc, title: inc.title || t('overview.untitledIncident') },
+                    })
+                  "
+                />
+                <OButton variant="accent-ghost" @click="goToIncident(inc)">
+                  {{ t("overview.investigate") }}
+                </OButton>
+              </span>
+            </div>
+          </div>
+        </section>
+        <OverviewSkeleton
+          v-else-if="isIncidentsEnabled && isSectionPending('incidents')"
+          class="py-6"
+          section="incidents"
+        />
+        <OverviewSectionError
+          v-else-if="showSectionError('incidents')"
+          class="py-6"
+          section="incidents"
+          :title="t('overview.activeIncidents')"
+          @retry="() => loadAll(true)"
+        />
+        <OverviewSectionEmpty
+          v-else-if="showSectionForbidden('incidents')"
+          class="py-6"
+          section="incidents"
+          kind="forbidden"
+          :title="t('overview.activeIncidents')"
+        />
+        <OverviewSectionEmpty
+          v-else-if="showSectionEmpty('incidents')"
+          class="py-6"
+          section="incidents"
+          kind="empty"
+          :title="t('overview.activeIncidents')"
+        />
+
+        <section class="flex flex-col gap-6 py-6" data-test="overview-time-range-group">
+          <div
+            v-if="showOverviewCards && pageShowsSections"
+            class="-mb-3 flex flex-wrap items-baseline gap-x-1.5"
+            data-test="overview-time-range-heading"
+          >
+            <h2 class="text-text-secondary text-xs font-medium">
+              {{ t("overview.timeRange.heading") }}
+            </h2>
+            <OText
+              v-if="rangeLabel"
+              variant="meta"
+              class="text-text-secondary"
+              data-test="overview-time-range-label"
+              >{{ rangeLabel }}</OText
+            >
+          </div>
+          <!-- SERVICES (enterprise only — needs service graph data) -->
+          <section
+            v-if="incidentsAccess.allowed && services.length > 0"
+            data-test="overview-services-section"
+          >
+            <div class="mb-2 flex min-h-8 items-center gap-2">
+              <OText variant="card-title" as="h2" class="flex flex-wrap items-center gap-1.5">
+                {{ t("overview.services") }}
+                <OTag type="countChip" value="warning">{{ services.length }}</OTag>
+                <OText
+                  v-if="servicePanelVisible && selectedService"
+                  variant="meta"
+                  class="text-text-secondary"
+                >
+                  {{ t("overview.viewingLabel") }}
+                  <strong class="text-text-body font-semibold">{{
+                    selectedService.label ?? selectedService.id
+                  }}</strong>
+                </OText>
+              </OText>
+              <OTooltip
+                :content="tracesLock.lockedReason.value"
+                :disabled="!tracesLock.locked.value"
+              >
+                <OButton
+                  variant="accent-ghost"
+                  size="sm"
+                  class="ms-auto -me-2.5"
+                  :aria-disabled="tracesLock.locked.value || undefined"
+                  data-test="overview-services-view-all"
+                  @click="goToServiceGraph"
+                >
+                  <OIcon
+                    v-if="tracesLock.locked.value"
+                    name="lock"
+                    class="text-icon-locked"
+                    size="sm"
+                    data-test="overview-services-view-all-lock"
+                  />
+                  {{ t("overview.viewAll") }}
+                </OButton>
+              </OTooltip>
+            </div>
+            <div class="relative">
+              <!-- Left fade + floating scroll control (only present when scrollable) -->
+              <div
+                class="from-surface-base pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center bg-linear-to-r to-transparent pe-8 transition-opacity duration-200"
+                :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
+              >
+                <button
+                  class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
+                  :tabindex="svcScrollCanLeft ? 0 : -1"
+                  :aria-hidden="!svcScrollCanLeft"
+                  :aria-label="t('overview.scrollLeft')"
+                  @click="scrollServices(-1)"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M15 18l-6-6 6-6"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div
+                ref="svcGridRef"
+                class="flex [scrollbar-width:none] flex-row gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden"
+                @scroll="onSvcScroll"
+              >
+                <div
+                  v-for="svc in services"
+                  :key="svc.id"
+                  :data-test="`overview-service-card-${svc.id}`"
+                  class="rounded-default border-border-default bg-surface-panel focus-visible:ring-button-ghost-focus-ring max-w-40 min-w-40 shrink-0 grow-0 basis-40 cursor-pointer border border-[0.0625em] px-3.5 py-3 transition-[background-color,box-shadow,outline-color] duration-150 focus-visible:ring-3 focus-visible:outline-none"
+                  tabindex="0"
+                  :class="[
+                    serviceCardClass(svc),
+                    selectedService?.id === svc.id && servicePanelVisible
+                      ? 'outline-accent bg-surface-tint-accent shadow-primary-500/22 shadow-sm outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
+                      : 'hover:bg-table-row-hover-bg',
+                  ]"
+                  @click="openServicePanel(svc)"
+                  @keydown.enter.self="openServicePanel(svc)"
+                  @keydown.space.self.prevent="openServicePanel(svc)"
+                >
+                  <div class="mb-2 flex items-center justify-between">
+                    <OTruncatedText class="text-text-body block flex-1 text-sm">{{
+                      svc.label
+                    }}</OTruncatedText>
+                    <OTooltip
+                      v-if="tracesLock.locked.value"
+                      :content="tracesLock.lockedReason.value"
+                    >
+                      <span class="ms-1 inline-flex shrink-0 items-center" @click.stop>
+                        <OButton
+                          icon-only
+                          variant="ghost"
+                          size="xs"
+                          disabled
+                          :aria-label="t('traces.servicesCatalog.viewTraces')"
+                          data-test="overview-service-view-traces"
+                        >
+                          <OIcon
+                            name="lock"
+                            class="text-icon-locked"
+                            size="sm"
+                            data-test="overview-service-view-traces-lock"
+                          />
+                        </OButton>
+                      </span>
+                    </OTooltip>
+                    <span v-else class="ms-1 inline-flex shrink-0 items-center">
+                      <OButton
+                        icon-only
+                        variant="ghost"
+                        size="xs"
+                        :title="t('traces.servicesCatalog.viewTraces')"
+                        data-test="overview-service-view-traces"
+                        @click="goToService(svc, $event)"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
+                          <path
+                            d="M12 16v-4m0-4h.01"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                          />
+                        </svg>
+                      </OButton>
+                    </span>
+                  </div>
+                  <div class="mt-2 flex flex-col gap-1">
+                    <div class="flex items-baseline justify-between gap-2">
+                      <span class="text-text-label text-xs">{{ t("overview.colErrorRate") }}</span>
+                      <span
+                        class="text-sm font-semibold tabular-nums"
+                        :class="SERVICE_ERROR_RATE_TEXT[svc.health]"
+                        :data-test="`overview-service-card-${svc.id}-error-rate`"
+                      >
+                        {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + "%" : "—" }}
+                      </span>
+                    </div>
+                    <div class="flex items-baseline justify-between gap-2">
+                      <span class="text-text-label text-xs">{{ t("overview.colLatency") }}</span>
+                      <span
+                        class="text-sm font-semibold tabular-nums"
+                        :class="svc.latencyFlag ? 'text-warning-700' : 'text-text-heading'"
+                      >
+                        {{ svc.latencyMultiplier ? raw(svc.latencyMultiplier + "x") : raw("—") }}
+                      </span>
+                    </div>
+                    <div class="flex items-baseline justify-between gap-2">
+                      <span class="text-text-label text-xs">{{ t("overview.colReqs") }}</span>
+                      <span class="text-text-heading text-sm font-semibold tabular-nums">{{
+                        raw(formatCompactCount(svc.requests ?? 0))
+                      }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Right fade + floating scroll control (only present when scrollable) -->
+              <div
+                class="from-surface-base pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end bg-linear-to-l to-transparent ps-8 transition-opacity duration-200"
+                :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
+              >
+                <button
+                  class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
+                  :tabindex="svcScrollCanRight ? 0 : -1"
+                  :aria-hidden="!svcScrollCanRight"
+                  :aria-label="t('overview.scrollRight')"
+                  @click="scrollServices(1)"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M9 18l6-6-6-6"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </section>
+          <OverviewSkeleton
+            v-else-if="servicesEnabled && isSectionPending('services')"
+            section="services"
+          />
+          <OverviewSectionError
+            v-else-if="showSectionError('services')"
+            section="services"
+            :title="t('overview.services')"
+            @retry="() => loadAll(true)"
+          />
+          <OverviewSectionEmpty
+            v-else-if="showSectionForbidden('services')"
+            section="services"
+            kind="forbidden"
+            :title="t('overview.services')"
+          />
+
+          <!-- Locked: Services shares the Incidents gate, and its data comes from traces, so a license without traces locks it too. -->
+          <section
+            v-else-if="!incidentsAccess.allowed || servicesLicenseLocked"
+            data-test="overview-services-locked"
+          >
+            <div class="mb-2 flex min-h-8 items-center">
+              <OText variant="card-title" as="h2">{{ t("overview.services") }}</OText>
+            </div>
+            <OverviewLockedNote
+              :message="
+                servicesLicenseLocked ? tracesLock.lockedReason.value : incidentsAccess.message
+              "
+              :clickable="!servicesLicenseLocked"
+              @open="openUpgradeDialog()"
+            />
+          </section>
+
+          <OverviewSectionEmpty
+            v-else-if="showSectionEmpty('services')"
+            section="services"
+            kind="empty"
+            :title="t('overview.services')"
+          />
+
+          <!-- Service node side panel (latency / RED charts) -->
+          <template v-if="incidentsAccess.allowed && selectedService">
+            <div
+              v-if="servicePanelVisible"
+              class="fixed inset-0 z-99 bg-transparent"
+              @click="closeServicePanel"
+            />
+            <ServiceGraphNodeSidePanel
+              :selected-node="selectedService"
+              :graph-data="graphData"
+              :time-range="timeRange"
+              :visible="servicePanelVisible"
+              :stream-filter="selectedService?.stream_name ?? graphStream"
+              @close="closeServicePanel"
+              @view-traces="goToService(selectedService)"
+            />
+          </template>
+
+          <div
+            :class="slimPair ? 'grid grid-cols-2 gap-x-8 gap-y-6 max-md:grid-cols-1' : 'contents'"
+            data-test="overview-time-range-pair"
+          >
+            <!-- ACTIVE ANOMALIES -->
+            <section v-if="anomalies.length > 0" data-test="overview-anomalies-section">
+              <div class="mb-2 flex min-h-8 items-center gap-2">
+                <OText variant="card-title" as="h2" class="flex flex-wrap items-center gap-1.5">
+                  {{ t("overview.activeAnomalies") }}
+                  <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
+                </OText>
+                <OButton
+                  variant="accent-ghost"
+                  size="sm"
+                  class="ms-auto -me-2.5"
+                  data-test="overview-anomalies-view-all"
+                  @click="goToAnomalies"
+                >
+                  {{ t("overview.viewAll") }}
+                </OButton>
+              </div>
+              <div class="divide-border-subtle flex flex-col divide-y">
+                <div
+                  v-for="item in anomalies"
+                  :key="item.id"
+                  class="group flex min-h-10 items-center gap-3 py-1 ps-3"
+                  :class="severityRowClass(item.severity)"
+                >
+                  <span
+                    class="flex shrink-0 items-center"
+                    :class="severityIconClass(item.severity)"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div
+                      class="text-text-body text-compact flex flex-wrap items-center gap-1 [row-gap:0.25rem]"
+                    >
+                      {{ item.title }}
+                      <span class="text-text-secondary mx-[0.1rem] text-xs font-normal">·</span>
+                      <span class="text-text-secondary text-xs font-normal">{{
+                        item.description
+                      }}</span>
+                    </div>
+                  </div>
+                  <span
+                    class="shrink-0 whitespace-nowrap opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
+                  >
+                    <OButton variant="accent-ghost" @click="goToAlert(item)">
+                      {{ t("overview.investigate") }}
+                    </OButton>
+                  </span>
+                </div>
+              </div>
+            </section>
+            <OverviewSkeleton v-else-if="isSectionPending('anomalies')" section="anomalies" />
+            <OverviewSectionError
+              v-else-if="showSectionError('anomalies')"
+              section="anomalies"
+              :title="t('overview.activeAnomalies')"
+              @retry="() => loadAll(true)"
+            />
+            <OverviewSectionEmpty
+              v-else-if="showSectionForbidden('anomalies')"
+              section="anomalies"
+              kind="forbidden"
+              :title="t('overview.activeAnomalies')"
+            />
+            <OverviewSectionEmpty
+              v-else-if="showSectionEmpty('anomalies')"
+              section="anomalies"
+              kind="empty"
+              :no-checks="anomalyConfigCount === 0"
+              :title="t('overview.activeAnomalies')"
+            />
+            <section v-else-if="anomalyLocked" data-test="overview-anomalies-locked">
+              <div class="mb-2 flex min-h-8 items-center">
+                <OText variant="card-title" as="h2">{{ t("overview.activeAnomalies") }}</OText>
+              </div>
+              <OverviewLockedNote :message="anomalyLock.lockedReason.value" :clickable="false" />
+            </section>
+
+            <!-- RECENT EVENTS (alert firing feed) -->
+            <section v-if="recentRows.length > 0" data-test="overview-recent-events-section">
+              <div class="mb-2 flex min-h-8 items-center gap-2">
+                <OText variant="card-title" as="h2">{{ t("overview.recentEvents") }}</OText>
+                <OButton
+                  variant="accent-ghost"
+                  size="sm"
+                  class="ms-auto -me-2.5"
+                  data-test="overview-recent-events-view-all"
+                  @click="() => openAlertList()"
+                >
+                  {{ t("overview.viewAll") }}
+                </OButton>
+              </div>
+              <ul class="divide-border-subtle flex flex-col divide-y">
+                <li
+                  v-for="ev in recentRows"
+                  :key="ev.id"
+                  class="py-0.5"
+                  data-test="overview-recent-events-row"
+                >
+                  <!-- a row opens its alert; a name two folders share opens none, so it stays plain text -->
+                  <div class="-mx-3">
+                    <component
+                      :is="ev.alert ? OverviewRowButton : 'div'"
+                      v-bind="
+                        ev.alert
+                          ? { to: alertDetailRoute(ev.alert) }
+                          : {
+                              class:
+                                'h-control-md flex min-w-0 items-center justify-between gap-3 px-3',
+                            }
+                      "
+                      data-test="overview-recent-events-link"
+                    >
+                      <span class="flex min-w-0 items-center gap-3">
+                        <OTag
+                          type="countChip"
+                          :value="ev.tone"
+                          class="min-w-16 shrink-0 justify-center"
+                          data-test="overview-recent-events-kind"
+                          >{{ ev.kindLabel }}</OTag
+                        >
+                        <OTruncatedText
+                          class="text-text-body text-compact min-w-0 shrink font-medium"
+                          data-test="overview-recent-events-name"
+                          >{{ raw(ev.name) }}</OTruncatedText
+                        >
+                        <OTruncatedText
+                          v-if="ev.alert?.stream_name"
+                          class="text-text-secondary min-w-0 text-xs font-normal max-sm:hidden"
+                          >{{ raw(ev.alert.stream_name) }}</OTruncatedText
+                        >
+                      </span>
+                      <span class="flex shrink-0 items-center gap-2">
+                        <OTag
+                          v-if="ev.notifyFailed"
+                          type="countChip"
+                          value="warning"
+                          data-test="overview-recent-events-undelivered"
+                          >{{ t("overview.firingNow.notifyFailed") }}</OTag
+                        >
+                        <OTag
+                          v-if="ev.count > 1"
+                          type="countChip"
+                          value="neutral"
+                          class="max-sm:hidden"
+                          data-test="overview-recent-events-count"
+                          >{{ t("overview.timesSymbol") }}{{ ev.count }}
+                          <OTooltip
+                            :content="
+                              t('overview.events.timesInRange', { count: ev.count }, ev.count)
+                            "
+                        /></OTag>
+                        <span
+                          class="text-text-secondary text-xs font-normal whitespace-nowrap tabular-nums"
+                          >{{ ev.timeAgo }}</span
+                        >
+                      </span>
+                    </component>
+                  </div>
+                </li>
+              </ul>
+            </section>
+            <OverviewSkeleton v-else-if="isSectionPending('recentEvents')" section="recentEvents" />
+            <OverviewSectionError
+              v-else-if="showSectionError('recentEvents')"
+              section="recentEvents"
+              :title="t('overview.recentEvents')"
+              @retry="() => loadAll(true)"
+            />
+            <OverviewSectionEmpty
+              v-else-if="showSectionForbidden('recentEvents')"
+              section="recentEvents"
+              kind="forbidden"
+              :title="t('overview.recentEvents')"
+            />
+            <OverviewSectionEmpty
+              v-else-if="showSectionEmpty('recentEvents')"
+              section="recentEvents"
+              kind="empty"
+              :title="t('overview.recentEvents')"
+            />
+          </div>
+        </section>
+      </template>
+      <template v-else>
+        <OverviewSkeleton v-if="isIncidentsEnabled" class="py-6" section="incidents" />
+        <section class="flex flex-col gap-6 py-6" data-test="overview-time-range-pending">
+          <div
+            v-if="showOverviewCards && pageShowsSections"
+            class="-mb-3 flex flex-wrap items-baseline gap-x-1.5"
+            data-test="overview-time-range-heading"
+          >
+            <h2 class="text-text-secondary text-xs font-medium">
+              {{ t("overview.timeRange.heading") }}
+            </h2>
+            <OText
+              v-if="rangeLabel"
+              variant="meta"
+              class="text-text-secondary"
+              data-test="overview-time-range-label"
+              >{{ rangeLabel }}</OText
+            >
+          </div>
+          <OverviewSkeleton v-if="servicesEnabled" section="services" />
+          <OverviewSkeleton v-if="anomalyEnabled" section="anomalies" />
+          <OverviewSkeleton v-if="!alertsLocked" section="recentEvents" />
+        </section>
+      </template>
+      <!-- below the time-range sections: a failed /overview drops these, and nothing under them moves -->
       <div
-        v-if="showSummary"
+        v-if="showSummaryDetail && legacySettled"
         class="grid grid-cols-[2fr_1fr] gap-x-8 gap-y-6 py-6 max-lg:grid-cols-1"
         data-test="overview-streams-limit-grid"
       >
@@ -289,7 +808,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <OverviewSignalCards
-        v-if="showSummary"
+        v-if="showSummaryDetail && legacySettled"
         class="py-6"
         :section="overview?.streams"
         :pending="overviewPending"
@@ -298,458 +817,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :locked-reasons="signalLockedReasons"
         @open="onSignalOpen"
       />
-
-      <section class="flex flex-col gap-6 py-6" data-test="overview-time-range-group">
-        <div
-          v-if="showOverviewCards && pageShowsSections"
-          class="-mb-3 flex flex-wrap items-baseline gap-x-1.5"
-          data-test="overview-time-range-heading"
-        >
-          <h2 class="text-text-secondary text-xs font-medium">
-            {{ t("overview.timeRange.heading") }}
-          </h2>
-          <OText
-            v-if="rangeLabel"
-            variant="meta"
-            class="text-text-secondary"
-            data-test="overview-time-range-label"
-            >{{ rangeLabel }}</OText
-          >
-        </div>
-        <!-- SERVICES (enterprise only — needs service graph data) -->
-        <section
-          v-if="incidentsAccess.allowed && services.length > 0"
-          data-test="overview-services-section"
-        >
-          <div class="mb-2 flex min-h-8 items-center gap-2">
-            <OText variant="card-title" as="h2" class="flex flex-wrap items-center gap-1.5">
-              {{ t("overview.services") }}
-              <OTag type="countChip" value="warning">{{ services.length }}</OTag>
-              <OText
-                v-if="servicePanelVisible && selectedService"
-                variant="meta"
-                class="text-text-secondary"
-              >
-                {{ t("overview.viewingLabel") }}
-                <strong class="text-text-body font-semibold">{{
-                  selectedService.label ?? selectedService.id
-                }}</strong>
-              </OText>
-            </OText>
-            <OTooltip :content="tracesLock.lockedReason.value" :disabled="!tracesLock.locked.value">
-              <OButton
-                variant="accent-ghost"
-                size="sm"
-                class="ms-auto -me-2.5"
-                :aria-disabled="tracesLock.locked.value || undefined"
-                data-test="overview-services-view-all"
-                @click="goToServiceGraph"
-              >
-                <OIcon
-                  v-if="tracesLock.locked.value"
-                  name="lock"
-                  class="text-icon-locked"
-                  size="sm"
-                  data-test="overview-services-view-all-lock"
-                />
-                {{ t("overview.viewAll") }}
-              </OButton>
-            </OTooltip>
-          </div>
-          <div class="relative">
-            <!-- Left fade + floating scroll control (only present when scrollable) -->
-            <div
-              class="from-surface-base pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center bg-linear-to-r to-transparent pe-8 transition-opacity duration-200"
-              :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
-            >
-              <button
-                class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
-                :tabindex="svcScrollCanLeft ? 0 : -1"
-                :aria-hidden="!svcScrollCanLeft"
-                :aria-label="t('overview.scrollLeft')"
-                @click="scrollServices(-1)"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M15 18l-6-6 6-6"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
-            <div
-              ref="svcGridRef"
-              class="flex [scrollbar-width:none] flex-row gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden"
-              @scroll="onSvcScroll"
-            >
-              <div
-                v-for="svc in services"
-                :key="svc.id"
-                :data-test="`overview-service-card-${svc.id}`"
-                class="rounded-default border-border-default bg-surface-panel focus-visible:ring-button-ghost-focus-ring max-w-40 min-w-40 shrink-0 grow-0 basis-40 cursor-pointer border border-[0.0625em] px-3.5 py-3 transition-[background-color,box-shadow,outline-color] duration-150 focus-visible:ring-3 focus-visible:outline-none"
-                tabindex="0"
-                :class="[
-                  serviceCardClass(svc),
-                  selectedService?.id === svc.id && servicePanelVisible
-                    ? 'outline-accent bg-surface-tint-accent shadow-primary-500/22 shadow-sm outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
-                    : 'hover:bg-table-row-hover-bg',
-                ]"
-                @click="openServicePanel(svc)"
-                @keydown.enter.self="openServicePanel(svc)"
-                @keydown.space.self.prevent="openServicePanel(svc)"
-              >
-                <div class="mb-2 flex items-center justify-between">
-                  <OTruncatedText class="text-text-body block flex-1 text-sm">{{
-                    svc.label
-                  }}</OTruncatedText>
-                  <OTooltip v-if="tracesLock.locked.value" :content="tracesLock.lockedReason.value">
-                    <span class="ms-1 inline-flex shrink-0 items-center" @click.stop>
-                      <OButton
-                        icon-only
-                        variant="ghost"
-                        size="xs"
-                        disabled
-                        :aria-label="t('traces.servicesCatalog.viewTraces')"
-                        data-test="overview-service-view-traces"
-                      >
-                        <OIcon
-                          name="lock"
-                          class="text-icon-locked"
-                          size="sm"
-                          data-test="overview-service-view-traces-lock"
-                        />
-                      </OButton>
-                    </span>
-                  </OTooltip>
-                  <span v-else class="ms-1 inline-flex shrink-0 items-center">
-                    <OButton
-                      icon-only
-                      variant="ghost"
-                      size="xs"
-                      :title="t('traces.servicesCatalog.viewTraces')"
-                      data-test="overview-service-view-traces"
-                      @click="goToService(svc, $event)"
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
-                        <path
-                          d="M12 16v-4m0-4h.01"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                        />
-                      </svg>
-                    </OButton>
-                  </span>
-                </div>
-                <div class="mt-2 flex flex-col gap-1">
-                  <div class="flex items-baseline justify-between gap-2">
-                    <span class="text-text-label text-xs">{{ t("overview.colErrorRate") }}</span>
-                    <span
-                      class="text-sm font-semibold tabular-nums"
-                      :class="SERVICE_ERROR_RATE_TEXT[svc.health]"
-                      :data-test="`overview-service-card-${svc.id}-error-rate`"
-                    >
-                      {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + "%" : "—" }}
-                    </span>
-                  </div>
-                  <div class="flex items-baseline justify-between gap-2">
-                    <span class="text-text-label text-xs">{{ t("overview.colLatency") }}</span>
-                    <span
-                      class="text-sm font-semibold tabular-nums"
-                      :class="svc.latencyFlag ? 'text-warning-700' : 'text-text-heading'"
-                    >
-                      {{ svc.latencyMultiplier ? raw(svc.latencyMultiplier + "x") : raw("—") }}
-                    </span>
-                  </div>
-                  <div class="flex items-baseline justify-between gap-2">
-                    <span class="text-text-label text-xs">{{ t("overview.colReqs") }}</span>
-                    <span class="text-text-heading text-sm font-semibold tabular-nums">{{
-                      formatReqRate(svc.requests)
-                    }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <!-- Right fade + floating scroll control (only present when scrollable) -->
-            <div
-              class="from-surface-base pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end bg-linear-to-l to-transparent ps-8 transition-opacity duration-200"
-              :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
-            >
-              <button
-                class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
-                :tabindex="svcScrollCanRight ? 0 : -1"
-                :aria-hidden="!svcScrollCanRight"
-                :aria-label="t('overview.scrollRight')"
-                @click="scrollServices(1)"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M9 18l6-6-6-6"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </section>
-        <OverviewSkeleton
-          v-else-if="servicesEnabled && isSectionPending('services')"
-          section="services"
-        />
-        <OverviewSectionError
-          v-else-if="showSectionError('services')"
-          section="services"
-          :title="t('overview.services')"
-          @retry="() => loadAll(true)"
-        />
-        <OverviewSectionEmpty
-          v-else-if="showSectionForbidden('services')"
-          section="services"
-          kind="forbidden"
-          :title="t('overview.services')"
-        />
-
-        <!-- Locked: Services shares the Incidents gate, and its data comes from traces, so a license without traces locks it too. -->
-        <section
-          v-else-if="!incidentsAccess.allowed || servicesLicenseLocked"
-          data-test="overview-services-locked"
-        >
-          <div class="mb-2 flex min-h-8 items-center">
-            <OText variant="card-title" as="h2">{{ t("overview.services") }}</OText>
-          </div>
-          <OverviewLockedNote
-            :message="
-              servicesLicenseLocked ? tracesLock.lockedReason.value : incidentsAccess.message
-            "
-            :clickable="!servicesLicenseLocked"
-            @open="openUpgradeDialog()"
-          />
-        </section>
-
-        <OverviewSectionEmpty
-          v-else-if="showSectionEmpty('services')"
-          section="services"
-          kind="empty"
-          :title="t('overview.services')"
-        />
-
-        <!-- Service node side panel (latency / RED charts) -->
-        <template v-if="incidentsAccess.allowed && selectedService">
-          <div
-            v-if="servicePanelVisible"
-            class="fixed inset-0 z-99 bg-transparent"
-            @click="closeServicePanel"
-          />
-          <ServiceGraphNodeSidePanel
-            :selected-node="selectedService"
-            :graph-data="graphData"
-            :time-range="timeRange"
-            :visible="servicePanelVisible"
-            :stream-filter="selectedService?.stream_name ?? graphStream"
-            @close="closeServicePanel"
-            @view-traces="goToService(selectedService)"
-          />
-        </template>
-
-        <div
-          :class="slimPair ? 'grid grid-cols-2 gap-x-8 gap-y-6 max-md:grid-cols-1' : 'contents'"
-          data-test="overview-time-range-pair"
-        >
-          <!-- ACTIVE ANOMALIES -->
-          <section v-if="anomalies.length > 0" data-test="overview-anomalies-section">
-            <div class="mb-2 flex min-h-8 items-center gap-2">
-              <OText variant="card-title" as="h2" class="flex flex-wrap items-center gap-1.5">
-                {{ t("overview.activeAnomalies") }}
-                <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
-              </OText>
-              <OButton
-                variant="accent-ghost"
-                size="sm"
-                class="ms-auto -me-2.5"
-                data-test="overview-anomalies-view-all"
-                @click="goToAnomalies"
-              >
-                {{ t("overview.viewAll") }}
-              </OButton>
-            </div>
-            <div class="divide-border-subtle flex flex-col divide-y">
-              <div
-                v-for="item in anomalies"
-                :key="item.id"
-                class="group flex min-h-10 items-center gap-3 py-1 ps-3"
-                :class="severityRowClass(item.severity)"
-              >
-                <span class="flex shrink-0 items-center" :class="severityIconClass(item.severity)">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                </span>
-                <div class="min-w-0 flex-1">
-                  <div
-                    class="text-text-body text-compact flex flex-wrap items-center gap-1 [row-gap:0.25rem]"
-                  >
-                    {{ item.title }}
-                    <span class="text-text-secondary mx-[0.1rem] text-xs font-normal">·</span>
-                    <span class="text-text-secondary text-xs font-normal">{{
-                      item.description
-                    }}</span>
-                  </div>
-                </div>
-                <span
-                  class="shrink-0 whitespace-nowrap opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
-                >
-                  <OButton variant="accent-ghost" @click="goToAlert(item)">
-                    {{ t("overview.investigate") }}
-                  </OButton>
-                </span>
-              </div>
-            </div>
-          </section>
-          <OverviewSkeleton v-else-if="isSectionPending('anomalies')" section="anomalies" />
-          <OverviewSectionError
-            v-else-if="showSectionError('anomalies')"
-            section="anomalies"
-            :title="t('overview.activeAnomalies')"
-            @retry="() => loadAll(true)"
-          />
-          <OverviewSectionEmpty
-            v-else-if="showSectionForbidden('anomalies')"
-            section="anomalies"
-            kind="forbidden"
-            :title="t('overview.activeAnomalies')"
-          />
-          <OverviewSectionEmpty
-            v-else-if="showSectionEmpty('anomalies')"
-            section="anomalies"
-            kind="empty"
-            :no-checks="anomalyConfigCount === 0"
-            :title="t('overview.activeAnomalies')"
-          />
-          <section v-else-if="anomalyLocked" data-test="overview-anomalies-locked">
-            <div class="mb-2 flex min-h-8 items-center">
-              <OText variant="card-title" as="h2">{{ t("overview.activeAnomalies") }}</OText>
-            </div>
-            <OverviewLockedNote :message="anomalyLock.lockedReason.value" :clickable="false" />
-          </section>
-
-          <!-- RECENT EVENTS (alert firing feed) -->
-          <section v-if="recentEvents.length > 0" data-test="overview-recent-events-section">
-            <div class="mb-2 flex min-h-8 items-center gap-2">
-              <OText variant="card-title" as="h2" class="flex flex-wrap items-center gap-1.5">
-                {{ t("overview.recentEvents") }}
-                <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
-              </OText>
-              <OButton
-                variant="accent-ghost"
-                size="sm"
-                class="ms-auto -me-2.5"
-                data-test="overview-recent-events-view-all"
-                @click="() => openAlertList()"
-              >
-                {{ t("overview.viewAll") }}
-              </OButton>
-            </div>
-            <div class="divide-border-subtle flex flex-col divide-y">
-              <div
-                v-for="ev in recentEvents"
-                :key="ev.id"
-                class="flex min-h-9 items-center gap-3 py-1.5 max-sm:flex-wrap max-sm:gap-y-1"
-                data-test="overview-recent-events-row"
-              >
-                <!-- a phone puts status and age on one line and gives the name the whole second line -->
-                <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0 max-sm:order-1" />
-                <OTruncatedText
-                  :class="[
-                    'text-text-secondary max-w-[12.5em] min-w-[7.5em] text-xs max-sm:order-5 max-sm:min-w-0',
-                    hasEventStream(ev) ? '' : 'max-sm:hidden',
-                  ]"
-                  >{{ ev.service }}</OTruncatedText
-                >
-                <OTruncatedText
-                  class="text-text-body text-compact flex-1 font-medium max-sm:order-4 max-sm:min-w-0"
-                  data-test="overview-recent-events-name"
-                  >{{ ev.description }}</OTruncatedText
-                >
-                <OTag
-                  v-if="ev.failCount > 1"
-                  type="countChip"
-                  value="error"
-                  class="shrink-0 max-sm:order-2"
-                  :title="t('common.failedTimesInWindow', { count: ev.failCount })"
-                  >{{ t("overview.timesSymbol") }}{{ ev.failCount }}</OTag
-                >
-                <span
-                  class="text-text-secondary shrink-0 text-xs whitespace-nowrap max-sm:order-2 max-sm:ms-auto"
-                  >{{ ev.timeAgo }}</span
-                >
-                <span
-                  class="hidden h-0 basis-full max-sm:order-3 max-sm:block"
-                  aria-hidden="true"
-                />
-              </div>
-            </div>
-          </section>
-          <OverviewSkeleton v-else-if="isSectionPending('recentEvents')" section="recentEvents" />
-          <OverviewSectionError
-            v-else-if="showSectionError('recentEvents')"
-            section="recentEvents"
-            :title="t('overview.recentEvents')"
-            @retry="() => loadAll(true)"
-          />
-          <OverviewSectionEmpty
-            v-else-if="showSectionForbidden('recentEvents')"
-            section="recentEvents"
-            kind="forbidden"
-            :title="t('overview.recentEvents')"
-          />
-          <OverviewSectionEmpty
-            v-else-if="showSectionEmpty('recentEvents')"
-            section="recentEvents"
-            kind="empty"
-            :title="t('overview.recentEvents')"
-          />
-        </div>
-      </section>
     </div>
-    <!-- Until /overview answers only the summary skeleton shows: a failed summary is one shorter
-         error state, which would pull every section below it up. -->
-    <div
-      v-else-if="showOverviewCards && pageShowsSections"
-      class="divide-border-default flex flex-col divide-y"
-      data-test="overview-sections-pending"
-    >
-      <OverviewHeadlineStrip
-        class="pt-2 pb-6"
-        :overview="null"
-        pending
-        :failed="false"
-        :incidents-state="incidentsTile"
-        :incidents-total="incidentsTotal"
-      />
-      <div class="grid grid-cols-[1.15fr_1fr] gap-x-8 gap-y-6 py-6 max-lg:grid-cols-1">
-        <OverviewAlertsCard pending :failed="false" />
-        <OverviewDataHealthCard :overview="null" pending :failed="false" />
-      </div>
-      <div class="grid grid-cols-[2fr_1fr] gap-x-8 gap-y-6 py-6 max-lg:grid-cols-1">
-        <OverviewTopStreamsCard pending :failed="false" />
-        <OverviewLimitCard pending :failed="false" />
-      </div>
-      <OverviewSignalCards class="py-6" pending :failed="false" />
-    </div>
-
     <OEmptyState
       v-if="pageState === 'forbidden' || errorIsForbidden"
       kind="denied"
@@ -825,7 +893,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { alertHistoryQuery } from "@/services/alerts.queries";
+import { alertHistoryQuery, firingAlertsQuery } from "@/services/alerts.queries";
+import { useQuery } from "@tanstack/vue-query";
+import { refreshUserStreamLists, useOrgHasUserData } from "@/composables/useOrgHasUserData";
 import { incidentsQuery } from "@/services/incidents.queries";
 import { serviceTopologyQuery } from "@/services/service_graph.queries";
 import { queryClient } from "@/composables/query/queryClient";
@@ -837,9 +907,11 @@ import { readFirstDataRecord } from "@/composables/firstEvent/useFirstDataNotice
 import { USER_DATA_STREAM_TYPES, userDataStreams } from "@/utils/internalStreams";
 import { ref, reactive, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
 
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
+import { formatCompactCount } from "@/utils/formatters";
+import { useOverviewTime } from "./overview/useOverviewTime";
+import { isFiringOutcome, isErrorOutcome, isNotifyFailedOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { useRouter } from "vue-router";
@@ -861,27 +933,31 @@ import OverviewHeadlineStrip, {
   type OverviewTarget,
   type IncidentsTile,
 } from "./overview/OverviewHeadlineStrip.vue";
-import OverviewAlertsCard, { type AlertsBoxTarget } from "./overview/OverviewAlertsCard.vue";
-import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
+import OverviewFiringNow, { type FiringNowState } from "./overview/OverviewFiringNow.vue";
+import OverviewDataFreshness, {
+  type DataFreshnessState,
+} from "./overview/OverviewDataFreshness.vue";
+import OverviewGettingStarted from "./overview/OverviewGettingStarted.vue";
+import {
+  alertsByName,
+  firingLevel,
+  firingNow,
+  type FiringLevel,
+  type HomeAlertRow,
+} from "./overview/overviewFiring";
+import { freshnessRows, noDataInRange } from "./overview/overviewFreshness";
 import OverviewTopStreamsCard from "./overview/OverviewTopStreamsCard.vue";
 import OverviewLimitCard from "./overview/OverviewLimitCard.vue";
 import OverviewSignalCards from "./overview/OverviewSignalCards.vue";
 import OverviewAskAiButton from "./overview/OverviewAskAiButton.vue";
 import OverviewLockedNote from "./overview/OverviewLockedNote.vue";
-import OverviewStatusLine from "./overview/OverviewStatusLine.vue";
 import { buildOverviewAskAi, type OverviewAskAiTarget } from "./overview/overviewAskAi";
-import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { OVERVIEW_TOP, orgOverviewQuery } from "@/services/overview.queries";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { safeTimezone } from "@/utils/dashboard/calendarPeriods";
 import { resolveBrowserTimezone } from "@/utils/timezone";
-import {
-  overviewChecks,
-  overviewStatus,
-  type AttentionCheck,
-  type OverviewDestination,
-  type OverviewSignal,
-} from "./overview/overviewFormat";
+import type { OverviewSignal } from "./overview/overviewFormat";
+import OverviewRowButton from "./overview/OverviewRowButton.vue";
 import { overviewKeys } from "@/services/overview.querykeys";
 import type { OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -902,6 +978,11 @@ const AlertHistoryDrawer = defineAsyncComponent(
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+
+defineProps<{
+  /** Selector of the page header's actions slot; the range and refresh render there. */
+  actionsTarget?: string;
+}>();
 
 const emit = defineEmits<{ sendToAiChat: [payload: AiChatHandoff] }>();
 
@@ -960,16 +1041,18 @@ const saved = loadSavedTime();
 const now = Date.now();
 const dateTimeRef = ref<any>(null);
 const dateTimeType = ref(saved?.type ?? "relative");
-const relativeTime = ref(saved?.relative ?? "15m");
+// an overview opens on the last day (R10, F8); a range the user picked is kept
+const DEFAULT_RANGE_MS = 24 * 60 * 60 * 1000;
+const relativeTime = ref(saved?.relative ?? "24h");
 const absoluteTime = ref(
   saved?.absolute ?? {
-    startTime: (now - 15 * 60 * 1000) * 1000,
+    startTime: (now - DEFAULT_RANGE_MS) * 1000,
     endTime: now * 1000,
   },
 );
 const timeRange = ref(
   saved?.timeRange ?? {
-    startTime: (now - 15 * 60 * 1000) * 1000,
+    startTime: (now - DEFAULT_RANGE_MS) * 1000,
     endTime: now * 1000,
   },
 );
@@ -1020,7 +1103,7 @@ const anomalies = ref<any[]>([]);
 const incidents = ref<any[]>([]);
 const incidentsTotal = ref(0);
 const services = ref<ServiceCard[]>([]);
-const recentEvents = ref<any[]>([]);
+const recentEvents = ref<RecentEvent[]>([]);
 
 // True once any section has something to show. Gates the skeleton and the empty
 // state so the three are mutually exclusive with the content: the skeleton is a
@@ -1135,8 +1218,8 @@ const pageState = computed<PageState>(() => {
     const allForbidden = attemptedSections.value.every((k) => isForbidden(sectionFailure[k]));
     const cardsLoaded = !!overview.value && !overviewFailed.value && !overviewForbidden.value;
     if (flagOn.value && allForbidden && !cardsLoaded) return "forbidden";
-    // the cards loaded, so the failed sections keep their own inline Retry
-    return cardsLoaded ? "partial" : "error";
+    // anything that loaded keeps the panels, each failed one with its own Retry (R3)
+    return cardsLoaded || !bandFailed.value ? "partial" : "error";
   }
   if (attemptedSections.value.some(isFailed)) return "partial";
   if (!flagOn.value && noUserStreams.value === true) return "no-data";
@@ -1161,10 +1244,13 @@ const summaryState = computed<"ok" | "error" | "denied">(() => {
   if (overviewForbidden.value && !overview.value) return "denied";
   return overviewFailed.value ? "error" : "ok";
 });
-const showSummary = computed(() => summaryState.value === "ok");
-// The sections render once /overview has answered, so a failed summary never moves the ones below it.
-const summarySettled = computed(
-  () => !orgId.value || !!overview.value || overviewFailed.value || overviewForbidden.value,
+// the detail panels read the same answer, so a failure drops them and the strip says it once
+const showSummaryDetail = computed(() => summaryState.value === "ok");
+// a retry after a failure re-arms its section, so the group waits for that answer too
+const legacySettled = computed(() =>
+  (Object.keys(sectionState) as SectionKey[])
+    .filter(sectionApplies)
+    .every((key) => sectionState[key].loaded),
 );
 // an edition without the service graph refuses it with 403, which is no outage
 const isDenied = (key: SectionKey) => isForbidden(sectionFailure[key]);
@@ -1270,11 +1356,60 @@ const servicePanelVisible = ref(false);
 // ── Data loading ─────────────────────────────────────────────────────────────
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
+// ── Status band: firing now and data health ─────────────────────────────────
+// The Firing view's own read, so the band answers even when /overview is slow or failing.
+const firingRead = useQuery(() => ({
+  ...firingAlertsQuery(orgId.value ?? ""),
+  enabled: !!orgId.value && !alertsLocked.value,
+}));
+const alertRows = computed<HomeAlertRow[]>(() => firingRead.data.value?.list ?? []);
+const firingRows = computed(() => firingNow(alertRows.value));
+const enabledRules = computed(() => alertRows.value.filter((a) => a.enabled !== false).length);
+const firingState = computed<FiringNowState>(() => {
+  if (alertsLocked.value) return "locked";
+  const page = firingRead.data.value;
+  if (page) return page.status_unavailable ? "unavailable" : "ok";
+  if (!firingRead.isError.value) return "loading";
+  return isForbidden(firingRead.error.value) ? "denied" : "error";
+});
+
+// the header's data probe already holds every stream list, so data health asks for nothing new
+const { lists: streamLists, listFailed: streamListFailed } = useOrgHasUserData(
+  () => orgId.value ?? "",
+);
+const streamsSettled = computed(() =>
+  streamLists.value.every((list, i) => list !== undefined || streamListFailed.value[i]),
+);
+const freshness = computed(() =>
+  freshnessRows(streamLists.value, timeRange.value.startTime, streamListFailed.value),
+);
+const freshnessState = computed<DataFreshnessState>(() => {
+  if (!streamsSettled.value) return "loading";
+  return streamListFailed.value.every(Boolean) ? "error" : "ok";
+});
+const retryStreamLists = () => refreshUserStreamLists(orgId.value ?? "");
+const { formatRangeWords } = useOverviewTime();
+const rangeWords = computed(() =>
+  formatRangeWords((timeRange.value.endTime - timeRange.value.startTime) / 1e6),
+);
+const showGettingStarted = computed(
+  () => freshnessState.value === "ok" && noDataInRange(freshness.value),
+);
+// data health reads the app's cached stream lists, so only the firing read can make the whole page fail
+const bandFailed = computed(() => firingState.value !== "ok" && firingState.value !== "loading");
+// ages are read against the time the data arrived, so they move only on a refresh
+const clock = ref(Date.now());
+watch([() => firingRead.dataUpdatedAt.value, lastFetched], () => (clock.value = Date.now()));
+
 // `force` comes from the Refresh button. A mount or a tab switch reads the
 // cache instead, which is what stops every tab switch re-requesting.
 const loadAll = async (force = false) => {
   if (!orgId.value) return;
   isLoading.value = true;
+  if (force) {
+    if (!alertsLocked.value) void firingRead.refetch();
+    void refreshUserStreamLists(orgId.value);
+  }
   // the full-page heroes weigh whether the cards loaded, so they wait for /overview too
   await Promise.allSettled([
     loadOverview(force),
@@ -1341,33 +1476,6 @@ const incidentsTile = computed<IncidentsTile>(() => {
   if (isFailed("incidents")) return "error";
   return "ok";
 });
-
-// a source not loaded yet is still being checked; one this deployment lacks is left out
-const incidentsCheck = computed<Omit<AttentionCheck, "key" | "monitors"> | undefined>(() => {
-  if (!isIncidentsEnabled.value) return undefined;
-  if (!sectionState.incidents.loaded) return { state: "loading", count: 0 };
-  if (isFailed("incidents")) return { state: "unavailable", count: 0 };
-  return { state: "ok", count: incidentsTotal.value };
-});
-const status = computed(() =>
-  overviewStatus(
-    overviewChecks({
-      overview: overview.value,
-      pending: overviewPending.value,
-      failed: overviewFailed.value,
-      forbidden: overviewForbidden.value,
-      incidents: incidentsCheck.value,
-    }),
-  ),
-);
-// The cards already show every count and problem, so the line speaks only when none can.
-const showStatusLine = computed(
-  () =>
-    showOverviewCards.value &&
-    showSummary.value &&
-    status.value.kind !== "danger" &&
-    status.value.kind !== "warning",
-);
 
 // only the flag-on page can tell that nothing is watched
 const loadAlertCount = async (force = false) => {
@@ -1556,6 +1664,72 @@ const loadAnomalies = async (force = false, current: () => boolean = () => true)
   }
 };
 
+interface RecentEvent {
+  id: string;
+  name: string;
+  kind: "firing" | "failed";
+  level: FiringLevel;
+  // the newest firing could not notify; it stays a firing, with delivery as a second fact (X6)
+  notifyFailed: boolean;
+  count: number;
+  rawTs: number;
+}
+
+// one row per alert and outcome, newest first, so a rule that fires every minute is one row with a count
+const summarizeHistory = (hits: any[]): RecentEvent[] => {
+  const byKey = new Map<string, RecentEvent>();
+  for (const h of hits) {
+    const kind = isFiringOutcome(h.status) ? "firing" : isErrorOutcome(h.status) ? "failed" : null;
+    if (!kind) continue;
+    const name = String(h.alert_name ?? "");
+    const key = `${kind}:${name}`;
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.count += 1;
+      if (h.timestamp <= existing.rawTs) continue;
+    }
+    byKey.set(key, {
+      id: key,
+      name,
+      kind,
+      level: firingLevel({ level: h.level } as HomeAlertRow),
+      notifyFailed: isNotifyFailedOutcome(h.status),
+      count: existing?.count ?? 1,
+      rawTs: h.timestamp ?? 0,
+    });
+  }
+  return [...byKey.values()].sort((a, b) => b.rawTs - a.rawTs).slice(0, 5);
+};
+
+const EVENT_TONE: Record<FiringLevel, string> = {
+  critical: "error",
+  warning: "warning",
+  other: "neutral",
+};
+
+const alertLookup = computed(() => alertsByName(alertRows.value));
+const recentRows = computed(() =>
+  recentEvents.value.map((ev) => ({
+    ...ev,
+    alert: alertLookup.value.get(ev.name),
+    tone: ev.kind === "failed" ? "warning" : EVENT_TONE[ev.level],
+    kindLabel: eventKindLabel(ev),
+    timeAgo: relativeTime_(ev.rawTs),
+  })),
+);
+
+const eventKindLabel = (ev: RecentEvent): I18nText => {
+  if (ev.kind === "failed") return t("overview.events.runFailed");
+  if (ev.level === "critical") return t("overview.level.critical");
+  return ev.level === "warning" ? t("overview.level.warning") : t("overview.level.okFiring");
+};
+
+const alertDetailRoute = (row: HomeAlertRow) => ({
+  name: "alertDetail",
+  params: { alert_id: row.alert_id },
+  query: { org_identifier: orgId.value ?? "", folder: row.folder_id || "default" },
+});
+
 // Alert trigger history feeds recentEvents only
 const loadHistoryAndSplit = async (force = false, current: () => boolean = () => true) => {
   sectionFailure.recentEvents = null;
@@ -1583,53 +1757,7 @@ const loadHistoryAndSplit = async (force = false, current: () => boolean = () =>
     const res: any = await queryClient.fetchQuery(historyOptions);
     if (!current()) return;
     const hits: any[] = res?.hits ?? [];
-
-    // Recent events: firing shown per-occurrence; failed deduped by alert_name with count.
-    // This previously filtered on the literal strings ["firing", "error"], neither
-    // of which the backend ever produced — so it silently matched nothing. The
-    // shared classifier covers both the current and the legacy vocabulary.
-    const firingHits = hits
-      .filter((h) => isFiringOutcome(h.status))
-      .slice(0, 5)
-      .map((h, idx) => ({
-        id: h.id ?? `ev-${idx}`,
-        typeLabel: formatStatus(h.status),
-        service: h.stream_name ?? "—",
-        description: h.alert_name ?? "",
-        timeAgo: relativeTime_(h.timestamp),
-        // Firing rows need a sort key too — without rawTs they scored 0 and
-        // always sorted beneath every failure row regardless of timestamp.
-        rawTs: h.timestamp,
-        failCount: 0,
-      }));
-
-    // Dedup failed: one row per alert_name, most recent timestamp, total count
-    const failedMap = new Map<string, any>();
-    hits
-      .filter((h) => isErrorOutcome(h.status))
-      .forEach((h) => {
-        const key = h.alert_name ?? h.id ?? "unknown";
-        const existing = failedMap.get(key);
-        if (!existing || h.timestamp > existing.rawTs) {
-          failedMap.set(key, {
-            id: `fail-${key}`,
-            // English for the same reason as formatStatus() — this is the OTag
-            // `eventStatus` lookup value, not free display copy.
-            typeLabel: raw("Failed"),
-            service: h.stream_name ?? "—",
-            description: h.alert_name ?? "",
-            timeAgo: relativeTime_(h.timestamp),
-            rawTs: h.timestamp,
-            failCount: (existing?.failCount ?? 0) + 1,
-          });
-        } else {
-          existing.failCount += 1;
-        }
-      });
-
-    recentEvents.value = [...firingHits, ...Array.from(failedMap.values())]
-      .sort((a, b) => (b.rawTs ?? 0) - (a.rawTs ?? 0))
-      .slice(0, 5);
+    recentEvents.value = summarizeHistory(hits);
   } catch (err) {
     if (!current()) return;
     recentEvents.value = [];
@@ -1742,21 +1870,6 @@ const loadServiceGraph = async (force = false, current: () => boolean = () => tr
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-// Deliberately English: the result feeds <OTag type="eventStatus" :value>, and
-// OTag normalises that value (lower-cased, separators stripped) to pick the
-// badge variant from the `eventStatus` group in badgeGroups.ts. A translated
-// value would miss `failed`/`firing`/`error` and lose the red/amber colouring.
-const formatStatus = (status: string) => {
-  if (!status) return raw("Event");
-  const map: Record<string, string> = {
-    firing: "Firing",
-    error: "Error",
-    failed: "Failed",
-    anomaly: "Anomaly",
-  };
-  return raw(map[status.toLowerCase()] ?? status.charAt(0).toUpperCase() + status.slice(1));
-};
-
 const relativeTime_ = (tsMicros: number): string => {
   if (!tsMicros) return "—";
   const diffMs = Date.now() - Math.floor(tsMicros / 1000);
@@ -1764,12 +1877,6 @@ const relativeTime_ = (tsMicros: number): string => {
   if (diffMs < 3_600_000) return t("overview.minutesAgo", { count: Math.round(diffMs / 60_000) });
   if (diffMs < 86_400_000) return t("overview.hoursAgo", { count: Math.round(diffMs / 3_600_000) });
   return t("overview.daysAgo", { count: Math.round(diffMs / 86_400_000) });
-};
-
-const formatReqRate = (reqs: number) => {
-  if (!reqs && reqs !== 0) return "—";
-  if (reqs >= 1000) return `${(reqs / 1000).toFixed(1)}k`;
-  return String(reqs);
 };
 
 const sortedDimensions = (dims: Record<string, string>): [string, string][] =>
@@ -1903,9 +2010,6 @@ const goToIncident = (inc: any) => {
 const showAlertsCard = computed(() => router.hasRoute("alertList"));
 const showLogsCard = computed(() => router.hasRoute("logs"));
 
-// events without a stream carry a dash placeholder, which a phone row has no room to repeat
-const hasEventStream = (ev: { service: string }) => ev.service !== "—";
-
 const openAlertList = (filter: Record<string, string> = {}) => {
   if (alertsLocked.value) return;
   trackDrilldown("alerts");
@@ -1945,22 +2049,10 @@ const goToIngestion = () => {
   router.push({ name: "ingestion", query: { org_identifier: orgId.value } });
 };
 
-const onHealthOpen = (destination: OverviewDestination) => {
-  if (destination === "failing" || destination === "delivery")
-    openAlertList(ALERT_LIST_FILTERS[destination]);
-  else if (destination === "pipelines") goToPipelines("errored");
-  else goToStreams();
-};
-
 const onSignalOpen = (signal: OverviewSignal) => {
   if (signal in signalLockedReasons.value) return;
   trackDrilldown("signal", { signal });
   router.push({ name: signal, query: { org_identifier: orgId.value } });
-};
-
-const onAlertsSelect = (target: AlertsBoxTarget) => {
-  if (target === "critical" || target === "warning") openAlertList(ALERT_LIST_FILTERS[target]);
-  else onHeadlineSelect(target);
 };
 
 const onHeadlineSelect = (target: OverviewTarget) => {

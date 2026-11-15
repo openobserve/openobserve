@@ -135,7 +135,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.loadingCounter &&
               searchObj.meta.showHistogram
             "
-            class="text-warning shrink-0 cursor-pointer"
+            class="text-text-secondary inline-flex shrink-0"
+            tabindex="0"
+            role="img"
+            :aria-label="raw(searchObj.data.histogram.errorMsg)"
+            data-test="logs-search-histogram-unavailable-info"
           >
             <OIcon name="info-outline" size="sm"> </OIcon>
             <OTooltip :content="raw(searchObj.data.histogram.errorMsg)" side="top" />
@@ -1304,12 +1308,16 @@ export default defineComponent({
       const parts = summaryView.value.parts;
       if (!parts) return null;
 
+      // An aggregate returns every row at once, so its chip is a plain row count.
+      const records = parts.rows
+        ? t("search.recordsChipRows", { total: parts.total }, parts.end)
+        : t(isMobile.value ? "search.recordsChipShort" : "search.recordsChip", {
+            start: parts.start,
+            end: parts.end,
+            total: parts.total,
+          });
       return {
-        records: t(isMobile.value ? "search.recordsChipShort" : "search.recordsChip", {
-          start: parts.start,
-          end: parts.end,
-          total: parts.total,
-        }),
+        records,
         time: t("search.tookChip", { took: parts.took }),
         // Label is already translated, the size is data — joined so the pair reads like the title.
         scan: parts.scanLabel != null ? raw(`${parts.scanLabel}: ${parts.scanSize}`) : null,

@@ -421,40 +421,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.resetFilters") }}
           </ODropdownItem>
 
-          <ODropdownItem
-            v-if="isSearchMode"
-            data-test="traces-search-bar-menu-metrics-btn"
-            @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
-          >
-            <template #icon>
-              <span
-                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-              >
-                <OIcon name="bar-chart" size="sm" />
-              </span>
-            </template>
-            {{ t("traces.redMetrics") }}
-            <template #end>
-              <span class="ms-auto flex items-center gap-1">
-                <OSwitch
-                  v-model="searchObj.meta.showHistogram"
-                  data-test="traces-search-bar-show-metrics-toggle-btn"
-                  @click.stop
-                />
-                <OButton
-                  icon-only
-                  data-test="traces-search-bar-menu-pin-metrics-btn"
-                  variant="ghost"
-                  :title="
-                    isPinned('histogram') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
-                  "
-                  @click.stop="togglePin('histogram')"
+          <ODropdownSeparator v-if="isSearchMode && toolbarMoveResetToMenu" />
+          <ODropdownGroup v-if="isSearchMode" :label="t('search.menuGroupViewOptions')">
+            <ODropdownItem
+              data-test="traces-search-bar-menu-metrics-btn"
+              @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+            >
+              <template #icon>
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
-                  <OIcon :name="isPinned('histogram') ? 'keep' : 'keep-outline'" size="sm" />
-                </OButton>
-              </span>
-            </template>
-          </ODropdownItem>
+                  <OIcon name="bar-chart" size="sm" />
+                </span>
+              </template>
+              {{ t("traces.redMetrics") }}
+              <template #end>
+                <span class="ms-auto flex items-center gap-1">
+                  <OSwitch
+                    v-model="searchObj.meta.showHistogram"
+                    data-test="traces-search-bar-show-metrics-toggle-btn"
+                    @click.stop
+                  />
+                  <OButton
+                    icon-only
+                    data-test="traces-search-bar-menu-pin-metrics-btn"
+                    variant="ghost"
+                    :pressed="isPinned('histogram')"
+                    :icon="isPinned('histogram') ? 'keep' : 'keep-outline'"
+                    :label="
+                      isPinned('histogram')
+                        ? t('search.unpinFromToolbar')
+                        : t('search.pinToToolbar')
+                    "
+                    @click.stop="togglePin('histogram')"
+                  />
+                </span>
+              </template>
+            </ODropdownItem>
+          </ODropdownGroup>
 
           <template v-if="isSearchMode">
             <ODropdownSeparator />
@@ -473,18 +477,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @create="openSaveViewDialog"
               @delete="deleteTracesSavedView"
             >
+              <template #icon>
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                >
+                  <OIcon name="saved-search" size="sm" />
+                </span>
+              </template>
               <template #actions>
                 <OButton
                   icon-only
                   data-test="traces-search-bar-menu-pin-saved-views-btn"
                   variant="ghost"
-                  :title="
+                  :pressed="isPinned('savedViews')"
+                  :icon="isPinned('savedViews') ? 'keep' : 'keep-outline'"
+                  :label="
                     isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
                   "
                   @click.stop="togglePin('savedViews')"
-                >
-                  <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
-                </OButton>
+                />
               </template>
             </SavedViewsSubmenu>
             <ODropdownSeparator />
@@ -604,6 +615,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         ref="queryEditorBoxRef"
+        data-primary-query
         class="relative flex h-full w-full flex-col overflow-hidden"
         @keydown.capture="onRecentEditorKeydown"
       >

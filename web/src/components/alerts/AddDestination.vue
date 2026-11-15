@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="destination-type-readonly"
                   >
                     <OIcon :name="getDestinationTypeIcon(dtVal)" size="md" class="me-2" />
-                    <span class="text-sm">{{ getDestinationTypeName(dtVal) }}</span>
+                    <span class="text-compact">{{ readonlyTypeLabel }}</span>
                     <OTag type="readonlyFlag" value="readonly" class="ms-2">{{
                       t("alert_destinations.readonly")
                     }}</OTag>
@@ -264,7 +264,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Tabs for non-alert destinations OR custom alert destinations -->
-            <div v-if="!isAlerts || (isAlerts && dtVal === 'custom')" class="w-full pb-3">
+            <!-- An existing destination keeps its type, which the read-only label above already names. -->
+            <div
+              v-if="!isAlerts || (isAlerts && dtVal === 'custom' && !destination)"
+              class="w-full pb-3"
+            >
               <div class="app-tabs-container me-2 h-9 w-fit">
                 <AppTabs
                   data-test="add-destination-tabs"
@@ -291,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- Name + Template row for custom alert destinations -->
             <div v-if="isAlerts && dtVal === 'custom'" class="flex w-full gap-3">
-              <div class="w-1/2 py-1">
+              <div v-if="!destination" class="w-1/2 py-1">
                 <OFormInput
                   data-test="add-destination-name-input"
                   name="name"
@@ -519,6 +523,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               type="submit"
               form="add-destination-form"
+              :disabled="saveWaitsForEdits"
+              :disabled-reason="t('common.saveBar.noChanges')"
               @click="onSaveClick"
               >{{ t("alerts.save") }}</OButton
             >
@@ -1009,6 +1015,14 @@ const tabs = computed(() => {
 // Check if current destination type is prebuilt
 const isPrebuiltDestination = computed(() => {
   return !!(dtVal.value && dtVal.value !== "custom");
+});
+
+// The list's wording, so an existing custom destination reads "Custom (Webhook)" on both screens.
+const readonlyTypeLabel = computed(() => {
+  if (dtVal.value !== "custom") return getDestinationTypeName(dtVal.value);
+  if (typeVal.value === "http") return t("alert_destinations.customWebhook");
+  if (typeVal.value === "email") return t("alert_destinations.customEmail");
+  return t("alert_destinations.custom");
 });
 
 // Helper methods for displaying destination type in edit mode
@@ -1778,6 +1792,12 @@ const destinationDraft = useEditorDraft<AddDestinationForm>({
     to.path !== from.path ||
     to.query.action !== from.query.action ||
     to.query.name !== from.query.name,
+});
+
+// Only the tracked editor knows its baseline; reading the values makes this recompute on each edit.
+const saveWaitsForEdits = computed(() => {
+  void formValues.value;
+  return isUpdatingDestination.value && draftsActive && !destinationDraft.hasUnsavedChanges();
 });
 
 onMounted(async () => {

@@ -27,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="settings-data-retention-add"
             variant="secondary"
-            icon="add"
             icon-end="keyboard-arrow-down"
             type="button"
             >{{ t("settings.dataRetentionDefaults.addType") }}</OButton
@@ -46,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else
         data-test="settings-data-retention-add"
         variant="secondary"
-        icon="add"
         type="button"
         disabled
         :disabled-reason="t('settings.dataRetentionDefaults.allTypesAdded')"
@@ -55,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <OSettingRow
-      control-at="end"
+      control-at="below"
       name="default"
       error-data-test="settings-data-retention-default-error"
       :label="t('settings.dataRetentionDefaults.defaultLabel')"
@@ -77,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSettingRow
       v-for="(row, index) in rows"
       :key="index"
-      control-at="end"
+      control-at="below"
       :name="`types[${index}].days`"
       :error-data-test="`settings-data-retention-days-${index}-error`"
       :label="typeLabels[row.type]"

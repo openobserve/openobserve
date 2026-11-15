@@ -266,6 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-actions="{ row }">
               <span class="row-actions flex items-center justify-end gap-0.5">
+                <!-- Icon actions appear on row hover or focus; at rest only the overflow shows. -->
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-only
@@ -273,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :aria-label="t('dashboard.move_to_another_folder')"
                   variant="ghost"
                   size="sm"
-                  class="max-md:hidden"
+                  class="opacity-0 focus-visible:opacity-100 max-md:hidden [tr:focus-within_&]:opacity-100 [tr:hover_&]:opacity-100"
                   data-test="dashboard-move-to-another-folder"
                   @click.stop="showMoveDashboardPanel(row)"
                 >
@@ -286,30 +287,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :aria-label="t('dashboard.duplicate')"
                   variant="ghost"
                   size="sm"
-                  class="max-md:hidden"
+                  class="opacity-0 focus-visible:opacity-100 max-md:hidden [tr:focus-within_&]:opacity-100 [tr:hover_&]:opacity-100"
                   data-test="dashboard-duplicate"
                   data-row-action="duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
                 >
                   <OTooltip side="bottom" :content="t('dashboard.duplicate')" />
                 </OButton>
-                <OButton
-                  v-if="row.actions == 'true'"
-                  icon-only
-                  icon="delete"
-                  :aria-label="t('dashboard.delete')"
-                  variant="danger-ghost"
-                  size="sm"
-                  class="max-md:hidden"
-                  data-test="dashboard-delete"
-                  data-row-action="delete"
-                  @click.stop="showDeleteDialogFn({ row })"
-                >
-                  <OTooltip side="bottom" :content="t('dashboard.delete')" />
-                </OButton>
-                <!-- Overflow menu (rightmost) — houses the low-frequency "set as
-                     home" action so it doesn't clutter every row with an
-                     always-on icon. Move/Duplicate/Delete stay inline. -->
                 <ODropdown v-if="row.actions == 'true'" side="bottom" align="end">
                   <template #trigger>
                     <OButton
@@ -324,6 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip side="bottom" :content="t('dashboard.moreActions')" />
                     </OButton>
                   </template>
+                  <!-- Mirrors of the hover icons, which are hidden below md. -->
                   <ODropdownItem
                     icon="drive-file-move"
                     class="md:hidden"
@@ -349,11 +334,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       isHome(row.id) ? t("dashboard.removeFromHome") : t("dashboard.setAsHome")
                     }}</span>
                   </ODropdownItem>
-                  <ODropdownSeparator class="md:hidden" />
+                  <ODropdownSeparator />
                   <ODropdownItem
                     icon="delete"
                     tone="danger"
-                    class="md:hidden"
                     data-test="dashboard-delete-menu"
                     @select="showDeleteDialogFn({ row })"
                   >
@@ -585,6 +569,7 @@ import {
   ref,
   watch,
   toRaw,
+  toRef,
 } from "vue";
 import { useStore } from "vuex";
 import { isCancelledError } from "@tanstack/vue-query";
@@ -621,7 +606,7 @@ import useNotifications from "@/composables/useNotifications";
 import { debounce } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
-import { useListViewState } from "@/composables/useListViewState";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
@@ -734,21 +719,26 @@ export default defineComponent({
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref<string | null>(null);
     const selectedFolderToEdit = ref<string | null>(null);
-    const savedView = useListViewState("dashboards", {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
-      sortBy: "",
-      sortOrder: "asc" as "asc" | "desc",
-      pageSize: 20,
-    });
-    const searchQuery = ref(savedView.searchQuery);
+    const savedView = useListViewState(
+      "dashboards",
+      {
+        searchQuery: "",
+        filterQuery: "",
+        searchAcrossFolders: false,
+        sortBy: "",
+        sortOrder: "asc" as "asc" | "desc",
+        pageSize: 20,
+      },
+      { url: { ...LIST_URL_PARAMS, searchQuery: "search", searchAcrossFolders: "all" } },
+    );
+    // Bound to the saved view, not copied, so Back between folder entries updates the fields too.
+    const searchQuery = toRef(savedView, "searchQuery");
     const filteredResults = ref<DashboardSearchResult[]>([]);
     const confirmDeleteFolderDialog = ref<boolean>(false);
     const selectedDashboardToMove = ref<DashboardRow | null>(null);
     const selectedDashboardIdToMove = ref<string[] | null>(null);
     const showMoveDashboardDialog = ref(false);
-    const searchAcrossFolders = ref(savedView.searchAcrossFolders);
+    const searchAcrossFolders = toRef(savedView, "searchAcrossFolders");
     const searchScopeOptions = computed<SearchScopeOption[]>(() => [
       {
         value: "this",
@@ -765,20 +755,10 @@ export default defineComponent({
         dataTest: "dashboard-search-across-folders-toggle",
       },
     ]);
-    const filterQuery = ref(savedView.filterQuery);
-    const sortBy = ref<string>(savedView.sortBy);
-    const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
-    const pageSize = ref<number>(savedView.pageSize);
-    watch([searchQuery, filterQuery, searchAcrossFolders, sortBy, sortOrder, pageSize], () => {
-      Object.assign(savedView, {
-        searchQuery: searchQuery.value,
-        filterQuery: filterQuery.value,
-        searchAcrossFolders: searchAcrossFolders.value,
-        sortBy: sortBy.value,
-        sortOrder: sortOrder.value,
-        pageSize: pageSize.value,
-      });
-    });
+    const filterQuery = toRef(savedView, "filterQuery");
+    const sortBy = toRef(savedView, "sortBy");
+    const sortOrder = toRef(savedView, "sortOrder");
+    const pageSize = toRef(savedView, "pageSize");
     const folderSearchQuery = ref("");
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
@@ -1229,6 +1209,18 @@ export default defineComponent({
         page: "Dashboards",
       });
     };
+
+    // "New dashboard" from the Jump to palette arrives as ?action=add; consumed so a refresh does not reopen it.
+    watch(
+      () => route.query.action,
+      (action) => {
+        if (action !== "add") return;
+        const { action: _consumed, ...rest } = route.query;
+        router.replace({ query: rest }).catch(() => {});
+        addDashboard();
+      },
+      { immediate: true },
+    );
     const addFolder = () => {
       isFolderEditMode.value = false;
       showAddFolderDialog.value = true;
@@ -1700,7 +1692,10 @@ export default defineComponent({
       // presentation state, not a user action — letting it through would
       // clobber the favorites-first landing with "default".
       if (!landingDecided) return;
+      // A new folder the URL already names came from Back or Forward, and the URL restores its search too.
+      const fromUrl = folderId !== activeFolderId.value && folderId === route.query.folder;
       activeFolderId.value = folderId;
+      if (fromUrl) return;
       filterQuery.value = "";
       searchQuery.value = "";
     };

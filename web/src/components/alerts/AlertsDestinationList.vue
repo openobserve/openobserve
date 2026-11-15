@@ -57,6 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-destinations-list-table"
           :data="visibleRows"
           :columns="columns"
+          :row-actions="rowActions"
+          :row-menu="rowMenu"
+          row-menu-data-test="alert-destination-list-row-more-actions"
           row-key="name"
           :loading="loading"
           :forbidden="forbidden"
@@ -277,87 +280,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <template #cell-actions="{ row }">
-            <div class="flex items-center justify-center gap-1">
-              <OButton
-                icon-only
-                data-test="destination-export"
-                data-row-action="export"
-                variant="ghost"
-                size="sm"
-                class="max-md:hidden"
-                :title="t('alert_destinations.exportDestination')"
-                @click.stop="exportDestination(row)"
-              >
-                <OIcon name="download" size="sm" />
-              </OButton>
-              <OButton
-                icon-only
-                :data-test="`alert-destination-list-${row.name}-update-destination`"
-                data-row-action="edit"
-                variant="ghost"
-                size="sm"
-                class="max-md:hidden"
-                :title="t('alert_destinations.edit')"
-                @click="editDestination(row)"
-              >
-                <OIcon name="edit" size="sm" />
-              </OButton>
-              <OButton
-                icon-only
-                :data-test="`alert-destination-list-${row.name}-delete-destination`"
-                data-row-action="delete"
-                variant="ghost"
-                size="sm"
-                class="max-md:hidden"
-                :title="t('alert_destinations.delete')"
-                :loading="deletingDestinations.has(row.name)"
-                @click="conformDeleteDestination(row)"
-              >
-                <OIcon name="delete" size="sm" />
-              </OButton>
-              <ODropdown side="bottom" align="end">
-                <template #trigger>
-                  <OButton
-                    icon-only
-                    :aria-label="t('common.moreActions')"
-                    icon="more-vert"
-                    variant="ghost"
-                    size="sm"
-                    class="md:hidden"
-                    data-test="alert-destination-list-row-more-actions"
-                    @click.stop
-                  />
-                </template>
-                <ODropdownItem
-                  icon="download"
-                  class="md:hidden"
-                  data-test="destination-export-menu"
-                  @select="exportDestination(row)"
-                >
-                  <span>{{ t("alert_destinations.exportDestination") }}</span>
-                </ODropdownItem>
-                <ODropdownItem
-                  icon="edit"
-                  class="md:hidden"
-                  :data-test="`alert-destination-list-${row.name}-update-destination-menu`"
-                  @select="editDestination(row)"
-                >
-                  <span>{{ t("alert_destinations.edit") }}</span>
-                </ODropdownItem>
-                <ODropdownItem
-                  icon="delete"
-                  tone="danger"
-                  class="md:hidden"
-                  :data-test="`alert-destination-list-${row.name}-delete-destination-menu`"
-                  @select="conformDeleteDestination(row)"
-                >
-                  <span>{{ t("alert_destinations.delete") }}</span>
-                </ODropdownItem>
-              </ODropdown>
-            </div>
-          </template>
-
           <template #cell-used_by="{ row }">
             <DependencyUsageCell
               :graph="depGraph"
@@ -440,8 +362,6 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -450,7 +370,11 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -484,8 +408,6 @@ export default defineComponent({
     ConfirmDialog,
     ImportDestination,
     OButton,
-    ODropdown,
-    ODropdownItem,
     OSearchInput,
     OTag,
     OTruncatedText,
@@ -614,13 +536,33 @@ export default defineComponent({
         size: 200,
         meta: { align: "left" },
       },
+    ];
+    // Export and Edit inline on hover; Delete lives in the row's ⋯ and confirms by name (B7, V8).
+    const rowActions: OTableRowAction[] = [
       {
-        id: "actions",
-        header: t("alert_destinations.actions"),
-        isAction: true,
-        pinned: "right",
-        size: 130,
-        meta: { align: "center", actionCount: 3 },
+        id: "export",
+        label: t("alert_destinations.exportDestination"),
+        icon: "download",
+        onClick: (row) => exportDestination(row),
+        dataTest: "destination-export",
+      },
+      {
+        id: "edit",
+        label: t("alert_destinations.edit"),
+        icon: "edit",
+        onClick: (row) => editDestination(row),
+        dataTest: (row) => `alert-destination-list-${row.name}-update-destination`,
+      },
+    ];
+    const rowMenu: OTableRowMenuItem[] = [
+      {
+        id: "delete",
+        label: t("alert_destinations.delete"),
+        icon: "delete",
+        destructive: true,
+        disabled: (row) => deletingDestinations.value.has(row.name),
+        onSelect: (row) => conformDeleteDestination(row),
+        dataTest: (row) => `alert-destination-list-${row.name}-delete-destination`,
       },
     ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
@@ -1167,6 +1109,8 @@ export default defineComponent({
       },
     ]);
     return {
+      rowActions,
+      rowMenu,
       t,
       lastUpdatedAt,
       depGraph,

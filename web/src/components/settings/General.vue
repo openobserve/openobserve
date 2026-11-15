@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="general-settings-query-defaults-section"
           >
             <OSettingRow
-              control-at="end"
+              control-at="below"
               name="scrape_interval"
               error-data-test="general-settings-scrape-interval-error"
               :label="t('settings.general.scrapeIntervalLabel')"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OSettingRow>
 
             <OSettingRow
-              control-at="end"
+              control-at="below"
               name="max_series_per_query"
               :label="t('settings.general.maxSeriesLabel')"
               :description="t('settings.general.maxSeriesHelp', { n: defaultMaxSeries })"
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="general-settings-branding-section"
         >
           <OSettingRow
-            control-at="end"
+            control-at="below"
             name="custom_logo_text"
             error-data-test="settings_ent_logo_custom_text_error"
             :label="t('settings.customLogoText')"

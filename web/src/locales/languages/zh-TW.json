@@ -11,7 +11,9 @@
     "bannerMessage": "此功能已鎖定。您的授權需要包含 {feature} 功能。",
     "bannerMessageGeneric": "此頁面所需的功能不在您的授權中。",
     "headerLocked": "已鎖定：需要 {feature}",
-    "availableInEnterprise": "{feature} 適用於 OpenObserve 企業版"
+    "availableInEnterprise": "{feature} 適用於 OpenObserve 企業版",
+    "turnedOffTitle": "已為此組織關閉",
+    "enterpriseTitle": "Enterprise 版提供"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "找不到任何模式",
       "description": "請嘗試增加時間範圍或選擇包含更多日誌資料的不同串流。模式提取在至少有 1,000 條日誌時效果最佳。",
       "logsAnalyzed": "僅分析了 {count} 條日誌。"
-    },
-    "noStreamSelected": {
-      "title": "請選擇一個串流以開始",
-      "description": "從左側下拉選單中選擇一個串流，然後按下「執行查詢」即可開始探索。您也可以套用額外的篩選條件並調整日期範圍。"
     },
     "noQueryApplied": {
       "title": "執行查詢以查看結果",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "正在等待您的第一筆資料",
       "description": "尚無資料抵達。連接一個來源後，您的串流將自動顯示於此處。",
-      "action": "設定擷取",
       "actionDesc": "連接資料來源",
       "createAction": "新增串流",
       "createActionDesc": "手動定義串流架構"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "沒有要儲存的變更"
+    },
     "dismiss": "關閉",
     "exitFullscreen": "退出全螢幕",
     "moreActions": "更多操作",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "上一個",
     "patternNavNext": "下一個",
     "patternNoValuesAvailable": "無可用值",
-    "sqlModeLabel": "SQL 模式",
     "nlpModeLabel": "自然語言模式",
     "quickModeLabel": "快速模式",
     "menuMore": "更多",
-    "menuGroupSetOnce": "一次性設定",
     "menuGroupHistory": "歷史記錄",
     "menuGroupDownloads": "下載",
     "menuGroupSchedule": "排程",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "檢視刪除成功。",
     "viewCreatedSuccessfully": "檢視建立成功。",
     "viewUpdatedSuccessfully": "檢視更新成功。",
-    "linkCopiedSuccessfully": "連結複製成功！",
     "errorCopyingLink": "複製連結時發生錯誤。",
     "errorShorteningLink": "縮短連結時發生錯誤。",
     "webUrlNotConfigured": "在管理員完成 ZO_WEB_URL 設定之前，分享 URL 功能已停用。",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "選取的串流沒有全文欄位",
     "freeTextNoTextFields": "此串流沒有可供搜尋的文字欄位。",
     "freeTextNoTextFieldsNamed": "未搜尋：{streams}（沒有文字欄位）。",
-    "freeTextBuildNotice": "此篩選條件包含文字搜尋；請在 SQL 中編輯。"
+    "freeTextBuildNotice": "此篩選條件包含文字搜尋；請在 SQL 中編輯。",
+    "queryModeLabel": "查詢語言",
+    "queryModeFilter": "篩選",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "依欄位和值縮小日誌範圍",
+    "queryModeSqlTooltip": "撰寫完整的 SQL 查詢，可使用彙總和聯結",
+    "sqlModeNeedsOneStream": "此檢視中的 SQL 只能使用一個串流",
+    "menuGroupViewOptions": "檢視選項",
+    "histogramHiddenForAggregates": "此查詢傳回的是群組，而不是隨時間分布的事件，因此沒有直方圖。可用視覺化繪製結果。",
+    "linkCopied": "已複製連結",
+    "linkCopiedFixedTime": "已複製連結 · 固定時間 {from} – {to}",
+    "linkCopiedRelativeTime": "已複製連結 · {period}，從開啟時起算",
+    "recordsChipRows": "{total} 列 | {total} 列",
+    "histogramTitleRows": "在 {took} 毫秒內顯示 {total} 列。 | 在 {took} 毫秒內顯示 {total} 列。",
+    "histogramTitleRowsWithScan": "在 {took} 毫秒內顯示 {total} 列。（{scanLabel}：{scanSize}） | 在 {took} 毫秒內顯示 {total} 列。（{scanLabel}：{scanSize}）",
+    "pickStreamFirst": "請先選擇一個串流"
   },
   "menu": {
     "alertCalibration": "警示校準",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "鍵盤快捷鍵",
     "searchOrJumpTo": "搜尋或跳至…",
     "jumpToTitle": "跳至",
-    "jumpToPlaceholder": "搜尋頁面",
+    "addData": "新增資料",
+    "jumpToPlaceholder": "搜尋頁面和操作",
     "synthetic": "合成監控",
     "experience": "體驗",
     "slos": "SLOs",
@@ -4212,7 +4225,8 @@
     "revokeInvitationMsg": "您確定要撤銷對 {email} 的邀請嗎？",
     "deleteUsersTitle": "刪除使用者",
     "deleteUsersMsg": "您確定要刪除 {count} 個使用者嗎？ | 您確定要刪除 {count} 個使用者嗎？",
-    "deleteUsersBlockNote": "其中 {count} 位是透過您已驗證的網域加入的，將被封鎖而非刪除。"
+    "deleteUsersBlockNote": "其中 {count} 位是透過您已驗證的網域加入的，將被封鎖而非刪除。",
+    "roleHint": "Admin 管理組織，Editor 可變更資料與設定，Viewer 只能檢視。"
   },
   "invitation": {
     "pendingInvitations": "待處理的邀請",
@@ -5160,6 +5174,7 @@
     "timezone": "時區",
     "deleteActionMessage": "您確定要刪除 {count} 個欄位嗎？此動作無法復原。 | 您確定要刪除 {count} 個欄位嗎？此動作無法復原。",
     "deleteDatesMessage": "您確定要刪除 {count} 個日期範圍嗎？此動作無法復原。 | 您確定要刪除 {count} 個日期範圍嗎？此動作無法復原。",
+    "summaryAllTypes": "串流（所有類型）",
     "labelLogs": "日誌",
     "labelMetrics": "指標",
     "labelTraces": "追蹤",
@@ -7757,7 +7772,8 @@
       "metricsSketch": "分佈會儲存為直方圖桶，百分位數則根據這些桶估算。較高的 ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA 會提供更細緻的桶與更精確的百分位數，代價是儲存更多資料列。"
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU 匯出器"
+    "gpuExporter": "GPU 匯出器",
+    "rotationNote": "權杖不會原地輪替。若要輪替，請建立新權杖，將來源切換到新權杖，再停用舊權杖。"
   },
   "dashboard": {
     "panelDraft": {
@@ -9385,6 +9401,9 @@
       "addClause": "新增子句"
     },
     "viewDashboard": {
+      "apply": "套用",
+      "lastDataSeen": "最新資料 {when}",
+      "jumpToLatest": "跳至最新",
       "refreshToApplyVariables": "重新整理以套用最新變數變更",
       "refresh": "重新整理",
       "refreshCacheReload": "重新整理快取並重新載入",
@@ -10130,6 +10149,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "範圍內無資料",
     "saveAndStay": "儲存並繼續編輯",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10572,6 +10592,38 @@
     },
     "timeRange": {
       "heading": "所選時間範圍內"
+    },
+    "firingNow": {
+      "title": "正在觸發",
+      "byLevel": "嚴重 {critical} 個 · 警告 {warning} 個",
+      "allQuiet": "一切正常",
+      "watching": "已啟用 {count} 條警示規則，皆未觸發 | 已啟用 {count} 條警示規則，皆未觸發",
+      "noRules": "還沒有警示規則",
+      "browseLibrary": "瀏覽警示庫",
+      "notifyFailed": "通知失敗",
+      "loadError": "無法載入觸發中的警示",
+      "unavailable": "目前無法讀取警示狀態"
+    },
+    "health": {
+      "subtitle": "依類型顯示最近收到的資料",
+      "lastData": "最近資料：{age}前",
+      "justNow": "最近資料：剛剛",
+      "noDataIn": "過去 {range} 沒有資料",
+      "noRecords": "還沒有記錄",
+      "loadError": "無法讀取你的資料流"
+    },
+    "start": {
+      "text": "過去 {range} 沒有收到資料。傳送資料、查看現有資料，或設定警示。",
+      "addData": "新增資料",
+      "createAlert": "建立警示"
+    },
+    "summary": {
+      "loadError": "無法載入組織摘要",
+      "denied": "無權存取組織摘要。請聯絡組織管理員。"
+    },
+    "events": {
+      "runFailed": "執行失敗",
+      "timesInRange": "在所選範圍內 {count} 次 | 在所選範圍內 {count} 次"
     }
   },
   "chatHistory": {
@@ -11546,6 +11598,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "在日誌中開啟",
+      "openInTraces": "在追蹤中開啟",
+      "openInMetrics": "在指標中開啟",
+      "evidenceFiringTip": "使用此警示的篩選條件開啟 {stream}，從本次觸發開始到現在",
+      "evidenceWindowTip": "使用此警示的篩選條件開啟 {stream}，範圍為最近 {window}",
+      "threshold": "閾值",
+      "noIncident": "尚無事件",
+      "conditionLabel": "警示條件",
+      "allRows": "所有列"
+    },
+    "summaryTrainingFailed": "訓練失敗",
+    "startFromTemplate": "從範本開始",
     "firing": {
       "title": "觸發中",
       "drawer": {
@@ -20564,7 +20629,6 @@
     },
     "noStream": {
       "title": "選擇一個串流以開始探索",
-      "description": "選擇一個串流，然後按下<strong>執行查詢</strong>。結果出現後，您可使用篩選條件、VRL 函式與自訂時間範圍進行精煉。",
       "selectStream": "選擇串流",
       "selectStreamDesc": "瀏覽日誌、追蹤、指標與 RUM 串流",
       "queryGuide": "閱讀查詢指南",
@@ -20616,7 +20680,16 @@
     "detailTable": {
       "noDataAvailable": "無可用資料。",
       "addIcon": "新增圖示",
-      "sendToAiChat": "傳送至 AI 聊天"
+      "sendToAiChat": "傳送至 AI 聊天",
+      "openTrace": "開啟追蹤",
+      "noTraceTitle": "沒有追蹤與此日誌關聯",
+      "noRelatedLogsTitle": "找不到相關日誌",
+      "noRelatedMetricsTitle": "找不到相關指標",
+      "noServiceText": "無法將任何服務與此日誌比對，因此無法自動找到相關資料。",
+      "searchTracesAround": "搜尋此時間前後的追蹤",
+      "searchAroundTip": "載入緊鄰此事件之前與之後記錄的事件。",
+      "noOfEventsTip": "圍繞此事件載入的事件數量。",
+      "severityTip": "偵測到的日誌層級。選取即可查看偵測方式。"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "不支援視覺化的 Select * 查詢。",
@@ -23155,7 +23228,7 @@
         "ok": "確定",
         "normal": "正常",
         "firing": "觸發中",
-        "notifyfailed": "通知失敗",
+        "notifyfailed": "傳送失敗",
         "flapping": "抖動",
         "anomaly": "異常",
         "succeeded": "成功",
@@ -30389,7 +30462,9 @@
     "validation": {
       "regexLength": "模式最多 {max} 個字元。",
       "regexInvalid": "此模式無效或不受支援。不能使用先行斷言、後行斷言和反向參照。"
-    }
+    },
+    "queryTooltip": "以文字編輯篩選條件",
+    "builderTooltip": "使用建構器編輯篩選條件"
   },
   "autoobserveLive": {
     "paging": {

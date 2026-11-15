@@ -95,17 +95,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-email="{ row }">
-            <template v-if="row.is_system">
-              <span data-test="service-accounts-system-account-label" class="font-medium">{{
-                row.first_name
-              }}</span>
+            <span v-if="row.is_system" class="inline-flex max-w-full min-w-0 items-center gap-2">
+              <span
+                data-test="service-accounts-system-account-label"
+                class="min-w-0 truncate font-medium"
+              >
+                {{ row.first_name }}
+                <OTooltip overflow-only />
+              </span>
               <OTag
                 data-test="service-accounts-system-badge"
                 type="serviceAccountKind"
                 value="system"
-                class="ms-2"
+                class="shrink-0"
               />
-            </template>
+            </span>
             <template v-else-if="isSyntheticSA(row.email)">
               <!-- UI-created accounts store `<name>.<org>@sa.internal`; show
                      the friendly name first, full identifier (the Basic-auth
@@ -116,7 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="service-accounts-list-name-link"
                   >{{ saDisplayName(row.email) }}</ONameLinkCell
                 >
-                <span class="text-text-secondary text-xs">{{ row.email }}</span>
+                <span class="text-text-secondary truncate text-xs">
+                  {{ row.email }}
+                  <OTooltip overflow-only />
+                </span>
               </div>
             </template>
             <template v-else>
@@ -181,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-accounts-system-managed-badge"
               class="inline-flex items-center gap-1"
             >
-              <OTag type="serviceAccountKind" value="managed" />
+              <OIcon name="lock" size="sm" class="text-text-secondary cursor-help" />
               <OTooltip :content="t('serviceAccounts.row.managedByTooltip')" />
             </span>
           </template>
@@ -454,7 +461,8 @@ import { useQuery } from "@tanstack/vue-query";
 import { serviceAccountsQuery } from "@/services/service_accounts.queries";
 import { allUserRolesQuery } from "@/services/users.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
+import { defineComponent, ref, toRef, onBeforeMount, computed, watch } from "vue";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -550,7 +558,10 @@ export default defineComponent({
     const isCurrentUserInternal = ref(false);
     const isShowToken = ref(false);
     const confirmRefresh = ref(false);
-    const filterQuery = ref("");
+    const filterQuery = toRef(
+      useListViewState("iam-serviceAccounts", { filterQuery: "" }, { url: LIST_URL_PARAMS }),
+      "filterQuery",
+    );
     const toBeRefreshed = ref<{ email?: string }>({});
 
     const serviceToken = ref("");
@@ -750,7 +761,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.description,
+        size: 220,
         minSize: 160,
         meta: { align: "left", flex: true },
       },
@@ -763,7 +774,7 @@ export default defineComponent({
         sortable: false,
         resizable: true,
         hideable: true,
-        size: 160,
+        size: 130,
         minSize: 120,
         meta: {
           align: "left",

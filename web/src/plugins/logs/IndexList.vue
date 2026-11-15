@@ -77,16 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
+    <!-- The page body explains the empty state; this panel only offers one-click picks beside the picker. -->
     <div v-if="!searchObj.data.stream.selectedStream.length" class="index-table mt-1">
-      <OEmptyState
-        data-test="logs-search-no-stream-selected"
-        :title="t('emptyState.noStreamSelected.title')"
-        :text="t('emptyState.noStreamSelected.description')"
-        size="compact"
-        icon="database"
-        class="px-page-edge"
-      >
-        <template v-if="quickPickGroups.length" #extra>
+      <div data-test="logs-search-no-stream-selected" class="px-page-edge pt-2">
+        <template v-if="quickPickGroups.length">
           <div data-test="logs-search-stream-quick-pick" class="flex w-full flex-col gap-1">
             <template v-for="group in quickPickGroups" :key="group.id">
               <OSelectHeaderRow
@@ -126,11 +120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
         </template>
-      </OEmptyState>
+      </div>
     </div>
     <div v-else class="index-table mt-1">
       <GroupedFieldList
         ref="fieldListRef"
+        :search-shortcut="false"
         :fields="streamFieldsRows"
         :search="searchObj.data.stream.filterField"
         :loading="showFieldListSkeleton"
@@ -312,7 +307,6 @@ import GroupedFieldList from "@/components/common/GroupedFieldList.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
 import FieldExpansion from "@/components/common/FieldExpansion.vue";
 import FieldListFooter from "@/components/common/FieldListFooter.vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelectHeaderRow from "@/lib/forms/Select/OSelectHeaderRow.vue";
 import { useStreamPickerOptions, type PickerStream } from "@/composables/useStreamPickerOptions";
 import { captureFromValuesApi } from "@/composables/fieldValueStore";
@@ -346,13 +340,13 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OTruncatedText,
-    OEmptyState,
     OSkeleton,
     OSelectHeaderRow,
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleStreamSelection(value: SelectModelValue) {
+      const fromEmptyPage = !this.searchObj.data.stream.selectedStream.length;
       if (this.selectionMode === "single") {
         this.searchObj.data.stream.selectedStream = value ? [value as string] : [];
       } else {
@@ -365,7 +359,10 @@ export default defineComponent({
           indexListSelectField.updateInputValue("");
         }
       });
-      this.onStreamChange("", { origin: "selector" });
+      this.onStreamChange("", {
+        origin: "selector",
+        runNow: fromEmptyPage && this.searchObj.data.stream.selectedStream.length > 0,
+      });
       this.resetPagination();
     },
     // One-click stream pick from the empty state — mirrors a dropdown

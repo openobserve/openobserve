@@ -107,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('user.role')"
           required
           :options="roles"
+          :help-text="t('user.roleHint')"
           class="showLabelOnTop mt-2"
           data-test="user-role-field"
         />
@@ -412,6 +413,11 @@ export default defineComponent({
     const unlockStaged = ref(false);
     const { confirm } = useConfirmDialog();
 
+    // The least-privileged built-in, or the only role on offer, so a new member never starts blank.
+    const defaultRole = () =>
+      ["viewer", "member", "user"].find((r) => props.roles.some((o) => o.value === r)) ??
+      (props.roles.length === 1 ? String(props.roles[0].value) : "");
+
     const blankForm = (): AddUserForm => ({
       email: "",
       password: "",
@@ -712,9 +718,19 @@ export default defineComponent({
         organization.value = store.state.selectedOrganization.identifier;
         editRecord.value = null;
         isExternalUser.value = false;
-        form.reset(blankForm());
+        form.reset({ ...blankForm(), role: defaultRole() });
       }
     };
+
+    // Roles can arrive after the dialog opens; fill the blank required field once they do.
+    watch(
+      () => props.roles,
+      () => {
+        if (props.open && !beingUpdated.value && !form.getFieldValue("role")) {
+          form.setFieldValue("role", defaultRole());
+        }
+      },
+    );
 
     watch(
       () => props.open,

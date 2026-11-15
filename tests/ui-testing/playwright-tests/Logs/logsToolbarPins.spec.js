@@ -87,14 +87,14 @@ test.describe('Logs toolbar pins', () => {
   test('an unknown stored pin is ignored and dropped on the next write', {
     tag: ['@toolbarPins', '@logs', '@P1', '@all'],
   }, async () => {
-    await pm.logsToolbarPinsPage.seedPinStorage({ pins: ['bogus', 'sqlMode'], decided: true });
+    await pm.logsToolbarPinsPage.seedPinStorage({ pins: ['bogus', 'functionEditor'], decided: true });
     await pm.logsToolbarPinsPage.navigateToLogs(getOrgIdentifier());
 
-    await pm.logsToolbarPinsPage.expectPinnedVisible('sqlMode');
+    await pm.logsToolbarPinsPage.expectPinnedVisible('functionEditor');
 
     await pm.logsToolbarPinsPage.togglePin('quickMode');
     const pins = await pm.logsToolbarPinsPage.readPins();
-    expect(pins).toContain('sqlMode');
+    expect(pins).toContain('functionEditor');
     expect(pins).toContain('quickMode');
     expect(pins).not.toContain('bogus');
 
@@ -111,10 +111,10 @@ test.describe('Logs toolbar pins', () => {
     await pm.logsToolbarPinsPage.expectPinnedHidden('histogram');
 
     // The next write must recover the key, not append to the garbage.
-    await pm.logsToolbarPinsPage.togglePin('sqlMode');
+    await pm.logsToolbarPinsPage.togglePin('functionEditor');
     const recovered = await pm.logsToolbarPinsPage.readPins();
     expect(Array.isArray(recovered)).toBe(true);
-    expect(recovered).toContain('sqlMode');
+    expect(recovered).toContain('functionEditor');
 
     testLogger.info('Corrupt pin storage did not break the toolbar and recovered on write');
   });

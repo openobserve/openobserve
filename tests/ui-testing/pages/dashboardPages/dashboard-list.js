@@ -43,7 +43,8 @@ export default class DashboardListPage {
     const dashboardRow = nameCell.locator(
       "xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]",
     );
-    await dashboardRow.locator('[data-test="dashboard-delete"]').click();
+    await dashboardRow.locator('[data-test="dashboard-row-more-actions"]').click();
+    await this.page.locator('[data-test="dashboard-delete-menu"]').click();
 
     // Confirm the deletion dialog.
     const confirmButton = this.page.locator(

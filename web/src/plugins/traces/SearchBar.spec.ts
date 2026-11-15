@@ -898,7 +898,7 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(pinBtn().exists()).toBe(true);
-      expect(pinBtn().attributes("title")).toBe("search.pinToToolbar");
+      expect(pinBtn().attributes("aria-label")).toBe("search.pinToToolbar");
       expect(pinBtn().findComponent({ name: "OIcon" }).props("name")).toBe("keep-outline");
       expect(pinnedBtn().exists()).toBe(false);
     });
@@ -917,7 +917,7 @@ describe("SearchBar", () => {
       expect(item.emitted("select")).toBeUndefined();
       expect(searchObjInstance.meta.showHistogram).toBe(true);
       expect(pinnedBtn().exists()).toBe(true);
-      expect(pinBtn().attributes("title")).toBe("search.unpinFromToolbar");
+      expect(pinBtn().attributes("aria-label")).toBe("search.unpinFromToolbar");
       expect(pinBtn().findComponent({ name: "OIcon" }).props("name")).toBe("keep");
       expect(menuItem().exists()).toBe(true);
 

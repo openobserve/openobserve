@@ -18,6 +18,9 @@ import type { I18nText } from "@/types/i18n";
 
 const VISITS_KEY = "o2.jumpTo.areaVisits";
 
+/** The area of the palette's actions, which list only for a query. */
+export const ACTIONS_AREA_KEY = "actions";
+
 /** One page the palette can open, with the rail area it belongs to. */
 export interface JumpDestination {
   key: string;
@@ -27,6 +30,10 @@ export interface JumpDestination {
   /** Stable, untranslated id of the area, used for the visit counts. */
   areaKey: string;
   to: RouteLocationRaw;
+  /** The page an action opens, shown beside it. */
+  hint?: I18nText;
+  /** Untranslated words that also find it, such as the last segment of its path. */
+  keywords?: string[];
 }
 
 export interface JumpGroup {
@@ -37,16 +44,17 @@ export interface JumpGroup {
 
 export type AreaVisits = Record<string, number>;
 
-/** 0 the label starts with the query, 1 a word of it does, 2 it holds it, 3 only the area does; null no match. */
+/** 0 the label starts with the query, 1 a word of it does, 2 it holds it, 3 only the area, hint or a keyword does; null no match. */
 function matchScore(destination: JumpDestination, query: string): number | null {
   const label = String(destination.label).toLowerCase();
   if (label.startsWith(query)) return 0;
   if (label.split(/[\s/_-]+/).some((word) => word.startsWith(query))) return 1;
   if (label.includes(query)) return 2;
-  return String(destination.area).toLowerCase().includes(query) ? 3 : null;
+  const extras = [destination.area, destination.hint ?? "", ...(destination.keywords ?? [])];
+  return extras.some((text) => String(text).toLowerCase().includes(query)) ? 3 : null;
 }
 
-/** Groups by area. An empty query puts the most-visited areas first; a query puts the best matches first. */
+/** Groups by area. An empty query lists no actions and puts the most-visited areas first; a query puts the best matches first, actions winning a tie. */
 export function rankDestinations(
   destinations: JumpDestination[],
   query: string,
@@ -59,6 +67,7 @@ export function rankDestinations(
     { area: I18nText; scored: Scored[]; best: number; order: number }
   >();
   destinations.forEach((destination, order) => {
+    if (!needle && destination.areaKey === ACTIONS_AREA_KEY) return;
     const score = needle ? matchScore(destination, needle) : 0;
     if (score === null) return;
     const group = groups.get(destination.areaKey) ?? {
@@ -72,10 +81,14 @@ export function rankDestinations(
     groups.set(destination.areaKey, group);
   });
   const visitsOf = (areaKey: string) => visits[areaKey] ?? 0;
+  const isActions = (areaKey: string) => Number(areaKey === ACTIONS_AREA_KEY);
   return [...groups.entries()]
     .sort(
       ([aKey, a], [bKey, b]) =>
-        a.best - b.best || visitsOf(bKey) - visitsOf(aKey) || a.order - b.order,
+        a.best - b.best ||
+        isActions(bKey) - isActions(aKey) ||
+        visitsOf(bKey) - visitsOf(aKey) ||
+        a.order - b.order,
     )
     .map(([areaKey, group]) => ({
       areaKey,
@@ -93,6 +106,7 @@ export function areaForPath(
   let best: string | null = null;
   let bestLength = 0;
   for (const destination of destinations) {
+    if (destination.areaKey === ACTIONS_AREA_KEY) continue;
     const base = resolvePath(destination.to);
     if (!base) continue;
     const matches = base === "/" ? path === "/" : path === base || path.startsWith(`${base}/`);

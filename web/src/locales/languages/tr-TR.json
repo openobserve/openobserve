@@ -11,7 +11,9 @@
     "bannerMessage": "Bu özellik kilitli. Lisansınızda {feature} özelliği gerekiyor.",
     "bannerMessageGeneric": "Bu sayfa lisansınızda bulunmayan bir özellik gerektiriyor.",
     "headerLocked": "Kilitli: {feature} gerekiyor",
-    "availableInEnterprise": "{feature}, OpenObserve Enterprise'da kullanılabilir"
+    "availableInEnterprise": "{feature}, OpenObserve Enterprise'da kullanılabilir",
+    "turnedOffTitle": "Bu kuruluş için kapalı",
+    "enterpriseTitle": "Enterprise'ta kullanılabilir"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "Desen bulunamadı",
       "description": "Zaman aralığını artırmayı veya daha fazla günlük verisi içeren farklı bir akış seçmeyi deneyin. Desen çıkarma en az 1.000 günlükle en iyi sonucu verir.",
       "logsAnalyzed": "Yalnızca {count} günlükleri analiz edildi."
-    },
-    "noStreamSelected": {
-      "title": "Başlamak için bir akış seçin",
-      "description": "Bir akış seçin, ardından verilerini keşfetmek için sorgunuzu çalıştırın. Filtreler ve özel bir zaman aralığı ile sonuçları hassaslaştırın."
     },
     "noQueryApplied": {
       "title": "Günlükleri görmek için bir sorgu çalıştırın",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "İlk akışınızı oluşturmak için bir kaynak bağlayın",
       "description": "Akışlar, veriler geldiği anda otomatik olarak oluşturulur. Başlamak için uygulamanızdan, aracınızdan veya toplayıcınızdan alımı ayarlayın.",
-      "action": "Veri alımını ayarlayın",
       "actionDesc": "Bir veri kaynağı bağlayın",
       "createAction": "Yeni akış",
       "createActionDesc": "Bir akış şemasını manuel olarak tanımlayın"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "Kaydedilecek değişiklik yok"
+    },
     "dismiss": "Kapat",
     "exitFullscreen": "Tam ekrandan çık",
     "moreActions": "Daha fazla işlem",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "Önceki",
     "patternNavNext": "Sonraki",
     "patternNoValuesAvailable": "Mevcut değer yok",
-    "sqlModeLabel": "SQL Modu",
     "nlpModeLabel": "Doğal Dil Modu",
     "quickModeLabel": "Hızlı Mod",
     "menuMore": "Daha",
-    "menuGroupSetOnce": "Bir Kez Ayarla",
     "menuGroupHistory": "Tarihçe",
     "menuGroupDownloads": "İndirilenler",
     "menuGroupSchedule": "Çizelge",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "Görünüm başarıyla silindi.",
     "viewCreatedSuccessfully": "Görünüm başarıyla oluşturuldu.",
     "viewUpdatedSuccessfully": "Görünüm başarıyla güncellendi.",
-    "linkCopiedSuccessfully": "Bağlantı Başarıyla Kopyalandı!",
     "errorCopyingLink": "Bağlantıyı kopyalarken hata oluştu.",
     "errorShorteningLink": "Bağlantı kısaltılırken hata oluştu.",
     "webUrlNotConfigured": "Paylaş URL, ZO_WEB_URL yöneticiniz tarafından yapılandırılana kadar devre dışı bırakılır.",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "Seçilen akışlarda tam metin alanı yok",
     "freeTextNoTextFields": "Bu akışta aranacak metin alanı yok.",
     "freeTextNoTextFieldsNamed": "Aranmadı: {streams} (metin alanı yok).",
-    "freeTextBuildNotice": "Bu filtrede metin araması var; SQL'de düzenleyin."
+    "freeTextBuildNotice": "Bu filtrede metin araması var; SQL'de düzenleyin.",
+    "queryModeLabel": "Sorgu dili",
+    "queryModeFilter": "Filtre",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Günlükleri alan ve değere göre daraltın",
+    "queryModeSqlTooltip": "Toplama ve birleştirmeler içeren tam bir SQL sorgusu yazın",
+    "sqlModeNeedsOneStream": "Bu görünümde SQL tek bir akış alır",
+    "menuGroupViewOptions": "Görünüm seçenekleri",
+    "histogramHiddenForAggregates": "Bu sorgu zaman içindeki olayları değil grupları döndürür, bu yüzden histogram yok. Görselleştir sonucu grafiğe döker.",
+    "linkCopied": "Bağlantı kopyalandı",
+    "linkCopiedFixedTime": "Bağlantı kopyalandı · sabit zaman {from} – {to}",
+    "linkCopiedRelativeTime": "Bağlantı kopyalandı · {period}, açıldığı andan itibaren",
+    "recordsChipRows": "{total} satır | {total} satır",
+    "histogramTitleRows": "{took} ms içinde {total} satır gösteriliyor. | {took} ms içinde {total} satır gösteriliyor.",
+    "histogramTitleRowsWithScan": "{took} ms içinde {total} satır gösteriliyor. ({scanLabel}: {scanSize}) | {took} ms içinde {total} satır gösteriliyor. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "Önce bir akış seçin"
   },
   "menu": {
     "alertCalibration": "Uyarı Kalibrasyonu",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "Klavye Kısayolları",
     "searchOrJumpTo": "Ara veya şuraya git…",
     "jumpToTitle": "Git",
-    "jumpToPlaceholder": "Sayfalarda ara",
+    "addData": "Veri ekle",
+    "jumpToPlaceholder": "Sayfalarda ve eylemlerde ara",
     "synthetic": "Sentetikler",
     "experience": "Deneyim",
     "slos": "SLO'lar",
@@ -4212,7 +4225,8 @@
     "revokeInvitationMsg": "{email} davetini iptal etmek istediğinizden emin misiniz?",
     "deleteUsersTitle": "Kullanıcıları Sil",
     "deleteUsersMsg": "Bu {count} kullanıcıyı silmek istediğinize emin misiniz? | Bu {count} kullanıcıyı silmek istediğinize emin misiniz?",
-    "deleteUsersBlockNote": "Bunlardan {count} tanesi doğrulanmış alan adınız üzerinden katıldı ve silinmek yerine engellenecek."
+    "deleteUsersBlockNote": "Bunlardan {count} tanesi doğrulanmış alan adınız üzerinden katıldı ve silinmek yerine engellenecek.",
+    "roleHint": "Admin kuruluşu yönetir, Editor verileri ve ayarları değiştirir, Viewer yalnızca okuyabilir."
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -5160,6 +5174,7 @@
     "timezone": "Saat dilimi",
     "deleteActionMessage": "{count} alanı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz. | {count} alanı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     "deleteDatesMessage": "{count} tarih aralığını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz. | {count} tarih aralığını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+    "summaryAllTypes": "Akışlar (tüm türler)",
     "labelLogs": "Günlükler",
     "labelMetrics": "Metrikler",
     "labelTraces": "İzler",
@@ -7757,7 +7772,8 @@
       "metricsSketch": "Dağılımlar histogram kovaları olarak saklanır ve yüzdelikler bu kovalardan tahmin edilir. Daha yüksek bir ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA daha ince kovalar ve daha kesin yüzdelikler sağlar, ancak daha fazla saklanan satır maliyetiyle."
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU dışa aktarıcı"
+    "gpuExporter": "GPU dışa aktarıcı",
+    "rotationNote": "Belirteçler yerinde yenilenmez. Yenilemek için yeni bir belirteç oluşturun, kaynaklarınızı ona geçirin, ardından eskisini devre dışı bırakın."
   },
   "dashboard": {
     "panelDraft": {
@@ -9390,6 +9406,9 @@
       "addClause": "Koşul ekle"
     },
     "viewDashboard": {
+      "apply": "Uygula",
+      "lastDataSeen": "Son veri {when}",
+      "jumpToLatest": "En yeniye git",
       "refreshToApplyVariables": "En son değişken değişikliklerini uygulamak için yenileyin",
       "refresh": "Yenile",
       "refreshCacheReload": "Önbelleği yenile ve yeniden yükle",
@@ -10135,6 +10154,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "Aralıkta veri yok",
     "saveAndStay": "Kaydet ve düzenlemeye devam et",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10577,6 +10597,38 @@
     },
     "timeRange": {
       "heading": "Seçilen zaman aralığında"
+    },
+    "firingNow": {
+      "title": "Şu anda tetiklenen",
+      "byLevel": "{critical} kritik · {warning} uyarı",
+      "allQuiet": "Her şey sakin",
+      "watching": "{count} uyarı kuralı etkin, hiçbiri tetiklenmiyor | {count} uyarı kuralı etkin, hiçbiri tetiklenmiyor",
+      "noRules": "Henüz uyarı kuralı yok",
+      "browseLibrary": "Uyarı kütüphanesine göz atın",
+      "notifyFailed": "Bildirim başarısız",
+      "loadError": "Tetiklenen uyarılar yüklenemedi",
+      "unavailable": "Uyarı durumları şu anda okunamıyor"
+    },
+    "health": {
+      "subtitle": "Tipe göre son alınan veriler",
+      "lastData": "Son veri {age} önce",
+      "justNow": "Son veri az önce",
+      "noDataIn": "Son {range} içinde veri yok",
+      "noRecords": "Henüz kayıt yok",
+      "loadError": "Akışlarınız okunamadı"
+    },
+    "start": {
+      "text": "Son {range} içinde veri gelmedi. Veri gönderin, elinizdekine bakın veya bir uyarı kurun.",
+      "addData": "Veri ekle",
+      "createAlert": "Uyarı oluştur"
+    },
+    "summary": {
+      "loadError": "Kuruluş özeti yüklenemedi",
+      "denied": "Kuruluş özetine erişiminiz yok. Bir yöneticiye başvurun."
+    },
+    "events": {
+      "runFailed": "Çalıştırma başarısız",
+      "timesInRange": "Seçili aralıkta {count} kez | Seçili aralıkta {count} kez"
     }
   },
   "chatHistory": {
@@ -11551,6 +11603,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "Günlüklerde aç",
+      "openInTraces": "İzlerde aç",
+      "openInMetrics": "Metriklerde aç",
+      "evidenceFiringTip": "Bu uyarının filtresiyle {stream} akışını bu tetiklenmenin başından şimdiye kadar açar",
+      "evidenceWindowTip": "Bu uyarının filtresiyle {stream} akışını son {window} için açar",
+      "threshold": "Eşik",
+      "noIncident": "Henüz olay yok",
+      "conditionLabel": "Uyarı koşulu",
+      "allRows": "Her satır"
+    },
+    "summaryTrainingFailed": "Eğitim başarısız",
+    "startFromTemplate": "Bir şablondan başla",
     "firing": {
       "title": "Tetiklenmiş",
       "drawer": {
@@ -20569,7 +20634,6 @@
     },
     "noStream": {
       "title": "Keşfetmeye başlamak için bir akış seçin",
-      "description": "Bir akış seçin, ardından Sorguyu <strong>çalıştır'a</strong> basın. Sonuçlar geldiğinde filtreler, bir VRL fonksiyonu ve özel bir zaman aralığı ile hassaslaştırabilirsiniz.",
       "selectStream": "Bir akış seçin",
       "selectStreamDesc": "Günlük, iz, metrik ve RUM akışlarına göz atın",
       "queryGuide": "Sorgu kılavuzunu okuyun",
@@ -20621,7 +20685,16 @@
     "detailTable": {
       "noDataAvailable": "Kullanılabilir veri yok.",
       "addIcon": "Simge ekle",
-      "sendToAiChat": "AI Sohbetine Gönder"
+      "sendToAiChat": "AI Sohbetine Gönder",
+      "openTrace": "İzi aç",
+      "noTraceTitle": "Bu günlüğe bağlı iz yok",
+      "noRelatedLogsTitle": "İlgili günlük bulunamadı",
+      "noRelatedMetricsTitle": "İlgili metrik bulunamadı",
+      "noServiceText": "Bu günlükle eşleşen bir servis bulunamadı, bu yüzden ilgili veriler otomatik olarak bulunamıyor.",
+      "searchTracesAround": "Bu zaman civarındaki izleri ara",
+      "searchAroundTip": "Bu olaydan hemen önce ve sonra kaydedilen olayları yükler.",
+      "noOfEventsTip": "Bu olayın çevresinde kaç olay yükleneceği.",
+      "severityTip": "Algılanan günlük düzeyi. Nasıl algılandığını görmek için seçin."
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT * sorgusu görselleştirme için desteklenmiyor.",
@@ -23160,7 +23233,7 @@
         "ok": "Tamam",
         "normal": "Normal",
         "firing": "Tetiklendi",
-        "notifyfailed": "Bildirim Başarısız",
+        "notifyfailed": "Teslim başarısız",
         "flapping": "Dalgalanıyor",
         "anomaly": "Anomali",
         "succeeded": "Başarılı",
@@ -30394,7 +30467,9 @@
     "validation": {
       "regexLength": "Deseni en fazla {max} karakterle sınırlayın.",
       "regexInvalid": "Bu desen geçersiz veya desteklenmiyor. İleriye bakma, geriye bakma ve geri başvurular kullanılamaz."
-    }
+    },
+    "queryTooltip": "Filtreyi metin olarak düzenle",
+    "builderTooltip": "Filtreyi oluşturucuyla düzenle"
   },
   "autoobserveLive": {
     "paging": {

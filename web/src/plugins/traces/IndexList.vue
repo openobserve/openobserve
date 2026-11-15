@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <GroupedFieldList
         ref="fieldListRef"
+        :search-shortcut="false"
         :fields="normalizedFieldList"
         :search="searchObj.data.stream.filterField"
         :loading="

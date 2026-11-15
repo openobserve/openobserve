@@ -15,6 +15,8 @@ export interface DropdownSubEmits {
 }
 
 export interface DropdownSubSlots {
+  /** A custom leading glyph in place of `icon`, matching the menu's other rows. */
+  icon?(): unknown;
   /** Trailing content before the chevron. */
   end?(): unknown;
   /** The submenu's items; a submenu never holds another submenu (guideline O1). */

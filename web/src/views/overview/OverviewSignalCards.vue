@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { SEGMENT_SWATCH } from "@/lib/data/SegmentedBar/OSegmentedBar.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { formatEventCount, formatSizeFromMB } from "@/utils/formatters";
+import { formatCompactCount, formatSizeFromMB } from "@/utils/formatters";
 import type { OverviewSection, OverviewStreamsData } from "@/ts/interfaces/overview";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
 import {
@@ -109,11 +109,15 @@ const cards = computed(() => {
     return {
       signal,
       stats: [
-        { key: "streams", label: t("overview.signals.streams"), value: raw(summary?.count ?? 0) },
+        {
+          key: "streams",
+          label: t("overview.signals.streams"),
+          value: raw(formatCompactCount(summary?.count ?? 0)),
+        },
         {
           key: "events",
           label: t(`overview.signals.${COUNT_LABEL[signal]}`),
-          value: raw(formatEventCount(summary?.doc_num ?? 0)),
+          value: raw(formatCompactCount(summary?.doc_num ?? 0)),
         },
         {
           key: "stored",

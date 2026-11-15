@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="opt.value"
               :data-test="`logs-view-mode-${opt.value}-item`"
               :disabled="opt.disabled"
+              :disabled-reason="opt.disabled ? opt.reason : undefined"
               @select="onLogsVisualizeToggleUpdate(opt.value)"
             >
               {{ opt.label }}
@@ -106,6 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroupItem
               data-test="logs-drilldown-toggle"
               :aria-label="t('search.drillDown')"
+              focusable-unavailable
               :disabled="searchObj.meta.sqlMode"
               :tooltip="
                 searchObj.meta.sqlMode
@@ -141,6 +143,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OToggleGroupItem>
           </OToggleGroup>
+          <!-- Typing SELECT still flips the mode; this tray is where the flip shows. -->
+          <OToggleGroup
+            v-if="!queryModeInMenu"
+            :model-value="searchObj.meta.sqlMode ? 'sql' : 'filter'"
+            :aria-label="t('search.queryModeLabel')"
+            data-test="logs-search-bar-query-mode"
+            class="shrink-0"
+            @update:model-value="setQueryMode"
+          >
+            <OToggleGroupItem
+              value="filter"
+              data-test="logs-search-bar-query-mode-filter"
+              :tooltip="t('search.queryModeFilterTooltip')"
+            >
+              {{ t("search.queryModeFilter") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem
+              value="sql"
+              data-test="logs-search-bar-query-mode-sql"
+              focusable-unavailable
+              :disabled="!!sqlModeReason"
+              :tooltip="sqlModeReason ?? t('search.queryModeSqlTooltip')"
+            >
+              {{ t("search.queryModeSql") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
           <OButton
             v-if="!toolbarMoveResetToMenu"
             :icon-only="shouldHideToolbarButtonText"
@@ -166,17 +194,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             shortcut="logsToggleHistogram"
             data-test="logs-search-bar-histogram-btn"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
-          />
-          <OButton
-            v-if="showPinnedSqlMode"
-            icon-only
-            icon="code"
-            variant="secondary"
-            :pressed="!!searchObj.meta.sqlMode"
-            :disabled="isSqlModeDisabled"
-            :label="t('search.sqlModeLabel')"
-            data-test="logs-search-bar-sql-mode-pinned-btn"
-            @click="searchObj.meta.sqlMode = !searchObj.meta.sqlMode"
           />
           <OButton
             v-if="showPinnedQuickMode"
@@ -523,7 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('search.runQuery')"
             class="rounded-s-default! relative min-w-[5.875rem] rounded-e-none! [transition:box-shadow_var(--duration-control)_var(--ease-control),opacity_var(--duration-control)_var(--ease-control)]"
             :class="[
-              showRunQueryPending
+              showRunQueryPending || noStreamReason
                 ? ''
                 : [
                     runButtonTone,
@@ -536,13 +553,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="
               searchObj.loading == true ||
               searchObj.loadingHistogram == true ||
-              patternsState.loading
+              patternsState.loading ||
+              !!noStreamReason
             "
+            :disabled-reason="noStreamReason ?? undefined"
           >
             <OTooltip
               v-if="
-                (searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled) ||
-                showRunQueryPending
+                !noStreamReason &&
+                ((searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled) ||
+                  showRunQueryPending)
               "
               :content="
                 showRunQueryPending ? t('search.autoRunPendingDot') : t('search.autoRunEnabled')
@@ -565,13 +585,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton
                 icon-only
-                :variant="showRunQueryPending && !isRunQueryCancelShown ? 'primary' : 'ghost'"
+                :variant="
+                  (showRunQueryPending && !isRunQueryCancelShown) || noStreamReason
+                    ? 'primary'
+                    : 'ghost'
+                "
                 :aria-label="t('search.refreshCacheAndRunQuery')"
                 data-test="logs-search-bar-refresh-cache-dropdown-trigger"
+                :disabled="!!noStreamReason"
+                :disabled-reason="noStreamReason ?? undefined"
                 :class="[
                   isRunQueryCancelShown
                     ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                    : !showRunQueryPending
+                    : !showRunQueryPending && !noStreamReason
                       ? [
                           runButtonTone,
                           'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
@@ -589,7 +615,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="refresh"
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
-              :disabled="searchObj.loading == true || searchObj.loadingHistogram == true"
+              :disabled="
+                searchObj.loading == true || searchObj.loadingHistogram == true || !!noStreamReason
+              "
+              :disabled-reason="noStreamReason"
               @select="handleRunQueryFn(true)"
             >
               {{ t("search.refreshCacheAndRunQuery") }}
@@ -630,7 +659,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!isVisualizeOrBuildMode"
           :last-run-at="searchObj.meta.lastRunAt"
           :loading="!!(searchObj.loading || searchObj.loadingHistogram)"
-          :disabled="!!(searchObj.loading || searchObj.loadingHistogram || patternsState.loading)"
+          :disabled="
+            !!(
+              searchObj.loading ||
+              searchObj.loadingHistogram ||
+              patternsState.loading ||
+              noStreamReason
+            )
+          "
+          :disabled-reason="noStreamReason"
           :auto-refresh="Number(searchObj.meta.refreshInterval) || 0"
           :auto-refresh-note="t('search.autoRefreshRelativeOnly')"
           data-test="logs-search-bar-data-age-refresh"
@@ -654,65 +691,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <!-- SET ONCE — view controls that persist across sessions -->
-          <ODropdownGroup :label="t('search.menuGroupSetOnce')">
-            <!-- SQL Mode — toggles the same flag used for SQL auto-detection -->
-            <ODropdownItem
-              data-test="logs-search-bar-menu-sql-mode-toggle-btn"
-              @select.prevent="
-                !isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
-              "
-            >
-              <template #icon>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="code" size="sm" />
-                </span>
-              </template>
-              {{ t("search.sqlModeLabel") }}
-              <template #end>
-                <span class="ms-auto flex items-center gap-1">
-                  <OSwitch
-                    :model-value="searchObj.meta.sqlMode"
-                    :disabled="isSqlModeDisabled"
-                    data-test="logs-search-bar-sql-mode-toggle"
-                    @click.stop="
-                      !isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
-                    "
-                  />
-                  <OButton
-                    icon-only
-                    data-test="logs-search-bar-menu-pin-sql-mode-btn"
-                    variant="ghost"
-                    :title="
-                      isPinned('sqlMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
-                    "
-                    @click.stop="togglePin('sqlMode')"
-                  >
-                    <OIcon :name="isPinned('sqlMode') ? 'keep' : 'keep-outline'" size="sm" />
-                  </OButton>
-                </span>
-              </template>
-            </ODropdownItem>
+          <template v-if="queryModeInMenu">
+            <ODropdownGroup :label="t('search.queryModeLabel')">
+              <ODropdownItem
+                :checked="!searchObj.meta.sqlMode"
+                data-test="logs-search-bar-menu-query-mode-filter"
+                @select="setQueryMode('filter')"
+              >
+                {{ t("search.queryModeFilter") }}
+              </ODropdownItem>
+              <ODropdownItem
+                :checked="!!searchObj.meta.sqlMode"
+                :disabled="!!sqlModeReason"
+                :disabled-reason="sqlModeReason"
+                data-test="logs-search-bar-menu-query-mode-sql"
+                @select="setQueryMode('sql')"
+              >
+                {{ t("search.queryModeSql") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+            <ODropdownSeparator />
+          </template>
+          <!-- Shown here only when the toolbar is too narrow for the inline button. -->
+          <ODropdownItem
+            v-if="toolbarMoveResetToMenu"
+            data-test="logs-search-bar-menu-reset-btn"
+            @select="resetFilters"
+          >
+            <template #icon>
+              <span
+                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+              >
+                <OIcon name="restart-alt" size="sm" />
+              </span>
+            </template>
+            {{ t("search.resetFilters") }}
+          </ODropdownItem>
+          <ODropdownSeparator v-if="toolbarMoveResetToMenu" />
 
-            <!-- Reset filters (shown here only when toolbar is too narrow for inline button) -->
-            <ODropdownItem
-              v-if="toolbarMoveResetToMenu"
-              data-test="logs-search-bar-menu-reset-btn"
-              @select="resetFilters"
-            >
-              <template #icon>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="restart-alt" size="sm" />
-                </span>
-              </template>
-              {{ t("search.resetFilters") }}
-            </ODropdownItem>
-
-            <!-- Histogram — pinned copy renders on the toolbar -->
+          <ODropdownGroup :label="t('search.menuGroupViewOptions')">
             <ODropdownItem
               data-test="logs-search-bar-menu-histogram-btn"
               @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
@@ -736,20 +753,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-only
                     data-test="logs-search-bar-menu-pin-histogram-btn"
                     variant="ghost"
-                    :title="
-                      isPinned('histogram')
-                        ? t('search.unpinFromToolbar')
-                        : t('search.pinToToolbar')
-                    "
+                    :pressed="isPinned('histogram')"
+                    :icon="isPinned('histogram') ? 'keep' : 'keep-outline'"
+                    :label="pinLabel('histogram')"
                     @click.stop="togglePin('histogram')"
-                  >
-                    <OIcon :name="isPinned('histogram') ? 'keep' : 'keep-outline'" size="sm" />
-                  </OButton>
+                  />
                 </span>
               </template>
             </ODropdownItem>
 
-            <!-- Quick Mode — always in the More menu -->
             <ODropdownItem
               data-test="logs-search-bar-menu-quick-mode-toggle-btn"
               @select.prevent="handleQuickMode"
@@ -773,20 +785,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-only
                     data-test="logs-search-bar-menu-pin-quick-mode-btn"
                     variant="ghost"
-                    :title="
-                      isPinned('quickMode')
-                        ? t('search.unpinFromToolbar')
-                        : t('search.pinToToolbar')
-                    "
+                    :pressed="isPinned('quickMode')"
+                    :icon="isPinned('quickMode') ? 'keep' : 'keep-outline'"
+                    :label="pinLabel('quickMode')"
                     @click.stop="togglePin('quickMode')"
-                  >
-                    <OIcon :name="isPinned('quickMode') ? 'keep' : 'keep-outline'" size="sm" />
-                  </OButton>
+                  />
                 </span>
               </template>
             </ODropdownItem>
 
-            <!-- Function Editor -->
             <ODropdownItem
               data-test="logs-search-bar-menu-transform-editor-toggle-btn"
               @select.prevent="
@@ -811,15 +818,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-only
                     data-test="logs-search-bar-menu-pin-function-editor-btn"
                     variant="ghost"
-                    :title="
-                      isPinned('functionEditor')
-                        ? t('search.unpinFromToolbar')
-                        : t('search.pinToToolbar')
-                    "
+                    :pressed="isPinned('functionEditor')"
+                    :icon="isPinned('functionEditor') ? 'keep' : 'keep-outline'"
+                    :label="pinLabel('functionEditor')"
                     @click.stop="togglePin('functionEditor')"
-                  >
-                    <OIcon :name="isPinned('functionEditor') ? 'keep' : 'keep-outline'" size="sm" />
-                  </OButton>
+                  />
                 </span>
               </template>
             </ODropdownItem>
@@ -845,18 +848,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @create="fnSavedView"
             @delete="handleDeleteSavedView"
           >
+            <template #icon>
+              <span
+                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+              >
+                <OIcon name="saved-search" size="sm" />
+              </span>
+            </template>
             <template #actions>
               <OButton
                 icon-only
                 data-test="logs-search-bar-menu-pin-saved-views-btn"
                 variant="ghost"
-                :title="
-                  isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
-                "
+                :pressed="isPinned('savedViews')"
+                :icon="isPinned('savedViews') ? 'keep' : 'keep-outline'"
+                :label="pinLabel('savedViews')"
                 @click.stop="togglePin('savedViews')"
-              >
-                <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
-              </OButton>
+              />
             </template>
           </SavedViewsSubmenu>
 
@@ -874,13 +882,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-menu-pin-syntax-guide-btn"
               variant="ghost"
               class="ms-auto"
-              :title="
-                isPinned('syntaxGuide') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
-              "
+              :pressed="isPinned('syntaxGuide')"
+              :icon="isPinned('syntaxGuide') ? 'keep' : 'keep-outline'"
+              :label="pinLabel('syntaxGuide')"
               @click.stop="togglePin('syntaxGuide')"
-            >
-              <OIcon :name="isPinned('syntaxGuide') ? 'keep' : 'keep-outline'" size="sm" />
-            </OButton>
+            />
           </div>
 
           <ODropdownSeparator />
@@ -945,9 +951,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:open="showDownloadSubmenu"
               data-test="search-download-submenu-trigger"
               :label="t('search.downloadTable')"
-              icon="download"
               :description="downloadNote"
             >
+              <template #icon>
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                >
+                  <OIcon name="download" size="sm" />
+                </span>
+              </template>
               <ODropdownItem
                 data-test="search-download-csv-btn"
                 icon="grid-on"
@@ -1091,30 +1103,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </CreateAlertAction>
           </ODropdownGroup>
 
-          <ODropdownSeparator />
-
-          <ODropdownGroup
+          <template
             v-if="
               config.isEnterprise == 'true' &&
               config.isCloud == 'false' &&
               store.state.zoConfig.search_inspector_enabled
             "
-            :label="t('search.menuGroupInspect')"
           >
-            <ODropdownItem data-test="search-inspect-btn" @select="openSearchInspectDialog">
-              <template #icon>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="troubleshoot" size="sm" />
-                </span>
-              </template>
-              <span data-test="search-inspect-label">{{ t("search.searchInspect") }}</span>
-            </ODropdownItem>
-          </ODropdownGroup>
+            <ODropdownSeparator />
+            <ODropdownGroup :label="t('search.menuGroupInspect')">
+              <ODropdownItem data-test="search-inspect-btn" @select="openSearchInspectDialog">
+                <template #icon>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon name="troubleshoot" size="sm" />
+                  </span>
+                </template>
+                <span data-test="search-inspect-label">{{ t("search.searchInspect") }}</span>
+              </ODropdownItem>
+            </ODropdownGroup>
+          </template>
 
-          <ODropdownSeparator />
-
+          <ODropdownSeparator v-if="searchObj.meta.sqlMode" />
           <ODropdownGroup v-if="searchObj.meta.sqlMode" :label="t('search.menuGroupExplain')">
             <ODropdownItem
               data-test="logs-search-bar-explain-query-menu-btn"
@@ -1157,13 +1168,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         icon-only
         :icon="isFocused ? 'fullscreen-exit' : 'fullscreen'"
+        :label="isFocused ? t('search.collapse') : t('search.expand')"
         data-test="logs-query-editor-full_screen-btn"
         variant="ghost"
         @click="toggleEditorFullscreen"
         class="absolute! top-0.75 right-1 z-51"
-      >
-        <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
-      </OButton>
+      />
       <div class="flex h-full w-full min-w-0 flex-col">
         <OSplitter
           class="h-full!"
@@ -1176,6 +1186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div
               ref="queryEditorBoxRef"
+              data-primary-query
               class="relative flex h-full flex-col overflow-hidden"
               @keydown.capture="onRecentEditorKeydown"
               @pointerdown.capture="noteEditorPointer"
@@ -1192,19 +1203,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 icon-only
                 :icon="filterBuilderOn ? 'code' : 'filter-list'"
+                :label="
+                  filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')
+                "
                 data-test="logs-search-bar-filter-builder-toggle"
                 :aria-pressed="filterBuilderOn"
                 variant="ghost"
                 @click="toggleFilterBuilder"
                 class="absolute! top-0.75 z-51"
                 :style="{ right: filterBuilderToggleRight }"
-              >
-                <OTooltip
-                  :content="
-                    filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')
-                  "
-                />
-              </OButton>
+              />
               <div
                 v-if="showFilterBuilder"
                 class="h-full overflow-y-auto py-0.75 ps-1.5"
@@ -1690,6 +1698,7 @@ import {
   computed,
 } from "vue";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -1725,7 +1734,7 @@ import type { HistoryStatus, QueryHistoryEntry } from "@/services/query_history"
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useLogs from "@/composables/useLogs";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
-import { useToolbarPins } from "@/composables/useToolbarPins";
+import { useToolbarPins, type ToolbarPinKey } from "@/composables/useToolbarPins";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import searchService from "@/services/search";
@@ -1773,7 +1782,7 @@ import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import { isExplainQuery, isSqlQuery } from "@/utils/query/sqlUtils";
+import { extractWhereClause, isExplainQuery, isSqlQuery } from "@/utils/query/sqlUtils";
 import { applyDownloadRange, downloadRangeWindow, sqlLimitOf } from "@/utils/logs/downloadRange";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
@@ -2517,12 +2526,22 @@ export default defineComponent({
     const TOGGLE_DROPDOWN_WIDTH = 120;
     const RESET_LABEL_WIDTH = computed(() => (isNarrowToolbar.value ? 77 : 81));
     const RESET_ICON_WIDTH = 34;
+    // The Filter | SQL tray keeps its labels, so every threshold below reserves it while it is shown.
+    const QUERY_MODE_WIDTH = 101;
     const TOOLBAR_GAP = 8;
     const COLLAPSE_BUFFER = 16;
+    // Below the width the collapsed view menu and the tray need together, the tray folds into ⋯ (F10).
+    const queryModeInMenu = computed(
+      () =>
+        availableLeftWidth.value <
+        TOGGLE_DROPDOWN_WIDTH + QUERY_MODE_WIDTH + TOOLBAR_GAP + COLLAPSE_BUFFER,
+    );
+    const querySlot = () => (queryModeInMenu.value ? 0 : QUERY_MODE_WIDTH + TOOLBAR_GAP);
 
     // A pinned histogram keeps its slot ahead of button labels.
     const leftContentWidth = (toggleWidth: number, resetWidth: number) =>
       toggleWidth +
+      querySlot() +
       resetWidth +
       TOOLBAR_GAP +
       (isPinned("histogram") ? TOOLBAR_GAP + PIN_BUTTON_WIDTH.value : 0) +
@@ -2536,8 +2555,8 @@ export default defineComponent({
       () =>
         availableLeftWidth.value < leftContentWidth(TOGGLE_LABELS_WIDTH.value, RESET_ICON_WIDTH),
     );
-    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 288);
-    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 216);
+    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 288 + querySlot());
+    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 216 + querySlot());
 
     // Width consumed by the always-present left content: the tray in its collapse state and Reset.
     const baseReservedWidth = computed(() => {
@@ -2545,6 +2564,7 @@ export default defineComponent({
       if (toolbarToggleAsDropdown.value) w += TOGGLE_DROPDOWN_WIDTH;
       else if (toolbarToggleIconOnly.value) w += TOGGLE_ICONS_WIDTH;
       else w += TOGGLE_LABELS_WIDTH.value;
+      w += querySlot();
       if (!toolbarMoveResetToMenu.value) {
         w +=
           (shouldHideToolbarButtonText.value ? RESET_ICON_WIDTH : RESET_LABEL_WIDTH.value) +
@@ -2564,7 +2584,6 @@ export default defineComponent({
       let used = 0;
       const res = {
         histogram: false,
-        sqlMode: false,
         quickMode: false,
         savedViews: false,
         syntaxGuide: false,
@@ -2579,7 +2598,6 @@ export default defineComponent({
         return false;
       };
       if (isPinned("histogram")) res.histogram = tryFit(PIN_BUTTON_WIDTH.value);
-      if (isPinned("sqlMode")) res.sqlMode = tryFit(PIN_BUTTON_WIDTH.value);
       if (isPinned("quickMode")) res.quickMode = tryFit(PIN_BUTTON_WIDTH.value);
       if (isPinned("savedViews")) res.savedViews = tryFit(SAVED_VIEWS_PIN_WIDTH.value);
       if (isPinned("syntaxGuide")) {
@@ -2596,15 +2614,49 @@ export default defineComponent({
     // Function editor lives on the right toolbar (next to the date picker), so it
     // is not part of the left-section budget.
     const showPinnedHistogram = computed(() => pinnedVisibility.value.histogram);
-    const showPinnedSqlMode = computed(() => pinnedVisibility.value.sqlMode);
     const showPinnedQuickMode = computed(() => pinnedVisibility.value.quickMode);
     const showPinnedFunctionEditor = computed(() => isPinned("functionEditor"));
     const showPinnedSavedViews = computed(() => pinnedVisibility.value.savedViews);
     const showPinnedSyntaxGuide = computed(() => pinnedVisibility.value.syntaxGuide);
     const pinSyntaxGuideIconOnly = computed(() => pinnedVisibility.value.syntaxGuideIconOnly);
+    const pinLabel = (key: ToolbarPinKey) =>
+      isPinned(key) ? t("search.unpinFromToolbar") : t("search.pinToToolbar");
+
+    // With no stream there is nothing to run, so Run and Refresh say so instead of doing nothing (B9).
+    const noStreamReason = computed<I18nText | null>(() =>
+      searchObj.data.stream.selectedStream.length ? null : t("search.pickStreamFirst"),
+    );
+
+    const sqlModeReason = computed<I18nText | null>(() => {
+      if (searchObj.meta.logsVisualizeToggle === "drilldown")
+        return t("search.drillDownUnavailableInSqlMode");
+      if (
+        searchObj.meta.logsVisualizeToggle === "visualize" &&
+        searchObj.data.stream.selectedStream.length > 1
+      )
+        return t("search.sqlModeNeedsOneStream");
+      return null;
+    });
+
+    // Leaving SQL keeps its WHERE clause as the filter instead of clearing the editor.
+    const setQueryMode = async (mode: unknown) => {
+      if (mode === "sql") {
+        if (!searchObj.meta.sqlMode && !sqlModeReason.value) searchObj.meta.sqlMode = true;
+        return;
+      }
+      if (mode !== "filter" || !searchObj.meta.sqlMode) return;
+      const where = await extractWhereClause(searchObj.data.query ?? "");
+      if (!searchObj.meta.sqlMode) return;
+      searchObj.meta.sqlModeEditTransition = true;
+      searchObj.data.query = where;
+      searchObj.data.editorValue = where;
+      searchObj.meta.sqlMode = false;
+    };
 
     // Computed label/icon for the toggle-group-as-dropdown trigger
-    const toggleViewOptions = computed(() => [
+    const toggleViewOptions = computed<
+      { value: string; icon: IconName; label: I18nText; disabled: boolean; reason?: I18nText }[]
+    >(() => [
       { value: "logs", icon: "search", label: t("common.search"), disabled: false },
       ...(store.state.zoConfig.timechart_enabled
         ? [
@@ -2615,6 +2667,7 @@ export default defineComponent({
               disabled:
                 (!searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1) ||
                 !!visualizeReason.value,
+              reason: visualizeReason.value ?? t("search.enableSqlModeOrSelectSingleStream"),
             },
           ]
         : []),
@@ -2624,6 +2677,7 @@ export default defineComponent({
         icon: "query-stats",
         label: t("search.drillDown"),
         disabled: searchObj.meta.sqlMode,
+        reason: t("search.drillDownUnavailableInSqlMode"),
       },
       ...(config.isEnterprise === "true"
         ? [
@@ -4700,6 +4754,21 @@ export default defineComponent({
       emit("buildModeToggle", false); // isCustomMode = false
     };
 
+    // Visualize writes its builder SQL into the shared editor, so Search gets back what the user typed.
+    let queryBeforeVisualize: { query: string; sqlMode: boolean } | null = null;
+    const restoreQueryBeforeVisualize = () => {
+      const saved = queryBeforeVisualize;
+      queryBeforeVisualize = null;
+      if (!saved) return;
+      if (saved.sqlMode !== !!searchObj.meta.sqlMode) {
+        if (saved.sqlMode) searchObj.meta.sqlModeManualTrigger = true;
+        else searchObj.meta.sqlModeEditTransition = true;
+        searchObj.meta.sqlMode = saved.sqlMode;
+      }
+      searchObj.data.query = saved.query;
+      searchObj.data.editorValue = saved.query;
+    };
+
     const onLogsVisualizeToggleUpdate = async (value: any) => {
       // OToggleGroup is controlled (`:model-value`), so refusing to advance
       // here is what keeps the locked Patterns view from becoming active —
@@ -4804,6 +4873,12 @@ export default defineComponent({
         // cancel all the logs queries
         autoRun.engine.cancelGeneration(null, { cause: "reset" });
       } else if (value == "build") {
+        if (searchObj.meta.logsVisualizeToggle !== "build") {
+          queryBeforeVisualize = {
+            query: searchObj.data.query ?? "",
+            sqlMode: !!searchObj.meta.sqlMode,
+          };
+        }
         // Only generate SQL query if user is already in SQL mode (Case 3).
         // When SQL mode is OFF (Case 1), BuildQueryPage will set up builder
         // mode with default histogram/count fields and carry over WHERE clause.
@@ -4834,7 +4909,9 @@ export default defineComponent({
           }
         }
       }
+      const leavingVisualize = searchObj.meta.logsVisualizeToggle === "build" && value !== "build";
       searchObj.meta.logsVisualizeToggle = value;
+      if (leavingVisualize) restoreQueryBeforeVisualize();
       patchUrlViewState();
       if (tabRunPending) autoRun.request(tabRunPending);
 
@@ -5424,7 +5501,11 @@ export default defineComponent({
       togglePin,
       pinSyntaxGuideIconOnly,
       showPinnedHistogram,
-      showPinnedSqlMode,
+      pinLabel,
+      queryModeInMenu,
+      noStreamReason,
+      sqlModeReason,
+      setQueryMode,
       showPinnedQuickMode,
       showPinnedFunctionEditor,
       showPinnedSavedViews,

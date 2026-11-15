@@ -17,6 +17,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -234,6 +235,15 @@ const filtered = computed(() => {
   });
 });
 
+// A first-run org gets the empty state alone, not a table header over nothing.
+const firstRun = computed(
+  () =>
+    !loading.value &&
+    !error.value &&
+    !denials.value.length &&
+    !scoped.value.length &&
+    !filtersActive.value,
+);
 const filtersActive = computed(() => !!search.value || !!severity.value || facets.value.length > 0);
 function clearFilters() {
   search.value = "";
@@ -241,6 +251,8 @@ function clearFilters() {
   facets.value = [];
 }
 
+// A failed rules load reads "—", never zero counts (R8).
+const failedDash = (n: number) => (error.value ? "—" : n);
 const stats = computed<StatItem[]>(() => [
   {
     key: "fired",
@@ -257,7 +269,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "erroring",
     label: t("siem.detections.stat.erroring"),
-    value: counts.value.erroring,
+    value: failedDash(counts.value.erroring),
     icon: "error-outline",
     tone: "error",
     max: scoped.value.length || undefined,
@@ -266,7 +278,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "notifyFailing",
     label: t("siem.detections.stat.notifyFailing"),
-    value: counts.value.notifyFailing,
+    value: failedDash(counts.value.notifyFailing),
     icon: "warning-amber",
     tone: "warning",
     max: scoped.value.length || undefined,
@@ -275,7 +287,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "enabled",
     label: t("siem.detections.stat.enabled"),
-    value: counts.value.enabled,
+    value: failedDash(counts.value.enabled),
     icon: "verified-user",
     tone: "success",
     max: scoped.value.length || undefined,
@@ -284,7 +296,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "disabled",
     label: t("siem.detections.stat.disabled"),
-    value: counts.value.disabled,
+    value: failedDash(counts.value.disabled),
     icon: "pause-circle-filled",
     tone: "neutral",
     max: scoped.value.length || undefined,
@@ -293,7 +305,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "all",
     label: t("siem.detections.stat.all"),
-    value: scoped.value.length,
+    value: failedDash(scoped.value.length),
     icon: "shield-alert-outline",
     tone: "primary",
     dataTest: "security-detections-stat-all",
@@ -850,6 +862,12 @@ watch(orgId, () => void refresh());
         {{ t("siem.detections.new") }}
         <OTooltip v-if="!canAuthor" :content="t('siem.access.needsAuthor')" />
       </OButton>
+      <ORefreshButton
+        :last-run-at="lastRunAt"
+        :loading="loading"
+        data-test="security-detections-refresh"
+        @click="refresh"
+      />
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col">
@@ -859,7 +877,17 @@ watch(orgId, () => void refresh());
         data-test="security-detections-notices"
       />
 
+      <OEmptyState
+        v-if="firstRun"
+        icon="shield-alert-outline"
+        :title="t('siem.detections.emptyTitle')"
+        :text="t('siem.detections.emptyHint')"
+        :action-label="canAuthor ? t('siem.detections.new') : undefined"
+        data-test="security-detections-first-run"
+        @action="openNew()"
+      />
       <OTable
+        v-else
         ref="tableRef"
         :data="filtered"
         :columns="columns"
@@ -883,22 +911,21 @@ watch(orgId, () => void refresh());
       >
         <template #toolbar>
           <div class="contents">
-            <div class="w-40 shrink-0">
-              <OSelect
-                :aria-label="t('siem.aria.severityFilter')"
-                :model-value="severity"
-                :options="severityOptions"
-                :placeholder="t('siem.detections.anySeverity')"
-                clearable
-                data-test="security-detections-severity"
-                @update:model-value="(v: unknown) => (severity = v ? String(v) : null)"
-              />
-            </div>
             <OSearchInput
               v-model="search"
               class="min-w-0 flex-1 md:min-w-48"
               :placeholder="t('siem.detections.search')"
               data-test="security-detections-search"
+            />
+            <OSelect
+              variant="filter"
+              :label="t('siem.common.severity')"
+              :aria-label="t('siem.aria.severityFilter')"
+              :model-value="severity"
+              :options="severityOptions"
+              clearable
+              data-test="security-detections-severity"
+              @update:model-value="(v: unknown) => (severity = v ? String(v) : null)"
             />
             <OStatStrip
               compact-values
@@ -914,15 +941,6 @@ watch(orgId, () => void refresh());
               @update:selected-keys="facets = $event as Facet[]"
             />
           </div>
-        </template>
-
-        <template #toolbar-trailing>
-          <ORefreshButton
-            :last-run-at="lastRunAt"
-            :loading="loading"
-            data-test="security-detections-refresh"
-            @click="refresh"
-          />
         </template>
 
         <template #selection-actions>
@@ -1030,6 +1048,14 @@ watch(orgId, () => void refresh());
             />
             <OTooltip v-if="!canAuthor" :content="t('siem.access.needsAuthor')" />
           </div>
+        </template>
+
+        <template #error>
+          <SecurityLoadError
+            :what="t('siem.detections.whatDetections')"
+            :hint="t('siem.detections.loadFailedHint')"
+            @retry="refresh"
+          />
         </template>
 
         <template #empty>

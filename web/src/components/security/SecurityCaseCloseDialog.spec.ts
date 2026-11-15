@@ -123,7 +123,7 @@ describe("SecurityCaseCloseDialog", () => {
       "1 closed, 1 left open, 0 failed",
     );
     expect(w.find('[data-test="security-case-close-result-c-p1"]').text()).toContain(
-      "Left open: high priority",
+      "Left open: high severity",
     );
     expect(w.find('[data-test="security-case-close-result-c-p3"]').attributes("data-outcome")).toBe(
       "updated",

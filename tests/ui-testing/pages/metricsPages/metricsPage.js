@@ -157,7 +157,7 @@ export class MetricsPage {
         this.moreMenuButton = '[data-test="metrics-explorer-more-btn"]';
         this.metricsPageContainer = '[data-test="metrics-explorer-visualize"]';
         // Scoped success toast for the share-link "Link Copied" message as in dashboard-share-export
-        this.shareSuccessToast = page.locator('[data-test-variant="success"][data-test-message*="Link Copied"]');
+        this.shareSuccessToast = page.locator('[data-test-variant="success"][data-test-message*="Link copied"]');
         this.shareErrorToast = page.locator('[data-test-variant="error"][data-test-message*="Error shortening link"]');
         this.toastMessage = page.locator('[data-test="o-toast-message"]');
 

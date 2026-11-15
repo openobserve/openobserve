@@ -34,6 +34,9 @@ const ROUTE_NAMES = [
   ["settings", "/settings"],
   ["general", "/settings/general"],
   ["organizationSettings", "/settings/organization"],
+  ["ingestion", "/ingestion"],
+  ["addAlert", "/alerts/add"],
+  ["dashboards", "/dashboards"],
 ] as const;
 
 const links: NavItem[] = [
@@ -42,6 +45,8 @@ const links: NavItem[] = [
   { title: raw("Alerts"), icon: "shield-alert-outline", link: "/alerts", name: "alertList" },
   { title: raw("Billing"), icon: "payments", link: "/billings", name: "billings", locked: true },
   { title: raw("Settings"), icon: "settings", link: "/settings", name: "settings" },
+  { title: raw("Data sources"), icon: "data-plus-line", link: "/ingestion", name: "ingestion" },
+  { title: raw("Dashboards"), icon: "dashboard", link: "/dashboards", name: "dashboards" },
 ];
 
 // The dialog is stubbed so its body renders inline; the palette owns every key it handles.
@@ -142,7 +147,11 @@ describe("JumpToPalette", () => {
 
     await search().setValue("observab");
     await flushPromises();
-    expect(items()).toEqual(["jump-to-palette-item-home", "jump-to-palette-item-logs"]);
+    expect(items()).toEqual([
+      "jump-to-palette-item-home",
+      "jump-to-palette-item-logs",
+      "jump-to-palette-item-dashboards",
+    ]);
 
     await search().setValue("nothing-like-this");
     await flushPromises();
@@ -191,5 +200,72 @@ describe("JumpToPalette", () => {
     await wrapper!.setProps({ open: true });
     await nextTick();
     expect(firstArea()).toBe("jump-to-palette-group-reliability");
+  });
+
+  it("lists no actions until something is typed", async () => {
+    await mountPalette();
+    expect(wrapper!.find('[data-test="jump-to-palette-group-actions"]').exists()).toBe(false);
+  });
+
+  it("puts matching actions in their own group above the pages, naming the page each opens", async () => {
+    await mountPalette();
+    await search().setValue("new");
+    await flushPromises();
+    const groups = wrapper!.findAll('[data-test^="jump-to-palette-group-"]');
+    expect(groups[0].attributes("data-test")).toBe("jump-to-palette-group-actions");
+    expect(items()).toEqual([
+      "jump-to-palette-item-actions:newAlert",
+      "jump-to-palette-item-actions:newDashboard",
+    ]);
+    expect(wrapper!.get('[data-test="jump-to-palette-hint-actions:newAlert"]').text()).toBe(
+      "All alerts",
+    );
+  });
+
+  it("leaves out an action whose page the rails do not offer", async () => {
+    await mountPalette();
+    await search().setValue("new pipeline");
+    await flushPromises();
+    expect(items()).toEqual([]);
+  });
+
+  it("finds Add data by its page's name and by the name in its URL", async () => {
+    await mountPalette();
+    await search().setValue("add");
+    await flushPromises();
+    expect(items()[0]).toBe("jump-to-palette-item-actions:addData");
+
+    await search().setValue("ingestion");
+    await flushPromises();
+    expect(items()).toEqual([
+      "jump-to-palette-item-actions:addData",
+      "jump-to-palette-item-data:ingestion:",
+    ]);
+  });
+
+  it("ranks a page above an action that matches it less well", async () => {
+    await mountPalette();
+    await search().setValue("dash");
+    await flushPromises();
+    expect(items()[0]).toBe("jump-to-palette-item-dashboards");
+    expect(items()).toContain("jump-to-palette-item-actions:newDashboard");
+  });
+
+  it("runs an action on Enter with the org in its link", async () => {
+    await mountPalette();
+    await search().setValue("new alert");
+    await flushPromises();
+    await search().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("addAlert");
+    expect(router.currentRoute.value.query.org_identifier).toBe("default");
+
+    await wrapper!.setProps({ open: true });
+    await search().setValue("new dash");
+    await flushPromises();
+    await search().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("dashboards");
+    expect(router.currentRoute.value.query.action).toBe("add");
   });
 });

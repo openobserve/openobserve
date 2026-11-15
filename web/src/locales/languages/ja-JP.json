@@ -11,7 +11,9 @@
     "bannerMessage": "この機能はロックされています。ライセンスに {feature} 機能が必要です。",
     "bannerMessageGeneric": "このページにはライセンスに含まれていない機能が必要です。",
     "headerLocked": "ロック中: {feature} が必要",
-    "availableInEnterprise": "{feature} は OpenObserve Enterprise で利用できます"
+    "availableInEnterprise": "{feature} は OpenObserve Enterprise で利用できます",
+    "turnedOffTitle": "この組織では無効です",
+    "enterpriseTitle": "Enterprise で利用できます"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "パターンが見つかりません",
       "description": "時間範囲を広げるか、ログデータの多い別のストリームを選択してみてください。パターン抽出は、少なくとも 1,000 個のログで最適に機能します。",
       "logsAnalyzed": "{count} 個のログのみが分析されました。"
-    },
-    "noStreamSelected": {
-      "title": "ストリームを選択して始めましょう",
-      "description": "ストリームを選択し、クエリを実行してそのデータを調べます。フィルターとカスタム時間範囲を使用して結果を絞り込みます。"
     },
     "noQueryApplied": {
       "title": "クエリを実行してログを確認する",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "ソースを接続して最初のストリームを作成",
       "description": "ストリームは、データが到着した瞬間に自動的に作成されます。アプリ、エージェント、コレクターからの取り込みを設定して始めましょう。",
-      "action": "取り込みを設定する",
       "actionDesc": "データソースを接続する",
       "createAction": "新しいストリーム",
       "createActionDesc": "ストリームスキーマを手動で定義する"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "保存する変更はありません"
+    },
     "dismiss": "閉じる",
     "exitFullscreen": "全画面表示を終了",
     "moreActions": "その他のアクション",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "前へ",
     "patternNavNext": "次へ",
     "patternNoValuesAvailable": "使用可能な値はありません",
-    "sqlModeLabel": "SQL モード",
     "nlpModeLabel": "自然言語モード",
     "quickModeLabel": "クイックモード",
     "menuMore": "もっと",
-    "menuGroupSetOnce": "1 回設定",
     "menuGroupHistory": "歴史",
     "menuGroupDownloads": "ダウンロード",
     "menuGroupSchedule": "スケジュール",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "ビューは正常に削除されました。",
     "viewCreatedSuccessfully": "ビューは正常に作成されました。",
     "viewUpdatedSuccessfully": "ビューは正常に更新されました。",
-    "linkCopiedSuccessfully": "リンクは正常にコピーされました！",
     "errorCopyingLink": "リンクをコピー中にエラーが発生しました。",
     "errorShorteningLink": "リンクを短縮中にエラーが発生しました。",
     "webUrlNotConfigured": "共有 URL は、管理者が ZO_WEB_URL を設定するまで無効になっています。",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "選択したストリームには全文検索フィールドがありません",
     "freeTextNoTextFields": "このストリームには検索可能なテキストフィールドがありません。",
     "freeTextNoTextFieldsNamed": "未検索: {streams}（テキストフィールドなし）。",
-    "freeTextBuildNotice": "このフィルターにはテキスト検索が含まれています。SQL で編集してください。"
+    "freeTextBuildNotice": "このフィルターにはテキスト検索が含まれています。SQL で編集してください。",
+    "queryModeLabel": "クエリ言語",
+    "queryModeFilter": "フィルター",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "フィールドと値でログを絞り込みます",
+    "queryModeSqlTooltip": "集計や結合を含む完全な SQL クエリを書きます",
+    "sqlModeNeedsOneStream": "このビューの SQL は 1 つのストリームのみ対象です",
+    "menuGroupViewOptions": "表示オプション",
+    "histogramHiddenForAggregates": "このクエリは時系列のイベントではなくグループを返すため、ヒストグラムはありません。可視化で結果をグラフにできます。",
+    "linkCopied": "リンクをコピーしました",
+    "linkCopiedFixedTime": "リンクをコピーしました · 固定期間 {from} – {to}",
+    "linkCopiedRelativeTime": "リンクをコピーしました · {period}（開いた時点から）",
+    "recordsChipRows": "{total} 行 | {total} 行",
+    "histogramTitleRows": "{total} 行を {took} ms で表示。 | {total} 行を {took} ms で表示。",
+    "histogramTitleRowsWithScan": "{total} 行を {took} ms で表示。（{scanLabel}: {scanSize}） | {total} 行を {took} ms で表示。（{scanLabel}: {scanSize}）",
+    "pickStreamFirst": "先にストリームを選択してください"
   },
   "menu": {
     "alertCalibration": "アラートキャリブレーション",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "キーボードショートカット",
     "searchOrJumpTo": "検索またはジャンプ…",
     "jumpToTitle": "ジャンプ",
-    "jumpToPlaceholder": "ページを検索",
+    "addData": "データを追加",
+    "jumpToPlaceholder": "ページとアクションを検索",
     "synthetic": "合成モニタリング",
     "experience": "エクスペリエンス",
     "slos": "SLOs",
@@ -4212,7 +4225,8 @@
     "revokeInvitationMsg": "{email} への招待を取り消してもよろしいですか？",
     "deleteUsersTitle": "ユーザーを削除する",
     "deleteUsersMsg": "{count}人のユーザーを削除してもよろしいですか？ | {count}人のユーザーを削除してもよろしいですか？",
-    "deleteUsersBlockNote": "そのうち {count} 人は検証済みドメイン経由で参加したため、削除ではなくブロックされます。"
+    "deleteUsersBlockNote": "そのうち {count} 人は検証済みドメイン経由で参加したため、削除ではなくブロックされます。",
+    "roleHint": "Admin は組織を管理し、Editor はデータと設定を変更でき、Viewer は閲覧のみ可能です。"
   },
   "invitation": {
     "pendingInvitations": "保留中の招待状",
@@ -5160,6 +5174,7 @@
     "timezone": "タイムゾーン",
     "deleteActionMessage": "{count} 個のフィールドを削除してもよろしいですか？この操作は元に戻せません。 | {count} 個のフィールドを削除してもよろしいですか？この操作は元に戻せません。",
     "deleteDatesMessage": "{count} 個の日付範囲を削除してもよろしいですか？この操作は元に戻せません。 | {count} 個の日付範囲を削除してもよろしいですか？この操作は元に戻せません。",
+    "summaryAllTypes": "ストリーム（全タイプ）",
     "labelLogs": "ログ",
     "labelMetrics": "メトリクス",
     "labelTraces": "トレース",
@@ -7757,7 +7772,8 @@
       "metricsSketch": "ディストリビューションはヒストグラムのバケットとして保存され、パーセンタイルはそれらのバケットから推定されます。ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA を大きくすると、保存される行数が増える代わりに、より細かいバケットとより正確なパーセンタイルが得られます。"
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU エクスポーター"
+    "gpuExporter": "GPU エクスポーター",
+    "rotationNote": "トークンはその場でローテーションされません。ローテーションするには、新しいトークンを作成してソースを切り替え、古いトークンを無効にしてください。"
   },
   "dashboard": {
     "panelDraft": {
@@ -9390,6 +9406,9 @@
       "addClause": "条件を追加"
     },
     "viewDashboard": {
+      "apply": "適用",
+      "lastDataSeen": "最新データ {when}",
+      "jumpToLatest": "最新に移動",
       "refreshToApplyVariables": "最新の変数変更を適用するには更新してください",
       "refresh": "更新",
       "refreshCacheReload": "キャッシュを更新して再読み込み",
@@ -10135,6 +10154,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "範囲内にデータがありません",
     "saveAndStay": "保存して編集を続ける",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10577,6 +10597,38 @@
     },
     "timeRange": {
       "heading": "選択した時間範囲内"
+    },
+    "firingNow": {
+      "title": "発火中",
+      "byLevel": "クリティカル {critical} 件 · 警告 {warning} 件",
+      "allQuiet": "異常なし",
+      "watching": "{count} 件のアラートルールが有効、発火なし | {count} 件のアラートルールが有効、発火なし",
+      "noRules": "アラートルールはまだありません",
+      "browseLibrary": "アラートライブラリを見る",
+      "notifyFailed": "通知に失敗",
+      "loadError": "発火中のアラートを読み込めませんでした",
+      "unavailable": "現在アラートの状態を読み取れません"
+    },
+    "health": {
+      "subtitle": "種類ごとの最終受信データ",
+      "lastData": "最終データ: {age} 前",
+      "justNow": "最終データ: たった今",
+      "noDataIn": "過去 {range} にデータがありません",
+      "noRecords": "まだレコードがありません",
+      "loadError": "ストリームを読み込めませんでした"
+    },
+    "start": {
+      "text": "過去 {range} にデータが届いていません。データを送信するか、既存のデータを確認するか、アラートを設定してください。",
+      "addData": "データを追加",
+      "createAlert": "アラートを作成"
+    },
+    "summary": {
+      "loadError": "組織の概要を読み込めませんでした",
+      "denied": "組織の概要へのアクセス権がありません。組織の管理者に依頼してください。"
+    },
+    "events": {
+      "runFailed": "実行に失敗",
+      "timesInRange": "選択した期間に {count} 回 | 選択した期間に {count} 回"
     }
   },
   "chatHistory": {
@@ -11551,6 +11603,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "ログで開く",
+      "openInTraces": "トレースで開く",
+      "openInMetrics": "メトリクスで開く",
+      "evidenceFiringTip": "このアラートのフィルターで {stream} を開きます（今回の発火開始から現在まで）",
+      "evidenceWindowTip": "このアラートのフィルターで {stream} を直近 {window} の範囲で開きます",
+      "threshold": "しきい値",
+      "noIncident": "インシデントはまだありません",
+      "conditionLabel": "アラート条件",
+      "allRows": "すべての行"
+    },
+    "summaryTrainingFailed": "トレーニング失敗",
+    "startFromTemplate": "テンプレートから開始",
     "firing": {
       "title": "発火",
       "drawer": {
@@ -20569,7 +20634,6 @@
     },
     "noStream": {
       "title": "ストリームを選んで探索を始めましょう",
-      "description": "ストリームを選択し、[<strong>クエリの実行</strong>] を押します。結果が出たら、フィルター、VRL 関数、カスタム時間範囲を使用して絞り込むことができます。",
       "selectStream": "ストリームを選択する",
       "selectStreamDesc": "ログ、トレース、メトリクス、RUM ストリームを参照",
       "queryGuide": "クエリガイドを読む",
@@ -20621,7 +20685,16 @@
     "detailTable": {
       "noDataAvailable": "利用可能なデータがありません。",
       "addIcon": "アイコンを追加",
-      "sendToAiChat": "AIチャットに送信"
+      "sendToAiChat": "AIチャットに送信",
+      "openTrace": "トレースを開く",
+      "noTraceTitle": "このログにリンクされたトレースはありません",
+      "noRelatedLogsTitle": "関連するログが見つかりません",
+      "noRelatedMetricsTitle": "関連するメトリクスが見つかりません",
+      "noServiceText": "このログに一致するサービスが見つからないため、関連データを自動で検出できません。",
+      "searchTracesAround": "この時刻前後のトレースを検索",
+      "searchAroundTip": "このイベントの直前と直後に記録されたイベントを読み込みます。",
+      "noOfEventsTip": "このイベントの前後に読み込むイベント数。",
+      "severityTip": "検出されたログレベル。選択すると検出方法を確認できます。"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT * クエリは可視化でサポートされていません。",
@@ -23160,7 +23233,7 @@
         "ok": "OK",
         "normal": "正常",
         "firing": "発火中",
-        "notifyfailed": "通知失敗",
+        "notifyfailed": "配信失敗",
         "flapping": "フラッピング",
         "anomaly": "異常",
         "succeeded": "成功",
@@ -30394,7 +30467,9 @@
     "validation": {
       "regexLength": "パターンは{max}文字以内にしてください。",
       "regexInvalid": "このパターンは無効か、サポートされていません。先読み、後読み、後方参照は使用できません。"
-    }
+    },
+    "queryTooltip": "フィルターをテキストで編集",
+    "builderTooltip": "ビルダーでフィルターを編集"
   },
   "autoobserveLive": {
     "paging": {

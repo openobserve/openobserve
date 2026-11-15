@@ -117,6 +117,9 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 - **C7** (must) Charts use the validated series palette in a fixed order; series that mean status (5xx, errors) use status colours.
 - **C8** (new) The chrome (rail and top bar) is tinted with the accent hue; the content surface stays white in light mode. Three themes ship: Indigo (default), Ocean and Ink rail.
   - Why: An all-grey frame with a white page read as "black and white". A tinted frame gives identity without competing with the data.
+- **C9** (must) Red means destructive or critical, nothing else. Pause, mute, disable, field keys and counts are never red; a failed delivery is a warning, not an error, unless data was lost.
+  - Today: The pause action is a red icon on Alerts and Pipelines, log detail keys render red, and the always-visible trash is the reddest thing on the Dashboards list. _(persona walkthroughs, polish iteration 1)_
+  - Why: When red is everywhere, the one critical alert stops standing out (P7).
 
 ## 5. Page header
 
@@ -140,7 +143,7 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 
 ## 6. Toolbar, search and filters
 
-- **F1** (must) Toolbar order, left to right: search → filters → (spacer) → view controls (columns, density, wrap) → time range → refresh. The page's primary action lives in the header, not the toolbar.
+- **F1** (must) Toolbar order, left to right: mode switch (F6, if the page has modes) → search → filters → (spacer) → at most two secondary text actions → time range → Run (explorers only) → refresh → one ghost ⋯ for everything else. Every visible control except ⋯ is a bordered 32 px control. A list page's primary action lives in the header, not the toolbar; an explorer's Run is the one primary in its toolbar.
   - Today: Seven toolbar orders in Respond. On the explorers, Share sits after Run, last, or before Run depending on the page. The time range sits in the header on 11 screens and in the toolbar on 8. _(screens-respond.md · screens-observe.md §9 · screens-ai-infra-security.md §6)_
 - **F2** (must) Search is the first control, on the left. List pages use a 280 px field (up to 360 px with an in-field scope toggle such as "This folder | All folders"). Explorers replace it with the query bar, which spans the toolbar, starts with the source chip and ends with Run.
   - Today: Search stretches across the row on 16 screens, is a fixed field on 4, sits alone on its own row on 4, and appears twice on Data sources (and neither box says when nothing matches). _(screens-ai-infra-security.md §6 · screens-data.md)_
@@ -150,11 +153,11 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 - **F4** (must) Explorers (logs, traces, metrics) filter with facets in a collapsible left panel — field, top values, counts, checkbox — and with the query bar. Facet panels hold nothing else.
 - **F5** (must) Every applied filter shows as a chip in one row under the toolbar ("service is payments-api ×"), with Clear all at the end. Chips and the query are two views of one state, so editing either updates both.
   - Today: No list shows its applied filters. Clear all exists in four forms ("×" at the bar end, a "Clear filters" link, "1 selected ×", Reset) and is often offered only from the empty state. _(screens-observe.md §9 · screens-data.md · screens-ai-infra-security.md §6)_
-- **F6** (must) A segmented control switches a view or an object type ("Alerts | Anomalies"). Tabs switch peer pages. Narrowing by state ("Firing", "Paused") is a filter: a filter select, a KPI tile or a chip.
+- **F6** (must) A segmented control switches a view or an object type ("Alerts | Anomalies"). Tabs switch peer pages. Narrowing by state ("Firing", "Paused") is a filter: a filter select, a KPI tile or a chip. A mode the user must know they are in (Builder | SQL, Table | Graph) is a labelled segmented control in the toolbar, never only an icon toggle or a ⋯ item.
   - Today: Segmented controls narrow by state on 26 screens: 12 in Respond, 6 in AI and Security, 5 in Observe, 3 in Data. _(screens-*.md filter styles)_
 - **F7** (must) A stat strip may filter the list: `OStatStrip selectable` renders filter chips (icon, label, count badge, 32 px) in the `#toolbar` right after the search, with `:row="false"`. The chips stay on the search row only while every one fits, else they take their own full-width toolbar line; overflow scrolls sideways, never wraps. Chips count the rows below. The reset chip ("All", the `default-key`) comes first, carries the total and reads as quietly selected while nothing is picked; then attention-first order. Chips are `multiple` (OR'ed) unless the backend takes one value; the reset chip and Esc clear, there is no Clear button. Selected is an accent border plus soft fill. Read-only counts are not chips: an `inline` KPI line in the toolbar, or a `row` strip above the table header. A tile earns its place only if its number varies, someone acts on it, and it is not already on screen.
   - Today: KPI strips filter on 25+ screens and are the most consistent filter in the app. Keep them. A tile row with nothing to act on (Dashboards, Roles) is noise. _(ui-architect calm-signal.md · screens-ai-infra-security.md §6)_
-- **F8** (must) One time-range control (presets, relative, absolute, time zone) in the toolbar. Defaults: explorers and dashboards 15 minutes, overviews and summaries 24 hours.
+- **F8** (must) One time-range control, `ODateTimeRange` (presets, relative, absolute, time zone), in the toolbar or, when the whole page shares one range, the header actions. Its preset list is the only one: no page builds its own preset tray. Defaults: explorers and dashboards 15 minutes, overviews and summaries 24 hours. A page that does not filter by time has no time control.
   - Today: The time range is a header picker (11 screens), a toolbar picker (8), a segmented control (6) or a read-only pill (2); defaults are 15 m, 24 h, 1 h, 3 h and 7 d. _(screens-ai-infra-security.md §6)_
 - **F9** (must) Refresh is one control, last in the toolbar: a button showing the data age ("↻ 2 min ago") with auto-refresh in its menu.
   - Today: Refresh is drawn five ways: ORefreshButton with data age (29 screens), icon-only (19), primary "Refresh" (8), ghost with a dot (4), a split "Refresh ▾" (1). Auto-refresh is an icon popover, "Auto: Off ▾", or missing. _(screens-respond.md · screens-ai-infra-security.md §6 · screens-observe.md §9)_
@@ -251,6 +254,8 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
   - Today: Four chains: New dashboard → Add folder, Move dashboard → Add folder, Dashboard settings drawer → Add tab, Settings drawer → leave dialog. _(screens-respond.md)_
 - **O9** (must) Escape closes the top overlay. Clicking outside closes popovers and menus. A dialog or drawer with edits asks before closing (V5).
   - Today: Dialogs throw typed input away on Escape or an outside click; the Condition drawer ignores Escape. _(screens-respond.md · screens-data.md)_
+- **O10** (must) A menu never runs off the screen: it caps at the viewport height minus 64 px and scrolls inside. Past about ten items, group them under headings ("View options", "Export") and move toggles into one group of checkable items.
+  - Today: The Logs ⋯ menu has 18+ items, is taller than a 900 px window and clips "Add alert" and "Explain". _(persona walkthroughs, polish iteration 1)_
 
 ## 10. Forms and saving
 
@@ -319,6 +324,8 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
   - Today: The stream detail drawer is not in the URL, while Prompts and AutoObserve drawers are. `meta.keepAlive` is set on 32 routes but nothing reads it. _(screens-data.md §9 · composition.md key findings)_
 - **N7** (must) One name means one feature.
   - Today: "Drill down" names three features: Logs dimension insights, the Metrics detail page and the Traces selection comparison. _(screens-observe.md §9)_
+- **N8** (must) Evidence travels with the link. A link from one area into another (alert → logs, log → trace, Home → alert, dashboard panel → logs) carries the stream, the filter and the time window in the URL, so the target opens on the same evidence. Switching solution lands on the matching page when one exists.
+  - Today: From an alert, reaching its logs took eight or more clicks and retyping the SQL; Logs then opened on "Past 15 minutes" with no stream. A log's trace_id was not a link. _(persona walkthroughs, polish iteration 1)_
 
 ## 13. Feedback
 
@@ -336,7 +343,7 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 - **K3** (must) A banner states a lasting condition of the page (quota, partial data, read-only): one line, directly under the header.
 - **K4** (must) Loading shows a skeleton of the final layout after 150 ms, never a "0". A refresh keeps the current rows visible with a thin progress bar.
   - Today: Logs keeps stale rows during a run, which is right; the Product analytics "Create named event" spinner never ends. _(screens-observe.md §9)_
-- **K5** (must) Empty states come in the four kinds above, in one component. A failed load never shows the first-run state.
+- **K5** (must) Empty states come in the four kinds above, in one component. A failed load never shows the first-run state, and every count it would have filled shows "—", never 0 (C4). A strip or panel that fails keeps its final height. When every panel on a page fails for one reason, the page shows one error, not one per panel.
   - Today: Seven empty-state looks in Data and eight in AI and Infra. Synthetics shows its first-run state on a 404; escalation policies says "No on-call teams yet" after the load failed. _(screens-data.md · screens-ai-infra-security.md §6 · screens-respond.md)_
 - **K6** (must) Error messages say what failed and what to do. Never raw HTTP text, never blame the user for a disabled feature.
   - Today: "Request failed with status code 404" on four Security screens; a solid red banner on Fleet; External alert sources blames the user's role for a feature that is switched off. _(screens-ai-infra-security.md §6 · screens-respond.md)_
@@ -383,11 +390,12 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 - [H8] Nothing in the header moves on tab switch or navigation.
 - [H3] At most two secondary, one primary, then ⋯ More.
 - [H6] Create button: "New <object>", label only.
-- [F1] Toolbar order: search, filters, spacer, view, time, refresh.
+- [F1] Toolbar order: mode, search, filters, spacer, ≤2 secondary, time, Run, refresh, one ghost ⋯.
 - [F2] Search first, 280 px on lists.
 - [F3] Filter selects carry their label inside.
 - [F5] Applied filters show as chips with Clear all.
-- [F6] No segmented control or tab used as a state filter.
+- [F6] No segmented control or tab used as a state filter; a mode is a labelled segmented control.
+- [F8] One time control, ODateTimeRange; no local preset trays.
 - [F10] Toolbar never wraps; overflow folds into More.
 - [F11] Filters, sort, page and time range are in the URL.
 - [S1] Heights only 24, 28, 32, 36.
@@ -402,6 +410,7 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 - [O3] Overlay width from the fixed sizes.
 - [O4] Overlay never resizes or moves while open.
 - [O8] No dialog opens from a dialog.
+- [O10] Menus cap at the viewport height and scroll; long ones are grouped.
 - [V2] Save where the eye ends, once per page.
 - [V4] Editors use the shared leave dialog.
 - [V5] Dirty dialogs and settings ask before discarding.
@@ -409,9 +418,11 @@ the 18 px page title, `ODialog` and `ODrawer` the 15 px titles, and `OFormSectio
 - [V7] Enter never saves a multi-field form.
 - [V8] Destructive confirm names the object.
 - [N3] Back via useSmartBack; never raw router.back().
-- [K5] Empty state of the right kind; never first-run on error.
+- [N8] Cross-area links carry stream, filter and time window.
+- [K5] Empty state of the right kind; never first-run or 0 on error.
 - [K6] No raw HTTP errors in the UI.
 - [C3] Colour the exception, not the norm.
 - [C4] Unknown is "—", zero is a muted 0.
+- [C9] Red only for destructive actions and critical state.
 - [T5] Sentence case, no uppercase labels.
 - [W4] One time format: relative with absolute tooltip.

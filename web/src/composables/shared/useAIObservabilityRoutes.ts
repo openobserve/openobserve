@@ -16,6 +16,7 @@
 import type { RouteRecordRaw } from "vue-router";
 import { routeGuard } from "@/utils/zincutils";
 import { withFeatureGate, type FeatureKey } from "@/utils/enterpriseFeatures";
+import { lockGatedRoutes } from "./lockInPlace";
 import { promptRoutes } from "@/views/AIObservability/promptRoutes";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { I18nKey } from "@/types/i18n";
@@ -560,7 +561,7 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
       } as RouteRecordRaw);
     }
   }
-  return children;
+  return lockGatedRoutes(children);
 }
 
 /** Per-`?tab=` titles for routes several rail items share; the router prefers these over `titleKey`. */

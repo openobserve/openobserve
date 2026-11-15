@@ -74,7 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :layoutMode="layoutMode"
           @refresh="refreshDashboard"
           @layoutChange="$emit('layoutChange')"
-        />
+        >
+          <template #end><slot name="tab_end" /></template>
+        </TabList>
 
         <!-- Tab-scoped Variables (for active tab, if using manager) -->
         <VariablesValueSelector

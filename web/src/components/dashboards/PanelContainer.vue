@@ -720,6 +720,10 @@ import {
   inject,
 } from "vue";
 import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh";
+import {
+  PANEL_EMPTY_REGISTRY_KEY,
+  type PanelDataState,
+} from "@/composables/dashboard/usePanelEmptyRegistry";
 import { summarizePanelError } from "@/utils/dashboard/kiosk";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
@@ -1500,6 +1504,32 @@ export default defineComponent({
     });
     onBeforeUnmount(() => {
       if (props.data?.id) kioskHealth?.unregister(props.data.id);
+    });
+
+    const emptyRegistry = inject(PANEL_EMPTY_REGISTRY_KEY, null);
+    // Text panels never hold data, so they stay out of the "every panel is empty" verdict.
+    const reportsData = () => !["html", "markdown", "alert-list"].includes(props.data?.type);
+    const panelDataState = (): PanelDataState => {
+      if (errorData.value) return "error";
+      if (isPanelLoading.value) return "pending";
+      const renderer = PanleSchemaRendererRef.value;
+      return renderer?.noData === "No data" || renderer?.statHasNoData ? "empty" : "data";
+    };
+    watch(
+      () => [
+        props.data?.id,
+        errorData.value,
+        isPanelLoading.value,
+        PanleSchemaRendererRef.value?.noData,
+        PanleSchemaRendererRef.value?.statHasNoData,
+      ],
+      () => {
+        if (props.data?.id && reportsData()) emptyRegistry?.report(props.data.id, panelDataState());
+      },
+      { immediate: true },
+    );
+    onBeforeUnmount(() => {
+      if (props.data?.id) emptyRegistry?.unregister(props.data.id);
     });
 
     const isPartialData = ref(false);

@@ -178,11 +178,11 @@ describe("SectionRail", () => {
     wrapper.unmount();
   });
 
-  it("routes an edition-locked item to the upgrade page", async () => {
+  it("opens an edition-locked item's own page, which shows its lock in place", async () => {
     const wrapper = mountRail({ groups: lockedGroups({ locked: true }) });
     expect(wrapper.findComponent({ name: "OTab" }).props("locked")).toBe(true);
     await wrapper.get('[data-name="roles"]').trigger("click");
-    expect(push).toHaveBeenCalledWith({ name: "enterpriseFeatures" });
+    expect(push).toHaveBeenCalledWith({ name: "roles" });
   });
 
   // The licensed page shows its own banner, so the upgrade page would only hide it.

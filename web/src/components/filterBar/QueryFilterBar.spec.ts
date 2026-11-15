@@ -138,6 +138,21 @@ describe("QueryFilterBar", () => {
     expect(rowKeys()).toContain("status");
   });
 
+  it("with submit-on-enter, the Enter that completes a chip closes the list and runs", async () => {
+    const onSubmit = vi.fn();
+    const state = mountBar({ submitOnEnter: true, onSubmit });
+    await openBar();
+    await type("lev");
+    await press("Enter");
+    await press("Enter");
+    expect(onSubmit).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(rowKeys()).toContain("error"));
+    await press("Enter");
+    expect(sql(state)).toBe("level = 'error'");
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(rows()).toEqual([]);
+  });
+
   it("opens the picker when the user types at the caret", async () => {
     mountBar();
     await type("s");

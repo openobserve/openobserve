@@ -4,6 +4,23 @@ import { withFeatureGate } from "@/utils/enterpriseFeatures";
 import { withLicenseFeature } from "@/utils/featureGate";
 import { oncallRouteGuard } from "./oncallRouteGuard";
 import { slackRouteGuard } from "./slackRouteGuard";
+import { lockGatedRoutes, lockInPlace } from "./lockInPlace";
+import type { FeatureKey } from "@/utils/enterpriseFeatures";
+
+// Locked pages open in place with their own lock, so a direct load and a click look alike.
+const LOCKED_IN_PLACE: Record<string, FeatureKey> = {
+  query_management: "queryManagement",
+  cipherKeys: "cipherKeys",
+  aiToolsets: "aiToolsets",
+  pipelineDestinations: "pipelineDestinations",
+  storageSettings: "storageSettings",
+  nodes: "nodes",
+  domainManagement: "domainManagement",
+  regexPatterns: "regexPatterns",
+  passwordPolicy: "passwordPolicy",
+  correlationSettings: "correlationSettings",
+  license: "license",
+};
 
 const Settings = () => import("@/components/settings/index.vue");
 
@@ -171,7 +188,6 @@ const useManagementRoutes = () => {
             titleKey: "settings.queryManagement",
             licenseFeature: "query_management",
           },
-          beforeEnter: withFeatureGate("queryManagement", routeGuard),
         },
         {
           path: "cipher_keys",
@@ -181,7 +197,6 @@ const useManagementRoutes = () => {
             keepAlive: true,
             titleKey: "settings.cipherKeys",
           },
-          beforeEnter: withFeatureGate("cipherKeys", routeGuard),
         },
         withLicenseFeature("ai_toolsets", {
           path: "ai_toolsets",
@@ -191,7 +206,6 @@ const useManagementRoutes = () => {
             keepAlive: true,
             titleKey: "aiToolset.header",
           },
-          beforeEnter: withFeatureGate("aiToolsets", routeGuard),
         }),
         {
           path: "pipeline_destinations",
@@ -200,7 +214,6 @@ const useManagementRoutes = () => {
             titleKey: "pipeline_destinations.header",
           },
           component: () => import("@/components/alerts/PipelinesDestinationList.vue"),
-          beforeEnter: withFeatureGate("pipelineDestinations", routeGuard),
         },
         // Its API is mounted with on-call's, so the page exists only where on-call is on.
         withLicenseFeature("oncall", {
@@ -220,7 +233,6 @@ const useManagementRoutes = () => {
             titleKey: "storage_settings.tabLabel",
             licenseFeature: "byob",
           },
-          beforeEnter: withFeatureGate("storageSettings", routeGuard),
         },
         {
           path: "nodes",
@@ -230,7 +242,6 @@ const useManagementRoutes = () => {
             keepAlive: true,
             titleKey: "settings.nodes",
           },
-          beforeEnter: withFeatureGate("nodes", routeGuard),
         },
         {
           path: "domain_management",
@@ -240,7 +251,6 @@ const useManagementRoutes = () => {
             keepAlive: true,
             titleKey: "settings.ssoDomainRestrictions",
           },
-          beforeEnter: withFeatureGate("domainManagement", routeGuard),
         },
         {
           path: "regex_patterns",
@@ -250,7 +260,6 @@ const useManagementRoutes = () => {
             keepAlive: true,
             titleKey: "regex_patterns.title",
           },
-          beforeEnter: withFeatureGate("regexPatterns", routeGuard),
         },
         {
           path: "password_policy",
@@ -260,7 +269,6 @@ const useManagementRoutes = () => {
             keepAlive: true,
             titleKey: "settings.passwordPolicy",
           },
-          beforeEnter: withFeatureGate("passwordPolicy", routeGuard),
         },
         {
           path: "correlation/:tab?",
@@ -270,14 +278,12 @@ const useManagementRoutes = () => {
             keepAlive: true,
             titleKey: "settings.correlationSettings",
           },
-          beforeEnter: withFeatureGate("correlationSettings", routeGuard),
         },
         {
           path: "license",
           name: "license",
           meta: { titleKey: "settings.license" },
           component: () => import("@/components/settings/License.vue"),
-          beforeEnter: withFeatureGate("license", routeGuard),
         },
       ],
     );
@@ -341,7 +347,10 @@ const useManagementRoutes = () => {
       ],
     );
   }
-  return routes;
+  routes[0].children = routes[0].children.map((child: any) =>
+    LOCKED_IN_PLACE[child.name] ? lockInPlace(LOCKED_IN_PLACE[child.name], child) : child,
+  );
+  return lockGatedRoutes(routes);
 };
 
 export default useManagementRoutes;

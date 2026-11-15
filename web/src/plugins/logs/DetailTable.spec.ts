@@ -910,6 +910,58 @@ describe("DetailTable Component", () => {
       expect(traceWrapper.find(WRAP_TOGGLE).isVisible()).toBe(true);
     });
   });
+  describe("trace links and neutral correlation state", () => {
+    let w: any;
+    const row = { _timestamp: 1_700_000_000_000_000, trace_id: "abc123", span_id: "s1" };
+    const mountRow = (extra: Record<string, unknown> = {}) =>
+      mount(DetailTable, {
+        attachTo: document.body,
+        props: { ...defaultProps, modelValue: row, initialTab: "table", ...extra },
+        global: globalMountOptions,
+      });
+
+    afterEach(() => {
+      w?.unmount();
+    });
+
+    it("renders trace_id and span_id values as links, other values as plain text", async () => {
+      w = mountRow();
+      await flushPromises();
+      expect(w.find('[data-test="log-detail-trace_id-link"]').text()).toBe("abc123");
+      expect(w.find('[data-test="log-detail-span_id-link"]').exists()).toBe(true);
+      expect(w.find('[data-test="log-detail-_timestamp-link"]').exists()).toBe(false);
+    });
+
+    it("opens the trace in the same tab with the log's time window", async () => {
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+      w = mountRow();
+      await flushPromises();
+      w.vm.searchObj.meta.selectedTraceStream = "default";
+      await w.find('[data-test="log-detail-trace_id-link"]').trigger("click");
+      await flushPromises();
+      const arg: any = push.mock.calls[0][0];
+      push.mockRestore();
+      expect(arg.name).toBe("traceDetails");
+      expect(arg.query.trace_id).toBe("abc123");
+      expect(arg.query.from).toBe(row._timestamp - 900_000_000);
+      expect(arg.query.span_id).toBeUndefined();
+    });
+
+    it("shows a neutral, non-error state when correlation finds no service", async () => {
+      w = mountRow({
+        initialTab: "correlated-traces",
+        correlationError: i18n.global.t("logs.searchResult.noMatchingService"),
+      });
+      await flushPromises();
+      const states = w.findAll('[data-test="logs-correlation-no-match"]');
+      const state = states[states.length - 1];
+      expect(states).toHaveLength(3);
+      expect(state.attributes("data-kind")).not.toBe("error");
+      expect(state.text()).toContain("No trace linked to this log");
+      expect(state.text()).toContain("Search traces around this time");
+    });
+  });
+
   describe("severity tag (A7)", () => {
     let sevWrapper: any;
     const BADGE = '[data-test="log-detail-severity-badge"]';

@@ -15,8 +15,10 @@
 
 import { computed, onBeforeUnmount, ref } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
+import { timestampToTimezoneDate } from "@/utils/timezone";
+import { formatRelativePeriod } from "@/utils/dashboard/kiosk";
 import shortURLService from "@/services/short_url";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -33,6 +35,24 @@ export interface ShareLinkOptions {
   /** Element the "Copied" confirmation anchors to; none centres it. */
   anchor?: () => HTMLElement | undefined;
   events?: ShareLinkEvents;
+}
+
+/** The copy confirmation names the time the link opens on: a fixed range, or a window that moves with the clock. */
+export function shareLinkCopiedMessage(url: string, t: TranslateFn, timezone = "UTC"): I18nText {
+  let params: URLSearchParams;
+  try {
+    params = new URL(url, window.location.origin).searchParams;
+  } catch {
+    return t("search.linkCopied");
+  }
+  const from = Number(params.get("from"));
+  const to = Number(params.get("to"));
+  if (from > 0 && to > 0) {
+    const at = (time: number) => raw(timestampToTimezoneDate(time, timezone, "yyyy-MM-dd HH:mm"));
+    return t("search.linkCopiedFixedTime", { from: at(from), to: at(to) });
+  }
+  const period = formatRelativePeriod(params.get("period"), t);
+  return period ? t("search.linkCopiedRelativeTime", { period }) : t("search.linkCopied");
 }
 
 /**
@@ -54,9 +74,10 @@ export function useShareLink(options: ShareLinkOptions) {
     return !webUrl || webUrl.trim() === "";
   });
 
+  let sharedUrl = "";
   const copyShortUrl = (shortUrl: string) =>
     copyToClipboard(shortUrl, t, {
-      successMessage: t("search.linkCopiedSuccessfully"),
+      successMessage: shareLinkCopiedMessage(sharedUrl, t, store.state.timezone),
       errorMessage: t("search.errorCopyingLink"),
       timeout: 5000,
       anchor: options.anchor?.(),
@@ -127,6 +148,7 @@ export function useShareLink(options: ShareLinkOptions) {
 
   const share = () => {
     const url = options.url();
+    sharedUrl = url;
     if (!url) {
       toast({
         variant: "warning",

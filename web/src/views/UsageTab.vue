@@ -437,7 +437,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
-import { formatEventCount } from "@/utils/formatters";
+import { formatCompactCount } from "@/utils/formatters";
 import { summaryHasUserData } from "@/utils/internalStreams";
 import { chartColor } from "@/utils/chartTheme";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
@@ -614,7 +614,7 @@ const getSummary = (org_id: any) => {
         streams_count: res.data.streams?.num_streams ?? 0,
         ingested_data: formatSizeFromMB(rawIngestedSize),
         compressed_data: formatSizeFromMB(rawCompressedSize),
-        doc_count: formatEventCount(rawDocCount),
+        doc_count: formatCompactCount(rawDocCount),
         doc_count_raw: rawDocCount,
         compressed_size_raw: rawCompressedSize,
         ingested_size_raw: rawIngestedSize,
@@ -856,7 +856,7 @@ const pipelinesPanelData = computed(() => {
 
 const formattedAnimatedEventsCount = computed(() => {
   return animatedEventsCount.value > 0
-    ? formatEventCount(animatedEventsCount.value)
+    ? formatCompactCount(animatedEventsCount.value)
     : summary.value.doc_count;
 });
 

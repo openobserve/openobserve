@@ -11,7 +11,9 @@
     "bannerMessage": "ฟีเจอร์นี้ถูกล็อก ต้องมีฟีเจอร์ {feature} ในสิทธิ์การใช้งานของคุณ",
     "bannerMessageGeneric": "หน้านี้ต้องใช้ฟีเจอร์ที่ไม่มีในสิทธิ์การใช้งานของคุณ",
     "headerLocked": "ล็อกอยู่: ต้องมี {feature}",
-    "availableInEnterprise": "{feature} ใช้งานได้ใน OpenObserve Enterprise"
+    "availableInEnterprise": "{feature} ใช้งานได้ใน OpenObserve Enterprise",
+    "turnedOffTitle": "ปิดใช้งานสำหรับองค์กรนี้",
+    "enterpriseTitle": "มีให้ใช้ใน Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "No patterns found",
       "description": "Try increasing the time range or selecting a different stream with more log data. Pattern extraction works best with at least 1,000 logs.",
       "logsAnalyzed": "Only {count} logs were analyzed."
-    },
-    "noStreamSelected": {
-      "title": "Select a stream to get started",
-      "description": "Pick a stream, then run your query to explore its data. Refine results with filters and a custom time range."
     },
     "noQueryApplied": {
       "title": "Run a query to see results",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "Connect a source to create your first stream",
       "description": "Streams are created automatically the moment data arrives. Set up ingestion from your app, agent, or collector to get started.",
-      "action": "Set up ingestion",
       "actionDesc": "Connect a data source",
       "createAction": "New stream",
       "createActionDesc": "Manually define a stream schema"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "ไม่มีการเปลี่ยนแปลงที่จะบันทึก"
+    },
     "dismiss": "ปิดการแจ้งเตือน",
     "exitFullscreen": "ออกจากโหมดเต็มหน้าจอ",
     "moreActions": "การดำเนินการเพิ่มเติม",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "ก่อนหน้า",
     "patternNavNext": "ถัดไป",
     "patternNoValuesAvailable": "No values available",
-    "sqlModeLabel": "SQL Mode",
     "nlpModeLabel": "Natural Language Mode",
     "quickModeLabel": "Quick Mode",
     "menuMore": "More",
-    "menuGroupSetOnce": "Set Once",
     "menuGroupHistory": "History",
     "menuGroupDownloads": "Downloads",
     "menuGroupSchedule": "Schedule",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "View deleted successfully.",
     "viewCreatedSuccessfully": "View created successfully.",
     "viewUpdatedSuccessfully": "View updated successfully.",
-    "linkCopiedSuccessfully": "Link Copied Successfully!",
     "errorCopyingLink": "Error while copy link.",
     "errorShorteningLink": "Error while shortening link.",
     "webUrlNotConfigured": "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "The selected streams have no full-text fields",
     "freeTextNoTextFields": "This stream has no text fields to search.",
     "freeTextNoTextFieldsNamed": "Not searched: {streams} (no text fields).",
-    "freeTextBuildNotice": "This filter has text search; edit it in SQL."
+    "freeTextBuildNotice": "This filter has text search; edit it in SQL.",
+    "queryModeLabel": "ภาษาคิวรี",
+    "queryModeFilter": "ตัวกรอง",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "กรองล็อกตามฟิลด์และค่า",
+    "queryModeSqlTooltip": "เขียนคิวรี SQL แบบเต็ม พร้อมการรวมและการเชื่อมตาราง",
+    "sqlModeNeedsOneStream": "SQL ในมุมมองนี้ใช้ได้กับสตรีมเดียว",
+    "menuGroupViewOptions": "ตัวเลือกการแสดงผล",
+    "histogramHiddenForAggregates": "คิวรีนี้คืนค่าเป็นกลุ่ม ไม่ใช่เหตุการณ์ตามเวลา จึงไม่มีฮิสโทแกรม ใช้การแสดงผลเพื่อสร้างกราฟของผลลัพธ์",
+    "linkCopied": "คัดลอกลิงก์แล้ว",
+    "linkCopiedFixedTime": "คัดลอกลิงก์แล้ว · ช่วงเวลาคงที่ {from} – {to}",
+    "linkCopiedRelativeTime": "คัดลอกลิงก์แล้ว · {period} นับจากตอนที่เปิด",
+    "recordsChipRows": "{total} แถว | {total} แถว",
+    "histogramTitleRows": "แสดง {total} แถวใน {took} ms | แสดง {total} แถวใน {took} ms",
+    "histogramTitleRowsWithScan": "แสดง {total} แถวใน {took} ms ({scanLabel}: {scanSize}) | แสดง {total} แถวใน {took} ms ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "เลือกสตรีมก่อน"
   },
   "menu": {
     "alertCalibration": "การปรับเทียบการแจ้งเตือน",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "คีย์ลัด",
     "searchOrJumpTo": "ค้นหาหรือไปที่…",
     "jumpToTitle": "ไปที่",
-    "jumpToPlaceholder": "ค้นหาหน้า",
+    "addData": "เพิ่มข้อมูล",
+    "jumpToPlaceholder": "ค้นหาหน้าและการดำเนินการ",
     "synthetic": "การตรวจสอบสังเคราะห์ (Synthetics)",
     "experience": "ประสบการณ์ใช้งาน (Experience)",
     "slos": "SLOs",
@@ -4211,7 +4224,8 @@
     "revokeInvitationMsg": "Are you sure you want to revoke the invitation for {email}?",
     "deleteUsersTitle": "Delete Users",
     "deleteUsersMsg": "Are you sure you want to delete {count} user? | Are you sure you want to delete {count} users?",
-    "deleteUsersBlockNote": "{count} รายในจำนวนนี้เข้าร่วมผ่านโดเมนที่ยืนยันแล้วของคุณ และจะถูกบล็อกแทนการลบ"
+    "deleteUsersBlockNote": "{count} รายในจำนวนนี้เข้าร่วมผ่านโดเมนที่ยืนยันแล้วของคุณ และจะถูกบล็อกแทนการลบ",
+    "roleHint": "Admin จัดการองค์กร Editor เปลี่ยนข้อมูลและการตั้งค่า Viewer อ่านได้อย่างเดียว"
   },
   "invitation": {
     "pendingInvitations": "Pending Invitations",
@@ -5159,6 +5173,7 @@
     "timezone": "Timezone",
     "deleteActionMessage": "Are you sure you want to delete {count} field? This action cannot be undone. | Are you sure you want to delete {count} fields? This action cannot be undone.",
     "deleteDatesMessage": "Are you sure you want to delete {count} date range? This action cannot be undone. | Are you sure you want to delete {count} date ranges? This action cannot be undone.",
+    "summaryAllTypes": "Streams (ทุกประเภท)",
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
     "labelTraces": "Traces",
@@ -7756,7 +7771,8 @@
       "metricsSketch": "ดิสทริบิวชันถูกจัดเก็บเป็นบักเก็ตของฮิสโตแกรม และเปอร์เซ็นไทล์จะถูกประมาณจากบักเก็ตเหล่านั้น ค่า ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA ที่สูงขึ้นจะให้บักเก็ตที่ละเอียดขึ้นและเปอร์เซ็นไทล์ที่แม่นยำขึ้น โดยแลกกับจำนวนแถวที่จัดเก็บมากขึ้น"
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU exporter"
+    "gpuExporter": "GPU exporter",
+    "rotationNote": "โทเค็นไม่ได้หมุนเวียนในที่เดิม หากต้องการหมุนเวียน ให้สร้างโทเค็นใหม่ สลับแหล่งข้อมูลไปใช้ แล้วปิดใช้งานโทเค็นเก่า"
   },
   "dashboard": {
     "panelDraft": {
@@ -9387,6 +9403,9 @@
       "addClause": "Add clause"
     },
     "viewDashboard": {
+      "apply": "ใช้",
+      "lastDataSeen": "ข้อมูลล่าสุด {when}",
+      "jumpToLatest": "ไปยังข้อมูลล่าสุด",
       "refreshToApplyVariables": "Refresh to apply latest variable changes",
       "refresh": "รีเฟรช",
       "refreshCacheReload": "Refresh cache & reload",
@@ -10132,6 +10151,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "ไม่มีข้อมูลในช่วงเวลา",
     "saveAndStay": "Save and keep editing",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10574,6 +10594,38 @@
     },
     "timeRange": {
       "heading": "ในช่วงเวลาที่เลือก"
+    },
+    "firingNow": {
+      "title": "กำลังแจ้งเตือน",
+      "byLevel": "วิกฤต {critical} · คำเตือน {warning}",
+      "allQuiet": "ทุกอย่างปกติ",
+      "watching": "เปิดใช้กฎการแจ้งเตือน {count} รายการ ไม่มีการแจ้งเตือน | เปิดใช้กฎการแจ้งเตือน {count} รายการ ไม่มีการแจ้งเตือน",
+      "noRules": "ยังไม่มีกฎการแจ้งเตือน",
+      "browseLibrary": "ดูคลังการแจ้งเตือน",
+      "notifyFailed": "แจ้งเตือนไม่สำเร็จ",
+      "loadError": "โหลดการแจ้งเตือนที่กำลังทำงานไม่ได้",
+      "unavailable": "ขณะนี้อ่านสถานะการแจ้งเตือนไม่ได้"
+    },
+    "health": {
+      "subtitle": "ข้อมูลล่าสุดที่ได้รับ แยกตามประเภท",
+      "lastData": "ข้อมูลล่าสุดเมื่อ {age} ที่แล้ว",
+      "justNow": "ข้อมูลล่าสุดเมื่อสักครู่",
+      "noDataIn": "ไม่มีข้อมูลใน {range} ที่ผ่านมา",
+      "noRecords": "ยังไม่มีเรคคอร์ด",
+      "loadError": "อ่านสตรีมของคุณไม่ได้"
+    },
+    "start": {
+      "text": "ไม่มีข้อมูลเข้ามาใน {range} ที่ผ่านมา ส่งข้อมูล ดูข้อมูลที่มี หรือตั้งค่าการแจ้งเตือน",
+      "addData": "เพิ่มข้อมูล",
+      "createAlert": "สร้างการแจ้งเตือน"
+    },
+    "summary": {
+      "loadError": "โหลดสรุปขององค์กรไม่ได้",
+      "denied": "ไม่มีสิทธิ์เข้าถึงสรุปขององค์กร ติดต่อผู้ดูแลองค์กร"
+    },
+    "events": {
+      "runFailed": "การรันล้มเหลว",
+      "timesInRange": "{count} ครั้งในช่วงที่เลือก | {count} ครั้งในช่วงที่เลือก"
     }
   },
   "chatHistory": {
@@ -11548,6 +11600,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "เปิดในบันทึก",
+      "openInTraces": "เปิดในเทรซ",
+      "openInMetrics": "เปิดในเมตริก",
+      "evidenceFiringTip": "เปิด {stream} ด้วยตัวกรองของการแจ้งเตือนนี้ ตั้งแต่เริ่มการแจ้งเตือนครั้งนี้จนถึงตอนนี้",
+      "evidenceWindowTip": "เปิด {stream} ด้วยตัวกรองของการแจ้งเตือนนี้ในช่วง {window} ล่าสุด",
+      "threshold": "เกณฑ์",
+      "noIncident": "ยังไม่มีเหตุการณ์",
+      "conditionLabel": "เงื่อนไขการแจ้งเตือน",
+      "allRows": "ทุกแถว"
+    },
+    "summaryTrainingFailed": "การฝึกล้มเหลว",
+    "startFromTemplate": "เริ่มจากเทมเพลต",
     "firing": {
       "title": "กำลังแจ้งเตือน",
       "drawer": {
@@ -20566,7 +20631,6 @@
     },
     "noStream": {
       "title": "Pick a stream to start exploring",
-      "description": "Choose a stream, then press <strong>Run query</strong>. You can refine with filters, a VRL function, and a custom time range once results come in.",
       "selectStream": "Select a stream",
       "selectStreamDesc": "Browse logs, traces, metrics & RUM streams",
       "queryGuide": "Read the query guide",
@@ -20618,7 +20682,16 @@
     "detailTable": {
       "noDataAvailable": "No data available.",
       "addIcon": "Add icon",
-      "sendToAiChat": "Send to AI Chat"
+      "sendToAiChat": "Send to AI Chat",
+      "openTrace": "เปิดเทรซ",
+      "noTraceTitle": "ไม่มีเทรซที่เชื่อมโยงกับบันทึกนี้",
+      "noRelatedLogsTitle": "ไม่พบบันทึกที่เกี่ยวข้อง",
+      "noRelatedMetricsTitle": "ไม่พบเมตริกที่เกี่ยวข้อง",
+      "noServiceText": "ไม่สามารถจับคู่บริการกับบันทึกนี้ได้ จึงไม่สามารถค้นหาข้อมูลที่เกี่ยวข้องโดยอัตโนมัติ",
+      "searchTracesAround": "ค้นหาเทรซรอบช่วงเวลานี้",
+      "searchAroundTip": "โหลดเหตุการณ์ที่บันทึกก่อนและหลังเหตุการณ์นี้",
+      "noOfEventsTip": "จำนวนเหตุการณ์ที่จะโหลดรอบเหตุการณ์นี้",
+      "severityTip": "ระดับบันทึกที่ตรวจพบ เลือกเพื่อดูว่าตรวจพบอย่างไร"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select * query is not supported for visualization.",
@@ -23157,7 +23230,7 @@
         "ok": "Ok",
         "normal": "Normal",
         "firing": "Firing",
-        "notifyfailed": "Notify Failed",
+        "notifyfailed": "ส่งไม่สำเร็จ",
         "flapping": "Flapping",
         "anomaly": "Anomaly",
         "succeeded": "Succeeded",
@@ -30478,5 +30551,9 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "filterBar": {
+    "queryTooltip": "แก้ไขตัวกรองเป็นข้อความ",
+    "builderTooltip": "แก้ไขตัวกรองด้วยตัวสร้าง"
   }
 }

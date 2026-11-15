@@ -25,6 +25,7 @@ const props = withDefaults(defineProps<RefreshButtonProps>(), {
   lastRunAt: null,
   loading: false,
   disabled: false,
+  disabledReason: null,
   failedAt: null,
   autoRefresh: undefined,
   intervals: () => AUTO_REFRESH_INTERVALS,
@@ -149,6 +150,7 @@ function handleClick(e: MouseEvent) {
     <OButton
       variant="secondary"
       :disabled="disabled"
+      :disabled-reason="disabled ? (disabledReason ?? undefined) : undefined"
       :aria-busy="loading || undefined"
       :data-test="dataTest"
       :data-state="failedText ? 'failed' : loading ? 'loading' : undefined"
@@ -157,7 +159,7 @@ function handleClick(e: MouseEvent) {
       @click="handleClick"
     >
       <!-- First child with no element before it, so the tooltip binds to the button itself. -->
-      <OTooltip :content="tooltipText" :shortcut="shortcut" />
+      <OTooltip v-if="!(disabled && disabledReason)" :content="tooltipText" :shortcut="shortcut" />
       <OIcon
         v-if="loading"
         name="progress-activity"
@@ -200,6 +202,7 @@ function handleClick(e: MouseEvent) {
           icon-only
           icon="arrow-drop-down"
           :disabled="disabled"
+          :disabled-reason="disabled ? (disabledReason ?? undefined) : undefined"
           :aria-label="t('refreshButton.autoRefresh')"
           :data-test="`${dataTest}-auto-menu`"
         />

@@ -366,6 +366,7 @@ import { resolveTraceStream } from "@/utils/traces/streamSelection";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { usePrimaryQueryFocus } from "@/composables/usePrimaryQueryFocus";
 import { recordPageLoad, recordPageRequest, type PageLoadReason } from "@/utils/pageCrossing";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { useRecentSearches } from "@/composables/queryHistory/useRecentSearches";
@@ -2690,16 +2691,6 @@ const tracesShortcuts = [
     },
   },
   {
-    id: "tracesFocusQuery",
-    handler: () => {
-      // The traces query editor is Monaco — focus its inner textarea.
-      const el = document.querySelector<HTMLElement>(
-        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea',
-      );
-      el?.focus();
-    },
-  },
-  {
     id: "tracesCopyUrl",
     handler: () => copyTracesUrl(t),
   },
@@ -2717,6 +2708,7 @@ const tracesShortcuts = [
   },
 ];
 useShortcuts(tracesShortcuts, undefined, { active: pageActive });
+usePrimaryQueryFocus("tracesFocusQuery", [], { active: pageActive });
 </script>
 
 <style scoped>

@@ -64,11 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               type="logLevel"
               :value="severity.level"
-              :label="severityTagLabel"
               toggle
               data-test="log-detail-severity-badge"
               :data-severity-source="severity.source"
-            />
+            >
+              {{ severityTagLabel }}
+              <OTooltip :content="t('logs.detailTable.severityTip')" />
+            </OTag>
           </template>
           <div
             class="flex flex-col gap-1.5 px-3 py-2.5 text-xs"
@@ -287,9 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #cell-field="{ value }">
-                <!-- `log-key` (assets/styles/log-highlighting.css) is the same class the
-                     JSON tab puts on its keys, so both tabs stay one color in both themes. -->
-                <span :data-test="`log-detail-${value}-key`" class="log-key text-left">
+                <span :data-test="`log-detail-${value}-key`" class="text-text-secondary text-left">
                   {{ value }}
                 </span>
               </template>
@@ -366,6 +366,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ t("common.removeFieldFromTable") }}
                         </ODropdownItem>
                       </template>
+                      <ODropdownItem
+                        v-if="isTraceLinkField(row.field)"
+                        data-test="log-details-open-trace-btn"
+                        icon="account-tree"
+                        @select="openTrace(row.field)"
+                      >
+                        {{ t("logs.detailTable.openTrace") }}
+                      </ODropdownItem>
                       <!-- Cross-link options -->
                       <template v-if="getCrossLinksForField(row.field).length > 0">
                         <ODropdownSeparator />
@@ -400,7 +408,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("regex_patterns.create_regex_pattern_field") }}
                       </ODropdownItem>
                     </ODropdown>
+                    <button
+                      v-if="isTraceLinkField(row.field)"
+                      type="button"
+                      :data-test="`log-detail-${row.field}-link`"
+                      class="text-text-link hover:text-text-link-hover focus-visible:ring-focus-ring rounded-default min-w-0 cursor-pointer border-none bg-transparent p-0 text-left font-mono underline-offset-2 outline-none hover:underline focus-visible:ring-2"
+                      :class="!shouldWrapValues ? 'truncate' : 'break-all'"
+                      @click="openTrace(row.field)"
+                    >
+                      {{ row.value }}
+                    </button>
                     <pre
+                      v-else
                       :data-test="`log-detail-${row.field}-value`"
                       class="m-0 inline min-w-0 flex-1 p-0 font-mono font-normal wrap-break-word"
                       :class="
@@ -458,6 +477,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               preset="tableRows"
               data-test="logs-correlation-loading-indicator"
             />
+            <OEmptyState
+              v-else-if="correlationError && correlationNoMatch"
+              size="compact"
+              class="px-page-edge"
+              icon="link"
+              :title="t('logs.detailTable.noRelatedLogsTitle')"
+              :text="t('logs.detailTable.noServiceText')"
+              data-test="logs-correlation-no-match"
+            ></OEmptyState>
             <OEmptyState v-else-if="correlationError" kind="error" :text="correlationErrorText" />
             <OEmptyState v-else icon="link" :title="t('correlation.clickToLoadLogs')" />
           </div>
@@ -495,6 +523,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               preset="chart"
               data-test="logs-correlation-loading-indicator"
             />
+            <OEmptyState
+              v-else-if="correlationError && correlationNoMatch"
+              size="compact"
+              class="px-page-edge"
+              icon="link"
+              :title="t('logs.detailTable.noRelatedMetricsTitle')"
+              :text="t('logs.detailTable.noServiceText')"
+              data-test="logs-correlation-no-match"
+            ></OEmptyState>
             <OEmptyState v-else-if="correlationError" kind="error" :text="correlationErrorText" />
             <OEmptyState v-else icon="link" :title="t('correlation.clickToLoadMetrics')" />
           </div>
@@ -533,6 +570,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               preset="tableRows"
               data-test="logs-correlation-loading-indicator"
             />
+            <OEmptyState
+              v-else-if="correlationError && correlationNoMatch"
+              size="compact"
+              class="px-page-edge"
+              icon="link"
+              :title="t('logs.detailTable.noTraceTitle')"
+              :text="t('logs.detailTable.noServiceText')"
+              data-test="logs-correlation-no-match"
+            >
+              <template #actions>
+                <OButton
+                  size="sm"
+                  variant="secondary"
+                  data-test="log-detail-search-traces-around-btn"
+                  @click="searchTracesAround"
+                >
+                  {{ t("logs.detailTable.searchTracesAround") }}
+                </OButton>
+              </template>
+            </OEmptyState>
             <OEmptyState v-else-if="correlationError" kind="error" :text="correlationErrorText" />
             <OEmptyState v-else icon="link" :title="t('correlation.clickToLoadTraces')" />
           </div>
@@ -573,7 +630,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="flex items-center gap-2 max-md:order-last max-md:basis-full max-md:justify-center"
         >
-          <label class="font-semibold whitespace-nowrap">{{ t("common.noOfRecords") }}</label>
+          <label class="font-semibold whitespace-nowrap">
+            <OTooltip :content="t('logs.detailTable.noOfEventsTip')" />
+            {{ t("common.noOfRecords") }}
+          </label>
           <OSelect
             v-model="selectedRelativeValue"
             :options="recordSizeOptions"
@@ -585,8 +645,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="secondary"
             :disabled="pageLoading"
             @click="searchTimeBoxed(rowData, selectedRelativeValue)"
-            >{{ t("common.searchAround") }}</OButton
           >
+            <OTooltip :content="t('logs.detailTable.searchAroundTip')" />
+            {{ t("common.searchAround") }}
+          </OButton>
         </div>
         <div class="w-1/12 items-end" style="display: contents">
           <OButton
@@ -647,7 +709,7 @@ import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import { crossLinkQueryText } from "@/composables/useLogs/freeTextSearch";
-import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
+import useViewTraceAction, { traceDetailsLocation } from "@/composables/useLogs/useViewTraceAction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -932,6 +994,7 @@ export default defineComponent({
       tracesLocked,
       tracesLockedReason,
       setViewTraceBtn: setViewTraceBtnFor,
+      getTracesStreams,
     } = useViewTraceAction(t, searchObj);
 
     watch(
@@ -1400,6 +1463,61 @@ export default defineComponent({
       emit("sendToAiChat", promptToBeAdded);
     };
 
+    const correlationNoMatch = computed(
+      () => props.correlationError === t("logs.searchResult.noMatchingService"),
+    );
+
+    const traceFieldNames = computed(() => {
+      const settings = store.state.organizationData?.organizationSettings;
+      return {
+        trace: settings?.trace_id_field_name || "trace_id",
+        span: settings?.span_id_field_name || "span_id",
+      };
+    });
+
+    const tracesMenuHidden = computed(() => {
+      const hidden: Set<string> | string[] | undefined = store.state.hiddenMenus;
+      return Array.isArray(hidden) ? hidden.includes("traces") : Boolean(hidden?.has("traces"));
+    });
+
+    const isTraceLinkField = (field: string | number) => {
+      if (tracesLocked.value || tracesMenuHidden.value) return false;
+      const { trace, span } = traceFieldNames.value;
+      const row = props.modelValue ?? {};
+      if (field === trace) return Boolean(row[trace]);
+      return field === span && Boolean(row[span]) && Boolean(row[trace]);
+    };
+
+    // Traces opens on a window around the log, in microseconds like every other time param.
+    const TRACE_WINDOW_US = 900_000_000;
+
+    const searchTracesAround = () => {
+      const ts = props.modelValue?.[store.state.zoConfig.timestamp_column];
+      const query: Record<string, string | number> = {
+        org_identifier: store.state.selectedOrganization.identifier,
+      };
+      if (searchObj.meta.selectedTraceStream) query.stream = searchObj.meta.selectedTraceStream;
+      if (ts) {
+        query.from = ts - TRACE_WINDOW_US;
+        query.to = ts + TRACE_WINDOW_US;
+      }
+      router.push({ name: "traces", query });
+    };
+
+    const openTrace = async (field: string | number) => {
+      if (!searchObj.meta.selectedTraceStream) await getTracesStreams();
+      const stream = searchObj.meta.selectedTraceStream;
+      if (!stream) {
+        searchTracesAround();
+        return;
+      }
+      const log = props.modelValue ?? {};
+      const { name, query } = traceDetailsLocation(log, store.state, stream);
+      const spanId = log[traceFieldNames.value.span];
+      const spanQuery = field === traceFieldNames.value.span ? { span_id: spanId } : {};
+      router.push({ name, query: { ...query, ...spanQuery } });
+    };
+
     const showCorrelation = () => {
       // Emit the original modelValue (not flattened rowData) as it has _timestamp
       emit("show-correlation", props.modelValue);
@@ -1487,6 +1605,10 @@ export default defineComponent({
       severity,
       severityTagLabel,
       severityFieldValue,
+      correlationNoMatch,
+      isTraceLinkField,
+      openTrace,
+      searchTracesAround,
       tableColumns,
       tableRows,
       detailSearchQuery,

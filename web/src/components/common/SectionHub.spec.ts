@@ -20,11 +20,6 @@ import SectionHub from "./SectionHub.vue";
 const push = vi.fn();
 vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
 
-const openUpgradeDialog = vi.fn();
-vi.mock("@/composables/useEnterpriseUpgradeDialog", () => ({
-  useEnterpriseUpgradeDialog: () => ({ open: openUpgradeDialog }),
-}));
-
 describe("SectionHub", () => {
   it("draws the lock on a license-locked card and still opens its page", async () => {
     const wrapper = mount(SectionHub, {
@@ -53,6 +48,5 @@ describe("SectionHub", () => {
     ).toBe(false);
     await card.trigger("click");
     expect(push).toHaveBeenCalledWith({ name: "roles" });
-    expect(openUpgradeDialog).not.toHaveBeenCalled();
   });
 });

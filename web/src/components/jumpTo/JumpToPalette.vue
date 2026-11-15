@@ -166,6 +166,12 @@ function onKeydown(event: KeyboardEvent) {
           >
             <OIcon :name="item.icon as IconName" size="sm" class="text-text-secondary shrink-0" />
             <OTruncatedText class="min-w-0 flex-1">{{ item.label }}</OTruncatedText>
+            <span
+              v-if="item.hint"
+              class="text-text-secondary shrink-0 text-xs"
+              :data-test="`jump-to-palette-hint-${item.key}`"
+              >{{ item.hint }}</span
+            >
           </div>
         </div>
         <div v-if="!results.length" class="px-3">

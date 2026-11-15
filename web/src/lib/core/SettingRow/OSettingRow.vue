@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       atEnd
         ? '@container flex flex-wrap items-center gap-x-6 gap-y-2'
-        : 'flex items-center gap-6 max-md:flex-col max-md:items-stretch max-md:gap-2',
+        : atBelow
+          ? 'flex flex-col items-stretch gap-2'
+          : 'flex items-center gap-6 max-md:flex-col max-md:items-stretch max-md:gap-2',
       'border-border-default border-b px-3 py-3 last:border-b-0',
       disabled && 'opacity-60',
     ]"
@@ -30,7 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       class="min-w-0"
-      :class="atEnd ? 'flex-1 @max-2xl:basis-full' : 'w-[22.5%] shrink-0 max-md:w-full'"
+      :class="
+        atEnd
+          ? 'flex-1 @max-2xl:basis-full'
+          : atBelow
+            ? 'w-full'
+            : 'w-[22.5%] shrink-0 max-md:w-full'
+      "
     >
       <div class="text-text-heading text-compact font-medium">{{ label }}</div>
       <div
@@ -55,8 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex items-center"
       :class="
         atEnd
-          ? 'w-75 shrink-0 justify-start @max-2xl:w-full'
-          : 'shrink-0 justify-end max-md:min-w-0 max-md:justify-start'
+          ? 'w-75 shrink-0 justify-end @max-2xl:w-full'
+          : atBelow
+            ? 'w-full max-w-md justify-start'
+            : 'shrink-0 justify-end max-md:min-w-0 max-md:justify-start'
       "
     >
       <OSkeleton
@@ -90,6 +100,7 @@ const form = inject(FORM_CONTEXT_KEY, null);
 const errorId = useId();
 
 const atEnd = computed(() => props.controlAt === "end");
+const atBelow = computed(() => props.controlAt === "below");
 
 const fieldErrors = form?.useStore((s: any) =>
   props.name ? s.fieldMeta?.[props.name]?.errors : undefined,

@@ -50,27 +50,20 @@ test.describe('List quick filter cards', { tag: ['@quickFilterCards', '@all'] },
     const qfc = pm.quickFilterCardsPage;
 
     await pm.alertsPage.gotoAlertListFolder(folder.folderId);
-    const counts = { failed: 0, firing: 0, acknowledged: 0, recent: 0, active: 2, paused: 1, total: 3 };
+    const counts = { firing: 0, acknowledged: 0, notify_failed: 0, error: 0, recent: 0, paused: 1, total: 3 };
     for (const [key, count] of Object.entries(counts)) await qfc.expectCardCount('alerts', key, count);
+    // Running is the norm and only anomaly detection trains, so neither gets a chip in this folder.
+    await expect(qfc.card('alerts', 'active')).toHaveCount(0);
+    await expect(qfc.card('alerts', 'failed')).toHaveCount(0);
     await qfc.expectRows('alerts', { count: 3, shown: [active1, active2, paused] });
     await qfc.expectCardSelected('alerts', 'total', true);
-
-    await qfc.clickCard('alerts', 'active');
-    await qfc.expectCardSelected('alerts', 'active', true);
-    await qfc.expectCardSelected('alerts', 'total', false);
-    await qfc.expectRows('alerts', { count: 2, shown: [active1, active2], hidden: [paused] });
-    // Counts are folder totals, so a filter must not shrink the other cards.
-    await qfc.expectCardCount('alerts', 'paused', 1);
-    await qfc.expectCardCount('alerts', 'total', 3);
-
-    await qfc.clickCard('alerts', 'active');
-    await qfc.expectCardSelected('alerts', 'active', false);
-    await qfc.expectCardSelected('alerts', 'total', true);
-    await qfc.expectRows('alerts', { count: 3, shown: [active1, active2, paused] });
 
     await qfc.clickCard('alerts', 'paused');
     await qfc.expectCardSelected('alerts', 'paused', true);
+    await qfc.expectCardSelected('alerts', 'total', false);
     await qfc.expectRows('alerts', { count: 1, shown: [paused], hidden: [active1, active2] });
+    // Counts are folder totals, so a filter must not shrink the other cards.
+    await qfc.expectCardCount('alerts', 'total', 3);
 
     // Chips are multi-select: a second chip adds to the selection and rows match any picked state.
     await qfc.clickCard('alerts', 'firing');

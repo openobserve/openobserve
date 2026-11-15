@@ -1534,9 +1534,10 @@ export class MetricsBuilderPage {
         const dashboardRow = this.page.locator(`[data-test="dashboard-name-cell-${dashboardName}"]`).first();
         if (await dashboardRow.isVisible({ timeout: 5000 }).catch(() => false)) {
             // Walk up to the OTable row and click delete
-            const deleteBtn = dashboardRow.locator(`xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]//*[@data-test='dashboard-delete']`).first();
-            if (await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await deleteBtn.click();
+            const moreBtn = dashboardRow.locator(`xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]//*[@data-test='dashboard-row-more-actions']`).first();
+            if (await moreBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await moreBtn.click();
+                await this.page.locator('[data-test="dashboard-delete-menu"]').click();
                 await this.confirmDeleteBtn.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
                 if (await this.confirmDeleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
                     await this.confirmDeleteBtn.click();

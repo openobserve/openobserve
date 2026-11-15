@@ -16,6 +16,7 @@
       <OSearchInput
         :model-value="searchModel"
         data-test="o-field-list-search"
+        :shortcut="searchShortcut"
         :placeholder="searchPlaceholder ?? t('common.searchFields')"
         @update:model-value="onSearchChange"
       >
@@ -145,6 +146,8 @@ const props = withDefaults(
     fields: FieldItem[];
     search?: string;
     searchPlaceholder?: I18nText;
+    /** Off where the page sends "/" to its own query, so the search shows no key hint it would not answer. */
+    searchShortcut?: boolean;
     /** Extra classes for the search block — see the template note on gutters. */
     searchClass?: string;
     loading?: boolean;
@@ -163,6 +166,7 @@ const props = withDefaults(
   }>(),
   {
     search: "",
+    searchShortcut: undefined,
     // No default here — a withDefaults default is evaluated at module scope, which
     // would freeze the locale. The template falls back to t() at render time.
     searchClass: "",

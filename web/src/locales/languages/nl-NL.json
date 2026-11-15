@@ -11,7 +11,9 @@
     "bannerMessage": "Deze functie is vergrendeld. Je licentie moet de functie {feature} bevatten.",
     "bannerMessageGeneric": "Deze pagina vereist een functie die niet in je licentie zit.",
     "headerLocked": "Vergrendeld: vereist {feature}",
-    "availableInEnterprise": "{feature} is beschikbaar in OpenObserve Enterprise"
+    "availableInEnterprise": "{feature} is beschikbaar in OpenObserve Enterprise",
+    "turnedOffTitle": "Uitgeschakeld voor deze organisatie",
+    "enterpriseTitle": "Beschikbaar in Enterprise"
   },
   "emptyState": {
     "illustrations": {
@@ -79,10 +81,6 @@
       "title": "Geen patronen gevonden",
       "description": "Probeer het tijdbereik te vergroten of een andere stream te selecteren met meer loggegevens. Patroonextractie werkt het beste met minstens 1.000 logs.",
       "logsAnalyzed": "Slechts {count} logs zijn geanalyseerd."
-    },
-    "noStreamSelected": {
-      "title": "Selecteer een stream om aan de slag te gaan",
-      "description": "Kies een stream en voer vervolgens uw zoekopdracht uit om de bijbehorende gegevens te verkennen. Verfijn de resultaten met filters en een aangepast tijdbereik."
     },
     "noQueryApplied": {
       "title": "Voer een query uit om logs te bekijken",
@@ -313,7 +311,6 @@
     "noStreams": {
       "title": "Sluit een bron aan om je eerste stream te maken",
       "description": "Streams worden automatisch aangemaakt op het moment dat gegevens binnenkomen. Stel de ingestie via je app, agent of verzamelaar in om aan de slag te gaan.",
-      "action": "Ingestie instellen",
       "actionDesc": "Een gegevensbron aansluiten",
       "createAction": "Nieuwe stream",
       "createActionDesc": "Handmatig een streamschema definiëren"
@@ -773,6 +770,9 @@
     }
   },
   "common": {
+    "saveBar": {
+      "noChanges": "Geen wijzigingen om op te slaan"
+    },
     "dismiss": "Sluiten",
     "exitFullscreen": "Volledig scherm sluiten",
     "moreActions": "Meer acties",
@@ -1351,11 +1351,9 @@
     "patternNavPrevious": "Vorige",
     "patternNavNext": "Volgende",
     "patternNoValuesAvailable": "Geen waarden beschikbaar",
-    "sqlModeLabel": "SQL-modus",
     "nlpModeLabel": "Modus voor natuurlijke taal",
     "quickModeLabel": "Snelle modus",
     "menuMore": "Meer",
-    "menuGroupSetOnce": "Eenmaal instellen",
     "menuGroupHistory": "Historie",
     "menuGroupDownloads": "Downloads",
     "menuGroupSchedule": "Schema",
@@ -1726,7 +1724,6 @@
     "viewDeletedSuccessfully": "Bekijk succesvol verwijderd.",
     "viewCreatedSuccessfully": "De weergave is succesvol aangemaakt.",
     "viewUpdatedSuccessfully": "Bekijk met succes bijgewerkt.",
-    "linkCopiedSuccessfully": "Link succesvol gekopieerd!",
     "errorCopyingLink": "Fout tijdens het kopiëren van de link.",
     "errorShorteningLink": "Fout bij het inkorten van de link.",
     "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder.",
@@ -1927,7 +1924,22 @@
     "freeTextNoFtsTitleMulti": "De geselecteerde streams hebben geen full-text velden",
     "freeTextNoTextFields": "Deze stream heeft geen tekstvelden om te doorzoeken.",
     "freeTextNoTextFieldsNamed": "Niet doorzocht: {streams} (geen tekstvelden).",
-    "freeTextBuildNotice": "Dit filter heeft tekstzoekopdracht; bewerk het in SQL."
+    "freeTextBuildNotice": "Dit filter heeft tekstzoekopdracht; bewerk het in SQL.",
+    "queryModeLabel": "Querytaal",
+    "queryModeFilter": "Filter",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Logs beperken op veld en waarde",
+    "queryModeSqlTooltip": "Een volledige SQL-query schrijven, met aggregaties en joins",
+    "sqlModeNeedsOneStream": "SQL in deze weergave werkt met één stream",
+    "menuGroupViewOptions": "Weergaveopties",
+    "histogramHiddenForAggregates": "Deze query geeft groepen terug, geen gebeurtenissen in de tijd, dus er is geen histogram. Visualiseren zet het resultaat in een grafiek.",
+    "linkCopied": "Link gekopieerd",
+    "linkCopiedFixedTime": "Link gekopieerd · vaste tijd {from} – {to}",
+    "linkCopiedRelativeTime": "Link gekopieerd · {period}, gerekend vanaf het openen",
+    "recordsChipRows": "{total} rij | {total} rijen",
+    "histogramTitleRows": "{total} rij in {took} ms. | {total} rijen in {took} ms.",
+    "histogramTitleRowsWithScan": "{total} rij in {took} ms. ({scanLabel}: {scanSize}) | {total} rijen in {took} ms. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "Kies eerst een stream"
   },
   "menu": {
     "alertCalibration": "Alarmkalibratie",
@@ -1963,7 +1975,8 @@
     "keyboardShortcuts": "Sneltoetsen",
     "searchOrJumpTo": "Zoeken of ga naar…",
     "jumpToTitle": "Ga naar",
-    "jumpToPlaceholder": "Pagina's zoeken",
+    "addData": "Gegevens toevoegen",
+    "jumpToPlaceholder": "Pagina's en acties zoeken",
     "synthetic": "Synthetics",
     "experience": "Ervaring",
     "slos": "SLO's",
@@ -4212,7 +4225,8 @@
     "revokeInvitationMsg": "Weet je zeker dat je de uitnodiging voor {email} wilt intrekken?",
     "deleteUsersTitle": "Gebruikers verwijderen",
     "deleteUsersMsg": "Weet je zeker dat je {count} gebruiker wilt verwijderen? | Weet je zeker dat je {count} gebruikers wilt verwijderen?",
-    "deleteUsersBlockNote": "{count} van hen is via je geverifieerde domein lid geworden en wordt geblokkeerd in plaats van verwijderd."
+    "deleteUsersBlockNote": "{count} van hen is via je geverifieerde domein lid geworden en wordt geblokkeerd in plaats van verwijderd.",
+    "roleHint": "Admin beheert de organisatie, Editor wijzigt gegevens en instellingen, Viewer kan alleen lezen."
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -5160,6 +5174,7 @@
     "timezone": "Tijdzone",
     "deleteActionMessage": "Weet je zeker dat je {count} veld wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt. | Weet je zeker dat je {count} velden wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
     "deleteDatesMessage": "Weet je zeker dat je {count} datumbereik wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt. | Weet je zeker dat je {count} datumbereiken wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
+    "summaryAllTypes": "Streams (alle typen)",
     "labelLogs": "Logs",
     "labelMetrics": "Metrieken",
     "labelTraces": "Traces",
@@ -7757,7 +7772,8 @@
       "metricsSketch": "Distributies worden opgeslagen als histogram-buckets, en percentielen worden geschat op basis van die buckets. Een hogere ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA geeft fijnere buckets en nauwkeurigere percentielen, ten koste van meer opgeslagen rijen."
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU-exporter"
+    "gpuExporter": "GPU-exporter",
+    "rotationNote": "Tokens worden niet ter plaatse geroteerd. Maak om te roteren een nieuw token, schakel uw bronnen erop over en schakel daarna het oude uit."
   },
   "dashboard": {
     "panelDraft": {
@@ -9390,6 +9406,9 @@
       "addClause": "Clausule toevoegen"
     },
     "viewDashboard": {
+      "apply": "Toepassen",
+      "lastDataSeen": "Laatste gegevens {when}",
+      "jumpToLatest": "Naar de nieuwste gaan",
       "refreshToApplyVariables": "Vernieuwen om de laatste variabelewijzigingen toe te passen",
       "refresh": "Vernieuwen",
       "refreshCacheReload": "Cache vernieuwen en herladen",
@@ -10135,6 +10154,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "Geen gegevens in bereik",
     "saveAndStay": "Opslaan en verder bewerken",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10577,6 +10597,38 @@
     },
     "timeRange": {
       "heading": "In het geselecteerde tijdsbereik"
+    },
+    "firingNow": {
+      "title": "Gaat nu af",
+      "byLevel": "{critical} kritiek · {warning} waarschuwing",
+      "allQuiet": "Alles rustig",
+      "watching": "{count} alarmregel actief, geen gaat af | {count} alarmregels actief, geen gaat af",
+      "noRules": "Nog geen alarmregels",
+      "browseLibrary": "Alarmbibliotheek bekijken",
+      "notifyFailed": "Melding mislukt",
+      "loadError": "Afgaande alarmen konden niet worden geladen",
+      "unavailable": "Alarmstatussen kunnen nu niet worden gelezen"
+    },
+    "health": {
+      "subtitle": "Laatst ontvangen gegevens, per type",
+      "lastData": "Laatste gegevens {age} geleden",
+      "justNow": "Laatste gegevens zojuist",
+      "noDataIn": "Geen gegevens in de afgelopen {range}",
+      "noRecords": "Nog geen records",
+      "loadError": "Je streams konden niet worden gelezen"
+    },
+    "start": {
+      "text": "Er zijn de afgelopen {range} geen gegevens binnengekomen. Stuur gegevens, bekijk wat je hebt of stel een alarm in.",
+      "addData": "Gegevens toevoegen",
+      "createAlert": "Alarm maken"
+    },
+    "summary": {
+      "loadError": "Het organisatieoverzicht kon niet worden geladen",
+      "denied": "Geen toegang tot het organisatieoverzicht. Vraag het een beheerder."
+    },
+    "events": {
+      "runFailed": "Uitvoering mislukt",
+      "timesInRange": "{count} keer in het geselecteerde bereik | {count} keer in het geselecteerde bereik"
     }
   },
   "chatHistory": {
@@ -11551,6 +11603,19 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "Openen in logs",
+      "openInTraces": "Openen in traces",
+      "openInMetrics": "Openen in metrieken",
+      "evidenceFiringTip": "Opent {stream} met het filter van deze waarschuwing, vanaf het begin van deze activering tot nu",
+      "evidenceWindowTip": "Opent {stream} met het filter van deze waarschuwing over de laatste {window}",
+      "threshold": "Drempel",
+      "noIncident": "Nog geen incident",
+      "conditionLabel": "Waarschuwingsvoorwaarde",
+      "allRows": "Elke rij"
+    },
+    "summaryTrainingFailed": "Training mislukt",
+    "startFromTemplate": "Begin met een sjabloon",
     "firing": {
       "title": "Afgaan",
       "drawer": {
@@ -20569,7 +20634,6 @@
     },
     "noStream": {
       "title": "Kies een stream om te beginnen met verkennen",
-      "description": "Kies een stream en druk vervolgens op <strong>Query uitvoeren</strong>. Je kunt verfijnen met filters, een VRL-functie en een aangepast tijdbereik zodra de resultaten binnen zijn.",
       "selectStream": "Selecteer een stream",
       "selectStreamDesc": "Blader door logs, traces, metrieken en RUM-streams.",
       "queryGuide": "Lees de handleiding voor zoekopdrachten",
@@ -20621,7 +20685,16 @@
     "detailTable": {
       "noDataAvailable": "Geen gegevens beschikbaar.",
       "addIcon": "Pictogram toevoegen",
-      "sendToAiChat": "Verzenden naar AI-chat"
+      "sendToAiChat": "Verzenden naar AI-chat",
+      "openTrace": "Trace openen",
+      "noTraceTitle": "Geen trace gekoppeld aan dit logbericht",
+      "noRelatedLogsTitle": "Geen gerelateerde logs gevonden",
+      "noRelatedMetricsTitle": "Geen gerelateerde metrics gevonden",
+      "noServiceText": "Er kon geen service aan dit logbericht worden gekoppeld, dus gerelateerde gegevens kunnen niet automatisch worden gevonden.",
+      "searchTracesAround": "Traces rond dit tijdstip zoeken",
+      "searchAroundTip": "Laad de gebeurtenissen die vlak voor en na deze zijn gelogd.",
+      "noOfEventsTip": "Hoeveel gebeurtenissen rond deze worden geladen.",
+      "severityTip": "Gedetecteerd logniveau. Selecteer om te zien hoe het is bepaald."
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select *-query wordt niet ondersteund voor visualisatie.",
@@ -23160,7 +23233,7 @@
         "ok": "Ok",
         "normal": "Normaal",
         "firing": "Actief",
-        "notifyfailed": "Melding mislukt",
+        "notifyfailed": "Bezorging mislukt",
         "flapping": "Flapperen",
         "anomaly": "Anomalie",
         "succeeded": "Geslaagd",
@@ -30394,7 +30467,9 @@
     "validation": {
       "regexLength": "Gebruik maximaal {max} tekens voor het patroon.",
       "regexInvalid": "Dit patroon is ongeldig of wordt niet ondersteund. Lookahead, lookbehind en terugverwijzingen kunnen niet worden gebruikt."
-    }
+    },
+    "queryTooltip": "Filter als tekst bewerken",
+    "builderTooltip": "Filter bewerken met de builder"
   },
   "autoobserveLive": {
     "paging": {
