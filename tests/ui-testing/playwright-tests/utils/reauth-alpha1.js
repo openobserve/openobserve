@@ -73,7 +73,9 @@ async function gotoWithAlpha1Reauth(page, url, readyLocator, options = {}) {
     if (!sessionLost) return;
 
     testLogger.warn(`[reauth] ${url} redirected to login (${page.url()}) — re-authenticating`);
-    await reauthenticateAlpha1(page);
+    if (!(await reauthenticateAlpha1(page))) {
+        throw new Error(`[reauth] re-authentication failed while navigating to ${url}`);
+    }
     await page.goto(url, gotoOptions);
     await readyLocator.waitFor({ state: 'visible', timeout });
 }
