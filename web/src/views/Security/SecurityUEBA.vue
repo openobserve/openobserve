@@ -47,6 +47,7 @@ import {
   type SeverityTone,
 } from "@/utils/security/severity";
 import { formatCompactCount, formatEventCount } from "@/utils/formatters";
+import { matchesAnyKey } from "@/utils/filterKeys";
 import { huntLinkQuery } from "@/utils/security/huntLink";
 
 const { t } = useI18nTyped();
@@ -68,7 +69,7 @@ const win = ref<WindowKey>(
 );
 const windowDef = computed(() => WINDOWS.find((w) => w.value === win.value)!);
 const search = ref(route.query.q ? String(route.query.q) : "");
-const toneFilter = ref<SeverityTone | "all">("all");
+const toneFilters = ref<SeverityTone[]>([]);
 const pendingUser = ref<string | null>(route.query.user ? String(route.query.user) : null);
 
 const nowUs = ref(Date.now() * 1000);
@@ -250,7 +251,7 @@ const filtered = computed(() => {
   const needle = search.value.trim().toLowerCase();
   return risks.value.filter(
     (r) =>
-      (toneFilter.value === "all" || r.tone === toneFilter.value) &&
+      matchesAnyKey(toneFilters.value, r, (row, key) => row.tone === key) &&
       (!needle || [r.user, ...r.current.aliases].some((v) => v.toLowerCase().includes(needle))),
   );
 });
@@ -423,7 +424,7 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "all",
-      label: t("siem.ueba.stat.all"),
+      label: t("common.all"),
       value: risks.value.length,
       icon: "groups",
       tone: "neutral",
@@ -431,9 +432,6 @@ const stats = computed<StatItem[]>(() => {
     },
   ];
 });
-function onStat(key: string) {
-  toneFilter.value = key === "all" || toneFilter.value === key ? "all" : (key as SeverityTone);
-}
 
 const notices = computed<SecurityNotice[]>(() => {
   const baseline = windowDef.value.baselineLabel;
@@ -668,7 +666,7 @@ function openEvents() {
 function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
     search.value = "";
-    toneFilter.value = "all";
+    toneFilters.value = [];
   }
 }
 const noUserSources = computed(
@@ -778,25 +776,25 @@ const noUserSources = computed(
         @row-click="openUser"
         @sort-change="() => nextTick(relocate)"
       >
-        <template #subheader>
-          <div class="px-page-edge border-table-row-divider border-b py-1.5">
-            <OStatStrip
-              compact-values
-              :items="stats"
-              :loading="tableLoading"
-              selectable
-              :selected-key="toneFilter === 'all' ? null : toneFilter"
-              data-test="security-ueba-stats"
-              @select="onStat"
-            />
-          </div>
-        </template>
         <template #toolbar>
           <OSearchInput
             v-model="search"
             :placeholder="t('siem.ueba.search')"
-            class="max-w-md flex-1"
+            class="min-w-0 flex-1 md:min-w-48"
             data-test="security-ueba-search"
+          />
+          <OStatStrip
+            compact-values
+            :items="stats"
+            :loading="tableLoading"
+            selectable
+            :row="false"
+            class="max-md:order-last"
+            multiple
+            :selected-keys="toneFilters"
+            default-key="all"
+            data-test="security-ueba-stats"
+            @update:selected-keys="toneFilters = $event as SeverityTone[]"
           />
         </template>
         <template #toolbar-trailing>
@@ -915,7 +913,7 @@ const noUserSources = computed(
             icon="task-alt"
             :title="t('siem.ueba.empty')"
             :description="t('siem.ueba.emptyHint')"
-            :filtered="!!search.trim() || toneFilter !== 'all'"
+            :filtered="!!search.trim() || toneFilters.length > 0"
             @action="onEmptyAction"
           />
         </template>

@@ -95,6 +95,8 @@ export interface QueryFilterBarEmits {
 
 export interface QueryFilterBarExpose {
   focus: () => void;
+  /** Focuses the caret and opens its list, as a click on the bar does. */
+  activate: () => void;
 }
 
 export interface FilterBarNodesProps {

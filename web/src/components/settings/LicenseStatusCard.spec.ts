@@ -239,10 +239,10 @@ describe("status rows from waiver data", () => {
       base: decision({ exceeded_days: 4 }),
       decision: decision({ allowed_days: 5, exceeded_days: 4 }),
     });
-    expect(w.find("[data-test=license-status-days]").find("dd").text()).toBe(
+    expect(w.find("[data-test=license-status-days]").find("span").text()).toBe(
       "3 allowed this month + 2 from a waiver · 4 used",
     );
-    expect(w.find("[data-test=license-status-reporting]").find("dd").text()).toBe(
+    expect(w.find("[data-test=license-status-reporting]").find("span").text()).toBe(
       "grace until Oct 30 — features stay on while reports catch up",
     );
     w.unmount();
@@ -265,7 +265,7 @@ describe("status rows from waiver data", () => {
     await vi.advanceTimersByTimeAsync(Date.UTC(2026, 10, 1) - end - 1);
     expect(w.find("[data-test=license-status-days]").text()).toContain("+ 2 from a waiver");
     await vi.advanceTimersByTimeAsync(1);
-    expect(w.find("[data-test=license-status-days]").find("dd").text()).toBe(
+    expect(w.find("[data-test=license-status-days]").find("span").text()).toBe(
       "3 allowed this month · 0 used",
     );
     w.unmount();
@@ -282,13 +282,13 @@ describe("status rows from waiver data", () => {
         base: hasBase ? decision() : undefined,
         decision: decision({ allowed_days: 5 }),
       });
-      expect(w.get("[data-test=license-status-days]").find("dd").text()).toBe(
+      expect(w.get("[data-test=license-status-days]").find("span").text()).toBe(
         hasBase ? "3 allowed this month + 2 from a waiver · 0 used" : "2 from a waiver · 0 used",
       );
       await vi.advanceTimersByTimeAsync(Date.UTC(2026, 10, 1) - start - 1);
       expect(w.get("[data-test=license-status-days]").text()).toContain("2 from a waiver");
       await vi.advanceTimersByTimeAsync(1);
-      const days = w.get("[data-test=license-status-days]").find("dd").text();
+      const days = w.get("[data-test=license-status-days]").find("span").text();
       expect(days).toBe(hasBase ? "3 allowed this month · 0 used" : "0 used");
       expect(days).not.toContain("from a waiver");
       expect(days).not.toContain("5 allowed");
@@ -304,7 +304,7 @@ describe("status rows from waiver data", () => {
       waivers: [breach],
       decision: decision({ allowed_days: 5, exceeded_days: undefined }),
     });
-    expect(w.find("[data-test=license-status-days]").find("dd").text()).toBe("2 from a waiver");
+    expect(w.find("[data-test=license-status-days]").find("span").text()).toBe("2 from a waiver");
     await w.setProps({
       waivers: [{ ...breach, extra: undefined }],
       decision: decision({ allowed_days: undefined, exceeded_days: undefined }),

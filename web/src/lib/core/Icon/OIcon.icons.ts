@@ -138,6 +138,7 @@ import Activity from "~icons/material-symbols/vital-signs";
 import AlignLeft from "~icons/material-symbols/format-align-left";
 import AlignRight from "~icons/material-symbols/format-align-right";
 import AllInclusive from "~icons/material-symbols/all-inclusive";
+import Apps from "~icons/material-symbols/apps";
 import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-outline";
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
@@ -369,8 +370,9 @@ import AndroidIcon from "~icons/material-symbols/android";
 import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
 import CallIcon from "~icons/material-symbols/call-outline";
 
-// Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
+// Brand marks (not Material Symbols) — local inline SVG components using currentColor.
 import McpLogo from "./McpLogo.vue";
+import SlackLogo from "./SlackLogo.vue";
 
 import type { Component } from "vue";
 
@@ -378,6 +380,7 @@ export const iconRegistry = {
   alarm: Alarm,
   add: Add,
   mcp: McpLogo,
+  slack: SlackLogo,
   "arrow-back": ArrowBack,
   "arrow-back-ios-new": ArrowBackIosNew,
   "arrow-downward": ArrowDownward,
@@ -503,6 +506,7 @@ export const iconRegistry = {
   "align-left": AlignLeft,
   "align-right": AlignRight,
   "all-inclusive": AllInclusive,
+  apps: Apps,
   "assignment-turned-in": AssignmentTurnedIn,
   "auto-awesome": AutoAwesome,
   "bar-chart": BarChart,

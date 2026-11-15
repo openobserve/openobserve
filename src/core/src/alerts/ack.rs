@@ -1118,6 +1118,16 @@ async fn gather_facts(
 /// Edit on the alert or any of the incident's (D24); Security triage stands in for detections.
 #[cfg(feature = "enterprise")]
 async fn may_edit_any_alert(p: &Problem, actor: &str) -> bool {
+    if let Problem::Incident {
+        org_id,
+        incident_id,
+    } = p
+        && incident_alert_ids(incident_id)
+            .await
+            .is_ok_and(|ids| ids.is_empty())
+    {
+        return may_update_alertless_incident(org_id, incident_id, actor).await;
+    }
     let siem = db::alerts::alert::resolve_siem_alert_ids(p.org_id()).await;
     let triage =
         !siem.is_empty() && crate::security::security_allowed(p.org_id(), actor, "PUT").await;
@@ -1139,6 +1149,30 @@ async fn may_edit_any_alert(p: &Problem, actor: &str) -> bool {
         )
         .await
     })
+    .await
+}
+
+/// An incident opened by hand has no alert to hold edit rights on, so updating it is the test.
+#[cfg(feature = "enterprise")]
+async fn may_update_alertless_incident(org_id: &str, incident_id: &str, actor: &str) -> bool {
+    let is_case = matches!(
+        infra::table::alert_incidents::security_case_of(org_id, incident_id).await,
+        Ok(Some(true))
+    );
+    if is_case {
+        return crate::security::security_allowed(org_id, actor, "PUT").await;
+    }
+    crate::auth::check_permissions(
+        org_id,
+        org_id,
+        actor,
+        "incidents",
+        "PUT",
+        None,
+        true,
+        false,
+        false,
+    )
     .await
 }
 

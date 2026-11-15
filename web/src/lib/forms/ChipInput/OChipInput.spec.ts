@@ -217,6 +217,39 @@ describe("OChipInput", () => {
     vi.unstubAllGlobals();
   });
 
+  it("lifts and restores the cap when maxRows changes after mount", async () => {
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 0;
+    });
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const line = Number(this.dataset.line ?? -1);
+      const top = line < 0 ? 0 : line * 30;
+      return { top, bottom: top + 24, height: line < 0 ? 0 : 24, width: 10 } as DOMRect;
+    });
+    const chips = () => [0, 1, 2, 3].map((line) => h("span", { "data-line": line }, "x"));
+    const input = mountInput({ maxRows: 3 }, { default: chips });
+    await flushPromises();
+    const lines = () => input.find("[data-o-chip-lines]");
+    expect(lines().attributes("style")).toContain("max-height: 90px");
+    await input.setProps({ maxRows: 0 });
+    await flushPromises();
+    expect(lines().attributes("style") ?? "").not.toContain("max-height");
+    await input.setProps({ maxRows: 3 });
+    await flushPromises();
+    expect(lines().attributes("style")).toContain("max-height: 90px");
+    vi.unstubAllGlobals();
+  });
+
   describe("sideways scrolling", () => {
     // The lines box shows x 100..400 of chips laid out 1000px wide.
     function layout(rects: Record<string, [number, number]>) {

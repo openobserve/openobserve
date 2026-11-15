@@ -802,7 +802,7 @@ function onChildMouseenter(event: MouseEvent) {
               class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
               :class="[
                 flyoutTextClass,
-                isChildActive(child) ? 'bg-select-item-selected-bg font-medium' : '',
+                isChildActive(child) ? 'bg-nav-flyout-item-selected-bg font-medium' : '',
               ]"
               :aria-current="isChildActive(child) ? 'page' : undefined"
               :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
@@ -851,7 +851,7 @@ function onChildMouseenter(event: MouseEvent) {
             :class="[
               flyoutTextClass,
               block.spaced ? 'mt-2' : '',
-              isChildActive(block.child) ? 'bg-select-item-selected-bg font-medium' : '',
+              isChildActive(block.child) ? 'bg-nav-flyout-item-selected-bg font-medium' : '',
             ]"
             :aria-current="isChildActive(block.child) ? 'page' : undefined"
             :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
@@ -982,8 +982,8 @@ function onChildMouseenter(event: MouseEvent) {
                       flyoutTextClass,
                       childIndex > 0 ? 'mt-0.5' : '',
                       isChildActive(child)
-                        ? 'bg-select-item-selected-bg font-medium'
-                        : 'hover:bg-dropdown-item-hover-bg',
+                        ? 'bg-nav-flyout-item-selected-bg font-medium'
+                        : 'hover:bg-nav-flyout-item-hover-bg',
                     ]"
                     :aria-current="isChildActive(child) ? 'page' : undefined"
                     :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
@@ -1046,8 +1046,8 @@ function onChildMouseenter(event: MouseEvent) {
                     // one look like the same size of break.
                     block.spaced ? 'mt-3' : '',
                     isChildActive(block.child)
-                      ? 'bg-select-item-selected-bg font-medium'
-                      : 'hover:bg-dropdown-item-hover-bg',
+                      ? 'bg-nav-flyout-item-selected-bg font-medium'
+                      : 'hover:bg-nav-flyout-item-hover-bg',
                   ]"
                   :aria-current="isChildActive(block.child) ? 'page' : undefined"
                   :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"

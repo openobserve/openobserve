@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export interface SettingRowPairProps {
-  dataTest?: string;
-}
-
-export interface SettingRowPairSlots {
-  /** Exactly two OSettingRow. */
-  default?: () => unknown;
-  /** Full-width content under both cells — a cross-field validation message. */
-  footer?: () => unknown;
+/** The one date shape Security pages print, to the minute: "Nov 9, 03:59 AM" in the viewer's locale. */
+export function securityTime(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "—";
+  return new Date(ms).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

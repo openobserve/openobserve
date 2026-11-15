@@ -301,6 +301,15 @@ pub async fn search(
         &trace_id,
     )
     .await
+        && !security_scope_admits(
+            &req.query.sql,
+            &org_id,
+            user_id,
+            stream_type,
+            StreamPermissionResourceType::Search,
+            &url_query,
+        )
+        .await
     {
         return res;
     }
@@ -1364,6 +1373,46 @@ fn digest_query_refusal(sql: &str, stream_type: StreamType, trace_id: &str) -> O
     calibration_refusal(&streams, trace_id)
 }
 
+/// A Security page's search (`security_scope=true`) may also read the org's Security sources.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn security_scope_admits(
+    sql: &str,
+    org_id: &str,
+    user_id: &str,
+    stream_type: StreamType,
+    permission_resource_type: StreamPermissionResourceType,
+    query: &HashMap<String, String>,
+) -> bool {
+    if !crate::common::utils::http::get_security_scope_from_request(query)
+        || !openobserve_core::security::security_licensed()
+    {
+        return false;
+    }
+    let Ok(streams) = resolve_typed_stream_names(sql, stream_type) else {
+        return false;
+    };
+    for (stream, stream_type) in streams {
+        if stream_type == StreamType::Logs
+            && openobserve_core::security::security_source_readable(org_id, user_id, &stream).await
+        {
+            continue;
+        }
+        if check_stream_permissions(
+            &stream,
+            org_id,
+            user_id,
+            &stream_type,
+            permission_resource_type,
+        )
+        .await
+        .is_some()
+        {
+            return false;
+        }
+    }
+    true
+}
+
 /// SearchStreamPartition
 
 #[utoipa::path(
@@ -2189,6 +2238,20 @@ mod tests {
                 "{file}: {signature} must authorize each stream under the type its SQL names"
             );
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_security_scope_checks_other_streams_with_the_callers_resource_type() {
+        let stream = include_str!("search_stream.rs");
+        let call = &stream[stream
+            .find("security_scope_admits(")
+            .expect("search_stream admits Security sources")..];
+        let call = &call[..call.find(".await").expect("call end")];
+        assert!(
+            call.contains("permission_resource_type"),
+            "an Insights search must not fall back to the Search permission"
+        );
     }
 
     fn schema() -> Schema {

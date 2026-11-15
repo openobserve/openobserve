@@ -28,7 +28,7 @@ use config::{
 };
 use o2_enterprise::enterprise::{
     common::{auditor::AUDIT_STREAM, config::get_config},
-    security::audit::{SecurityAuditEvent, audit_sql, event},
+    security::audit::{SecurityAuditEvent, audit_count_sql, audit_sql, event},
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
@@ -51,6 +51,9 @@ pub struct SecurityAuditQuery {
     pub end_time: Option<i64>,
     pub from: Option<i64>,
     pub size: Option<i64>,
+    /// Also list Security requests that only read, such as sweeps and searches.
+    #[serde(default)]
+    pub include_reads: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -60,6 +63,8 @@ pub struct SecurityAuditResponse {
     pub start_time: i64,
     pub end_time: i64,
     pub events: Vec<SecurityAuditEvent>,
+    /// Events in the whole window, so the page can be turned on the server.
+    pub total: usize,
 }
 
 /// ListSecurityAudit
@@ -76,10 +81,11 @@ pub struct SecurityAuditResponse {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds (default: 7 days ago)"),
+        ("start_time" = Option<i64>, Query, description = "Start time in Unix timestamp microseconds (default: the audit trail's retention)"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix timestamp microseconds (default: now)"),
         ("from" = Option<i64>, Query, description = "Offset of the first event"),
         ("size" = Option<i64>, Query, description = "Events per page (default 100, at most 500)"),
+        ("include_reads" = Option<bool>, Query, description = "Also list Security requests that only read (default false)"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SecurityAuditResponse),
@@ -109,7 +115,7 @@ pub async fn list_security_audit(
         end_time,
         ..Default::default()
     };
-    match search_audit(&org_id, response, from, size).await {
+    match search_audit(&org_id, response, from, size, query.include_reads).await {
         Ok(response) => MetaHttpResponse::json(response),
         Err(e) => {
             log::error!("Failed to read the Security audit trail: {e}");
@@ -125,6 +131,7 @@ async fn search_audit(
     mut response: SecurityAuditResponse,
     from: i64,
     size: i64,
+    include_reads: bool,
 ) -> Result<SecurityAuditResponse, anyhow::Error> {
     if !get_config().common.audit_enabled {
         return Ok(response);
@@ -135,16 +142,38 @@ async fn search_audit(
     if schema.fields().is_empty() {
         return Ok(response);
     }
-    let sql = audit_sql(
-        AUDIT_STREAM,
-        org_id,
-        schema.field_with_name("target").is_ok(),
-    );
+    let has_target = schema.field_with_name("target").is_ok();
+    let rows = audit_sql(AUDIT_STREAM, org_id, has_target, include_reads);
+    let count = audit_count_sql(AUDIT_STREAM, org_id, has_target, include_reads);
+    let (start, end) = (response.start_time, response.end_time);
+    let (rows, count) = futures::future::try_join(
+        search_meta(rows, start, end, from, size),
+        search_meta(count, start, end, 0, 1),
+    )
+    .await?;
+    response.events = rows.hits.iter().map(event).collect();
+    let counted = count
+        .hits
+        .first()
+        .and_then(|h| h.get("zo_n"))
+        .and_then(|n| n.as_u64())
+        .unwrap_or(0) as usize;
+    response.total = counted.max(from as usize + response.events.len());
+    Ok(response)
+}
+
+async fn search_meta(
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+    from: i64,
+    size: i64,
+) -> Result<config::meta::search::Response, anyhow::Error> {
     let req = SearchRequest {
         query: SearchQuery {
             sql,
-            start_time: response.start_time,
-            end_time: response.end_time,
+            start_time,
+            end_time,
             from,
             size,
             track_total_hits: false,
@@ -157,19 +186,20 @@ async fn search_audit(
         ..Default::default()
     };
     let trace_id = config::ider::generate_trace_id();
-    let result = search_service::search(&trace_id, META_ORG_ID, StreamType::Logs, None, &req)
+    search_service::search(&trace_id, META_ORG_ID, StreamType::Logs, None, &req)
         .await
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
-    response.events = result.hits.iter().map(event).collect();
-    Ok(response)
+        .map_err(|e| anyhow::anyhow!("{e}"))
 }
 
 /// The defaulted, validated window and page of a request.
 fn page(query: &SecurityAuditQuery) -> Result<(i64, i64, i64, i64), &'static str> {
     let end_time = query.end_time.unwrap_or_else(now_micros);
-    let start_time = query
-        .start_time
-        .unwrap_or_else(|| (Utc::now() - Duration::try_days(7).unwrap()).timestamp_micros());
+    // The whole trail the deployment keeps, so a change is listed until the audit stream drops it.
+    let retention_days = config::get_config().compact.data_retention_days.max(1);
+    let start_time = query.start_time.unwrap_or_else(|| {
+        (Utc::now() - Duration::try_days(retention_days).unwrap_or(Duration::days(7)))
+            .timestamp_micros()
+    });
     validate_history_range(start_time, end_time)?;
     let from = query.from.unwrap_or(0);
     if from < 0 {
@@ -190,6 +220,7 @@ mod tests {
             end_time: Some(end),
             from: None,
             size,
+            include_reads: false,
         };
         assert_eq!(page(&query(1, 2, None)), Ok((1, 2, 0, DEFAULT_SIZE)));
         assert_eq!(page(&query(1, 2, Some(9_999))).unwrap().3, MAX_SIZE);

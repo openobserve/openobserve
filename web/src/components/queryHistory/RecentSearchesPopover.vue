@@ -246,8 +246,9 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import RecentSearchesDetails from "./RecentSearchesDetails.vue";
 import analytics from "@/services/product_analytics";
 
+// The active fill, not the darker selected-option fill: the pinned row's outline button label must stay at 4.5:1 on it.
 const ROW_ACTIVE_CLASSES =
-  "border-s-2 border-transparent data-[highlighted]:border-accent data-[highlighted]:bg-select-item-selected-bg";
+  "border-s-2 border-transparent data-[highlighted]:border-accent data-[highlighted]:bg-surface-accent-active";
 const HOVER_LEAVE_GRACE_MS = 200;
 
 const props = withDefaults(

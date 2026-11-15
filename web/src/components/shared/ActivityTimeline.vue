@@ -108,7 +108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ isAiLabelledOf(event) ? aiSreBadgeText : getEventBadgeText(event) }}
                         <OTooltip
                           v-if="getTooltip && getTooltip(event)"
-                          :delay="300"
                           side="bottom"
                           align="start"
                           :max-width="'24rem'"

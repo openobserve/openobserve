@@ -227,7 +227,13 @@ function focus() {
   inputRef.value?.focus();
 }
 
-defineExpose<QueryFilterBarExpose>({ focus });
+function activate() {
+  if (props.disabled) return;
+  focus();
+  onActivate();
+}
+
+defineExpose<QueryFilterBarExpose>({ focus, activate });
 
 function onActivate() {
   if (props.disabled) return;

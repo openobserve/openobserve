@@ -25,6 +25,7 @@ import { groupNavLinks, NAV_GROUPS } from "@/lib/core/Navbar/navGroups";
 import type { NavItem, RailEntry } from "@/lib/core/Navbar/ONavbar.types";
 import { toastRecords, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { addLicenseDeniedError, clearLicenseDenials } from "@/composables/useLicenseDenials";
+import { readLocaleMessages } from "@/test/unit/helpers/localeFiles";
 
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
@@ -116,6 +117,26 @@ describe("MainLayout — Product Analytics menu entry", () => {
     expect(back).toContain("reports");
     expect(back).toContain("synthetics");
     expect(back).not.toContain("securityOverview");
+  });
+
+  it("translates the security rail on a shared route, before any Security page loaded the namespace", async () => {
+    const global = i18n.global as any;
+    const setLocale = (locale: string) =>
+      typeof global.locale === "string" ? (global.locale = locale) : (global.locale.value = locale);
+    setLocale("pt");
+    try {
+      expect(global.te("siem.nav.detections", "pt")).toBe(false);
+      const expected = (readLocaleMessages("pt-PT") as any).siem.nav.detections;
+      expect(expected).not.toBe(global.t("siem.nav.detections"));
+      store.state.solutionMode = "security";
+      await railItems();
+      await vi.waitFor(() => {
+        const items = wrapper!.findAllComponents(NavbarStub)[0].props("linksList") as NavItem[];
+        expect(items.find((l) => l.name === "securityDetections")?.title).toBe(expected);
+      });
+    } finally {
+      setLocale("en-us");
+    }
   });
 
   it("keeps Reports right after Streams", async () => {

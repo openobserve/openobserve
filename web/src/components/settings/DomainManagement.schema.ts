@@ -116,13 +116,19 @@ export const isValidEmail = (email: any, domain: any): boolean => {
 };
 
 // ── Add-domain row: required + valid domain ──────────────────────────────────
-export const makeAddDomainSchema = (t: (_key: string) => string) =>
+export const makeAddDomainSchema = (
+  t: (_key: string) => string,
+  isAlreadyAdded: (_domain: string) => boolean = () => false,
+) =>
   z.object({
     newDomain: z
       .string()
       .min(1, t("settings.domainRequired"))
       .refine((v) => isValidDomain(v), {
         message: t("settings.invalidDomain"),
+      })
+      .refine((v) => !isAlreadyAdded(v), {
+        message: t("settings.domainAlreadyExists"),
       }),
   });
 

@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { defineComponent } from "vue";
+import { defineComponent, h, type Component } from "vue";
+import { provideSlackSaveBar } from "@/components/settings/slackSaveBar";
 import { createStore } from "vuex";
 import { vi } from "vitest";
 import type {
@@ -237,3 +238,14 @@ export const ConfirmDialogStub = defineComponent({
       <button data-test-stub="confirm-ok" @click="$emit('update:modelValue', false); $emit('update:ok')">{{ okLabel }}</button>
     </div>`,
 });
+
+/** Mounts a section under the Slack page's save bar; the bar is exposed as `vm.bar`. */
+export const withSlackSaveBar = (section: Component) =>
+  defineComponent({
+    inheritAttrs: false,
+    setup(_, { attrs, expose }) {
+      const bar = provideSlackSaveBar();
+      expose({ bar });
+      return () => h(section, attrs);
+    },
+  });

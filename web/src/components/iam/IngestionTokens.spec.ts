@@ -291,11 +291,11 @@ describe("IngestionTokens — analytics", () => {
 // Renders each row's name, credential and action cells, so the per-row templates are exercised.
 const OTableRowsStub = {
   name: "OTable",
-  props: ["data"],
-  template: `<div><div v-for="row in data" :key="row.name" :data-test="'row-' + row.name"><slot name="cell-name" :row="row" /><slot name="cell-token" :row="row" /><slot name="cell-actions" :row="row" /></div></div>`,
+  props: ["data", "rowActions"],
+  template: `<div><div v-for="row in data" :key="row.name" :data-test="'row-' + row.name"><slot name="cell-name" :row="row" /><slot name="cell-token" :row="row" /><template v-for="action in rowActions" :key="action.id"><i v-if="!action.visible || action.visible(row)" :data-test="action.dataTest(row)" /></template></div></div>`,
 };
 
-function mountRows(rows: Record<string, unknown>[]) {
+function mountRows(rows: Record<string, unknown>[], table: unknown = OTableRowsStub) {
   vi.mocked(organizationsService.list_org_ingestion_tokens).mockResolvedValue({
     data: { data: rows },
   } as any);
@@ -304,7 +304,7 @@ function mountRows(rows: Record<string, unknown>[]) {
       plugins: [store, i18n],
       stubs: {
         ODialog: ODialogStub,
-        OTable: OTableRowsStub,
+        OTable: table,
         OSearchInput: true,
         OTooltip: true,
         OEmptyState: true,
@@ -436,6 +436,28 @@ describe("IngestionTokens — system tokens", () => {
     await flushPromises();
     const names = (store.state.organizationData.orgTokens as { name: string }[]).map((t) => t.name);
     expect(names).toEqual([USER.name]);
+    wrapper.unmount();
+  });
+});
+
+describe("IngestionTokens — column budget", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    queryClient.clear();
+  });
+
+  it("fits a 950 px box without sideways scroll, with the creator column shown", async () => {
+    const wrapper = mountRows(
+      [{ name: "ci-collector", token: "o2oi_ci", enabled: true, created_by: "admin@demo-org" }],
+      false,
+    );
+    await flushPromises();
+    const table: any = (wrapper.findComponent({ name: "OTable" }).vm.$ as any).setupState;
+    table.containerWidth = 950;
+    await flushPromises();
+
+    expect(table.allowHorizontalScroll).toBe(false);
+    expect(wrapper.find('[data-test="o2-table-th-created_by"]').exists()).toBe(true);
     wrapper.unmount();
   });
 });

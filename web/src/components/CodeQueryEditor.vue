@@ -443,6 +443,11 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    /** Off for whitespace-significant text (Sigma YAML): typed text lands verbatim, so indentation never compounds. */
+    typingAids: {
+      type: Boolean,
+      default: true,
+    },
     stickyScroll: {
       type: Boolean,
       default: true,
@@ -1024,6 +1029,20 @@ export default defineComponent({
           enabled: props.stickyScroll,
         },
         ...suggestKeyOptions(suggestMode.value, props.language),
+        ...(props.typingAids
+          ? {}
+          : {
+              autoIndent: "none" as const,
+              formatOnType: false,
+              formatOnPaste: false,
+              autoClosingBrackets: "never" as const,
+              autoClosingQuotes: "never" as const,
+              autoSurround: "never" as const,
+              quickSuggestions: false,
+              wordBasedSuggestions: "off" as const,
+              acceptSuggestionOnEnter: "off" as const,
+              suggestOnTriggerCharacters: false,
+            }),
       });
       handOverWhenPainted(editorElement as HTMLElement);
 

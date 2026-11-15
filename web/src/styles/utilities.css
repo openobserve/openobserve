@@ -40,6 +40,13 @@
 @utility bg-gradient-danger-hover {
   background-image: var(--color-gradient-danger-hover);
 }
+/* Edge fades for overflowing scroll strips: surface colour melting into the content. */
+@utility bg-fade-surface-to-right {
+  background-image: linear-gradient(to right, var(--color-surface-base), transparent);
+}
+@utility bg-fade-surface-to-left {
+  background-image: linear-gradient(to left, var(--color-surface-base), transparent);
+}
 /* Same thing under a different name: a linear-gradient token used as a fill. */
 @utility bg-chat-bubble-user {
   background-image: var(--color-chat-bubble-user);

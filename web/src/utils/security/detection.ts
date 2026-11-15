@@ -16,6 +16,8 @@ export const GROUP_BY_ATTRIBUTE = "siem_group_by";
 export const TIMESPAN_ATTRIBUTE = "siem_timespan_minutes";
 /** History the first run evaluates; absent means a new detection sees only its own look-back. */
 export const BACKFILL_ATTRIBUTE = "siem_backfill_minutes";
+/** The first run records what already matches as a baseline instead of opening cases. */
+export const LEARN_ATTRIBUTE = "siem_learn_first_run";
 
 export interface DetectionMeta {
   isSiem: boolean;
@@ -154,6 +156,8 @@ export interface BuildDetectionInput {
   sql?: string;
   /** Minutes of history the first run evaluates, opted into by the author; 0 or absent for none. */
   backfillMinutes?: number;
+  /** Treat the first run's matches as a baseline; a backfill asks for cases on history, so it wins. */
+  learnFirstRun?: boolean;
 }
 
 /** Fires on any matching row; a count on top would be a threshold the Sigma rule's author never wrote. */
@@ -172,6 +176,7 @@ export function buildDetectionAlert(input: BuildDetectionInput): Record<string, 
     enabled = true,
     correlation,
     backfillMinutes = 0,
+    learnFirstRun = false,
   } = input;
   // The scheduler counts a correlation per timespan-wide window, so a run must cover at least one.
   const lookBack = correlation ? Math.max(period, correlation.timespanMinutes) : period;
@@ -228,6 +233,7 @@ export function buildDetectionAlert(input: BuildDetectionInput): Record<string, 
           }
         : {}),
       ...(backfillMinutes > 0 ? { [BACKFILL_ATTRIBUTE]: String(Math.round(backfillMinutes)) } : {}),
+      ...(learnFirstRun && backfillMinutes <= 0 ? { [LEARN_ATTRIBUTE]: "true" } : {}),
     },
   };
 }

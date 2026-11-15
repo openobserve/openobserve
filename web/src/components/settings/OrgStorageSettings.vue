@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="org-storage-settings h-full">
     <OPageLayout
       v-if="currentAction === 'list'"
-      :title="t('storage_settings.title')"
+      :title="t('storage_settings.tabLabel')"
       icon="cloud"
       :subtitle="t('settings.orgStorageSettings.subtitle')"
       bleed
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Cloud: storage not enabled -->
       <div v-else-if="isCloud && !orgStorageEnabled" class="text-text-secondary py-3 text-sm">
-        {{ t("storage_settings.notEnabled", { product: raw("BYOB") }) }}
+        {{ t("storage_settings.notEnabled", { product: t("storage_settings.tabLabel") }) }}
       </div>
 
       <!-- ========== NOT CONFIGURED: cloud hero ========== -->
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="storage-settings-configure-btn"
                 variant="primary"
-                class="no-border o2-primary-button hero-cta-btn h-11 px-7 text-base font-semibold"
+                size="sm-action"
                 @click="navigateToCreate"
               >
                 {{ t("storage_settings.configureStorage") }}
@@ -201,8 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="storage-settings-update-btn"
                 variant="primary"
-                size="sm"
-                class="no-border o2-primary-button"
+                size="sm-action"
                 @click="navigateToEdit"
               >
                 {{ t("storage_settings.updateStorage") }}
@@ -316,7 +315,7 @@ import { ref, computed, onMounted } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";

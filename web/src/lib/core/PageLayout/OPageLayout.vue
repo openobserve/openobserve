@@ -182,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConstrainedPage
       v-else-if="constrained"
       :size="contentSize"
+      :align="contentAlign === 'start' ? 'left' : 'center'"
       :class="[bodyEnter, 'min-h-0 flex-1']"
     >
       <OPageLockedBody :replace="showsOwnBody"><slot /></OPageLockedBody>
@@ -265,6 +266,7 @@ const props = withDefaults(
     // Reading-column mode
     constrained?: boolean;
     contentSize?: "sm" | "md" | "lg" | "xl";
+    contentAlign?: "center" | "start";
     // Header wrapper override (rare)
     headerClass?: string;
   }>(),
@@ -280,6 +282,7 @@ const props = withDefaults(
     splitterLimits: () => [0, 400] as [number, number],
     constrained: false,
     contentSize: "lg",
+    contentAlign: "center",
     headerClass: undefined,
   },
 );

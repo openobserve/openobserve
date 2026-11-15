@@ -72,9 +72,15 @@ test.describe('List quick filter cards', { tag: ['@quickFilterCards', '@all'] },
     await qfc.expectCardSelected('alerts', 'paused', true);
     await qfc.expectRows('alerts', { count: 1, shown: [paused], hidden: [active1, active2] });
 
+    // Chips are multi-select: a second chip adds to the selection and rows match any picked state.
     await qfc.clickCard('alerts', 'firing');
     await qfc.expectCardSelected('alerts', 'firing', true);
+    await qfc.expectCardSelected('alerts', 'paused', true);
+    await qfc.expectRows('alerts', { count: 1, shown: [paused], hidden: [active1, active2] });
+
+    await qfc.clickCard('alerts', 'paused');
     await qfc.expectCardSelected('alerts', 'paused', false);
+    await qfc.expectCardSelected('alerts', 'firing', true);
     await qfc.expectRows('alerts', { count: 0, hidden: [active1, active2, paused] });
 
     await qfc.clickCard('alerts', 'total');
@@ -162,16 +168,23 @@ test.describe('List quick filter cards', { tag: ['@quickFilterCards', '@all'] },
     await qfc.expectRows('publicLinks', { count: expected.not_viewed.length, shown: [unseen1.id, unseen2.id], hidden: [paused.id, expired.id] });
     await qfc.expectCardCount('publicLinks', 'all', expected.all.length);
 
+    // Chips are multi-select: a second chip adds to the selection and rows match any picked status.
     await qfc.clickCard('publicLinks', 'paused');
     await qfc.expectCardSelected('publicLinks', 'paused', true);
+    await qfc.expectCardSelected('publicLinks', 'not-viewed', true);
+    await qfc.expectRows('publicLinks', { count: expected.not_viewed.length + expected.paused.length, shown: [unseen1.id, unseen2.id, paused.id], hidden: [expired.id] });
+
+    await qfc.clickCard('publicLinks', 'not-viewed');
+    await qfc.expectCardSelected('publicLinks', 'not-viewed', false);
     await qfc.expectRows('publicLinks', { count: expected.paused.length, shown: [paused.id], hidden: [unseen1.id, unseen2.id, expired.id] });
 
     await qfc.clickCard('publicLinks', 'expired');
     await qfc.expectCardSelected('publicLinks', 'expired', true);
-    await qfc.expectRows('publicLinks', { count: expected.expired.length, shown: [expired.id], hidden: [unseen1.id, unseen2.id, paused.id] });
+    await qfc.expectRows('publicLinks', { count: expected.paused.length + expected.expired.length, shown: [paused.id, expired.id], hidden: [unseen1.id, unseen2.id] });
 
     await qfc.clickCard('publicLinks', 'all');
     await qfc.expectCardSelected('publicLinks', 'expired', false);
+    await qfc.expectCardSelected('publicLinks', 'paused', false);
     await qfc.expectCardSelected('publicLinks', 'all', true);
     await qfc.expectRows('publicLinks', { count: expected.all.length, shown: ids });
   });

@@ -22,7 +22,10 @@ use config::{
     },
     utils::json,
 };
-use o2_enterprise::enterprise::{common::config::get_config as get_o2_config, security::detection};
+use o2_enterprise::enterprise::{
+    common::config::get_config as get_o2_config,
+    security::{cases::EntityRole, detection, tuning},
+};
 
 use crate::alerts::alert::AlertExt;
 
@@ -37,6 +40,8 @@ pub(super) struct SiemRun {
     pub(super) severity: Option<String>,
     /// A new detection's opted-in first look at history beyond its own window.
     pub(super) is_backfill: bool,
+    /// An opted-in first run that records current matches as baseline instead of firing.
+    learning: bool,
 }
 
 impl SiemRun {
@@ -61,8 +66,9 @@ impl SiemRun {
             cfg.siem_detection.backfill_hours,
         );
         let prior = data.siem.clone();
-        let is_backfill =
-            detection::SiemTriggerState::from_value(prior.as_ref()).is_backfill(&plan);
+        let state = detection::SiemTriggerState::from_value(prior.as_ref());
+        let is_backfill = state.is_backfill(&plan);
+        let learning = state.is_learning(attrs, &plan);
         Some(Self {
             grouped,
             dedupe_keys,
@@ -70,6 +76,7 @@ impl SiemRun {
             prior,
             severity: detection::sigma_level(attrs).map(str::to_string),
             is_backfill,
+            learning,
         })
     }
 
@@ -96,6 +103,15 @@ impl SiemRun {
                 self.plan.stride_us,
             )
         };
+        let settings =
+            db::organization::read_org_setting(&alert.org_id, |s| s.security_tuning.shared())
+                .await
+                .unwrap_or_default();
+        let now = chrono::Utc::now().timestamp_micros();
+        let alert_id = alert.get_unique_key();
+        let exceptions = settings.active_exceptions(&alert_id, now);
+        let tuned = excepted_alert(alert, &exceptions, &settings).await;
+        let alert = tuned.as_ref().unwrap_or(alert);
         let mut merged: Option<TriggerEvalResults> = None;
         for (from, to) in windows {
             let window = alert
@@ -106,7 +122,22 @@ impl SiemRun {
                 None => window,
             });
         }
-        Ok(merged.unwrap_or_default())
+        let mut results = merged.unwrap_or_default();
+        let role = EntityRole::of_attributes(alert.context_attributes.as_ref());
+        let group_by = detection::group_by(alert.context_attributes.as_ref());
+        // Rows are checked too: a missing schema or unparsable SQL runs the detection unguarded.
+        let dropped = tuning::drop_rows(&mut results, |row| {
+            tuning::row_excepted(row, &exceptions, &settings.lists)
+                || settings.suppressed(&alert_id, &tuning::row_entities(row, role, &group_by), now)
+        });
+        if dropped > 0 {
+            log::debug!(
+                "[SIEM] detection {}/{} dropped {dropped} rows by exception or suppression",
+                alert.org_id,
+                alert.name
+            );
+        }
+        Ok(results)
     }
 
     /// Drops rows already alerted on and records this run's memory in `data`.
@@ -125,6 +156,10 @@ impl SiemRun {
             end_time,
             get_o2_config().siem_detection.dedup_max_rows,
         );
+        if self.learning {
+            let matches = state.learn_baseline(results, end_time);
+            log::info!("[SIEM] learning first run recorded {matches} matches as baseline");
+        }
         state.covered_until = Some(end_time);
         data.siem = Some(state.to_value());
     }
@@ -149,5 +184,112 @@ impl SiemRun {
         if let Some(run) = run {
             data.siem = run.prior.clone();
         }
+    }
+}
+
+/// The detection with its exceptions ANDed into its SQL; `None` runs it as stored.
+async fn excepted_alert(
+    alert: &Alert,
+    exceptions: &[&o2_enterprise::enterprise::security::tuning::DetectionException],
+    settings: &o2_enterprise::enterprise::security::tuning::TuningSettings,
+) -> Option<Alert> {
+    if exceptions.is_empty() {
+        return None;
+    }
+    let sql = alert.query_condition.sql.as_deref()?;
+    let columns: Vec<String> =
+        match infra::schema::get(&alert.org_id, &alert.stream_name, alert.stream_type).await {
+            Ok(schema) => schema.fields().iter().map(|f| f.name().clone()).collect(),
+            Err(e) => {
+                log::warn!(
+                    "[SIEM] no schema for {}/{}, exceptions apply to result rows only: {e}",
+                    alert.org_id,
+                    alert.stream_name
+                );
+                return None;
+            }
+        };
+    match tuning::apply_exceptions_sql(
+        sql,
+        &alert.stream_name,
+        exceptions,
+        &settings.lists,
+        &columns,
+    ) {
+        Ok(rewritten) if rewritten != sql => {
+            let mut tuned = alert.clone();
+            tuned.query_condition.sql = Some(rewritten);
+            Some(tuned)
+        }
+        Ok(_) => None,
+        Err(e) => {
+            log::warn!(
+                "[SIEM] detection {}/{} keeps its SQL; exceptions apply to result rows only: {e}",
+                alert.org_id,
+                alert.name
+            );
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::alerts::alert::Alert;
+
+    use super::*;
+
+    fn rows(n: usize) -> TriggerEvalResults {
+        TriggerEvalResults {
+            data: Some(
+                (0..n)
+                    .map(|i| {
+                        json::json!({"host": format!("etl-{i}"), "_timestamp": 1_000 + i as i64})
+                            .as_object()
+                            .unwrap()
+                            .clone()
+                    })
+                    .collect(),
+            ),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_learning_first_run_fires_nothing_and_the_next_run_fires_new_matches() {
+        let mut alert = Alert::default();
+        alert.trigger_condition.period = 15;
+        alert.context_attributes = Some(
+            [
+                (detection::SIEM_ATTRIBUTE, "true"),
+                (detection::LEARN_FIRST_RUN_ATTRIBUTE, "true"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect(),
+        );
+        let mut data = ScheduledTriggerData::default();
+        let first = SiemRun::for_alert(&alert, &data).unwrap();
+        let mut results = rows(3);
+        first.dedupe(&mut results, &mut data, 0, 2_000);
+        assert!(results.data.is_none(), "the first run opens no case");
+        let state = detection::SiemTriggerState::from_value(data.siem.as_ref());
+        assert_eq!(state.baseline_matches, Some(3));
+
+        let second = SiemRun::for_alert(&alert, &data).unwrap();
+        let mut results = rows(3);
+        results.data.as_mut().unwrap().push(
+            json::json!({"host": "new", "_timestamp": 1_900})
+                .as_object()
+                .unwrap()
+                .clone(),
+        );
+        second.dedupe(&mut results, &mut data, 0, 3_000);
+        let fired = results.data.unwrap_or_default();
+        assert_eq!(
+            fired.len(),
+            1,
+            "only the match the baseline had not seen fires"
+        );
     }
 }

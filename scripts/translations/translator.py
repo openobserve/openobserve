@@ -54,6 +54,10 @@ STATE_FILENAME = ".translation_state.json"
 # Source locale: filename stem of the English source (web/.../languages/en-US.json).
 SOURCE_LOCALE = "en-US"
 
+# Top-level namespaces stored in their own per-locale file, languages/<subdir>/<locale>.json,
+# so the web entry chunk does not ship them. Every reader and writer here sees one merged tree.
+SPLIT_NAMESPACES = {"siem": "security"}
+
 # Human-readable target names used in the translation prompt, keyed by the target
 # locale's filename stem (BCP-47 style, matching web/src/locales/languages/*.json).
 LANGUAGE_NAMES = {
@@ -691,12 +695,25 @@ def _script_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def _languages_dir():
+    return os.path.join(_script_dir(), "..", "..", "web", "src", "locales", "languages")
+
+
 def get_language_file_path(locale):
-    """Absolute path to a language file (e.g. fr-FR.json)."""
-    languages_dir = os.path.join(
-        _script_dir(), "..", "..", "web", "src", "locales", "languages"
-    )
-    return os.path.join(languages_dir, f"{locale}.json")
+    """Absolute path to a locale's main language file (e.g. fr-FR.json)."""
+    return os.path.join(_languages_dir(), f"{locale}.json")
+
+
+def get_split_file_path(locale, namespace):
+    """Absolute path to the file holding one split-out namespace of a locale."""
+    return os.path.join(_languages_dir(), SPLIT_NAMESPACES[namespace], f"{locale}.json")
+
+
+def get_language_file_paths(locale):
+    """Every file that makes up a locale: the main file, then one per split namespace."""
+    return [get_language_file_path(locale)] + [
+        get_split_file_path(locale, namespace) for namespace in SPLIT_NAMESPACES
+    ]
 
 
 def get_state_file_path():
@@ -750,9 +767,34 @@ def find_duplicate_keys(path):
     return sorted(set(found))
 
 
+def load_locale(locale):
+    """Load a locale as one tree: the main file with each split namespace merged back in."""
+    tree = load_json(get_language_file_path(locale), {})
+    for namespace in SPLIT_NAMESPACES:
+        part = load_json(get_split_file_path(locale, namespace), {})
+        if namespace in part:
+            tree[namespace] = part[namespace]
+    return tree
+
+
+def write_locale(locale, tree):
+    """Write a merged locale tree back to its files, rewriting only the files whose content changed.
+
+    An unchanged file is left alone so its committed prettier formatting survives.
+    """
+    parts = [(get_language_file_path(locale), {k: v for k, v in tree.items() if k not in SPLIT_NAMESPACES})]
+    for namespace in SPLIT_NAMESPACES:
+        if namespace in tree:
+            parts.append((get_split_file_path(locale, namespace), {namespace: tree[namespace]}))
+    for path, data in parts:
+        if load_json(path, None) != data:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            write_json(path, data)
+
+
 def load_source():
-    """Load the English source (en-US.json)."""
-    return load_json(get_language_file_path(SOURCE_LOCALE), {})
+    """Load the English source (en-US.json plus its split namespaces)."""
+    return load_locale(SOURCE_LOCALE)
 
 
 def load_state():

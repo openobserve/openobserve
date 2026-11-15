@@ -69,6 +69,30 @@ describe("SecurityAuditPanel", () => {
     expect(table.text()).toContain("Detection");
   });
 
+  it("turns pages on the server and asks for reads only when switched on", async () => {
+    vi.mocked(security.getAudit).mockResolvedValue(page({ total: 120 }) as never);
+    const w = await mountPanel();
+    expect(security.getAudit).toHaveBeenLastCalledWith(expect.any(String), {
+      from: 0,
+      size: 50,
+      includeReads: false,
+    });
+    w.findComponent({ name: "OTable" }).vm.$emit("pagination-change", { page: 3, size: 50 });
+    await flushPromises();
+    expect(security.getAudit).toHaveBeenLastCalledWith(expect.any(String), {
+      from: 100,
+      size: 50,
+      includeReads: false,
+    });
+    w.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", true);
+    await flushPromises();
+    expect(security.getAudit).toHaveBeenLastCalledWith(expect.any(String), {
+      from: 0,
+      size: 50,
+      includeReads: true,
+    });
+  });
+
   it("says so when the deployment keeps no audit trail", async () => {
     vi.mocked(security.getAudit).mockResolvedValue(page({ audit_enabled: false }) as never);
     const w = await mountPanel();

@@ -15,22 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import type { I18nText } from "@/types/i18n";
 
 defineProps<{ label: I18nText; help: I18nText }>();
 </script>
 
 <template>
-  <div
-    class="border-border-default grid grid-cols-[1fr_20rem] gap-6 border-b p-4 max-md:grid-cols-1 max-md:gap-2.5"
-  >
-    <div class="flex min-w-0 flex-col">
-      <div class="text-text-heading text-sm font-medium">{{ label }}</div>
-      <div class="text-text-secondary text-compact mt-0.5">{{ help }}</div>
+  <OSettingRow control-at="end" :label="label">
+    <template #description>
+      {{ help }}
       <slot name="line" />
-    </div>
-    <div class="flex min-w-0 flex-col items-start gap-1.5">
+    </template>
+    <div class="flex w-full min-w-0 flex-col items-start gap-1.5">
       <slot />
     </div>
-  </div>
+  </OSettingRow>
 </template>

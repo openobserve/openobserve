@@ -419,6 +419,24 @@ describe("IncidentList.vue", () => {
       expect(visible.every((i: Incident) => i.severity === "P1")).toBe(true);
     });
 
+    it("ORs two picked severity chips", async () => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({ id: "1", severity: "P1" }),
+            createIncident({ id: "2", severity: "P2" }),
+            createIncident({ id: "3", severity: "P3" }),
+          ],
+          total: 3,
+        },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      (wrapper.vm as any).severityFilters = ["P1", "P3"];
+      const ids = (wrapper.vm as any).visibleIncidents.map((i: Incident) => i.id);
+      expect(ids.sort()).toEqual(["1", "3"]);
+    });
+
     it("returns empty array when no match", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -799,12 +817,12 @@ describe("IncidentList.vue", () => {
         isInitialized: true,
         shouldRefresh: false,
       };
-      useListViewState("incidents", { severityFilter: "P3" }).severityFilter = "P3";
+      useListViewState("incidents", { severityFilter: ["P3"] }).severityFilter = ["P3"];
       const vm = await mountWithStatus("open");
       store.state.incidents = { incidents: {}, isInitialized: false };
 
       expect(vm.statusFilter).toBe("open");
-      expect(vm.severityFilter).toBe("all");
+      expect(vm.severityFilters).toEqual([]);
     });
 
     it("starts without the saved search and page when ?status is present", async () => {
@@ -910,7 +928,7 @@ describe("IncidentList.vue", () => {
         sortOrder: "desc",
       });
       wrapper = createWrapper();
-      expect(wrapper.vm.severityFilter).toBe("P2");
+      expect(wrapper.vm.severityFilters).toEqual(["P2"]);
       expect(wrapper.vm.pageSize).toBe(50);
       expect(wrapper.vm.sortBy).toBe("title");
       expect(wrapper.vm.sortOrder).toBe("desc");
@@ -918,11 +936,11 @@ describe("IncidentList.vue", () => {
 
     it("saves changes to the view state", async () => {
       wrapper = createWrapper();
-      wrapper.vm.severityFilter = "P1";
+      wrapper.vm.severityFilters = ["P1", "P3"];
       wrapper.vm.pageSize = 100;
       await flushPromises();
       const saved: any = useListViewState("incidents", {});
-      expect(saved.severityFilter).toBe("P1");
+      expect(saved.severityFilter).toEqual(["P1", "P3"]);
       expect(saved.pageSize).toBe(100);
     });
   });
@@ -1143,7 +1161,7 @@ describe("IncidentList.vue", () => {
       wrapper.vm.onPageChange(2);
       await flushPromises();
 
-      wrapper.vm.severityFilter = "P2";
+      wrapper.vm.severityFilters = ["P2"];
       await flushPromises();
 
       expect(wrapper.vm.currentPage).toBe(1);
