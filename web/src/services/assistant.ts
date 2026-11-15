@@ -729,6 +729,11 @@ const assistant = {
     await http().patch(`/api/${enc(org)}/ai/chats/${enc(sid)}`, { pinned }, ASSISTANT_REQUEST);
   },
 
+  /** Marks the newest ended turn seen for the caller on every device; a running turn is left unseen. */
+  markChatSeen: async (org: string, sid: string): Promise<void> => {
+    await http().patch(`/api/${enc(org)}/ai/chats/${enc(sid)}`, { seen: true }, ASSISTANT_REQUEST);
+  },
+
   deleteChat: async (org: string, sid: string): Promise<void> => {
     await http().delete(`/api/${enc(org)}/ai/chats/${enc(sid)}`, ASSISTANT_REQUEST);
   },

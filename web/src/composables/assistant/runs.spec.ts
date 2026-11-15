@@ -441,6 +441,33 @@ describe("createRuns", () => {
     expect(readRunsCleared(store.state.userOrgKey)).toEqual({ s: NOW });
   });
 
+  it("marks a chat seen on the server once a container shows it, so it never returns as ready", async () => {
+    const seen = vi.spyOn(assistantService, "markChatSeen").mockResolvedValue(undefined);
+    const { store, runs, feed, sid } = setup();
+    feed([chat(sid, { seen: false, last_turn_status: "completed" })]);
+    store.state.shell.activeSid = sid;
+    store.state.shell.placement = { kind: "full" } as never;
+    await nextTick();
+    expect(seen).toHaveBeenCalledTimes(1);
+    expect(seen).toHaveBeenCalledWith("default", sid);
+    store.dropSession(sid, "cleared");
+    await nextTick();
+    expect(runs.rows.value).toEqual([]);
+  });
+
+  it("leaves a running or unshown chat unseen", async () => {
+    const seen = vi.spyOn(assistantService, "markChatSeen").mockResolvedValue(undefined);
+    const { store, feed, sid } = setup();
+    feed([
+      chat(sid, { seen: false, active_turn: true }),
+      chat("far", { seen: false, last_turn_status: "completed" }),
+    ]);
+    store.state.shell.activeSid = sid;
+    store.state.shell.placement = { kind: "sidebar" } as never;
+    await nextTick();
+    expect(seen).not.toHaveBeenCalled();
+  });
+
   it("re-reads the cleared set when another tab clears", async () => {
     const { hints, runs, feed, store } = setup();
     feed([chat("s", { seen: false, last_turn_status: "completed" })]);

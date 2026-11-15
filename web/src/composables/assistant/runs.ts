@@ -329,6 +329,34 @@ export function createRuns(deps: RunsDeps): AssistantRuns {
     clearAll,
   );
 
+  // Reloads and other devices read only the server's marker, so a chat shown here must set it.
+  const marking = new Set<Sid>();
+  const markSeen = async (sid: Sid) => {
+    const org = deps.org();
+    if (!org || marking.has(sid)) return;
+    marking.add(sid);
+    chats.value = chats.value.map((chat) =>
+      chat.session_id === sid ? { ...chat, seen: true } : chat,
+    );
+    try {
+      await assistantService.markChatSeen(org, sid);
+    } catch {
+      // The next list read still says unseen, so the chat is marked again while it shows.
+    } finally {
+      marking.delete(sid);
+    }
+  };
+  const stopServerSeen = watch(
+    () => {
+      const shown = shownSids(state());
+      return chats.value
+        .filter((chat) => chat.seen === false && !chat.active_turn && !chat.pending_approval)
+        .map((chat) => chat.session_id)
+        .filter((sid) => shown.includes(sid));
+    },
+    (sids) => sids.forEach((sid) => void markSeen(sid)),
+  );
+
   // A 429 names the real cap, which an admin may have changed from the default.
   const stopLimit = watch(
     () => {
@@ -443,7 +471,16 @@ export function createRuns(deps: RunsDeps): AssistantRuns {
     dispose() {
       if (timer) clearInterval(timer);
       stopActive?.();
-      for (const stop of [stopSeen, stopLimit, stopKey, stopFollow, stopTick, stopCleared]) stop();
+      for (const stop of [
+        stopSeen,
+        stopServerSeen,
+        stopLimit,
+        stopKey,
+        stopFollow,
+        stopTick,
+        stopCleared,
+      ])
+        stop();
     },
   };
 }
