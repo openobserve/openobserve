@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSelect
             :model-value="selectedStream"
-            @update:model-value="pickInput('stream', $event)"
+            @update:model-value="pickSelect('stream', $event)"
             :label="t('profiles.stream')"
             label-position="inside"
             :options="streamOptions"
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSelect
             :model-value="selectedService"
-            @update:model-value="pickInput('service', $event)"
+            @update:model-value="pickSelect('service', $event)"
             :label="t('profiles.service')"
             label-position="inside"
             :options="serviceOptions"
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSelect
             :model-value="selectedProfileType"
-            @update:model-value="pickInput('profileType', $event)"
+            @update:model-value="pickSelect('profileType', $event)"
             :label="t('profiles.profileType')"
             label-position="inside"
             :options="profileTypeSelectOptions"
@@ -672,6 +672,7 @@ import OContent from "@/lib/core/Content/OContent.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
@@ -907,7 +908,7 @@ let initRunSeq = 0;
 let seeding = false;
 // The inputs the user picked while seeding held the watchers; replayed when it ends, so the latest change wins.
 let heldChanges: Partial<HeldInputs> = {};
-// Open while the picker echoes a window the page set (on mount, after setSavedDate), rounded to its seconds and zone.
+// Open while the picker echoes a window the page set (on mount, after setSavedDate), rounding it to its seconds and zone.
 let pickerEchoes = 1;
 let lastRunSeeded = false;
 // The focus from a link belongs to the first run's tree; any later run draws a tree its index path may not match.
@@ -2052,6 +2053,9 @@ const pickInput = <K extends keyof HeldInputs>(key: K, value: HeldInputs[K]) => 
   if (seeding && isPick) heldChanges[key] = value;
   target.value = value;
 };
+
+const pickSelect = (key: "stream" | "service" | "profileType", value: SelectModelValue) =>
+  pickInput(key, typeof value === "string" ? value : null);
 
 // Children mount first, so the picker's mount replay has been emitted by now.
 onMounted(() =>
