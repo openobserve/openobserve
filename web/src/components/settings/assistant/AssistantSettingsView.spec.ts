@@ -123,6 +123,17 @@ describe("AssistantSettingsView", () => {
     expect(w.find(`[data-test="settings-assistant-${tab}-tab"]`).exists()).toBe(true);
   });
 
+  it.each([
+    ["access", true],
+    ["permissions", false],
+    ["activity", false],
+  ])("puts the %s tab in the form column: %s", async (tab, column) => {
+    const { w } = await mountView(`/settings/assistant/${tab}`);
+    wrapper = w;
+    const panel = w.get(`[data-test="settings-assistant-panel-${tab}"]`);
+    expect(panel.classes().includes("o2-constrained-page")).toBe(column);
+  });
+
   it("lands an unknown or missing tab on Status, keeping the query", async () => {
     const { w, router } = await mountView("/settings/assistant/nope?org_identifier=acme");
     wrapper = w;

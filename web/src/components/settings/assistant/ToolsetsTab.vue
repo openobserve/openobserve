@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="formMode && capabilities.isLoading.value"
-    class="flex max-w-2xl flex-col gap-3"
+    class="px-page-edge flex max-w-2xl flex-col gap-3 py-3"
     data-test="ai-toolset-form-capabilities-loading"
   >
     <OSkeleton v-for="n in 5" :key="n" type="rect" class="h-9 w-full" />
@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AssistantToolsetForm
     v-else-if="formMode"
     :key="`${formMode}:${editId}`"
+    class="px-page-edge overflow-y-auto py-3"
     :mode="formMode"
     :edit-id="formMode === 'edit' ? editId : undefined"
     :existing="rows"
@@ -32,19 +33,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @done="closeForm"
     @forbidden="writeForbidden = true"
   />
-  <section v-else class="flex flex-col gap-3" data-test="settings-assistant-toolsets-tab">
+  <section v-else class="flex flex-col" data-test="settings-assistant-toolsets-tab">
     <h2 class="sr-only">{{ t("assistant.settings.tabs.toolsets") }}</h2>
-    <p v-if="writeForbidden" class="text-text-body text-sm" data-test="ai-toolsets-view-only">
+    <p
+      v-if="writeForbidden"
+      class="text-text-body px-page-edge pt-3 text-sm"
+      data-test="ai-toolsets-view-only"
+    >
       {{ t("assistant.toolsets.viewOnly") }}
     </p>
     <p
       v-else-if="!page.aiEnabled.value"
-      class="text-text-secondary text-sm"
+      class="text-text-secondary px-page-edge pt-3 text-sm"
       data-test="ai-toolsets-not-set-up"
     >
       {{ t("assistant.toolsets.notSetUp") }}
     </p>
     <OTable
+      class="min-h-0 flex-1"
       :data="visibleRows"
       :columns="columns"
       row-key="id"
@@ -66,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #toolbar>
         <OSearchInput
           v-model="view.filterQuery"
-          class="w-64 max-md:w-auto max-md:flex-1"
+          class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48"
           :placeholder="t('assistant.toolsets.search')"
           data-test="ai-toolsets-search"
         />

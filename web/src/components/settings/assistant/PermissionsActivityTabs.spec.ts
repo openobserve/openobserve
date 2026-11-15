@@ -180,13 +180,25 @@ describe("ActivityTab", () => {
     expect(w.text()).toContain("3LY6Bc");
   });
 
-  it("pages forward with the server cursor", async () => {
+  it("pages forward and back with the server cursor on the shared pager", async () => {
     vi.mocked(assistantSettings.activity).mockResolvedValue({ rows: [ENTRY], next_cursor: "n1" });
     const w = (wrapper = await mountTab(ActivityTab, true));
-    await w.find('[data-test="settings-assistant-activity-next"]').trigger("click");
+    expect(vi.mocked(assistantSettings.activity).mock.calls[0][1]!.limit).toBe(50);
+    expect(w.get('[data-test="o2-table-pagination-info"]').text()).toContain("51+");
+    await w.find('[data-test="o2-table-next-page-btn"]').trigger("click");
     await settle();
-    const last = vi.mocked(assistantSettings.activity).mock.calls.at(-1)![1]!;
-    expect(last.cursor).toBe("n1");
+    expect(vi.mocked(assistantSettings.activity).mock.calls.at(-1)![1]!.cursor).toBe("n1");
+    expect(w.get('[data-test="o2-table-pagination-info"]').text()).toContain("51 - ");
+    await w.find('[data-test="o2-table-prev-page-btn"]').trigger("click");
+    await settle();
+    expect(w.get('[data-test="o2-table-prev-page-btn"]').attributes("aria-disabled")).toBe("true");
+  });
+
+  it("stops at the last page when the server sends no cursor", async () => {
+    vi.mocked(assistantSettings.activity).mockResolvedValue({ rows: [ENTRY] });
+    const w = (wrapper = await mountTab(ActivityTab, true));
+    expect(w.get('[data-test="o2-table-next-page-btn"]').attributes("aria-disabled")).toBe("true");
+    expect(w.get('[data-test="o2-table-pagination-info"]').text()).not.toContain("+");
   });
 
   it("moves the window to now on Refresh so newer actions appear", async () => {

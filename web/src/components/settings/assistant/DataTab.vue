@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
     </OForm>
-    <AssistantVoiceSetting v-if="state !== 'loading'" />
+    <AssistantVoiceSetting v-if="state !== 'loading'" class="border-border-default border-t pt-4" />
   </div>
 </template>
 

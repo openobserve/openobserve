@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OText variant="meta" as="p">{{ t("assistant.settings.voice.help") }}</OText>
     <OToggleGroup
       :model-value="mode"
+      class="self-start"
       :disabled="readOnly"
       :aria-label="t('assistant.settings.voice.title')"
       :aria-describedby="lineId"

@@ -104,6 +104,8 @@ export interface AssistantActivityFilter {
   actor?: string;
   q?: string;
   cursor?: string;
+  /** Rows per page; the server caps it at MAX_ACTIVITY_PAGE. */
+  limit?: number;
 }
 
 export const MAX_GRANTS = 500;

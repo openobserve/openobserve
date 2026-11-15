@@ -15,14 +15,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <FeatureLockBoundary :feature="lockedFeature">
-    <OPageLayout
-      :title="t('assistant.settings.pageTitle', name)"
-      :icon="assistantGlyph.assistant"
-      title-data-test="settings-assistant-page-title"
-      data-assistant-surface
-      tabs-below
-      scroll
+  <OPageLayout
+    :title="t('assistant.settings.pageTitle', name)"
+    :icon="assistantGlyph.assistant"
+    title-data-test="settings-assistant-page-title"
+    data-assistant-surface
+    tabs-below
+    bleed
+  >
+    <template #header-tabs>
+      <OTabs :model-value="activeTab" align="left" data-test="settings-assistant-tabs">
+        <ORouteTab
+          v-for="entry in TABS"
+          :key="entry.id"
+          :name="entry.id"
+          :label="t(entry.labelKey)"
+          :to="{
+            name: 'assistantSettings',
+            params: { tab: entry.id },
+            query: { org_identifier: page.org.value },
+          }"
+          :data-test="`settings-assistant-tab-${entry.id}`"
+        />
+      </OTabs>
+    </template>
+    <template #actions>
+      <ORefreshButton
+        :loading="refreshing"
+        data-test="settings-assistant-refresh"
+        @click="refresh"
+      />
+    </template>
+    <component
+      :is="listTab ? 'div' : ConstrainedPage"
+      v-bind="listTab ? LIST_BODY : FORM_BODY"
+      :data-test="`settings-assistant-panel-${activeTab}`"
     >
       <template #header-tabs>
         <FeatureLockExempt>
@@ -50,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <div
-        class="flex max-w-240 flex-col gap-4 p-4 max-md:p-3"
-        :data-test="`settings-assistant-panel-${activeTab}`"
+        v-if="adminHelper || offInDeployment"
+        :class="['flex flex-col gap-4', listTab ? 'px-page-edge pt-3' : 'pb-4']"
       >
         <div
           v-if="adminHelper"
@@ -74,20 +101,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </AssistantAskAdminPopover>
         </div>
         <p
-          v-if="!page.aiEnabled.value && activeTab !== 'status'"
+          v-if="offInDeployment"
           class="text-text-secondary text-sm"
           data-test="settings-assistant-off-in-deployment"
         >
           {{ t("assistant.settings.offInDeployment") }}
         </p>
-        <component
-          :is="TAB_COMPONENTS[activeTab]"
-          :key="`${page.org.value}:${activeTab}`"
-          ref="panel"
-        />
       </div>
-    </OPageLayout>
-  </FeatureLockBoundary>
+      <component
+        :is="TAB_COMPONENTS[activeTab]"
+        :key="`${page.org.value}:${activeTab}`"
+        ref="panel"
+        :class="listTab ? 'min-h-0 flex-1' : ''"
+      />
+    </component>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -101,15 +129,21 @@ export interface AssistantSettingsViewProps {
 }
 
 /** The tabs this build renders, in strip order; an unknown or unbuilt tab id lands on Status. */
-export const SETTINGS_TABS: { id: AssistantSettingsTab; labelKey: I18nKey; writes: boolean }[] = [
-  { id: "status", labelKey: "assistant.settings.tabs.status", writes: true },
-  { id: "access", labelKey: "assistant.settings.tabs.access", writes: true },
-  { id: "data", labelKey: "assistant.settings.tabs.data", writes: true },
-  { id: "history", labelKey: "assistant.settings.tabs.history", writes: false },
-  { id: "usage", labelKey: "assistant.settings.tabs.usage", writes: false },
-  { id: "toolsets", labelKey: "assistant.settings.tabs.toolsets", writes: false },
-  { id: "permissions", labelKey: "assistant.settings.tabs.permissions", writes: false },
-  { id: "activity", labelKey: "assistant.settings.tabs.activity", writes: false },
+export const SETTINGS_TABS: {
+  id: AssistantSettingsTab;
+  labelKey: I18nKey;
+  writes: boolean;
+  /** A table tab runs full width and height, like every Settings list; the rest sit in the form column. */
+  list: boolean;
+}[] = [
+  { id: "status", labelKey: "assistant.settings.tabs.status", writes: true, list: false },
+  { id: "access", labelKey: "assistant.settings.tabs.access", writes: true, list: false },
+  { id: "data", labelKey: "assistant.settings.tabs.data", writes: true, list: false },
+  { id: "history", labelKey: "assistant.settings.tabs.history", writes: false, list: false },
+  { id: "usage", labelKey: "assistant.settings.tabs.usage", writes: false, list: false },
+  { id: "toolsets", labelKey: "assistant.settings.tabs.toolsets", writes: false, list: true },
+  { id: "permissions", labelKey: "assistant.settings.tabs.permissions", writes: false, list: true },
+  { id: "activity", labelKey: "assistant.settings.tabs.activity", writes: false, list: true },
 ];
 </script>
 
@@ -119,8 +153,7 @@ import { useRouter } from "vue-router";
 
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
-import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
-import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
+import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
 import { useAssistantName } from "@/composables/assistant";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -151,6 +184,9 @@ const TABS = SETTINGS_TABS.filter(
     entry.id !== "toolsets" || checkFeatureAccess("aiToolsets", buildFeatureGateContext()).allowed,
 );
 
+const FORM_BODY = { size: "lg", align: "left", padded: false, class: "px-page-edge py-3" } as const;
+const LIST_BODY = { class: "flex h-full min-h-0 flex-col" } as const;
+
 const TAB_COMPONENTS: Partial<Record<AssistantSettingsTab, Component>> = {
   status: StatusTab,
   access: AccessTab,
@@ -180,6 +216,8 @@ const lockedFeature = computed(() =>
   activeTab.value === "toolsets" && toolsetsLocked.value ? "ai_toolsets" : null,
 );
 const adminHelper = computed(() => !page.isAdmin.value && (known.value?.writes ?? true));
+const offInDeployment = computed(() => !page.aiEnabled.value && activeTab.value !== "status");
+const listTab = computed(() => known.value?.list ?? false);
 
 watch(
   () => props.tab,

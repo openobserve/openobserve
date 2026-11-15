@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <section class="flex flex-col gap-3" data-test="settings-assistant-activity-tab">
+  <section class="flex flex-col" data-test="settings-assistant-activity-tab">
     <h2 class="sr-only">{{ t("assistant.settings.tabs.activity") }}</h2>
     <OEmptyState
       v-if="state === 'ready' && activity.data.value === null"
@@ -28,38 +28,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <OTable
       v-else
+      class="min-h-0 flex-1"
       :data="rows"
       :columns="columns"
       row-key="id"
       :loading="activity.isPending.value"
       :forbidden="state === 'forbidden'"
       :error="state === 'error' ? t('assistant.activity.loadFailed') : null"
-      pagination="none"
+      pagination="server"
+      :current-page="cursors.length + 1"
+      :page-size="pageSize"
+      :page-size-options="PAGE_SIZES"
+      :total-count="knownTotal"
+      :total-count-exact="!activity.data.value?.next_cursor"
       :default-columns="false"
       :show-global-filter="false"
       data-test="settings-assistant-activity-table"
+      @pagination-change="turnPage"
     >
       <template #toolbar>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="contents">
           <OSelect
             v-model="range"
             :options="rangeOptions"
             label-key="label"
             value-key="value"
-            class="w-40"
+            width="sm"
             :aria-label="t('assistant.activity.rangeLabel')"
             data-test="settings-assistant-activity-range"
           />
           <OSearchInput
             v-if="page.isAdmin.value"
             v-model="actor"
-            class="w-48 max-md:flex-1"
+            class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48"
             :placeholder="t('assistant.activity.actor')"
             data-test="settings-assistant-activity-actor"
           />
           <OSearchInput
             v-model="search"
-            class="w-56 max-md:flex-1"
+            class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48"
             :placeholder="t('assistant.activity.search')"
             data-test="settings-assistant-activity-search"
           />
@@ -139,28 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
       </template>
-      <template #pagination-bar>
-        <div class="flex flex-wrap items-center justify-end gap-2 p-2">
-          <OButton
-            variant="outline"
-            size="sm"
-            class="max-md:min-h-11"
-            :disabled="!cursors.length"
-            data-test="settings-assistant-activity-prev"
-            @click="cursors.pop()"
-            >{{ t("assistant.activity.previous") }}</OButton
-          >
-          <OButton
-            variant="outline"
-            size="sm"
-            class="max-md:min-h-11"
-            :disabled="!activity.data.value?.next_cursor"
-            data-test="settings-assistant-activity-next"
-            @click="cursors.push(activity.data.value!.next_cursor!)"
-            >{{ t("assistant.activity.next") }}</OButton
-          >
-        </div>
-      </template>
     </OTable>
   </section>
 </template>
@@ -176,14 +161,18 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import {
+  COL,
+  type OTableColumnDef,
+  type OTablePaginationParams,
+} from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import type { AssistantActivityEntry } from "@/services/assistant_settings";
+import { MAX_ACTIVITY_PAGE, type AssistantActivityEntry } from "@/services/assistant_settings";
 import {
   assistantActivityQuery,
   undoActivityMutation,
@@ -194,6 +183,8 @@ import { b64EncodeUnicode } from "@/utils/formatters";
 import { readStateOf, useAssistantSettingsPage } from "./useAssistantSettingsPage";
 
 const DAY_US = 86_400_000_000;
+
+const PAGE_SIZES = [20, 50, 100, MAX_ACTIVITY_PAGE];
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -209,6 +200,7 @@ const range = ref(7);
 const actor = ref("");
 const search = ref("");
 const cursors = ref<string[]>([]);
+const pageSize = ref(50);
 const actorQuery = refDebounced(actor, 300);
 const searchQuery = refDebounced(search, 300);
 // Fixed while paging so the cursor walks one window; a filter change or Refresh on page one moves it.
@@ -220,6 +212,7 @@ const filter = computed(() => ({
   ...(actorQuery.value.trim() ? { actor: actorQuery.value.trim() } : {}),
   ...(searchQuery.value.trim() ? { q: searchQuery.value.trim() } : {}),
   ...(cursors.value.length ? { cursor: cursors.value[cursors.value.length - 1] } : {}),
+  limit: pageSize.value,
 }));
 
 const activity = useQuery(computed(() => assistantActivityQuery(page.org.value, filter.value)));
@@ -230,42 +223,49 @@ const undone = ref(new Set<string>());
 
 const state = computed(() => readStateOf(activity));
 const rows = computed(() => activity.data.value?.rows ?? []);
+// The cursor API returns no total, so while a next page exists the pager counts one row past this page.
+const knownTotal = computed(() =>
+  activity.data.value?.next_cursor
+    ? (cursors.value.length + 1) * pageSize.value + 1
+    : cursors.value.length * pageSize.value + rows.value.length,
+);
 
+// Sized so every column fits beside the pinned actions at 1280 wide; the action column takes what is left.
 const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "at",
     header: t("assistant.activity.columns.when"),
-    size: COL.lastCheck + 40,
+    size: COL.lastCheck + 20,
     meta: { align: "left" },
   },
   {
     id: "action",
     header: t("assistant.activity.columns.action"),
-    size: COL.name,
+    size: 160,
     meta: { align: "left", flex: true },
   },
   {
     id: "target",
     header: t("assistant.activity.columns.target"),
-    size: COL.name,
+    size: 150,
     meta: { align: "left" },
   },
   {
     id: "actor",
     header: t("assistant.activity.columns.actor"),
-    size: COL.owner,
+    size: 150,
     meta: { align: "left" },
   },
   {
     id: "approval",
     header: t("assistant.activity.columns.approval"),
-    size: COL.type,
+    size: 120,
     meta: { align: "left" },
   },
   {
     id: "result",
     header: t("assistant.activity.columns.result"),
-    size: COL.type,
+    size: 100,
     meta: { align: "left" },
   },
   {
@@ -273,10 +273,23 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("assistant.activity.columns.actions"),
     isAction: true,
     pinned: "right",
-    size: 150,
+    size: 140,
     meta: { align: "right" },
   },
 ]);
+
+/** The pager steps one page at a time over a cursor chain; a new page size starts it again. */
+function turnPage({ page: target, size }: OTablePaginationParams) {
+  if (size !== pageSize.value) {
+    pageSize.value = size;
+    cursors.value = [];
+    return;
+  }
+  const next = activity.data.value?.next_cursor;
+  if (target === 1) cursors.value = [];
+  else if (target === cursors.value.length + 2 && next) cursors.value.push(next);
+  else if (target === cursors.value.length) cursors.value.pop();
+}
 
 watch([range, actorQuery, searchQuery, () => page.org.value], () => {
   windowEnd.value = Date.now() * 1000;

@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <section class="flex flex-col gap-3" data-test="settings-assistant-permissions-tab">
-    <h2 class="text-text-heading text-sm font-semibold">{{ heading }}</h2>
+  <section class="flex flex-col" data-test="settings-assistant-permissions-tab">
+    <h2 class="text-text-heading px-page-edge pt-3 pb-2 text-sm font-semibold">{{ heading }}</h2>
     <p
       v-if="unsupported && page.isAdmin.value"
-      class="text-text-body text-sm"
+      class="text-text-body px-page-edge pt-3 text-sm"
       data-test="settings-assistant-grants-unsupported"
     >
       {{ t("assistant.grants.unsupported") }}
@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <OTable
       v-else
+      class="min-h-0 flex-1"
       :data="rows"
       :columns="columns"
       row-key="id"
