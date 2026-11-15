@@ -37,14 +37,15 @@ use config::{
 };
 use infra::errors::{DbError, Error as InfraError};
 use o2_enterprise::enterprise::autoobserve::{
+    context::{ChangeAsk, ChangeRecord, Checked},
     contract::DAY_US,
     engine::MAX_HOOK_TIMEOUT,
     job::MODULE_KEY,
     names::streams::STREAM_PRESENCE,
     ports::{
-        AiPermit, AiUsagePort, HourRecords, KvWritePort, Ports, QueryRejected, SearchPage,
-        SearchPort, StreamHistory, StreamSinkPort, StreamStat, StreamStatsPort, TriggerPort,
-        stats_refresh_us,
+        AiPermit, AiUsagePort, ContextReadPort, HourRecords, KvWritePort, OssSource, Ports,
+        QueryRejected, SearchPage, SearchPort, StreamHistory, StreamSinkPort, StreamStat,
+        StreamStatsPort, TriggerPort, stats_refresh_us,
     },
     stream_silence::PRESENCE_RETENTION_DAYS,
 };
@@ -425,6 +426,25 @@ impl AiUsagePort for NoAiUsage {
     }
 }
 
+/// The OSS reads behind the context providers; a source not read yet says it is not recorded.
+pub struct ContextReads;
+
+#[async_trait]
+impl ContextReadPort for ContextReads {
+    async fn changes(&self, source: OssSource, _ask: &ChangeAsk) -> (Checked, Vec<ChangeRecord>) {
+        match source {
+            OssSource::PipelineErrors => (Checked::NotRecorded, Vec::new()),
+            OssSource::IngestRefusals => (Checked::NotRecorded, Vec::new()),
+            OssSource::AuditTrail => (Checked::NotRecorded, Vec::new()),
+            OssSource::Deploys => (Checked::NotRecorded, Vec::new()),
+        }
+    }
+
+    async fn security_sources(&self, _org: &str) -> (Checked, Vec<(String, String)>) {
+        (Checked::NotRecorded, Vec::new())
+    }
+}
+
 /// The region's one engine row, kept in `infra::scheduler`, which never replicates.
 pub struct EngineTrigger;
 
@@ -487,6 +507,7 @@ pub fn ports() -> Ports {
         ai_usage: Arc::new(NoAiUsage),
         investigation: Some(Arc::new(super::incidents::IncidentInvestigation)),
         triggers: Arc::new(EngineTrigger),
+        context: Arc::new(ContextReads),
     }
 }
 

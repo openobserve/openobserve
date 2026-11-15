@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use async_trait::async_trait;
 use config::meta::alerts::{incidents::AlertKind, rca_runs::RunSummaryFields};
+use futures::{StreamExt, TryStreamExt};
 use infra::table::{
     alert_incidents::CaseFilter,
     entity::{alert_incident_alerts, alert_incidents},
@@ -28,6 +29,7 @@ use infra::table::{
 use o2_enterprise::enterprise::autoobserve::{
     INTERVAL_SECS,
     api::Page,
+    context::{self, IssueContext, IssueRef, ViewerResolver, for_issues, issue_for},
     contract::ActionRequest,
     names::decision_kinds,
     page_routing::{catalogue, cohort_dimensions, stream_service},
@@ -37,6 +39,7 @@ use o2_enterprise::enterprise::autoobserve::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::ports::SearchAdapter;
 use crate::alerts::incidents::{
     FINDING_KIND_DIMENSION, FINDING_STREAM_NAME_DIMENSION, FINDING_STREAM_TYPE_DIMENSION,
     FindingIncident, FindingPager, OncallPager, finding_dimensions, incidents_enabled,
@@ -50,6 +53,11 @@ pub const REFUSED_INCIDENTS_OFF: &str = "incidents are off or not licensed";
 pub const PAGE_PENDING_US: i64 = 2 * INTERVAL_SECS * 1_000_000;
 /// The queue keeps one row per dimension path, so this many rows hold every recent sample.
 const UNROUTED_SCANNED: u64 = 500;
+/// Issue lookups in flight for one page of incidents.
+const ISSUE_READS: usize = 8;
+
+/// A finding's decision kind, stream entity id and onset.
+type IssueKey = (String, String, i64);
 
 /// P6 over main's incident path: the incident's own automatic analysis is the investigation.
 pub struct IncidentInvestigation;
@@ -123,6 +131,9 @@ pub struct AutoObserveIncident {
     /// Who was paged, or why nobody was; left out only by bodies older than R8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page: Option<PageView>,
+    /// What changed before the finding and what it breaks, as this caller may see it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<IssueContext>,
 }
 
 /// One stream of an incident; its type and name are null once the org no longer has the stream.
@@ -274,6 +285,36 @@ pub async fn list_with(
     })
 }
 
+/// Each item's issue context for the resolver's caller; an item with no issue row gets none.
+pub async fn attach_context(
+    org: &str,
+    items: &mut [AutoObserveIncident],
+    resolver: &dyn ViewerResolver,
+) -> anyhow::Result<()> {
+    if !context::enabled() {
+        return Ok(());
+    }
+    let keys: Vec<Option<IssueKey>> = items.iter().map(issue_key).collect();
+    let issues: Vec<Option<IssueRef>> = futures::stream::iter(keys)
+        .map(|key| issue_of(org.to_string(), key))
+        .buffered(ISSUE_READS)
+        .try_collect()
+        .await?;
+    let found: Vec<IssueRef> = issues.iter().flatten().cloned().collect();
+    if found.is_empty() {
+        return Ok(());
+    }
+    let mut contexts = for_issues(&SearchAdapter, org, &found, resolver)
+        .await?
+        .into_iter();
+    for (item, issue) in items.iter_mut().zip(&issues) {
+        if issue.is_some() {
+            item.context = contexts.next();
+        }
+    }
+    Ok(())
+}
+
 pub fn members_of(
     links: &[alert_incident_alerts::Model],
     names: &HashMap<String, (String, String)>,
@@ -355,7 +396,23 @@ pub fn item_of(
         },
         members: Vec::new(),
         page: None,
+        context: None,
     }
+}
+
+/// The finding's decision kind, its stream's entity id and the onset its firing recorded.
+fn issue_key(item: &AutoObserveIncident) -> Option<IssueKey> {
+    let f = &item.finding;
+    let entity_id = format!("{}/{}", f.stream_type.as_ref()?, f.stream_name.as_ref()?);
+    Some((f.kind.clone()?, entity_id, f.first_seen_at))
+}
+
+/// Owns its inputs: a lookup future borrowing the item fails the handler's `Send` check.
+async fn issue_of(org: String, key: Option<IssueKey>) -> anyhow::Result<Option<IssueRef>> {
+    let Some((kind, entity_id, onset_us)) = key else {
+        return Ok(None);
+    };
+    issue_for(&SearchAdapter, &org, &kind, &entity_id, onset_us).await
 }
 
 async fn unrouted_samples(org: &str) -> anyhow::Result<HashSet<String>> {

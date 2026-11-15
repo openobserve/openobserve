@@ -20,6 +20,7 @@ pub mod incidents;
 pub mod paging;
 pub mod review;
 pub mod slack_feed;
+pub mod viewer;
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -547,7 +548,7 @@ pub async fn stream_volume(
     tag = "AutoObserve",
     operation_id = "AutoObserveSuggestions",
     summary = "List suggestions",
-    description = "Each suggestion's newest state from the last 7 days, highest score first, with a stored accept or reject applied. `total` counts the matches before paging; a decision made since the last engine pass can drop an item from a status-filtered page. `last_seen_at` is when the suggestion last changed or was confirmed (at most 24 h old while current). Where alert calibration owns alert findings, an alert's broken-definition finding is listed once as `alert_not_working` from the newest calibration run, and dismissed findings are left out. Where the deployment lists them, a source that stopped sending while its stream kept flowing is listed as `source_silence`, one per outage, until a day after every source of the outage sends again.",
+    description = "Each suggestion's newest state from the last 7 days, highest score first, with a stored accept or reject applied. `total` counts the matches before paging; a decision made since the last engine pass can drop an item from a status-filtered page. `last_seen_at` is when the suggestion last changed or was confirmed (at most 24 h old while current). Where alert calibration owns alert findings, an alert's broken-definition finding is listed once as `alert_not_working` from the newest calibration run, and dismissed findings are left out. Where the deployment lists them, a source that stopped sending while its stream kept flowing is listed as `source_silence`, one per outage, until a day after every source of the outage sends again. Where issue context is on, an item that is an issue also carries `context`: what changed just before it and what it affects, limited to what the caller may read.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), SuggestionsQuery),
     responses(
@@ -585,6 +586,9 @@ pub async fn suggestions(
     };
     serve(|deps| async move {
         let readable = |subjects| readable_subjects(&org_id, &user.user_id, subjects);
+        let viewer = viewer::WebViewer {
+            user_id: user.user_id.clone(),
+        };
         api::suggestions(
             &deps,
             &org_id,
@@ -593,6 +597,7 @@ pub async fn suggestions(
             now_micros(),
             readable,
             &ReaderDigest(&user.user_id),
+            &viewer,
         )
         .await
     })
