@@ -22895,6 +22895,8 @@
       "noResults": "Brak ikon pasujących do wyszukiwania",
       "groups": {
         "results": "Wyniki",
+        "icons": "Ikony",
+        "monoLogos": "Logotypy",
         "status": "Status",
         "services": "Usługi",
         "ai": "AI",

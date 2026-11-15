@@ -22895,6 +22895,8 @@
       "noResults": "Keine Symbole entsprechen Ihrer Suche",
       "groups": {
         "results": "Ergebnisse",
+        "icons": "Symbole",
+        "monoLogos": "Logos",
         "status": "Status",
         "services": "Dienste",
         "ai": "KI",
