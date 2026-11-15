@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -173,13 +174,15 @@ onMounted(() => nextTick(focusSearch));
         />
       </ODropdownGroup>
     </div>
-    <div
+    <OEmptyState
       v-else
-      class="text-text-secondary px-3 py-1.5 text-sm"
+      size="compact"
+      class="px-3"
+      :kind="props.views.length ? 'filtered' : 'first-run'"
+      :icon="props.views.length ? undefined : 'bookmark'"
+      :title="props.views.length ? t('search.savedViewsNoMatch') : t('search.savedViewsEmpty')"
       :data-test="`${props.dataTestPrefix}-empty`"
-    >
-      {{ props.views.length ? t("search.savedViewsNoMatch") : t("search.savedViewsEmpty") }}
-    </div>
+    />
     <ODropdownSeparator class="my-0.5!" />
     <ODropdownItem
       icon="add"

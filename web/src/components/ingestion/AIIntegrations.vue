@@ -209,7 +209,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
-import { aiCategories } from "./ai/data";
+import { aiCategoriesWithLogos as aiCategories } from "./ai/cardLogos";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";

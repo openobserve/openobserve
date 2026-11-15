@@ -34,12 +34,11 @@
             class="border-border-default bg-code-bg rounded-default text-text-body h-40 overflow-auto border px-3 py-2 text-xs wrap-break-word whitespace-pre-wrap"
             data-test="ai-experiment-row-input"
           >
-            <div
+            <OEmptyState
               v-if="!hasContent(detail.input)"
-              class="text-text-secondary p-8 text-center text-sm italic"
-            >
-              {{ t("aiObservability.experiments.rowDetail.noDataAvailable") }}
-            </div>
+              size="compact"
+              :title="t('aiObservability.experiments.rowDetail.noDataAvailable')"
+            />
             <LLMContentRenderer
               v-else-if="isPlainText(detail.input)"
               :content="detail.input as string"
@@ -71,12 +70,11 @@
             class="border-border-default bg-code-bg rounded-default text-text-body h-40 overflow-auto border px-3 py-2 text-xs wrap-break-word whitespace-pre-wrap"
             data-test="ai-experiment-row-expected-output"
           >
-            <div
+            <OEmptyState
               v-if="!hasContent(detail.expectedOutput)"
-              class="text-text-secondary p-8 text-center text-sm italic"
-            >
-              {{ t("aiObservability.experiments.rowDetail.noDataAvailable") }}
-            </div>
+              size="compact"
+              :title="t('aiObservability.experiments.rowDetail.noDataAvailable')"
+            />
             <LLMContentRenderer
               v-else-if="isPlainText(detail.expectedOutput)"
               :content="detail.expectedOutput as string"
@@ -337,6 +335,7 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";

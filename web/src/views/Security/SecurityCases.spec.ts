@@ -205,6 +205,18 @@ describe("SecurityCases", () => {
     expect(w.text()).not.toContain("Request failed with status code 403");
   });
 
+  it("shows a failed list as the table's error state with Retry, never the first-run one", async () => {
+    vi.mocked(securityCases.searchCases).mockRejectedValue({
+      response: { status: 404, data: "Not Found" },
+      message: "Request failed with status code 404",
+    });
+    const w = await mountView();
+    expect(w.find('[data-test="o2-table-error"]').exists()).toBe(true);
+    expect(w.find('[data-test="o2-table-error-retry-btn"]').exists()).toBe(true);
+    expect(w.text()).not.toContain("Request failed with status code 404");
+    expect(w.find('[data-test="security-cases-error"]').exists()).toBe(false);
+  });
+
   it("opens a case showing only its SIEM detections and the correlated entities", async () => {
     const w = await mountView();
     await rowOf(w, "svc-deploy key used")!.trigger("click");

@@ -51,13 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OToggleGroup>
     </div>
 
-    <p
+    <OEmptyState
       v-if="evidence.length === 0"
+      size="compact"
+      icon="fact-check"
+      :title="t('alerts.incidents.rcaSummary.noEvidence')"
       data-test="rca-evidence-empty"
-      class="text-text-muted text-compact m-0"
-    >
-      {{ t("alerts.incidents.rcaSummary.noEvidence") }}
-    </p>
+    />
     <ul
       v-else
       class="rounded-default border-border-default bg-surface-base divide-border-default m-0 list-none divide-y overflow-hidden border p-0"
@@ -146,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref, useId, type ComponentPublicInstance } from "vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useI18nTyped } from "@/types/i18n";

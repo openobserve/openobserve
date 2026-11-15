@@ -4165,15 +4165,15 @@ describe("AlertList - first run and the alert library", () => {
     });
   });
 
-  it("shows the first-run empty state at page size with New alert, Alert library and Import", async () => {
+  it("shows the first-run region empty state with Alert library and New alert", async () => {
     const wrapper = await mountEmpty();
     const state = emptyState(wrapper);
-    expect(state.props("size")).toBe("page");
+    expect(state.props("size")).toBe("region");
     expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').text()).toContain("New alert");
     expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').text()).toContain(
       "Alert library",
     );
-    expect(wrapper.find('[data-test="alert-list-empty-import"]').text()).toContain("Import alert");
+    expect(wrapper.find('[data-test="alert-list-empty-import"]').exists()).toBe(false);
   });
 
   const emptyActions = (wrapper: any) =>
@@ -4186,12 +4186,11 @@ describe("AlertList - first run and the alert library", () => {
         size: b.props("size"),
       }));
 
-  it("leads the first-run actions with the library, at lg size, when the library is shown", async () => {
+  it("leads the first-run actions with the library when the library is shown", async () => {
     const wrapper = await mountEmpty();
     expect(emptyActions(wrapper)).toEqual([
-      { id: "alert-list-empty-alert-library", variant: "primary", size: "lg" },
-      { id: "alert-list-empty-import", variant: "secondary", size: "lg" },
-      { id: "alert-list-empty-new-alert", variant: "secondary", size: "lg" },
+      { id: "alert-list-empty-alert-library", variant: "primary", size: undefined },
+      { id: "alert-list-empty-new-alert", variant: "secondary", size: undefined },
     ]);
   });
 
@@ -4199,8 +4198,8 @@ describe("AlertList - first run and the alert library", () => {
     (store.state as any).zoConfig.custom_hide_menus = "alertLibrary";
     const wrapper = await mountEmpty();
     expect(emptyActions(wrapper)).toEqual([
-      { id: "alert-list-empty-new-alert", variant: "primary", size: "lg" },
-      { id: "alert-list-empty-import", variant: "secondary", size: "lg" },
+      { id: "alert-list-empty-new-alert", variant: "primary", size: undefined },
+      { id: "alert-list-empty-import", variant: "secondary", size: undefined },
     ]);
   });
 
@@ -4228,6 +4227,7 @@ describe("AlertList - first run and the alert library", () => {
   });
 
   it("opens the import dialog from the empty state, as the header's Import does", async () => {
+    (store.state as any).zoConfig.custom_hide_menus = "alertLibrary";
     const wrapper = await mountEmpty();
     const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
     await wrapper.find('[data-test="alert-list-empty-import"]').trigger("click");

@@ -624,6 +624,13 @@ describe("OStatStrip row above a table", () => {
     for (const cls of ROW) expect(toolbar).not.toContain(cls);
   });
 
+  it("gives an inline strip asked to stack the KPI-strip look without the row", () => {
+    const w = mount(OStatStrip, { props: { items: chips, inline: true, stacked: true } });
+    for (const cls of ROW) expect(w.get('[data-test="o-stat-strip"]').classes()).not.toContain(cls);
+    expect(w.get('[data-test="o-stat-card-value"]').classes()).toContain("text-xl");
+    expect(w.find('[data-test="o-stat-strip-divider"]').exists()).toBe(false);
+  });
+
   it("lets a filter strip that is not above a table opt out of the row", () => {
     const root = rootOf({ items: chips, selectable: true, defaultKey: "all", row: false });
     for (const cls of ROW) expect(root).not.toContain(cls);
@@ -664,8 +671,13 @@ describe("OStatStrip with nothing but the reset chip", () => {
     expect(labels).toEqual(["Databases", "Calls", "Failed"]);
   });
 
-  it("keeps the row's chip height so the chips appearing later never shift the table", () => {
-    expect(mountDb(0).get('[data-test="o-stat-strip"]').classes()).toContain("min-h-12");
+  // R4: with nothing to filter the row is the page's KPI strip, values over labels.
+  it("reads its KPIs at the strip size while no real filter exists", () => {
+    const w = mountDb(0);
+    expect(w.get('[data-test="o-stat-strip"]').classes()).toContain("py-3");
+    expect(w.get('[data-test="o-stat-card-value"]').classes()).toContain("text-xl");
+    expect(w.find('[data-test="o-stat-card-glyph"]').exists()).toBe(false);
+    expect(w.find('[data-test="o-stat-strip-divider"]').exists()).toBe(false);
   });
 
   it("brings the reset chip back with the first real filter", () => {

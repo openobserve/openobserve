@@ -65,15 +65,19 @@
             :data-test="`svcver-region-${region.cluster}`"
           /></div></template
     ></template>
-    <p v-else data-test="svcver-verdict-empty" class="text-text-secondary text-compact">
-      {{ t("serviceVersions.compare.empty") }}
-    </p>
+    <OEmptyState
+      v-else
+      size="compact"
+      :title="t('serviceVersions.compare.empty')"
+      data-test="svcver-verdict-empty"
+    />
   </section>
 </template>
 <script setup lang="ts">
 import { computed } from "vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import type {
   CompareArm,

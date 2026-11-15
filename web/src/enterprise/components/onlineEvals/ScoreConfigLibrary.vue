@@ -9,23 +9,19 @@ the Free Software Foundation, either version 3 of the License, or
   <div class="flex h-full min-h-0 flex-col p-4" data-test="score-config-library">
     <div
       v-if="isLoadingCatalog"
-      class="flex flex-1 flex-col items-center justify-center p-8"
+      class="flex flex-1 flex-col gap-2"
       data-test="score-config-library-loading"
     >
-      <OSpinner size="lg" />
+      <OSkeleton class="h-control-md mb-2 w-full" />
+      <OSkeleton v-for="row in 6" :key="row" class="h-8 w-full" />
     </div>
 
-    <div
+    <OEmptyState
       v-else-if="loadError"
-      class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
+      kind="error"
       data-test="score-config-library-error"
-    >
-      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
-      <div class="text-status-error-text">{{ loadError }}</div>
-      <OButton variant="primary" class="mt-4" @click="loadCatalog">
-        {{ t("common.retry") }}
-      </OButton>
-    </div>
+      @action="loadCatalog"
+    />
 
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <OSearchInput
@@ -102,11 +98,10 @@ the Free Software Foundation, either version 3 of the License, or
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { saveScoreConfigMutation } from "@/services/online-evals.service.queries";
 import { useMutation } from "@tanstack/vue-query";

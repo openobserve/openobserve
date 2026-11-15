@@ -93,7 +93,6 @@
 
         <template #empty>
           <OEmptyState
-            size="inline"
             :title="t('emptyState.noData.title')"
             :text="t('oncall.noRotations')"
             data-test="oncall-schedule-empty"

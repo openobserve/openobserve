@@ -15,102 +15,129 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
-    <!-- LEFT SIDE: Logo -->
-    <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
-      <OButton
-        v-if="!focusMode"
-        icon-only
-        variant="ghost"
-        class="md:hidden"
-        data-test="header-mobile-nav-toggle"
-        :aria-label="t('components.navbar.mainNavigation')"
-        @click="$emit('toggle-mobile-nav')"
-      >
-        <OIcon name="menu" size="sm" class="size-5!" />
-      </OButton>
-      <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
-      <!-- Shows custom logo/text if configured in enterprise mode -->
-      <div
-        class="relative-position flex"
-        v-if="
-          (config.isEnterprise == 'true' &&
-            store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
-            store.state.zoConfig.custom_logo_text != '') ||
-          (config.isEnterprise == 'true' &&
-            store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-            store.state.zoConfig.custom_logo_img != null) ||
-          (config.isEnterprise == 'true' &&
-            store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
-            store.state.zoConfig.custom_logo_dark_img != null)
-        "
-      >
-        <!-- Custom logo text -->
-        <a
-          v-if="
-            store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
-            store.state.zoConfig?.custom_logo_text != ''
-          "
-          :href="homeUrl"
-          @click.prevent="goToHome"
-          class="me-2 flex cursor-pointer items-center p-0 text-xl font-semibold text-inherit no-underline"
-          >{{ store.state.zoConfig.custom_logo_text }}</a
+  <div
+    class="bg-surface-chrome-deeper flex h-12 w-full shrink-0 flex-nowrap items-center gap-2 pe-3 max-md:gap-1 max-md:pe-1.5"
+    data-test="app-top-bar"
+  >
+    <!-- Equal sides from xl centre the search on the bar, so a control mounting late in either side moves nothing. -->
+    <div
+      class="flex shrink-0 items-center gap-2 max-md:gap-1 md:max-xl:min-w-0 md:max-xl:shrink xl:flex-1"
+      data-test="header-start"
+    >
+      <!-- LEFT SIDE: Logo -->
+      <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
+        <OButton
+          v-if="!focusMode"
+          icon-only
+          variant="ghost"
+          class="md:hidden"
+          data-test="header-mobile-nav-toggle"
+          :aria-label="t('components.navbar.mainNavigation')"
+          @click="$emit('toggle-mobile-nav')"
         >
-
-        <!-- Custom logo image - shows appropriate logo based on current theme -->
-        <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
-          <!-- Dark mode: Show dark logo, fallback to light logo -->
-          <img
-            :alt="t('common.customLogoAlt')"
-            v-if="
-              isDark &&
-              store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
-              store.state.zoConfig?.custom_logo_dark_img != null
-            "
-            :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 9.375rem; max-height: 2rem"
-          />
-          <!-- Light mode: Show light logo, fallback to dark logo -->
-          <img
-            :alt="t('common.customLogoAlt')"
-            v-else-if="
-              !isDark &&
-              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-              store.state.zoConfig?.custom_logo_img != null
-            "
-            :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 9.375rem; max-height: 2rem"
-          />
-          <!-- Fallback: Show whichever logo exists (dark or light) -->
-          <img
-            :alt="t('common.customLogoAlt')"
-            v-else-if="
-              store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
-              store.state.zoConfig?.custom_logo_dark_img != null
-            "
-            :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 9.375rem; max-height: 2rem"
-          />
-          <img
-            :alt="t('common.customLogoAlt')"
-            v-else-if="
-              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-              store.state.zoConfig?.custom_logo_img != null
-            "
-            :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 9.375rem; max-height: 2rem"
-          />
-        </a>
-
-        <!-- OpenObserve logo (shown alongside custom logo if configured) -->
+          <OIcon name="menu" size="sm" class="size-5!" />
+        </OButton>
+        <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
+        <!-- Shows custom logo/text if configured in enterprise mode -->
         <div
-          v-if="store.state.zoConfig.custom_hide_self_logo == false"
-          class="relative inline-flex min-h-10 items-center"
+          class="relative-position flex"
+          v-if="
+            (config.isEnterprise == 'true' &&
+              store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+              store.state.zoConfig.custom_logo_text != '') ||
+            (config.isEnterprise == 'true' &&
+              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+              store.state.zoConfig.custom_logo_img != null) ||
+            (config.isEnterprise == 'true' &&
+              store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
+              store.state.zoConfig.custom_logo_dark_img != null)
+          "
         >
+          <!-- Custom logo text -->
+          <a
+            v-if="
+              store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+              store.state.zoConfig?.custom_logo_text != ''
+            "
+            :href="homeUrl"
+            @click.prevent="goToHome"
+            class="me-2 flex cursor-pointer items-center p-0 text-xl font-semibold text-inherit no-underline"
+            >{{ store.state.zoConfig.custom_logo_text }}</a
+          >
+
+          <!-- Custom logo image - shows appropriate logo based on current theme -->
+          <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
+            <!-- Dark mode: Show dark logo, fallback to light logo -->
+            <img
+              :alt="t('common.customLogoAlt')"
+              v-if="
+                isDark &&
+                store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
+                store.state.zoConfig?.custom_logo_dark_img != null
+              "
+              :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
+              style="max-width: 9.375rem; max-height: 2rem"
+            />
+            <!-- Light mode: Show light logo, fallback to dark logo -->
+            <img
+              :alt="t('common.customLogoAlt')"
+              v-else-if="
+                !isDark &&
+                store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+                store.state.zoConfig?.custom_logo_img != null
+              "
+              :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
+              style="max-width: 9.375rem; max-height: 2rem"
+            />
+            <!-- Fallback: Show whichever logo exists (dark or light) -->
+            <img
+              :alt="t('common.customLogoAlt')"
+              v-else-if="
+                store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
+                store.state.zoConfig?.custom_logo_dark_img != null
+              "
+              :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
+              style="max-width: 9.375rem; max-height: 2rem"
+            />
+            <img
+              :alt="t('common.customLogoAlt')"
+              v-else-if="
+                store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+                store.state.zoConfig?.custom_logo_img != null
+              "
+              :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
+              style="max-width: 9.375rem; max-height: 2rem"
+            />
+          </a>
+
+          <!-- OpenObserve logo (shown alongside custom logo if configured) -->
+          <div
+            v-if="store.state.zoConfig.custom_hide_self_logo == false"
+            class="relative inline-flex min-h-10 items-center"
+          >
+            <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
+              <img
+                data-test="header-openobserve-logo"
+                class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80 max-md:h-6"
+                :src="
+                  getImageURL(
+                    isDark
+                      ? 'images/common/openobserve_latest_dark_2.svg'
+                      : 'images/common/openobserve_latest_light_2.svg',
+                  )
+                "
+                :alt="raw('OpenObserve')"
+              />
+            </a>
+          </div>
+        </div>
+
+        <!-- Default OpenObserve logo (when no custom logo) -->
+        <div v-else class="relative-position relative inline-flex min-h-10 items-center">
           <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
             <img
               data-test="header-openobserve-logo"
-              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
+              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80 max-md:h-6"
               :src="
                 getImageURL(
                   isDark
@@ -123,47 +150,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </a>
         </div>
       </div>
+      <!-- end left side -->
 
-      <!-- Default OpenObserve logo (when no custom logo) -->
-      <div v-else class="relative-position relative inline-flex min-h-10 items-center">
-        <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
-          <img
-            data-test="header-openobserve-logo"
-            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
-            :src="
-              getImageURL(
-                isDark
-                  ? 'images/common/openobserve_latest_dark_2.svg'
-                  : 'images/common/openobserve_latest_light_2.svg',
-              )
-            "
-            :alt="raw('OpenObserve')"
-          />
-        </a>
+      <div
+        v-if="securityAccess.canOpen.value"
+        class="ms-1 flex shrink-0 items-center max-md:ms-0 md:max-xl:min-w-0 md:max-xl:shrink"
+      >
+        <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
       </div>
     </div>
-    <!-- end left side -->
 
-    <div
-      v-if="securityAccess.canOpen.value"
-      class="ms-3 flex shrink-0 items-center md:max-xl:min-w-0 md:max-xl:shrink"
-    >
-      <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
+    <!-- The centre also spaces the right cluster to the end edge, so it stays when the trigger hides. -->
+    <div class="flex min-w-0 flex-1 justify-center px-2 max-md:px-0 xl:grow-0 xl:basis-94">
+      <OButton
+        v-if="!focusMode"
+        variant="ghost"
+        class="bg-button-ghost-hover-bg! w-full max-w-90 min-w-0 font-normal! max-md:hidden"
+        data-test="header-search-trigger"
+        :aria-keyshortcuts="searchShortcutAria"
+        @click="openJumpTo"
+      >
+        <template #icon>
+          <OIcon name="search" size="sm" class="shrink-0" />
+        </template>
+        <span class="min-w-0 flex-1 truncate text-start">{{ t("menu.searchOrJumpTo") }}</span>
+        <template #icon-end>
+          <OShortcut id="searchOrJumpTo" aria-hidden="true" class="max-lg:hidden" />
+        </template>
+      </OButton>
     </div>
-
-    <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
-    <div class="min-w-0 flex-1" />
 
     <!-- RIGHT SIDE: Controls -->
     <div
-      class="flex shrink-0 items-center justify-end gap-1 pe-3 md:max-xl:min-w-0 md:max-xl:shrink"
+      class="flex shrink-0 items-center gap-1 md:max-xl:min-w-0 md:max-xl:shrink xl:flex-1 xl:justify-end"
+      data-test="header-end"
     >
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
-      <SampleDataHeaderChip class="me-2" />
+      <SampleDataHeaderChip class="me-1" />
 
       <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
       <div
-        class="me-4 flex items-center gap-1 max-md:hidden"
+        class="me-2 flex items-center gap-1 max-md:hidden"
         v-if="store.state.organizationData.quotaThresholdMsg"
       >
         <div type="warning" icon="cloud" class="bg-status-warning-bg rounded-default inline p-1.25">
@@ -171,13 +198,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.organizationData.quotaThresholdMsg
           }}
         </div>
-        <OButton variant="secondary" class="m-1" @click="router.replace('/billings/plans')">
+        <OButton variant="accent-ghost" @click="router.replace('/billings/plans')">
           {{ t("menu.upgradeToProPlan") }}
         </OButton>
       </div>
 
-      <!-- HEADER MENU: Contains all header navigation and user controls -->
-      <div class="header-menu flex items-center gap-x-2 md:max-xl:min-w-0">
+      <div class="flex items-center gap-1 md:max-xl:min-w-0">
         <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ingestion_quota_used >= 85"
@@ -198,30 +224,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <OPageHeaderStatus fallback />
-        <!-- EDITION BADGE / UPGRADE BUTTON -->
-        <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
-        <!-- Open Source: primary CTA to drive upgrades -->
+        <!-- Enterprise and Cloud list the edition in the Help menu; open source keeps its upgrade link here. -->
         <OButton
-          :variant="
-            config.isEnterprise === 'true' || config.isCloud === 'true' ? 'secondary' : 'primary'
-          "
-          size="sm"
+          v-if="isOpenSource"
+          variant="accent-ghost"
           class="max-md:hidden md:max-xl:min-w-0"
           data-test="upgrade-to-enterprise-btn"
           @click="openEnterpriseDialog"
         >
-          <template #icon>
-            <OIcon
-              :name="
-                config.isEnterprise === 'true' || config.isCloud === 'true'
-                  ? 'verified'
-                  : 'card-giftcard'
-              "
-              size="sm"
-            />
-          </template>
-          <span class="md:max-xl:truncate">{{ enterpriseButtonText }}</span>
-          <OTooltip :content="enterpriseButtonText" />
+          <OTruncatedText class="min-w-0">{{ enterpriseButtonText }}</OTruncatedText>
         </OButton>
 
         <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
@@ -231,28 +242,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="handleOrgSelection"
         />
 
-        <div class="header-utility-icons flex items-center gap-x-2 md:max-xl:shrink-0">
-          <!-- AI CHAT TOGGLE: Enterprise/Cloud feature to toggle AI chat panel.
-           Leads the utility-icon cluster, set off by a separator from the
-           org selector so it reads as the primary action in this group.
-           Shown locked (not hidden) in builds that don't unlock it. -->
+        <div class="flex items-center gap-1 md:max-xl:shrink-0">
+          <!-- AI CHAT TOGGLE: shown locked, not hidden, in builds that don't unlock it. -->
           <template v-if="aiButtonVisible || aiLicenseLocked">
             <OButton
               icon-only
               variant="ghost"
+              :pressed="aiLicenseLocked ? undefined : store.state.isAiChatEnabled"
               @click="aiLicenseLocked ? openLockedAiAssistant() : toggleAIChat()"
               :data-test="aiLicenseLocked ? 'menu-link-ai-locked' : 'menu-link-ai-item'"
               :aria-label="aiButtonLabel"
-              class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_var(--duration-control)_var(--ease-control),box-shadow_var(--duration-control)_var(--ease-control),color_var(--duration-control)_var(--ease-control)] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
               :class="store.state.isAiChatEnabled && !aiLicenseLocked ? 'ai-btn-active' : ''"
               @mouseenter="handleMouseEnter"
               @mouseleave="handleMouseLeave"
             >
-              <img
-                alt=""
-                :src="getBtnLogo"
-                class="h-5 w-5 shrink-0 [transition:transform_var(--duration-indicator)_var(--ease-control)] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_var(--duration-control)_var(--ease-control)]"
-              />
+              <img alt="" :src="getBtnLogo" class="size-5 shrink-0" />
               <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
               <OTooltip
                 side="bottom"
@@ -264,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             v-else-if="aiSlotPending"
             aria-hidden="true"
-            class="size-[1.875rem] shrink-0"
+            class="size-control-md shrink-0"
             data-test="header-ai-slot-placeholder"
           />
 
@@ -298,31 +302,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip side="top" :content="t('menu.help')" />
               </OButton>
             </template>
-            <div class="header-menu-bar min-w-62.5">
+            <div class="min-w-62.5">
               <!-- OpenAPI link (only for non-cloud deployments) -->
-              <template
+              <ODropdownItem
                 v-if="
                   config.isCloud !== 'true' &&
                   !store.state.zoConfig?.custom_hide_menus?.split(',')?.includes('openapi')
                 "
+                icon="code"
+                data-test="menu-link-openapi-item"
+                @select="navigateToOpenAPI(zoBackendUrl)"
               >
-                <ODropdownItem
-                  data-test="menu-link-openapi-item"
-                  @select="navigateToOpenAPI(zoBackendUrl)"
-                >
-                  {{ raw("OpenAPI") }}
-                </ODropdownItem>
-                <ODropdownSeparator />
-              </template>
-
-              <!-- Documentation link -->
-              <ODropdownItem data-test="menu-link-docs-item" @select="navigateToDocs()">
-                {{ t(`menu.docs`) }}
+                {{ raw("OpenAPI") }}
+                <template #end><OIcon name="open-in-new" size="xs" /></template>
               </ODropdownItem>
-              <ODropdownSeparator />
-
-              <!-- Keyboard shortcuts -->
               <ODropdownItem
+                icon="article"
+                data-test="menu-link-docs-item"
+                @select="navigateToDocs()"
+              >
+                {{ t(`menu.docs`) }}
+                <template #end><OIcon name="open-in-new" size="xs" /></template>
+              </ODropdownItem>
+              <ODropdownItem
+                icon="keyboard"
                 data-test="menu-link-shortcuts-item"
                 shortcut="openCheatsheet"
                 @select="openShortcuts"
@@ -331,9 +334,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
               <ODropdownSeparator />
 
-              <!-- About page link -->
-              <ODropdownItem data-test="menu-link-about-item" @select="goToAbout">
+              <ODropdownItem
+                icon="info-outline"
+                data-test="menu-link-about-item"
+                @select="goToAbout"
+              >
                 {{ t(`menu.about`) }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="!isOpenSource"
+                icon="verified"
+                data-test="upgrade-to-enterprise-btn"
+                @select="openEnterpriseDialog"
+              >
+                {{ enterpriseButtonText }}
               </ODropdownItem>
             </div>
           </ODropdown>
@@ -357,18 +371,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   user.given_name ? user.given_name + ' ' + user.family_name : user.email
                 "
               >
-                <OIcon :name="user.picture ? user.picture : 'person'" size="sm" class="size-5!" />
+                <!-- The soft avatar tones sit close to the chrome tint, so a hairline keeps the disc visible. -->
+                <OAvatar
+                  :value="user.email"
+                  :name="userDisplayName"
+                  :tooltip="false"
+                  class="ring-border-default ring-1"
+                />
                 <OTooltip
                   side="top"
                   :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email"
                 />
               </OButton>
             </template>
-            <div class="header-menu-bar min-w-62.5">
+            <div class="min-w-62.5">
               <!-- User information (non-clickable info row) -->
-              <div class="flex items-center gap-3 px-3 py-2">
-                <OIcon :name="user.picture ? user.picture : 'person'" size="xs" />
-                <span class="truncate text-sm">{{
+              <div class="flex items-center gap-2 px-3 py-2">
+                <OAvatar :value="user.email" :name="userDisplayName" :tooltip="false" />
+                <span class="text-compact truncate">{{
                   user.given_name ? user.given_name + " " + user.family_name : user.email
                 }}</span>
               </div>
@@ -485,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, computed, nextTick, ref } from "vue";
+import { defineComponent, PropType, computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
@@ -501,7 +521,12 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
+import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isMacOS } from "@/utils/keyboardShortcuts";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -514,6 +539,7 @@ import { getImageURL } from "@/utils/zincutils";
 import { featureLockedPath, menuState } from "@/utils/featureGate";
 import { useFeatureNames } from "@/composables/useFeatureLock";
 import { chartColor } from "@/utils/chartTheme";
+import { readTopBarMemory, rememberTopBar } from "@/utils/topBarMemory";
 
 export default defineComponent({
   name: "HeaderComponent",
@@ -528,6 +554,9 @@ export default defineComponent({
     OButton,
     OIcon,
     OLockBadge,
+    OAvatar,
+    OShortcut,
+    OTruncatedText,
     OTooltip,
     ODropdown,
     ODropdownItem,
@@ -614,6 +643,7 @@ export default defineComponent({
     "changeLanguage",
     "openPredefinedThemes",
     "openShortcuts",
+    "openJumpTo",
     "toggle-mobile-nav",
     "signout",
   ],
@@ -746,11 +776,21 @@ export default defineComponent({
     const aiButtonVisible = computed(
       () => !focusMode.value && (!aiAccess.value.allowed || aiAssistantState.value === "enabled"),
     );
+    // The slot is held only while the config is loading, and only if the button showed last time.
+    const aiShownBefore = readTopBarMemory().aiButton;
     const aiSlotPending = computed(
-      () => aiAccess.value.allowed && !props.store.state.zoConfig?.version,
+      () =>
+        aiAccess.value.allowed && !props.store.state.zoConfig?.version && aiShownBefore !== false,
     );
     const aiLicenseLocked = computed(
       () => !focusMode.value && aiAccess.value.allowed && aiAssistantState.value === "locked",
+    );
+    watch(
+      () => [props.store.state.zoConfig?.version, aiButtonVisible.value || aiLicenseLocked.value],
+      ([version, shown]) => {
+        if (version && !focusMode.value) rememberTopBar({ aiButton: !!shown });
+      },
+      { immediate: true },
     );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
@@ -763,6 +803,14 @@ export default defineComponent({
         }).allowed && readSlackOrgConfig(props.store.state.zoConfig).enabled,
     );
     const showLinkedAccounts = ref(false);
+
+    const isOpenSource = computed(
+      () => props.config.isEnterprise !== "true" && props.config.isCloud !== "true",
+    );
+    const userDisplayName = computed(() =>
+      [props.user.given_name, props.user.family_name].filter(Boolean).join(" "),
+    );
+    const searchShortcutAria = isMacOS() ? "Meta+K" : "Control+K";
 
     // Computed property for enterprise button text based on deployment type
     const enterpriseButtonText = computed(() => {
@@ -842,6 +890,12 @@ export default defineComponent({
       emit("openShortcuts");
     };
 
+    // The trigger and Ctrl K open Jump to; a focus-mode route has no navigation to jump through.
+    const openJumpTo = () => {
+      if (!focusMode.value) emit("openJumpTo");
+    };
+    useShortcuts([{ id: "searchOrJumpTo", handler: openJumpTo }]);
+
     const signout = () => {
       emit("signout");
     };
@@ -869,6 +923,10 @@ export default defineComponent({
       featureName,
       getImageURL,
       enterpriseButtonText,
+      isOpenSource,
+      userDisplayName,
+      searchShortcutAria,
+      openJumpTo,
       aiSlotPending,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
@@ -907,16 +965,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-/* keep(lib-override:o2-button): dark-only, element-scoped re-point of OButton's
-   ghost-primary tokens for the navbar upgrade CTA. The custom properties are READ by OButton's
-   own internal DOM, so they have to be declared on the button element itself —
-   there is no utility that sets them. Scoping appends [data-v] to the
-   [data-test] compound, which is OButton's root and therefore carries this
-   component's scope id. Was a global in styles/utilities.css (W1.d). */
-.dark [data-test="upgrade-to-enterprise-btn"] {
-  --color-button-ghost-primary-active-bg: var(--color-primary-900);
-  --color-button-ghost-primary-text: var(--color-primary-200);
-}
-</style>

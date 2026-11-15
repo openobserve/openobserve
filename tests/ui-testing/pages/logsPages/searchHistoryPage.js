@@ -20,7 +20,7 @@ export class SearchHistoryPage {
 
     // ===== ENTRY POINT (SearchBar.vue) =====
     // Search History lives in the more-options (hamburger) menu, not the "More" utilities one.
-    this.moreOptionsMenuBtn = '[data-test="logs-search-bar-more-options-btn"]';
+    this.moreOptionsMenuBtn = '[data-test="logs-search-bar-utilities-menu-btn"]';
     this.searchHistoryItemBtn = '[data-test="search-history-item-btn"]';
 
     // ===== SEARCH HISTORY PAGE (SearchHistory.vue) =====

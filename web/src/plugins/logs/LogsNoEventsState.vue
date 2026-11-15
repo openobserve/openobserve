@@ -42,59 +42,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-html="DOMPurify.sanitize(t('logs.noEvents.descWithFilters'))"
       />
       <!-- We know where the stream's last data is: offer to jump to it. -->
-      <span v-else-if="jumpTarget">{{ t("logs.noEvents.descOutOfRange") }}</span>
+      <span v-else-if="jumpTarget"
+        >{{ t("logs.noEvents.descOutOfRange") }} {{ jumpTargetSublabel }}</span
+      >
       <!-- No stream stats: generic fallback. -->
       <span v-else>{{ t("logs.noEvents.descNoFilters", { range: currentPeriodLabel }) }}</span>
     </template>
 
     <template #actions>
-      <!-- The selected range has no data but the stream does (out of range, or a
-           no-filter window in a gap): offer a precise jump to the latest data. -->
-      <EmptyStateActionCard
+      <OButton
         v-if="jumpTarget"
-        icon="schedule"
-        :label="t('logs.noEvents.jumpToData')"
-        :sublabel="raw(jumpTargetSublabel)"
+        variant="primary"
         data-test="logs-no-events-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget!.from, jumpTarget!.to)"
-      />
-      <!-- Filter excluded everything within an overlapping window: no action
-           card — the user relaxes the query themselves (Ask AI / history below). -->
+      >
+        {{ t("logs.noEvents.jumpToData") }}
+      </OButton>
+      <OButton data-test="logs-no-events-open-history-btn" @click="emit('open-history')">
+        {{ t("logs.noEvents.openHistory") }}
+      </OButton>
     </template>
 
-    <template #extra>
-      <div class="flex flex-wrap items-center justify-center gap-2">
-        <OButton
-          variant="ghost"
-          icon="history"
-          data-test="logs-no-events-open-history-btn"
-          @click="emit('open-history')"
-        >
-          {{ t("logs.noEvents.openHistory") }}
-        </OButton>
-        <OButton
-          v-if="aiEnabled && windowHasStreamData && !jumpTarget"
-          variant="ghost"
-          data-test="logs-no-events-ask-ai-btn"
-          @click="emit('ask-ai')"
-        >
-          <template #icon>
-            <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
-          </template>
-          {{ t("logs.noEvents.askAi") }}
-        </OButton>
-      </div>
+    <template v-if="aiEnabled && windowHasStreamData && !jumpTarget" #extra>
+      <OButton variant="link" data-test="logs-no-events-ask-ai-btn" @click="emit('ask-ai')">
+        {{ t("logs.noEvents.askAi") }}
+      </OButton>
     </template>
   </OEmptyState>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { useAiIcon } from "@/composables/useAiIcon";
 import { DateTime } from "luxon";
 import { periodToLabel } from "@/composables/useWidenRange";
 import DOMPurify from "dompurify";
@@ -125,7 +106,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const { aiIconSrc } = useAiIcon();
 
 // --- filter detection -------------------------------------------------------
 

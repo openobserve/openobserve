@@ -23,7 +23,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -311,12 +311,11 @@ onBeforeUnmount(stopPolling);
       </OButton>
     </div>
 
-    <div v-if="loading" class="flex flex-1 items-center justify-center">
-      <OSpinner size="lg" data-test="k8s2-logs-loading" />
+    <div v-if="loading" class="flex flex-col gap-2 py-2" data-test="k8s2-logs-loading">
+      <OSkeleton v-for="line in 8" :key="line" class="h-3 w-full" />
     </div>
     <OEmptyState
       v-else-if="failed && !lines.length"
-      size="inline"
       kind="error"
       :text="t('emptyState.loadError.description')"
       :title="t('infra.k8s2.logsError')"
@@ -325,14 +324,12 @@ onBeforeUnmount(stopPolling);
     />
     <OEmptyState
       v-else-if="!link"
-      size="inline"
       :text="t('emptyState.noData.description')"
       :title="t('infra.k8s2.logsNoStream')"
       data-test="k8s2-logs-nostream"
     />
     <OEmptyState
       v-else-if="!visible.length"
-      size="inline"
       :text="t('emptyState.noData.description')"
       :title="t('infra.k8s2.logsEmpty')"
       data-test="k8s2-logs-empty"

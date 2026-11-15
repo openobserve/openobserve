@@ -471,37 +471,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #empty>
-                <div v-if="loadFailed" data-test="downtime-list-error" class="h-full">
-                  <OEmptyState
-                    kind="error"
-                    :title="t('emptyState.loadError.title')"
-                    :text="t('emptyState.loadError.description')"
-                    @action="refreshAll"
-                  />
-                </div>
-                <div v-else data-test="downtime-list-empty" class="h-full">
-                  <OEmptyState
-                    v-if="!loading"
-                    :kind="isFiltered ? 'filtered' : 'first-run'"
-                    :title="
-                      isFiltered
-                        ? t('emptyState.filtered.title', {
-                            noun: t('emptyState.filtered.fallbackNoun'),
-                          })
-                        : t('emptyState.noDowntimes.title')
-                    "
-                    :text="
-                      isFiltered
-                        ? t('emptyState.filtered.description', {
-                            noun: t('emptyState.filtered.fallbackNoun'),
-                          })
-                        : t('emptyState.noDowntimes.description')
-                    "
-                    :icon="isFiltered ? undefined : 'schedule'"
-                    :action-label="isFiltered ? undefined : t('emptyState.noDowntimes.action')"
-                    @action="onEmptyAction(isFiltered ? 'clear-filters' : 'create')"
-                  />
-                </div>
+                <OEmptyState
+                  v-if="loadFailed"
+                  kind="error"
+                  data-test="downtime-list-error"
+                  @action="refreshAll"
+                />
+                <OEmptyState
+                  v-else-if="!loading"
+                  :kind="isFiltered ? 'filtered' : 'first-run'"
+                  :title="
+                    isFiltered
+                      ? t('emptyState.filtered.title', {
+                          noun: t('emptyState.filtered.fallbackNoun'),
+                        })
+                      : t('emptyState.noDowntimes.title')
+                  "
+                  :text="
+                    isFiltered
+                      ? t('emptyState.filtered.description', {
+                          noun: t('emptyState.filtered.fallbackNoun'),
+                        })
+                      : t('emptyState.noDowntimes.description')
+                  "
+                  :icon="isFiltered ? undefined : 'schedule'"
+                  :action-label="isFiltered ? undefined : t('emptyState.noDowntimes.action')"
+                  data-test="downtime-list-empty"
+                  @action="onEmptyAction(isFiltered ? 'clear-filters' : 'create')"
+                />
               </template>
 
               <template #selection-actions>

@@ -452,22 +452,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @sendToAiChat="sendToAiChat"
             @addSearchTerm="addSearchTerm"
           />
-          <!-- Loading/Empty state when no data -->
-          <div v-else class="flex h-full items-center justify-center py-20">
-            <div class="text-center">
-              <OSpinner
-                v-if="correlationLoading"
-                size="lg"
-                class="mb-4"
-                data-test="logs-correlation-loading-indicator"
-              />
-              <div v-else-if="correlationError" class="text-status-error-text text-sm">
-                {{ correlationError }}
-              </div>
-              <div v-else class="text-text-muted text-sm">
-                {{ t("correlation.clickToLoadLogs") }}
-              </div>
-            </div>
+          <div v-else class="flex h-full flex-col">
+            <OSkeleton
+              v-if="correlationLoading"
+              preset="tableRows"
+              data-test="logs-correlation-loading-indicator"
+            />
+            <OEmptyState v-else-if="correlationError" kind="error" :text="correlationErrorText" />
+            <OEmptyState v-else icon="link" :title="t('correlation.clickToLoadLogs')" />
           </div>
         </OTabPanel>
 
@@ -497,22 +489,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :hide-dimension-filters="true"
             @close="tab = 'table'"
           />
-          <!-- Loading/Empty state when no data -->
-          <div v-else class="flex h-full items-center justify-center py-20">
-            <div class="text-center">
-              <OSpinner
-                v-if="correlationLoading"
-                size="lg"
-                class="mb-4"
-                data-test="logs-correlation-loading-indicator"
-              />
-              <div v-else-if="correlationError" class="text-status-error-text text-sm">
-                {{ correlationError }}
-              </div>
-              <div v-else class="text-text-muted text-sm">
-                {{ t("correlation.clickToLoadMetrics") }}
-              </div>
-            </div>
+          <div v-else class="flex h-full flex-col">
+            <OSkeleton
+              v-if="correlationLoading"
+              preset="chart"
+              data-test="logs-correlation-loading-indicator"
+            />
+            <OEmptyState v-else-if="correlationError" kind="error" :text="correlationErrorText" />
+            <OEmptyState v-else icon="link" :title="t('correlation.clickToLoadMetrics')" />
           </div>
         </OTabPanel>
 
@@ -543,22 +527,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :hide-dimension-filters="true"
             @close="tab = 'table'"
           />
-          <!-- Loading/Empty state when no data -->
-          <div v-else class="flex h-full items-center justify-center py-20">
-            <div class="text-center">
-              <OSpinner
-                v-if="correlationLoading"
-                size="lg"
-                class="mb-4"
-                data-test="logs-correlation-loading-indicator"
-              />
-              <div v-else-if="correlationError" class="text-status-error-text text-sm">
-                {{ correlationError }}
-              </div>
-              <div v-else class="text-text-muted text-sm">
-                {{ t("correlation.clickToLoadTraces") }}
-              </div>
-            </div>
+          <div v-else class="flex h-full flex-col">
+            <OSkeleton
+              v-if="correlationLoading"
+              preset="tableRows"
+              data-test="logs-correlation-loading-indicator"
+            />
+            <OEmptyState v-else-if="correlationError" kind="error" :text="correlationErrorText" />
+            <OEmptyState v-else icon="link" :title="t('correlation.clickToLoadTraces')" />
           </div>
         </OTabPanel>
       </OTabPanels>
@@ -673,6 +649,9 @@ import { searchState } from "@/composables/useLogs/searchState";
 import { crossLinkQueryText } from "@/composables/useLogs/freeTextSearch";
 import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -734,6 +713,8 @@ export default defineComponent({
     ODropdownSeparator,
     OSwitch,
     OSpinner,
+    OEmptyState,
+    OSkeleton,
     OShortcut,
     OTooltip,
     LogLineLinkPopover,
@@ -861,6 +842,12 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useI18nTyped();
+    // Raw transport text never reaches the error state (K6).
+    const correlationErrorText = computed(() =>
+      props.correlationError && !isRawHttpText(String(props.correlationError))
+        ? raw(String(props.correlationError))
+        : undefined,
+    );
     const rowData: any = ref({});
     const router = useRouter();
     const store = useStore();
@@ -1453,6 +1440,7 @@ export default defineComponent({
     };
 
     return {
+      correlationErrorText,
       t,
       raw,
       store,

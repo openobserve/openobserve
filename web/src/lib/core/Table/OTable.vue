@@ -2130,6 +2130,7 @@ defineExpose({
         <OTableError
           v-if="showError"
           :message="props.error ?? ''"
+          :floor="!props.fillHeight"
           @retry="
             emit('retry');
             emit('pagination-change', {

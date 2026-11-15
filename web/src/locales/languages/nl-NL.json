@@ -1961,6 +1961,9 @@
     "workflows": "Workflows",
     "language": "Taal",
     "keyboardShortcuts": "Sneltoetsen",
+    "searchOrJumpTo": "Zoeken of ga naar…",
+    "jumpToTitle": "Ga naar",
+    "jumpToPlaceholder": "Pagina's zoeken",
     "synthetic": "Synthetics",
     "experience": "Ervaring",
     "slos": "SLO's",
@@ -4039,7 +4042,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "Je bent niet bevoegd om de licentie te beheren."
-      }
+      },
+      "usageTitle": "Dagelijkse opname"
     },
     "value_sso_requires_ha": "✅ HA-modus vereist",
     "value_rbac_requires_ha": "✅ HA-modus vereist",
@@ -5048,6 +5052,7 @@
   },
   "organization": {
     "searchByNameOrId": "Zoeken op naam of ID",
+    "currentLabel": "Organisatie: {name}",
     "noOrganizationsFound": "Geen organisaties gevonden",
     "header": "Organisaties",
     "orgBeingDeletedSwitching": "Deze organisatie wordt verwijderd. U wordt omgeschakeld naar een andere organisatie.",
@@ -10752,7 +10757,8 @@
       "taglineAnd": "en begeleidt u door uw logs, traces, metrieken en incidenten.",
       "signedInAs": "Ingelogd als",
       "role": "Rol",
-      "tryOneOfThese": "Of probeer een van deze"
+      "tryOneOfThese": "Of probeer een van deze",
+      "panelText": "Stel vragen over je logs, traces, metrics en incidenten, of krijg hulp bij het schrijven van een query."
     },
     "capabilities": {
       "query": {
@@ -18952,7 +18958,7 @@
       "version": "Versie",
       "agentIdHint": "Agent-ID: {ids}",
       "noAgentIdentity": "Geen agentidentiteit gevonden",
-      "noAgentIdentityDescription": "Deze LLM-spans bevatten geen agentnaam, dus ze worden per stream getoond. Koppel het attribuut dat de naam van je agent bevat om ze per agent te bekijken.",
+      "noAgentIdentityDescription": "Deze LLM-spans bevatten geen agentnaam, dus ze worden per stream getoond.",
       "noAgentIdentityAction": "GenAI Agent Mapping openen"
     },
     "agentGraph": {
@@ -22728,6 +22734,7 @@
     },
     "actions": {
       "openCheatsheet": "Cheatsheet voor sneltoetsen openen",
+      "searchOrJumpTo": "Zoeken of naar een pagina gaan",
       "closeDialog": "Elke dialoog, lade of modaal sluiten",
       "focusSearch": "Focuszoekbalk",
       "focusQuery": "Editor voor focusquery's",
@@ -25452,7 +25459,8 @@
         "p95": "De trage staart — 1 op de 20 calls duurde minstens zo lang. Gemeten op basis van voltooide calls in de traces van je applicatie.",
         "p99": "De slechtste 1% van de calls duurde minstens zo lang. Gemeten op basis van voltooide calls in de traces van je applicatie.",
         "load": "Totale tijd die je apps besteedden aan calls naar deze database, gemeten op basis van de traces van je applicatie. Het toont hoeveel verkeer deze database voor je apps verwerkte.",
-        "attention": "Hoe dicht deze instantie bij een limiet zit die de eigen engine publiceert — vandaag, verbindingen ten opzichte van max_connections. De slechtste dergelijke ratio, geen samengestelde score. Gesorteerd van hoog naar laag, met instanties waarvan de gezondheid niet kan worden uitgelezen bovenaan, want van een instantie die je niet kunt zien weet je niet of ze gezond is. Gemeten op de databaseserver, dus het is niet vergelijkbaar met de Databasetijd ernaast."
+        "attention": "Hoe dicht deze instantie bij een limiet zit die de eigen engine publiceert — vandaag, verbindingen ten opzichte van max_connections. De slechtste dergelijke ratio, geen samengestelde score. Gesorteerd van hoog naar laag, met instanties waarvan de gezondheid niet kan worden uitgelezen bovenaan, want van een instantie die je niet kunt zien weet je niet of ze gezond is. Gemeten op de databaseserver, dus het is niet vergelijkbaar met de Databasetijd ernaast.",
+        "calls": "Hoe vaak je apps deze database aanriepen, gemeten uit de traces van je applicatie."
       },
       "failedChip": "{count} mislukt",
       "columnSubLabels": {
@@ -25893,7 +25901,8 @@
         "tableHealthHint": "Tabelgrootte, bloat en vacuumstatus. Bloat en vacuum zijn alleen voor PostgreSQL beschikbaar.",
         "deadlocksLocked": "Deadlocks is een Enterprise-functie. Upgrade om te zien welke queries tegen elkaar deadlocked zijn en waarom. De andere database-tabbladen werken op elk abonnement.",
         "blockedLocked": "Geblokkeerde queries is een Enterprise-functie. Upgrade om te zien welke sessies op een lock wachten en wat die vasthoudt. De andere database-tabbladen werken op elk abonnement.",
-        "tableHealthLocked": "Tabelgezondheid is een Enterprise-functie. Upgrade om tabelgrootte, bloat en vacuumstatus bij te houden. De andere database-tabbladen werken op elk abonnement."
+        "tableHealthLocked": "Tabelgezondheid is een Enterprise-functie. Upgrade om tabelgrootte, bloat en vacuumstatus bij te houden. De andere database-tabbladen werken op elk abonnement.",
+        "queriesHintServer": "Soorten query's die je databases in dit venster meldden, geteld in de database zelf."
       }
     },
     "metrics": {

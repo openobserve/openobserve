@@ -82,8 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-stream-selected"
         :title="t('emptyState.noStreamSelected.title')"
         :text="t('emptyState.noStreamSelected.description')"
-        size="inline"
+        size="compact"
         icon="database"
+        class="px-page-edge"
       >
         <template v-if="quickPickGroups.length" #extra>
           <div data-test="logs-search-stream-quick-pick" class="flex w-full flex-col gap-1">

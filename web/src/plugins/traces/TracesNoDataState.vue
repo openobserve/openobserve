@@ -16,85 +16,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   TracesNoDataState — shown when no trace streams exist in the org yet.
-  Each card routes to a distinct, real tracing ingestion path.
+  Each action routes to a distinct, real tracing ingestion path.
 -->
 <template>
   <OEmptyState v-bind="shell">
     <template v-if="!alternativesOnly" #text><span v-html="description" /></template>
 
-    <template #actions>
+    <template v-if="!alternativesOnly" #actions>
       <div v-if="$slots.status" class="flex basis-full justify-center">
         <slot name="status" />
       </div>
-
-      <!-- OpenTelemetry OTLP — primary path for traces -->
-      <EmptyStateIngestionCard
-        icon="account-tree"
-        :label="t('traces.noData.otlp', { product: raw('OTLP') })"
-        :sublabel="
-          t('traces.noData.otlpDesc', {
-            product1: raw('Jaeger'),
-            product2: raw('Zipkin'),
-            product3: raw('OpenTelemetry'),
-          })
-        "
-        icon-variant="purple"
-        data-test="traces-no-data-otlp-card"
-        @click="go('tracesOTLP')"
-      />
-
-      <!-- OTel Collector / agent -->
-      <EmptyStateIngestionCard
-        :image="getImageURL('images/ingestion/otlp.svg')"
-        :label="raw('OTel Collector / Agent')"
-        :sublabel="t('traces.noData.otelCollectorDesc', { product: raw('OTel Collector') })"
-        icon-variant="blue"
-        data-test="traces-no-data-otel-card"
-        @click="go('ingestTracesFromOtel')"
-      />
+      <OButton variant="primary" data-test="traces-no-data-otlp-card" @click="go('tracesOTLP')">
+        {{ t("traces.noData.otlp", { product: raw("OTLP") }) }}
+      </OButton>
+      <OButton data-test="traces-no-data-otel-card" @click="go('ingestTracesFromOtel')">
+        {{ otelLabel }}
+      </OButton>
     </template>
 
     <template #extra>
-      <div class="flex flex-wrap items-center justify-center gap-2">
-        <span class="text-text-secondary me-1 text-sm font-semibold">
-          {{ t("traces.noData.or") }}
-        </span>
-        <EmptyStateIngestionChip
+      <div
+        :class="[
+          'flex flex-wrap items-center gap-x-4 gap-y-1',
+          alternativesOnly ? 'justify-start' : 'justify-center',
+        ]"
+      >
+        <span class="text-text-secondary text-compact">{{ t("traces.noData.or") }}</span>
+        <template v-if="alternativesOnly">
+          <OButton variant="link" data-test="traces-no-data-otlp-card" @click="go('tracesOTLP')">
+            {{ t("traces.noData.otlp", { product: raw("OTLP") }) }}
+          </OButton>
+          <OButton
+            variant="link"
+            data-test="traces-no-data-otel-card"
+            @click="go('ingestTracesFromOtel')"
+          >
+            {{ otelLabel }}
+          </OButton>
+        </template>
+        <OButton
+          variant="link"
           data-test="traces-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
         >
-          <img
-            :src="getImageURL('images/common/kubernetes.svg')"
-            class="h-3.5 w-3.5 shrink-0 object-contain"
-            alt=""
-          />
           {{ raw("Kubernetes") }}
-        </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip data-test="traces-no-data-python-btn" @click="go('python')">
-          <img
-            :src="getImageURL('images/ingestion/python.svg')"
-            class="h-3.5 w-3.5 shrink-0 object-contain"
-            alt=""
-          />
+        </OButton>
+        <OButton variant="link" data-test="traces-no-data-python-btn" @click="go('python')">
           {{ raw("Python") }}
-        </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip data-test="traces-no-data-nodejs-btn" @click="go('nodejs')">
-          <img
-            :src="getImageURL('images/ingestion/nodejs.svg')"
-            class="h-3.5 w-3.5 shrink-0 object-contain"
-            alt=""
-          />
+        </OButton>
+        <OButton variant="link" data-test="traces-no-data-nodejs-btn" @click="go('nodejs')">
           {{ raw("Node.js") }}
-        </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
+        </OButton>
+        <OButton
           v-if="aiEnabled"
-          variant="ai"
+          variant="link"
           data-test="traces-no-data-ask-ai-btn"
           @click="emit('ask-ai')"
         >
-          <img :src="aiIconSrc" class="h-3.5 w-3.5 shrink-0" alt="" />
           {{ t("traces.noData.askAi") }}
-        </EmptyStateIngestionChip>
+        </OButton>
       </div>
     </template>
   </OEmptyState>
@@ -106,10 +86,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
-import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
-import { useAiIcon } from "@/composables/useAiIcon";
-import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const props = defineProps<{
   aiEnabled: boolean;
@@ -126,7 +103,7 @@ defineSlots<{
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
-const { aiIconSrc } = useAiIcon();
+const otelLabel = raw("OTel Collector / Agent");
 
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,
@@ -135,7 +112,7 @@ const orgQuery = computed(() => ({
 // Under FirstDataPanel the caption names the alternatives instead of the first-run title.
 const shell = computed(() =>
   props.alternativesOnly
-    ? { size: "inline" as const, title: t("ingestion.firstDataPanel.anotherWay") }
+    ? { size: "compact" as const, title: t("ingestion.firstDataPanel.anotherWay") }
     : {
         icon: "timeline" as const,
         title: t("traces.noData.title", { product: raw("OpenObserve") }),

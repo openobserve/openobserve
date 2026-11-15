@@ -346,12 +346,8 @@
         </div>
       </template>
 
-      <!-- Empty state -->
       <template #empty>
-        <div class="flex items-center justify-center py-[0.725rem] text-center">
-          <OIcon name="info" size="xs" />
-          <span class="ps-1.5">{{ t("search.noFieldFound") }}</span>
-        </div>
+        <OEmptyState size="compact" icon="info" :title="t('search.noFieldFound')" />
       </template>
 
       <!-- After list: pagination -->
@@ -419,6 +415,7 @@ import { BADGE_LABEL_KEYS, getBadgeStyle } from "@/utils/metrics/metricPalette";
 import useNotifications from "@/composables/useNotifications";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           icon-only
           variant="ghost"
+          size="sm"
           class="me-1.5 shrink-0"
           data-test="traces-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
@@ -108,25 +109,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div
-          class="me-1 flex min-w-0 items-center @max-[58rem]/results:flex-1 @max-[58rem]/results:justify-end @min-[58rem]/results:min-w-33"
-          data-test="traces-search-result-data-age"
-        >
-          <ORefreshButton
-            :last-run-at="searchObj.meta.lastRunAt"
-            :failed-at="searchObj.meta.refreshFailedAt"
-            :loading="regionBusy"
-            data-test="traces-search-result-refresh"
-            @click="$emit('run-query')"
-          />
-        </div>
         <!-- Same affordance as the logs table: a long operation name is often
              the widest thing on a row, and clipping it hides the part that
              distinguishes one trace or span from the next. -->
         <OButton
           icon-only
-          variant="ghost"
-          :pressed="searchObj.meta.resultGrid.wrapCells"
+          variant="secondary"
+          size="sm"
+          class="@max-[58rem]/results:ms-auto"
+          :pressed="!!searchObj.meta.resultGrid.wrapCells"
           @click.stop="toggleWrapCells"
           data-test="traces-search-result-wrap-btn"
         >
@@ -250,7 +241,6 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import { useRouter } from "vue-router";
 import TracesSearchResultList from "./components/TracesSearchResultList.vue";
 import { formatLargeNumber } from "../../utils/zincutils";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useLocalWrapTracesContent } from "@/utils/storage";
@@ -270,7 +260,6 @@ import { formatRefreshFailed } from "@/utils/formatters";
 export default defineComponent({
   name: "SearchResult",
   components: {
-    ORefreshButton,
     OButton,
     OTooltip,
     OSelect,
@@ -325,7 +314,6 @@ export default defineComponent({
     "get:traceDetails",
     "metrics:editor-filter-set",
     "metrics:editor-filter-run",
-    "run-query",
     "remove-filter",
     "jump-to-stream-data",
     "error-only-toggled",

@@ -100,29 +100,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div class="flex items-center justify-center py-8">
-            <OEmptyState
-              :kind="
-                Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS ? 'filtered' : 'first-run'
-              "
-              :title="
-                Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS
-                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.discoveryItems') })
-                  : t('emptyState.noDiscoveryItems.title')
-              "
-              :text="
-                Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS
-                  ? t('emptyState.filtered.description', {
-                      noun: t('emptyState.nouns.discoveryItems'),
-                    })
-                  : t('emptyState.noDiscoveryItems.description')
-              "
-              :icon="
-                Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS ? undefined : 'task-alt'
-              "
-              data-test="ai-discovery-empty-state"
-            />
-          </div>
+          <OEmptyState
+            :kind="
+              Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS ? 'filtered' : 'first-run'
+            "
+            :title="
+              Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.discoveryItems') })
+                : t('emptyState.noDiscoveryItems.title')
+            "
+            :text="
+              Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS
+                ? t('emptyState.filtered.description', {
+                    noun: t('emptyState.nouns.discoveryItems'),
+                  })
+                : t('emptyState.noDiscoveryItems.description')
+            "
+            :icon="Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS ? undefined : 'task-alt'"
+            data-test="ai-discovery-empty-state"
+          />
         </template>
 
         <template #cell-refTimestamp="{ row }">

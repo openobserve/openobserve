@@ -241,7 +241,7 @@ test.describe('Logs bare-word search (item 1)', () => {
 
     await expect(page.locator(panel)).toContainText(`Full-text search fields are not configured for ${NOFTS}`, { timeout: 30000 });
     expect(searches.hits()).toHaveLength(0);
-    await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').click();
     const alertItem = page.locator('[data-test="logs-create-alert-btn"]');
     await expect(alertItem).toBeDisabled();
     await page.keyboard.press('Escape');

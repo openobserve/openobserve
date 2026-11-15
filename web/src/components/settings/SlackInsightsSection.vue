@@ -401,8 +401,7 @@ async function save(value: InsightsFormValues): Promise<void> {
     <OEmptyState
       v-if="!data && settings.isError.value"
       kind="error"
-      :title="t('emptyState.loadError.title')"
-      :text="t('emptyState.loadError.description')"
+      size="compact"
       data-test="slack-insights-load-error"
       @action="settings.refetch()"
     />

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LiveNoticeState
       v-if="notice"
       :notice="notice"
-      size="page"
+      size="region"
       :detail="incidentsState.detail"
       :busy="busy"
       data-test="autoobserve-live-history-error"

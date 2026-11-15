@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <OButton
           v-if="pa.canWidenRange.value"
-          variant="primary"
+          variant="secondary"
           data-test="rum-analytics-overview-widen-range-btn"
           @click="widenRange"
           >{{ t("rum.analytics.overview.widenRange") }}</OButton
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OInlineNotice>
         <OEmptyState
           v-if="clicksNotCaptured"
-          size="inline"
+          size="compact"
           :title="t('rum.analytics.overview.clicksNotCapturedTitle')"
           :text="t('rum.analytics.overview.clicksNotCaptured')"
           data-test="rum-analytics-overview-clicks-not-captured"
@@ -255,6 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #actions>
             <OButton
               variant="secondary"
+              size="sm"
               data-test="rum-analytics-overview-clicks-setup-link"
               @click="openSetup"
               >{{ t("rum.analytics.overview.openSetup") }}</OButton

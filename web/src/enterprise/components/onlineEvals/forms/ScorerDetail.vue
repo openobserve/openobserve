@@ -26,12 +26,9 @@
           class="flex-none"
           data-test="scorer-detail-runs-window"
         />
-        <OButton
-          icon-only
-          variant="ghost"
-          icon="refresh"
+        <ORefreshButton
+          :last-run-at="lastRunAt"
           :loading="isLoadingRuns"
-          :title="t('onlineEvals.scorer.detail.refresh')"
           data-test="scorer-detail-runs-refresh"
           @click="refreshRuns"
         />
@@ -176,7 +173,7 @@
             </div>
             <OEmptyState
               v-else
-              size="inline"
+              size="compact"
               :title="t('onlineEvals.scorer.detail.producesEmpty')"
               data-test="scorer-detail-produces-empty"
             />
@@ -298,7 +295,7 @@
             </p>
             <OEmptyState
               v-if="usedByCount === 0 && !experimentsLoading"
-              size="inline"
+              size="compact"
               :title="t('onlineEvals.scorer.detail.usedByEmpty')"
               data-test="scorer-detail-used-by-empty"
             />
@@ -354,6 +351,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { useLoadedAt } from "@/composables/useLoadedAt";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -643,6 +642,8 @@ const {
   isLoadingRuns,
   refresh: refreshRunsData,
 } = useScorerRuns(scorerIdRef, dateWindow, runsEnabled, selectedAgent);
+
+const lastRunAt = useLoadedAt(isLoadingRuns);
 
 async function refreshRuns() {
   syncDateWindow();

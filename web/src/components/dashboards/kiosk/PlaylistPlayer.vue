@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div
         v-if="player.state.phase === 'empty'"
-        class="bg-surface-base absolute inset-0 z-30 flex items-center justify-center"
+        class="bg-surface-base absolute inset-0 z-30"
         data-test="dashboard-playlist-empty-state"
       >
         <OEmptyState

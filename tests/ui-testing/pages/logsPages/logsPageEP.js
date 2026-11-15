@@ -21,8 +21,8 @@ async selectStreamDropDown() {
 // Search Job Scheduler Dropdown updated with new locator for more options at the top right of the page 
 
 async searchSchedulerDropdown() {
-  await this.page.waitForSelector('[data-test="logs-search-bar-more-options-btn"]');
-  await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+  await this.page.waitForSelector('[data-test="logs-search-bar-utilities-menu-btn"]');
+  await this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').click();
 }
 
 async searchSchedulerCreate() {
@@ -68,7 +68,7 @@ async validateAddJob(jobId) {
     .waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
   // Navigate to the scheduler list
-  await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+  await this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').click();
   await this.page.locator('[data-test="search-scheduler-list-btn"]').click();
 
   // OTable rows are indexed as [data-test="o2-table-row-{index}"] (positional integer).

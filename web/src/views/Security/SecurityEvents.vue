@@ -1549,6 +1549,7 @@ function widenTo(period: string) {
         :rows="rows"
         :columns="columns"
         :loading="loading"
+        :last-run-at="lastRunAt"
         :error="errorMsg"
         :page="page"
         :page-size="pageSize"

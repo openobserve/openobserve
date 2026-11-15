@@ -1961,6 +1961,9 @@
     "workflows": "Workflows",
     "language": "Sprache",
     "keyboardShortcuts": "Tastenkürzel",
+    "searchOrJumpTo": "Suchen oder springen zu…",
+    "jumpToTitle": "Springen zu",
+    "jumpToPlaceholder": "Seiten durchsuchen",
     "synthetic": "Synthetics",
     "experience": "Erfahrung",
     "slos": "SLOs",
@@ -4039,7 +4042,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "Sie sind nicht berechtigt, die Lizenz zu verwalten."
-      }
+      },
+      "usageTitle": "Tägliche Aufnahme"
     },
     "value_sso_requires_ha": "✅ Erfordert den HA-Modus",
     "value_rbac_requires_ha": "✅ Erfordert den HA-Modus",
@@ -5048,6 +5052,7 @@
   },
   "organization": {
     "searchByNameOrId": "Nach Name oder ID suchen",
+    "currentLabel": "Organisation: {name}",
     "noOrganizationsFound": "Keine Organisationen gefunden",
     "header": "Organisationen",
     "orgBeingDeletedSwitching": "Diese Organisation wird gelöscht. Sie werden zu einer anderen Organisation umgeleitet.",
@@ -10752,7 +10757,8 @@
       "taglineAnd": "und führe Sie durch Ihre Logs, Traces, Metriken und Vorfälle.",
       "signedInAs": "Angemeldet als",
       "role": "Rolle",
-      "tryOneOfThese": "Oder probieren Sie eines davon aus"
+      "tryOneOfThese": "Oder probieren Sie eines davon aus",
+      "panelText": "Fragen Sie zu Ihren Logs, Traces, Metriken und Vorfällen oder lassen Sie sich beim Schreiben einer Abfrage helfen."
     },
     "capabilities": {
       "query": {
@@ -18952,7 +18958,7 @@
       "version": "Version",
       "agentIdHint": "Agent-ID: {ids}",
       "noAgentIdentity": "Keine Agent-Identität gefunden",
-      "noAgentIdentityDescription": "Diese LLM-Spans enthalten keinen Agent-Namen, daher werden sie nach Stream angezeigt. Ordnen Sie das Attribut zu, das Ihren Agent benennt, um sie nach Agent anzuzeigen.",
+      "noAgentIdentityDescription": "Diese LLM-Spans enthalten keinen Agent-Namen, daher werden sie nach Stream angezeigt.",
       "noAgentIdentityAction": "GenAI-Agent-Zuordnung öffnen"
     },
     "agentGraph": {
@@ -22728,6 +22734,7 @@
     },
     "actions": {
       "openCheatsheet": "Cheatsheet mit Tastenkombinationen öffnen",
+      "searchOrJumpTo": "Suchen oder zu einer Seite springen",
       "closeDialog": "Dialog, Seitenleiste oder Modal schließen",
       "focusSearch": "Fokus-Suchleiste",
       "focusQuery": "Fokusabfrage-Editor",
@@ -25452,7 +25459,8 @@
         "p95": "Der langsame Ausläufer – 1 von 20 Aufrufen dauerte mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
         "p99": "Die schlechtesten 1 % der Aufrufe dauerten mindestens so lange. Gemessen an abgeschlossenen Aufrufen in den Traces Ihrer Anwendung.",
         "load": "Gesamtzeit, die Ihre Apps für Aufrufe an diese Datenbank aufgewendet haben, gemessen an den Traces Ihrer Anwendung. Sie zeigt, wie viel Verkehr diese Datenbank für Ihre Apps abgewickelt hat.",
-        "attention": "Wie nah diese Instanz an einem Limit ist, das ihre eigene Engine veröffentlicht — heute Verbindungen gegen max_connections. Das schlechteste Verhältnis, kein Mischwert. Absteigend sortiert, wobei Instanzen, deren Zustand nicht lesbar ist, oben stehen, denn eine, die man nicht sehen kann, ist keine, von der man weiß, dass sie gesund ist. Auf dem Datenbankserver gemessen, daher nicht vergleichbar mit der Datenbankzeit daneben."
+        "attention": "Wie nah diese Instanz an einem Limit ist, das ihre eigene Engine veröffentlicht — heute Verbindungen gegen max_connections. Das schlechteste Verhältnis, kein Mischwert. Absteigend sortiert, wobei Instanzen, deren Zustand nicht lesbar ist, oben stehen, denn eine, die man nicht sehen kann, ist keine, von der man weiß, dass sie gesund ist. Auf dem Datenbankserver gemessen, daher nicht vergleichbar mit der Datenbankzeit daneben.",
+        "calls": "Wie oft Ihre Apps diese Datenbank aufgerufen haben, gemessen an den Traces Ihrer Anwendung."
       },
       "failedChip": "{count} fehlgeschlagen",
       "columnSubLabels": {
@@ -25893,7 +25901,8 @@
         "tableHealthHint": "Tabellengröße, Bloat und Vakuumzustand. Bloat und Vakuum gelten nur für PostgreSQL.",
         "deadlocksLocked": "Deadlocks ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um zu sehen, welche Abfragen sich gegenseitig blockiert haben und warum. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan.",
         "blockedLocked": "Blockierte Abfragen ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um zu sehen, welche Sitzungen auf eine Sperre warten und was sie hält. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan.",
-        "tableHealthLocked": "Tabellenzustand ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um Tabellengröße, Bloat und Vakuumzustand zu verfolgen. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan."
+        "tableHealthLocked": "Tabellenzustand ist eine Enterprise-Funktion. Führen Sie ein Upgrade durch, um Tabellengröße, Bloat und Vakuumzustand zu verfolgen. Die anderen Datenbank-Registerkarten funktionieren in jedem Plan.",
+        "queriesHintServer": "Abfragearten, die Ihre Datenbanken in diesem Zeitraum gemeldet haben, gezählt innerhalb der Datenbank."
       }
     },
     "metrics": {

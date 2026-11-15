@@ -213,11 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("settings.addRegexPattern.clickTestInputHint") }}
                     </span>
                   </div>
-                  <div v-else-if="testLoading">
-                    <span class="flex h-27.75 items-center justify-center">
-                      <OSpinner size="lg" />
-                    </span>
-                  </div>
+                  <OSkeleton v-else-if="testLoading" shape="block" class="h-27.75" />
                 </div>
               </div>
             </div>
@@ -260,7 +256,7 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
@@ -295,7 +291,7 @@ export default defineComponent({
     O2AIChat,
     OButton,
     ODrawer,
-    OSpinner,
+    OSkeleton,
     OIcon,
     OForm,
     OFormInput,

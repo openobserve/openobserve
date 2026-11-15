@@ -1961,6 +1961,9 @@
     "workflows": "Quy trình làm việc",
     "language": "Ngôn ngữ",
     "keyboardShortcuts": "Phím tắt",
+    "searchOrJumpTo": "Tìm kiếm hoặc chuyển đến…",
+    "jumpToTitle": "Chuyển đến",
+    "jumpToPlaceholder": "Tìm trang",
     "synthetic": "Synthetics",
     "experience": "Trải nghiệm",
     "slos": "SLO",
@@ -4039,7 +4042,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "Bạn không được ủy quyền quản lý giấy phép."
-      }
+      },
+      "usageTitle": "Lượng nạp hằng ngày"
     },
     "value_sso_requires_ha": "✅ Yêu cầu chế độ HA",
     "value_rbac_requires_ha": "✅ Yêu cầu chế độ HA",
@@ -5048,6 +5052,7 @@
   },
   "organization": {
     "searchByNameOrId": "Tìm kiếm theo tên hoặc ID",
+    "currentLabel": "Tổ chức: {name}",
     "noOrganizationsFound": "Không tìm thấy tổ chức nào",
     "header": "Tổ chức",
     "orgBeingDeletedSwitching": "Tổ chức này đang bị xóa. Đang chuyển bạn sang tổ chức khác.",
@@ -10752,7 +10757,8 @@
       "taglineAnd": "và hướng dẫn bạn qua nhật ký, trace, chỉ số và sự cố của bạn.",
       "signedInAs": "Đã đăng nhập với tên",
       "role": "Vai trò",
-      "tryOneOfThese": "Hoặc thử một trong những"
+      "tryOneOfThese": "Hoặc thử một trong những",
+      "panelText": "Hỏi về log, trace, chỉ số và sự cố của bạn, hoặc nhờ trợ giúp viết truy vấn."
     },
     "capabilities": {
       "query": {
@@ -18952,7 +18958,7 @@
       "version": "Phiên bản",
       "agentIdHint": "Agent ID: {ids}",
       "noAgentIdentity": "Không tìm thấy danh tính agent",
-      "noAgentIdentityDescription": "Các span LLM này không có tên agent, nên chúng được hiển thị theo stream. Hãy ánh xạ thuộc tính đặt tên agent của bạn để xem chúng theo agent.",
+      "noAgentIdentityDescription": "Các span LLM này không có tên agent, nên chúng được hiển thị theo stream.",
       "noAgentIdentityAction": "Mở Ánh xạ Agent GenAI"
     },
     "agentGraph": {
@@ -22728,6 +22734,7 @@
     },
     "actions": {
       "openCheatsheet": "Mở bảng phím tắt",
+      "searchOrJumpTo": "Tìm kiếm hoặc chuyển đến trang",
       "closeDialog": "Đóng bất kỳ hộp thoại, ngăn kéo hoặc cửa sổ phương thức",
       "focusSearch": "Tập trung thanh tìm kiếm",
       "focusQuery": "Tập trung trình soạn thảo truy vấn",
@@ -25452,7 +25459,8 @@
         "p95": "Phần đuôi chậm — 1 trong 20 lệnh gọi mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
         "p99": "1% lệnh gọi tệ nhất mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
         "load": "Tổng thời gian ứng dụng của bạn dành cho các lệnh gọi đến cơ sở dữ liệu này, được đo từ trace của ứng dụng của bạn. Nó cho thấy cơ sở dữ liệu này đã phục vụ bao nhiêu lưu lượng cho ứng dụng của bạn.",
-        "attention": "Phiên bản này gần đến mức nào so với giới hạn mà công cụ của chính nó công bố — hôm nay, số kết nối so với max_connections. Tỷ lệ tệ nhất, không phải điểm tổng hợp. Sắp xếp theo thứ tự giảm dần, với các phiên bản không thể đọc tình trạng ở trên cùng, vì một phiên bản bạn không thể thấy không phải là phiên bản bạn biết là khỏe mạnh. Được đo trên máy chủ cơ sở dữ liệu, vì vậy nó không thể so sánh với Thời gian cơ sở dữ liệu bên cạnh."
+        "attention": "Phiên bản này gần đến mức nào so với giới hạn mà công cụ của chính nó công bố — hôm nay, số kết nối so với max_connections. Tỷ lệ tệ nhất, không phải điểm tổng hợp. Sắp xếp theo thứ tự giảm dần, với các phiên bản không thể đọc tình trạng ở trên cùng, vì một phiên bản bạn không thể thấy không phải là phiên bản bạn biết là khỏe mạnh. Được đo trên máy chủ cơ sở dữ liệu, vì vậy nó không thể so sánh với Thời gian cơ sở dữ liệu bên cạnh.",
+        "calls": "Số lần ứng dụng của bạn gọi cơ sở dữ liệu này, đo từ trace của ứng dụng."
       },
       "failedChip": "{count} thất bại",
       "columnSubLabels": {
@@ -25893,7 +25901,8 @@
         "tableHealthHint": "Kích thước bảng, độ phình và trạng thái dọn dẹp. Độ phình và dọn dẹp chỉ áp dụng cho PostgreSQL.",
         "deadlocksLocked": "Deadlock là tính năng Enterprise. Nâng cấp để xem truy vấn nào đã khóa lẫn nhau và tại sao. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
         "blockedLocked": "Truy vấn bị chặn là tính năng Enterprise. Nâng cấp để xem phiên nào đang chờ khóa và điều gì đang giữ khóa. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
-        "tableHealthLocked": "Sức khỏe bảng là tính năng Enterprise. Nâng cấp để theo dõi kích thước bảng, độ phình và trạng thái dọn dẹp. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói."
+        "tableHealthLocked": "Sức khỏe bảng là tính năng Enterprise. Nâng cấp để theo dõi kích thước bảng, độ phình và trạng thái dọn dẹp. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
+        "queriesHintServer": "Các loại truy vấn mà cơ sở dữ liệu của bạn báo cáo trong khoảng này, được đếm bên trong cơ sở dữ liệu."
       }
     },
     "metrics": {

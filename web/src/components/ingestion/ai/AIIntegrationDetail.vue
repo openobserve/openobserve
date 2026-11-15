@@ -22,7 +22,7 @@ import { useStore } from "vuex";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import useIngestion from "@/composables/useIngestion";
 import { basicIngestToken } from "@/composables/useCredentialSnippet";
-import { aiCategories } from "./data";
+import { aiCategoriesWithLogos as aiCategories } from "./cardLogos";
 import type { AICategory, AIIntegration } from "./data";
 import { getAICardRaw } from "./content";
 import { safeHttpUrl, type CardSubstitutions } from "./content/renderMarkdown";

@@ -1961,6 +1961,9 @@
     "workflows": "Fluxos de trabalho",
     "language": "Idioma",
     "keyboardShortcuts": "Atalhos de teclado",
+    "searchOrJumpTo": "Pesquisar ou ir para…",
+    "jumpToTitle": "Ir para",
+    "jumpToPlaceholder": "Pesquisar páginas",
     "synthetic": "Sintéticos",
     "experience": "Experiência",
     "slos": "SLOs",
@@ -4039,7 +4042,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "Não está autorizado a gerir a licença."
-      }
+      },
+      "usageTitle": "Ingestão diária"
     },
     "value_sso_requires_ha": "✅ Requer o modo HA",
     "value_rbac_requires_ha": "✅ Requer o modo HA",
@@ -5048,6 +5052,7 @@
   },
   "organization": {
     "searchByNameOrId": "Pesquisar por nome ou ID",
+    "currentLabel": "Organização: {name}",
     "noOrganizationsFound": "Nenhuma organização encontrada",
     "header": "Organizações",
     "orgBeingDeletedSwitching": "Esta organização está a ser eliminada. A redirecioná-lo para outra organização.",
@@ -10752,7 +10757,8 @@
       "taglineAnd": "e guiá-lo pelos seus logs, traces, métricas e incidentes.",
       "signedInAs": "Sessão iniciada como",
       "role": "Função",
-      "tryOneOfThese": "Ou experimente um destes"
+      "tryOneOfThese": "Ou experimente um destes",
+      "panelText": "Pergunte sobre os seus logs, traces, métricas e incidentes, ou obtenha ajuda para escrever uma consulta."
     },
     "capabilities": {
       "query": {
@@ -18952,7 +18958,7 @@
       "version": "Versão",
       "agentIdHint": "ID do agente: {ids}",
       "noAgentIdentity": "Nenhuma identidade de agente encontrada",
-      "noAgentIdentityDescription": "Estes spans LLM não têm nome de agente, por isso são apresentados por stream. Mapeie o atributo que dá nome ao seu agente para os ver por agente.",
+      "noAgentIdentityDescription": "Estes spans LLM não têm nome de agente, por isso são apresentados por stream.",
       "noAgentIdentityAction": "Abrir mapeamento de agentes GenAI"
     },
     "agentGraph": {
@@ -22728,6 +22734,7 @@
     },
     "actions": {
       "openCheatsheet": "Abrir o guia rápido de atalhos de teclado",
+      "searchOrJumpTo": "Pesquisar ou ir para uma página",
       "closeDialog": "Fechar qualquer caixa de diálogo, gaveta ou modal",
       "focusSearch": "Focar a barra de pesquisa",
       "focusQuery": "Focar o editor de consultas",
@@ -25452,7 +25459,8 @@
         "p95": "A cauda lenta — 1 em cada 20 chamadas levou pelo menos este tempo. Medido a partir das chamadas concluídas nos traces da sua aplicação.",
         "p99": "O pior 1% das chamadas demorou pelo menos este tempo. Medido a partir das chamadas concluídas nos traces da sua aplicação.",
         "load": "Tempo total que as suas aplicações gastaram em chamadas a esta base de dados, medido a partir dos traces da sua aplicação. Mostra quanto tráfego esta base de dados atendeu para as suas aplicações.",
-        "attention": "Quão perto esta instância está de um limite que o seu próprio mecanismo publica — hoje, ligações em relação a max_connections. A pior destas proporções, não uma pontuação combinada. Ordenado do maior para o menor, com as instâncias cuja saúde não pode ser lida no topo, porque uma que não pode ver não é uma que sabe que está saudável. Medido no servidor da base de dados, portanto não é comparável com o Tempo de base de dados ao lado."
+        "attention": "Quão perto esta instância está de um limite que o seu próprio mecanismo publica — hoje, ligações em relação a max_connections. A pior destas proporções, não uma pontuação combinada. Ordenado do maior para o menor, com as instâncias cuja saúde não pode ser lida no topo, porque uma que não pode ver não é uma que sabe que está saudável. Medido no servidor da base de dados, portanto não é comparável com o Tempo de base de dados ao lado.",
+        "calls": "Quantas vezes as suas aplicações chamaram esta base de dados, medido a partir dos traces da sua aplicação."
       },
       "failedChip": "{count} falhas",
       "columnSubLabels": {
@@ -25893,7 +25901,8 @@
         "tableHealthHint": "Tamanho da tabela, estado de bloat e vacuum. Bloat e vacuum são exclusivos do PostgreSQL.",
         "deadlocksLocked": "Deadlocks é uma funcionalidade Enterprise. Faça upgrade para ver que consultas entraram em deadlock entre si e porquê. Os outros separadores de base de dados funcionam em todos os planos.",
         "blockedLocked": "Consultas bloqueadas é uma funcionalidade Enterprise. Faça upgrade para ver que sessões estão à espera de um lock e o que o está a reter. Os outros separadores de base de dados funcionam em todos os planos.",
-        "tableHealthLocked": "Saúde da tabela é uma funcionalidade Enterprise. Faça upgrade para acompanhar o tamanho da tabela, o estado de bloat e vacuum. Os outros separadores de base de dados funcionam em todos os planos."
+        "tableHealthLocked": "Saúde da tabela é uma funcionalidade Enterprise. Faça upgrade para acompanhar o tamanho da tabela, o estado de bloat e vacuum. Os outros separadores de base de dados funcionam em todos os planos.",
+        "queriesHintServer": "Tipos de consulta que as suas bases de dados reportaram neste período, contados dentro da base de dados."
       }
     },
     "metrics": {

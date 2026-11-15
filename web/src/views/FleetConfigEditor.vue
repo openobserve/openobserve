@@ -205,13 +205,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="fleet-config-editor-load-error"
           @action="retryLoad"
         />
-        <div
+        <OSkeleton
           v-else-if="!loaded"
-          class="flex h-full items-center justify-center"
+          shape="block"
+          class="h-full"
           data-test="fleet-config-editor-loading"
-        >
-          <OSpinner size="lg" />
-        </div>
+        />
         <FleetEditorCanvas
           v-else-if="graph && mode === 'visual'"
           :key="loadedFor ?? ''"
@@ -405,7 +404,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OAccessLock from "@/components/access/OAccessLock.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";

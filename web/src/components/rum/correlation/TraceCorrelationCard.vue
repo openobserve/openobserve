@@ -27,12 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <template v-else-if="!traceId">
-      <div class="text-text-muted p-3 text-center">
-        <OIcon name="info" size="md" class="mb-2" />
-        <div>{{ t("traces.correlation.noTraceInfoAvailable") }}</div>
-      </div>
-    </template>
+    <OEmptyState
+      v-else-if="!traceId"
+      size="compact"
+      class="px-3"
+      icon="timeline"
+      :title="t('traces.correlation.noTraceInfoAvailable')"
+    />
 
     <template v-else>
       <!-- Trace ID Section -->
@@ -202,6 +203,7 @@ import { normalizeTraceId } from "@/utils/rum/fields";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

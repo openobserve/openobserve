@@ -30,16 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </router-link>
     </div>
 
-    <OText v-if="failed" variant="meta" data-test="alerts-firing-history-error">
-      {{ t("alerts.firing.drawer.historyFailed") }}
-    </OText>
-    <OText
+    <OEmptyState
+      v-if="failed"
+      size="compact"
+      kind="error"
+      :title="t('alerts.firing.drawer.historyFailed')"
+      data-test="alerts-firing-history-error"
+    />
+    <OEmptyState
       v-else-if="!hits.length && !firingStartedAt"
-      variant="meta"
+      size="compact"
+      icon="history"
+      :title="t('alerts.firing.drawer.historyEmpty')"
       data-test="alerts-firing-history-empty"
-    >
-      {{ t("alerts.firing.drawer.historyEmpty") }}
-    </OText>
+    />
     <template v-else>
       <div
         class="flex h-3 w-full gap-px overflow-hidden rounded-full"
@@ -88,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import type { RouteLocationRaw } from "vue-router";
-import OText from "@/lib/core/Typography/OText.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { ackEventText } from "@/utils/alerts/ackState";

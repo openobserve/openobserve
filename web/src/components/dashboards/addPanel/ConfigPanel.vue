@@ -60,17 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
-    <!-- No results empty state -->
-    <div
+    <OEmptyState
       v-if="searchQuery && !anySectionVisible"
-      class="column items-center py-4 text-center"
+      size="compact"
+      kind="filtered"
+      :title="t('dashboard.configPanelNoResultsFound', { query: searchQuery })"
       data-test="dashboard-config-no-results"
-    >
-      <OIcon name="search-off" size="md" class="text-icon-color mb-1" />
-      <div class="text-text-muted text-xs">
-        {{ t("dashboard.configPanelNoResultsFound", { query: searchQuery }) }}
-      </div>
-    </div>
+    />
 
     <!-- Section: General -->
     <OCollapsible
@@ -3363,6 +3359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { DEFAULT_STAT_TEXT_MODE, STAT_TEXT_MODES } from "@/utils/dashboard/metricOptions";
 import {
   DEFAULT_GAUGE_STYLE,
@@ -3572,6 +3569,7 @@ const LogsPanelConfig = defineAsyncComponent(() => import("./LogsPanelConfig.vue
 
 export default defineComponent({
   components: {
+    OEmptyState,
     OTabs,
     OTab,
     OInput,

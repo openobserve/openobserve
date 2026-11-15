@@ -238,6 +238,14 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.global",
     shortcuts: [
       { id: "openCheatsheet", key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
+      // skipInInput leaves Ctrl K to the editors, where it starts Monaco's chords.
+      {
+        id: "searchOrJumpTo",
+        keyForWindows: "ctrl+k",
+        keyForMac: "meta+k",
+        descriptionKey: "shortcuts.actions.searchOrJumpTo",
+        skipInInput: true,
+      },
       { id: "closeDialog", key: "escape", descriptionKey: "shortcuts.actions.closeDialog" },
       {
         id: "aiChatToggle",

@@ -11,6 +11,7 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -23,6 +24,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -863,8 +865,7 @@ async function loadEvidence() {
     evidenceError.value =
       e?.response?.data?.message ??
       e?.response?.data?.error ??
-      e?.message ??
-      t("siem.alerts.evidenceError");
+      (e?.message && !isRawHttpText(e.message) ? e.message : t("siem.alerts.evidenceError"));
   } finally {
     if (mine === evidenceSeq) evidenceLoading.value = false;
   }
@@ -1124,16 +1125,12 @@ onUnmounted(() => {
           </div>
         </template>
         <template #toolbar-trailing>
-          <OButton
-            icon-only
-            variant="ghost"
-            icon="refresh"
+          <ORefreshButton
+            :last-run-at="lastRunAt"
             :loading="inFlight > 0"
             data-test="security-alerts-refresh"
             @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('siem.alerts.refresh')" />
-          </OButton>
+          />
         </template>
 
         <template #cell-severity="{ row }">
@@ -1327,7 +1324,6 @@ onUnmounted(() => {
       <template #tab-evidence>
         <OEmptyState
           v-if="!evidenceSql"
-          size="inline"
           icon="info-outline"
           :title="t('siem.alerts.noEvidence')"
           :text="t('siem.alerts.noEvidenceHint')"
@@ -1432,7 +1428,6 @@ onUnmounted(() => {
       <template #tab-detection>
         <OEmptyState
           v-if="!selected.detection"
-          size="inline"
           icon="info-outline"
           :title="t('siem.alerts.notSiemTitle')"
           :text="t('siem.alerts.notSiemHint')"

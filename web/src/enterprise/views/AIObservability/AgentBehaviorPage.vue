@@ -25,14 +25,10 @@
     @date-change="onDateChange"
     @refresh="refresh"
   >
-    <!-- Scope control — same Stream/Agent pattern as Agent Graph, so the AI
-         pages read as one product. Stream tab shows every agent's signals for
-         the stream; Agent tab narrows to one discovered agent (and follows its
-         source_stream). Lives in OPageLayout's #subnav (full-bleed divider). -->
-    <template #subnav>
-      <!-- Shared scope control. #subnav already draws the full-bleed divider,
-           so the bar itself is unbordered. allAgents:false → the agent picker
-           falls back to the plain agent label (no All-Agents concept here). -->
+    <!-- The banner (K3) and the scope bar wait for the scope together, so neither pushes the panel
+         down. Same Stream/Agent bar as Agent Graph; allAgents:false shows the plain agent label. -->
+    <template v-if="scopeReady">
+      <AiNoAgentIdentityBanner v-if="noAgentIdentity" data-test="agent-behavior" />
       <AiScopeBar
         v-model:filter-mode="filterMode"
         v-model:active-stream="activeStream"
@@ -40,7 +36,7 @@
         v-model:selected-agent-name="selectedAgentName"
         v-model:selected-version="selectedVersion"
         data-test="agent-behavior"
-        :bordered="false"
+        bordered
         :labels="{
           agent: t('aiObservability.agentGraph.agent'),
           stream: t('aiObservability.agentGraph.stream'),
@@ -62,10 +58,6 @@
       />
     </template>
 
-    <!-- Stream mode because these LLM spans carry no agent identity: the
-         signals show for every span in the stream (agent "unknown"). -->
-    <AiNoAgentIdentityBanner v-if="noAgentIdentity && scopeReady" data-test="agent-behavior" />
-
     <!-- Agent mode whose agents list failed to load: not "no agents". -->
     <div
       v-if="scopeReady && agentsLoadFailed"
@@ -81,7 +73,7 @@
          two cards, so the page itself never scrolls — each table scrolls
          internally when its rows overflow. The stream is withheld until the
          scope is settled, so the panel fetches once, for the final scope. -->
-    <div v-else class="px-page-edge flex min-h-0 flex-1 flex-col py-4">
+    <div v-else-if="scopeReady" class="px-page-edge flex min-h-0 flex-1 flex-col py-4">
       <AgentBehaviorPanel
         ref="panelRef"
         class="min-h-0 flex-1"
@@ -95,6 +87,7 @@
         @send-to-ai-chat="(value: unknown, append?: boolean) => emit('sendToAiChat', value, append)"
       />
     </div>
+    <OSkeleton v-else shape="block" class="min-h-0 flex-1" data-test="agent-behavior-loading" />
   </AiPageShell>
 </template>
 
@@ -103,6 +96,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import AgentBehaviorPanel from "./AgentBehaviorPanel.vue";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";

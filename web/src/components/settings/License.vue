@@ -3,9 +3,9 @@
   <div>
     <LicensePeriod @renew="redirectToGetLicense()"></LicensePeriod>
 
-    <div v-if="loading" class="flex flex-col items-center justify-center p-3">
-      <OSpinner size="lg" />
-      <div class="mt-3">{{ t("about.loading_license_info") }}</div>
+    <div v-if="loading" class="flex flex-col gap-4 pb-4">
+      <OSkeleton shape="block" class="h-36" />
+      <OSkeleton shape="block" class="h-48" />
     </div>
     <div v-else class="grid grid-cols-1 items-start gap-4 pb-4">
       <div class="col-span-1 min-h-0">
@@ -481,7 +481,7 @@ import LicenseFeatures from "./LicenseFeatures.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -521,7 +521,7 @@ export default defineComponent({
     RenderDashboardCharts,
     OButton,
     ODialog,
-    OSpinner,
+    OSkeleton,
     OIcon,
     OBadge,
     OTextarea,

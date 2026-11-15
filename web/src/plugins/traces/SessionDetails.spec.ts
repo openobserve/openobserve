@@ -314,11 +314,19 @@ describe("SessionDetails — loading state", () => {
 
 describe("SessionDetails — error state", () => {
   it("shows 'failed to load' message when fetchSession throws", async () => {
+    mockFetchSession.mockRejectedValue(new Error("session store offline"));
+
+    const wrapper = await mountComponent();
+    expect(wrapper.text()).toContain("traces.sessionDetail.failedToLoad");
+    expect(wrapper.text()).toContain("session store offline");
+  });
+
+  it("never shows raw transport text such as 'network error'", async () => {
     mockFetchSession.mockRejectedValue(new Error("network error"));
 
     const wrapper = await mountComponent();
     expect(wrapper.text()).toContain("traces.sessionDetail.failedToLoad");
-    expect(wrapper.text()).toContain("network error");
+    expect(wrapper.text()).not.toContain("network error");
   });
 
   it("shows a Retry button when error is set", async () => {

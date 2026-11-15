@@ -17,6 +17,7 @@ export class LogsToolbarPinsPage {
     this.tracesPinsKey = 'traces_toolbar_pinned_items';
 
     // ===== LOCATORS =====
+    // The toolbar ⋯, which holds the pin toggles.
     this.moreMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
     // The bar clips its overflow, so its box is what decides "clipped" below.
     this.searchBar = '#searchBarComponent';
@@ -219,10 +220,6 @@ export class LogsToolbarPinsPage {
         return localStorage.getItem(key);
       }
     }, this.pinsKey);
-  }
-
-  async readHistogramDecidedFlag() {
-    return this.page.evaluate((key) => localStorage.getItem(key), this.histogramDecidedKey);
   }
 
   async readTracesPins() {

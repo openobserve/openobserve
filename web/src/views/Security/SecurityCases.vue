@@ -10,6 +10,7 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -29,7 +30,7 @@ import SecurityNotices, { type SecurityNotice } from "@/components/security/Secu
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
 import { failedRequests, viewDenial, type AccessDenial } from "@/composables/useAccessStore";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -268,8 +269,12 @@ const error = computed(() => {
   return e?.response?.data?.message ?? e?.message ?? t("siem.cases.loadError");
 });
 
+// A failed list read is the table's error state with Retry (K5), not a bar that mounts above it late.
+const tableError = computed(() => (cases.value.length ? null : error.value || null));
+
+// A refresh that fails over rows still on screen keeps them and says so in the bar.
 const notices = computed<SecurityNotice[]>(() => [
-  ...(error.value
+  ...(error.value && !tableError.value
     ? [
         {
           key: "error",
@@ -1381,9 +1386,11 @@ onMounted(() => {
         :column-visibility="{ first_alert_at: false }"
         :row-class="rowClass"
         :get-row-status-color="rowRail"
+        :error="tableError"
         class="min-h-0 flex-1"
         data-test="security-cases-table"
         @row-click="open"
+        @retry="refetchCases"
       >
         <template v-if="canTriage" #selection-actions>
           <SecurityCaseBulkBar
@@ -1469,16 +1476,12 @@ onMounted(() => {
           </div>
         </template>
         <template #toolbar-trailing>
-          <OButton
-            icon-only
-            variant="ghost"
-            icon="refresh"
+          <ORefreshButton
+            :last-run-at="list.dataUpdatedAt.value || null"
             :loading="loading"
             data-test="security-cases-refresh"
             @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('siem.cases.refresh')" />
-          </OButton>
+          />
         </template>
 
         <template #cell-severity="{ row }">
@@ -1663,10 +1666,12 @@ onMounted(() => {
           <h3 class="text-text-secondary text-xs font-semibold tracking-wide uppercase">
             {{ t("siem.cases.detections") }}
           </h3>
-          <div v-if="detailLoading" class="flex justify-center py-4"><OSpinner size="lg" /></div>
+          <div v-if="detailLoading" class="flex flex-col gap-2">
+            <OSkeleton v-for="row in 3" :key="row" class="h-8" />
+          </div>
           <OEmptyState
             v-else-if="!detections.length"
-            size="inline"
+            size="compact"
             icon="rule"
             :title="t('siem.cases.noDetections')"
           />
@@ -1715,15 +1720,16 @@ onMounted(() => {
             :rows="entityRows"
             data-test="security-cases-drawer-entities"
           />
-          <span v-else class="text-text-secondary text-xs">{{ t("siem.cases.noEntities") }}</span>
+          <OEmptyState v-else size="compact" :title="t('siem.cases.noEntities')" />
         </section>
       </template>
 
       <template #tab-alerts>
-        <div v-if="detailLoading" class="flex justify-center py-6"><OSpinner size="lg" /></div>
+        <div v-if="detailLoading" class="flex flex-col gap-2">
+          <OSkeleton v-for="row in 5" :key="row" class="h-10" />
+        </div>
         <OEmptyState
           v-else-if="!alertRows.length"
-          size="inline"
           icon="notifications-active"
           :title="t('siem.cases.noAlerts')"
         />
@@ -1798,13 +1804,10 @@ onMounted(() => {
         >
           {{ t("siem.cases.timelinePartial") }}
         </OInlineNotice>
-        <div v-if="eventsLoading" class="flex justify-center py-6"><OSpinner size="lg" /></div>
-        <OEmptyState
-          v-else-if="!events.length"
-          size="inline"
-          icon="history"
-          :title="t('siem.cases.noEvents')"
-        />
+        <div v-if="eventsLoading" class="flex flex-col gap-3">
+          <OSkeleton v-for="row in 5" :key="row" class="h-8" />
+        </div>
+        <OEmptyState v-else-if="!events.length" icon="history" :title="t('siem.cases.noEvents')" />
         <OTimeline v-else data-test="security-cases-drawer-timeline">
           <OTimelineItem
             v-for="(e, i) in events"
@@ -1848,7 +1851,7 @@ onMounted(() => {
         </p>
         <OEmptyState
           v-else-if="!analyzing"
-          size="inline"
+          size="compact"
           icon="psychology"
           :title="t('siem.cases.noAnalysis')"
         />

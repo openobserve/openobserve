@@ -29,12 +29,14 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef, OTableSortParams } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
@@ -72,6 +74,7 @@ const {
 
 const hostsState = computed(() => detection.states.value.hosts);
 const loading = ref(false);
+const listLoadedAt = ref<number | null>(null);
 
 const nowUs = () => Date.now() * 1000;
 const range = ref({ start: nowUs() - HOSTS_DEFAULT_WINDOW_US, end: nowUs(), relative: true });
@@ -88,6 +91,7 @@ const refreshList = async () => {
   loading.value = true;
   try {
     await list.refresh({ orgId: orgId.value, start: range.value.start, end: range.value.end });
+    listLoadedAt.value = Date.now();
   } finally {
     loading.value = false;
   }
@@ -98,6 +102,7 @@ const refreshList = async () => {
 const refreshNonce = ref(0);
 // The Dependencies view reports its own reloads, which the header's Refresh shows on that tab.
 const mapLoading = ref(false);
+const mapLoadedAt = ref<number | null>(null);
 const reload = () => {
   refreshNonce.value++;
   if (view.value === "dependencies") listStale = true;
@@ -513,47 +518,46 @@ const osToggleLabel = (slug: string) =>
           data-test-name="hosts-date-time"
           @on:date-change="onDateChange"
         />
-        <!-- Icon-only on phones so the actions share the title row; sr-only keeps the button named. -->
-        <OButton
-          variant="secondary"
-          icon="refresh"
-          class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
-          data-test="hosts-refresh"
+        <ORefreshButton
+          :last-run-at="view === 'dependencies' ? mapLoadedAt : listLoadedAt"
           :loading="view === 'dependencies' ? mapLoading : loading"
+          data-test="hosts-refresh"
           @click="onRefreshClick"
-        >
-          <span class="max-md:sr-only">{{ t("infra.hosts.refresh") }}</span>
-        </OButton>
+        />
       </div>
     </template>
 
-    <!-- Detection unresolved: a spinner, never a false "set up" flash. -->
-    <div v-if="hostsState === 'unknown'" class="flex min-h-60 items-center justify-center">
-      <OSpinner size="lg" />
+    <!-- Detection unresolved: a skeleton, never a false "set up" flash. -->
+    <div v-if="hostsState === 'unknown'" class="px-page-edge" data-test="hosts-loading">
+      <OSkeleton preset="tableRows" :rows="8" />
     </div>
 
     <!-- Undetected: onboarding, not a dead end — the embedded card carries the auto-import wiring. -->
     <div v-else-if="hostsState !== 'detected'" class="min-h-0 flex-1 overflow-y-auto">
-      <div
-        class="max-lg:px-page-edge mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
+      <OEmptyState
+        icon="dns"
+        :title="t('infra.hosts.emptyHeadline')"
+        :text="t('infra.hosts.emptyRbacHint')"
         data-test="hosts-empty-state"
       >
-        <OText tag="h2" class="text-xl font-semibold">{{ t("infra.hosts.emptyHeadline") }}</OText>
-        <OText variant="meta">{{ t("infra.hosts.emptyRbacHint") }}</OText>
-        <div class="flex items-center gap-2 pt-2">
-          <OButton
-            v-for="slug in OS_SLUGS"
-            :key="slug"
-            :variant="osSlug === slug ? 'primary' : 'secondary'"
-            :data-test="`hosts-os-toggle-${slug}`"
-            @click="osSlug = slug"
-          >
-            {{ osToggleLabel(slug) }}
-          </OButton>
-        </div>
-        <!-- Detection connecting inside the embedded card must flip this page live (design 4.8). -->
-        <DataSourceSetupCard :slug="osSlug" @detected="detection.refresh({ force: true })" />
-      </div>
+        <template #extra>
+          <div class="flex w-full max-w-3xl min-w-0 flex-col gap-3 text-start">
+            <div class="flex items-center justify-center gap-2">
+              <OButton
+                v-for="slug in OS_SLUGS"
+                :key="slug"
+                :variant="osSlug === slug ? 'primary' : 'secondary'"
+                :data-test="`hosts-os-toggle-${slug}`"
+                @click="osSlug = slug"
+              >
+                {{ osToggleLabel(slug) }}
+              </OButton>
+            </div>
+            <!-- Detection connecting inside the embedded card must flip this page live (design 4.8). -->
+            <DataSourceSetupCard :slug="osSlug" @detected="detection.refresh({ force: true })" />
+          </div>
+        </template>
+      </OEmptyState>
     </div>
 
     <!-- Labelled by name: the tab buttons carry generated ids and no aria-controls without a tab-content
@@ -571,6 +575,7 @@ const osToggleLabel = (slug: string) =>
       @update:low-traffic="onLowTraffic"
       @refresh="onRefreshClick"
       @loading="(now: boolean) => (mapLoading = now)"
+      @loaded="(at: number) => (mapLoadedAt = at)"
     />
 
     <!-- Total failure: ONE page-level surface, never stacked column warnings. -->
@@ -578,14 +583,16 @@ const osToggleLabel = (slug: string) =>
       v-else-if="pageError"
       role="tabpanel"
       :aria-label="t('infra.hosts.viewTable')"
-      class="flex min-h-60 flex-col items-center justify-center gap-2"
+      class="flex min-h-0 flex-1 flex-col"
       data-test="hosts-page-error"
     >
-      <OText class="text-lg font-semibold">{{ t("infra.hosts.pageError") }}</OText>
-      <OText variant="meta">{{ raw(pageError) }}</OText>
-      <OButton variant="secondary" data-test="hosts-retry" @click="refreshList">
-        {{ t("infra.hosts.retry") }}
-      </OButton>
+      <OEmptyState kind="error" :text="t('infra.hosts.pageError')">
+        <template #actions>
+          <OButton data-test="hosts-retry" @click="refreshList">
+            {{ t("infra.hosts.retry") }}
+          </OButton>
+        </template>
+      </OEmptyState>
     </div>
 
     <div

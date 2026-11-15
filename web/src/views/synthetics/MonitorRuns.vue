@@ -39,50 +39,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          passes lastTriggeredAt to distinguish "never triggered" from "no
          runs in this window." -->
     <template v-if="kpiHasLoadedOnce && synthetics.kpi.value.totalRuns === 0">
-      <div class="flex flex-1 items-center justify-center">
-        <OEmptyState
-          :kind="lastTriggeredAt > 0 ? 'filtered' : 'first-run'"
-          :icon="lastTriggeredAt > 0 ? undefined : 'web'"
-          :title="
-            lastTriggeredAt > 0
-              ? t('synthetics.results.noRunsInWindow')
-              : t('synthetics.results.noRunsYet')
-          "
-          :text="
-            lastTriggeredAt > 0
-              ? t('synthetics.results.noRunsInWindowDesc')
-              : t('synthetics.results.noRunsYetDesc')
-          "
-          data-test="monitor-runs-page-empty"
-        >
-          <template #actions>
-            <EmptyStateActionCard
-              v-if="lastTriggeredAt > 0"
-              icon="schedule"
-              :label="t('synthetics.results.jumpToLatestData')"
-              :sublabel="raw(lastTriggeredAtSublabel)"
-              data-test="monitor-runs-empty-jump-latest"
-              @click="handleJumpToLatestData"
-            />
-            <EmptyStateActionCard
-              v-else
-              icon="play-arrow"
-              :label="t('synthetics.results.triggerRunNow')"
-              :sublabel="t('synthetics.results.triggerRunNowDesc')"
-              data-test="monitor-runs-empty-trigger-run"
-              @click="handleEmptyStateAction('trigger-run')"
-            />
-            <EmptyStateActionCard
-              v-if="hasActiveFilters"
-              icon="filter-list"
-              :label="t('synthetics.results.clearFilters')"
-              :sublabel="t('synthetics.results.clearFiltersDesc')"
-              data-test="monitor-runs-empty-clear-filters"
-              @click="handleEmptyStateAction('clear-filters')"
-            />
-          </template>
-        </OEmptyState>
-      </div>
+      <OEmptyState
+        :kind="lastTriggeredAt > 0 ? 'filtered' : 'first-run'"
+        :icon="lastTriggeredAt > 0 ? undefined : 'web'"
+        :title="
+          lastTriggeredAt > 0
+            ? t('synthetics.results.noRunsInWindow')
+            : t('synthetics.results.noRunsYet')
+        "
+        :text="
+          lastTriggeredAt > 0
+            ? t('synthetics.results.noRunsInWindowDesc')
+            : t('synthetics.results.noRunsYetDesc')
+        "
+        data-test="monitor-runs-page-empty"
+      >
+        <template #actions>
+          <OButton
+            v-if="lastTriggeredAt > 0"
+            data-test="monitor-runs-empty-jump-latest"
+            @click="handleJumpToLatestData"
+          >
+            {{ t("synthetics.results.jumpToLatestData") }}
+            <OTooltip :content="raw(lastTriggeredAtSublabel)" />
+          </OButton>
+          <OButton
+            v-else
+            variant="primary"
+            data-test="monitor-runs-empty-trigger-run"
+            @click="handleEmptyStateAction('trigger-run')"
+          >
+            {{ t("synthetics.results.triggerRunNow") }}
+          </OButton>
+          <OButton
+            v-if="hasActiveFilters"
+            data-test="monitor-runs-empty-clear-filters"
+            @click="handleEmptyStateAction('clear-filters')"
+          >
+            {{ t("synthetics.results.clearFilters") }}
+          </OButton>
+        </template>
+      </OEmptyState>
     </template>
 
     <!-- ── Tabs ──────────────────────────────────────────────────────── -->
@@ -150,14 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }}</span>
                     </div>
                     <div class="border-border-default border-t" />
-                    <div
-                      class="text-status-error-text flex items-center justify-center py-6 text-xs"
-                    >
-                      <span class="flex items-center gap-1">
-                        <OIcon name="error" size="xs" />
-                        {{ runsError }}
-                      </span>
-                    </div>
+                    <OEmptyState size="compact" kind="error" class="px-3.5" :text="runsErrorText" />
                   </div>
                 </div>
               </template>
@@ -395,14 +385,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </div>
                       <div class="border-border-default border-t" />
-                      <div
-                        class="text-status-error-text flex items-center justify-center py-8 text-xs"
-                      >
-                        <span class="flex items-center gap-1">
-                          <OIcon name="error" size="xs" />
-                          {{ runsError }}
-                        </span>
-                      </div>
+                      <OEmptyState
+                        size="compact"
+                        kind="error"
+                        class="px-3.5"
+                        :text="runsErrorText"
+                      />
                     </div>
                   </div>
                 </div>
@@ -807,7 +795,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Empty state: smart — differentiates "never run" vs "no runs in window" -->
                   <template #empty>
-                    <div v-if="kpiHasLoadedOnce" class="px-page-edge">
+                    <template v-if="kpiHasLoadedOnce">
                       <!-- Monitor has runs elsewhere — guide to last run + optionally clear filters -->
                       <OEmptyState
                         v-if="synthetics.kpi.value.totalRuns > 0"
@@ -817,21 +805,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="monitor-runs-empty"
                       >
                         <template #actions>
-                          <EmptyStateActionCard
-                            icon="schedule"
-                            :label="t('synthetics.results.jumpToLastRun')"
-                            :sublabel="raw(lastRunLabel)"
+                          <OButton
                             data-test="monitor-runs-empty-jump-last-run"
                             @click="handleEmptyStateAction('jump-to-last-run')"
-                          />
-                          <EmptyStateActionCard
+                          >
+                            {{ t("synthetics.results.jumpToLastRun") }}
+                            <OTooltip :content="raw(lastRunLabel)" />
+                          </OButton>
+                          <OButton
                             v-if="hasActiveFilters"
-                            icon="filter-list"
-                            :label="t('synthetics.results.clearFilters')"
-                            :sublabel="t('synthetics.results.clearFiltersDesc')"
                             data-test="monitor-runs-empty-clear-filters"
                             @click="handleEmptyStateAction('clear-filters')"
-                          />
+                          >
+                            {{ t("synthetics.results.clearFilters") }}
+                          </OButton>
                         </template>
                       </OEmptyState>
 
@@ -844,16 +831,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="monitor-runs-empty"
                       >
                         <template #actions>
-                          <EmptyStateActionCard
-                            icon="play-arrow"
-                            :label="t('synthetics.results.triggerRunNow')"
-                            :sublabel="t('synthetics.results.triggerRunNowDesc')"
+                          <OButton
+                            variant="primary"
                             data-test="monitor-runs-empty-trigger-run"
                             @click="handleEmptyStateAction('trigger-run')"
-                          />
+                          >
+                            {{ t("synthetics.results.triggerRunNow") }}
+                          </OButton>
                         </template>
                       </OEmptyState>
-                    </div>
+                    </template>
                   </template>
                 </OTable>
               </OCard>
@@ -1046,11 +1033,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Empty -->
                     <template #empty>
-                      <div
-                        class="text-text-secondary flex items-center justify-center py-12 text-sm"
-                      >
-                        {{ t("synthetics.runs.noStepData") }}
-                      </div>
+                      <OEmptyState :title="t('synthetics.runs.noStepData')" />
                     </template>
                   </OTable>
                 </OCard>
@@ -1126,7 +1109,8 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { useListViewState } from "@/composables/useListViewState";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -1263,6 +1247,11 @@ const stepsHasLoadedOnce = computed(() => synthetics.stepsHasLoadedOnce.value);
 const kpiError = computed(() => synthetics.kpiError.value);
 const histogramError = computed(() => synthetics.histogramError.value);
 const runsError = computed(() => synthetics.runsError.value);
+const runsErrorText = computed(() =>
+  runsError.value && !isRawHttpText(runsError.value)
+    ? raw(runsError.value)
+    : t("emptyState.loadError.description"),
+);
 const stepsError = computed(() => synthetics.stepsError.value);
 const effectiveP95Ms = computed(() => synthetics.effectiveP95Ms.value);
 

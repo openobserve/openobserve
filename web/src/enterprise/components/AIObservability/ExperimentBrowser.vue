@@ -86,12 +86,12 @@
       />
     </section>
 
-    <div
+    <OEmptyState
       v-else-if="!groups.length"
-      class="border-border-default text-text-secondary rounded-default border border-dashed p-6 text-center"
-    >
-      {{ t("aiObservability.experiments.emptyFiltered") }}
-    </div>
+      kind="filtered"
+      :text="t('aiObservability.experiments.emptyFiltered')"
+      data-test="ai-experiment-empty-filtered"
+    />
 
     <section
       v-for="group in datasetRows"
@@ -481,6 +481,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

@@ -19,29 +19,34 @@
       </OButton>
     </template>
 
-    <div v-if="loading" class="flex flex-1 items-center justify-center">
-      <OSpinner size="lg" />
-    </div>
+    <ConstrainedPage
+      v-if="loading"
+      size="lg"
+      align="left"
+      :padded="false"
+      class="min-h-0 flex-1 px-4 py-3"
+    >
+      <div class="flex flex-col gap-6">
+        <OSkeleton shape="block" class="h-56" />
+        <OSkeleton shape="block" class="h-56" />
+      </div>
+    </ConstrainedPage>
 
-    <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
-      <OEmptyState
-        kind="denied"
-        :title="t('emptyState.noAccess.title')"
-        :text="t('emptyState.noAccess.description')"
-        data-test="gen-ai-agent-mapping-forbidden"
-      />
-    </div>
+    <OEmptyState
+      v-else-if="forbidden"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
+      data-test="gen-ai-agent-mapping-forbidden"
+    />
 
     <!-- No form on a failed load: saving what an empty form holds would wipe the stored mapping. -->
-    <div v-else-if="loadError" class="flex flex-1 items-center justify-center">
-      <OEmptyState
-        kind="error"
-        :title="t('emptyState.loadError.title')"
-        :text="t('emptyState.loadError.description')"
-        data-test="gen-ai-agent-mapping-load-error"
-        @action="loadConfig()"
-      />
-    </div>
+    <OEmptyState
+      v-else-if="loadError"
+      kind="error"
+      data-test="gen-ai-agent-mapping-load-error"
+      @action="loadConfig()"
+    />
 
     <template v-else>
       <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
@@ -168,13 +173,13 @@
             </OSettingRow>
 
             <div class="flex flex-col gap-3 py-3">
-              <p
+              <OEmptyState
                 v-if="harnessRules.length === 0"
-                class="text-text-secondary text-xs"
+                size="compact"
+                icon="smart-toy"
+                :title="t('genAiAgentMapping.sessions.noAgents')"
                 data-test="gen-ai-harness-empty"
-              >
-                {{ t("genAiAgentMapping.sessions.noAgents") }}
-              </p>
+              />
               <div
                 v-for="(rule, i) in harnessRules"
                 :key="rule.id"
@@ -325,7 +330,7 @@ import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

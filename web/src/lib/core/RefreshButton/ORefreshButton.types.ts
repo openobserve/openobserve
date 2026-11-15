@@ -1,18 +1,6 @@
 import type { I18nText } from "@/types/i18n";
 import type { ButtonSize } from "../Button/OButton.types";
 
-/** Auto-refresh choices offered by the menu segment; the page maps them to its timer. */
-export type AutoRefreshInterval = "off" | "10s" | "30s" | "1m" | "5m" | "15m";
-
-export const AUTO_REFRESH_INTERVALS = [
-  "off",
-  "10s",
-  "30s",
-  "1m",
-  "5m",
-  "15m",
-] as const satisfies readonly AutoRefreshInterval[];
-
 export interface RefreshButtonProps {
   /** Unix millisecond timestamp of the last completed query; drives the data age. */
   lastRunAt?: number | null;
@@ -22,8 +10,14 @@ export interface RefreshButtonProps {
   disabled?: boolean;
   /** Epoch ms of a failed refresh: a warn dot, "Failed", and the button reads Retry. */
   failedAt?: number | null;
-  /** Shows the auto-refresh menu segment; omit to hide it. */
-  autoRefresh?: AutoRefreshInterval;
+  /** Auto-refresh interval in seconds, 0 for Off; omit to hide the menu segment. The page runs the timer. */
+  autoRefresh?: number;
+  /** The menu's intervals in seconds; the app's shared list when absent. */
+  intervals?: readonly number[];
+  /** Intervals shorter than this many seconds are disabled; the server's minimum when absent. */
+  minInterval?: number;
+  /** One line under the intervals, such as which time ranges auto-refresh applies to. */
+  autoRefreshNote?: I18nText;
   /** `md` in a toolbar, `sm` in a panel header. */
   size?: Extract<ButtonSize, "sm" | "md">;
   /** Shortcut registry id shown in the tooltip. */
@@ -38,5 +32,5 @@ export interface RefreshButtonProps {
 
 export interface RefreshButtonEmits {
   (e: "click", event: MouseEvent): void;
-  (e: "update:autoRefresh", value: AutoRefreshInterval): void;
+  (e: "update:autoRefresh", value: number): void;
 }

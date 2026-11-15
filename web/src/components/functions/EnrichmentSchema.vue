@@ -27,8 +27,13 @@
     @update:open="$emit('update:open', $event)"
   >
     <div>
-      <div v-if="loadingState" class="flex h-full w-full items-center justify-center py-10">
-        <OSpinner size="lg" data-test="enrichment-schema-loading-indicator" />
+      <div
+        v-if="loadingState"
+        class="flex flex-col gap-5 p-5"
+        data-test="enrichment-schema-loading-indicator"
+      >
+        <OSkeleton shape="block" class="h-24" />
+        <OSkeleton preset="tableRows" :rows="8" />
       </div>
       <div v-else class="indexDetailsContainer h-screen w-full p-5">
         <div
@@ -113,7 +118,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 const defaultStreamData = {
   name: "",
   schema: [],
@@ -141,7 +146,7 @@ export default defineComponent({
     OTable,
     ODrawer,
     OSearchInput,
-    OSpinner,
+    OSkeleton,
   },
   emits: ["update:open"],
   setup(props) {

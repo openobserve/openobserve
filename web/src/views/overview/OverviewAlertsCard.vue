@@ -28,57 +28,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #empty>
       <OEmptyState
-        size="inline"
+        size="compact"
         :title="t('overview.alerts.emptyTitle')"
         :text="t('overview.alerts.emptyDesc')"
         data-test="overview-alerts-empty"
       />
     </template>
-    <div class="flex flex-1 flex-col">
+    <div class="flex flex-1 flex-col gap-2">
+      <!-- the counts are quiet text buttons; the negative start margin puts the first number on the heading's edge -->
       <ul
-        :class="[
-          'grid gap-2 px-3 pb-2 max-md:grid-cols-2',
-          boxes.length === 4 ? 'grid-cols-4' : 'grid-cols-3',
-        ]"
+        class="-ms-2.5 flex flex-wrap items-center gap-x-1 gap-y-1"
         data-test="overview-alerts-boxes"
       >
         <li
           v-for="box in boxes"
           :key="box.key"
-          :class="[
-            'rounded-default relative flex border transition-colors motion-reduce:transition-none',
-            box.count > 0 && box.tint
-              ? box.tint
-              : 'border-border-default hover:border-border-strong',
-          ]"
+          class="flex items-center"
           :data-test="`overview-alerts-frame-${box.key}`"
         >
           <OButton
-            variant="link"
-            class="flex-1"
+            variant="ghost"
+            size="sm"
             :data-test="`overview-alerts-box-${box.key}`"
             @click="emit('select', box.target)"
           >
-            <span class="flex flex-col gap-0 px-3 py-1.5 text-start">
-              <span
-                :class="[
-                  'text-xl font-semibold tabular-nums',
-                  box.count > 0 ? box.tone : 'text-text-heading',
-                ]"
-                data-test="overview-alerts-box-count"
-                >{{ box.count }}</span
-              >
-              <span :class="['text-text-label text-xs', askVisible && box.count > 0 && 'pe-6']">{{
-                box.label
-              }}</span>
-            </span>
+            <span
+              :class="[
+                'font-semibold tabular-nums',
+                box.count > 0 ? box.tone : 'text-text-heading',
+              ]"
+              data-test="overview-alerts-box-count"
+              >{{ box.count }}</span
+            >
+            <span class="text-text-secondary font-normal">{{ box.label }}</span>
           </OButton>
           <OverviewAskAiButton
             kind="box"
+            size="sm"
             :item-key="box.key"
             :label="box.label"
             :show="box.count > 0"
-            class="absolute end-1 top-1"
             @ask="
               emit('askAi', {
                 kind: 'count',
@@ -92,11 +81,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ul>
       <div
         v-if="rows.length === 0"
-        class="border-border-default flex flex-1 flex-col items-center justify-center gap-0.5 border-t px-3 py-2 text-center"
+        class="border-border-subtle flex min-h-9 items-center gap-2 border-t pt-2"
         data-test="overview-alerts-none-firing"
       >
-        <OIcon name="check-circle" size="md" class="text-status-success-text" />
-        <p class="text-text-heading text-sm font-medium">
+        <OIcon name="check-circle" size="sm" class="text-status-success-text shrink-0" />
+        <p class="text-text-heading text-compact font-medium">
           {{ t("overview.alerts.noneFiring") }}
         </p>
         <p class="text-text-secondary text-xs" data-test="overview-alerts-evaluated">
@@ -105,58 +94,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else data-test="overview-alerts-firing">
         <div
-          class="border-border-default text-text-label flex items-center justify-between gap-3 border-t px-3 py-1.5 text-xs"
+          class="border-border-subtle text-text-secondary flex items-center justify-between gap-3 border-y py-1.5 text-xs"
           data-test="overview-alerts-table-header"
         >
           <span>{{ t("overview.alerts.firingNow") }}</span>
-          <span>{{ t("overview.alerts.firingFor") }}</span>
+          <span :class="askVisible && 'pe-9'">{{ t("overview.alerts.firingFor") }}</span>
         </div>
-        <ul class="flex flex-col">
+        <ul class="divide-border-subtle flex flex-col divide-y">
           <li
             v-for="(row, index) in rows"
             :key="`${row.stream}-${row.name}-${row.since}-${index}`"
-            class="border-border-default flex items-center border-t"
+            class="py-0.5"
           >
-            <OverviewRowButton
-              compact
-              class="min-w-0 flex-1"
-              :data-test="`overview-alerts-firing-${row.name}`"
-              @click="emit('select', 'firing')"
-            >
-              <span class="flex min-w-0 items-center gap-3">
-                <OTag
-                  type="countChip"
-                  :value="rowTone(row.level)"
-                  class="min-w-16 shrink-0 justify-center"
-                  :data-test="`overview-alerts-firing-level-${row.name}`"
-                  >{{ rowLevelLabel(row.level) }}</OTag
-                >
-                <span class="flex min-w-0 flex-col text-start">
-                  <OTruncatedText class="text-text-body text-sm font-medium">{{
+            <div class="-mx-3 flex items-center">
+              <OverviewRowButton
+                class="min-w-0 flex-1"
+                :data-test="`overview-alerts-firing-${row.name}`"
+                @click="emit('select', 'firing')"
+              >
+                <span class="flex min-w-0 items-center gap-3">
+                  <OTag
+                    type="countChip"
+                    :value="rowTone(row.level)"
+                    class="min-w-16 shrink-0 justify-center"
+                    :data-test="`overview-alerts-firing-level-${row.name}`"
+                    >{{ rowLevelLabel(row.level) }}</OTag
+                  >
+                  <OTruncatedText class="text-text-body text-compact min-w-0 shrink font-medium">{{
                     raw(row.name)
                   }}</OTruncatedText>
-                  <OTruncatedText class="text-text-secondary text-xs">{{
-                    raw(row.stream)
-                  }}</OTruncatedText>
+                  <OTruncatedText
+                    class="text-text-secondary min-w-0 text-xs font-normal max-sm:hidden"
+                    >{{ raw(row.stream) }}</OTruncatedText
+                  >
                 </span>
+                <span class="text-text-secondary shrink-0 text-xs font-normal tabular-nums">{{
+                  row.age
+                }}</span>
+              </OverviewRowButton>
+              <span v-if="askVisible" class="flex w-9 shrink-0 justify-center">
+                <OverviewAskAiButton
+                  kind="alert"
+                  :item-key="row.name"
+                  :label="row.name"
+                  @ask="emit('askAi', { kind: 'alert', alert: row.alert })"
+                />
               </span>
-              <span class="text-text-secondary shrink-0 text-xs tabular-nums">{{ row.age }}</span>
-            </OverviewRowButton>
-            <span v-if="askVisible" class="flex w-9 shrink-0 justify-center">
-              <OverviewAskAiButton
-                kind="alert"
-                :item-key="row.name"
-                :label="row.name"
-                @ask="emit('askAi', { kind: 'alert', alert: row.alert })"
-              />
-            </span>
+            </div>
           </li>
         </ul>
       </div>
       <OButton
         v-if="remaining > 0"
         variant="accent-ghost"
-        class="ms-0.5 mb-2 self-start"
+        size="sm"
+        class="-ms-2.5 self-start"
         data-test="overview-alerts-show-more"
         @click="emit('select', 'firing')"
       >
@@ -204,16 +196,9 @@ interface CountBox {
   label: I18nText;
   count: number;
   tone: string;
-  // a box above zero takes a soft status surface so the problem reads before its number
-  tint?: string;
   target: AlertsBoxTarget;
   level?: "critical" | "warning";
 }
-
-const TINT = {
-  danger: "bg-status-error-bg border-status-negative",
-  warning: "bg-status-warning-bg border-status-warning-text",
-} as const;
 
 const props = defineProps<{
   section?: OverviewSection<OverviewAlertsData>;
@@ -295,7 +280,6 @@ const boxes = computed<CountBox[]>(() => {
       label: t("overview.alerts.criticalLevel"),
       count: levelCount(data, "critical"),
       tone: "text-status-negative",
-      tint: TINT.danger,
       target: "critical",
       level: "critical",
     },
@@ -304,7 +288,6 @@ const boxes = computed<CountBox[]>(() => {
       label: t("overview.alerts.warningLevel"),
       count: levelCount(data, "warning"),
       tone: "text-status-warning-text",
-      tint: TINT.warning,
       target: "warning",
       level: "warning",
     },
@@ -323,7 +306,6 @@ const boxes = computed<CountBox[]>(() => {
     label: t("overview.alerts.rulesFailing"),
     count: data?.failed_evaluation ?? 0,
     tone: "text-status-negative",
-    tint: TINT.danger,
     target: "failing",
   });
   return list;

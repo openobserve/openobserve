@@ -1,5 +1,6 @@
 // editionFeaturesPage.js - Page Object for the Enterprise Upgrade / Edition dialog
-// Covers the header edition button (data-test="upgrade-to-enterprise-btn") and the
+// Covers the edition entry (data-test="upgrade-to-enterprise-btn", a top-bar link on OSS and a
+// Help menu item on Enterprise and Cloud) and the
 // EnterpriseUpgradeDialog feature list with o2.ws documentation short links.
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -32,7 +33,7 @@ export const ENTERPRISE_FEATURES = [
   { name: 'Service graph', slug: 'service_maps', beta: false, ha: false, expectedPath: '/docs/user-guide/data-exploration/traces/service-graph/' },
 ];
 
-// Cloud-only feature: rendered with v-show, so present in DOM but hidden on OSS/ENT.
+// Cloud-only feature: EnterpriseOfferFeatureGrid leaves it out of the grid on OSS/ENT.
 export const CLOUD_ONLY_FEATURE_NAME = 'Bring your own bucket';
 
 // Hero panel link buttons (EnterpriseUpgradeDialog.vue openDownloadPage/openDocsLink).
@@ -49,8 +50,10 @@ export class EditionFeaturesPage {
   constructor(page) {
     this.page = page;
 
-    // Header trigger button (same data-test in OSS and ENT, label differs)
+    // Edition entry (same data-test in OSS and ENT, label differs). OSS keeps it in the
+    // top bar; Enterprise and Cloud list it in the Help menu, so it exists only while that menu is open.
     this.editionButton = page.locator('[data-test="upgrade-to-enterprise-btn"]');
+    this.helpMenuButton = page.locator('[data-test="menu-link-help-item"]');
 
     // Dialog
     this.dialog = page.locator('[data-test="enterprise-upgrade-dialog"]');
@@ -58,7 +61,8 @@ export class EditionFeaturesPage {
     this.offerBadge = this.dialog.locator('[data-test="enterprise-upgrade-offer-badge"]');
     this.primaryButton = this.dialog.locator('[data-test="enterprise-upgrade-download-btn"]');
     this.learnMoreButton = this.dialog.locator('[data-test="enterprise-upgrade-learn-more-btn"]');
-    this.featuresTitle = this.dialog.locator('[data-test="enterprise-upgrade-features-title"]');
+    // The dialog has no features heading any more: the header carries the title, the grid follows.
+    this.featuresGrid = this.dialog.locator('[data-test="enterprise-upgrade-features-list-standard"]');
     this.featureItems = this.dialog.locator('[data-test="enterprise-upgrade-feature-item"]');
   }
 
@@ -68,18 +72,34 @@ export class EditionFeaturesPage {
     });
   }
 
+  // Makes the edition entry visible: on Enterprise and Cloud it lives in the Help menu.
+  // Returns true when this call opened the Help menu, so the caller can close it again.
+  async revealEditionButton() {
+    await expect(this.helpMenuButton).toBeVisible({ timeout: 15000 });
+    if (await this.editionButton.isVisible()) return false;
+    await this.helpMenuButton.click();
+    await expect(this.editionButton).toBeVisible({ timeout: 10000 });
+    return true;
+  }
+
   async expectEditionButtonLabel(expectedLabel) {
-    await expect(this.editionButton).toBeVisible({ timeout: 15000 });
+    await this.revealEditionButton();
     await expect(this.editionButton).toContainText(expectedLabel);
   }
 
-  // Detects the active edition from the rendered header button label. The dialog
+  // Detects the active edition from the rendered edition entry's label. The dialog
   // variant is driven by frontend build-time flags (VITE_OPENOBSERVE_ENTERPRISE /
   // VITE_OPENOBSERVE_CLOUD via @/aws-exports), which can diverge from the backend
   // binary's build_type (e.g. an OSS frontend bundle served by an enterprise
-  // backend). The button label is the most direct signal of what the user sees.
+  // backend). The label is the most direct signal of what the user sees.
   async detectEdition() {
+    const openedMenu = await this.revealEditionButton();
     const label = await this.editionButton.innerText({ timeout: 15000 });
+    // Close the Help menu again so the caller's next click is not swallowed by it.
+    if (openedMenu) {
+      await this.page.keyboard.press('Escape');
+      await expect(this.editionButton).toBeHidden({ timeout: 5000 });
+    }
     const trimmed = label.trim();
     if (trimmed.includes('Edition: Enterprise')) return 'enterprise';
     if (trimmed.includes('Get OpenObserve Enterprise')) return 'opensource';
@@ -88,15 +108,16 @@ export class EditionFeaturesPage {
   }
 
   async openDialog() {
+    await this.revealEditionButton();
     await this.editionButton.click();
     await expect(this.dialog).toBeVisible({ timeout: 10000 });
   }
 
-  async expectHero({ heroTitle, badgePattern, primaryButtonText, featuresTitle, hasLearnMore }) {
+  async expectHero({ heroTitle, badgePattern, primaryButtonText, hasLearnMore }) {
     await expect(this.heroTitle).toHaveText(heroTitle);
     await expect(this.offerBadge).toContainText(badgePattern);
     await expect(this.primaryButton).toContainText(primaryButtonText);
-    await expect(this.featuresTitle).toHaveText(featuresTitle);
+    await expect(this.featuresGrid).toBeVisible();
     if (hasLearnMore) {
       await expect(this.learnMoreButton).toContainText('Learn more');
     }
@@ -115,7 +136,7 @@ export class EditionFeaturesPage {
   }
 
   async expectCloudOnlyFeatureHidden() {
-    // byob is v-show gated: attached to the DOM but display:none on OSS/ENT
+    // byob is filtered out of the OSS/ENT grid, so it is not rendered at all
     const item = this.getFeatureItem(CLOUD_ONLY_FEATURE_NAME);
     await expect(item, `"${CLOUD_ONLY_FEATURE_NAME}" must stay hidden outside Cloud`).toBeHidden();
   }

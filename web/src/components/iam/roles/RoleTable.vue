@@ -30,6 +30,8 @@ const props = defineProps<{
   data: any[];
   loading?: boolean;
   forbidden?: ForbiddenState;
+  /** A failed load's message: the table shows the error state with Retry, never the first-run one. */
+  error?: string | null;
   actionLoading?: boolean;
   /** Member counts are still being fetched; unknown counts draw a placeholder instead of a dash. */
   countsLoading?: boolean;
@@ -63,6 +65,7 @@ const emit = defineEmits<{
   "bulk-delete": [];
   create: [];
   assign: [row: any];
+  retry: [];
 }>();
 
 const oTableRef = ref<any>(null);
@@ -160,6 +163,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     :columns="columns"
     :loading="loading"
     :forbidden="forbidden"
+    :error="error"
     :selected-ids="selectedIds"
     :global-filter="globalFilter"
     pagination="client"
@@ -182,6 +186,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     @update:current-page="emit('update:currentPage', $event)"
     @update:sort-by="emit('update:sortBy', $event)"
     @update:sort-order="emit('update:sortOrder', $event)"
+    @retry="emit('retry')"
   >
     <template #toolbar>
       <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">

@@ -96,25 +96,23 @@
         </template>
 
         <template #empty>
-          <div class="flex items-center justify-center py-8">
-            <OEmptyState
-              :kind="hasFilters ? 'filtered' : 'first-run'"
-              :title="
-                hasFilters
-                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.evalJobs') })
-                  : t('emptyState.noEvalJobs.title')
-              "
-              :text="
-                hasFilters
-                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.evalJobs') })
-                  : t('emptyState.noEvalJobs.description')
-              "
-              :icon="hasFilters ? undefined : 'schedule'"
-              data-test="eval-job-empty-state"
-              :action-label="hasFilters ? undefined : t('emptyState.noEvalJobs.action')"
-              @action="onEmptyAction(hasFilters ? 'clear-filters' : 'create')"
-            />
-          </div>
+          <OEmptyState
+            :kind="hasFilters ? 'filtered' : 'first-run'"
+            :title="
+              hasFilters
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.evalJobs') })
+                : t('emptyState.noEvalJobs.title')
+            "
+            :text="
+              hasFilters
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.evalJobs') })
+                : t('emptyState.noEvalJobs.description')
+            "
+            :icon="hasFilters ? undefined : 'schedule'"
+            data-test="eval-job-empty-state"
+            :action-label="hasFilters ? undefined : t('emptyState.noEvalJobs.action')"
+            @action="onEmptyAction(hasFilters ? 'clear-filters' : 'create')"
+          />
         </template>
 
         <template #selection-actions>

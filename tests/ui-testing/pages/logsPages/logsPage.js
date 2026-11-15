@@ -193,8 +193,9 @@ export class LogsPage {
         // SearchResult.vue exposes the result title via data-test — replacement for the
         // legacy class-based searchListFirstTextLeft selector in expectSearchListVisible.
         this.searchResultTitle = '[data-test="logs-search-result-title"]';
-        this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn"]';
-        this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
+        // Auto-refresh lives in the refresh button's menu; each interval item carries its seconds.
+        this.liveModeToggleBtn = '[data-test="logs-search-bar-data-age-refresh-auto-menu"]';
+        this.liveMode5SecBtn = '[data-test="logs-search-bar-data-age-refresh-auto-5"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"]';
@@ -236,7 +237,7 @@ export class LogsPage {
         this.searchErrorSummary = '[data-test="error-detail-summary"], [data-test="query-error-summary"]';
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
-        this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
+        this.moreOptionsBtn = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.explainQueryMenuBtn = '[data-test="logs-search-bar-explain-query-menu-btn"]';
         // Hover trigger for the nested CSV/JSON submenu (data-test added on the wrapper div).
         this.downloadSubmenuTrigger = '[data-test="search-download-submenu-trigger"]';
@@ -358,8 +359,10 @@ export class LogsPage {
         this.multiStreamPatternsToastText = 'Patterns are not available when multiple streams are selected. Please select a single stream.';
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
+        // A menu item inside ⋯: open it with openShareLinkMenuItem().
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
-        this.shareLinkTooltip = '[data-test="o-tooltip-content"]';
+        // A disabled menu item states its reason under its label.
+        this.shareLinkTooltip = '[id="logs-search-bar-share-link-btn-reason"], [data-test="o-tooltip-content"]';
         // OToast convention §4: variant-prefixed data-test (`o-toast-success`, `o-toast-error`,
         // `o-toast-info`, `o-toast-warning`, `o-toast-loading`, `o-toast-default`). Enumerate
         // known variants on the root only — also dodges Monaco's `role="alert"` accessibility
@@ -1905,12 +1908,8 @@ export class LogsPage {
         const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
         const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
         if (isInline) {
-            // Normal viewport: the OSwitch inner button carries data-state="unchecked" when OFF.
-            // The Reka OSwitch animates the checked→unchecked transition, and under CI load the
-            // settled state can appear >5s after the toggle+execute — poll longer (still asserts
-            // the real end-state, not an arbitrary sleep) to avoid the flaky 5s ceiling.
-            const switchUnchecked = inlineBtn.locator('[data-state="unchecked"]');
-            await expect(switchUnchecked).toBeVisible({ timeout: 15000 });
+            // A pinned histogram is a pressed toggle button; poll for the settled OFF state.
+            await expect(inlineBtn).toHaveAttribute('aria-pressed', 'false', { timeout: 15000 });
             return;
         }
         // Narrow-viewport fallback: check state via the utilities menu item.
@@ -2770,6 +2769,22 @@ export class LogsPage {
 
     getShareLinkButtonLocator() {
         return this.page.locator(this.shareLinkButton);
+    }
+
+    /** Opens the toolbar ⋯ unless it is already open. */
+    async openToolbarMoreMenu() {
+        const trigger = this.page.locator(this.utilitiesMenuButton);
+        await trigger.waitFor({ state: 'visible', timeout: 10000 });
+        if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 5000 });
+    }
+
+    /** Opens ⋯ and returns the Share link item. */
+    async openShareLinkMenuItem() {
+        await this.openToolbarMoreMenu();
+        const item = this.page.locator(this.shareLinkButton);
+        await item.waitFor({ state: 'visible', timeout: 10000 });
+        return item;
     }
 
     // Readiness gates (deterministic waits keyed on the search-bar controls).
@@ -4806,7 +4821,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator} The button locator
      */
     getLiveModeButtonByValue(value) {
-        return this.page.locator(`[data-test="logs-search-bar-refresh-time-${value}"]`);
+        return this.page.locator(`[data-test="logs-search-bar-data-age-refresh-auto-${value}"]`);
     }
 
     async getPageContent() {
@@ -7725,12 +7740,12 @@ export class LogsPage {
      * Click the share link button on the logs search bar
      */
     async clickShareLinkButton() {
-        const btn = this.page.locator(this.shareLinkButton);
-        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        let btn = await this.openShareLinkMenuItem();
         const enabled = await expect(btn).toBeEnabled({ timeout: 30000 }).then(() => true).catch(() => false);
         if (!enabled) {
             testLogger.warn('Share link button still disabled after 30s; reloading once', { url: this.page.url() });
             await this.page.reload({ waitUntil: 'domcontentloaded' });
+            btn = await this.openShareLinkMenuItem();
             await expect(btn, 'share link button never enabled: the query has not run yet (G1), or web_url is missing from the org config').toBeEnabled({ timeout: 30000 });
         }
         await btn.click();
@@ -7741,6 +7756,7 @@ export class LogsPage {
      * Verify the share link button is visible
      */
     async expectShareLinkButtonVisible() {
+        await this.openShareLinkMenuItem();
         await expect(this.page.locator(this.shareLinkButton)).toBeVisible();
         testLogger.info('Share link button is visible');
     }
@@ -7834,6 +7850,7 @@ export class LogsPage {
      * Verify the share link button is disabled
      */
     async expectShareLinkButtonDisabled() {
+        await this.openShareLinkMenuItem();
         await expect(this.page.locator(this.shareLinkButton)).toBeDisabled();
         testLogger.info('Share link button is disabled');
     }
@@ -7842,6 +7859,7 @@ export class LogsPage {
      * Hover over the share link button to show tooltip
      */
     async hoverShareLinkButton() {
+        await this.openShareLinkMenuItem();
         await this.page.locator(this.shareLinkButton).hover();
         testLogger.info('Hovered over share link button');
     }
@@ -8773,7 +8791,7 @@ export class LogsPage {
     async disableAutoRefresh() {
         await this.clickLiveModeButton();
         await this.page.waitForTimeout(500);
-        const offButton = this.page.locator('[data-test="logs-search-bar-refresh-time-0"]');
+        const offButton = this.page.locator('[data-test="logs-search-bar-data-age-refresh-auto-0"]');
         if (await offButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await offButton.click();
         }
@@ -8843,9 +8861,7 @@ export class LogsPage {
     }
 
     /**
-     * Toggle histogram on/off.
-     * In normal viewports the histogram is a standalone inline toolbar button.
-     * Only falls back to the utilities menu in narrow viewports (shouldMoveButtonsToMenu).
+     * Toggle histogram on/off: the ⋯ item, or the toolbar copy when the user pinned it.
      */
     async toggleHistogram() {
         await this.page.keyboard.press('Escape').catch(() => {});
@@ -8856,7 +8872,6 @@ export class LogsPage {
             testLogger.info('Histogram toggled (inline button)');
             return;
         }
-        // Narrow-viewport fallback: open the utilities menu and click the menu item.
         await this.page.locator(this.utilitiesMenuButton).click();
         const menuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
         await menuItem.waitFor({ state: 'visible', timeout: 5000 });
@@ -12172,7 +12187,7 @@ export class LogsPage {
      * Open the "More Options" menu on the logs search bar.
      */
     async openMoreOptionsMenu() {
-        const menuBtn = this.page.locator('[data-test="logs-search-bar-more-options-btn"]');
+        const menuBtn = this.page.locator(this.moreOptionsBtn);
         await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
         await menuBtn.click();
         await this.page.waitForTimeout(500);

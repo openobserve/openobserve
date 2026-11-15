@@ -26,8 +26,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -998,24 +999,11 @@ const noSources = computed(
           <OTimeCell :value="row.lastSeen" unit="us" />
         </template>
 
-        <template #toolbar-trailing>
-          <OButton
-            icon-only
-            variant="ghost"
-            icon="refresh"
-            :loading="loading"
-            data-test="security-entities-refresh-table"
-            @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('siem.entities.refresh')" />
-          </OButton>
-        </template>
-
         <template #error="{ message }">
           <OEmptyState
             kind="error"
             :title="t('siem.entities.loadError')"
-            :text="raw(message)"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             @action="refresh"
           />
         </template>
@@ -1109,7 +1097,9 @@ const noSources = computed(
       </template>
 
       <template #tab-related>
-        <div v-if="detailLoading" class="flex justify-center py-8"><OSpinner size="lg" /></div>
+        <div v-if="detailLoading" class="flex flex-col gap-2">
+          <OSkeleton v-for="row in 5" :key="row" class="h-8" />
+        </div>
         <template v-else>
           <div
             v-for="other in relatedKinds"
@@ -1159,15 +1149,15 @@ const noSources = computed(
                 />
               </div>
             </div>
-            <span v-else class="text-text-secondary text-xs">{{
-              t("siem.entities.noRelated")
-            }}</span>
+            <OEmptyState v-else size="compact" :title="t('siem.entities.noRelated')" />
           </div>
         </template>
       </template>
 
       <template #tab-cases>
-        <div v-if="detailLoading" class="flex justify-center py-8"><OSpinner size="lg" /></div>
+        <div v-if="detailLoading" class="flex flex-col gap-2">
+          <OSkeleton v-for="row in 4" :key="row" class="h-10" />
+        </div>
         <div
           v-else-if="cases.length"
           class="border-border-default rounded-surface overflow-hidden border"
@@ -1198,12 +1188,12 @@ const noSources = computed(
             />
           </div>
         </div>
-        <span
+        <OEmptyState
           v-else
-          class="text-text-secondary text-xs"
+          icon="assignment"
+          :title="t('siem.entities.noCases')"
           data-test="security-entity-drawer-no-cases"
-          >{{ t("siem.entities.noCases") }}</span
-        >
+        />
       </template>
 
       <template #tab-sources>

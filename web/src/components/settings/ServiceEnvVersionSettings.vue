@@ -55,30 +55,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :text="t('serviceVersions.settings.denied')"
       data-test="svcver-overrides-denied"
     />
-    <div
+    <OEmptyState
       v-else-if="overrides.isError.value"
-      class="rounded-default border-border-default text-text-secondary flex items-center gap-2 border px-4 py-3 text-sm"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="loadError"
       data-test="svcver-overrides-error"
-    >
-      <OIcon name="error-outline" size="sm" class="text-status-error-text" />
-      <span>{{ loadError }}</span>
-      <OButton variant="accent-ghost" size="sm" @click="overrides.refetch()">{{
-        t("serviceVersions.actions.retry")
-      }}</OButton>
-    </div>
-    <div
+      @action="overrides.refetch()"
+    />
+    <OEmptyState
       v-else-if="!rows.length && page === 1"
-      class="rounded-default border-border-default flex flex-col items-center gap-2.5 border px-6 py-10 text-center"
+      icon="check"
+      :title="t('serviceVersions.settings.emptyTitle')"
       data-test="svcver-overrides-empty"
     >
-      <span
-        class="bg-tabs-active-bg text-tabs-active-text rounded-surface flex h-12 w-12 items-center justify-center"
-        ><OIcon name="check" size="md"
-      /></span>
-      <div class="text-text-heading text-sm font-semibold">
-        {{ t("serviceVersions.settings.emptyTitle") }}
-      </div>
-      <div class="text-text-secondary text-compact max-w-[34rem]">
+      <template #text>
         <i18n-t keypath="serviceVersions.settings.emptyBody" tag="span"
           ><template #attribute
             ><span class="font-mono">{{ raw("deployment.environment") }}</span></template
@@ -86,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ><b class="text-text-heading">{{ t("serviceVersions.envEdit.title") }}</b></template
           ></i18n-t
         >
-      </div>
-    </div>
+      </template>
+    </OEmptyState>
     <template v-else>
       <div class="mb-2 flex items-center gap-2">
         <span class="text-text-heading text-sm font-semibold">{{

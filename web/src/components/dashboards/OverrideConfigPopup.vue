@@ -89,18 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div
+          <OEmptyState
             v-else
-            class="flex flex-1 flex-col items-center justify-center gap-1.5 p-4 text-center"
-          >
-            <OIcon name="format-color-text" size="lg" class="text-text-secondary" />
-            <div class="text-sm font-semibold">
-              {{ t("dashboard.seriesFormattingNoneAdded") }}
-            </div>
-            <div class="text-text-secondary text-xs leading-[1.4]">
-              {{ t("dashboard.seriesFormattingNoneAddedHint") }}
-            </div>
-          </div>
+            size="compact"
+            icon="tune"
+            :title="t('dashboard.seriesFormattingNoneAdded')"
+            :text="t('dashboard.seriesFormattingNoneAddedHint')"
+          />
         </div>
 
         <template v-if="selectedSeries">
@@ -151,10 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <div
-          v-else
-          class="col-start-2 col-end-4 flex items-center justify-center p-6 max-[56.25rem]:col-end-3"
-        >
+        <div v-else class="col-start-2 col-end-4 max-[56.25rem]:col-end-3">
           <OEmptyState
             :title="t('dashboard.seriesFormattingEmptyTitle')"
             :text="t('dashboard.seriesFormattingEmptyHint')"
@@ -247,18 +239,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div
+          <OEmptyState
             v-else
-            class="flex flex-1 flex-col items-center justify-center gap-1.5 p-4 text-center"
-          >
-            <OIcon name="format-color-text" size="lg" class="text-text-secondary" />
-            <div class="text-sm font-semibold">
-              {{ t("dashboard.columnFormattingNoFields") }}
-            </div>
-            <div class="text-text-secondary text-xs leading-[1.4]">
-              {{ t("dashboard.columnFormattingNoFieldsHint") }}
-            </div>
-          </div>
+            size="compact"
+            icon="tune"
+            :title="t('dashboard.columnFormattingNoFields')"
+            :text="t('dashboard.columnFormattingNoFieldsHint')"
+          />
         </div>
 
         <!-- Detail: controls + live preview for the selected field -->
@@ -293,10 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Empty state: nothing added yet -->
-        <div
-          v-else
-          class="col-start-2 col-end-4 flex items-center justify-center p-6 max-[56.25rem]:col-end-3"
-        >
+        <div v-else class="col-start-2 col-end-4 max-[56.25rem]:col-end-3">
           <OEmptyState
             :title="t('dashboard.columnFormattingEmptyTitle')"
             :text="t('dashboard.columnFormattingEmptyHint')"
@@ -305,11 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #actions>
               <ODropdown v-model:open="addOpenCenter" align="start">
                 <template #trigger>
-                  <OButton
-                    variant="primary"
-                    icon="add"
-                    data-test="dashboard-addpanel-config-add-column-empty"
-                  >
+                  <OButton variant="primary" data-test="dashboard-addpanel-config-add-column-empty">
                     {{ t("dashboard.columnFormattingAddField") }}
                   </OButton>
                 </template>

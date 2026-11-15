@@ -35,7 +35,7 @@ put and only the body scrolls. The header is [header-spec.md](header-spec.md):
 - **The context line names the container** (H4), derived for you from the route
   through the rail's nav model (`navGroups.ts` + MainLayout's links): the rail
   group ("Reliability", "Data", "Infra", "Experience", "Settings", "Dashboards")
-  or the org on ungrouped pages. Override it with `:context` only where the
+  or nothing on ungrouped pages (the slot stays, empty; never the org). Override it with `:context` only where the
   derivation is wrong (an `OPageHeader` inside a panel). Detail, editor and import
   pages pass **`:back="{ label, to }"`**: the line becomes a real "‹ Parent" link,
   and Back is smart (N3) — see the detail recipe below.

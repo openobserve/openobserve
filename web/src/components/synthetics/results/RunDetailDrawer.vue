@@ -22,6 +22,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import {
@@ -186,29 +187,19 @@ function toggleSteps(executionId: string) {
         </div>
       </div>
 
-      <!-- ── Query error ── -->
-      <div
+      <OEmptyState
         v-else-if="queryError"
-        class="text-text-muted flex flex-col items-center gap-3 px-5 py-16"
-      >
-        <OIcon name="error_outline" size="xl" class="text-status-error-text" />
-        <p class="text-status-error-text text-sm font-medium">
-          {{ t("synthetics.runDetail.loadFailed") }}
-        </p>
-        <p class="text-text-secondary max-w-sm text-center font-mono text-xs">{{ queryError }}</p>
-      </div>
+        kind="error"
+        :title="t('synthetics.runDetail.loadFailed')"
+        :text="t('emptyState.loadError.description')"
+      />
 
-      <!-- ── No data ── -->
-      <div
+      <OEmptyState
         v-else-if="!locations.length"
-        class="text-text-muted flex flex-col items-center gap-3 px-5 py-16"
-      >
-        <OIcon name="hourglass_empty" size="xl" />
-        <p class="text-sm font-medium">{{ t("synthetics.runDetail.noExecutionData") }}</p>
-        <p class="text-text-secondary text-center text-xs">
-          {{ t("synthetics.runDetail.noExecutionDataDesc", { runId: runId }) }}
-        </p>
-      </div>
+        icon="hourglass-empty"
+        :title="t('synthetics.runDetail.noExecutionData')"
+        :text="t('synthetics.runDetail.noExecutionDataDesc', { runId: runId })"
+      />
 
       <!-- ── Data ── -->
       <template v-else>

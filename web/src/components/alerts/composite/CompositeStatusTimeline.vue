@@ -5,6 +5,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import alertsService from "@/services/alerts";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -29,6 +30,7 @@ const WINDOWS = [
 const timeRange = ref("4h");
 const data = ref<CompositeTimelineResponse | null>(null);
 const loading = ref(false);
+const failed = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 const lanes = computed<CompositeTimelineLane[]>(() => {
@@ -48,6 +50,7 @@ const LEVEL_BG: Record<string, string> = {
 const fetch = async (): Promise<void> => {
   if (!orgId.value || !props.alertId) return;
   loading.value = true;
+  failed.value = false;
   const micros = WINDOWS.find((w) => w.value === timeRange.value)?.micros ?? WINDOWS[1].micros;
   const to = Date.now() * 1000;
   const from = to - micros;
@@ -56,6 +59,7 @@ const fetch = async (): Promise<void> => {
     data.value = response.data;
   } catch {
     data.value = null;
+    failed.value = true;
   } finally {
     loading.value = false;
   }
@@ -158,13 +162,20 @@ onMounted(fetch);
       </template>
     </div>
 
-    <div
+    <OEmptyState
+      v-else-if="failed"
+      size="compact"
+      kind="error"
+      data-test="alerts-composite-timeline-error"
+      @action="fetch"
+    />
+    <OEmptyState
       v-else
-      class="text-text-secondary py-6 text-center text-sm"
+      size="compact"
+      icon="timeline"
+      :title="t('alerts.composite.timelineEmpty')"
       data-test="alerts-composite-timeline-empty"
-    >
-      {{ t("alerts.composite.timelineEmpty") }}
-    </div>
+    />
 
     <div class="text-text-secondary flex flex-wrap gap-x-4 gap-y-1 text-xs">
       <span class="flex items-center gap-1.5">

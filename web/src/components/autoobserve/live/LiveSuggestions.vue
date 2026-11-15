@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="notice" class="px-3 pb-3 sm:px-4">
       <LiveNoticeState
         :notice="notice"
-        size="inline"
+        size="compact"
         :detail="rail.detail"
         :busy="rail.busy"
         :data-test="NOTICE_TEST[notice.failure]"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-if="hidden"
-        size="inline"
+        size="compact"
         icon="task-alt"
         :title="t('autoobserveLive.notice.suggestions.pageEmptyTitle')"
         :text="t('autoobserveLive.notice.suggestions.pageEmptyDesc')"
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-else
-        size="inline"
+        size="compact"
         icon="task-alt"
         :title="t('autoobserveLive.notice.suggestions.emptyTitle')"
         :text="t('autoobserveLive.notice.suggestions.emptyDesc')"

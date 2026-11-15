@@ -31,8 +31,8 @@ import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
@@ -750,48 +750,43 @@ watch(
 
     <div
       v-else-if="face === 'unknown'"
-      class="flex min-h-60 flex-col items-center justify-center gap-2"
-      data-test="curated-spinner"
+      class="px-page-edge flex min-h-0 flex-1 flex-col gap-3"
+      data-test="curated-loading"
     >
-      <OSpinner size="lg" />
       <OText variant="meta" data-test="curated-checking">{{
         t("infra.curated.checking", { workload: t(manifest.titleKey) })
       }}</OText>
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <OSkeleton v-for="panel in 4" :key="panel" shape="block" class="h-60" />
+      </div>
     </div>
 
-    <div v-else-if="face === 'undetected'" class="px-page-edge min-h-0 flex-1 overflow-y-auto">
-      <div
-        class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
+    <div v-else-if="face === 'undetected'" class="min-h-0 flex-1 overflow-y-auto">
+      <OEmptyState
+        icon="dashboard"
+        :title="t('infra.workload.setupHeadline')"
         data-test="curated-setup-state"
       >
-        <div class="flex flex-col gap-1 px-3">
-          <OText data-test="curated-setup-lead">{{ t("infra.workload.setupHeadline") }}</OText>
-          <OText v-if="showPartialTelemetry" variant="meta" data-test="curated-partial-telemetry">{{
-            t(partialTelemetryKey)
-          }}</OText>
-        </div>
-        <DataSourceSetupCard
-          v-if="setupDoor?.kind === 'card'"
-          :slug="setupDoor.slug"
-          @detected="runRefresh(true)"
-        />
-        <div v-else-if="setupDoor?.kind === 'route'">
-          <OButton
-            variant="primary"
-            icon="cloud"
-            data-test="curated-setup-route-cta"
-            @click="openSetupRoute"
-          >
+        <template v-if="showPartialTelemetry" #text>
+          <span data-test="curated-partial-telemetry">{{ t(partialTelemetryKey) }}</span>
+        </template>
+        <template v-if="setupDoor?.kind === 'route'" #actions>
+          <OButton variant="primary" data-test="curated-setup-route-cta" @click="openSetupRoute">
             {{ t("infra.workload.awsSetupCta") }}
           </OButton>
-        </div>
-      </div>
+        </template>
+        <template v-if="setupDoor?.kind === 'card'" #extra>
+          <div class="w-full max-w-3xl min-w-0 text-start">
+            <DataSourceSetupCard :slug="setupDoor.slug" @detected="runRefresh(true)" />
+          </div>
+        </template>
+      </OEmptyState>
     </div>
 
     <!-- Streams exist but stopped reporting, so this names the outage and offers no setup CTA. -->
     <div
       v-else-if="face === 'dormant'"
-      class="flex min-h-0 flex-1 flex-col justify-center-safe overflow-y-auto"
+      class="flex min-h-0 flex-1 flex-col overflow-y-auto"
       data-test="curated-dormant-state"
     >
       <!-- shrink-0: an overflow-hidden flex child shrinks to the pane and clips its own content. -->
@@ -801,20 +796,14 @@ watch(
         :title="t('infra.curated.dormantHeadline', { workload: t(manifest.titleKey) })"
         :text="t('infra.curated.dormantBody')"
       >
-        <template #actions>
-          <EmptyStateActionCard
-            v-if="jumpTarget"
-            icon="schedule"
-            :label="t('traces.noEvents.jumpToData')"
-            :sublabel="jumpLabel"
-            data-test="curated-jump-to-data"
-            @click="jumpToLatestData"
-          />
+        <template v-if="jumpTarget" #actions>
+          <OButton data-test="curated-jump-to-data" @click="jumpToLatestData">
+            {{ t("traces.noEvents.jumpToData") }}
+            <OTooltip :content="jumpLabel" />
+          </OButton>
         </template>
         <template #extra>
-          <ul
-            class="border-border-default divide-border-default rounded-surface flex w-full max-w-3xl flex-col divide-y border text-start"
-          >
+          <ul class="divide-border-default flex w-full max-w-3xl flex-col divide-y text-start">
             <li
               v-for="hidden in dormantGroups"
               :key="hidden.group.id"

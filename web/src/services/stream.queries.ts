@@ -13,19 +13,47 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mutationOptions, queryOptions } from "@tanstack/vue-query";
+import { hashKey, mutationOptions, queryOptions, type QueryClient } from "@tanstack/vue-query";
 import stream from "./stream";
 import type { StreamPageParams } from "./stream";
 import { streamKeys } from "./stream.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
+import { queryClient } from "@/composables/query/queryClient";
 
 export const STREAM_PROBE_PAGE = 20;
+
+/** How old a read one caller just made may be and still answer another caller's first read. */
+export const SHARED_READ_MS = 2_000;
+
+// The header's data probe reads each list under its own key as a page loads; the page's list shares that read.
+const probeRead = (client: QueryClient, org: string, type: string) =>
+  client.getQueryCache().find<any[]>({ queryKey: streamKeys.hasDataProbe(org, type), exact: true });
+
+const recentProbeData = (org: string, type: string) => {
+  const state = probeRead(queryClient, org, type)?.state;
+  if (state?.status !== "success" || Date.now() - state.dataUpdatedAt > SHARED_READ_MS) return;
+  return state;
+};
 
 export const streamNameListQuery = (org: string, type: string) =>
   queryOptions({
     queryKey: streamKeys.nameList(org, type),
-    // `schema: false` deliberately — schemas are fetched per stream on demand.
-    queryFn: async (): Promise<any[]> => (await stream.nameList(org, type, false)).data.list ?? [],
+    queryFn: ({ client, queryKey }): Promise<any[]> => {
+      // `schema: false` deliberately — schemas are fetched per stream on demand.
+      const own = () => stream.nameList(org, type, false).then((res) => res.data.list ?? []);
+      const probe = probeRead(client, org, type);
+      const inFlight =
+        probe?.state.fetchStatus === "fetching" &&
+        probe.queryHash !== hashKey(queryKey) &&
+        // A refresh or a write invalidates the entry, and those ask the server themselves.
+        !client.getQueryState(queryKey)?.isInvalidated
+          ? probe.promise
+          : undefined;
+      return inFlight ? inFlight.then((list) => list ?? [], own) : own();
+    },
+    // Seeds only a new entry, so a refresh of the page's list still reaches the server.
+    initialData: () => recentProbeData(org, type)?.data,
+    initialDataUpdatedAt: () => recentProbeData(org, type)?.dataUpdatedAt,
     staleTime: MEDIUM_STALE_TIME,
   });
 

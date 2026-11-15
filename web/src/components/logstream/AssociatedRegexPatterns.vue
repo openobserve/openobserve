@@ -52,13 +52,13 @@
                 class="mt-2 text-sm font-[600]"
                 data-test="associated-regex-patterns-applied-patterns-expansion-item"
               >
-                <div
+                <OEmptyState
                   v-if="filteredAppliedPatterns.length === 0"
-                  class="px-2 py-3 text-xs opacity-50"
+                  size="compact"
+                  class="px-2"
+                  :title="t('regex_patterns.no_data_available')"
                   data-test="associated-regex-patterns-applied-patterns-table"
-                >
-                  {{ t("regex_patterns.no_data_available") }}
-                </div>
+                />
                 <ul
                   v-else
                   class="m-0 list-none p-0"
@@ -124,27 +124,13 @@
       <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div class="flex w-[75%] flex-col" style="height: calc(100vh - 59px)">
         <div class="flex-1 overflow-y-auto pt-3">
-          <div
+          <OEmptyState
             v-if="!userClickedPattern"
-            class="flex h-full flex-col items-center justify-center gap-4 px-6 py-12"
-          >
-            <img
-              data-test="associated-regex-patterns-no-pattern-image"
-              :src="getImageURL('images/regex_pattern/no_applied_pattern.svg')"
-              style="width: 7.8125rem"
-              alt=""
-            />
-            <span
-              class="text-sm leading-8 font-semibold"
-              data-test="associated-regex-patterns-no-pattern-applied-title"
-              >{{ t("regex_patterns.no_patterns_applied_title") }}</span
-            >
-            <span
-              class="text-center text-sm leading-3 font-normal"
-              data-test="associated-regex-patterns-no-pattern-applied-subtitle"
-              >{{ t("regex_patterns.no_patterns_applied_subtitle") }}</span
-            >
-          </div>
+            icon="pattern"
+            :title="t('regex_patterns.no_patterns_applied_title')"
+            :text="t('regex_patterns.no_patterns_applied_subtitle')"
+            data-test="associated-regex-patterns-no-pattern-applied"
+          />
           <div v-else class="flex flex-col gap-3 px-3 pb-4">
             <!-- Pattern Info Card -->
             <div
@@ -339,11 +325,7 @@
                             {{ t("regex_patterns.click_test_input_hint") }}
                           </span>
                         </div>
-                        <div v-else-if="testLoading">
-                          <span class="flex h-27.75 items-center justify-center">
-                            <OSpinner size="lg" />
-                          </span>
-                        </div>
+                        <OSkeleton v-else-if="testLoading" shape="block" class="h-27.75" />
                       </div>
                     </div>
                   </div>
@@ -395,7 +377,8 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import FullViewContainer from "../functions/FullViewContainer.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
@@ -420,7 +403,8 @@ export default defineComponent({
     FullViewContainer,
     ConfirmDialog,
     OButton,
-    OSpinner,
+    OSkeleton,
+    OEmptyState,
     OTextarea,
     OSearchInput,
     ORadioGroup,

@@ -265,9 +265,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("about.manage_license") }}
           </OButton>
         </div>
-        <div v-if="loadingLicense" class="py-8 text-center">
-          <OSpinner size="lg" />
-          <div class="text-text-muted mt-3 text-sm">{{ t("about.loading_license_info") }}</div>
+        <div v-if="loadingLicense" class="flex flex-col gap-2 py-2">
+          <OSkeleton v-for="line in 4" :key="line" class="h-4" />
         </div>
 
         <div v-else-if="!licenseData || !licenseData.license" class="py-2">
@@ -468,7 +467,7 @@ import { effectiveLimitGb, FREE_LIMIT_GB, licenseRequestUrl } from "@/utils/feat
 import { quotaPercent } from "@/utils/licenseWaivers";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -482,7 +481,7 @@ export default defineComponent({
     LicenseFeatures,
     OButton,
     OIcon,
-    OSpinner,
+    OSkeleton,
     OInlineNotice,
     OText,
     OTruncatedText,

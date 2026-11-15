@@ -596,7 +596,8 @@
      was almost identical to the enabled white bg in light mode, making
      disabled fields visually indistinguishable from enabled ones. */
   --color-input-disabled-bg: var(--color-grey-200);
-  --color-input-disabled-border: var(--color-border-default);
+  /* The control's own edge: disabled reads from the dashes and the fill, not a lighter border. */
+  --color-input-disabled-border: var(--color-control-border);
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-focus-ring: var(--color-focus-ring-accent);
   --color-input-text: var(--color-text-heading);
@@ -614,7 +615,7 @@
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
   --color-select-border: var(--color-control-border);
-  --color-select-disabled-border: var(--color-border-default);
+  --color-select-disabled-border: var(--color-control-border);
   --color-select-border-hover: var(--color-control-border-hover);
   --color-select-border-focus: var(--color-accent);
   --color-select-border-error: var(--color-error-500);
@@ -962,7 +963,7 @@
   --color-glyph-plate: transparent;
 }
 
-/* Ingestion empty-state card icon accents (EmptyStateIngestionCard `iconVariant`).
+/* Ingestion path accents.
    Same five palette values the card used to read from its own style block, named
    so a utility can reach them. Fixed in both themes on purpose — they distinguish
    ingestion paths, and hover repaints them with --color-primary-600 anyway. */

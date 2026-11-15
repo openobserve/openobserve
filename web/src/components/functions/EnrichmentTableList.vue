@@ -475,9 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </li>
           </ul>
         </div>
-        <div v-else class="text-text-muted p-3 text-center">
-          {{ t("function.noUrlJobsFound") }}
-        </div>
+        <OEmptyState v-else size="compact" :title="t('function.noUrlJobsFound')" />
       </div>
     </ODrawer>
   </div>

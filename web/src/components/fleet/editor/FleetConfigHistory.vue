@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-if="comparable() && diffForbidden"
-      size="inline"
+      size="compact"
       kind="denied"
       :title="t('emptyState.noAccess.title')"
       :text="t('emptyState.noAccess.description')"
@@ -83,20 +83,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <OEmptyState
       v-else-if="comparable() && diffFailed"
-      size="inline"
+      size="compact"
       kind="error"
       :title="t('emptyState.loadError.title')"
       :text="t('emptyState.loadError.description')"
       data-test="fleet-config-history-diff-error"
       @action="retryDiff"
     />
-    <div
+    <OSkeleton
       v-else-if="comparable() && !(before && after)"
-      class="flex justify-center py-4"
+      shape="block"
+      class="h-60"
       data-test="fleet-config-history-diff-loading"
-    >
-      <OSpinner size="lg" />
-    </div>
+    />
     <div v-else-if="before && after" class="flex flex-col gap-2">
       <div class="flex items-center gap-2">
         <OText variant="panel-title">{{
@@ -121,7 +120,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { FleetConfigVersionSummary } from "@/services/fleet";
 import FleetConfigDiff from "../FleetConfigDiff.vue";

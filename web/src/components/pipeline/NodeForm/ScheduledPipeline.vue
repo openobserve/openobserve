@@ -777,14 +777,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="mt-1"
                       />
                     </span>
-                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-                    <div
-                      v-if="loading && expandState.output && tab == 'sql'"
-                      style="height: calc(100vh - 190px) !important"
-                      class="flex items-center justify-center"
-                    >
-                      <!-- eslint-enable local/no-hardcoded-px -->
-                      <OSpinner size="lg" />
+                    <div v-if="loading && expandState.output && tab == 'sql'" class="p-3">
+                      <OSkeleton preset="tableRows" :rows="8" />
                     </div>
 
                     <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
@@ -1009,6 +1003,7 @@ import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import {
   getFieldFromExpression,
   hasFieldCondition,

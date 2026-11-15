@@ -53,16 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #toolbar-trailing>
-        <OButton
-          icon-only
-          variant="ghost"
-          icon="refresh"
+        <ORefreshButton
+          :last-run-at="lastRunAt"
           :loading="loading"
           data-test="synthetics-variables-refresh-btn"
           @click="$emit('refresh')"
-        >
-          <OTooltip side="bottom" :content="t('common.refresh')" />
-        </OButton>
+        />
       </template>
 
       <template #cell-name="{ row }">
@@ -189,12 +185,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <OEmptyState
           :kind="filterQuery ? 'filtered' : 'first-run'"
-          :title="t('synthetics.variables.emptyTitle')"
+          :title="filterQuery ? undefined : t('synthetics.variables.emptyTitle')"
           :text="
             filterQuery
               ? t('synthetics.variables.emptyFiltered')
               : t('synthetics.variables.emptyBody')
           "
+          @action="filterQuery = ''"
         />
       </template>
     </OTable>
@@ -269,6 +266,7 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -293,6 +291,7 @@ export default defineComponent({
   components: {
     OTable,
     OButton,
+    ORefreshButton,
     OBadge,
     OEmptyState,
     OSearchInput,
@@ -306,6 +305,8 @@ export default defineComponent({
   props: {
     variables: { type: Array as PropType<SyntheticsVariable[]>, default: () => [] },
     loading: { type: Boolean, default: false },
+    /** Epoch-ms of the last successful load, shown as the refresh age. */
+    lastRunAt: { type: Number as PropType<number | null>, default: null },
     forbidden: { type: [Boolean, Array] as PropType<ForbiddenState>, default: false },
     /** Environment NAME, or null for the unscoped tier. */
     environment: { type: String as PropType<string | null>, default: null },

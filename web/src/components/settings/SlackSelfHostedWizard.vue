@@ -26,7 +26,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -585,10 +585,11 @@ const nextBlocked = computed(() => {
             {{ t("slackApp.prereq.title") }}
           </h3>
           <p class="text-text-secondary text-compact m-0">{{ t("slackApp.prereq.subtitle") }}</p>
-          <OSpinner v-if="prerequisites.isPending.value" size="lg" />
+          <OSkeleton v-if="prerequisites.isPending.value" shape="block" class="h-32" />
           <OEmptyState
             v-else-if="prerequisites.isError.value"
             kind="error"
+            size="compact"
             :text="t('emptyState.loadError.description')"
             :title="t('slackApp.prereq.loadFailed')"
             data-test="slack-wizard-prereq-error"
@@ -611,7 +612,7 @@ const nextBlocked = computed(() => {
           <p class="text-text-secondary text-compact m-0">
             {{ t("slackApp.wizard.connection.description") }}
           </p>
-          <OSpinner v-if="connectivity.isPending.value" size="lg" />
+          <OSkeleton v-if="connectivity.isPending.value" shape="block" class="h-32" />
           <template v-else-if="connectivityResult">
             <OInlineNotice :tone="connectivityBlocked ? 'err' : 'ok'">
               {{
@@ -1106,7 +1107,7 @@ const nextBlocked = computed(() => {
             {{ t("slackApp.wizard.test.signInPassed") }}
           </span>
 
-          <OSpinner v-if="linking.isPending.value" size="lg" />
+          <OSkeleton v-if="linking.isPending.value" shape="block" class="h-32" />
           <OForm
             v-else
             :key="linkingDefaults.domains.join(',')"

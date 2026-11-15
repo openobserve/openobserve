@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <OInlineNotice
-        v-if="loadError"
+        v-if="loadError && nodes.length"
         class="mx-3 mb-3"
         tone="err"
         :message="t('fleet.pipelines.loadFailed')"
@@ -100,11 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OInlineNotice>
 
       <div ref="canvasEl" class="relative min-h-0 flex-1 max-lg:min-h-112">
-        <div
-          v-if="forbidden"
-          class="absolute inset-0 grid place-items-center"
-          data-test="fleet-flow-overview-forbidden"
-        >
+        <div v-if="forbidden" class="absolute inset-0" data-test="fleet-flow-overview-forbidden">
           <OEmptyState
             kind="denied"
             :title="t('emptyState.noAccess.title')"
@@ -225,19 +221,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div
-          v-if="noFleets"
-          class="absolute inset-0 grid place-items-center"
-          data-test="fleet-flow-overview-no-fleets"
-        >
+        <div v-if="noFleets" class="absolute inset-0" data-test="fleet-flow-overview-no-fleets">
           <OEmptyState
             :title="t('emptyState.noData.title')"
             :text="t('fleet.pipelines.noFleets')"
           />
         </div>
         <div
+          v-else-if="loadError && !nodes.length && !loading"
+          class="absolute inset-0"
+          data-test="fleet-flow-overview-error"
+        >
+          <OEmptyState kind="error" :title="t('fleet.pipelines.loadFailed')">
+            <template #actions>
+              <OButton variant="secondary" data-test="fleet-flow-overview-retry" @click="retry">
+                {{ t("common.retry") }}
+              </OButton>
+            </template>
+          </OEmptyState>
+        </div>
+        <div
           v-else-if="!nodes.length && !loading && !loadError && !forbidden"
-          class="absolute inset-0 grid place-items-center"
+          class="absolute inset-0"
           data-test="fleet-flow-overview-empty"
         >
           <OEmptyState

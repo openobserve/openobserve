@@ -203,13 +203,11 @@
           <p class="text-text-secondary m-0 text-xs leading-normal">
             {{ t("onlineEvals.scoreConfig.detail.usedByIntro") }}
           </p>
-          <div
+          <OEmptyState
             v-if="usedByScorers.length === 0"
-            class="rounded-default text-text-secondary bg-text-secondary/6 inline-flex items-center gap-1.5 p-[0.5rem_0.625rem] text-xs"
-          >
-            <OIcon name="info" size="xs" />
-            <span>{{ t("onlineEvals.scoreConfig.detail.usedByEmpty") }}</span>
-          </div>
+            size="compact"
+            :title="t('onlineEvals.scoreConfig.detail.usedByEmpty')"
+          />
           <ul v-else class="m-0 flex list-none flex-col gap-2 p-0">
             <li v-for="scorer in usedByScorers" :key="scorer.id">
               <OButton
@@ -250,6 +248,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";

@@ -20,6 +20,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import {
@@ -207,13 +208,17 @@ function failedAtStep(steps: StepResult[]): string {
     </div>
 
     <!-- No data -->
-    <div v-else-if="!executions.length" class="text-text-muted flex items-center gap-2 p-4 text-xs">
-      <OIcon name="info" size="sm" />
-      <span v-if="runStatus === 'error'">{{
-        t("synthetics.runRowExpansion.probeInfraError")
-      }}</span>
-      <span v-else>{{ t("synthetics.runRowExpansion.noExecutionData") }}</span>
-    </div>
+    <OEmptyState
+      v-else-if="!executions.length"
+      size="compact"
+      class="px-4"
+      :kind="runStatus === 'error' ? 'error' : 'first-run'"
+      :title="
+        runStatus === 'error'
+          ? t('synthetics.runRowExpansion.probeInfraError')
+          : t('synthetics.runRowExpansion.noExecutionData')
+      "
+    />
 
     <!-- Location groups -->
     <template v-else>

@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
         @open-shortcuts="openShortcutsList"
+        @open-jump-to="jumpToOpen = true"
         @toggle-mobile-nav="mobileNavOpen = !mobileNavOpen"
         @signout="signout"
       />
@@ -142,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col"
+          class="bg-surface-chrome-deeper flex min-h-0 min-w-0 flex-col"
           :style="{
             width:
               focusMode || !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
@@ -197,16 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </router-view>
               </FeatureLockBoundary>
             </div>
-            <div
-              v-else
-              data-test="main-content-pending"
-              aria-busy="true"
-              class="flex h-full flex-1 flex-col gap-3 overflow-hidden p-4"
-            >
-              <OSkeleton class="h-6 w-48" />
-              <OSkeleton shape="block" class="h-8 w-full" />
-              <OSkeleton v-for="n in 8" :key="n" shape="block" class="h-9 w-full" />
-            </div>
+            <RoutePendingSkeleton v-else />
           </div>
         </main>
 
@@ -233,11 +225,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 // same top position + height, so the main header stays visible.
                 store.state.isAiChatExpanded
                 ? { width: '50%', minWidth: '18.75rem' }
-                : { width: '25%', minWidth: '4.688rem' },
+                : { width: '25%', minWidth: '22.5rem' },
           ]"
         >
           <O2AIChat
-            :header-height="40"
+            docked
             :is-open="store.state.isAiChatEnabled"
             @close="closeChat"
             :aiChatInputContext="aiChatInputContext"
@@ -261,6 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite v-if="!focusMode" />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
+    <JumpToPalette v-if="!focusMode" v-model:open="jumpToOpen" />
     <VersionCompareDrawerHost />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
     <DashboardSaveConflictDialog
@@ -346,7 +339,7 @@ import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/draft
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { providePageNavContext } from "@/lib/core/PageHeader/pageContext";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import RoutePendingSkeleton from "@/components/common/RoutePendingSkeleton.vue";
 import { confirmLeave, releaseLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
 import { switchOrganization, toOrganizationOption } from "@/utils/organizationSwitch";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -378,6 +371,7 @@ import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import JumpToPalette from "@/components/jumpTo/JumpToPalette.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
@@ -411,6 +405,7 @@ export default defineComponent({
     O2AIChat,
     PaidOverageConsentDialog,
     ShortcutCheatsheet,
+    JumpToPalette,
     CommunitySlackInvite,
     SampleDataWelcome,
     SampleDataRemoveDialog,
@@ -418,7 +413,7 @@ export default defineComponent({
     SampleDataProgressDock,
     ODrawer,
     OButton,
-    OSkeleton,
+    RoutePendingSkeleton,
     FirstDataNotice,
     EditorDraftSignOutDialog,
     FeatureLockBoundary,
@@ -863,7 +858,7 @@ export default defineComponent({
 
     const setNavbarHeight = (barHeightPx: number) => {
       const barHeightRem = barHeightPx / 16;
-      document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
+      document.documentElement.style.setProperty("--navbar-height", `${3 + barHeightRem}rem`);
     };
 
     // a sign-up that never reaches onboarding still sends its one attribution event: its pick, or skipped
@@ -1844,17 +1839,8 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const getBtnLogo = computed(() => {
-      if (isDark.value) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-
-      if (isHovered.value) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-
-      return getImageURL("images/common/ai_icon_gradient.svg");
-    });
+    // The top bar's ghost hover is a neutral fill, so the gradient glyph reads on it in both themes.
+    const getBtnLogo = computed(() => getImageURL("images/common/ai_icon_gradient.svg"));
     /** `value` is a query string or `{ query, autoSend?, chipName?, newChat?, context? }`; a chip never auto-sends. */
     const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
       const wasOpen = store.state.isAiChatEnabled;
@@ -1946,6 +1932,7 @@ export default defineComponent({
     );
 
     const showShortcuts = ref(false);
+    const jumpToOpen = ref(false);
     const openShortcutsList = () => {
       showShortcuts.value = true;
     };
@@ -2019,6 +2006,7 @@ export default defineComponent({
       setRumUser,
       openPredefinedThemes,
       showShortcuts,
+      jumpToOpen,
       openShortcutsList,
       isPredefinedThemesOpen,
       handleMenuHover,

@@ -117,21 +117,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OEmptyState>
         </template>
-        <template #error="{ message }">
-          <OInlineNotice
-            tone="err"
-            :message="raw(message)"
+        <template #error>
+          <OEmptyState
+            kind="error"
+            :title="t('rum.analytics.saved.loadFailed')"
             data-test="rum-analytics-saved-funnels-error"
           >
             <template #actions>
               <OButton
-                variant="ghost"
+                variant="secondary"
                 data-test="rum-analytics-saved-funnels-retry-btn"
                 @click="refresh"
                 >{{ t("common.retry") }}</OButton
               >
             </template>
-          </OInlineNotice>
+          </OEmptyState>
         </template>
         <template #cell-name="{ row, index }">
           <span class="flex min-w-0 items-center gap-1.5">
@@ -289,7 +289,7 @@ import useFunnelDraft, {
   forwardFunnelLink,
   hasDeletedStep,
 } from "@/composables/rum/useFunnelDraft";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   MAX_FUNNELS_PER_APP,
   type NamedEvent,

@@ -59,17 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :column-visibility="columnVisibility"
           @update:column-visibility="setColumnVisibility"
         />
-        <OButton
-          icon-only
-          variant="ghost"
+        <ORefreshButton
           class="shrink-0"
-          @click="refreshJobs"
-          :disabled="loading"
+          :last-run-at="lastUpdatedAt"
+          :loading="loading"
           data-test="refresh-btn"
-          icon="refresh"
-        >
-          <OTooltip :content="t('common.refresh')" side="top" />
-        </OButton>
+          @click="refreshJobs"
+        />
       </div>
     </Teleport>
 
@@ -393,6 +389,7 @@ import { ref, computed, onMounted } from "vue";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -426,6 +423,7 @@ const { isMobile } = useBreakpoint();
 const qTableRef = ref();
 
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 const forbidden = ref<ForbiddenState>(false);
 const jobs = ref<BackfillJob[]>([]);
 const showDetailsDialog = ref(false);
@@ -541,6 +539,7 @@ const loadJobs = async () => {
       org_id: store.state.selectedOrganization.identifier,
     });
     jobs.value = response;
+    lastUpdatedAt.value = Date.now();
     loadPipelineOptions();
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);

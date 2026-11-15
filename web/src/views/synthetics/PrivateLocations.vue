@@ -53,12 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #toolbar-trailing>
-        <OButton
-          icon-only
-          variant="ghost"
-          icon="refresh"
+        <ORefreshButton
+          :last-run-at="lastRunAt"
           :loading="loading"
-          :title="t('common.refresh')"
           data-test="synthetics-private-locations-refresh-btn"
           @click="emit('refresh')"
         />
@@ -226,6 +223,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { ForbiddenState } from "@/utils/featureGate";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -243,6 +241,8 @@ import { syntheticsPrivateLocationRoute } from "@/utils/synthetics/routes";
 const props = defineProps<{
   locations: SyntheticLocation[];
   loading: boolean;
+  /** Epoch-ms of the last successful load, shown as the refresh age. */
+  lastRunAt?: number | null;
   forbidden?: ForbiddenState;
 }>();
 const emit = defineEmits<{

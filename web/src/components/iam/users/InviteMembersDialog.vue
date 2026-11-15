@@ -53,8 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="invite-members-dialog-role-select"
       />
     </OForm>
-    <div v-else class="flex justify-center py-6" data-test="invite-members-dialog-loading">
-      <OSpinner size="lg" />
+    <div v-else class="flex flex-col gap-4" data-test="invite-members-dialog-loading">
+      <OSkeleton shape="block" class="h-20" />
+      <OSkeleton shape="block" class="h-14" />
     </div>
   </ODialog>
 </template>
@@ -67,7 +68,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";

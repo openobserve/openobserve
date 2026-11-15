@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="privateLocationsEnabled && activeSection === 'private'"
         :locations="privateLocations"
         :loading="locationsLoading"
+        :last-run-at="locationsLoadedAt"
         :forbidden="locationsForbidden"
         @refresh="loadPrivateLocations"
         @copy-setup="openSetupDrawer"
@@ -270,6 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="activeSection === 'status-pages'"
         :pages="statusPages"
         :loading="statusPagesLoading"
+        :last-run-at="statusPagesLoadedAt"
         :forbidden="statusPagesForbidden"
         :timezone="store.state.timezone"
         @refresh="loadStatusPages"
@@ -1103,6 +1105,7 @@ const onTabChange = (v: unknown) => {
 // ── Private locations tab ──────────────────────────────────────────────
 const privateLocations = ref<SyntheticLocation[]>([]);
 const locationsLoading = ref(false);
+const locationsLoadedAt = ref<number | null>(null);
 const showSetupDrawer = ref(false);
 const setupInstall = ref<string | null>(null);
 const setupLocationName = ref<string | null>(null);
@@ -1120,6 +1123,7 @@ async function loadPrivateLocations() {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
     const all: SyntheticLocation[] = (res.data as any).locations ?? [];
     privateLocations.value = all.filter((l) => l.kind === "private");
+    locationsLoadedAt.value = Date.now();
   } catch (err) {
     locationsForbidden.value = forbiddenState(err);
     console.error("[synthetics] failed to load private locations", err);
@@ -1173,6 +1177,7 @@ async function deleteLocation() {
 // ── Status pages tab ───────────────────────────────────────────────────
 const statusPages = ref<StatusPageListItem[]>([]);
 const statusPagesLoading = ref(false);
+const statusPagesLoadedAt = ref<number | null>(null);
 const statusPagesForbidden = ref<ForbiddenState>(false);
 const showCreateStatusPage = ref(false);
 
@@ -1183,6 +1188,7 @@ async function loadStatusPages() {
   try {
     const res = await statusPagesService.list(orgIdentifier.value);
     statusPages.value = (res.data as any).pages ?? [];
+    statusPagesLoadedAt.value = Date.now();
   } catch (err) {
     statusPagesForbidden.value = forbiddenState(err);
     console.error("[status-pages] failed to load", err);

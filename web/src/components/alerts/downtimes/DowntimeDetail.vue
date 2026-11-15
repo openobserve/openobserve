@@ -296,9 +296,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </template>
             <template #empty>
-              <div data-test="downtime-detail-notifications-empty">
-                <OEmptyState icon="history" :title="t('alerts.downtimes.notify.log.empty')" />
-              </div>
+              <OEmptyState
+                icon="history"
+                :title="t('alerts.downtimes.notify.log.empty')"
+                data-test="downtime-detail-notifications-empty"
+              />
             </template>
           </OTable>
         </section>
@@ -320,9 +322,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTimeCell :value="row.timestamp" unit="us" :timezone="viewerZone" />
           </template>
           <template #empty>
-            <div data-test="downtime-detail-suppressed-empty">
-              <OEmptyState icon="history" :title="t('alerts.downtimes.detail.noSuppressed')" />
-            </div>
+            <OEmptyState
+              icon="history"
+              :title="t('alerts.downtimes.detail.noSuppressed')"
+              data-test="downtime-detail-suppressed-empty"
+            />
           </template>
         </OTable>
       </template>

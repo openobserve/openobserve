@@ -73,18 +73,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-full flex-1 overflow-x-hidden overflow-y-auto p-3"
         @scroll="handleScroll"
       >
-        <!-- No Results Message -->
-        <div v-if="filteredCategories.length === 0" class="flex h-full items-center justify-center">
-          <div class="text-center">
-            <OIcon class="h-16 w-16" name="search-off" />
-            <div class="text-text-muted mt-3 text-xl font-semibold">
-              {{ t("dashboard.customChartTypeSelector.noResultsFound") }}
-            </div>
-            <div class="text-text-muted mt-2 text-sm">
-              {{ t("dashboard.customChartTypeSelector.trySearchingDifferentKeywords") }}
-            </div>
-          </div>
-        </div>
+        <OEmptyState
+          v-if="filteredCategories.length === 0"
+          kind="filtered"
+          :title="t('dashboard.customChartTypeSelector.noResultsFound')"
+          :text="t('dashboard.customChartTypeSelector.trySearchingDifferentKeywords')"
+        />
 
         <!-- Chart Categories -->
         <div
@@ -155,6 +149,7 @@ import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -162,6 +157,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 export default defineComponent({
   name: "CustomChartTypeSelector",
   components: {
+    OEmptyState,
     CustomChartConfirmDialog,
     OButton,
     OSearchInput,

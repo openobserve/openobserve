@@ -48,22 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="loading && patterns.length === 0" class="p-6 text-center">
-      <OSpinner size="lg" />
-      <div class="mt-3">{{ t("regex_patterns.loading_patterns") }}</div>
+    <div v-if="loading && patterns.length === 0" class="p-3">
+      <OSkeleton preset="tableRows" :rows="8" />
     </div>
 
-    <!-- Error State -->
-    <div v-else-if="error" class="p-6 text-center">
-      <OIcon name="error" style="width: 3.125rem; height: 3.125rem" />
-      <div class="text-status-error-text mt-3">{{ error }}</div>
-      <span class="mt-2">
-        <OButton variant="accent-ghost" @click="() => fetchPatterns()">
-          {{ t("regex_patterns.try_again") }}
-        </OButton>
-      </span>
-    </div>
+    <OEmptyState v-else-if="error" kind="error" @action="() => fetchPatterns()" />
 
     <!-- Patterns List -->
     <div v-else class="patterns-list min-h-0 flex-1 overflow-y-auto">
@@ -131,15 +120,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </li>
 
-          <li v-if="filteredPatterns.length === 0" class="flex items-center px-3 py-2">
-            <div class="text-text-muted flex min-w-0 flex-1 flex-col text-center">
-              <div class="p-6">
-                <OIcon name="search-off" style="width: 3.125rem; height: 3.125rem" />
-                <div class="mt-3">
-                  {{ t("regex_patterns.no_patterns_found") }}
-                </div>
-              </div>
-            </div>
+          <li v-if="filteredPatterns.length === 0">
+            <OEmptyState
+              v-if="searchQuery || selectedTags.length"
+              kind="filtered"
+              @action="((searchQuery = ''), (selectedTags = []))"
+            />
+            <OEmptyState v-else :title="t('regex_patterns.no_patterns_found')" />
           </li>
         </ul>
       </div>
@@ -227,7 +214,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -259,7 +247,8 @@ export default defineComponent({
     OButton,
     ORefreshButton,
     ODialog,
-    OSpinner,
+    OSkeleton,
+    OEmptyState,
     OIcon,
     OTag,
     OSelect,

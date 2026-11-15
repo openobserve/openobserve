@@ -20,7 +20,7 @@ import SearchResult from "@/plugins/logs/SearchResult.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
-import { STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
+import { LOADER_DELAY_MS, STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -1385,9 +1385,9 @@ describe("SearchResult Component", () => {
       vi.useRealTimers();
     });
 
-    it("waits 300ms so a fast query never flashes the line", async () => {
+    it("waits the loader delay so a fast query never flashes the line", async () => {
       await startQuery(42);
-      vi.advanceTimersByTime(299);
+      vi.advanceTimersByTime(LOADER_DELAY_MS - 1);
       await nextTick();
       expect(line().exists()).toBe(false);
       vi.advanceTimersByTime(1);

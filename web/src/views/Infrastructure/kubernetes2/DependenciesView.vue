@@ -23,7 +23,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -619,13 +619,12 @@ function clearFilters() {
       data-test="k8s2-deps-error"
       @action="emit('refresh')"
     />
-    <div
+    <OSkeleton
       v-else-if="!loaded"
-      class="flex min-h-60 flex-1 items-center justify-center"
+      shape="block"
+      class="min-h-60 flex-1"
       data-test="k8s2-deps-loading"
-    >
-      <OSpinner size="lg" />
-    </div>
+    />
     <OEmptyState
       v-else-if="!allEdges.length"
       :title="t('infra.k8s2.depsNoFlowsTitle')"

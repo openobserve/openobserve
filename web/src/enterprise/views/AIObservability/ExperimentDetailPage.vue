@@ -246,16 +246,12 @@
           </template>
 
           <template #toolbar-trailing>
-            <OButton
-              icon-only
-              variant="ghost"
-              icon="refresh"
+            <ORefreshButton
+              :last-run-at="loadedAt"
               :loading="loading"
               data-test="ai-experiment-detail-refresh"
               @click="refresh"
-            >
-              <OTooltip side="bottom" :content="t('common.refresh')" />
-            </OButton>
+            />
           </template>
 
           <template #cell-slotStatus="{ row }: { row: any }">
@@ -326,13 +322,11 @@
           </template>
 
           <template #empty>
-            <div class="flex items-center justify-center py-8">
-              <OEmptyState
-                :title="t('emptyState.noExperiments.title')"
-                :text="t('emptyState.noExperiments.description')"
-                icon="query-stats"
-              />
-            </div>
+            <OEmptyState
+              :title="t('emptyState.noExperiments.title')"
+              :text="t('emptyState.noExperiments.description')"
+              icon="query-stats"
+            />
           </template>
         </OTable>
       </div>
@@ -377,7 +371,7 @@ import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -443,6 +437,7 @@ const orgId = computed<string>(() => store.state.selectedOrganization?.identifie
 const experimentId = computed<string>(() => String(route.params.id ?? ""));
 const detail = ref<ExperimentDetail | null>(null);
 const loading = ref(false);
+const loadedAt = ref<number | null>(null);
 const rowsLoading = ref(false);
 const acting = ref(false);
 const comparePickerOpen = ref(false);
@@ -995,6 +990,7 @@ async function refresh() {
     ]);
     detail.value = nextDetail;
     resultRows.value = rows;
+    loadedAt.value = Date.now();
   } catch (error: any) {
     showLoadError(error);
   } finally {
@@ -1112,6 +1108,7 @@ async function pollSlotRetry(rowId: string, generation: number) {
 
     detail.value = nextDetail;
     resultRows.value = rows;
+    loadedAt.value = Date.now();
     if (nextRowDetail && selectedRowDetail.value?.rowId === rowId) {
       selectedRowDetail.value = nextRowDetail;
     }

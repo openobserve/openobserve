@@ -19,14 +19,11 @@
       </div>
     </template>
 
-    <!-- Body -->
-    <div
+    <OEmptyState
       v-if="queryData.length === 0"
-      class="text-text-muted flex h-64 flex-col items-center justify-center"
-    >
-      <OIcon class="h-12 w-12" name="info" />
-      <p class="mt-2">{{ t("dashboard.queryInspector.noQueries") }}</p>
-    </div>
+      icon="query-stats"
+      :title="t('dashboard.queryInspector.noQueries')"
+    />
 
     <div v-else class="space-y-4">
       <div
@@ -258,6 +255,7 @@ import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -291,7 +289,7 @@ interface QueryInspectorQuery {
 export default defineComponent({
   name: "QueryInspector",
   emits: ["update:open"],
-  components: { OInlineNotice, OButton, ODialog, OSearchInput, OIcon },
+  components: { OInlineNotice, OButton, ODialog, OEmptyState, OSearchInput, OIcon },
   props: {
     open: {
       type: Boolean,

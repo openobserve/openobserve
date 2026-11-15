@@ -266,44 +266,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTable>
 
           <!-- Table Skeleton (initial load) -->
-          <div
+          <OSkeleton
             v-else-if="isLoading && !hasError"
-            class="flex h-full flex-col items-center justify-center"
+            preset="tableRows"
+            :rows="10"
             data-test="table-skeleton"
-          >
-            <!-- Loading indicator -->
-            <div class="flex items-center justify-center gap-3 max-md:flex-col">
-              <OSpinner size="lg" />
-              <span class="text-sm opacity-70">
-                {{ t("correlation.logs.loading") }}
-              </span>
-            </div>
-          </div>
+          />
 
-          <!-- Error State -->
-          <div
+          <OEmptyState
             v-else-if="hasError"
-            class="flex h-full flex-col items-center justify-center py-20"
+            kind="error"
+            :text="t('correlation.logs.errorDetails')"
             data-test="error-state"
-          >
-            <p class="max-w-md text-center text-sm opacity-70">
-              {{ error || t("correlation.logs.errorDetails") }}
-            </p>
-          </div>
+            @action="fetchCorrelatedLogs()"
+          />
 
-          <!-- Empty State -->
-          <div
+          <OEmptyState
             v-else-if="isEmpty"
-            class="flex h-full flex-col items-center justify-center py-20"
+            :title="t('correlation.logs.noData')"
+            :text="t('correlation.logs.noDataDetails')"
             data-test="empty-state"
-          >
-            <p class="mb-2 text-sm font-medium opacity-90">
-              {{ t("correlation.logs.noData") }}
-            </p>
-            <p class="mb-4 text-sm opacity-70">
-              {{ t("correlation.logs.noDataDetails") }}
-            </p>
-          </div>
+          />
         </div>
 
         <!-- Pagination bar -->
@@ -358,7 +341,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -382,7 +365,6 @@ const { loadKeyFields } = useServiceCorrelation();
 
 // Use correlated logs composable
 const {
-  error,
   searchResults,
   pagedResults,
   currentFilters,

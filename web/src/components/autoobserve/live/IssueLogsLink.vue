@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col p-4" data-test="autoobserve-issue-logs">
+  <div class="flex min-h-0 flex-1 flex-col" data-test="autoobserve-issue-logs">
     <OEmptyState
       icon="article"
       :title="title"
@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <OButton
           variant="secondary"
-          icon="open-in-new"
           data-test="autoobserve-issue-logs-open"
           @click="router.push(route)"
         >

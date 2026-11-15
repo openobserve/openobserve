@@ -25,32 +25,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       inert
     >
-      <OButton icon-only variant="ghost" size="sm" class="ms-1.5 shrink-0">
+      <OButton icon-only variant="ghost" size="sm" class="ms-1 shrink-0">
         <OIcon :name="collapseIcon" size="sm" />
       </OButton>
       <div class="min-w-0 flex-1 ps-2 max-md:min-w-32" />
       <div class="flex flex-none items-center justify-end gap-1 pe-2 max-md:ms-auto">
-        <OButton v-if="narrow" icon-only variant="ghost" size="xs">
-          <OIcon name="more-horiz" size="sm" />
-        </OButton>
-        <template v-else>
-          <ORefreshButton
+        <template v-if="logsTab">
+          <OButton v-if="narrow" icon-only variant="ghost" size="sm">
+            <OIcon name="more-horiz" size="sm" />
+          </OButton>
+          <OButton
+            v-else
+            icon-only
+            variant="secondary"
             size="sm"
-            :last-run-at="searchObj.meta.lastRunAt"
-            :loading="searchObj.loading || searchObj.loadingHistogram"
-            :disabled="searchObj.loading || searchObj.loadingHistogram"
-          />
-          <div v-if="logsTab" class="inline-flex items-center gap-0.5">
-            <OButton icon-only size="xs" :pressed="!!searchObj.meta.toggleSourceWrap">
-              <OIcon name="wrap-text" size="sm" />
-            </OButton>
-          </div>
+            :pressed="!!searchObj.meta.toggleSourceWrap"
+          >
+            <OIcon name="wrap-text" size="sm" />
+          </OButton>
         </template>
         <template v-if="searchObj.meta.resultGrid?.showPagination && logsTab">
           <span>
             <OSelect
               :model-value="searchObj.meta.resultGrid.rowsPerPage"
               :options="ROWS_PER_PAGE"
+              size="sm"
               class="select-pagination min-w-[4.5rem]"
               :searchable="false"
               :disabled="searchObj.loading"
@@ -88,7 +87,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
@@ -163,13 +161,10 @@ onBeforeUnmount(() => observer?.disconnect());
 .select-pagination {
   position: relative;
   width: 4rem !important;
-  height: 1.5rem !important;
   margin-top: 0;
 }
 
 .select-pagination :deep(button) {
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
   font-size: var(--text-xs) !important;
   padding-inline: 0.5rem !important;
 }

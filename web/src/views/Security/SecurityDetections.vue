@@ -11,6 +11,7 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -21,12 +22,13 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
 import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import SecurityRecordDrawer, {
@@ -143,10 +145,12 @@ function loadFirings() {
   });
 }
 
+const lastRunAt = ref<number | null>(null);
 async function refresh() {
   // Firings are read for the listed detections, so the rule list has to be known first.
   await loadRules(orgId.value);
   await loadFirings();
+  lastRunAt.value = Date.now();
 }
 
 const search = ref("");
@@ -913,16 +917,12 @@ watch(orgId, () => void refresh());
         </template>
 
         <template #toolbar-trailing>
-          <OButton
-            icon-only
-            variant="ghost"
-            icon="refresh"
+          <ORefreshButton
+            :last-run-at="lastRunAt"
             :loading="loading"
             data-test="security-detections-refresh"
             @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('siem.detections.refresh')" />
-          </OButton>
+          />
         </template>
 
         <template #selection-actions>
@@ -1166,20 +1166,21 @@ watch(orgId, () => void refresh());
       </template>
 
       <template #tab-history>
-        <div v-if="historyLoading" class="flex items-center justify-center gap-2 py-10">
-          <OSpinner size="lg" />
-          <span class="text-text-secondary text-sm">{{ t("siem.detections.historyLoading") }}</span>
+        <div v-if="historyLoading" class="flex flex-col gap-2">
+          <OSkeleton class="h-4 w-64" />
+          <OSkeleton v-for="row in 5" :key="row" class="h-8" />
         </div>
         <OEmptyState
           v-else-if="historyError"
-          size="inline"
           kind="error"
           :title="t('siem.detections.historyError')"
-          :text="raw(historyError)"
+          :text="
+            isRawHttpText(historyError) ? t('emptyState.loadError.description') : raw(historyError)
+          "
+          @action="loadHistory(String(selected.entry.alert.id))"
         />
         <OEmptyState
           v-else-if="!history.length"
-          size="inline"
           icon="history"
           :title="t('siem.detections.historyEmpty')"
           :text="t('siem.detections.historyEmptyHint', { days: HISTORY_DAYS })"
@@ -1244,7 +1245,6 @@ watch(orgId, () => void refresh());
         />
         <OEmptyState
           v-else
-          size="inline"
           icon="info-outline"
           :title="t('siem.detections.noSigma')"
           :text="t('siem.detections.noSigmaHint')"

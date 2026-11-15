@@ -317,9 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
             </template>
-            <div v-if="isRoleLimitsLoading" class="flex h-[50vh] items-center justify-center">
-              <OSpinner size="lg" />
-            </div>
+            <OSkeleton v-if="isRoleLimitsLoading" preset="tableRows" :rows="6" />
           </template>
         </OTable>
       </div>
@@ -431,7 +429,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 import useRateLimiter from "@/composables/useRateLimiter";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { featureState } from "@/utils/featureGate";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
@@ -451,7 +449,7 @@ export default defineComponent({
     ConfirmDialog,
     QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OEmptyState,
-    OSpinner,
+    OSkeleton,
     OIcon,
     OTable,
   },

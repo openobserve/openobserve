@@ -58,10 +58,7 @@
     <!-- Empty state -->
     <template #empty>
       <slot name="empty">
-        <div class="flex items-center justify-center py-[0.725rem] text-center">
-          <OIcon name="info" size="xs" />
-          <span class="ps-1.5">{{ t("search.noFieldFound") }}</span>
-        </div>
+        <OEmptyState size="compact" icon="info" :title="t('search.noFieldFound')" />
       </slot>
     </template>
 
@@ -86,6 +83,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 

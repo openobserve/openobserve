@@ -53,7 +53,7 @@ test.describe('Search scheduler after a logs search (#13243)', { tag: '@enterpri
     await page.waitForTimeout(5000);
 
     // Reach the scheduler the way the toolbar does.
-    await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').click();
     await page.locator('[data-test="search-scheduler-list-btn"]').click();
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 

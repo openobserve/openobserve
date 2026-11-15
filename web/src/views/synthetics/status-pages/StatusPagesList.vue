@@ -46,16 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #toolbar-trailing>
-        <OButton
-          icon-only
-          variant="ghost"
-          icon="refresh"
+        <ORefreshButton
+          :last-run-at="lastRunAt"
           :loading="loading"
           data-test="status-pages-refresh-btn"
           @click="emit('refresh')"
-        >
-          <OTooltip side="bottom" :content="t('common.refresh')" />
-        </OButton>
+        />
       </template>
 
       <!-- Name -->
@@ -272,6 +268,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -291,10 +288,12 @@ const props = withDefaults(
   defineProps<{
     pages: StatusPageListItem[];
     loading?: boolean;
+    /** Epoch-ms of the last successful load, shown as the refresh age. */
+    lastRunAt?: number | null;
     forbidden?: ForbiddenState;
     timezone?: string;
   }>(),
-  { loading: false, forbidden: false, timezone: "UTC" },
+  { loading: false, lastRunAt: null, forbidden: false, timezone: "UTC" },
 );
 
 const emit = defineEmits<{

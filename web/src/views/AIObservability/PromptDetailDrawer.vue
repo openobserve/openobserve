@@ -77,8 +77,8 @@
         class="min-h-0 flex-1 overflow-auto"
         :class="activeTab === 'versions' || activeTab === 'labels' ? '' : 'px-5 py-3'"
       >
-        <div v-if="loading" class="text-text-secondary py-10 text-center">
-          {{ t("aiObservability.promptManagement.loadingPrompt") }}
+        <div v-if="loading" class="flex flex-col gap-3">
+          <OSkeleton v-for="row in 6" :key="row" class="h-4 w-full" />
         </div>
 
         <OEmptyState
@@ -372,6 +372,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import PromptLabelsPanel from "./PromptLabelsPanel.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";

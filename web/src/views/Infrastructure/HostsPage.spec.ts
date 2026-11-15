@@ -21,6 +21,7 @@ import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import { defineComponent, h, ref } from "vue";
 import HostsPage from "./HostsPage.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import i18n from "@/locales";
 import analytics from "@/services/product_analytics";
 
@@ -930,10 +931,7 @@ describe("HostsPage", () => {
 
     it("spins the page's Refresh while the map reloads", async () => {
       wrapper = await mountPage({ view: "dependencies" });
-      const refresh = () =>
-        wrapper
-          .findAllComponents({ name: "OButton" })
-          .find((b) => b.attributes("data-test") === "hosts-refresh")!;
+      const refresh = () => wrapper.findComponent(ORefreshButton);
       deps().vm.$emit("loading", true);
       await flushPromises();
       expect(refresh().props("loading")).toBe(true);

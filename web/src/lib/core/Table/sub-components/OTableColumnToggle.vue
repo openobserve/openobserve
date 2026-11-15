@@ -74,9 +74,10 @@ function resetToDefault(): void {
   <ODropdown align="end" side="bottom" :side-offset="4">
     <template #trigger>
       <div class="relative inline-flex">
+        <!-- Bordered: it sits beside refresh in a toolbar where only More is borderless. -->
         <OButton
           icon-only
-          variant="ghost"
+          variant="secondary"
           :aria-label="
             hiddenCount > 0
               ? t('common.manageColumnsHidden', { count: hiddenCount })

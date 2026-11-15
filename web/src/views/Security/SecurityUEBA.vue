@@ -4,6 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -790,18 +791,6 @@ const noUserSources = computed(
             @update:selected-keys="toneFilters = $event as SeverityTone[]"
           />
         </template>
-        <template #toolbar-trailing>
-          <OButton
-            icon-only
-            variant="ghost"
-            icon="refresh"
-            :loading="loading"
-            data-test="security-ueba-refresh-table"
-            @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('siem.entities.refresh')" />
-          </OButton>
-        </template>
 
         <template #cell-user="{ row }">
           <div class="flex min-w-0 items-center gap-2">
@@ -891,7 +880,7 @@ const noUserSources = computed(
           <OEmptyState
             kind="error"
             :title="t('siem.ueba.loadError')"
-            :text="raw(message)"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             @action="refresh"
           />
         </template>
@@ -993,7 +982,7 @@ const noUserSources = computed(
         </OInlineNotice>
         <OEmptyState
           v-if="!selected.signals.length"
-          size="inline"
+          size="compact"
           icon="task-alt"
           :title="t('siem.ueba.noSignals')"
           :text="t('siem.ueba.noSignalsHint')"
@@ -1124,7 +1113,8 @@ const noUserSources = computed(
           </div>
           <OEmptyState
             v-if="!ipRows.length"
-            size="inline"
+            size="compact"
+            class="px-3"
             icon="lan"
             :title="t('siem.ueba.noIps')"
           />

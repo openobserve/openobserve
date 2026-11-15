@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OEmptyState
             v-if="!versionsLoading && !versions.length"
-            size="inline"
+            size="compact"
             :title="t('aiObservability.datasets.detail.itemDetail.versionsEmpty')"
             data-test="ai-dataset-item-detail-versions-empty"
           />

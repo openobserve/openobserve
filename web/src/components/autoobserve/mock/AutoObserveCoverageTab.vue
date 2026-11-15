@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LiveNoticeState
         v-else-if="liveNoticeView"
         :notice="liveNoticeView"
-        size="page"
+        size="region"
         :detail="source.detail"
         :busy="source.busy"
         :data-test="`autoobserve-coverage-${liveNoticeView.failure}`"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <LiveNoticeState
           :notice="emptyNotice"
-          size="page"
+          size="region"
           :data-test="
             source.passMinutes === null
               ? 'autoobserve-coverage-no-pass'

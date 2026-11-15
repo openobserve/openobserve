@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           icon-only
           variant="ghost"
-          size="xs"
-          class="ms-1.5 shrink-0"
+          size="sm"
+          class="ms-1 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
         >
@@ -143,31 +143,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="flex flex-none items-center justify-end gap-1 pe-2 max-md:ms-auto">
-          <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
-          <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
+          <!-- Narrow results: the bar's actions fold into one ⋯; refresh lives in the toolbar. -->
+          <ODropdown
+            v-if="shouldMoveActionsToMenu && (showWrapBtn || showInspectBtn)"
+            side="bottom"
+            align="end"
+          >
             <template #trigger>
-              <OButton icon-only variant="ghost" size="xs" data-test="logs-result-actions-menu-btn">
-                <OIcon name="more-horiz" size="sm" />
-                <OTooltip :content="t('search.moreActions')" />
-              </OButton>
+              <OButton
+                icon-only
+                icon="more-horiz"
+                variant="ghost"
+                size="sm"
+                :label="t('search.moreActions')"
+                data-test="logs-result-actions-menu-btn"
+              />
             </template>
-            <ODropdownItem
-              icon="refresh"
-              data-test="logs-result-refresh-menu-item"
-              @select="$emit('run-query')"
-            >
-              {{ t("common.refresh") }}
-            </ODropdownItem>
             <ODropdownItem
               icon="wrap-text"
               v-if="showWrapBtn"
               data-test="logs-result-wrap-menu-item"
+              :checked="!!searchObj.meta.toggleSourceWrap"
               @select="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
             >
               {{ t("search.messageWrapContent") }}
-              <template v-if="searchObj.meta.toggleSourceWrap" #end>
-                <OIcon name="check" size="sm" />
-              </template>
             </ODropdownItem>
             <ODropdownItem
               icon="troubleshoot"
@@ -179,21 +178,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
           </ODropdown>
 
-          <!-- INLINE BUTTONS (wider container) -->
-          <template v-else>
-            <ORefreshButton
-              size="sm"
-              :last-run-at="searchObj.meta.lastRunAt"
-              :loading="searchObj.loading || histogramSettling"
-              :disabled="searchObj.loading || histogramSettling"
-              @click="$emit('run-query')"
-            />
-            <!-- Action buttons -->
-            <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-0.5">
+          <template v-else-if="!shouldMoveActionsToMenu">
+            <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-1">
               <OButton
                 v-if="inspectAvailable"
                 :icon-only="!showActionLabels"
-                size="xs"
+                size="sm"
                 :disabled="!showInspectBtn"
                 @click="openSearchJobInspector"
                 data-test="logs-inspect-button"
@@ -210,9 +200,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="showWrapBtn"
                 icon-only
-                variant="ghost"
-                size="xs"
-                :pressed="searchObj.meta.toggleSourceWrap"
+                variant="secondary"
+                size="sm"
+                :pressed="!!searchObj.meta.toggleSourceWrap"
                 @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
                 data-test="logs-search-result-wrap-table-content-btn"
               >
@@ -239,6 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-result-records-per-page"
               v-model="searchObj.meta.resultGrid.rowsPerPage"
               :options="rowsPerPageOptions"
+              size="sm"
               class="select-pagination min-w-[4.5rem]"
               :searchable="false"
               :disabled="searchObj.loading || !!gridLockReason"
@@ -388,15 +379,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Same no-data treatment as dashboard panels (PanelSchemaRenderer);
-               inline min-height/padding overridden to fit the 6.25rem strip. -->
+          <!-- Same no-data treatment as dashboard panels (PanelSchemaRenderer). -->
           <OEmptyState
             v-else-if="histogramView.phase === 'empty'"
-            size="inline"
+            size="compact"
             icon="bar-chart"
             :title="t('logs.searchResult.noData')"
             data-test="logs-search-no-data-histogram"
-            class="histogram-empty !min-h-0 !p-2"
+            class="histogram-empty px-3"
           />
         </div>
         <div
@@ -974,7 +964,6 @@ import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { quickModeHiddenFieldCount } from "@/utils/query/quickModeFieldList";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1029,7 +1018,6 @@ export default defineComponent({
   name: "SearchResult",
   components: {
     LogLineLinkPopover,
-    ORefreshButton,
     OButton,
     ODrawer,
     OSpinner,
@@ -3535,13 +3523,10 @@ export default defineComponent({
 .select-pagination {
   position: relative;
   width: 4rem !important;
-  height: 1.5rem !important;
   margin-top: 0;
 }
 
 .select-pagination :deep(button) {
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
   font-size: var(--text-xs) !important;
   padding-inline: 0.5rem !important;
 }

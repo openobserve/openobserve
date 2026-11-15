@@ -1961,6 +1961,9 @@
     "workflows": "工作流程",
     "language": "語言",
     "keyboardShortcuts": "鍵盤快捷鍵",
+    "searchOrJumpTo": "搜尋或跳至…",
+    "jumpToTitle": "跳至",
+    "jumpToPlaceholder": "搜尋頁面",
     "synthetic": "合成監控",
     "experience": "體驗",
     "slos": "SLOs",
@@ -4039,7 +4042,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "沒有管理授權的權限。"
-      }
+      },
+      "usageTitle": "每日擷取量"
     },
     "value_sso_requires_ha": "✅ 需要高可用模式",
     "value_rbac_requires_ha": "✅ 需要高可用模式",
@@ -5048,6 +5052,7 @@
   },
   "organization": {
     "searchByNameOrId": "按名稱或 ID 搜尋",
+    "currentLabel": "組織：{name}",
     "noOrganizationsFound": "找不到任何組織",
     "header": "組織",
     "orgBeingDeletedSwitching": "此組織正在刪除中。正在將您切換至另一個組織。",
@@ -10747,7 +10752,8 @@
       "taglineAnd": "並引導您瀏覽您的日誌、追蹤、指標與事件。",
       "signedInAs": "登入身分",
       "role": "角色",
-      "tryOneOfThese": "或試試以下其中一項"
+      "tryOneOfThese": "或試試以下其中一項",
+      "panelText": "詢問你的日誌、追蹤、指標與事件，或取得撰寫查詢的協助。"
     },
     "capabilities": {
       "query": {
@@ -18947,7 +18953,7 @@
       "version": "版本",
       "agentIdHint": "Agent ID：{ids}",
       "noAgentIdentity": "找不到 Agent 身分",
-      "noAgentIdentityDescription": "這些 LLM Span 沒有 Agent 名稱，因此依串流呈現。請對應可指出 Agent 名稱的屬性，即可依 Agent 檢視。",
+      "noAgentIdentityDescription": "這些 LLM Span 沒有 Agent 名稱，因此依串流呈現。",
       "noAgentIdentityAction": "開啟 GenAI Agent 對應"
     },
     "agentGraph": {
@@ -22723,6 +22729,7 @@
     },
     "actions": {
       "openCheatsheet": "開啟鍵盤快捷鍵速查表",
+      "searchOrJumpTo": "搜尋或跳至頁面",
       "closeDialog": "關閉任何對話框、抽屜或模態視窗",
       "focusSearch": "聚焦搜尋列",
       "focusQuery": "聚焦查詢編輯器",
@@ -25447,7 +25454,8 @@
         "p95": "慢速尾端 — 每 20 次呼叫就有 1 次至少耗時這麼久。依據應用程式追蹤中已完成的呼叫測量而得。",
         "p99": "最差的 1% 呼叫至少耗時這麼久。依據應用程式追蹤中已完成的呼叫測量而得。",
         "load": "你的應用程式呼叫此資料庫所花費的總時間，依據應用程式追蹤測量而得。這顯示此資料庫為你的應用程式承載了多少流量。",
-        "attention": "此執行個體距離其引擎自行發布的限制有多近 — 目前是連線數對比 max_connections。取最差的比率，而非綜合分數。依最高的優先排序，健康狀態無法讀取的執行個體會排在頂部，因為您無法看到的執行個體，無法確定其健康。在資料庫伺服器上衡量，因此無法與旁邊的資料庫時間比較。"
+        "attention": "此執行個體距離其引擎自行發布的限制有多近 — 目前是連線數對比 max_connections。取最差的比率，而非綜合分數。依最高的優先排序，健康狀態無法讀取的執行個體會排在頂部，因為您無法看到的執行個體，無法確定其健康。在資料庫伺服器上衡量，因此無法與旁邊的資料庫時間比較。",
+        "calls": "你的應用程式呼叫此資料庫的次數，根據應用程式的追蹤資料測量。"
       },
       "failedChip": "{count} 失敗",
       "columnSubLabels": {
@@ -25888,7 +25896,8 @@
         "tableHealthHint": "資料表大小、膨脹與 vacuum 狀態。膨脹與 vacuum 僅限 PostgreSQL。",
         "deadlocksLocked": "死結 (deadlock) 是 Enterprise 功能。升級以查看哪些查詢彼此發生死結，以及原因。其他資料庫分頁適用於所有方案。",
         "blockedLocked": "被封鎖的查詢是 Enterprise 功能。升級以查看哪些工作階段正在等待鎖定，以及什麼持有該鎖定。其他資料庫分頁適用於所有方案。",
-        "tableHealthLocked": "資料表健康狀態是 Enterprise 功能。升級以追蹤資料表大小、膨脹與 vacuum 狀態。其他資料庫分頁適用於所有方案。"
+        "tableHealthLocked": "資料表健康狀態是 Enterprise 功能。升級以追蹤資料表大小、膨脹與 vacuum 狀態。其他資料庫分頁適用於所有方案。",
+        "queriesHintServer": "此時間範圍內資料庫回報的查詢種類，在資料庫內部計算。"
       }
     },
     "metrics": {

@@ -13,57 +13,22 @@
 -->
 <script setup lang="ts">
 import type { I18nText } from "@/types/i18n";
-import { computed } from "vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
-const props = defineProps<{
+defineProps<{
   title: I18nText;
   /** Optional one-line explanation under the title. */
   hint?: I18nText;
-  /** Optional leading glyph — use the SAME one as the section's summary tile. */
-  icon?: IconName;
-  /** Icon colour — match the summary tile's tone so the two read as one thing. */
-  tone?: "warning" | "error" | "primary" | "neutral";
 }>();
-
-// Soft tone chip — same rounded-square treatment as the OPageHeader module tile,
-// a touch smaller (w-8.5 vs the page header's w-9.5), and identical to the detail
-// drawer's header chip so tile → section header → drawer read as one thing.
-const iconWrap = computed(() => {
-  switch (props.tone) {
-    case "warning":
-      return "bg-badge-warning-soft-bg text-badge-warning-soft-text";
-    case "error":
-      return "bg-badge-error-soft-bg text-badge-error-soft-text";
-    case "primary":
-      return "bg-badge-primary-soft-bg text-badge-primary-soft-text";
-    default:
-      return "bg-surface-subtle text-text-secondary";
-  }
-});
 </script>
 
 <template>
-  <div
-    class="px-page-edge flex items-start justify-between gap-2 pt-3 pb-2"
-    data-test="ai-panel-section-header"
-  >
-    <div class="flex min-w-0 items-center gap-2.5">
-      <span
-        v-if="icon"
-        class="rounded-default inline-flex h-8.5 w-8.5 shrink-0 items-center justify-center"
-        :class="iconWrap"
-      >
-        <OIcon :name="icon" size="md" />
-      </span>
-      <div class="flex min-w-0 flex-col">
-        <div class="text-text-heading truncate text-sm font-semibold">
-          {{ title }}
-        </div>
-        <div v-if="hint" class="text-2xs text-text-secondary leading-normal">
-          {{ hint }}
-        </div>
+  <div class="flex items-start justify-between gap-2 pb-2" data-test="ai-panel-section-header">
+    <div class="flex min-w-0 flex-col">
+      <div class="text-text-heading truncate text-sm font-semibold">
+        {{ title }}
+      </div>
+      <div v-if="hint" class="text-text-secondary text-xs">
+        {{ hint }}
       </div>
     </div>
     <div v-if="$slots.actions" class="shrink-0">

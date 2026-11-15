@@ -535,9 +535,8 @@ onMounted(reload);
       </template>
       <template #empty>
         <OEmptyState
-          size="inline"
           icon="cloud-upload"
-          :title="t('siem.sources.title')"
+          :title="t('siem.overview.noSources')"
           :text="t('siem.sources.empty')"
         />
       </template>

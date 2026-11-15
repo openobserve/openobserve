@@ -26,12 +26,9 @@
           class="flex-none"
           data-test="eval-job-detail-window"
         />
-        <OButton
-          icon-only
-          variant="ghost"
-          icon="refresh"
+        <ORefreshButton
+          :last-run-at="lastRunAt"
           :loading="isLoadingKpis || isLoadingRuns"
-          :title="t('onlineEvals.job.detail.refresh')"
           data-test="eval-job-detail-refresh"
           @click="refreshAll"
         />
@@ -192,7 +189,7 @@
             </h4>
             <OEmptyState
               v-if="resolvedScorers.length === 0"
-              size="inline"
+              size="compact"
               :title="t('onlineEvals.job.detail.scorersEmpty')"
               data-test="eval-job-detail-scorers-empty"
             />
@@ -505,7 +502,8 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { useLoadedAt } from "@/composables/useLoadedAt";
 import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -888,6 +886,7 @@ function openEvaluationRun(run: JobRunRow) {
 }
 
 const refreshToken = ref(0);
+const lastRunAt = useLoadedAt(() => isLoadingKpis.value || isLoadingRuns.value);
 
 async function refreshAll() {
   syncDateWindow();

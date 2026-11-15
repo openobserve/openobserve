@@ -362,37 +362,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Content -->
                 <div class="min-h-0 flex-1 overflow-hidden">
-                  <!-- Idle: not yet run -->
                   <div
                     v-if="!tempRunQuery && outputEvents == ''"
-                    class="bg-card-glass-bg flex h-full w-full flex-col items-center justify-center"
+                    class="bg-card-glass-bg h-full w-full"
                   >
-                    <div class="flex flex-col items-center gap-2">
-                      <OIcon name="table-chart" class="size-12! opacity-[0.18]" />
-                      <span class="text-xs opacity-[0.45]">{{
-                        t("alerts.runQueryForOutput")
-                      }}</span>
-                    </div>
+                    <OEmptyState icon="table-chart" :title="t('alerts.runQueryForOutput')" />
                   </div>
-                  <!-- No results after run -->
                   <div
                     v-else-if="outputEvents == '' && !runQueryLoading"
-                    class="bg-card-glass-bg flex h-full flex-col items-center justify-center"
+                    class="bg-card-glass-bg h-full w-full"
                   >
-                    <div class="flex flex-col items-center gap-2">
-                      <OIcon name="warning" size="xl" class="text-warning opacity-60" />
-                    </div>
+                    <OEmptyState icon="table-chart" :title="t('search.noResult')" />
                   </div>
-                  <!-- Loading -->
-                  <div
-                    v-else-if="runQueryLoading"
-                    class="flex h-full flex-col items-center justify-center gap-2"
-                  >
-                    <OSpinner size="lg" />
-                    <span class="text-text-secondary text-sm">{{
-                      t("search.fetchingResults")
-                    }}</span>
-                  </div>
+                  <OSkeleton v-else-if="runQueryLoading" preset="tableRows" :rows="8" />
                   <!-- Results -->
                   <QueryEditor
                     v-else
@@ -441,37 +423,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Content -->
                 <div class="min-h-0 flex-1 overflow-hidden">
-                  <!-- Idle -->
                   <div
                     v-if="!tempTestFunction && !runFnQueryLoading"
-                    class="bg-card-glass-bg flex h-full w-full flex-col items-center justify-center"
+                    class="bg-card-glass-bg h-full w-full"
                   >
-                    <div class="flex flex-col items-center gap-2">
-                      <OIcon name="data-object" class="size-12! opacity-[0.18]" />
-                      <span class="text-xs opacity-[0.45]">{{
-                        t("alerts.applyVRLForOutput")
-                      }}</span>
-                    </div>
+                    <OEmptyState icon="data-object" :title="t('alerts.applyVRLForOutput')" />
                   </div>
-                  <!-- No results -->
                   <div
                     v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction"
-                    class="bg-card-glass-bg flex h-full flex-col items-center justify-center"
+                    class="bg-card-glass-bg h-full w-full"
                   >
-                    <div class="flex flex-col items-center gap-2">
-                      <OIcon name="warning" size="xl" class="text-warning opacity-60" />
-                    </div>
+                    <OEmptyState icon="data-object" :title="t('search.noResult')" />
                   </div>
-                  <!-- Loading -->
-                  <div
-                    v-else-if="runFnQueryLoading"
-                    class="flex h-full flex-col items-center justify-center gap-2"
-                  >
-                    <OSpinner size="lg" />
-                    <span class="text-text-secondary text-sm">{{
-                      t("search.fetchingResults")
-                    }}</span>
-                  </div>
+                  <OSkeleton v-else-if="runFnQueryLoading" preset="tableRows" :rows="8" />
                   <!-- Results -->
                   <QueryEditor
                     v-else
@@ -541,6 +505,8 @@ import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

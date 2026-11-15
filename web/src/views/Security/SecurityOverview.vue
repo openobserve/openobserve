@@ -127,6 +127,7 @@ const summaryLoading = computed(() => awaitingRules.value || summary.loading.val
 /** Set once the first summary lands, so later refreshes keep the tiles instead of a skeleton. */
 const summaryLanded = ref(false);
 const triageLoading = computed(() => awaitingRules.value || historyWindow.loading.value);
+const rulesSettled = computed(() => !awaitingRules.value && !rulesLoading.value);
 const loading = computed(
   () =>
     summaryLoading.value ||
@@ -613,7 +614,8 @@ function nav(path: string, query: Record<string, string> = {}) {
       </div>
     </template>
 
-    <div class="flex flex-col gap-4 pb-4">
+    <!-- The notices above the tiles depend on the rules list, so the body waits for it rather than move down. -->
+    <div v-if="rulesSettled" class="flex flex-col gap-4 pb-4">
       <SecurityNotices :notices="notices" data-test="security-overview-notices" />
       <SecurityAccessLock
         v-if="denials.length"
@@ -664,7 +666,6 @@ function nav(path: string, query: Record<string, string> = {}) {
             />
             <OEmptyState
               v-else
-              size="inline"
               icon="task-alt"
               :title="t('siem.overview.quiet')"
               :text="t('siem.overview.quietHint')"
@@ -700,13 +701,11 @@ function nav(path: string, query: Record<string, string> = {}) {
           />
           <OEmptyState
             v-else-if="casesUnsupported"
-            size="inline"
             icon="info-outline"
             :title="t('siem.overview.casesUnsupported')"
           />
           <OEmptyState
             v-else-if="!openCases.length"
-            size="inline"
             icon="task-alt"
             :title="t('siem.overview.noOpenCases')"
           />
@@ -816,7 +815,6 @@ function nav(path: string, query: Record<string, string> = {}) {
             </template>
             <template #empty>
               <OEmptyState
-                size="inline"
                 icon="task-alt"
                 :title="t('siem.overview.queueClear')"
                 :text="t('siem.overview.quietHint')"
@@ -835,7 +833,6 @@ function nav(path: string, query: Record<string, string> = {}) {
         >
           <OEmptyState
             v-if="!topDetections.length && !summaryLoading"
-            size="inline"
             icon="task-alt"
             :title="t('siem.overview.quiet')"
           />
@@ -943,7 +940,6 @@ function nav(path: string, query: Record<string, string> = {}) {
           </div>
           <OEmptyState
             v-else-if="!sources.length"
-            size="inline"
             icon="cloud-upload"
             :title="t('siem.overview.noSources')"
             :text="t('siem.overview.noSourcesHint')"
@@ -982,5 +978,11 @@ function nav(path: string, query: Record<string, string> = {}) {
 
       <SecurityAuditPanel />
     </div>
+    <OSkeleton
+      v-else
+      preset="statStrip"
+      :count="stats.length"
+      data-test="security-overview-pending"
+    />
   </OPageLayout>
 </template>

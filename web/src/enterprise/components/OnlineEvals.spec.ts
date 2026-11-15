@@ -138,7 +138,6 @@ function mountPage() {
       stubs: {
         DateTimePickerDashboard: PickerStub,
         AgentScopeCascade: true,
-        AiLastRefreshed: true,
         OTable: ScoresTableStub,
         QualityDistributionChart: true,
         QualityScorePane: PaneStub,

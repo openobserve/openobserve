@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 flex-1 overflow-y-auto pb-3">
       <OEmptyState
         v-if="visibleGroups.length === 0"
-        size="inline"
+        size="compact"
         class="px-2"
         kind="filtered"
         :title="t('alert_library.noCategoryMatch')"

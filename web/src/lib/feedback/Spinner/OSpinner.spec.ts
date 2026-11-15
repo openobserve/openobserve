@@ -37,11 +37,11 @@ describe("OSpinner", () => {
 
   it("waits out the loader delay before it shows", () => {
     const classes = mount(OSpinner).classes();
-    expect(classes).toContain("delay-300");
+    expect(classes).toContain("delay-150");
     expect(classes).toContain("fade-in-0");
   });
 
   it("shows at once when instant", () => {
-    expect(mount(OSpinner, { props: { instant: true } }).classes()).not.toContain("delay-300");
+    expect(mount(OSpinner, { props: { instant: true } }).classes()).not.toContain("delay-150");
   });
 });

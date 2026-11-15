@@ -30,13 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :text="t('emptyState.noServicesCatalog.description')"
   >
     <template #actions>
-      <EmptyStateActionCard
-        icon="schedule"
-        :label="t('traces.noEvents.jumpToData')"
-        :sublabel="raw(jumpTargetSublabel)"
+      <OButton
+        variant="primary"
+        :title="jumpTargetSublabel"
         data-test="services-catalog-no-data-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
-      />
+      >
+        {{ t("traces.noEvents.jumpToData") }}
+      </OButton>
     </template>
   </OEmptyState>
   <OEmptyState
@@ -48,9 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import useJumpToLatestData from "@/composables/useJumpToLatestData";
 
 // An org with no trace stream gets no advice to widen the range or switch streams; neither can help.

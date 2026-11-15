@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <OEmptyState
     v-else-if="view === 'error'"
-    size="inline"
+    size="compact"
     kind="error"
     :title="t('emptyState.loadError.title')"
     :text="t('emptyState.loadError.description')"
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <OButton
         variant="secondary"
-        icon="refresh"
+        size="sm"
         :data-test="`overview-${section}-retry-btn`"
         @click="emit('retry')"
       >
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OEmptyState>
   <OEmptyState
     v-else-if="view === 'forbidden'"
-    size="inline"
+    size="compact"
     kind="denied"
     :title="t('emptyState.noAccess.title')"
     :text="t('overview.state.sectionForbidden')"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
   <OEmptyState
     v-else-if="view === 'locked' && !canUnlock"
-    size="inline"
+    size="compact"
     icon="lock"
     :title="lockedMessage ?? t('overview.state.sectionLocked')"
     :data-test="`overview-${section}-locked`"

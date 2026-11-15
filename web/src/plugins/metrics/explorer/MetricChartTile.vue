@@ -48,21 +48,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <div
+      <OEmptyState
         v-else-if="queries && !queries.length"
-        class="text-text-secondary flex h-full items-center justify-center text-xs"
+        size="compact"
+        icon="show-chart"
+        class="h-full"
+        :title="t('metrics.explorer.card.noPreview')"
         :data-test="`${dataTest}-nopreview`"
-      >
-        {{ t("metrics.explorer.card.noPreview") }}
-      </div>
+      />
 
-      <div
+      <OEmptyState
         v-else-if="state.status === 'done' && !hasData"
-        class="text-text-secondary flex h-full items-center justify-center text-xs"
+        size="compact"
+        icon="bar-chart"
+        class="h-full"
+        :title="t('metrics.explorer.noData')"
         :data-test="`${dataTest}-nodata`"
-      >
-        {{ t("metrics.explorer.noData") }}
-      </div>
+      />
 
       <slot
         v-else-if="state.status === 'done'"
@@ -102,6 +104,7 @@ import MetricCardChart from "./MetricCardChart.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import { parseSearchError } from "@/utils/query/searchError";

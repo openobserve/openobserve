@@ -457,13 +457,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-        <div
+        <OEmptyState
           v-else
-          class="text-text-muted py-8 text-center text-sm"
+          size="compact"
+          :title="t('common.noNetworkRequestsFound')"
           data-test="network-empty-state"
-        >
-          {{ t("common.noNetworkRequestsFound") }}
-        </div>
+        />
       </OTabPanel>
 
       <!-- Console Tab -->
@@ -539,6 +538,7 @@ import { sqlEquals, sqlLike } from "@/utils/query/sqlFilterBuilder";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";

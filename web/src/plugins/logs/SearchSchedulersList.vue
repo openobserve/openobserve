@@ -13,21 +13,13 @@
             :column-visibility="columnVisibility"
             @update:column-visibility="setColumnVisibility"
           />
-          <OButton
-            icon-only
-            variant="ghost"
-            icon="refresh"
-            class=""
+          <ORefreshButton
+            :last-run-at="lastUpdatedAt"
             :loading="isLoading"
+            shortcut="searchSchedulersRefresh"
             data-test="search-scheduler-get-jobs-btn"
             @click="fetchSearchHistory"
-          >
-            <OTooltip
-              side="bottom"
-              :content="t('search_scheduler_job.get_jobs')"
-              shortcut="searchSchedulersRefresh"
-            />
-          </OButton>
+          />
         </div>
       </template>
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
@@ -356,8 +348,8 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -381,8 +373,8 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
+    ORefreshButton,
     OCopyButton,
-    OTooltip,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
@@ -409,6 +401,7 @@ export default defineComponent({
     );
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref<ForbiddenState>(false);
     const showSearchResults = ref(false);
     const toBeCancelled = ref({});
@@ -577,6 +570,7 @@ export default defineComponent({
             });
 
             dataToBeLoaded.value = responseToBeFetched;
+            lastUpdatedAt.value = Date.now();
             isLoading.value = false;
             if (pendingPageRestore) {
               pendingPageRestore = false;
@@ -922,6 +916,7 @@ export default defineComponent({
       t,
       route,
       isLoading,
+      lastUpdatedAt,
       forbidden,
       pageSize,
       pageSizeOptions,

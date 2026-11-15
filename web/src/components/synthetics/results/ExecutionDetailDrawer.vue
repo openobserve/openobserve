@@ -19,6 +19,7 @@ import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type {
   RunLocationResult,
   RecordedStep,
@@ -149,12 +150,11 @@ function fmtDuration(ms: number) {
 
           <!-- Steps -->
           <div class="flex-1 overflow-y-auto px-5 py-4">
-            <p
+            <OEmptyState
               v-if="!mergedSteps.length && !execution.startLoad"
-              class="text-text-muted text-xs italic"
-            >
-              {{ t("synthetics.executionDetail.noStepData") }}
-            </p>
+              size="compact"
+              :title="t('synthetics.executionDetail.noStepData')"
+            />
 
             <div v-else class="flex flex-col gap-3">
               <!-- Row 0: the Starting URL, above the numbered Steps and counted in none of them. -->

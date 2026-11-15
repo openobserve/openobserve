@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OEmptyState
           v-else
           :kind="searchActive ? 'filtered' : 'first-run'"
-          size="inline"
+          size="compact"
           icon="search"
           :title="
             searchActive

@@ -113,29 +113,21 @@
       <!-- ── Right: Live Results ── -->
       <div class="flex-1 overflow-y-auto py-5 ps-5 pe-6">
         <transition name="tmm-fade" mode="out-in">
-          <!-- Empty state -->
-          <div
+          <OEmptyState
             v-if="!testModelName"
             key="empty"
-            class="flex h-full min-h-50 items-center justify-center"
+            icon="manage-search"
+            :title="t('modelPricing.enterModelName')"
             data-test="test-match-empty"
-          >
-            <OEmptyState
-              size="inline"
-              icon="manage-search"
-              :title="t('modelPricing.enterModelName')"
-            />
-          </div>
+          />
 
-          <!-- Typed but not yet tested -->
-          <div
+          <OEmptyState
             v-else-if="testResult === null"
             key="waiting"
-            class="flex h-full min-h-50 items-center justify-center"
+            icon="ads-click"
+            :title="t('modelPricing.clickToTest')"
             data-test="test-match-waiting"
-          >
-            <OEmptyState size="inline" icon="ads-click" :title="t('modelPricing.clickToTest')" />
-          </div>
+          />
 
           <!-- No Match -->
           <div
@@ -306,7 +298,7 @@
               </div>
               <OEmptyState
                 v-else
-                size="inline"
+                size="compact"
                 icon="info-outline"
                 :title="t('modelPricing.noPricingForTier')"
               />

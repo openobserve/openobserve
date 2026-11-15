@@ -66,23 +66,21 @@
         data-test="alerts-alertgroupchart-panel"
       />
       <PanelChartPlaceholder v-else-if="pending" data-test="alerts-alertgroupchart-placeholder" />
-      <div
+      <OEmptyState
         v-else-if="chartError"
-        class="flex h-full flex-col items-center justify-center gap-2"
+        kind="error"
+        :size="compact ? 'compact' : 'region'"
+        :text="isRawHttpText(chartError) ? undefined : raw(chartError)"
         data-test="alerts-alertgroupchart-error"
-      >
-        <OIcon size="md" name="warning" />
-        <span class="text-text-secondary text-sm">{{ chartError }}</span>
-      </div>
-      <div
+        @action="buildChart"
+      />
+      <OEmptyState
         v-else
-        class="flex h-full items-center justify-center"
+        :size="compact ? 'compact' : 'region'"
+        icon="bar-chart"
+        :title="t('alerts.groups.chartUnavailable')"
         data-test="alerts-alertgroupchart-empty"
-      >
-        <span class="text-text-secondary text-sm">
-          {{ t("alerts.groups.chartUnavailable") }}
-        </span>
-      </div>
+      />
     </div>
   </div>
 </template>
@@ -91,11 +89,12 @@
 import { toZonedTime } from "date-fns-tz";
 import { cloneDeep } from "lodash-es";
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";

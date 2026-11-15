@@ -23,18 +23,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
       scroll
     >
-      <!-- Loading state -->
-      <div
-        v-if="loading"
-        class="flex min-h-[calc(100vh-var(--navbar-height)-7.5rem)] items-center justify-center"
-      >
-        <OSpinner size="lg" data-test="org-storage-settings-loading-indicator" />
+      <div v-if="loading" class="p-3" data-test="org-storage-settings-loading-indicator">
+        <OSkeleton shape="block" class="h-48 max-w-170" />
       </div>
 
-      <!-- Cloud: storage not enabled -->
-      <div v-else-if="isCloud && !orgStorageEnabled" class="text-text-secondary py-3 text-sm">
-        {{ t("storage_settings.notEnabled", { product: t("storage_settings.tabLabel") }) }}
-      </div>
+      <OEmptyState
+        v-else-if="isCloud && !orgStorageEnabled"
+        kind="denied"
+        :title="t('storage_settings.notEnabled', { product: t('storage_settings.tabLabel') })"
+        data-test="org-storage-settings-not-enabled"
+      />
 
       <!-- ========== NOT CONFIGURED: cloud hero ========== -->
       <div
@@ -120,63 +118,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- ========== NOT CONFIGURED: enterprise empty state ========== -->
-      <div
+      <OEmptyState
         v-else-if="!isConfigured && !isCloud"
-        class="min-h-[calc(100vh-var(--navbar-height)-10rem)] w-full"
+        :title="t('emptyState.noStorageConfig.title')"
+        :text="t('emptyState.noStorageConfig.description')"
+        data-test="org-storage-settings-empty-state"
+        :action-label="t('emptyState.noStorageConfig.action')"
+        @action="navigateToCreate()"
       >
-        <OEmptyState
-          :title="t('emptyState.noStorageConfig.title')"
-          :text="t('emptyState.noStorageConfig.description')"
-          data-test="org-storage-settings-empty-state"
-          :action-label="t('emptyState.noStorageConfig.action')"
-          @action="navigateToCreate()"
-        >
-          <template #extra>
-            <!-- key fact chips -->
-            <div class="flex flex-wrap items-center justify-center gap-2">
-              <span
-                class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-              >
-                <OIcon name="corporate-fare" size="xs" />
-                {{ t("storage_settings.perOrgIsolation") }}
-              </span>
-              <span
-                class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-              >
-                <OIcon name="bolt" size="xs" />
-                {{ t("storage_settings.appliesImmediately") }}
-              </span>
-              <span
-                class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-              >
-                <OIcon name="lock" size="xs" />
-                {{ t("storage_settings.usesOrgCredentials") }}
-              </span>
-            </div>
+        <template #extra>
+          <!-- key fact chips -->
+          <div class="flex flex-wrap items-center justify-center gap-2">
+            <span
+              class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+            >
+              <OIcon name="corporate-fare" size="xs" />
+              {{ t("storage_settings.perOrgIsolation") }}
+            </span>
+            <span
+              class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+            >
+              <OIcon name="bolt" size="xs" />
+              {{ t("storage_settings.appliesImmediately") }}
+            </span>
+            <span
+              class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+            >
+              <OIcon name="lock" size="xs" />
+              {{ t("storage_settings.usesOrgCredentials") }}
+            </span>
+          </div>
 
-            <!-- supported providers -->
-            <div class="flex items-center gap-3">
-              <span class="text-text-disabled text-xs font-medium whitespace-nowrap">{{
-                t("storage_settings.supportedProviders")
-              }}</span>
-              <div class="flex items-center gap-2.5">
-                <div
-                  v-for="p in providerDefinitions"
-                  :key="p.value"
-                  class="flex h-7 w-7 shrink-0 cursor-default items-center justify-center opacity-65 transition-opacity duration-150 hover:opacity-100"
-                >
-                  <img
-                    :src="p.image"
-                    :alt="p.label"
-                    class="block h-7 max-h-7 w-7 max-w-7 object-contain"
-                  />
-                  <OTooltip :content="p.label" />
-                </div>
+          <!-- supported providers -->
+          <div class="flex items-center gap-3">
+            <span class="text-text-disabled text-xs font-medium whitespace-nowrap">{{
+              t("storage_settings.supportedProviders")
+            }}</span>
+            <div class="flex items-center gap-2.5">
+              <div
+                v-for="p in providerDefinitions"
+                :key="p.value"
+                class="flex h-7 w-7 shrink-0 cursor-default items-center justify-center opacity-65 transition-opacity duration-150 hover:opacity-100"
+              >
+                <img
+                  :src="p.image"
+                  :alt="p.label"
+                  class="block h-7 max-h-7 w-7 max-w-7 object-contain"
+                />
+                <OTooltip :content="p.label" />
               </div>
             </div>
-          </template>
-        </OEmptyState>
-      </div>
+          </div>
+        </template>
+      </OEmptyState>
 
       <!-- ========== CONFIGURED ========== -->
       <div v-else>
@@ -309,7 +303,7 @@ import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OrgStorageEditor from "./OrgStorageEditor.vue";

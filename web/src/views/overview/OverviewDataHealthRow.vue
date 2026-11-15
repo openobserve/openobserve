@@ -14,44 +14,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OverviewRowButton
-    compact
     :data-test="`overview-data-health-row-${row.key}`"
     :disabled="!row.ok"
     @click="emit('open', row.destination)"
   >
-    <!-- the text column shrinks and wraps instead of the row, so every row keeps its status on the label's line -->
-    <span
-      class="flex w-full items-center justify-between gap-x-3 whitespace-normal max-sm:items-start"
-    >
-      <span class="flex min-w-0 flex-1 items-start gap-2.5 text-start">
-        <span
-          :class="['mt-1.5 size-2 shrink-0 rounded-full', DOT[tier]]"
-          aria-hidden="true"
-          :data-test="`overview-data-health-dot-${row.key}`"
-        />
-        <span class="flex min-w-0 flex-col">
-          <span class="text-text-body text-sm">{{ row.label }}</span>
-          <span class="text-text-secondary text-xs">{{ row.note }}</span>
-        </span>
-      </span>
-      <span class="ms-auto flex shrink-0 items-baseline gap-3">
-        <span
-          :class="['text-xs font-semibold', WORD[tier]]"
-          :data-test="`overview-data-health-status-${row.key}`"
-          >{{ row.word }}</span
-        >
-        <span
-          :class="['min-w-8 text-end text-sm font-semibold tabular-nums', valueTone]"
-          :data-test="`overview-data-health-value-${row.key}`"
-          >{{ row.value }}</span
-        >
-      </span>
+    <span class="flex min-w-0 flex-1 items-center gap-2.5 text-start">
+      <span
+        :class="['size-2 shrink-0 rounded-full', DOT[tier]]"
+        aria-hidden="true"
+        :data-test="`overview-data-health-dot-${row.key}`"
+      />
+      <span class="text-text-body text-compact shrink-0 font-normal">{{ row.label }}</span>
+      <OTruncatedText class="text-text-secondary min-w-0 text-xs font-normal max-sm:hidden">{{
+        row.note
+      }}</OTruncatedText>
+    </span>
+    <span class="flex shrink-0 items-baseline gap-3">
+      <span
+        :class="['text-xs font-medium', WORD[tier]]"
+        :data-test="`overview-data-health-status-${row.key}`"
+        >{{ row.word }}</span
+      >
+      <span
+        :class="['text-compact min-w-8 text-end font-semibold tabular-nums', valueTone]"
+        :data-test="`overview-data-health-value-${row.key}`"
+        >{{ row.value }}</span
+      >
     </span>
   </OverviewRowButton>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { I18nText } from "@/types/i18n";
 import OverviewRowButton from "./OverviewRowButton.vue";
 import type { HealthTone, OverviewDestination } from "./overviewFormat";

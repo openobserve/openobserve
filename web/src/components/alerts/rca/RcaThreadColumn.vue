@@ -68,26 +68,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.incidents.rcaThread.loading") }}
       </p>
 
-      <div
+      <OEmptyState
         v-else-if="emptyMessage"
+        size="compact"
+        :kind="threadFailed ? 'error' : 'first-run'"
+        :icon="threadFailed ? undefined : 'info'"
+        :title="emptyMessage"
         data-test="rca-thread-empty"
-        class="text-text-secondary text-compact flex flex-col items-start gap-2"
       >
-        <p class="m-0 flex items-start gap-2">
-          <OIcon name="info" size="sm" class="mt-0.5 shrink-0" />
-          {{ emptyMessage }}
-        </p>
         <!-- A live run retries on its own poll; a finished run needs the user. -->
-        <OButton
-          v-if="status === 'unavailable' && !runLive"
-          data-test="rca-thread-retry-btn"
-          variant="secondary"
-          icon="refresh"
-          @click="$emit('retry')"
-        >
-          {{ t("common.retry") }}
-        </OButton>
-      </div>
+        <template v-if="status === 'unavailable' && !runLive" #actions>
+          <OButton
+            data-test="rca-thread-retry-btn"
+            variant="secondary"
+            size="sm"
+            @click="$emit('retry')"
+          >
+            {{ t("common.retry") }}
+          </OButton>
+        </template>
+      </OEmptyState>
 
       <p
         v-else-if="!thread && runLive"
@@ -411,6 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, ref, useId, watch } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -548,6 +549,9 @@ const conclusionStep = computed<RcaStep | null>(() => {
   return thread.steps.at(-1) ?? null;
 });
 
+const threadFailed = computed(
+  () => !props.noTranscript && ["unavailable", "missing", "unsupported"].includes(props.status),
+);
 const emptyMessage = computed<I18nText | null>(() => {
   if (props.noTranscript) return t("alerts.incidents.rcaThread.noTranscript");
   // A live run's session is created after the run starts, so "expired" is only a race there.

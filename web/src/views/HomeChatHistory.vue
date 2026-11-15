@@ -12,6 +12,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AiChatShareDialog from "@/components/ai-assistant/share/AiChatShareDialog.vue";
@@ -327,12 +328,13 @@ function formatTime(ts: string): string {
       >
         <OSkeleton v-for="i in 3" :key="i" />
       </div>
-      <div
+      <OEmptyState
         v-else-if="filtered.length === 0"
-        class="py-[1.5em] text-center text-[0.8125em] opacity-[0.45]"
-      >
-        {{ searchTerm ? t("chatHistory.noMatches") : t("chatHistory.noHistory") }}
-      </div>
+        size="compact"
+        class="px-2"
+        :kind="searchTerm ? 'filtered' : 'first-run'"
+        :title="searchTerm ? t('chatHistory.noMatches') : t('chatHistory.noHistory')"
+      />
     </div>
 
     <div

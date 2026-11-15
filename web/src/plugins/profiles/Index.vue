@@ -170,59 +170,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="!hasProfileData && streamOptions.length ? 'flex flex-col' : ''"
     >
       <!-- Same states as the Metrics explorer: a load error with Retry, and a no-data state that links to setup. -->
-      <div
+      <OEmptyState
         v-if="errorMessage && !hasProfileData"
-        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
-      >
-        <OEmptyState
-          kind="error"
-          :title="t('emptyState.loadError.title')"
-          :text="raw(errorMessage)"
-          data-test="profiles-error"
-          @action="retry"
-        />
-      </div>
+        kind="error"
+        data-test="profiles-error"
+        @action="retry"
+      />
 
-      <div
+      <OEmptyState
         v-else-if="streamsLoaded && !streamOptions.length"
-        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
-      >
-        <OEmptyState
-          :text="t('emptyState.noStreams.description')"
-          icon="link"
-          :title="t('profiles.noStreams')"
-          :action-label="t('profiles.setupIngestion')"
-          data-test="profiles-no-stream"
-          @action="openProfilesIngestion"
-        />
-      </div>
+        :text="t('emptyState.noStreams.description')"
+        icon="link"
+        :title="t('profiles.noStreams')"
+        :action-label="t('profiles.setupIngestion')"
+        data-test="profiles-no-stream"
+        @action="openProfilesIngestion"
+      />
 
       <!-- As on Logs: a cancelled query with nothing on screen is not "no data". -->
-      <div
+      <OEmptyState
         v-else-if="!hasProfileData && !showSkeleton && queryCancelled"
-        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
+        kind="filtered"
+        :title="t('emptyState.searchCancelled.title')"
+        :text="t('emptyState.searchCancelled.description')"
+        :action-label="t('emptyState.searchCancelled.action')"
         data-test="profiles-search-cancelled"
-      >
-        <OEmptyState
-          kind="filtered"
-          :title="t('emptyState.searchCancelled.title')"
-          :text="t('emptyState.searchCancelled.description')"
-          :action-label="t('emptyState.searchCancelled.action')"
-          @action="runQuery(true)"
-        />
-      </div>
+        @action="runQuery(true)"
+      />
 
-      <div
+      <OEmptyState
         v-else-if="!hasProfileData && !showSkeleton"
-        class="flex min-h-0 flex-1 flex-col items-center justify-center p-3"
+        kind="filtered"
+        :title="t('emptyState.noProfiles.title')"
+        :text="t('emptyState.noProfiles.description')"
         data-test="profiles-no-results"
-      >
-        <OEmptyState
-          kind="filtered"
-          :title="t('emptyState.noProfiles.title')"
-          :text="t('emptyState.noProfiles.description')"
-        />
-      </div>
+      />
 
       <OContent v-else class="flex flex-col gap-2.5 py-2.5 md:min-h-0 md:flex-1">
         <!-- A failed re-run keeps the last results and says so. -->

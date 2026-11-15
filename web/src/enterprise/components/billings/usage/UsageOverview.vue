@@ -203,7 +203,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="!selectedMeter">
               <OEmptyState
                 v-if="isSuperOrg && !selectedOrg && orgCostsFailed"
-                size="inline"
                 kind="error"
                 :title="t('billing.usageV2.orgCostsFailed')"
                 data-test="billings-usageoverview-org-error"
@@ -270,7 +269,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OEmptyState
               v-else-if="!chartSchema"
-              size="inline"
               :title="chartEmptyTitle"
               :action-label="usageStreamEnabled ? undefined : t('billing.usageTrends.enableButton')"
               data-test="billings-usageoverview-daily-empty"

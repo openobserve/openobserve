@@ -149,8 +149,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="warning" size="sm" />
         >{{ store.state.selectedOrganization.note }}
       </div>
-      <div v-if="loading" class="text-center text-xl font-semibold">
-        <OSpinner size="lg" class="mx-auto mt-3 block text-center" />
+      <div v-if="loading" class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3">
+        <OSkeleton v-for="card in 2" :key="card" shape="block" class="h-96" />
       </div>
       <div v-else class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3">
         <ProPlan
@@ -193,7 +193,7 @@ import { useLocalOrganization, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import { siteURL } from "@/constants/config";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -214,7 +214,7 @@ export default defineComponent({
     EnterprisePlan,
     ProPlan,
     TrialPeriod,
-    OSpinner,
+    OSkeleton,
     OProgressBar,
     OIcon,
     OTag,

@@ -790,12 +790,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <div
+          <OEmptyState
             v-else-if="!outputHasError && !outputNoMatch"
-            class="text-text-secondary flex h-full items-center justify-center p-4 text-center text-sm italic"
-          >
-            {{ hasResult ? t("workflow.ndv.noOutput") : t("workflow.ndv.noRunYet") }}
-          </div>
+            size="compact"
+            class="px-4"
+            :title="hasResult ? t('workflow.ndv.noOutput') : t('workflow.ndv.noRunYet')"
+          />
         </div>
       </section>
     </div>
@@ -833,6 +833,7 @@ import WorkflowRunHttpOutcome from "./WorkflowRunHttpOutcome.vue";
 import { DEFAULT_TRIGGER_KIND } from "@/plugins/workflows/triggers";
 import WorkflowRunRequestFacts from "./WorkflowRunRequestFacts.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { HttpRequestFacts, WorkflowHistoryRow } from "@/services/workflows";
 import { isHttpRun } from "@/plugins/workflows/httpEndpoint";
 import {

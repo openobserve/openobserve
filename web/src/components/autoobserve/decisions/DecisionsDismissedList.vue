@@ -47,21 +47,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton shape="block" class="h-12 w-full" />
     </div>
 
-    <p
+    <OEmptyState
       v-else-if="page.isError.value && !page.data.value"
-      class="text-status-error-text flex items-center gap-2 text-sm"
+      size="compact"
+      kind="error"
+      :title="t('insight.decisions.list.loadFailed')"
       data-test="decision-dismissed-error"
     >
-      <OIcon name="error" size="xs" />
-      <span>{{ t("insight.decisions.list.loadFailed") }}</span>
-      <OButton variant="secondary" size="sm" @click="page.refetch()">
-        {{ copy.retry() }}
-      </OButton>
-    </p>
+      <template #actions>
+        <OButton variant="secondary" size="sm" @click="page.refetch()">
+          {{ copy.retry() }}
+        </OButton>
+      </template>
+    </OEmptyState>
 
-    <OText v-else-if="!rows.length" variant="meta" as="p" data-test="decision-dismissed-empty">
-      {{ t(KIND_EMPTY[kind]) }}
-    </OText>
+    <OEmptyState
+      v-else-if="!rows.length"
+      size="compact"
+      icon="history"
+      :title="t(KIND_EMPTY[kind])"
+      data-test="decision-dismissed-empty"
+    />
 
     <ul
       v-else
@@ -153,7 +159,7 @@ import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

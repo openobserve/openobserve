@@ -49,9 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="min-w-0 truncate">{{ back.label }}</span>
             </component>
           </FeatureLockExempt>
-          <span v-else class="min-w-0 truncate" data-test="o-page-header-context-label">{{
-            context || derivedContext
-          }}</span>
+          <!-- An ungrouped page keeps the empty slot so its title sits where every other title does (H1). -->
+          <span
+            v-else
+            class="min-w-0 truncate"
+            :aria-hidden="contextLabel ? undefined : 'true'"
+            data-test="o-page-header-context-label"
+            >{{ contextLabel }}</span
+          >
         </div>
 
         <div class="flex h-6 min-w-0 items-center gap-2" data-test="o-page-header-title-row">
@@ -230,6 +235,7 @@ const lockedLabel = computed(() =>
 );
 const aboutLabel = computed(() => t("pageHeader.about"));
 const derivedContext = usePageContextLabel(() => props.title);
+const contextLabel = computed(() => props.context || derivedContext.value);
 
 const backHref = computed(() => {
   const to = props.back?.to;

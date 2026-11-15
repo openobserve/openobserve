@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <LiveNoticeState
       v-else-if="loadError"
-      size="page"
+      size="region"
       :notice="{
         ...readNotice(
           t,

@@ -49,8 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-if="list.isError.value"
-      size="inline"
+      size="compact"
       kind="error"
+      class="px-2"
       :title="t('recentSearches.loadError')"
       data-test="recent-searches-error"
       @action="list.refetch()"
@@ -58,27 +59,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="list.isPending.value" class="flex flex-col gap-2 p-2">
       <OSkeleton v-for="n in 4" :key="n" />
     </div>
-    <div v-else-if="isEmpty" class="flex flex-col items-center gap-2 p-3">
-      <OEmptyState
-        size="inline"
-        icon="history"
-        :title="t('recentSearches.emptyTitle')"
-        data-test="recent-searches-empty"
-      />
-      <div v-if="examples.length" class="flex flex-wrap justify-center gap-2">
-        <OButton
-          v-for="(example, index) in examples"
-          :key="index"
-          variant="secondary"
-          size="sm"
-          icon="lightbulb"
-          :data-test="`recent-searches-example-${index}`"
-          @click="emit('example', example)"
-        >
-          <OTruncatedText class="max-w-60 font-mono">{{ example }}</OTruncatedText>
-        </OButton>
-      </div>
-    </div>
+    <OEmptyState
+      v-else-if="isEmpty"
+      size="compact"
+      icon="history"
+      class="px-2"
+      :title="t('recentSearches.emptyTitle')"
+      data-test="recent-searches-empty"
+    >
+      <template v-if="examples.length" #extra>
+        <div class="flex flex-wrap gap-2">
+          <OButton
+            v-for="(example, index) in examples"
+            :key="index"
+            variant="secondary"
+            size="sm"
+            icon="lightbulb"
+            :data-test="`recent-searches-example-${index}`"
+            @click="emit('example', example)"
+          >
+            <OTruncatedText class="max-w-60 font-mono">{{ example }}</OTruncatedText>
+          </OButton>
+        </div>
+      </template>
+    </OEmptyState>
     <div
       v-else
       ref="listRef"

@@ -325,11 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
         </ul>
       </div>
-      <div v-else>
-        <div class="text-center text-xl font-semibold">
-          {{ t("function.noPipelinesAssociated") }}
-        </div>
-      </div>
+      <OEmptyState v-else size="compact" :title="t('function.noPipelinesAssociated')" />
     </ODialog>
   </div>
 </template>

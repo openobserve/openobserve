@@ -361,13 +361,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="!isLoading && loadError !== null"
-        class="flex flex-1 items-center justify-center"
+        class="flex flex-1 flex-col"
         data-test="services-catalog-error"
       >
         <OEmptyState
           kind="error"
           :title="t('emptyState.loadError.title')"
-          :text="loadError"
+          :text="isRawHttpText(loadError) ? t('emptyState.loadError.description') : loadError"
           @action="loadServicesCatalog"
         />
       </div>
@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty state (shown when not loading and no data) -->
       <div
         v-else-if="!isLoading && services.length === 0"
-        class="flex flex-1 flex-col items-center justify-center"
+        class="flex flex-1 flex-col"
         data-test="services-catalog-empty"
       >
         <ServicesCatalogNoDataState
@@ -714,6 +714,7 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";

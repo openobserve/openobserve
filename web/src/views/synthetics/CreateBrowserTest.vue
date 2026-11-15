@@ -2176,7 +2176,7 @@ function onClearResults() {
     <!-- ── Editor phase ── -->
     <template v-else>
       <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
-      <div v-else-if="loadError" class="flex flex-1 flex-col items-center justify-center">
+      <div v-else-if="loadError" class="flex flex-1 flex-col">
         <OEmptyState
           kind="error"
           :title="t('emptyState.loadError.title')"

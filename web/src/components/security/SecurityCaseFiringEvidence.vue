@@ -6,7 +6,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { computed, ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import SecurityEvidenceEvent from "@/components/security/SecurityEvidenceEvent.vue";
 import { detectionEvidenceQuery } from "@/services/securitySigma.queries";
 import type { EvidenceGroup } from "@/services/securitySigma";
@@ -91,15 +92,17 @@ const failure = computed(() => {
 
 <template>
   <div class="flex flex-col" :data-test="dataTest ?? 'security-case-firing-evidence'">
-    <div v-if="evidence.isPending.value" class="flex justify-center py-3">
-      <OSpinner size="sm" />
+    <div v-if="evidence.isPending.value" class="flex flex-col gap-2 px-3 py-2">
+      <OSkeleton v-for="n in 3" :key="n" />
     </div>
-    <span
+    <OEmptyState
       v-else-if="failure"
-      class="text-text-secondary px-3 py-2 text-xs"
+      kind="error"
+      size="compact"
+      class="px-3"
+      :title="failure"
       data-test="security-case-firing-evidence-error"
-      >{{ failure }}</span
-    >
+    />
     <template v-else>
       <div
         v-if="hiddenRows"

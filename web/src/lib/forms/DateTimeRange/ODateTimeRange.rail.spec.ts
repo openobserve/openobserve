@@ -168,9 +168,25 @@ describe("ODateTimeRange rail", () => {
       expect(wrapper!.vm.selectedType).toBe("relative");
     });
 
+    it("mounts the calendar once Absolute shows and keeps it for the rest of the open", async () => {
+      createWrapper();
+      await openMenu();
+      expect(el("daterangecalendar-root")).toBeNull();
+
+      el("date-time-absolute-tab")!.click();
+      await flushPromises();
+      expect(el("daterangecalendar-root")).not.toBeNull();
+
+      el("date-time-relative-tab")!.click();
+      await flushPromises();
+      expect(el("daterangecalendar-root")).not.toBeNull();
+    });
+
     it("gives every timezone option a UTC offset suffix and the zone name as its list label", async () => {
       createWrapper({ autoApply: false });
       await openMenu();
+      wrapper!.vm.isTimezoneSelectOpen = true;
+      await flushPromises();
 
       const options = wrapper!.vm.timezoneSelectOptions as {
         label: string;
@@ -184,6 +200,20 @@ describe("ODateTimeRange rail", () => {
       expect(kolkata.label).toBe("Asia/Calcutta (UTC+05:30)");
       expect(options.find((o) => o.value === "UTC")?.suffix).toBe("UTC+00:00");
       expect(options.every((o) => o.suffix?.startsWith("UTC"))).toBe(true);
+    });
+
+    it("builds only the chosen zone's option until the timezone select opens", async () => {
+      createWrapper({ autoApply: false });
+      await openMenu();
+      wrapper!.vm.timezone = IST;
+      await flushPromises();
+
+      const closed = wrapper!.vm.timezoneSelectOptions as { value: string }[];
+      expect(closed.map((o) => o.value)).toEqual([IST]);
+
+      wrapper!.vm.isTimezoneSelectOpen = true;
+      await flushPromises();
+      expect((wrapper!.vm.timezoneSelectOptions as unknown[]).length).toBeGreaterThan(100);
     });
 
     it("has no Cancel button and shows the timezone offset", async () => {

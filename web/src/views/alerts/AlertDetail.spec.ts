@@ -936,28 +936,50 @@ describe("AlertDetail — first paint", () => {
     query_condition: { aggregation: { group_by: ["host"], multi_alert: false } },
   });
 
-  it("mounts the evaluation chart with no alert while the GET runs, ahead of the tabs", async () => {
+  const pending = () => wrapper.find('[data-test="alerts-alertdetail-pending"]');
+
+  it("holds a chart-shaped skeleton while the GET runs, then mounts the chart and tabs together", async () => {
     const { alertRequest, resolveAlert } = pendingAlert();
     wrapper = await mountView({ alertRequest });
 
-    expect(chart().exists()).toBe(true);
-    expect(chart().props("alert")).toBeNull();
+    expect(pending().exists()).toBe(true);
+    expect(chart().exists()).toBe(false);
     expect(tabs().exists()).toBe(false);
 
     resolveAlert(makeSimpleAlert());
     await flushPromises();
+    expect(pending().exists()).toBe(false);
     expect(chart().props("alert")).toMatchObject({ name: "cpu-high" });
     expect(tabs().exists()).toBe(true);
   });
 
-  it("drops the held chart when the alert turns out to be an anomaly config", async () => {
+  it("never mounts the chart when the alert turns out to be an anomaly config", async () => {
     const { alertRequest, resolveAlert } = pendingAlert();
     wrapper = await mountView({ alertRequest });
-    expect(chart().exists()).toBe(true);
+    expect(pending().exists()).toBe(true);
 
     resolveAlert(makeAnomalyAlert());
     await flushPromises();
+    expect(pending().exists()).toBe(false);
     expect(chart().exists()).toBe(false);
+    expect(tabs().exists()).toBe(true);
+  });
+
+  it("waits for a single alert's list row, so its firing tiles never push the chart down", async () => {
+    let resolveList: (value: any) => void = () => {};
+    vi.mocked(alertsService.listByFolderId).mockReturnValue(
+      new Promise((resolve) => {
+        resolveList = resolve;
+      }) as any,
+    );
+    wrapper = await mountView();
+    expect(pending().exists()).toBe(true);
+    expect(chart().exists()).toBe(false);
+
+    resolveList({ data: { list: [] } });
+    await flushPromises();
+    expect(pending().exists()).toBe(false);
+    expect(chart().exists()).toBe(true);
   });
 
   it("puts the grouped-but-simple banner below the tabs, so the tabs never move when it lands", async () => {

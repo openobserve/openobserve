@@ -17,8 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OEmptyState
     v-if="!hasSpanError"
-    size="inline"
-    kind="filtered"
+    icon="task-alt"
     :title="t('traces.noErrorPresent')"
     data-test="trace-details-sidebar-no-error"
   />
@@ -204,14 +203,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-html="formatStackTrace(row['exception.stacktrace'])"
                 />
               </div>
-              <div
+              <OEmptyState
                 v-else
-                class="bg-code-bg text-text-muted border-border-default rounded-default flex items-center justify-center border border-dashed px-3 py-4 text-xs italic"
+                size="compact"
+                icon="info-outline"
+                :title="t('traces.noStacktraceAvailable')"
                 data-test="exception-stacktrace-empty"
-              >
-                <OIcon name="info" size="sm" class="me-1" />
-                <span>{{ t("traces.noStacktraceAvailable") }}</span>
-              </div>
+              />
             </div>
           </div>
         </div>

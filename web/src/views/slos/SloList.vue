@@ -407,11 +407,9 @@
           icon="target"
           :title="t('slos.empty.title')"
           :text="t('slos.empty.description')"
-        >
-          <OButton variant="primary" icon="add" @click="goToNew">
-            {{ t("slos.new") }}
-          </OButton>
-        </OEmptyState>
+          :action-label="t('slos.new')"
+          @action="goToNew"
+        />
       </template>
 
       <template #selection-actions>

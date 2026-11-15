@@ -24,7 +24,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -477,9 +477,7 @@ const onChannelSearch = (q: string) => {
 
 <template>
   <section class="flex w-full flex-col gap-4" data-test="slack-app-destination-form">
-    <div v-if="installations.isPending.value" class="flex justify-center py-10">
-      <OSpinner size="lg" />
-    </div>
+    <OSkeleton v-if="installations.isPending.value" preset="tableRows" :rows="3" />
 
     <OInlineNotice
       v-else-if="noWorkspace && isCloud"

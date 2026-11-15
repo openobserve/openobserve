@@ -111,16 +111,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @row-click="openItemDetail"
           >
             <template #toolbar-trailing>
-              <OButton
-                icon-only
-                variant="ghost"
-                icon="refresh"
+              <ORefreshButton
+                :last-run-at="loadedAt"
                 :loading="loading"
                 data-test="ai-dataset-detail-refresh-btn"
                 @click="refresh(true)"
-              >
-                <OTooltip side="bottom" :content="t('common.refresh')" />
-              </OButton>
+              />
             </template>
 
             <template #toolbar>
@@ -133,26 +129,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #empty>
-              <div class="flex items-center justify-center py-8">
-                <OEmptyState
-                  :kind="search ? 'filtered' : 'first-run'"
-                  :title="
-                    search
-                      ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.datasetItems') })
-                      : t('emptyState.noDatasetItems.title')
-                  "
-                  :text="
-                    search
-                      ? t('emptyState.filtered.description', {
-                          noun: t('emptyState.nouns.datasetItems'),
-                        })
-                      : t('emptyState.noDatasetItems.description')
-                  "
-                  data-test="ai-dataset-detail-empty-state"
-                  :action-label="search ? undefined : t('emptyState.noDatasetItems.action')"
-                  @action="search ? (search = '') : openAddItem()"
-                />
-              </div>
+              <OEmptyState
+                :kind="search ? 'filtered' : 'first-run'"
+                :title="
+                  search
+                    ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.datasetItems') })
+                    : t('emptyState.noDatasetItems.title')
+                "
+                :text="
+                  search
+                    ? t('emptyState.filtered.description', {
+                        noun: t('emptyState.nouns.datasetItems'),
+                      })
+                    : t('emptyState.noDatasetItems.description')
+                "
+                data-test="ai-dataset-detail-empty-state"
+                :action-label="search ? undefined : t('emptyState.noDatasetItems.action')"
+                @action="search ? (search = '') : openAddItem()"
+              />
             </template>
 
             <!-- Show the message CONTENT; the role envelope is kept in the stored
@@ -397,6 +391,7 @@ import { useRoute, useRouter } from "vue-router";
 import { formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
@@ -457,6 +452,7 @@ const dataset = ref<LlmDataset | null>(null);
 const items = ref<LlmDatasetItem[]>([]);
 const experiments = ref<LlmExperiment[]>([]);
 const loading = ref(false);
+const loadedAt = ref<number | null>(null);
 const search = ref("");
 const activeTab = ref<"items" | "experiments">("items");
 
@@ -564,6 +560,7 @@ async function refresh(force = false) {
     items.value = page.items;
     totalItems.value = page.total;
     await refreshExperiments(force);
+    loadedAt.value = Date.now();
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.detail.loadError") });
   } finally {

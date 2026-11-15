@@ -1961,6 +1961,9 @@
     "workflows": "İş Akışları",
     "language": "Dil",
     "keyboardShortcuts": "Klavye Kısayolları",
+    "searchOrJumpTo": "Ara veya şuraya git…",
+    "jumpToTitle": "Git",
+    "jumpToPlaceholder": "Sayfalarda ara",
     "synthetic": "Sentetikler",
     "experience": "Deneyim",
     "slos": "SLO'lar",
@@ -4039,7 +4042,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "Lisansı yönetme yetkisiniz yok."
-      }
+      },
+      "usageTitle": "Günlük alım"
     },
     "value_sso_requires_ha": "✅ HA modu gerektirir",
     "value_rbac_requires_ha": "✅ HA modu gerektirir",
@@ -5048,6 +5052,7 @@
   },
   "organization": {
     "searchByNameOrId": "İsim veya ID'ye göre ara",
+    "currentLabel": "Kuruluş: {name}",
     "noOrganizationsFound": "Kuruluş bulunamadı",
     "header": "Kuruluşlar",
     "orgBeingDeletedSwitching": "Bu kuruluş siliniyor. Sizi başka bir kuruluşa yönlendiriyoruz.",
@@ -10752,7 +10757,8 @@
       "taglineAnd": "ve günlükleriniz, izleriniz, metrikleriniz ve vakalarınız arasında size yol gösterir.",
       "signedInAs": "Olarak oturum açtı",
       "role": "Rol",
-      "tryOneOfThese": "Veya bunlardan birini deneyin"
+      "tryOneOfThese": "Veya bunlardan birini deneyin",
+      "panelText": "Günlükleriniz, izleriniz, metrikleriniz ve olaylarınız hakkında soru sorun ya da sorgu yazmak için yardım alın."
     },
     "capabilities": {
       "query": {
@@ -18952,7 +18958,7 @@
       "version": "Sürüm",
       "agentIdHint": "Ajan Kimliği: {ids}",
       "noAgentIdentity": "Ajan kimliği bulunamadı",
-      "noAgentIdentityDescription": "Bu LLM span'lerinde ajan adı yok, bu nedenle akışa göre gösteriliyorlar. Ajanınızı adlandıran özniteliği eşleyerek bunları ajana göre görüntüleyin.",
+      "noAgentIdentityDescription": "Bu LLM span'lerinde ajan adı yok, bu nedenle akışa göre gösteriliyorlar.",
       "noAgentIdentityAction": "GenAI Ajan Eşlemesini Aç"
     },
     "agentGraph": {
@@ -22728,6 +22734,7 @@
     },
     "actions": {
       "openCheatsheet": "Klavye kısayolları özet sayfasını aç",
+      "searchOrJumpTo": "Ara veya bir sayfaya git",
       "closeDialog": "Açık iletişim kutusunu, çekmeceyi veya kalıcı pencereyi kapat",
       "focusSearch": "Arama çubuğuna odaklan",
       "focusQuery": "Sorgu düzenleyicisine odaklan",
@@ -25452,7 +25459,8 @@
         "p95": "Yavaş kuyruk — 20 çağrıdan 1'i en az bu kadar sürdü. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
         "p99": "Çağrıların en kötü %1'i en az bu kadar sürdü. Uygulamanızın izlerindeki tamamlanmış çağrılardan ölçülmüştür.",
         "load": "Uygulamalarınızın bu veritabanına yaptığı çağrılarda harcadığı toplam süre, uygulamanızın izlerinden ölçülmüştür. Bu veritabanının uygulamalarınıza ne kadar trafik sunduğunu gösterir.",
-        "attention": "Bu örneğin kendi motorunun yayınladığı bir limite ne kadar yakın olduğu — bugün, max_connections'a karşı bağlantılar. En kötü oran, harmanlanmış bir puan değil. En yüksekten başlayarak sıralanır; sağlığı okunamayan örnekler en üsttedir, çünkü göremediğiniz bir şeyin sağlıklı olduğunu bilemezsiniz. Veritabanı sunucusunda ölçülür, bu nedenle yanındaki Veritabanı süresiyle karşılaştırılamaz."
+        "attention": "Bu örneğin kendi motorunun yayınladığı bir limite ne kadar yakın olduğu — bugün, max_connections'a karşı bağlantılar. En kötü oran, harmanlanmış bir puan değil. En yüksekten başlayarak sıralanır; sağlığı okunamayan örnekler en üsttedir, çünkü göremediğiniz bir şeyin sağlıklı olduğunu bilemezsiniz. Veritabanı sunucusunda ölçülür, bu nedenle yanındaki Veritabanı süresiyle karşılaştırılamaz.",
+        "calls": "Uygulamalarınızın bu veritabanını kaç kez çağırdığı, uygulamanızın izlerinden ölçüldü."
       },
       "failedChip": "{count} başarısız",
       "columnSubLabels": {
@@ -25893,7 +25901,8 @@
         "tableHealthHint": "Tablo boyutu, şişkinlik ve vacuum durumu. Şişkinlik ve vacuum yalnızca PostgreSQL'e özgüdür.",
         "deadlocksLocked": "Kilitlenmeler bir Enterprise özelliğidir. Hangi sorguların birbirine kilitlendiğini ve nedenini görmek için yükseltin. Diğer veritabanı sekmeleri her planda çalışır.",
         "blockedLocked": "Engellenen sorgular bir Enterprise özelliğidir. Hangi oturumların bir kilidi beklediğini ve neyin onu tuttuğunu görmek için yükseltin. Diğer veritabanı sekmeleri her planda çalışır.",
-        "tableHealthLocked": "Tablo sağlığı bir Enterprise özelliğidir. Tablo boyutu, şişkinlik ve vacuum durumunu izlemek için yükseltin. Diğer veritabanı sekmeleri her planda çalışır."
+        "tableHealthLocked": "Tablo sağlığı bir Enterprise özelliğidir. Tablo boyutu, şişkinlik ve vacuum durumunu izlemek için yükseltin. Diğer veritabanı sekmeleri her planda çalışır.",
+        "queriesHintServer": "Veritabanlarınızın bu aralıkta bildirdiği sorgu türleri, veritabanının içinde sayıldı."
       }
     },
     "metrics": {

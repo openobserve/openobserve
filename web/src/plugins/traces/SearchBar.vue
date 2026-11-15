@@ -23,11 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="toolbarLeftRef"
         class="flex min-w-0 flex-1 flex-row items-center gap-2 max-lg:w-full max-lg:flex-none max-lg:flex-wrap max-lg:gap-y-1"
       >
-        <!-- Clips its overflow so More, a shrink-0 sibling, is never clipped. -->
         <div
           class="flex min-w-0 flex-initial flex-row items-center gap-2 overflow-hidden max-lg:flex-wrap max-lg:gap-y-1 max-lg:overflow-visible"
         >
-          <!-- Unified View Toggle: Service Graph / Traces / Spans -->
           <OToggleGroup
             :model-value="searchObj.meta.searchMode"
             @update:model-value="onSearchModeChange"
@@ -78,14 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showDrillDown"
             data-test="insights-button"
             variant="secondary"
+            :icon-only="shouldHideToolbarButtonText"
+            :icon="shouldHideToolbarButtonText ? 'timeline' : undefined"
+            :label="shouldHideToolbarButtonText ? t('traces.drillDown') : undefined"
             :disabled="searchObj.loading"
             :disabled-reason="t('common.loading')"
             @click="$emit('drill-down')"
           >
-            <template #icon>
-              <OIcon name="timeline" size="sm" class="shrink-0" />
-            </template>
-            <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
+            <template v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</template>
             <OTooltip
               v-if="!searchObj.loading"
               :content="t('volumeInsights.analyzeTooltipTraces')"
@@ -98,44 +96,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             inert
             data-test="insights-button-placeholder"
           >
-            <OButton variant="secondary" tabindex="-1">
-              <template #icon>
-                <OIcon name="timeline" size="sm" class="shrink-0" />
-              </template>
-              <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
-            </OButton>
+            <OButton
+              variant="secondary"
+              tabindex="-1"
+              :icon-only="shouldHideToolbarButtonText"
+              :icon="shouldHideToolbarButtonText ? 'timeline' : undefined"
+              :label="t('traces.drillDown')"
+            />
           </span>
 
-          <!-- Show search controls only when not on Service Graph or Services Catalog -->
-          <template
-            v-if="
-              searchObj.meta.searchMode !== 'service-graph' &&
-              searchObj.meta.searchMode !== 'services-catalog'
-            "
+          <OButton
+            v-if="isSearchMode && !toolbarMoveResetToMenu"
+            data-test="traces-search-bar-reset-filters-btn"
+            variant="secondary"
+            :icon-only="shouldHideToolbarButtonText"
+            :icon="shouldHideToolbarButtonText ? 'restart-alt' : undefined"
+            :label="shouldHideToolbarButtonText ? t('search.resetFilters') : undefined"
+            @click="resetFilters"
           >
-            <OButton
-              v-if="!toolbarMoveResetToMenu"
-              data-test="traces-search-bar-reset-filters-btn"
-              variant="secondary"
-              @click="resetFilters"
-            >
-              <template #icon>
-                <OIcon name="restart-alt" size="sm" class="shrink-0" />
-              </template>
-              <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
-            </OButton>
-          </template>
+            <template v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</template>
+          </OButton>
 
+          <!-- Pinned toggles are bordered pressed toggles: a bare switch never sits in a toolbar. -->
           <OButton
             v-if="showPinnedMetrics"
-            data-test="traces-search-bar-metrics-pinned-btn"
+            icon-only
+            icon="bar-chart"
             variant="secondary"
+            :pressed="!!searchObj.meta.showHistogram"
+            :label="t('traces.redMetrics')"
+            data-test="traces-search-bar-metrics-pinned-btn"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
-          >
-            <OSwitch v-model="searchObj.meta.showHistogram" @click.stop />
-            <OIcon name="bar-chart" size="sm" class="shrink-0" />
-            <OTooltip :content="t('traces.redMetrics')" />
-          </OButton>
+          />
 
           <OButtonGroup
             v-if="showPinnedSavedViews"
@@ -179,125 +171,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </OButtonGroup>
         </div>
-
-        <ODropdown
-          :open="moreMenuOpen"
-          side="bottom"
-          align="start"
-          @update:open="moreMenuOpen = $event"
-        >
-          <template #trigger>
-            <OButton
-              data-test="traces-search-bar-more-menu-btn"
-              variant="secondary"
-              icon="more-horiz"
-              class="shrink-0 max-lg:ms-auto"
-            >
-              {{ t("search.menuMore") }}
-            </OButton>
-          </template>
-
-          <ODropdownItem
-            v-if="isSearchMode && toolbarMoveResetToMenu"
-            data-test="traces-search-bar-menu-reset-filters-btn"
-            @select="resetFilters"
-          >
-            <template #icon>
-              <span
-                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-              >
-                <OIcon name="restart-alt" size="sm" />
-              </span>
-            </template>
-            {{ t("search.resetFilters") }}
-          </ODropdownItem>
-
-          <ODropdownItem
-            v-if="isSearchMode"
-            data-test="traces-search-bar-menu-metrics-btn"
-            @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
-          >
-            <template #icon>
-              <span
-                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-              >
-                <OIcon name="bar-chart" size="sm" />
-              </span>
-            </template>
-            {{ t("traces.redMetrics") }}
-            <template #end>
-              <span class="ms-auto flex items-center gap-1">
-                <OSwitch
-                  v-model="searchObj.meta.showHistogram"
-                  data-test="traces-search-bar-show-metrics-toggle-btn"
-                  @click.stop
-                />
-                <OButton
-                  icon-only
-                  data-test="traces-search-bar-menu-pin-metrics-btn"
-                  variant="ghost"
-                  :title="
-                    isPinned('histogram') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
-                  "
-                  @click.stop="togglePin('histogram')"
-                >
-                  <OIcon :name="isPinned('histogram') ? 'keep' : 'keep-outline'" size="sm" />
-                </OButton>
-              </span>
-            </template>
-          </ODropdownItem>
-
-          <template v-if="isSearchMode">
-            <ODropdownSeparator />
-            <SavedViewsSubmenu
-              :views="tracesSavedViews"
-              :favorite-ids="favoriteIds"
-              :applied-view-id="appliedSavedViewId"
-              :loading="savedViewsLoading"
-              data-test-prefix="traces-search-bar-menu-saved-views"
-              trigger-test-id="traces-search-bar-menu-list-saved-views-btn"
-              create-test-id="traces-search-bar-menu-create-saved-view-btn"
-              @open="refreshSavedViews"
-              @apply="applySavedView"
-              @update="requestUpdateSavedView"
-              @toggle-favorite="toggleFavorite"
-              @create="openSaveViewDialog"
-              @delete="deleteTracesSavedView"
-            >
-              <template #actions>
-                <OButton
-                  icon-only
-                  data-test="traces-search-bar-menu-pin-saved-views-btn"
-                  variant="ghost"
-                  :title="
-                    isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
-                  "
-                  @click.stop="togglePin('savedViews')"
-                >
-                  <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
-                </OButton>
-              </template>
-            </SavedViewsSubmenu>
-            <ODropdownSeparator />
-          </template>
-
-          <SyntaxGuide
-            :sqlmode="searchObj.meta.sqlMode"
-            :menuItem="true"
-            data-test="traces-search-bar-syntax-guide-btn"
-          />
-        </ODropdown>
       </div>
-      <!-- Right toolbar — persistent wrapper so toolbarRightRef is always observable -->
+      <!-- Persistent wrapper so toolbarRightRef is always observable. -->
       <div
         ref="toolbarRightRef"
-        class="flex flex-shrink-0 items-center max-lg:w-full max-lg:justify-end"
+        class="flex flex-shrink-0 items-center gap-2 max-lg:w-full max-lg:justify-end"
       >
         <div
-          v-if="
-            searchObj.meta.searchMode !== 'service-graph' &&
-            searchObj.meta.searchMode !== 'services-catalog'
-          "
+          v-if="isSearchMode"
           class="flex items-center gap-2 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
         >
           <OPageHeaderStatus />
@@ -318,10 +199,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="max-lg:me-auto max-md:[&_.date-time-label]:hidden"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
-          />
-          <RecentSearchesButton
-            data-test="traces-search-bar-recent-searches-btn"
-            @view-all="openRecentSearches"
           />
           <div>
             <div ref="runControlRef" class="flex items-center">
@@ -427,23 +304,234 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </div>
           </div>
-          <ShareButton
-            data-test="logs-search-bar-share-link-btn"
-            :url="tracesShareURL"
-            shortcut-id="tracesCopyUrl"
+          <ORefreshButton
+            :last-run-at="searchObj.meta.lastRunAt"
+            :failed-at="searchObj.meta.refreshFailedAt"
+            :loading="isLoading"
+            data-test="traces-search-bar-data-age-refresh"
+            @click="searchData"
           />
-          <ODropdown side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                icon-only
-                data-test="traces-search-bar-more-actions-btn"
-                class="hover:bg-interactive-hover-bg!"
-                variant="ghost"
+          <AddToDashboard
+            v-if="redDashboardOpen"
+            v-model:open="redDashboardOpen"
+            :dashboard-panel-data="{ data: {} }"
+            :panels="redDashboardPanels"
+            :notice="redDashboardNotice"
+          />
+        </div>
+
+        <!-- Service Graph right toolbar: DateTime, Tree/Graph tabs, Layout, then Refresh last (R1) -->
+        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ms-auto max-lg:ms-0">
+          <div class="flex items-center gap-2 max-lg:w-full max-lg:justify-end max-lg:gap-1.5">
+            <OPageHeaderStatus />
+            <ODateTimeRange
+              ref="dateTimeRef"
+              auto-apply
+              :default-type="searchObj.data.datetime.type"
+              :default-absolute-time="{
+                startTime: searchObj.data.datetime.startTime,
+                endTime: searchObj.data.datetime.endTime,
+              }"
+              :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+              data-test="service-graph-date-time-picker"
+              calendar-presets
+              @on:date-change="updateDateTime"
+            />
+            <OToggleGroup
+              :model-value="searchObj.meta.serviceGraphVisualizationType"
+              @update:model-value="onServiceGraphVisualizationChange($event)"
+            >
+              <OToggleGroupItem data-test="service-graph-tree-view-btn" value="tree">
+                <template #icon-left>
+                  <OIcon name="git-branch" size="sm" />
+                </template>
+                <span class="max-lg:hidden">{{ t("traces.treeView") }}</span>
+              </OToggleGroupItem>
+              <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph">
+                <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
+                <span class="max-lg:hidden">{{ t("traces.graphView") }}</span>
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <OSelect
+              v-model="searchObj.meta.serviceGraphLayoutType"
+              :options="serviceGraphLayoutOptions"
+              :searchable="false"
+              class="w-[7.5rem] max-lg:w-24!"
+              :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+              @update:model-value="onServiceGraphLayoutChange"
+            />
+            <ORefreshButton
+              :last-run-at="serviceGraphLastRunAt"
+              :loading="serviceGraphLoading"
+              data-test="service-graph-refresh-btn"
+              @click="$emit('service-graph-refresh')"
+            />
+          </div>
+        </div>
+
+        <!-- Services Catalog right toolbar: DateTime, Refresh -->
+        <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ms-auto">
+          <div class="flex items-center gap-2">
+            <OPageHeaderStatus />
+            <ODateTimeRange
+              ref="dateTimeRef"
+              auto-apply
+              menu-align="end"
+              :default-type="searchObj.data.datetime.type"
+              :default-absolute-time="{
+                startTime: searchObj.data.datetime.startTime,
+                endTime: searchObj.data.datetime.endTime,
+              }"
+              :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+              data-test="services-catalog-date-time-picker"
+              calendar-presets
+              @on:date-change="updateDateTime"
+            />
+          </div>
+        </div>
+
+        <ODropdown
+          :open="moreMenuOpen"
+          side="bottom"
+          align="end"
+          @update:open="moreMenuOpen = $event"
+        >
+          <template #trigger>
+            <OButton
+              icon-only
+              icon="more-horiz"
+              variant="ghost"
+              :label="t('search.moreActions')"
+              data-test="traces-search-bar-more-menu-btn"
+            />
+          </template>
+
+          <ODropdownItem
+            v-if="isSearchMode && toolbarMoveResetToMenu"
+            data-test="traces-search-bar-menu-reset-filters-btn"
+            @select="resetFilters"
+          >
+            <template #icon>
+              <span
+                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
               >
-                <OIcon name="menu" size="sm" />
-                <OTooltip :content="t('search.moreActions')" />
-              </OButton>
+                <OIcon name="restart-alt" size="sm" />
+              </span>
             </template>
+            {{ t("search.resetFilters") }}
+          </ODropdownItem>
+
+          <ODropdownItem
+            v-if="isSearchMode"
+            data-test="traces-search-bar-menu-metrics-btn"
+            @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+          >
+            <template #icon>
+              <span
+                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+              >
+                <OIcon name="bar-chart" size="sm" />
+              </span>
+            </template>
+            {{ t("traces.redMetrics") }}
+            <template #end>
+              <span class="ms-auto flex items-center gap-1">
+                <OSwitch
+                  v-model="searchObj.meta.showHistogram"
+                  data-test="traces-search-bar-show-metrics-toggle-btn"
+                  @click.stop
+                />
+                <OButton
+                  icon-only
+                  data-test="traces-search-bar-menu-pin-metrics-btn"
+                  variant="ghost"
+                  :title="
+                    isPinned('histogram') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+                  "
+                  @click.stop="togglePin('histogram')"
+                >
+                  <OIcon :name="isPinned('histogram') ? 'keep' : 'keep-outline'" size="sm" />
+                </OButton>
+              </span>
+            </template>
+          </ODropdownItem>
+
+          <template v-if="isSearchMode">
+            <ODropdownSeparator />
+            <SavedViewsSubmenu
+              :views="tracesSavedViews"
+              :favorite-ids="favoriteIds"
+              :applied-view-id="appliedSavedViewId"
+              :loading="savedViewsLoading"
+              data-test-prefix="traces-search-bar-menu-saved-views"
+              trigger-test-id="traces-search-bar-menu-list-saved-views-btn"
+              create-test-id="traces-search-bar-menu-create-saved-view-btn"
+              @open="refreshSavedViews"
+              @apply="applySavedView"
+              @update="requestUpdateSavedView"
+              @toggle-favorite="toggleFavorite"
+              @create="openSaveViewDialog"
+              @delete="deleteTracesSavedView"
+            >
+              <template #actions>
+                <OButton
+                  icon-only
+                  data-test="traces-search-bar-menu-pin-saved-views-btn"
+                  variant="ghost"
+                  :title="
+                    isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+                  "
+                  @click.stop="togglePin('savedViews')"
+                >
+                  <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
+                </OButton>
+              </template>
+            </SavedViewsSubmenu>
+            <ODropdownSeparator />
+          </template>
+
+          <SyntaxGuide
+            :sqlmode="searchObj.meta.sqlMode"
+            :menuItem="true"
+            data-test="traces-search-bar-syntax-guide-btn"
+          />
+
+          <template v-if="isSearchMode">
+            <ODropdownSeparator />
+            <ODropdownItem
+              v-if="recentSearchesEnabled"
+              data-test="traces-search-bar-recent-searches-btn"
+              @select="openRecentSearches(null)"
+            >
+              <template #icon>
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                >
+                  <OIcon name="manage-search" size="sm" />
+                </span>
+              </template>
+              {{ t("recentSearches.title") }}
+            </ODropdownItem>
+            <ODropdownItem
+              data-test="logs-search-bar-share-link-btn"
+              shortcut="tracesCopyUrl"
+              :disabled="shareLink.isWebUrlNotConfigured.value"
+              :disabled-reason="
+                shareLink.isWebUrlNotConfigured.value ? t('search.webUrlNotConfigured') : null
+              "
+              @select="shareLink.share()"
+            >
+              <template #icon>
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                >
+                  <OIcon name="share" size="sm" />
+                </span>
+              </template>
+              {{ t("search.shareLink") }}
+            </ODropdownItem>
+
+            <ODropdownSeparator />
 
             <ODropdownGroup :label="t('search.menuGroupDownloads')">
               <ODropdownItem
@@ -502,90 +590,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("traces.redActions.addRedToDashboard") }}
               </ODropdownItem>
             </ODropdownGroup>
-          </ODropdown>
-          <AddToDashboard
-            v-if="redDashboardOpen"
-            v-model:open="redDashboardOpen"
-            :dashboard-panel-data="{ data: {} }"
-            :panels="redDashboardPanels"
-            :notice="redDashboardNotice"
-          />
-        </div>
-
-        <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
-        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ms-auto max-lg:ms-0">
-          <div class="flex items-center gap-2 max-lg:w-full max-lg:justify-end max-lg:gap-1.5">
-            <OPageHeaderStatus />
-            <ODateTimeRange
-              ref="dateTimeRef"
-              auto-apply
-              :default-type="searchObj.data.datetime.type"
-              :default-absolute-time="{
-                startTime: searchObj.data.datetime.startTime,
-                endTime: searchObj.data.datetime.endTime,
-              }"
-              :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
-              data-test="service-graph-date-time-picker"
-              calendar-presets
-              @on:date-change="updateDateTime"
-            />
-            <OButton
-              icon-only
-              data-test="service-graph-refresh-btn"
-              variant="ghost"
-              @click="$emit('service-graph-refresh')"
-            >
-              <OIcon name="refresh" size="sm" />
-              <OTooltip :content="t('common.refresh')" />
-            </OButton>
-            <OToggleGroup
-              :model-value="searchObj.meta.serviceGraphVisualizationType"
-              @update:model-value="onServiceGraphVisualizationChange($event)"
-            >
-              <OToggleGroupItem data-test="service-graph-tree-view-btn" value="tree">
-                <template #icon-left>
-                  <OIcon name="git-branch" size="sm" />
-                </template>
-                <span class="max-lg:hidden">{{ t("traces.treeView") }}</span>
-              </OToggleGroupItem>
-              <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph">
-                <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
-                <span class="max-lg:hidden">{{ t("traces.graphView") }}</span>
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <OSelect
-              v-model="searchObj.meta.serviceGraphLayoutType"
-              :options="serviceGraphLayoutOptions"
-              :searchable="false"
-              class="w-[7.5rem] max-lg:w-24!"
-              :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
-              @update:model-value="onServiceGraphLayoutChange"
-            />
-          </div>
-        </div>
-
-        <!-- Services Catalog right toolbar: DateTime, Refresh -->
-        <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ms-auto">
-          <div class="flex items-center gap-2">
-            <OPageHeaderStatus />
-            <ODateTimeRange
-              ref="dateTimeRef"
-              auto-apply
-              menu-align="end"
-              :default-type="searchObj.data.datetime.type"
-              :default-absolute-time="{
-                startTime: searchObj.data.datetime.startTime,
-                endTime: searchObj.data.datetime.endTime,
-              }"
-              :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
-              data-test="services-catalog-date-time-picker"
-              calendar-presets
-              @on:date-change="updateDateTime"
-            />
-          </div>
-        </div>
+          </template>
+        </ODropdown>
       </div>
-      <!-- /toolbarRightRef wrapper -->
     </div>
     <div
       v-if="
@@ -738,6 +745,7 @@ import {
   computed,
   toRef,
   shallowRef,
+  type PropType,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
@@ -751,7 +759,8 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
-import ShareButton from "@/components/common/ShareButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { useShareLink } from "@/composables/useShareLink";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -807,7 +816,6 @@ import { toFilterFields } from "@/utils/query/filterBar";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import savedViewsService from "@/services/saved_views";
-import RecentSearchesButton from "@/components/queryHistory/RecentSearchesButton.vue";
 import RecentSearchesDrawer from "@/components/queryHistory/RecentSearchesDrawer.vue";
 import RecentSearchesFocusDropdown from "@/components/queryHistory/RecentSearchesFocusDropdown.vue";
 import {
@@ -837,7 +845,7 @@ export default defineComponent({
     OPageHeaderStatus,
     OSeparator,
     ODateTimeRange,
-    ShareButton,
+    ORefreshButton,
     OToggleGroup,
     OToggleGroupItem,
     OButton,
@@ -856,7 +864,6 @@ export default defineComponent({
     UnifiedQueryEditor: defineAsyncComponent(() => import("@/components/QueryEditor.vue")),
     SqlFilterBuilder,
     SyntaxGuide,
-    RecentSearchesButton,
     RecentSearchesDrawer,
     RecentSearchesFocusDropdown,
     SavedViewsMenu,
@@ -888,6 +895,15 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** The service graph's own last load and in-flight state, for its refresh button. */
+    serviceGraphLastRunAt: {
+      type: Number as PropType<number | null>,
+      default: null,
+    },
+    serviceGraphLoading: {
+      type: Boolean,
+      default: false,
+    },
   },
   methods: {
     searchData() {
@@ -906,6 +922,7 @@ export default defineComponent({
     const store = useStore();
 
     const { searchObj, tracesShareURL, tracesParser } = useTraces();
+    const shareLink = useShareLink({ url: () => tracesShareURL.value });
     const queryEditorRef = ref(null);
 
     const nlpMode = ref(false);
@@ -1799,6 +1816,8 @@ export default defineComponent({
       onErrorOnlyToggle,
       updateNewDateTime,
       tracesShareURL,
+      shareLink,
+      recentSearchesEnabled,
       config,
       applyFilters,
       removeFilterByField,

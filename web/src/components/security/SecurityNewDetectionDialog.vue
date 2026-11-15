@@ -777,7 +777,7 @@ const destinationOptions = computed(() =>
           </ORadioGroup>
           <OEmptyState
             v-if="!catalogMatches.length"
-            size="inline"
+            size="compact"
             icon="search-off"
             :title="t('siem.detections.libraryEmpty')"
           />

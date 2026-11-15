@@ -85,17 +85,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #toolbar-trailing>
-            <OButton
-              icon-only
-              variant="ghost"
-              icon="refresh"
-              :aria-label="t('alertCalibration.refresh')"
+            <ORefreshButton
+              :last-run-at="runs.loadedAt.value"
               :loading="runs.loading.value"
               data-test="alert-calibration-digests-refresh"
               @click="refresh"
-            >
-              <OTooltip side="bottom" :content="t('alertCalibration.refresh')" />
-            </OButton>
+            />
           </template>
 
           <template #cell-window="{ row }">
@@ -158,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #error>
             <LiveNoticeState
-              size="page"
+              size="region"
               :notice="
                 readNotice(t, runs.error.value, t('alertCalibration.digests.loadFailedTitle'))
               "
@@ -190,7 +185,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

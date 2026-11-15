@@ -80,11 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            spacer, then the action row). -->
       <div class="flex-1" />
 
-      <div ref="headerCluster" class="flex shrink-0 flex-nowrap items-center">
+      <div ref="headerCluster" class="flex shrink-0 flex-nowrap items-center font-normal">
         <span
           v-if="restInfo"
-          class="text-2xs text-text-secondary whitespace-nowrap opacity-70"
-          :title="restInfo"
+          class="text-text-secondary text-xs whitespace-nowrap"
           :data-test="`metrics-explorer-card-rest-info-${card.name}`"
           >{{ restInfo }}</span
         >
@@ -96,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="card.help"
           icon-only
           variant="ghost"
-          size="xs"
+          size="sm"
           icon="info-outline"
           class="ms-1 shrink-0"
           :aria-label="
@@ -188,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="exemplars?.status === 'error'"
             icon-only
             variant="ghost"
-            size="xs"
+            size="sm"
             icon="warning"
             :aria-label="t('dashboard.exemplars.loadFailed')"
             :data-test="`metrics-explorer-card-exemplars-error-${card.name}`"
@@ -238,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-only
           variant="primary"
           stale
-          size="xs"
+          size="sm"
           icon="refresh"
           :disabled="preview?.status === 'loading'"
           :aria-label="t('metrics.explorer.card.refreshAria', { name: card.name })"
@@ -353,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            (PanelSchemaRenderer) — same component, same icon, same i18n key. -->
       <OEmptyState
         v-else-if="isSparse"
-        size="inline"
+        size="compact"
         icon="show-chart"
         :title="t('metrics.explorer.card.sparse')"
         :text="t('metrics.explorer.card.sparseHint')"
@@ -363,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OEmptyState
         v-else-if="isEmpty"
-        size="inline"
+        size="compact"
         icon="bar-chart"
         :title="t('panel.noData')"
         class="h-full"

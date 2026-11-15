@@ -167,24 +167,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSkeleton class="w-1/2" aria-hidden="true" />
         </div>
 
-        <div
+        <OEmptyState
           v-else-if="detailPreview?.status === 'failed'"
-          class="flex flex-col items-start gap-2 px-1 py-3"
+          kind="error"
+          size="compact"
+          class="px-1"
+          :title="t('iam.editRole.presetStreamsFailed')"
           data-test="edit-role-preset-failed"
         >
-          <span class="text-badge-warning-soft-text flex items-start gap-1 text-xs">
-            <OIcon name="warning" size="sm" class="shrink-0" />
-            {{ t("iam.editRole.presetStreamsFailed") }}
-          </span>
-          <OButton
-            variant="secondary"
-            icon="refresh"
-            data-test="edit-role-preset-retry"
-            @click="requestStreams"
-          >
-            {{ t("iam.editRole.presetRetry") }}
-          </OButton>
-        </div>
+          <template #actions>
+            <OButton
+              variant="secondary"
+              size="sm"
+              data-test="edit-role-preset-retry"
+              @click="requestStreams"
+            >
+              {{ t("iam.editRole.presetRetry") }}
+            </OButton>
+          </template>
+        </OEmptyState>
 
         <template v-else-if="detailPreview">
           <div class="border-border-subtle border-b px-1 pt-2 pb-2.5">
@@ -291,6 +292,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

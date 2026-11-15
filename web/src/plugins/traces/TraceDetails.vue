@@ -990,12 +990,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta)
       "
-      class="flex h-full flex-col items-center justify-center"
+      class="flex h-full flex-col gap-3 p-3"
+      data-test="trace-details-loading"
     >
-      <OSpinner data-test="trace-details-loading-spinner" size="lg" />
-      <div data-test="trace-details-loading-text" class="pt-2">
-        {{ t("traces.fetchingTrace") }}
-      </div>
+      <OSkeleton class="h-6 w-1/3" />
+      <OSkeleton preset="tableRows" :rows="10" />
     </div>
     <div
       v-else-if="licenseLockedView"
@@ -1182,7 +1181,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -1445,7 +1444,7 @@ export default defineComponent({
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
-    OSpinner,
+    OSkeleton,
     OTooltip,
     OTruncatedText,
     OSearchInput,

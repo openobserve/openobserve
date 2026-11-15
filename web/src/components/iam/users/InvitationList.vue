@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="token"
           :loading="loading"
           :forbidden="forbidden"
+          :error="loadError"
           v-model:global-filter="filterQuery"
           pagination="client"
           :page-size="20"
@@ -33,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-invitations-list"
+          @retry="fetchPendingInvitations"
         >
           <template #toolbar>
             <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
@@ -45,20 +47,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
-              icon-only
-              variant="ghost"
-              icon="refresh"
+            <ORefreshButton
+              :last-run-at="lastUpdatedAt"
               :loading="loading"
+              shortcut="iamInvitationsRefresh"
               data-test="invitation-list-refresh-btn"
               @click="fetchPendingInvitations"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut="iamInvitationsRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -185,9 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -204,7 +199,7 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
+import { forbiddenState, loadErrorText, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -228,9 +223,9 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
+    ORefreshButton,
     ODropdown,
     ODropdownItem,
-    OTooltip,
     OTag,
     OTimeCell,
     OUserCell,
@@ -309,7 +304,10 @@ export default defineComponent({
       },
     ];
     const loading = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref<ForbiddenState>(false);
+    // A failed read with no rows on screen is the table's error state, never the first-run one (K5).
+    const loadError = ref<string | null>(null);
 
     onMounted(() => {
       fetchPendingInvitations();
@@ -324,6 +322,7 @@ export default defineComponent({
 
       loading.value = true;
       forbidden.value = false;
+      loadError.value = null;
       try {
         const response = await usersService.getPendingInvites();
 
@@ -331,12 +330,15 @@ export default defineComponent({
           ...invitation,
           expiry: formatExpiry(invitation.expires_at),
         }));
+        lastUpdatedAt.value = Date.now();
         dismiss();
       } catch (error) {
         const e = error as { response?: { status?: number; data?: { message?: string } } };
         dismiss();
         forbidden.value = forbiddenState(e);
-        if (!forbidden.value) {
+        if (!invitations.value.length) {
+          loadError.value = loadErrorText(e, t("emptyState.loadError.description"));
+        } else if (!forbidden.value) {
           toast({
             message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),
             variant: "error",
@@ -476,6 +478,8 @@ export default defineComponent({
       filterQuery,
       columns,
       loading,
+      loadError,
+      lastUpdatedAt,
       forbidden,
       confirmAccept,
       confirmReject,

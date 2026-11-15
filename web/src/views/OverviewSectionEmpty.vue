@@ -16,27 +16,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section :data-test="`overview-${testSection}-${kind}`">
-    <div class="mb-2 flex min-h-8 items-center ps-1">
-      <OText variant="card-title">{{ title }}</OText>
+    <div class="mb-2 flex min-h-8 items-center">
+      <OText variant="card-title" as="h2">{{ title }}</OText>
     </div>
-    <div
-      class="border-border-default rounded-surface bg-surface-panel overflow-hidden border border-[0.0625em]"
-    >
-      <OEmptyState
-        v-if="kind === 'forbidden'"
-        size="inline"
-        kind="denied"
-        :title="t('emptyState.noAccess.title')"
-        :text="t('overview.state.sectionForbidden')"
-        :data-test="`overview-${testSection}-${kind}-message`"
-      />
-      <OEmptyState
-        v-else
-        size="inline"
-        :title="message"
-        :data-test="`overview-${testSection}-${kind}-message`"
-      />
-    </div>
+    <OEmptyState
+      v-if="kind === 'forbidden'"
+      size="compact"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('overview.state.sectionForbidden')"
+      :data-test="`overview-${testSection}-${kind}-message`"
+    />
+    <OEmptyState
+      v-else
+      size="compact"
+      :title="message"
+      :data-test="`overview-${testSection}-${kind}-message`"
+    />
   </section>
 </template>
 

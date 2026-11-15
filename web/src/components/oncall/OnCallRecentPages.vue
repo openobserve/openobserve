@@ -106,7 +106,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('emptyState.noOncallResponses.title')"
           :text="t('emptyState.noOncallResponses.description')"
           icon="task-alt"
-          size="inline"
         />
       </template>
     </OTable>

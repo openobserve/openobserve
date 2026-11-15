@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-else-if="!labels.length"
-      size="inline"
+      size="compact"
       icon="label"
       :title="t('metrics.explorer.detail.breakdown.noLabels')"
       data-test="metrics-breakdown-no-labels"
@@ -246,13 +246,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-breakdown-values-loading"
           />
 
-          <p
+          <OEmptyState
             v-else-if="!rows.length"
-            class="text-text-secondary px-1 text-xs"
+            size="compact"
+            class="px-1"
+            :title="t('metrics.explorer.noData')"
             data-test="metrics-breakdown-values-empty"
-          >
-            {{ t("metrics.explorer.noData") }}
-          </p>
+          />
 
           <OTable
             v-else

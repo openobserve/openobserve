@@ -115,13 +115,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </section>
       </div>
 
-      <p
+      <OEmptyState
         v-if="!dayGroups.length"
-        class="text-text-secondary py-6 text-center text-sm"
+        kind="filtered"
         data-test="autoobserve2-activity-filter-empty"
-      >
-        {{ t("autoobserve2.activityPage.empty.filter") }}
-      </p>
+        @action="filter = 'all'"
+      />
     </template>
   </div>
 </template>
@@ -129,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

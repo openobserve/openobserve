@@ -22,10 +22,10 @@ import { gt, raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
@@ -670,12 +670,8 @@ k8s.loadStreams();
       </div>
     </div>
 
-    <div
-      v-else-if="detection === 'unknown'"
-      class="flex min-h-60 items-center justify-center"
-      data-test="k8s2-spinner"
-    >
-      <OSpinner size="lg" />
+    <div v-else-if="detection === 'unknown'" class="px-page-edge" data-test="k8s2-loading">
+      <OSkeleton preset="tableRows" :rows="8" />
     </div>
 
     <OEmptyState
@@ -688,20 +684,20 @@ k8s.loadStreams();
     />
 
     <div v-else-if="detection === 'undetected'" class="min-h-0 flex-1 overflow-y-auto">
-      <div
-        class="max-lg:px-page-edge mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
-        data-test="k8s2-empty-state"
-      >
-        <OText tag="h2" class="text-xl font-semibold">{{ t("infra.k8s2.emptyHeadline") }}</OText>
-        <DataSourceSetupCard slug="kubernetes" @detected="retryStreams" />
-      </div>
+      <OEmptyState icon="lan" :title="t('infra.k8s2.emptyHeadline')" data-test="k8s2-empty-state">
+        <template #extra>
+          <div class="w-full max-w-3xl min-w-0 text-start">
+            <DataSourceSetupCard slug="kubernetes" @detected="retryStreams" />
+          </div>
+        </template>
+      </OEmptyState>
     </div>
 
     <OEmptyState
       v-else-if="pageError"
       kind="error"
       :title="t('infra.k8s2.pageError')"
-      :text="raw(pageError)"
+      :text="isRawHttpText(pageError) ? t('emptyState.loadError.description') : raw(pageError)"
       data-test="k8s2-page-error"
       @action="retryPage"
     />

@@ -103,8 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template v-if="field.name === 'duration'" #body>
-                  <div v-if="durationPercentilesLoading" class="flex justify-center py-2">
-                    <OSpinner />
+                  <div
+                    v-if="durationPercentilesLoading"
+                    class="flex flex-col gap-1.5 py-1 ps-2 pe-2.5"
+                  >
+                    <OSkeleton v-for="row in 4" :key="row" class="h-4" />
                   </div>
                   <template v-else-if="hasDurationPercentiles">
                     <div
@@ -157,9 +160,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </template>
-                  <div v-else class="py-1 ps-3 text-sm font-medium">
-                    {{ durationPercentileErrMsg || t("traces.indexList.noValuesFound") }}
-                  </div>
+                  <OEmptyState
+                    v-else
+                    size="compact"
+                    class="ps-3"
+                    :kind="durationPercentileErrMsg ? 'error' : 'first-run'"
+                    :title="
+                      durationPercentileErrMsg
+                        ? t('traces.failedToLoadPercentiles')
+                        : t('traces.indexList.noValuesFound')
+                    "
+                  />
                 </template>
               </FieldExpansion>
             </template>
@@ -214,7 +225,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles from "@/composables/useDurationPercentiles";
@@ -244,7 +255,7 @@ export default defineComponent({
     FieldRow,
     OButton,
     OSelect,
-    OSpinner,
+    OEmptyState,
     OIcon,
     GroupedFieldList: defineAsyncComponent(
       () => import("@/components/common/GroupedFieldList.vue"),

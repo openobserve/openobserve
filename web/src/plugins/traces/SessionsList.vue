@@ -15,12 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions-list bg-card-glass-bg flex h-full! flex-col">
+  <!-- The banner above depends on the agents list, so the bar and the table wait for it rather than move. -->
+  <div v-if="!scopeDecided" class="flex h-full flex-col" data-test="sessions-list-pending">
+    <OSkeleton preset="tableRows" :rows="10" class="pt-2" />
+  </div>
+  <div v-else class="sessions-list bg-card-glass-bg flex h-full! flex-col">
+    <!-- Stream mode because these LLM spans carry no agent identity: directly under the header (K3). -->
+    <AiNoAgentIdentityBanner v-if="noAgentIdentity" data-test="sessions-list" />
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->
     <div
       v-if="streamsLoaded && availableStreams.length === 0"
-      class="flex min-h-0 flex-1 items-center justify-center"
+      class="flex min-h-0 flex-1 flex-col"
       data-test="sessions-empty-no-streams"
     >
       <OEmptyState
@@ -42,37 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          `sessions-*` for the count/badges — so those two are passed explicitly to
          stay byte-identical. solidAgentTrigger keeps the "All Agents" empty state
          in solid text (Sessions never dimmed it). -->
-    <!-- Debounced 300 ms like the Streams search; the term lives in useSessions so Back restores the filtered page. -->
-    <div
-      v-if="!(streamsLoaded && availableStreams.length === 0)"
-      class="px-page-edge shrink-0 pt-2"
-    >
-      <label :for="SEARCH_INPUT_ID" class="sr-only">
-        {{ t("traces.sessionsList.search.placeholder") }}
-      </label>
-      <OSearchInput
-        :id="SEARCH_INPUT_ID"
-        v-model="searchKeyword"
-        :placeholder="t('traces.sessionsList.search.placeholder')"
-        :title="t('traces.sessionsList.search.title')"
-        :debounce="300"
-        class="w-full"
-        data-test="sessions-list-search"
-      />
-      <!-- Exact user from a `?user=` link (Users page "Sessions"). -->
-      <OTag
-        v-if="searchUser"
-        tone="accent"
-        :label="t('traces.sessionsList.search.user', { user: searchUser })"
-        removable
-        :remove-label="t('traces.sessionsList.search.clearUser')"
-        class="mt-2"
-        data-test="sessions-list-user-filter"
-        @remove="clearUserFilter"
-      />
-    </div>
     <AiScopeBar
-      v-if="!(streamsLoaded && availableStreams.length === 0)"
+      v-if="showBody"
       :filter-mode="filterMode"
       v-model:active-stream="activeStream"
       v-model:selected-env="selectedEnv"
@@ -106,10 +83,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @agent-pick="modeExplicit = true"
       @stream-change="onStreamChange"
     >
+      <!-- Debounced 300 ms like the Streams search; the term lives in useSessions so Back restores the filtered page. -->
+      <template #search>
+        <div class="flex w-70 min-w-0 items-center gap-2 max-md:w-full">
+          <label :for="SEARCH_INPUT_ID" class="sr-only">
+            {{ t("traces.sessionsList.search.placeholder") }}
+          </label>
+          <OSearchInput
+            :id="SEARCH_INPUT_ID"
+            v-model="searchKeyword"
+            :placeholder="t('traces.sessionsList.search.placeholder')"
+            :title="t('traces.sessionsList.search.title')"
+            :debounce="300"
+            class="w-full"
+            data-test="sessions-list-search"
+          />
+        </div>
+        <!-- Exact user from a `?user=` link (Users page "Sessions"). -->
+        <OTag
+          v-if="searchUser"
+          tone="accent"
+          :label="t('traces.sessionsList.search.user', { user: searchUser })"
+          removable
+          :remove-label="t('traces.sessionsList.search.clearUser')"
+          data-test="sessions-list-user-filter"
+          @remove="clearUserFilter"
+        />
+      </template>
     </AiScopeBar>
-
-    <!-- Stream mode because these LLM spans carry no agent identity. -->
-    <AiNoAgentIdentityBanner v-if="noAgentIdentity" data-test="sessions-list" class="pb-2" />
 
     <!-- Streams exist: OTable owns the data surface (column chooser, server-side
          pagination footer, column resize, empty/error body). The scope control
@@ -118,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          v-if, so a v-else here would chain to the bar and hide the table
          whenever streams exist. -->
     <OTable
-      v-if="!(streamsLoaded && availableStreams.length === 0)"
+      v-if="showBody"
       :data="sessions"
       :columns="tableColumns"
       :loading="loading"
@@ -151,7 +152,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           kind="error"
           data-test="sessions-empty-error"
           :title="t('traces.sessionsList.failedToLoad')"
-          :text="raw(error || '')"
+          :text="
+            error && !isRawHttpText(error) ? raw(error) : t('emptyState.loadError.description')
+          "
           @action="loadSessions()"
         />
         <!-- Agent mode whose agents list failed to load: not "no agents". -->
@@ -170,9 +173,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :action-label="t('traces.sessionsList.viewByStream')"
           @action="onFilterModeChange('stream')"
         />
-        <!-- A search that matched nothing is NOT a first-run situation — the
-             stream has sessions, just none for this term — so never show the
-             "instrument your app" screen here; offer to clear the search. -->
+        <!-- A search that matched nothing is not a first-run: the stream has
+             sessions, so offer to clear the search instead of setup steps. -->
         <OEmptyState
           v-else-if="searchActive"
           data-test="sessions-empty-search"
@@ -182,15 +184,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :action-label="t('traces.sessionsList.search.clear')"
           @action="clearSearch"
         />
-        <div v-else class="flex items-center justify-center py-12" data-test="sessions-empty">
-          <OEmptyState
-            :title="t('emptyState.noLLMSessions.title')"
-            :text="t('emptyState.noLLMSessions.description')"
-            icon="insights"
-            :action-label="t('emptyState.noLLMSessions.action')"
-            @action="onEmptyAction"
-          />
-        </div>
+        <OEmptyState
+          v-else
+          data-test="sessions-empty"
+          :title="t('emptyState.noLLMSessions.title')"
+          :text="t('emptyState.noLLMSessions.description')"
+          icon="insights"
+          :action-label="t('emptyState.noLLMSessions.action')"
+          @action="onEmptyAction"
+        />
       </template>
       <!-- Last activity -->
       <template #cell-lastSeenNanos="{ row }">
@@ -316,7 +318,6 @@ import {
   type ScopeMode,
 } from "@/enterprise/composables/useAgentScope";
 import { replaceRouteQuery } from "@/utils/url/replaceRouteQuery";
-import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
 import AiAgentsLoadError from "@/enterprise/components/AIObservability/AiAgentsLoadError.vue";
 import {
   useSessions,
@@ -326,6 +327,9 @@ import {
 } from "./composables/useSessions";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import AiNoAgentIdentityBanner from "@/enterprise/components/AIObservability/AiNoAgentIdentityBanner.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -647,7 +651,7 @@ const tableColumns = computed(() =>
       id: "turns",
       header: t("traces.sessionsList.columns.turns"),
       accessorKey: "turns",
-      size: 70,
+      size: 88,
       sortable: true,
       hideable: true,
       meta: { align: "right" },
@@ -675,7 +679,7 @@ const tableColumns = computed(() =>
       id: "durationNanos",
       header: t("traces.sessionsList.columns.duration"),
       accessorKey: "durationNanos",
-      size: 90,
+      size: 104,
       sortable: true,
       hideable: true,
       meta: { align: "left" },
@@ -982,6 +986,20 @@ async function refresh(startTime?: number, endTime?: number, force = true, windo
   await loadSessions(startTime, endTime, force, force, windowPicked);
 }
 
+// The no-agent-identity banner needs the agents list, so nothing below it renders before the list
+// answers; rows kept from an earlier load (Back) show at once.
+const scopeDecided = computed(
+  () =>
+    streamsLoaded.value &&
+    (!availableStreams.value.length ||
+      !genAiAgentMappingAccess.allowed ||
+      agentsLoaded.value ||
+      !!agentsError.value ||
+      hasLoadedOnce.value),
+);
+const showBody = computed(
+  () => scopeDecided.value && !(streamsLoaded.value && availableStreams.value.length === 0),
+);
 defineExpose({ refresh, lastRunAt, loading });
 
 onMounted(() => {

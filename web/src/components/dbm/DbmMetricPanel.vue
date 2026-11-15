@@ -104,21 +104,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            own rendering. -->
       <div
         v-if="noAccess"
-        class="bg-surface-base absolute inset-0 mx-2 mb-2 flex flex-col items-center justify-center gap-2"
+        class="bg-surface-base absolute inset-0 mx-2 mb-2 px-3"
         :data-test="`dbm-metric-panel-no-access-${panelKey}`"
       >
-        <OIcon name="lock" class="text-text-muted size-5" />
-        <span class="text-text-secondary max-w-full px-4 text-center text-xs">
-          {{ t("dbm.metrics.noAccess", { stream: streamName }) }}
-        </span>
+        <OEmptyState
+          size="compact"
+          kind="denied"
+          :title="t('dbm.metrics.noAccess', { stream: streamName })"
+        />
       </div>
       <div
         v-else-if="streamMissing"
-        class="bg-surface-base absolute inset-0 mx-2 mb-2 flex items-center justify-center"
+        class="bg-surface-base absolute inset-0 mx-2 mb-2 px-3"
         :data-test="`dbm-metric-panel-not-collecting-${panelKey}`"
       >
         <OEmptyState
-          size="inline"
+          size="compact"
           icon="database"
           :title="t('dbm.metrics.serverStreamMissing.title')"
           :action-label="t('dbm.metrics.serverStreamMissing.action')"

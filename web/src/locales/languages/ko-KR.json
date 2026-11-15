@@ -1961,6 +1961,9 @@
     "workflows": "워크플로우",
     "language": "언어",
     "keyboardShortcuts": "키보드 단축키",
+    "searchOrJumpTo": "검색 또는 이동…",
+    "jumpToTitle": "이동",
+    "jumpToPlaceholder": "페이지 검색",
     "synthetic": "Synthetics",
     "experience": "경험",
     "slos": "SLO",
@@ -4039,7 +4042,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "라이선스를 관리할 권한이 없습니다."
-      }
+      },
+      "usageTitle": "일일 수집량"
     },
     "value_sso_requires_ha": "✅ HA 모드 필요",
     "value_rbac_requires_ha": "✅ HA 모드 필요",
@@ -5048,6 +5052,7 @@
   },
   "organization": {
     "searchByNameOrId": "이름 또는 ID로 검색",
+    "currentLabel": "조직: {name}",
     "noOrganizationsFound": "조직을 찾을 수 없습니다",
     "header": "조직",
     "orgBeingDeletedSwitching": "이 조직이 삭제 중입니다. 다른 조직으로 전환합니다.",
@@ -10752,7 +10757,8 @@
       "taglineAnd": "그리고 로그, 트레이스, 메트릭 및 인시던트를 안내합니다.",
       "signedInAs": "로 로그인",
       "role": "역할",
-      "tryOneOfThese": "또는 다음 중 하나를 시도해 보십시오."
+      "tryOneOfThese": "또는 다음 중 하나를 시도해 보십시오.",
+      "panelText": "로그, 트레이스, 메트릭, 인시던트에 대해 묻거나 쿼리 작성에 도움을 받으세요."
     },
     "capabilities": {
       "query": {
@@ -18952,7 +18958,7 @@
       "version": "버전",
       "agentIdHint": "에이전트 ID: {ids}",
       "noAgentIdentity": "에이전트 ID를 찾을 수 없습니다",
-      "noAgentIdentityDescription": "이 LLM 스팬에는 에이전트 이름이 없어 스트림별로 표시됩니다. 에이전트별로 보려면 에이전트 이름을 지정하는 속성을 매핑하세요.",
+      "noAgentIdentityDescription": "이 LLM 스팬에는 에이전트 이름이 없어 스트림별로 표시됩니다.",
       "noAgentIdentityAction": "GenAI 에이전트 매핑 열기"
     },
     "agentGraph": {
@@ -22728,6 +22734,7 @@
     },
     "actions": {
       "openCheatsheet": "키보드 단축키 치트시트 열기",
+      "searchOrJumpTo": "검색 또는 페이지로 이동",
       "closeDialog": "모든 대화 상자, 서랍 또는 모달 닫기",
       "focusSearch": "검색창에 포커스",
       "focusQuery": "쿼리 편집기에 포커스",
@@ -25452,7 +25459,8 @@
         "p95": "느린 꼬리 구간 — 20건 중 1건의 호출이 최소 이만큼 걸렸습니다. 애플리케이션 트레이스에서 완료된 호출을 기준으로 측정됩니다.",
         "p99": "가장 느린 1%의 호출이 최소 이만큼 걸렸습니다. 애플리케이션 트레이스에서 완료된 호출을 기준으로 측정됩니다.",
         "load": "앱이 이 데이터베이스 호출에 소비한 총 시간으로, 애플리케이션 트레이스에서 측정됩니다. 이 데이터베이스가 앱을 위해 처리한 트래픽 양을 보여줍니다.",
-        "attention": "이 인스턴스가 자체 엔진이 게시하는 한도에 얼마나 가까운지 — 현재는 max_connections 대비 연결 수입니다. 혼합 점수가 아닌 최악의 비율입니다. 가장 높은 순으로 정렬되며 상태를 읽을 수 없는 인스턴스가 맨 위에 표시됩니다. 보이지 않는 인스턴스는 정상이라고 알 수 없기 때문입니다. 데이터베이스 서버에서 측정되므로 옆의 데이터베이스 시간과 비교할 수 없습니다."
+        "attention": "이 인스턴스가 자체 엔진이 게시하는 한도에 얼마나 가까운지 — 현재는 max_connections 대비 연결 수입니다. 혼합 점수가 아닌 최악의 비율입니다. 가장 높은 순으로 정렬되며 상태를 읽을 수 없는 인스턴스가 맨 위에 표시됩니다. 보이지 않는 인스턴스는 정상이라고 알 수 없기 때문입니다. 데이터베이스 서버에서 측정되므로 옆의 데이터베이스 시간과 비교할 수 없습니다.",
+        "calls": "앱이 이 데이터베이스를 호출한 횟수로, 애플리케이션 트레이스에서 측정했습니다."
       },
       "failedChip": "{count} 실패",
       "columnSubLabels": {
@@ -25893,7 +25901,8 @@
         "tableHealthHint": "테이블 크기, 블로트 및 진공 상태. 블로트와 진공은 PostgreSQL 전용입니다.",
         "deadlocksLocked": "교착 상태는 엔터프라이즈 기능입니다. 어떤 쿼리가 서로 교착 상태에 빠졌는지, 그리고 그 이유를 보려면 업그레이드하세요. 다른 데이터베이스 탭은 모든 요금제에서 사용할 수 있습니다.",
         "blockedLocked": "차단된 쿼리는 엔터프라이즈 기능입니다. 어떤 세션이 잠금을 기다리고 있고 무엇이 잠금을 보유하고 있는지 보려면 업그레이드하세요. 다른 데이터베이스 탭은 모든 요금제에서 사용할 수 있습니다.",
-        "tableHealthLocked": "테이블 상태는 엔터프라이즈 기능입니다. 테이블 크기, 블로트 및 진공 상태를 추적하려면 업그레이드하세요. 다른 데이터베이스 탭은 모든 요금제에서 사용할 수 있습니다."
+        "tableHealthLocked": "테이블 상태는 엔터프라이즈 기능입니다. 테이블 크기, 블로트 및 진공 상태를 추적하려면 업그레이드하세요. 다른 데이터베이스 탭은 모든 요금제에서 사용할 수 있습니다.",
+        "queriesHintServer": "이 기간에 데이터베이스가 보고한 쿼리 종류로, 데이터베이스 내부에서 집계했습니다."
       }
     },
     "metrics": {

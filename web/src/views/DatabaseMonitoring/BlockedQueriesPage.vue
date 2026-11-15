@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState
             kind="error"
             :title="t('emptyState.loadError.title')"
-            :text="raw(message)"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             data-test="dbm-blocked-error"
             @action="onRefresh()"
           />
@@ -77,22 +77,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @clear="clearScope"
               />
             </template>
-            <!-- Which question the table answers. Defaults to "who's stuck". -->
-            <OToggleGroup
-              v-model="perspective"
-              class="shrink-0"
-              mobile-dropdown
-              data-test="dbm-blocked-perspective"
-            >
-              <OToggleGroupItem value="waiting" data-test="dbm-blocked-perspective-waiting">
-                {{ t("dbm.blocked.perspective.waiting") }}
-                <OTooltip side="bottom" :content="t('dbm.blocked.perspective.waitingHint')" />
-              </OToggleGroupItem>
-              <OToggleGroupItem value="blocking" data-test="dbm-blocked-perspective-blocking">
-                {{ t("dbm.blocked.perspective.blocking") }}
-                <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
-              </OToggleGroupItem>
-            </OToggleGroup>
+            <template #view>
+              <!-- Which question the table answers. Defaults to "who's stuck". -->
+              <OToggleGroup
+                v-model="perspective"
+                class="shrink-0"
+                mobile-dropdown
+                data-test="dbm-blocked-perspective"
+              >
+                <OToggleGroupItem value="waiting" data-test="dbm-blocked-perspective-waiting">
+                  {{ t("dbm.blocked.perspective.waiting") }}
+                  <OTooltip side="bottom" :content="t('dbm.blocked.perspective.waitingHint')" />
+                </OToggleGroupItem>
+                <OToggleGroupItem value="blocking" data-test="dbm-blocked-perspective-blocking">
+                  {{ t("dbm.blocked.perspective.blocking") }}
+                  <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </template>
           </DbmTableToolbar>
         </template>
 
@@ -447,6 +449,7 @@ import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";

@@ -76,6 +76,21 @@ vi.mock("./composables/useLLMInsights", () => ({
   }),
 }));
 
+// The data health check is out of scope here; settled, so the dashboard's first view can render.
+vi.mock("./composables/useLLMDataHealth", () => ({
+  useLLMDataHealth: () => ({
+    health: ref(null),
+    checkedWindow: ref(null),
+    loading: ref(false),
+    error: ref(false),
+    samples: ref(null),
+    samplesLoading: ref(false),
+    fetchHealth: vi.fn(),
+    fetchSamples: vi.fn(),
+    reset: vi.fn(),
+  }),
+}));
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,

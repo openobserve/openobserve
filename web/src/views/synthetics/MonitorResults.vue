@@ -70,11 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("synthetics.results.editCheck") }}
       </OButton>
-      <OButton
-        icon-only
-        :aria-label="t('common.refresh')"
-        variant="ghost"
-        icon="refresh"
+      <ORefreshButton
+        :last-run-at="lastRunAt"
         :loading="isRefreshing"
         data-test="synthetic-monitor-results-refresh-btn"
         @click="refresh"
@@ -164,6 +161,8 @@ import { useStore } from "vuex";
 import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { useLoadedAt } from "@/composables/useLoadedAt";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
@@ -251,6 +250,7 @@ const timeRange = ref({ startTime: 0, endTime: 0 });
 const dateTimeRef = ref<any>(null);
 const runsRef = ref<any>(null);
 const isRefreshing = ref(false);
+const lastRunAt = useLoadedAt(isRefreshing);
 
 // ── Run Detail Drawer ────────────────────────────────────────────────────────
 const drawerOpen = ref(false);

@@ -134,18 +134,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="logsDashboardData"
             class="border-card-glass-border flex justify-end border-b border-solid p-2"
           >
-            <OButton variant="ghost" @click="loadDashboard" :loading="loading">
-              <OIcon name="refresh" size="xs" class="me-1" />
-              {{ t("common.refresh") }}
-            </OButton>
+            <ORefreshButton
+              :last-run-at="logsLoadedAt"
+              :loading="loading"
+              data-test="correlation-logs-refresh"
+              @click="loadDashboard"
+            />
           </div>
 
-          <!-- Loading State -->
-          <div v-if="loading" class="flex h-full flex-col items-center justify-center gap-3 py-20">
-            <OSpinner size="lg" />
-            <div class="text-sm opacity-70">
-              {{ t("correlation.loadingLogs") }}
-            </div>
+          <div v-if="loading" class="grid grid-cols-2 gap-3 p-3 max-md:grid-cols-1">
+            <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-48" />
           </div>
 
           <!-- Logs Dashboard -->
@@ -159,15 +157,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchType="dashboards"
           />
 
-          <!-- No Logs State -->
-          <div v-else class="flex h-full flex-col items-center justify-center py-20">
-            <div class="mb-2 text-sm font-medium opacity-90">
-              {{ t("correlation.noLogsFound") }}
-            </div>
-            <div class="text-sm opacity-70">
-              {{ t("correlation.noLogsDescription") }}
-            </div>
-          </div>
+          <OEmptyState
+            v-else
+            :title="t('correlation.noLogsFound')"
+            :text="t('correlation.noLogsDescription')"
+          />
         </OTabPanel>
 
         <!-- Metrics Tab Panel -->
@@ -269,10 +263,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </template>
                   </template>
-                  <div v-else class="px-2 pt-3 text-center">
-                    <OIcon name="info" size="sm" class="me-1 align-middle" />
-                    {{ t("search.noResult") }}
-                  </div>
+                  <OEmptyState
+                    v-else
+                    size="compact"
+                    kind="filtered"
+                    class="px-2"
+                    :title="t('search.noResult')"
+                  />
                 </div>
 
                 <!-- Footer: selected count -->
@@ -358,34 +355,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Dashboard content -->
                 <div class="min-h-0 flex-1 overflow-auto">
-                  <div
-                    v-if="loading"
-                    class="flex h-full flex-col items-center justify-center gap-3 py-20"
-                  >
-                    <OSpinner size="lg" />
-                    <div class="text-sm opacity-70">
-                      {{
-                        t("correlation.loadingMetrics", {
-                          count: selectedMetricStreams.length,
-                        })
-                      }}
-                    </div>
+                  <div v-if="loading" class="grid grid-cols-2 gap-3 p-3 max-md:grid-cols-1">
+                    <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-48" />
                   </div>
-                  <div
+                  <OEmptyState
                     v-else-if="error"
-                    class="flex h-full flex-col items-center justify-center py-20"
-                  >
-                    <div class="mb-2 text-sm font-medium opacity-90">
-                      {{ t("correlation.metricsError") }}
-                    </div>
-                    <div class="mb-4 text-sm opacity-70">
-                      {{ error || t("correlation.metricsErrorDetails") }}
-                    </div>
-                    <OButton variant="ghost" @click="loadDashboard">
-                      <OIcon name="refresh" size="xs" class="me-1" />
-                      {{ t("correlation.retryButton") }}
-                    </OButton>
-                  </div>
+                    kind="error"
+                    :title="t('correlation.metricsError')"
+                    :text="t('correlation.metricsErrorDetails')"
+                    :action-label="t('correlation.retryButton')"
+                    @action="loadDashboard"
+                  />
                   <RenderDashboardCharts
                     v-else-if="activeDashboardForGroup"
                     ref="dashboardChartsRef"
@@ -396,17 +376,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :allowAlertCreation="false"
                     searchType="dashboards"
                   />
-                  <div
+                  <OEmptyState
                     v-else
-                    class="flex h-[calc(100vh-7.5rem)] flex-col items-center justify-center py-20"
-                  >
-                    <div class="mb-2 text-sm font-medium opacity-90">
-                      {{ t("correlation.noMetrics") }}
-                    </div>
-                    <div class="text-sm opacity-70">
-                      {{ t("correlation.noMetricsDescription") }}
-                    </div>
-                  </div>
+                    :title="t('correlation.noMetrics')"
+                    :text="t('correlation.noMetricsDescription')"
+                  />
                 </div>
               </div>
             </template>
@@ -418,33 +392,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <CorrelationVersionsLine :versions="versionsSummary.versions" :service="titleName" />
           <!-- Refresh Button -->
 
-          <!-- Loading State -->
-          <div
-            v-if="tracesLoading"
-            class="flex h-full flex-col items-center justify-center gap-3 py-20"
-          >
-            <OSpinner size="lg" />
-            <div class="text-sm opacity-70">
-              {{ t("correlation.loadingTraces") }}
-            </div>
+          <div v-if="tracesLoading" class="p-3">
+            <OSkeleton preset="tableRows" :rows="8" />
           </div>
 
-          <!-- Error State -->
-          <div
+          <OEmptyState
             v-else-if="tracesError"
-            class="flex h-full flex-col items-center justify-center py-20"
-          >
-            <div class="mb-2 text-sm font-medium opacity-90">
-              {{ t("correlation.tracesError") }}
-            </div>
-            <div class="mb-4 text-sm opacity-70">
-              {{ tracesError || t("correlation.tracesErrorDetails") }}
-            </div>
-            <OButton variant="ghost" @click="loadCorrelatedTraces">
-              <OIcon name="refresh" size="xs" class="me-1" />
-              {{ t("correlation.retryButton") }}
-            </OButton>
-          </div>
+            kind="error"
+            :title="t('correlation.tracesError')"
+            :text="t('correlation.tracesErrorDetails')"
+            :action-label="t('correlation.retryButton')"
+            @action="loadCorrelatedTraces"
+          />
 
           <!-- Direct Trace Correlation - Full Span List -->
           <div
@@ -597,22 +556,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="logsDashboardData"
             class="border-card-glass-border flex justify-end border-b border-solid p-2"
           >
-            <OButton variant="ghost" @click="loadDashboard" :loading="loading">
-              <OIcon name="refresh" size="xs" class="me-1" />
-              {{ t("common.refresh") }}
-            </OButton>
+            <ORefreshButton
+              :last-run-at="logsLoadedAt"
+              :loading="loading"
+              data-test="correlation-logs-refresh"
+              @click="loadDashboard"
+            />
           </div>
 
-          <!-- Loading State -->
-          <div
-            v-if="loading"
-            class="flex flex-1 flex-col items-center justify-center gap-3"
-            style="min-height: 18.75rem"
-          >
-            <OSpinner size="lg" />
-            <div class="text-sm opacity-70">
-              {{ t("correlation.loadingLogs") }}
-            </div>
+          <div v-if="loading" class="grid grid-cols-2 gap-3 p-3 max-md:grid-cols-1">
+            <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-48" />
           </div>
 
           <!-- Logs Dashboard -->
@@ -626,15 +579,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchType="dashboards"
           />
 
-          <!-- No Logs State -->
-          <div v-else class="flex h-full flex-col items-center justify-center py-20">
-            <div class="mb-2 text-sm font-medium opacity-90">
-              {{ t("correlation.noLogsFound") }}
-            </div>
-            <div class="text-sm opacity-70">
-              {{ t("correlation.noLogsDescription") }}
-            </div>
-          </div>
+          <OEmptyState
+            v-else
+            :title="t('correlation.noLogsFound')"
+            :text="t('correlation.noLogsDescription')"
+          />
         </div>
 
         <div
@@ -737,10 +686,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </template>
                   </template>
-                  <div v-else class="px-2 pt-3 text-center">
-                    <OIcon name="info" size="sm" class="me-1 align-middle" />
-                    {{ t("search.noResult") }}
-                  </div>
+                  <OEmptyState
+                    v-else
+                    size="compact"
+                    kind="filtered"
+                    class="px-2"
+                    :title="t('search.noResult')"
+                  />
                 </div>
 
                 <!-- Footer: selected count -->
@@ -826,34 +778,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Dashboard content -->
                 <div class="min-h-0 flex-1 overflow-auto">
-                  <div
-                    v-if="loading"
-                    class="flex h-full flex-col items-center justify-center gap-3 py-20"
-                  >
-                    <OSpinner size="lg" />
-                    <div class="text-sm opacity-70">
-                      {{
-                        t("correlation.loadingMetrics", {
-                          count: selectedMetricStreams.length,
-                        })
-                      }}
-                    </div>
+                  <div v-if="loading" class="grid grid-cols-2 gap-3 p-3 max-md:grid-cols-1">
+                    <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-48" />
                   </div>
-                  <div
+                  <OEmptyState
                     v-else-if="error"
-                    class="flex h-full flex-col items-center justify-center py-20"
-                  >
-                    <div class="mb-2 text-sm font-medium opacity-90">
-                      {{ t("correlation.metricsError") }}
-                    </div>
-                    <div class="mb-4 text-sm opacity-70">
-                      {{ error || t("correlation.metricsErrorDetails") }}
-                    </div>
-                    <OButton variant="ghost" @click="loadDashboard">
-                      <OIcon name="refresh" size="xs" class="me-1" />
-                      {{ t("correlation.retryButton") }}
-                    </OButton>
-                  </div>
+                    kind="error"
+                    :title="t('correlation.metricsError')"
+                    :text="t('correlation.metricsErrorDetails')"
+                    :action-label="t('correlation.retryButton')"
+                    @action="loadDashboard"
+                  />
                   <RenderDashboardCharts
                     v-else-if="activeDashboardForGroup"
                     :key="activeMetricGroupTab + '_' + groupedDashboardRenderKey"
@@ -864,14 +799,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchType="dashboards"
                     class="border-none"
                   />
-                  <div v-else class="flex h-full flex-col items-center justify-center py-20">
-                    <div class="mb-2 text-sm font-medium opacity-90">
-                      {{ t("correlation.noMetrics") }}
-                    </div>
-                    <div class="text-sm opacity-70">
-                      {{ t("correlation.noMetricsDescription") }}
-                    </div>
-                  </div>
+                  <OEmptyState
+                    v-else
+                    :title="t('correlation.noMetrics')"
+                    :text="t('correlation.noMetricsDescription')"
+                  />
                 </div>
               </div>
             </template>
@@ -887,30 +819,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filter-options="versionOptions"
           />
           <div class="min-h-0 flex-1">
-            <!-- Loading State -->
-            <div
-              v-if="tracesLoading"
-              class="flex h-full flex-col items-center justify-center py-20"
-            >
-              <OSpinner size="lg" class="mb-4" />
-              <div class="text-sm">{{ t("correlation.loadingTraces") }}</div>
+            <div v-if="tracesLoading" class="p-3">
+              <OSkeleton preset="tableRows" :rows="8" />
             </div>
 
-            <!-- Error State -->
-            <div
+            <OEmptyState
               v-else-if="tracesError"
-              class="flex h-full flex-col items-center justify-center py-20"
-            >
-              <OIcon name="error-outline" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
-              <div class="mb-2 text-sm">
-                {{ t("correlation.tracesError") }}
-              </div>
-              <div class="text-text-secondary text-sm">{{ tracesError }}</div>
-              <OButton variant="secondary" class="mt-4" @click="loadCorrelatedTraces">
-                <OIcon name="refresh" size="xs" class="me-1" />
-                {{ t("correlation.retryButton") }}
-              </OButton>
-            </div>
+              kind="error"
+              :title="t('correlation.tracesError')"
+              :text="t('correlation.tracesErrorDetails')"
+              :action-label="t('correlation.retryButton')"
+              @action="loadCorrelatedTraces"
+            />
 
             <!-- Direct Trace Correlation - Full Span List -->
             <div
@@ -1104,11 +1024,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
 
-      <!-- No results message -->
-      <div v-else class="px-2 pt-3 text-center">
-        <OIcon name="info" size="sm" class="me-1 align-middle" />
-        {{ t("search.noResult") }}
-      </div>
+      <OEmptyState
+        v-else
+        size="compact"
+        kind="filtered"
+        class="px-2"
+        :title="t('search.noResult')"
+      />
     </div>
   </ODialog>
 </template>
@@ -1166,6 +1088,7 @@ import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -1177,7 +1100,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CorrelationServiceHeader from "./CorrelationServiceHeader.vue";
 import CorrelationSourcePodVersion from "./CorrelationSourcePodVersion.vue";
@@ -1371,6 +1294,7 @@ provide("selectedTabId", selectedTabId);
 
 const isOpen = ref(true);
 const loading = ref(false);
+const logsLoadedAt = ref<number | null>(null);
 const error = ref<string | null>(null);
 const dashboardData = ref<any>(null);
 const logsDashboardData = ref<any>(null);
@@ -2389,6 +2313,7 @@ const loadDashboard = async () => {
       );
       logsDashboardData.value = logsDashboard;
       logsDashboardRenderKey.value++;
+      logsLoadedAt.value = Date.now();
     } else {
       // console.log("[TelemetryCorrelationDashboard] No log streams and not from logs page");
     }

@@ -46,7 +46,7 @@ const card = (w: ReturnType<typeof mountStrip>, key: string) =>
   w.get(`[data-test="overview-tile-card-${key}"]`);
 
 const noteOf = (w: ReturnType<typeof mountStrip>, key: string) =>
-  tile(w, key).find('[data-test="overview-tile-note"]');
+  card(w, key).find('[data-test="overview-tile-note"]');
 
 const withAlerts = (over: Record<string, unknown>) => {
   const base = buildOverview();
@@ -78,13 +78,16 @@ describe("OverviewHeadlineStrip", () => {
     expect(w.find('[data-test="overview-headline-streams"]').exists()).toBe(false);
   });
 
-  it("puts each label above a large value", () => {
+  it("puts each value at the KPI size above its label", () => {
     const w = mountStrip();
     for (const key of ALL) {
-      const text = tile(w, key).text();
       const value = valueOf(w, key);
-      expect(value.classes()).toContain("text-2xl");
-      expect(text.indexOf(value.text())).toBeGreaterThan(0);
+      const label = card(w, key).get('[data-test="overview-tile-label"]');
+      expect(value.classes()).toEqual(expect.arrayContaining(["text-xl", "font-semibold"]));
+      expect(label.classes()).toEqual(expect.arrayContaining(["text-xs", "text-text-secondary"]));
+      expect(
+        value.element.compareDocumentPosition(label.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     }
   });
 
@@ -106,7 +109,7 @@ describe("OverviewHeadlineStrip", () => {
     expect(valueOf(w, "quiet").classes()).toContain("text-status-warning-text");
   });
 
-  it("draws a zero in strong ink on the plain card, and only a dash muted", () => {
+  it("draws a zero in strong ink with no box, and only a dash muted", () => {
     const base = buildOverview();
     const overview = {
       ...base,
@@ -119,20 +122,18 @@ describe("OverviewHeadlineStrip", () => {
       expect(valueOf(w, key).classes()).toEqual(
         expect.arrayContaining(["text-text-heading", "font-semibold", "tabular-nums"]),
       );
-      expect(card(w, key).classes()).toContain("bg-surface-panel");
+      expect(card(w, key).classes()).not.toContain("border");
     }
     const dash = mountStrip({ incidentsState: "locked" });
     expect(valueOf(dash, "incidents").classes()).toContain("text-text-muted");
   });
 
-  it("tints a tile with a problem and colours its note like its value", () => {
+  it("colours a problem in its value and note, never with a tinted box", () => {
     const w = mountStrip();
-    expect(card(w, "firing").classes()).toEqual(
-      expect.arrayContaining(["bg-status-error-bg", "border-status-negative"]),
-    );
-    expect(card(w, "quiet").classes()).toEqual(
-      expect.arrayContaining(["bg-status-warning-bg", "border-status-warning-text"]),
-    );
+    for (const key of ["firing", "quiet"]) {
+      expect(card(w, key).classes()).not.toContain("bg-status-error-bg");
+      expect(card(w, key).classes()).not.toContain("bg-status-warning-bg");
+    }
     expect(noteOf(w, "failing").classes()).toContain("text-status-negative");
     expect(noteOf(w, "quiet").classes()).toContain("text-status-warning-text");
   });
@@ -164,7 +165,7 @@ describe("OverviewHeadlineStrip", () => {
   it("keeps a two-line note slot on every tile so their rhythm matches", () => {
     const w = mountStrip({ incidentsState: "ok", incidentsTotal: 2 });
     for (const key of ALL) {
-      expect(tile(w, key).find(".min-h-8").exists()).toBe(true);
+      expect(card(w, key).find(".min-h-8").exists()).toBe(true);
     }
   });
 
@@ -174,8 +175,7 @@ describe("OverviewHeadlineStrip", () => {
       "2 at critical level",
     );
     expect(noteOf(w, "firing").text()).toBe("Oldest firing for 1h 0m");
-    const value = valueOf(w, "firing").element;
-    expect(value.parentElement?.classList.contains("items-baseline")).toBe(true);
+    expect(tile(w, "firing").find('[data-test="overview-tile-unit"]').exists()).toBe(true);
   });
 
   it("says zero at critical level when nothing is critical", () => {
@@ -234,7 +234,7 @@ describe("OverviewHeadlineStrip", () => {
       expect(valueOf(w, key).text()).toBe("—");
       expect(noteOf(w, key).text()).toBe("No alert rules");
     }
-    expect(tile(w, "pipelines").text()).not.toContain("No alert rules");
+    expect(card(w, "pipelines").text()).not.toContain("No alert rules");
   });
 
   it("says no enabled rules when every alert rule is disabled", () => {
@@ -291,8 +291,8 @@ describe("OverviewHeadlineStrip", () => {
     const w = mountStrip({ overview: null, pending: true });
     expect(w.findAll('[data-test="overview-tile-skeleton"]').length).toBe(5);
     expect(tile(w, "firing").text()).not.toContain("0");
-    expect(tile(w, "quiet").text()).not.toContain("Could not load");
-    expect(tile(w, "quiet").text()).not.toContain("—");
+    expect(card(w, "quiet").text()).not.toContain("Could not load");
+    expect(card(w, "quiet").text()).not.toContain("—");
   });
 
   it("shows a dash and our own copy for an errored section, never the API string", () => {
@@ -338,19 +338,24 @@ describe("OverviewHeadlineStrip", () => {
     expect(w.emitted("select")).toBeUndefined();
   });
 
-  it("makes a tile selectable only when its section loaded", async () => {
-    const overview = buildOverview({ pipelines: { status: "forbidden" } });
+  it("keeps a value a link to its page unless the section is refused", async () => {
+    const overview = buildOverview({
+      pipelines: { status: "forbidden" },
+      alerts: { status: "error", error: "boom" },
+    });
     const w = mountStrip({ overview });
+    expect(tile(w, "pipelines").element.tagName).not.toBe("BUTTON");
     await tile(w, "pipelines").trigger("click");
     expect(w.emitted("select")).toBeUndefined();
+    await tile(w, "firing").trigger("click");
     await tile(w, "quiet").trigger("click");
-    expect(w.emitted("select")).toEqual([["quiet"]]);
+    expect(w.emitted("select")).toEqual([["firing"], ["quiet"]]);
   });
 
   it("shows delivery failures from notify_failed with their meaning, toned as danger", () => {
     const overview = withAlerts({ by_state: { firing: 1, notify_failed: 2 } });
     const w = mountStrip({ overview });
-    expect(tile(w, "delivery").text()).toContain("Alert delivery failures");
+    expect(card(w, "delivery").text()).toContain("Alert delivery failures");
     expect(valueOf(w, "delivery").text()).toBe("2");
     expect(valueOf(w, "delivery").classes()).toContain("text-status-negative");
     expect(noteOf(w, "delivery").text()).toBe("Alerts that fired but could not notify");

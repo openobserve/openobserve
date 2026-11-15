@@ -157,7 +157,7 @@
       </OButton>
     </template>
 
-    <OContent v-if="notFound" class="py-6">
+    <OContent v-if="notFound">
       <OEmptyState
         :title="t('alerts.groups.notFoundTitle')"
         :text="t('alerts.groups.notFoundDescription')"
@@ -193,6 +193,11 @@
         </OTabPanels>
       </template>
 
+      <!-- The strips above the chart wait for the alert and its list row, so the chart and tabs never move down. -->
+      <OContent v-else-if="!bodyReady" class="shrink-0 py-3">
+        <OSkeleton preset="chart" class="h-62.5" data-test="alerts-alertdetail-pending" />
+      </OContent>
+
       <template v-else>
         <OContent v-if="isMultiAlert" class="shrink-0 pt-3">
           <OStatStrip :items="groupStats" data-test="alerts-alertdetail-group-stats" />
@@ -217,8 +222,7 @@
            renders then is an empty frame that reads as "no data" — a lie about
            an alert that is evaluating perfectly well. -->
         <!-- An anomaly config has no query_condition for generate_sql to build from. -->
-        <!-- Mounted before the GET lands so its placeholder holds the chart's height and the tabs never move. -->
-        <OContent v-if="!alert || (!isSloAlertView && !isAnomalyAlert)" class="shrink-0 py-3">
+        <OContent v-if="!isSloAlertView && !isAnomalyAlert" class="shrink-0 py-3">
           <AlertGroupChart :alert="alert" />
         </OContent>
 
@@ -229,9 +233,7 @@
            the strip takes no horizontal wrapper padding (the first label
            self-aligns to the px-page-edge grid) and carries its own bottom
            divider via `bordered`. -->
-        <!-- Waits for the alert: an SLO or anomaly alert has no chart, and tabs painted under the placeholder would jump up. -->
         <OTabs
-          v-if="alert"
           v-model="activeTab"
           size="compact"
           bordered
@@ -289,12 +291,12 @@
           </OInlineNotice>
         </OContent>
 
-        <!-- Every panel waits for the alert, so an empty box placed early would only be pushed down by the banner. -->
-        <OTabPanels v-if="alert" v-model="activeTab" class="min-h-0 flex-1">
+        <OTabPanels v-model="activeTab" class="min-h-0 flex-1">
           <OTabPanel v-if="isMultiAlert" name="groups" stretch>
             <AlertGroupsTable
               :groups="groupData?.list || []"
               :loading="loadingGroups"
+              :last-run-at="groupsLoadedAt"
               :load-error="groupsLoadError"
               :alert-id="alertId"
               :alert-name="alert?.name || alertId"
@@ -333,6 +335,7 @@
               v-if="isMultiAlert"
               :transitions="transitions"
               :loading="loadingTransitions"
+              :last-run-at="transitionsLoadedAt"
               :group-filter="historyGroupFilter"
               @clear-filter="clearGroupFilter"
               @refresh="fetchTransitions"
@@ -370,6 +373,7 @@
                   v-else
                   :transitions="transitions"
                   :loading="loadingTransitions"
+                  :last-run-at="transitionsLoadedAt"
                   :show-group-column="false"
                   @refresh="fetchTransitions"
                 />
@@ -426,6 +430,7 @@ import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -485,6 +490,8 @@ const groupsLoadError = ref(false);
 const transitions = ref<AlertGroupTransition[]>([]);
 const loadingGroups = ref(false);
 const loadingTransitions = ref(false);
+const groupsLoadedAt = ref<number | null>(null);
+const transitionsLoadedAt = ref<number | null>(null);
 const historyGroupFilter = ref<AlertGroup | null>(null);
 // The alert could not be loaded — deleted, mistyped id, or no access. Without
 // this the page rendered a phantom alert: the raw id as the title, live-looking
@@ -750,6 +757,11 @@ const isSingleRow = computed(
   () => !isMultiAlert.value && !isCompositeAlert.value && !isAnomalyAlert.value,
 );
 
+// A single alert's tiles come from its list row, which loads after the alert; the body waits for both.
+const bodyReady = computed(
+  () => !!alert.value && (!isSingleRow.value || !alert.value.name || !listQuery.isPending.value),
+);
+
 const nowMicros = useNowMicros();
 const viewerZone = useViewerTimezone();
 
@@ -870,6 +882,7 @@ const fetchGroups = async () => {
     const res = await alertsService.list_groups(orgId.value, alertId.value);
     groupData.value = res.data;
     groupsLoadError.value = false;
+    groupsLoadedAt.value = Date.now();
   } catch {
     groupData.value = null;
     groupsLoadError.value = true;
@@ -894,6 +907,7 @@ const fetchTransitions = async () => {
     // hides stale per-group rows left behind if the alert was once a
     // multi-alert; without a Group column they would be unreadable.
     transitions.value = isMultiAlert.value ? list : list.filter((tr) => tr.group_key === "");
+    transitionsLoadedAt.value = Date.now();
   } catch {
     transitions.value = [];
   } finally {

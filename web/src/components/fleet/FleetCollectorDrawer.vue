@@ -24,32 +24,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="fleet-collector-drawer"
     @update:open="emit('update:open', $event)"
   >
-    <div
-      v-if="error && !collector"
-      class="flex h-full items-center justify-center"
-      data-test="fleet-collector-drawer-error"
-    >
-      <OEmptyState
-        v-if="forbidden"
-        kind="denied"
-        :title="t('emptyState.noAccess.title')"
-        :text="t('emptyState.noAccess.description')"
-        data-test="fleet-collector-drawer-forbidden"
-      />
-      <OEmptyState
-        v-else
-        kind="error"
-        :title="t('emptyState.loadError.title')"
-        :text="t('emptyState.loadError.description')"
-        @action="refetch"
-      />
+    <div v-if="error && !collector" data-test="fleet-collector-drawer-error">
+      <OEmptyState v-if="forbidden" kind="denied" data-test="fleet-collector-drawer-forbidden" />
+      <OEmptyState v-else kind="error" @action="refetch" />
     </div>
     <div
       v-else-if="!collector"
-      class="flex h-full items-center justify-center"
+      class="flex flex-col gap-3 px-4 pt-3"
       data-test="fleet-collector-drawer-loading"
     >
-      <OSpinner size="lg" />
+      <OSkeleton shape="block" class="h-6 w-1/3" />
+      <OSkeleton preset="tableRows" :rows="8" />
     </div>
     <div v-else class="flex h-full min-h-0 flex-col">
       <div class="flex shrink-0 flex-wrap items-center gap-2 px-4 pt-3">
@@ -346,9 +331,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OCollapsible>
           </template>
-          <div v-else data-test="fleet-collector-drawer-no-yaml">
-            <OEmptyState size="inline" :title="t('fleet.collectors.noEffectiveConfig')" />
-          </div>
+          <OEmptyState
+            v-else
+            size="compact"
+            :title="t('fleet.collectors.noEffectiveConfig')"
+            data-test="fleet-collector-drawer-no-yaml"
+          />
         </div>
 
         <div v-else data-test="fleet-collector-drawer-history">
@@ -365,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OText v-if="event.detail" variant="meta">{{ event.detail }}</OText>
             </OTimelineItem>
           </OTimeline>
-          <OEmptyState v-else size="inline" :title="t('fleet.collectors.noHistory')" />
+          <OEmptyState v-else size="compact" :title="t('fleet.collectors.noHistory')" />
         </div>
       </div>
     </div>
@@ -381,7 +369,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";

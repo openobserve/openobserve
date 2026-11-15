@@ -195,6 +195,8 @@ describe("OverviewTab", () => {
   const INCIDENTS = '[data-test="overview-incidents-section"]';
   const SERVICES = '[data-test="overview-services-section"]';
   const REFRESH_BTN = '[data-test="overview-refresh-btn-stub"]';
+  const SUMMARY_ERROR = '[data-test="overview-summary-error"]';
+  const SUMMARY_RETRY = `${SUMMARY_ERROR} [data-test="o2-empty-state-action"]`;
 
   const skeletonOf = (section: SectionKey) => `[data-test="overview-skeleton-${section}"]`;
 
@@ -867,10 +869,9 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      const row = wrapper.find(SERVICES_LOCKED).find(".rounded-surface");
-      await row.trigger("click");
-
-      expect(row.classes()).not.toContain("cursor-pointer");
+      const note = wrapper.find(SERVICES_LOCKED).get('[data-test="overview-locked-note"]');
+      expect(note.find("button").exists()).toBe(false);
+      await note.trigger("click");
 
       expect(upgradeDialogOpen).not.toHaveBeenCalled();
     });
@@ -1439,7 +1440,8 @@ describe("OverviewTab", () => {
 
       expect(wrapper.find(NO_ACCESS).exists()).toBe(true);
       expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
-      expect(wrapper.get('[data-test="overview-headline-firing"]').text()).toContain("No access");
+      // one denied state for the page, never a second one per tile under it
+      expect(wrapper.find('[data-test="overview-headline-strip"]').exists()).toBe(false);
       // nothing on this page can load, so neither Refresh nor the time range has anything to act on
       expect(wrapper.find(REFRESH_BTN).exists()).toBe(false);
       expect(wrapper.find('[data-test="overview-date-time-stub"]').exists()).toBe(false);
@@ -1558,7 +1560,8 @@ describe("OverviewTab", () => {
       expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
       expect(wrapper.find('[data-test="overview-not-monitored-alert-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="overview-not-monitored-anomaly-card"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="overview-not-monitored-logs-card"]').exists()).toBe(true);
+      // R3: one primary and at most one secondary, so the anomaly remedy outranks Explore logs
+      expect(wrapper.find('[data-test="overview-not-monitored-logs-card"]').exists()).toBe(false);
     });
 
     it("should show the per-section empty messages, not an all-clear claim, once one alert exists", async () => {
@@ -2046,6 +2049,25 @@ describe("OverviewTab", () => {
       expect(wrapper.find('[data-test="overview-streams-loading"]').exists()).toBe(true);
     });
 
+    it("should hold the sections below the summary until /overview answers, so a failure moves nothing", async () => {
+      let fail!: (error: Error) => void;
+      const answer = new Promise((_resolve, reject) => {
+        fail = reject;
+      });
+      vi.mocked(overviewService.getOrgOverview).mockReturnValue(answer as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-sections-pending"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-time-range-group"]').exists()).toBe(false);
+
+      fail(new Error("boom"));
+      await flushPromises();
+      expect(wrapper.find('[data-test="overview-sections-pending"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-summary-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-time-range-group"]').exists()).toBe(true);
+    });
+
     it("should force the read with refresh=true on the refresh button", async () => {
       wrapper = mountOverviewTab();
       await flushPromises();
@@ -2093,10 +2115,10 @@ describe("OverviewTab", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="overview-stale-notice"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="overview-alerts-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-summary-error"]').exists()).toBe(true);
     });
 
-    it("should show the error state on every /overview card, keep the rest, and retry with refresh=true", async () => {
+    it("should say the /overview failure once, keep the rest, and retry with refresh=true", async () => {
       vi.mocked(overviewService.getOrgOverview)
         .mockRejectedValueOnce(new Error("boom"))
         .mockResolvedValue({ data: buildOverview() } as never);
@@ -2105,21 +2127,21 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
+      expect(wrapper.findAll(SUMMARY_ERROR)).toHaveLength(1);
       for (const section of ["alerts", "data-health", "streams", "limit"]) {
-        expect(wrapper.find(`[data-test="overview-${section}-error"]`).exists()).toBe(true);
+        expect(wrapper.find(`[data-test="overview-${section}-error"]`).exists()).toBe(false);
       }
-      expect(wrapper.find('[data-test="overview-limit-body"]').exists()).toBe(false);
-      expect(wrapper.get(tile("firing")).text()).toContain("—");
+      expect(wrapper.find(tile("firing")).exists()).toBe(false);
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
       expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
 
-      await wrapper.get('[data-test="overview-streams-retry-btn"]').trigger("click");
+      await wrapper.get(SUMMARY_RETRY).trigger("click");
       await flushPromises();
 
       expect(vi.mocked(overviewService.getOrgOverview).mock.calls.at(-1)?.[1]).toMatchObject({
         refresh: true,
       });
-      expect(wrapper.find('[data-test="overview-streams-error"]').exists()).toBe(false);
+      expect(wrapper.find(SUMMARY_ERROR).exists()).toBe(false);
       expect(wrapper.get(tile("firing")).text()).toContain("3");
     });
 
@@ -2259,13 +2281,13 @@ describe("OverviewTab", () => {
       expect(wrapper.get(`${tile(key)} [data-test="overview-tile-value"]`).text()).toBe(expected);
     });
 
-    it("should retry a single card with only the /overview request", async () => {
+    it("should retry the summary with only the /overview request", async () => {
       vi.mocked(overviewService.getOrgOverview).mockRejectedValueOnce(new Error("boom"));
       wrapper = mountOverviewTab();
       await flushPromises();
       const alertCalls = vi.mocked(alertsService.getHistory).mock.calls.length;
 
-      await wrapper.get('[data-test="overview-alerts-retry-btn"]').trigger("click");
+      await wrapper.get(SUMMARY_RETRY).trigger("click");
       await flushPromises();
 
       expect(overviewService.getOrgOverview).toHaveBeenCalledTimes(2);
@@ -2305,7 +2327,7 @@ describe("OverviewTab", () => {
       expect(wrapper.findComponent({ name: "ORefreshButton" }).props("loading")).toBe(true);
     });
 
-    it("should map a 403 to the forbidden state on every overview card without Retry", async () => {
+    it("should map a 403 to one no-access state for the summary, without Retry", async () => {
       vi.mocked(overviewService.getOrgOverview).mockRejectedValue(
         Object.assign(new Error("denied"), { response: { status: 403 } }),
       );
@@ -2313,21 +2335,22 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
+      const denied = wrapper.get('[data-test="overview-summary-forbidden"]');
+      expect(denied.text()).toContain("Ask an org admin for access.");
+      expect(denied.find("button").exists()).toBe(false);
       for (const section of ["alerts", "data-health", "streams", "limit"]) {
-        expect(wrapper.find(`[data-test="overview-${section}-forbidden"]`).exists()).toBe(true);
-        expect(wrapper.find(`[data-test="overview-${section}-retry-btn"]`).exists()).toBe(false);
+        expect(wrapper.find(`[data-test="overview-${section}-forbidden"]`).exists()).toBe(false);
       }
-      expect(wrapper.get(tile("firing")).text()).toContain("No access");
+      expect(wrapper.find(tile("firing")).exists()).toBe(false);
     });
 
-    it("should show a dash, not a zero, on the firing tile when the overview request failed", async () => {
+    it("should show no count at all, never a zero, when the overview request failed", async () => {
       vi.mocked(overviewService.getOrgOverview).mockRejectedValue(new Error("boom"));
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      const text = wrapper.get('[data-test="overview-headline-firing"]').text();
-      expect(text).toContain("—");
-      expect(text).not.toContain("0");
+      expect(wrapper.find('[data-test="overview-headline-strip"]').exists()).toBe(false);
+      expect(wrapper.find(SUMMARY_ERROR).exists()).toBe(true);
     });
 
     it("should mark the firing tile unavailable when the alerts section errored", async () => {
@@ -2338,7 +2361,7 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      const text = wrapper.get('[data-test="overview-headline-firing"]').text();
+      const text = wrapper.get('[data-test="overview-tile-card-firing"]').text();
       expect(text).toContain("—");
       expect(text).toContain("Could not load");
     });
@@ -2364,7 +2387,7 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.get(tile("incidents")).text()).toContain("Locked");
+      expect(wrapper.get('[data-test="overview-tile-card-incidents"]').text()).toContain("Locked");
     });
   });
 
@@ -2476,8 +2499,9 @@ describe("OverviewTab", () => {
       await flushPromises();
 
       const tileEl = wrapper.get('[data-test="overview-headline-incidents"]');
-      expect(tileEl.text()).toContain("No access");
-      expect(tileEl.text()).not.toContain("Could not load");
+      const card = wrapper.get('[data-test="overview-tile-card-incidents"]');
+      expect(card.text()).toContain("No access");
+      expect(card.text()).not.toContain("Could not load");
       await tileEl.trigger("click");
       expect(push).not.toHaveBeenCalledWith(expect.objectContaining({ name: "incidentList" }));
       push.mockRestore();
@@ -2636,11 +2660,14 @@ describe("OverviewTab", () => {
       );
     });
 
-    it("stretches side-by-side cards to one height on the same gap", async () => {
+    it("lays the sections on the page gutter, split by hairlines, two columns where they pair", async () => {
       await mountWith(buildOverview());
 
       expect(wrapper.get('[data-test="overview-canvas"]').classes()).toEqual(
-        expect.arrayContaining(["flex", "flex-col", "gap-3", "p-3", "min-w-0"]),
+        expect.arrayContaining(["flex", "flex-col", "px-page-edge", "min-w-0"]),
+      );
+      expect(wrapper.get('[data-test="overview-sections"]').classes()).toEqual(
+        expect.arrayContaining(["divide-y", "divide-border-default"]),
       );
 
       const grids = {
@@ -2650,7 +2677,7 @@ describe("OverviewTab", () => {
       for (const [id, cols] of Object.entries(grids)) {
         const classes = wrapper.get(`[data-test="${id}"]`).classes();
         expect(classes).not.toContain("items-start");
-        expect(classes).toEqual(expect.arrayContaining(["gap-3", cols, "max-lg:grid-cols-1"]));
+        expect(classes).toEqual(expect.arrayContaining(["gap-x-8", cols, "max-lg:grid-cols-1"]));
       }
     });
 
@@ -2807,9 +2834,9 @@ describe("OverviewTab", () => {
       wrapper = mountOverviewTab();
       await flushPromises();
 
-      expect(wrapper.get('[data-test="overview-status-partial"]').text()).toBe(
-        "Some checks could not load",
-      );
+      // the summary's own error says it, so no status line repeats it above
+      expect(wrapper.find(SUMMARY_ERROR).exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-status-partial"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="overview-status-clear"]').exists()).toBe(false);
     });
 

@@ -392,7 +392,7 @@ const selectedLocations = computed({
         <!-- ── Search matched nothing anywhere ──────────────────────────────── -->
         <OEmptyState
           v-if="allNoMatches"
-          size="inline"
+          size="compact"
           icon="search-off"
           :title="t('synthetics.locations.noSearchResults')"
           :action-label="allowPrivate ? t('synthetics.locations.newPrivateLocation') : undefined"
@@ -444,7 +444,7 @@ const selectedLocations = computed({
           <!-- ── Search matched no public locations (private still has hits) ── -->
           <OEmptyState
             v-if="publicNoMatches"
-            size="inline"
+            size="compact"
             icon="search-off"
             :title="t('synthetics.locations.noPublicMatches')"
             data-test="synthetics-check-locations-public-no-results"
@@ -560,7 +560,7 @@ const selectedLocations = computed({
             <!-- ── Search matched no private locations (public still has hits) ── -->
             <OEmptyState
               v-else-if="privateNoMatches"
-              size="inline"
+              size="compact"
               icon="search-off"
               :title="t('synthetics.locations.noPrivateMatches')"
               data-test="synthetics-check-locations-private-no-results"
@@ -587,13 +587,13 @@ const selectedLocations = computed({
         </OCheckboxGroup>
 
         <!-- ── No locations at all ──────────────────────────────────────────── -->
-        <div
+        <OEmptyState
           v-else
-          class="rounded-default border-border-default text-text-secondary flex items-center justify-center border border-dashed px-3 py-3 text-sm"
+          size="compact"
+          icon="location-on"
+          :title="t('synthetics.locations.empty')"
           data-test="synthetics-check-locations-empty"
-        >
-          {{ t("synthetics.locations.empty") }}
-        </div>
+        />
 
         <p
           v-if="prefillView?.unconfirmed.locations"

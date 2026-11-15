@@ -102,7 +102,8 @@ function reasonLine(item: AttentionItem): I18nText {
     </div>
     <OEmptyState
       v-else-if="!items.length"
-      size="inline"
+      size="compact"
+      class="px-3"
       :title="t('infra.k8s2.overviewAttentionEmptyTitle')"
       :text="t('infra.k8s2.overviewAttentionEmptyDesc')"
       data-test="k8s2-overview-attention-empty"

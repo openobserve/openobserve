@@ -346,7 +346,7 @@ describe("PublicDashboard viewer", () => {
     );
   });
 
-  it("shows Loading dashboard on a 202 and reads again after exactly Retry-After", async () => {
+  it("shows the loading skeleton on a 202 and reads again after exactly Retry-After", async () => {
     vi.useFakeTimers();
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
     vi.mocked(service.getData)
@@ -359,7 +359,6 @@ describe("PublicDashboard viewer", () => {
     const w = buildWrapper();
     await flushPromises();
     expect(has(w, "dashboards-public-dashboard-loading")).toBe(true);
-    expect(w.text()).toContain("Loading dashboard…");
     expect(w.text()).not.toContain("Preparing");
 
     await vi.advanceTimersByTimeAsync(3_999);

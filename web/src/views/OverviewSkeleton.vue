@@ -14,28 +14,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  OverviewSkeleton — first-load placeholder for ONE OverviewTab section.
-
-  Rendered per section (`section` prop) rather than as one block, because the
-  four datasets resolve independently: a global placeholder disappears the moment
-  the *first* dataset lands, leaving the still-loading sections blank until they
-  pop in. Each section instead stands in for itself and is replaced only by its
-  own data.
-
-  Shapes mirror the real sections so the layout doesn't shift on swap:
-    incidents     joined rows in one bordered container (icon, tag, title, time)
-    services      horizontally scrolling fixed-width cards
-    anomalies     free-standing rows, gap-separated
-    recentEvents  joined compact rows (denser padding than incidents)
-
-  Row counts are deliberately small: a placeholder should suggest shape, not
-  imply a quantity we don't know yet.
--->
+<!-- One placeholder per section, shaped like its rows, so each section swaps in on its own load without a shift. -->
 <template>
   <section :data-test="`overview-skeleton-${section}`">
-    <!-- Every real section carries a title + count chip + View all -->
-    <div class="mb-2 flex min-h-8 items-center justify-between gap-2 ps-1">
+    <div class="mb-2 flex min-h-8 items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <OSkeleton shape="block" class="h-4 w-28" />
         <OSkeleton shape="block" class="h-4 w-6" />
@@ -43,16 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton shape="block" class="h-3 w-14" />
     </div>
 
-    <!-- INCIDENTS: joined rows inside one bordered container -->
-    <div
-      v-if="section === 'incidents'"
-      class="border-border-default rounded-surface flex flex-col overflow-hidden border border-[0.0625em]"
-    >
-      <div
-        v-for="i in 2"
-        :key="i"
-        class="bg-surface-panel border-b-border-default flex items-center gap-3 border-b-[0.0625em] px-3 py-2 last:border-b-0"
-      >
+    <div v-if="section === 'incidents'" class="divide-border-subtle flex flex-col divide-y">
+      <div v-for="i in 2" :key="i" class="flex min-h-10 items-center gap-3 py-1 ps-3">
         <OSkeleton shape="circle" class="w-4 shrink-0" />
         <OSkeleton shape="block" class="h-4 w-8 shrink-0" />
         <OSkeleton shape="block" class="h-4 max-w-[20em]" />
@@ -60,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- SERVICES: scroll chevron + fixed-width cards -->
     <div v-else-if="section === 'services'" class="flex items-stretch gap-2">
       <OSkeleton shape="block" class="w-6 shrink-0" />
       <div class="flex flex-1 flex-row gap-2 overflow-hidden">
@@ -75,30 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div
-      v-else-if="section === 'anomalies'"
-      class="border-border-default rounded-surface bg-surface-panel flex flex-col overflow-hidden border border-[0.0625em]"
-    >
-      <div
-        v-for="i in 2"
-        :key="i"
-        class="border-b-border-default flex items-center gap-3 border-b-[0.0625em] px-3 py-2 last:border-b-0"
-      >
+    <div v-else-if="section === 'anomalies'" class="divide-border-subtle flex flex-col divide-y">
+      <div v-for="i in 2" :key="i" class="flex min-h-10 items-center gap-3 py-1 ps-3">
         <OSkeleton shape="circle" class="w-4 shrink-0" />
         <OSkeleton shape="block" class="h-4 max-w-[24em]" />
       </div>
     </div>
 
-    <!-- RECENT EVENTS: joined compact rows -->
-    <div
-      v-else
-      class="border-border-default rounded-surface bg-surface-panel flex flex-col gap-0 overflow-hidden border border-[0.0625em]"
-    >
-      <div
-        v-for="i in 3"
-        :key="i"
-        class="border-b-border-default flex items-center gap-3 border-b border-b-[0.0625em] px-3 py-2 last:border-b-0"
-      >
+    <div v-else class="divide-border-subtle flex flex-col divide-y">
+      <div v-for="i in 3" :key="i" class="flex min-h-9 items-center gap-3 py-1.5">
         <OSkeleton shape="block" class="h-4 w-12 shrink-0" />
         <OSkeleton shape="block" class="h-3 w-[7.5em] shrink-0" />
         <OSkeleton shape="block" class="h-3 flex-1" />

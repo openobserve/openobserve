@@ -341,25 +341,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <!-- Empty state -->
         <template #empty>
-          <div v-if="!loading" class="flex h-full w-full items-center justify-center">
-            <OEmptyState
-              :kind="!!searchQuery || statusFilter !== 'all' ? 'filtered' : 'first-run'"
-              :title="
-                !!searchQuery || statusFilter !== 'all'
-                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.incidents') })
-                  : t('emptyState.noIncidents.title')
-              "
-              :text="
-                !!searchQuery || statusFilter !== 'all'
-                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.incidents') })
-                  : t('emptyState.noIncidents.description')
-              "
-              :icon="!!searchQuery || statusFilter !== 'all' ? undefined : 'task-alt'"
-              @action="clearFilters()"
-            />
-          </div>
+          <OEmptyState
+            v-if="!loading"
+            :kind="!!searchQuery || statusFilter !== 'all' ? 'filtered' : 'first-run'"
+            :title="
+              !!searchQuery || statusFilter !== 'all'
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.incidents') })
+                : t('emptyState.noIncidents.title')
+            "
+            :text="
+              !!searchQuery || statusFilter !== 'all'
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.incidents') })
+                : t('emptyState.noIncidents.description')
+            "
+            :icon="!!searchQuery || statusFilter !== 'all' ? undefined : 'task-alt'"
+            @action="clearFilters()"
+          />
         </template>
       </OTable>
     </OPageLayout>

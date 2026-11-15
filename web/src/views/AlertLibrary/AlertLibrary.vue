@@ -234,13 +234,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSkeleton v-for="index in 6" :key="index" shape="block" class="h-32 w-full" />
               </div>
 
-              <!-- A catalog that loaded but holds nothing is not a filter
-                   problem, and "try another category" is not advice when there
-                   are no categories. Offering Clear filters there would be a
-                   button that changes nothing. -->
+              <!-- An empty catalog is not a filter problem: Clear filters there
+                   would be a button that changes nothing. -->
               <OEmptyState
                 v-else-if="entries.length === 0"
-                class="py-8"
                 :title="t('alert_library.emptyLibraryTitle')"
                 :text="t('alert_library.emptyLibraryDescription')"
                 :action-label="t('alert_library.retry')"
@@ -250,7 +247,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <OEmptyState
                 v-else-if="groupedEntries.length === 0"
-                class="py-8"
                 kind="filtered"
                 :title="t('alert_library.noMatchesTitle')"
                 :text="t('alert_library.noMatchesDescription')"

@@ -62,7 +62,7 @@ placement and the tab underline, and drifts.
   The stacked anatomy is [header-spec.md](header-spec.md) (H1–H8).
 - **There is no `icon` and no `subtitle`** (H2). Real help goes in `about` (an ⓘ
   "About this page" popover beside the title); filler is dropped.
-- The context line is derived from the route (the rail group, else the org);
+- The context line is derived from the route (the rail group, else an empty slot; never the org);
   `context` overrides it only where the derivation is wrong. `back`
   (`{ label, to | onClick, dataTest }`) turns it into the "‹ Parent" link (H4):
   `label` is the parent's own name, `to` is its route (the href, and where Back

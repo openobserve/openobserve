@@ -83,10 +83,13 @@
       </div>
     </div>
 
-    <!-- Empty State -->
-    <div v-else class="text-text-muted py-4 text-center text-sm" data-test="cross-link-empty">
-      {{ t("crossLinks.emptyState", { addLabel: t("crossLinks.addCrossLink") }) }}
-    </div>
+    <OEmptyState
+      v-else
+      size="compact"
+      icon="link"
+      :title="t('crossLinks.emptyState', { addLabel: t('crossLinks.addCrossLink') })"
+      data-test="cross-link-empty"
+    />
 
     <!-- Add/Edit Dialog -->
     <CrossLinkDialog
@@ -105,6 +108,7 @@ import { useStore } from "vuex";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
@@ -117,7 +121,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkManager",
-  components: { CrossLinkDialog, OButton, OTag, OTruncatedText },
+  components: { CrossLinkDialog, OButton, OEmptyState, OTag, OTruncatedText },
   props: {
     modelValue: {
       type: Array as PropType<CrossLink[]>,

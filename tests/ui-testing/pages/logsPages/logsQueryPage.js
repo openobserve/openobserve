@@ -120,8 +120,7 @@ export class LogsQueryPage {
   }
 
   async toggleHistogram() {
-    // In normal viewport the histogram is a standalone toolbar button (inline).
-    // In narrow viewport it moves into the More menu.
+    // The ⋯ item, or the toolbar copy when the user pinned it.
     await this.page.keyboard.press('Escape').catch(() => {});
     const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
     const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
@@ -129,7 +128,6 @@ export class LogsQueryPage {
       await inlineBtn.click();
       return;
     }
-    // Narrow-viewport fallback: open utilities menu and click the menu item.
     await this.page.locator(this.utilitiesMenuButton).click();
     const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
     await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
@@ -137,16 +135,13 @@ export class LogsQueryPage {
   }
 
   async isHistogramOn() {
-    // In normal viewport the histogram is a standalone inline toolbar button.
-    // Check its OSwitch state directly without opening the More menu.
+    // A pinned toolbar copy reports aria-pressed; otherwise read the ⋯ item's switch.
     await this.page.keyboard.press('Escape').catch(() => {});
     const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
     const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
     if (isInline) {
-      const switchChecked = inlineBtn.locator('[data-state="checked"]');
-      return (await switchChecked.count()) > 0;
+      return (await inlineBtn.getAttribute('aria-pressed')) === 'true';
     }
-    // Narrow-viewport fallback: check state via the More menu item.
     await this.page.locator(this.utilitiesMenuButton).click();
     const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
     await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});

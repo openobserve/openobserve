@@ -44,15 +44,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Loading / not-found guards -->
-      <div v-if="loading" class="flex h-full items-center justify-center">
-        <OSpinner size="lg" />
+      <div v-if="loading" class="grid h-full grid-cols-2 gap-4 p-4">
+        <div class="flex flex-col gap-3">
+          <OSkeleton v-for="row in 6" :key="row" class="h-control-md" />
+        </div>
+        <OSkeleton shape="block" class="h-full" />
       </div>
-      <div
+      <OEmptyState
         v-else-if="!page"
-        class="text-text-secondary flex h-full items-center justify-center text-sm"
-      >
-        {{ t("statusPages.loadFailed") }}
-      </div>
+        kind="error"
+        :text="t('statusPages.loadFailed')"
+        data-test="status-page-editor-load-error"
+        @action="load"
+      />
 
       <!-- Two-pane split: config (left) | live preview (right) -->
       <OSplitter
@@ -247,9 +251,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <div class="flex flex-col gap-3">
-                  <p v-if="components.length === 0" class="text-text-secondary text-sm">
-                    {{ t("statusPages.components.empty") }}
-                  </p>
+                  <OEmptyState
+                    v-if="components.length === 0"
+                    size="compact"
+                    :title="t('statusPages.components.empty')"
+                  />
 
                   <div
                     v-for="(comp, idx) in components"
@@ -339,7 +345,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";

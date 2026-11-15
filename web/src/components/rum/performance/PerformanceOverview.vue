@@ -50,12 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :text="t('rum.overviewPage.pageErrorBody')"
       >
         <template #actions>
-          <OButton
-            variant="secondary"
-            icon="refresh"
-            data-test="rum-overview-page-retry"
-            @click="loadAll"
-          >
+          <OButton variant="secondary" data-test="rum-overview-page-retry" @click="loadAll">
             {{ t("rum.overviewPage.retry") }}
           </OButton>
         </template>
@@ -84,17 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <OButton
           v-if="filtersActive"
-          variant="primary"
+          variant="secondary"
           data-test="rum-overview-page-clear-filters"
           @click="clearFilters"
         >
           {{ t("rum.overviewPage.clearFilters") }}
         </OButton>
-        <OButton
-          :variant="filtersActive ? 'ghost' : 'secondary'"
-          data-test="rum-overview-page-setup"
-          @click="openSetup"
-        >
+        <OButton variant="secondary" data-test="rum-overview-page-setup" @click="openSetup">
           {{ t("rum.overviewPage.stateEmptyAction") }}
         </OButton>
       </template>

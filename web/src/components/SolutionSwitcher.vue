@@ -69,10 +69,11 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
         variant="ghost"
         :icon="current.icon"
         icon-end="expand-more"
-        class="font-semibold tracking-tight md:max-xl:max-w-full md:max-xl:min-w-0"
+        class="md:max-xl:max-w-full md:max-xl:min-w-0"
         data-test="solution-switcher"
+        :aria-label="t(current.labelKey)"
       >
-        <span class="md:max-xl:truncate">{{ t(current.labelKey) }}</span>
+        <span class="max-md:hidden md:max-xl:truncate">{{ t(current.labelKey) }}</span>
         <OTooltip :content="t(current.labelKey)" />
       </OButton>
     </template>

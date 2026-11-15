@@ -595,7 +595,7 @@ arrow, the rows re-order, and the order is wrong.
 - Columns: `column-order-change`, `column-visibility-change`, `update:columnSizes`
 - Virtual scroll: `scroll`, `scroll-end`
 
-**Always supply `#error` when `error` can be set.** Without the slot, OTable falls back to a solid red banner carrying the raw server string — a different failure look on every page. Use `<template #error="{ message }"><OEmptyState kind="error" :title="t('common.errorLoadingData')" :text="raw(message)" @action="onRefresh()" /></template>`, with Retry wired to the page's own refresh handler.
+**The `error` prop renders the shared error state.** Without an `#error` slot, OTable shows a region `OEmptyState kind="error"` ("Couldn't load this data", the message unless it is raw transport text, and Retry, which emits `retry`). Supply `#error` only to wire Retry to a different handler or to name what failed: `<template #error><OEmptyState kind="error" @action="onRefresh()" /></template>`.
 
 **Main slots:** `cell` (scoped `{ row, column, value, table }`), `top`, `toolbar` (inside the frame, above header), `toolbar-trailing`, `header-actions`, `selection-actions` (bulk-action buttons for the footer), `footer-note` (a footer line the pager cannot say), `pagination-bar` (a caller-drawn pager, scoped with pagination state/actions), `loading`, `loading-banner`, `empty`, `error` (`{ message }`), `expansion` (`{ row }`), `tree-warning` (`{ row }`)
 

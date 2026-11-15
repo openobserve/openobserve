@@ -22,7 +22,6 @@ import config from "@/aws-exports";
 import addToSlackImage from "@/assets/images/common/add_to_slack.png";
 import addToSlackImage2x from "@/assets/images/common/add_to_slack@2x.png";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
@@ -318,85 +317,82 @@ const nextSteps = computed<I18nText[]>(() =>
       </OSettingRow>
     </OFormSection>
 
-    <OCard>
-      <OEmptyState icon="link" :title="t('emptyState.slackNotConnected.title')">
-        <template v-if="autoobserveEdition" #text>
-          <span data-test="slack-connect-autoobserve">{{
-            t("slackApp.connect.autoobserveHint")
-          }}</span>
-        </template>
-        <template #actions>
-          <OButton
-            v-if="isCloud"
-            variant="ghost"
-            :loading="
-              popup.connecting.value && action.kind === 'install' && action.source === 'settings'
+    <OEmptyState icon="link" :title="t('emptyState.slackNotConnected.title')">
+      <template v-if="autoobserveEdition" #text>
+        <span data-test="slack-connect-autoobserve">{{
+          t("slackApp.connect.autoobserveHint")
+        }}</span>
+      </template>
+      <template #actions>
+        <OButton
+          v-if="isCloud"
+          variant="ghost"
+          :loading="
+            popup.connecting.value && action.kind === 'install' && action.source === 'settings'
+          "
+          data-test="slack-add-to-slack"
+          @click="runPopup({ kind: 'install', source: 'settings' })"
+        >
+          <img
+            :src="addToSlackImage"
+            :srcset="addToSlackSrcset"
+            :alt="t('slackApp.connect.addToSlack')"
+            class="h-10 w-auto"
+          />
+        </OButton>
+        <OButton
+          v-else
+          :variant="offered.length ? 'secondary' : 'primary'"
+          data-test="slack-setup-app"
+          @click="emit('setup')"
+        >
+          {{ t("slackApp.connect.setupApp") }}
+        </OButton>
+      </template>
+      <template #extra>
+        <ol
+          class="m-0 grid w-full max-w-2xl list-none grid-cols-1 gap-3 p-0 text-start"
+          :class="nextSteps.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'"
+          role="list"
+          data-test="slack-connect-steps"
+        >
+          <li
+            v-for="(item, index) in nextSteps"
+            :key="index"
+            class="flex items-center gap-2.5"
+            data-test="slack-connect-step"
+          >
+            <span
+              class="bg-surface-subtle text-text-secondary flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+            >
+              {{ index + 1 }}
+            </span>
+            <span class="text-text-heading text-compact min-w-0 font-medium">{{ item }}</span>
+          </li>
+        </ol>
+        <span v-if="!isCloud && instance" class="text-text-secondary text-xs">
+          {{ t("slackApp.connect.setupAppOtherTeam", { team: instance.team_name }) }}
+        </span>
+        <!-- What Slack may read is a privacy fact worth one hover, not a paragraph under the steps. -->
+        <span class="text-text-secondary flex items-center gap-1 text-xs">
+          {{ t("slackApp.connect.permissionHint") }}
+          <OnCallHint
+            :hint="
+              isCloud ? t('slackApp.connect.consent') : t('slackApp.connect.consentSelfHosted')
             "
-            data-test="slack-add-to-slack"
-            @click="runPopup({ kind: 'install', source: 'settings' })"
+            icon-class=""
+            max-width="24rem"
+            data-test="slack-connect-consent"
           >
-            <img
-              :src="addToSlackImage"
-              :srcset="addToSlackSrcset"
-              :alt="t('slackApp.connect.addToSlack')"
-              class="h-10 w-auto"
-            />
-          </OButton>
-          <OButton
-            v-else
-            :variant="offered.length ? 'secondary' : 'primary'"
-            icon="settings"
-            data-test="slack-setup-app"
-            @click="emit('setup')"
-          >
-            {{ t("slackApp.connect.setupApp") }}
-          </OButton>
-        </template>
-        <template #extra>
-          <ol
-            class="m-0 grid w-full max-w-2xl list-none grid-cols-1 gap-3 p-0 text-start"
-            :class="nextSteps.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'"
-            role="list"
-            data-test="slack-connect-steps"
-          >
-            <li
-              v-for="(item, index) in nextSteps"
-              :key="index"
-              class="border-border-subtle bg-surface-panel rounded-default flex items-center gap-2.5 border p-3"
-              data-test="slack-connect-step"
-            >
-              <span
-                class="bg-surface-subtle text-text-secondary flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-              >
-                {{ index + 1 }}
+            <template #content>
+              <span class="flex flex-col gap-1">
+                <span>{{ t("slackApp.connect.consent") }}</span>
+                <span v-if="!isCloud">{{ t("slackApp.connect.selfHostedPrivacy") }}</span>
               </span>
-              <span class="text-text-heading text-compact min-w-0 font-medium">{{ item }}</span>
-            </li>
-          </ol>
-          <span v-if="!isCloud && instance" class="text-text-secondary text-xs">
-            {{ t("slackApp.connect.setupAppOtherTeam", { team: instance.team_name }) }}
-          </span>
-          <!-- What Slack may read is a privacy fact worth one hover, not a paragraph under the steps. -->
-          <span class="text-text-secondary flex items-center gap-1 text-xs">
-            {{ t("slackApp.connect.permissionHint") }}
-            <OnCallHint
-              :hint="
-                isCloud ? t('slackApp.connect.consent') : t('slackApp.connect.consentSelfHosted')
-              "
-              icon-class=""
-              max-width="24rem"
-              data-test="slack-connect-consent"
-            >
-              <template #content>
-                <span class="flex flex-col gap-1">
-                  <span>{{ t("slackApp.connect.consent") }}</span>
-                  <span v-if="!isCloud">{{ t("slackApp.connect.selfHostedPrivacy") }}</span>
-                </span>
-              </template>
-            </OnCallHint>
-          </span>
-        </template>
-      </OEmptyState>
-    </OCard>
+            </template>
+          </OnCallHint>
+        </span>
+      </template>
+    </OEmptyState>
   </div>
 </template>

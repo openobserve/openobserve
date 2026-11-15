@@ -56,13 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="indexData.schema">
       <div class="m-0 p-0">
         <div @submit.prevent="onSubmit">
-          <!-- we will show loading state here -->
-          <div
-            v-if="loadingState"
-            class="flex h-full w-full items-center justify-center"
-            style="min-height: calc(100vh - 3.75rem)"
-          >
-            <OSpinner size="lg" />
+          <div v-if="loadingState" class="flex flex-col gap-2 p-3">
+            <OSkeleton preset="statStrip" />
+            <OSkeleton preset="tableRows" :rows="10" />
           </div>
           <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
           <div
@@ -872,7 +868,7 @@ import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -928,7 +924,7 @@ export default defineComponent({
     CrossLinkManager,
     OButton,
     OIcon,
-    OSpinner,
+    OSkeleton,
     OInput,
     OSearchInput,
     OSelect,

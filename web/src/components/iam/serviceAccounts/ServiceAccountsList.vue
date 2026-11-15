@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-menu-data-test="service-accounts-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
+          :error="loadError"
           forbidden-resource="service_accounts"
           pagination="client"
           :page-size="20"
@@ -51,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :persist-columns="true"
           table-id="iam-service-accounts-list"
           @update:selected-ids="handleSelectedIdsUpdate"
+          @retry="refreshServiceAccounts"
         >
           <template #toolbar>
             <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
@@ -503,7 +505,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { forbiddenState } from "@/utils/featureGate";
+import { forbiddenState, loadErrorText } from "@/utils/featureGate";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: {
@@ -842,7 +844,18 @@ export default defineComponent({
       Object.assign(serviceAccountsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
     );
 
-    const loading = serviceAccountsList.isPending;
+    // A failed read with no rows on screen is the error state, never the first-run one (K5).
+    const loadError = computed(() =>
+      serviceAccountsState.service_accounts_users.length
+        ? null
+        : loadErrorText(serviceAccountsList.error.value, t("emptyState.loadError.description")),
+    );
+    // `isPending` is the cold read; a retry from the error state shows the skeleton again.
+    const loading = computed(
+      () =>
+        serviceAccountsList.isPending.value ||
+        (!!loadError.value && serviceAccountsList.isFetching.value),
+    );
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = serviceAccountsList.isFetching;
@@ -1220,6 +1233,7 @@ export default defineComponent({
       rowMenu,
       isSystemRow,
       loading,
+      loadError,
       fetching,
       lastUpdatedAt,
       forbidden,

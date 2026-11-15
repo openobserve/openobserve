@@ -25,10 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-else-if="loadError !== null"
-      size="inline"
+      size="compact"
       kind="error"
       :title="t('oncall.myDeliveriesLoadFailed')"
-      :text="raw(loadError)"
+      :text="t('emptyState.loadError.description')"
       data-test="oncall-my-deliveries-error"
       @action="refresh"
     />
@@ -336,7 +336,7 @@ const PAGE_SIZES = [10, 20, 50, 100];
 const HISTORY_SKELETON_ROWS = PAGE_ROWS;
 /// Header plus PAGE_ROWS dense rows; the scroller is sized rather than the table so the pager sits below it.
 const FIXED_BODY = "[&_[data-test=o2-table-scroll-container]]:h-104";
-const FIXED_EMPTY = "flex h-104 items-center justify-center";
+const FIXED_EMPTY = "h-104";
 
 const CHANNEL_ICON: Record<Channel, IconName> = {
   email: "mail",

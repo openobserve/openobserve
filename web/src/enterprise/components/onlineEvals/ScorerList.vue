@@ -53,43 +53,36 @@
         </template>
 
         <template #empty>
-          <div class="flex items-center justify-center py-8">
-            <!-- Special-case empty: the org has no LLM providers yet. LLM Judge
-                 scorers (the most common type) can't be created without one, so
-                 we surface a dedicated provider-onboarding card. Rendered inside
-                 the table's #empty slot (not EvalListShell's) so the search bar
-                 and column header stay visible — consistent with the no-scorers
-                 state and the Eval Jobs / Score Configs list pages. Reuses the
-                 shared `no-llm-providers` preset with scorer-specific copy. -->
-            <OEmptyState
-              v-if="showNoProvidersState"
-              :title="t('onlineEvals.scorer.noProviders.title')"
-              :text="t('onlineEvals.scorer.noProviders.description')"
-              data-test="scorer-no-providers-state"
-              :action-label="t('emptyState.noLlmProviders.action')"
-              @action="$emit('add-provider')"
-            />
-            <OEmptyState
-              v-else
-              :kind="hasFilters ? 'filtered' : 'first-run'"
-              :title="
-                hasFilters
-                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.scorers') })
-                  : t('emptyState.noScorers.title')
-              "
-              :text="
-                hasFilters
-                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.scorers') })
-                  : t('emptyState.noScorers.description')
-              "
-              :icon="hasFilters ? undefined : 'insights'"
-              :action-label="hasFilters ? undefined : t('emptyState.noScorers.action')"
-              :secondary-action-label="hasFilters ? undefined : t('emptyState.noScorers.import')"
-              @action="onEmptyAction(hasFilters ? 'clear-filters' : 'create')"
-              @secondary-action="onEmptyAction('import')"
-              data-test="scorer-empty-state"
-            />
-          </div>
+          <!-- LLM Judge scorers can't be created without a provider; inside the
+               table's #empty so the search bar and column header stay visible. -->
+          <OEmptyState
+            v-if="showNoProvidersState"
+            :title="t('onlineEvals.scorer.noProviders.title')"
+            :text="t('onlineEvals.scorer.noProviders.description')"
+            data-test="scorer-no-providers-state"
+            :action-label="t('emptyState.noLlmProviders.action')"
+            @action="$emit('add-provider')"
+          />
+          <OEmptyState
+            v-else
+            :kind="hasFilters ? 'filtered' : 'first-run'"
+            :title="
+              hasFilters
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.scorers') })
+                : t('emptyState.noScorers.title')
+            "
+            :text="
+              hasFilters
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.scorers') })
+                : t('emptyState.noScorers.description')
+            "
+            :icon="hasFilters ? undefined : 'insights'"
+            :action-label="hasFilters ? undefined : t('emptyState.noScorers.action')"
+            :secondary-action-label="hasFilters ? undefined : t('emptyState.noScorers.import')"
+            @action="onEmptyAction(hasFilters ? 'clear-filters' : 'create')"
+            @secondary-action="onEmptyAction('import')"
+            data-test="scorer-empty-state"
+          />
         </template>
 
         <template #selection-actions>

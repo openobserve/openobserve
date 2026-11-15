@@ -1,14 +1,22 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
+import { computed } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
-defineProps<{
-  message?: string | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    message?: string | null;
+    /** Same floor as the empty state, so a failed load keeps the table's height. */
+    floor?: boolean;
+  }>(),
+  { floor: true },
+);
 
 defineEmits<{
   retry: [];
@@ -17,22 +25,30 @@ defineEmits<{
 defineSlots<{
   default(props: { message: string }): any;
 }>();
+
+// Raw transport text ("Request failed with status code 500") is never shown (K6).
+const text = computed(() =>
+  props.message && !isRawHttpText(props.message) ? raw(props.message) : undefined,
+);
 </script>
 
 <template>
-  <div data-test="o2-table-error" class="sticky start-0 px-2 py-4">
+  <div
+    data-test="o2-table-error"
+    :class="['sticky start-0 flex flex-1 flex-col items-center', floor ? 'min-h-75' : '']"
+  >
     <slot :message="message ?? ''">
-      <OInlineNotice tone="err" :message="raw(message ?? '')">
-        <template v-if="message" #actions>
-          <button
-            data-test="o2-table-error-retry-btn"
-            class="rounded-default bg-white/20 px-3 py-1 text-sm transition-colors hover:bg-white/30"
-            @click="$emit('retry')"
-          >
+      <OEmptyState
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="text ?? t('emptyState.loadError.description')"
+      >
+        <template #actions>
+          <OButton data-test="o2-table-error-retry-btn" @click="$emit('retry')">
             {{ t("common.retry") }}
-          </button>
+          </OButton>
         </template>
-      </OInlineNotice>
+      </OEmptyState>
     </slot>
   </div>
 </template>

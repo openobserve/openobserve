@@ -83,7 +83,7 @@ const STUBS = {
   "trace-details-sidebar": { template: "<div />", props: ["span"] },
 };
 
-const SPINNER = '[data-test="trace-details-loading-spinner"]';
+const LOADING = '[data-test="trace-details-loading"]';
 
 describe("TraceDetails - first paint (T-8)", () => {
   let wrapper: any;
@@ -128,7 +128,7 @@ describe("TraceDetails - first paint (T-8)", () => {
     });
 
     expect(wrapper.vm.searchObj.data.traceDetails.isLoadingTraceDetails).toBe(true);
-    expect(wrapper.find(SPINNER).exists()).toBe(true);
+    expect(wrapper.find(LOADING).exists()).toBe(true);
   });
 
   it("requests the trace without waiting for the log stream list, which only feeds View Logs", async () => {

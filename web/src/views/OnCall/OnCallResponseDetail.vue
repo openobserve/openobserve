@@ -527,18 +527,18 @@
 
     <OnCallResponseDetailSkeleton v-else-if="loading" />
 
-    <OContent v-else-if="loadError !== null" y>
+    <OContent v-else-if="loadError !== null">
       <OEmptyState
         kind="error"
         :title="t('oncall.loadResponseFailed')"
-        :text="raw(loadError)"
+        :text="isRawHttpText(loadError) ? t('emptyState.loadError.description') : raw(loadError)"
         data-test="oncall-response-detail-error"
         @action="refreshPage"
       />
     </OContent>
 
     <!-- Reads return 404 for a deleted page, and "nothing here yet" would suggest it is still coming. -->
-    <OContent v-else y>
+    <OContent v-else>
       <OEmptyState
         :title="t('oncall.responseNotFoundTitle')"
         :action-label="t('oncall.openPagesList')"
@@ -736,6 +736,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 

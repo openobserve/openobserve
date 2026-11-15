@@ -46,10 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <div
       v-else-if="open && !seeded"
-      class="flex justify-center py-6"
+      class="flex flex-col gap-4"
       data-test="fleet-new-rollout-dialog-loading"
     >
-      <OSpinner size="lg" />
+      <OSkeleton class="w-2/3" />
+      <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-8" />
     </div>
     <OForm v-else-if="open" :id="FORM_ID" class="flex flex-col gap-5" :form="form">
       <OFormSelect
@@ -196,7 +197,7 @@ import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { setFleetDesiredMutation } from "@/services/fleet.queries";

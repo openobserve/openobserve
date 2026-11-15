@@ -907,13 +907,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </div>
                         </div>
-                        <div
+                        <OEmptyState
                           v-else
-                          :class="'text-text-muted'"
-                          class="py-4 text-center text-sm italic"
-                        >
-                          {{ t("alerts.incidents.noDimensionsAvailable") }}
-                        </div>
+                          size="compact"
+                          icon="label"
+                          :title="t('alerts.incidents.noDimensionsAvailable')"
+                        />
                       </div>
                     </div>
 
@@ -1030,23 +1029,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :facts="findingFactsShown"
                       />
 
-                      <!-- No alerts available -->
-                      <div
+                      <OEmptyState
                         v-else-if="!alerts || alerts.length === 0"
-                        :class="'text-text-muted'"
-                        class="text-sm italic"
-                      >
-                        {{ t("alerts.incidents.noAlertDetailsAvailable") }}
-                      </div>
-
-                      <!-- No trigger selected -->
-                      <div
+                        size="compact"
+                        icon="notifications"
+                        :title="t('alerts.incidents.noAlertDetailsAvailable')"
+                      />
+                      <OEmptyState
                         v-else-if="selectedAlertIndex === -1"
-                        :class="'text-text-muted'"
-                        class="mt-8 text-center text-sm italic"
-                      >
-                        {{ t("alerts.incidents.clickOnTriggerToViewDetails") }}
-                      </div>
+                        size="compact"
+                        icon="touch-app"
+                        :title="t('alerts.incidents.clickOnTriggerToViewDetails')"
+                      />
 
                       <!-- Alert details -->
                       <div v-else class="flex flex-col gap-3">
@@ -1223,13 +1217,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Logs Tab Content -->
               <template v-if="activeTab === 'logs' && findingLogsRoute">
-                <div
+                <OSkeleton
                   v-if="findingItemQuery.isLoading.value"
-                  class="flex flex-1 items-center justify-center p-4"
+                  preset="tableRows"
+                  :rows="4"
                   data-test="incident-finding-logs-loading"
-                >
-                  <OSpinner size="lg" />
-                </div>
+                />
                 <IssueLogsLink
                   v-else
                   :route="findingLogsRoute"
@@ -1246,57 +1239,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else-if="activeTab === 'logs'"
                 class="flex h-full flex-1 flex-col overflow-hidden"
               >
-                <!-- Loading State -->
-                <div
+                <OSkeleton
                   v-if="correlationLoading"
-                  class="flex h-[70vh] flex-1 flex-col items-center justify-center"
-                >
-                  <OSpinner
-                    size="lg"
-                    class="mb-4"
-                    data-test="incident-telemetry-loading-indicator"
-                  />
-                </div>
+                  preset="tableRows"
+                  :rows="10"
+                  data-test="incident-telemetry-loading-indicator"
+                />
 
-                <!-- Error/No Data State -->
-                <div
-                  v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
-                  class="flex h-full flex-1 flex-col items-center justify-center gap-2"
-                >
-                  <OIcon
-                    :name="
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'warning'
-                          : 'error-outline'
-                        : 'info-outline'
-                    "
-                    :class="[
-                      'h-16 w-16',
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'text-warning'
-                          : 'text-status-negative'
-                        : 'text-text-muted',
-                    ]"
-                  />
-                  <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || t("alerts.incidents.noCorrelatedLogs") }}
-                  </div>
-                  <div
-                    v-if="correlationError && correlationError.includes('disambiguation fields')"
-                    class="text-text-secondary mt-2 max-w-125 text-center text-sm"
-                  >
-                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
-                  </div>
-                  <OButton
-                    v-if="correlationError && !correlationError.includes('disambiguation fields')"
-                    variant="secondary"
-                    @click="refreshCorrelation"
-                    class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
-                  >
-                </div>
+                <OEmptyState
+                  v-else-if="correlationError?.includes('disambiguation fields')"
+                  kind="error"
+                  :text="t('alerts.incidents.disambiguationChangedMessage')"
+                />
+                <OEmptyState
+                  v-else-if="correlationError"
+                  kind="error"
+                  @action="refreshCorrelation"
+                />
+                <OEmptyState
+                  v-else-if="!hasCorrelatedData || !hasAnyStreams"
+                  icon="info-outline"
+                  :title="t('alerts.incidents.noCorrelatedLogs')"
+                />
 
                 <!-- Success State - CorrelatedLogsTable -->
                 <div
@@ -1328,58 +1292,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else-if="activeTab === 'metrics'"
                 class="flex h-full flex-1 flex-col overflow-hidden"
               >
-                <!-- Loading State -->
-                <div
+                <OSkeleton
                   v-if="correlationLoading"
-                  class="flex h-full flex-1 flex-col items-center justify-center"
-                >
-                  <OSpinner
-                    size="lg"
-                    class="mb-4"
-                    data-test="incident-telemetry-loading-indicator"
-                  />
-                  <div class="text-sm">{{ t("alerts.incidents.loadingCorrelatedMetrics") }}</div>
-                </div>
+                  preset="chart"
+                  class="h-60 p-4"
+                  data-test="incident-telemetry-loading-indicator"
+                />
 
-                <!-- Error/No Data State -->
-                <div
-                  v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
-                  class="flex h-full flex-1 flex-col items-center justify-center gap-2"
-                >
-                  <OIcon
-                    :name="
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'warning'
-                          : 'error-outline'
-                        : 'info-outline'
-                    "
-                    :class="[
-                      'h-16 w-16',
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'text-warning'
-                          : 'text-status-negative'
-                        : 'text-text-muted',
-                    ]"
-                  />
-                  <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || t("alerts.incidents.noCorrelatedMetrics") }}
-                  </div>
-                  <div
-                    v-if="correlationError && correlationError.includes('disambiguation fields')"
-                    class="text-text-secondary mt-2 max-w-125 text-center text-sm"
-                  >
-                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
-                  </div>
-                  <OButton
-                    v-if="correlationError && !correlationError.includes('disambiguation fields')"
-                    variant="secondary"
-                    @click="refreshCorrelation"
-                    class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
-                  >
-                </div>
+                <OEmptyState
+                  v-else-if="correlationError?.includes('disambiguation fields')"
+                  kind="error"
+                  :text="t('alerts.incidents.disambiguationChangedMessage')"
+                />
+                <OEmptyState
+                  v-else-if="correlationError"
+                  kind="error"
+                  @action="refreshCorrelation"
+                />
+                <OEmptyState
+                  v-else-if="!hasCorrelatedData || !hasAnyStreams"
+                  icon="info-outline"
+                  :title="t('alerts.incidents.noCorrelatedMetrics')"
+                />
 
                 <!-- Success State - TelemetryCorrelationDashboard -->
                 <div
@@ -1430,58 +1364,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   /></OButton>
                 </div>
 
-                <!-- Loading State -->
-                <div
+                <OSkeleton
                   v-if="correlationLoading"
-                  class="flex h-full flex-1 flex-col items-center justify-center"
-                >
-                  <OSpinner
-                    size="lg"
-                    class="mb-4"
-                    data-test="incident-telemetry-loading-indicator"
-                  />
-                  <div class="text-sm">{{ t("alerts.incidents.loadingCorrelatedTraces") }}</div>
-                </div>
+                  preset="chart"
+                  class="h-60 p-4"
+                  data-test="incident-telemetry-loading-indicator"
+                />
 
-                <!-- Error/No Data State -->
-                <div
-                  v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
-                  class="flex h-full flex-1 flex-col items-center justify-center gap-2"
-                >
-                  <OIcon
-                    :name="
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'warning'
-                          : 'error-outline'
-                        : 'info-outline'
-                    "
-                    :class="[
-                      'h-16 w-16',
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'text-warning'
-                          : 'text-status-negative'
-                        : 'text-text-muted',
-                    ]"
-                  />
-                  <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || t("alerts.incidents.noCorrelatedTraces") }}
-                  </div>
-                  <div
-                    v-if="correlationError && correlationError.includes('disambiguation fields')"
-                    class="text-text-secondary mt-2 max-w-125 text-center text-sm"
-                  >
-                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
-                  </div>
-                  <OButton
-                    v-if="correlationError && !correlationError.includes('disambiguation fields')"
-                    variant="secondary"
-                    @click="refreshCorrelation"
-                    class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
-                  >
-                </div>
+                <OEmptyState
+                  v-else-if="correlationError?.includes('disambiguation fields')"
+                  kind="error"
+                  :text="t('alerts.incidents.disambiguationChangedMessage')"
+                />
+                <OEmptyState
+                  v-else-if="correlationError"
+                  kind="error"
+                  @action="refreshCorrelation"
+                />
+                <OEmptyState
+                  v-else-if="!hasCorrelatedData || !hasAnyStreams"
+                  icon="info-outline"
+                  :title="t('alerts.incidents.noCorrelatedTraces')"
+                />
 
                 <!-- Success State - TelemetryCorrelationDashboard -->
                 <div
@@ -1509,9 +1413,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Loading state -->
-      <div v-if="loading" class="flex flex-1 items-center justify-center">
-        <OSpinner size="lg" />
+      <div v-if="loading" class="flex flex-1 flex-col gap-4 p-4">
+        <OSkeleton preset="statStrip" />
+        <OSkeleton shape="block" class="h-60" />
       </div>
       <LicenseDeniedState
         v-else-if="licenseDenied"
@@ -1611,7 +1515,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
 import { contextRegistry, createIncidentsContextProvider } from "@/composables/contextProviders";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -1705,7 +1609,7 @@ export default defineComponent({
     IncidentTimeline,
     CustomChartRenderer,
     OButton,
-    OSpinner,
+    OEmptyState,
     OTooltip,
     OTimeCell,
     OUserCell,

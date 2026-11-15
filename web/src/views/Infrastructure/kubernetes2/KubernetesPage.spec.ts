@@ -928,7 +928,7 @@ describe("KubernetesPage", () => {
         },
       });
       await flushPromises();
-      expect(wrapper.find('[data-test="k8s2-spinner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="k8s2-loading"]').exists()).toBe(true);
     });
 
     it("shows the setup card without metric detection streams or k8s_events", async () => {

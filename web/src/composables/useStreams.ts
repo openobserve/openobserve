@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { CancelledError } from "@tanstack/vue-query";
-import { streamNameListQuery } from "@/services/stream.queries";
+import { SHARED_READ_MS, streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { useStore } from "vuex";
@@ -60,6 +60,16 @@ const SCHEMA_PREFETCH_TTL_MS = 30_000;
 const prefetchedSchemas = new Map<string, { at: number; request: Promise<any> }>();
 const schemaPrefetchKey = (org: string, streamType: string, streamName: string) =>
   JSON.stringify([org, streamType, streamName]);
+
+// Readers asking at once share one request; the copy is theirs to strip, as the cached payload is shared.
+const readSchema = async (org: string, streamName: string, streamType: string) =>
+  deepCopy(
+    await queryClient.fetchQuery({
+      ...streamSchemaQuery(org, streamName, streamType),
+      staleTime: SHARED_READ_MS,
+      retry: false,
+    }),
+  );
 
 const useStreams = (t: TranslateFn) => {
   const store = useStore();
@@ -302,9 +312,13 @@ const useStreams = (t: TranslateFn) => {
                 const prefetched = force
                   ? undefined
                   : takePrefetchedSchema(org, streamType, streamName);
-                const _stream: any = await (prefetched ??
-                  StreamService.schema(org, streamName, streamType));
-                const fetched = removeSchemaFields(_stream.data);
+                const fetched = removeSchemaFields(
+                  prefetched
+                    ? (await prefetched).data
+                    : force
+                      ? (await StreamService.schema(org, streamName, streamType)).data
+                      : await readSchema(org, streamName, streamType),
+                );
                 if (!storeFetchedSchema(org, streamType, streamName, fetched)) {
                   return resolve(fetched);
                 }
@@ -409,8 +423,7 @@ const useStreams = (t: TranslateFn) => {
             // If schema is requested but not present, fetch and update it.
             if (schema && !hasSchema) {
               const org = store.state.selectedOrganization.identifier;
-              const fetchedStream = await StreamService.schema(org, streamName, streamType);
-              const fetched = removeSchemaFields(fetchedStream.data);
+              const fetched = removeSchemaFields(await readSchema(org, streamName, streamType));
               if (!storeFetchedSchema(org, streamType, streamName, fetched)) return fetched;
             }
           }

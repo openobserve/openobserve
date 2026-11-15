@@ -1281,6 +1281,16 @@ describe("OTable", () => {
       await wrapper.find('[data-test="o2-table-error-retry-btn"]').trigger("click");
       expect(wrapper.emitted("retry")).toHaveLength(1);
     });
+
+    it("shows the shared error state, never raw transport text", () => {
+      wrapper = mount(OTable, {
+        props: { data: [], columns: makeColumns(), error: "Request failed with status code 500" },
+      });
+      const error = wrapper.find('[data-test="o2-table-error"]');
+      expect(error.find('[data-o2-empty="region"]').attributes("data-kind")).toBe("error");
+      expect(error.text()).not.toContain("status code");
+      expect(error.text()).toContain("Couldn't load this data");
+    });
   });
 
   // ── Header over a non-row state ────────────────────────────

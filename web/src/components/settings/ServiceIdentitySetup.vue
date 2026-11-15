@@ -185,27 +185,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OSettingRow>
 
             <div>
-              <!-- Empty state: nothing configured anywhere -->
-              <div v-if="allConfiguredEnvs.length === 0 && !addingToEnv" class="py-3">
-                <div
-                  class="rounded-default flex flex-col items-center gap-2 border border-dashed px-4 py-3"
-                  :class="'border-border-default bg-surface-subtle'"
-                >
-                  <OIcon name="tune" size="lg" class="text-icon-color mb-1" />
-                  <span class="text-sm font-medium" :class="'text-text-secondary'">
-                    {{ t("settings.serviceIdentitySetup.noFieldsConfiguredYet") }}
-                  </span>
+              <OEmptyState
+                v-if="allConfiguredEnvs.length === 0 && !addingToEnv"
+                size="compact"
+                icon="tune"
+                :title="t('settings.serviceIdentitySetup.noFieldsConfiguredYet')"
+              >
+                <template #actions>
                   <OButton
                     variant="secondary"
-                    class="mt-1"
+                    size="sm"
                     data-test="service-identity-add-distinguish-btn"
                     @click="addingToEnv = activeEnvironment"
                   >
-                    <template #icon><OIcon name="add" size="xs" /></template>
                     {{ t("settings.correlation.addField") }}
                   </OButton>
-                </div>
-              </div>
+                </template>
+              </OEmptyState>
 
               <!-- Each group is a direct child, so its rule reaches the card edges. -->
               <template v-else>
@@ -1116,19 +1112,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <!-- Fallback when no ranked dims beyond the selected field -->
-              <div
+              <OEmptyState
                 v-if="popupColumns.length === 0"
-                class="text-text-muted flex flex-1 items-center justify-center text-sm italic"
-              >
-                {{ t("settings.serviceIdentitySetup.noAdditionalDimensions") }}
-              </div>
+                :title="t('settings.serviceIdentitySetup.noAdditionalDimensions')"
+              />
             </div>
           </div>
 
-          <div v-else class="text-text-muted p-4 text-center italic">
-            {{ t("settings.serviceIdentitySetup.noSampleData") }}
-          </div>
+          <OEmptyState v-else :title="t('settings.serviceIdentitySetup.noSampleData')" />
         </div>
       </ODialog>
     </div>
@@ -1171,6 +1162,7 @@ import type {
 } from "@/services/service_streams";
 import { groupEnvKey } from "@/utils/serviceStreamEnvs";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";

@@ -964,41 +964,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-if="showAlertLibrary"
                       variant="primary"
-                      size="lg"
-                      icon="menu-book"
                       data-test="alert-list-empty-alert-library"
                       @click="goToAlertLibrary"
                     >
                       {{ t("alerts.alertLibrary") }}
                     </OButton>
                     <OButton
-                      v-if="!showAlertLibrary"
-                      variant="primary"
-                      size="lg"
-                      icon="add"
+                      :variant="showAlertLibrary ? 'secondary' : 'primary'"
                       data-test="alert-list-empty-new-alert"
                       @click="showAddUpdateFn({})"
                     >
                       {{ t("emptyState.noAlerts.action") }}
                     </OButton>
                     <OButton
+                      v-if="!showAlertLibrary"
                       variant="secondary"
-                      size="lg"
-                      icon="upload-file"
                       data-test="alert-list-empty-import"
                       @click="importAlert"
                     >
                       {{ t("alerts.importAlert") }}
-                    </OButton>
-                    <OButton
-                      v-if="showAlertLibrary"
-                      variant="secondary"
-                      size="lg"
-                      icon="add"
-                      data-test="alert-list-empty-new-alert"
-                      @click="showAddUpdateFn({})"
-                    >
-                      {{ t("emptyState.noAlerts.action") }}
                     </OButton>
                   </template>
                 </OEmptyState>

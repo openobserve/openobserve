@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template v-else-if="emptyText" #empty>
-          <OEmptyState size="inline" icon="bar-chart" :title="emptyText" data-test="no-data" />
+          <OEmptyState size="compact" icon="bar-chart" :title="emptyText" data-test="no-data" />
         </template>
 
         <!-- Override bottom slot to add legend filter alongside native pagination -->

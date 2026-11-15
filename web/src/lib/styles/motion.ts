@@ -25,7 +25,7 @@ export const ENTER_SLIDE =
 export const ROUTE_ENTER = "o2-route-enter";
 
 // Region loaders (skeleton, progress line, button spinner) wait this long, so fast loads never flash one.
-export const LOADER_DELAY_MS = 300;
+export const LOADER_DELAY_MS = 150;
 
 // A skeleton, once shown, stays at least this long so it never blinks.
 export const MIN_SKELETON_MS = 300;
@@ -43,7 +43,7 @@ export const STALE_DIM = "opacity-60";
 
 // A CSS wait, not a timer, so every re-display restarts it; o2-motion-keep stops reduced motion zeroing the wait.
 export const LOADER_REVEAL =
-  "o2-motion-keep animate-in fade-in-0 fill-mode-backwards delay-300 animation-duration-(--duration-overlay-in)";
+  "o2-motion-keep animate-in fade-in-0 fill-mode-backwards delay-150 animation-duration-(--duration-overlay-in)";
 
 // The first tooltip waits; a neighbour opened inside the skip window opens at once.
 export const TOOLTIP_DELAY_MS = 300;

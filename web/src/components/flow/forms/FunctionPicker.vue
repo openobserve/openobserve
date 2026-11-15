@@ -67,7 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       createNewFunction ? 'h-full min-h-0 gap-0' : createButton ? 'h-full min-h-0 gap-2' : 'gap-4'
     "
   >
-    <OSpinner v-if="loading" size="lg" class="mx-auto my-8" />
+    <div v-if="loading" class="flex flex-col gap-2">
+      <OSkeleton shape="block" class="h-8" />
+      <OSkeleton shape="block" class="h-40" />
+    </div>
 
     <template v-else>
       <!-- create / pick MODE SWITCH (pipelines). Single-screen hosts (workflows) use a
@@ -329,7 +332,7 @@ import {
   type SavedFunctionForm,
 } from "@/plugins/logs/SearchBar.SavedFunction.schema";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

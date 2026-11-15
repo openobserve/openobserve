@@ -1961,6 +1961,9 @@
     "workflows": "Przepływy pracy",
     "language": "Język",
     "keyboardShortcuts": "Skróty klawiaturowe",
+    "searchOrJumpTo": "Szukaj lub przejdź do…",
+    "jumpToTitle": "Przejdź do",
+    "jumpToPlaceholder": "Szukaj stron",
     "synthetic": "Syntetyki",
     "experience": "Doświadczenie",
     "slos": "SLO",
@@ -4039,7 +4042,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "Nie masz uprawnień do zarządzania licencją."
-      }
+      },
+      "usageTitle": "Dzienne pozyskiwanie"
     },
     "value_sso_requires_ha": "✅ Wymaga trybu HA",
     "value_rbac_requires_ha": "✅ Wymaga trybu HA",
@@ -5048,6 +5052,7 @@
   },
   "organization": {
     "searchByNameOrId": "Szukaj po nazwie lub ID",
+    "currentLabel": "Organizacja: {name}",
     "noOrganizationsFound": "Nie znaleziono organizacji",
     "header": "Organizacje",
     "orgBeingDeletedSwitching": "Ta organizacja jest usuwana. Przełączanie do innej organizacji.",
@@ -10752,7 +10757,8 @@
       "taglineAnd": "i przeprowadzi Cię przez Twoje logi, trace, metryki i incydenty.",
       "signedInAs": "Zalogowany jako",
       "role": "Rola",
-      "tryOneOfThese": "Lub wypróbuj jedną z tych opcji"
+      "tryOneOfThese": "Lub wypróbuj jedną z tych opcji",
+      "panelText": "Zapytaj o logi, ślady, metryki i incydenty albo poproś o pomoc w napisaniu zapytania."
     },
     "capabilities": {
       "query": {
@@ -18952,7 +18958,7 @@
       "version": "Wersja",
       "agentIdHint": "ID agenta: {ids}",
       "noAgentIdentity": "Nie znaleziono tożsamości agenta",
-      "noAgentIdentityDescription": "Te spany LLM nie zawierają nazwy agenta, więc są wyświetlane według strumienia. Zmapuj atrybut określający nazwę agenta, aby wyświetlać je według agenta.",
+      "noAgentIdentityDescription": "Te spany LLM nie zawierają nazwy agenta, więc są wyświetlane według strumienia.",
       "noAgentIdentityAction": "Otwórz mapowanie agentów GenAI"
     },
     "agentGraph": {
@@ -22728,6 +22734,7 @@
     },
     "actions": {
       "openCheatsheet": "Otwórz ściągawkę skrótów klawiszowych",
+      "searchOrJumpTo": "Szukaj lub przejdź do strony",
       "closeDialog": "Zamknij dowolne okno dialogowe, panel lub modal",
       "focusSearch": "Skup na pasku wyszukiwania",
       "focusQuery": "Skup na edytorze zapytań",
@@ -25452,7 +25459,8 @@
         "p95": "Wolny ogon — 1 wywołanie na 20 trwało co najmniej tyle. Mierzone na podstawie zakończonych wywołań w trace'ach Twojej aplikacji.",
         "p99": "Najgorszy 1% wywołań trwał co najmniej tyle. Mierzone na podstawie zakończonych wywołań w trace'ach Twojej aplikacji.",
         "load": "Łączny czas, jaki Twoje aplikacje spędziły na wywołaniach do tej bazy danych, mierzony na podstawie trace'ów Twojej aplikacji. Pokazuje, jak duży ruch ta baza danych obsłużyła na rzecz Twoich aplikacji.",
-        "attention": "Jak blisko limitu opublikowanego przez własny silnik jest ta instancja — obecnie połączenia względem max_connections. Najgorszy taki wskaźnik, a nie wynik mieszany. Sortowane od najwyższego, z instancjami, których kondycji nie można odczytać, na górze, ponieważ tej, której nie widzisz, nie możesz uznać za zdrową. Mierzone na serwerze bazy danych, więc nie jest porównywalne z czasem bazy danych obok."
+        "attention": "Jak blisko limitu opublikowanego przez własny silnik jest ta instancja — obecnie połączenia względem max_connections. Najgorszy taki wskaźnik, a nie wynik mieszany. Sortowane od najwyższego, z instancjami, których kondycji nie można odczytać, na górze, ponieważ tej, której nie widzisz, nie możesz uznać za zdrową. Mierzone na serwerze bazy danych, więc nie jest porównywalne z czasem bazy danych obok.",
+        "calls": "Ile razy Twoje aplikacje wywołały tę bazę danych, mierzone na podstawie śladów aplikacji."
       },
       "failedChip": "Nieudane: {count}",
       "columnSubLabels": {
@@ -25893,7 +25901,8 @@
         "tableHealthHint": "Rozmiar tabeli, stan bloat i vacuum. Bloat i vacuum dotyczą wyłącznie PostgreSQL.",
         "deadlocksLocked": "Zakleszczenia to funkcja Enterprise. Dokonaj upgrade'u, aby zobaczyć, które zapytania zablokowały się wzajemnie i dlaczego. Pozostałe zakładki bazy danych działają w każdym planie.",
         "blockedLocked": "Zablokowane zapytania to funkcja Enterprise. Dokonaj upgrade'u, aby zobaczyć, które sesje oczekują na blokadę i co ją trzyma. Pozostałe zakładki bazy danych działają w każdym planie.",
-        "tableHealthLocked": "Zdrowie tabel to funkcja Enterprise. Dokonaj upgrade'u, aby śledzić rozmiar tabeli, stan bloat i vacuum. Pozostałe zakładki bazy danych działają w każdym planie."
+        "tableHealthLocked": "Zdrowie tabel to funkcja Enterprise. Dokonaj upgrade'u, aby śledzić rozmiar tabeli, stan bloat i vacuum. Pozostałe zakładki bazy danych działają w każdym planie.",
+        "queriesHintServer": "Rodzaje zapytań zgłoszone przez Twoje bazy danych w tym oknie, liczone wewnątrz bazy danych."
       }
     },
     "metrics": {

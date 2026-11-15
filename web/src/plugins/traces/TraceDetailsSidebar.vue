@@ -631,12 +631,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </OCollapsible>
                   </div>
-                  <div
+                  <OEmptyState
                     v-if="!hasContent(previewInput) && !parsedSystemInstructions"
-                    class="text-text-secondary p-8 text-center text-sm italic"
-                  >
-                    {{ t("traces.traceDetailsSidebar.noDataAvailable") }}
-                  </div>
+                    size="compact"
+                    :title="t('traces.traceDetailsSidebar.noDataAvailable')"
+                  />
                   <LLMContentRenderer
                     v-if="hasContent(previewInput)"
                     :content="previewInput"
@@ -687,12 +686,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="llm-content-box border-card-glass-border rounded-default bg-code-bg h-full max-h-[calc(100%-1.625rem)] flex-1 overflow-x-hidden overflow-y-auto border border-solid p-3"
                 >
-                  <div
+                  <OEmptyState
                     v-if="!hasContent(previewOutput)"
-                    class="text-text-secondary p-8 text-center text-sm italic"
-                  >
-                    {{ t("traces.traceDetailsSidebar.noDataAvailable") }}
-                  </div>
+                    size="compact"
+                    :title="t('traces.traceDetailsSidebar.noDataAvailable')"
+                  />
                   <LLMContentRenderer
                     v-else
                     :content="previewOutput"
@@ -931,8 +929,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <OEmptyState
             v-else
-            size="inline"
-            kind="filtered"
             :title="t('traces.noEventsPresent')"
             data-test="trace-details-sidebar-no-events"
           />
@@ -993,8 +989,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OEmptyState
             v-else
-            size="inline"
-            kind="filtered"
             :title="t('traces.noLinksPresent')"
             data-test="trace-details-sidebar-no-links"
           />
@@ -1031,16 +1025,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :hide-reset-filters-button="true"
           />
           <!-- Loading/Empty state when no data -->
-          <div v-else class="flex h-full items-center justify-center py-20">
-            <div class="text-center">
-              <OSpinner v-if="correlationLoading" size="lg" class="mb-4" />
-              <div v-else-if="correlationError" class="text-sm font-semibold">
-                {{ correlationError }}
-              </div>
-              <div v-else class="text-text-muted text-sm">
-                {{ t("correlation.clickToLoadLogs") }}
-              </div>
-            </div>
+          <div v-else class="flex h-full flex-col">
+            <OSkeleton v-if="correlationLoading" preset="tableRows" :rows="8" />
+            <OEmptyState
+              v-else-if="correlationError"
+              :kind="correlationFailed ? 'error' : 'first-run'"
+              :title="correlationFailed ? undefined : correlationNotice"
+              :text="correlationFailed ? correlationNotice : undefined"
+            />
+            <OEmptyState v-else :title="t('correlation.clickToLoadLogs')" />
           </div>
         </OTabPanel>
 
@@ -1081,16 +1074,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @close="$emit('update:activeTab', 'attributes')"
           />
           <!-- Loading/Empty state when no data -->
-          <div v-else class="flex h-full items-center justify-center py-20">
-            <div class="text-center">
-              <OSpinner v-if="correlationLoading" size="lg" class="mb-4" />
-              <div v-else-if="correlationError" class="text-sm font-semibold">
-                {{ correlationError }}
-              </div>
-              <div v-else class="text-text-muted text-sm">
-                {{ t("correlation.clickToLoadMetrics") }}
-              </div>
+          <div v-else class="flex h-full flex-col">
+            <div v-if="correlationLoading" class="grid grid-cols-1 gap-3 p-3">
+              <OSkeleton v-for="panel in 3" :key="panel" shape="block" class="h-40" />
             </div>
+            <OEmptyState
+              v-else-if="correlationError"
+              :kind="correlationFailed ? 'error' : 'first-run'"
+              :title="correlationFailed ? undefined : correlationNotice"
+              :text="correlationFailed ? correlationNotice : undefined"
+            />
+            <OEmptyState v-else :title="t('correlation.clickToLoadMetrics')" />
           </div>
         </OTabPanel>
       </OTabPanels>
@@ -1188,7 +1182,8 @@ import AttributeValueCell from "@/components/AttributeValueCell.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -1364,7 +1359,7 @@ export default defineComponent({
     DeployedCode,
     DbSpanDetails,
     TraceErrorTab,
-    OSpinner,
+    OSkeleton,
     OSwitch,
     OTag,
   },
@@ -2527,6 +2522,12 @@ export default defineComponent({
     // True when the lookup itself failed (request error, missing span/stream) as
     // opposed to succeeding with nothing correlated — the two need different wording.
     const correlationFailed = ref(false);
+    // Axios status text is not a reason a reader can act on (K6).
+    const correlationNotice = computed(() =>
+      correlationError.value && !isRawHttpText(correlationError.value)
+        ? raw(correlationError.value)
+        : t("emptyState.loadError.description"),
+    );
     const correlationProps = ref<any>(null);
     const { findRelatedTelemetry, loadSemanticGroups, semanticGroups } = useServiceCorrelation();
 
@@ -3053,6 +3054,8 @@ export default defineComponent({
       // Correlation
       correlationLoading,
       correlationError,
+      correlationFailed,
+      correlationNotice,
       correlationProps,
       metricGroupResources,
       config,

@@ -53,17 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <div
+    <OEmptyState
       v-if="unreadable"
-      class="flex h-full items-center justify-center"
+      kind="error"
       data-test="alerts-firing-drawer-error"
-    >
-      <OEmptyState
-        kind="error"
-        :title="t('emptyState.loadError.title')"
-        :text="t('emptyState.loadError.description')"
-      />
-    </div>
+      @action="detailRead.refetch()"
+    />
 
     <div v-else-if="view" class="flex flex-col gap-3" data-test="alerts-firing-drawer-body">
       <div class="flex items-start gap-3">

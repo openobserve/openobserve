@@ -133,7 +133,7 @@ test.describe('G1 visible action reasons C2', () => {
       // A slow shared server can hold this search for longer than the default row-count wait.
       await expect(page.locator(`${table} tbody tr[data-test^="o2-table-row-"]`)).toHaveCount(1, { timeout: 90000 });
       await expect(page.locator(run)).toContainText('Run query');
-      await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+      await page.locator('[data-test="logs-search-bar-utilities-menu-btn"]').click();
       await expect(page.locator('[data-test="logs-create-alert-btn"]')).not.toHaveAttribute('aria-disabled', 'true');
       await expect(page.locator('[data-test="logs-create-alert-btn-reason"]')).toHaveCount(0);
       await expect(page.locator('[data-test="search-download-submenu-trigger-reason"]')).toHaveCount(0);

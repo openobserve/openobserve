@@ -16,7 +16,7 @@
 <template>
   <OEmptyState
     v-if="modelValue.length === 0"
-    size="inline"
+    size="compact"
     icon="swap-horiz"
     :title="t('dashboard.valueMappingEmptyTitle')"
     :text="t('dashboard.valueMappingEmptyDescription')"

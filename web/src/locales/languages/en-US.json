@@ -389,10 +389,14 @@
       "importDesc": "Import from a JSON file"
     },
     "loadError": {
-      "title": "Something went wrong",
-      "description": "We couldn't load this data. It's usually temporary — give it another try in a moment.",
+      "title": "Couldn't load this data",
+      "description": "The request didn't finish. Retry now, or try again in a minute.",
       "action": "Retry",
       "actionDesc": "Try loading the data again"
+    },
+    "pageError": {
+      "title": "Couldn't load this page",
+      "description": "None of this page's data loaded. Retry now, or try again in a minute."
     },
     "noData": {
       "title": "Nothing here yet",
@@ -470,7 +474,9 @@
       "description": "No {noun} match your current filters or search. Try adjusting or clearing them.",
       "action": "Clear filters",
       "actionDesc": "Reset all filters and search",
-      "fallbackNoun": "results"
+      "fallbackNoun": "results",
+      "noMatches": "No matches",
+      "noMatchesText": "Nothing matches the current search or filters."
     },
     "nouns": {
       "logs": "logs",
@@ -2103,6 +2109,9 @@
     "workflows": "Workflows",
     "language": "Language",
     "keyboardShortcuts": "Keyboard shortcuts",
+    "searchOrJumpTo": "Search or jump to…",
+    "jumpToTitle": "Jump to",
+    "jumpToPlaceholder": "Search pages",
     "synthetic": "Synthetics",
     "experience": "Experience",
     "slos": "SLOs",
@@ -4183,7 +4192,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "You are not authorized to manage the license."
-      }
+      },
+      "usageTitle": "Daily ingestion"
     },
     "value_sso_requires_ha": "✅ Requires HA mode",
     "value_rbac_requires_ha": "✅ Requires HA mode",
@@ -5192,6 +5202,7 @@
   },
   "organization": {
     "searchByNameOrId": "Search by name or ID",
+    "currentLabel": "Organization: {name}",
     "noOrganizationsFound": "No organizations found",
     "header": "Organizations",
     "orgBeingDeletedSwitching": "This organization is being deleted. Switching you to another organization.",
@@ -10904,7 +10915,8 @@
       "taglineAnd": "and walk you through your logs, traces, metrics and incidents.",
       "signedInAs": "Signed in as",
       "role": "Role",
-      "tryOneOfThese": "Or try one of these"
+      "tryOneOfThese": "Or try one of these",
+      "panelText": "Ask about your logs, traces, metrics and incidents, or get help writing a query."
     },
     "capabilities": {
       "query": {
@@ -19799,7 +19811,7 @@
       "streamHint": "This agent version sends traces to {count} streams. The one it has used longest is shown unless you pick another.",
       "agentIdHint": "Agent ID: {ids}",
       "noAgentIdentity": "No agent identity found",
-      "noAgentIdentityDescription": "These LLM spans carry no agent name, so they are shown by stream. Map the attribute that names your agent to view them by agent.",
+      "noAgentIdentityDescription": "These LLM spans carry no agent name, so they are shown by stream.",
       "noAgentIdentityAction": "Open agent mapping"
     },
     "agentGraph": {
@@ -21816,6 +21828,7 @@
     "showDetail": "Show details",
     "hideDetail": "Hide details",
     "runAs": "Run as",
+    "runSuggestion": "Run {query}",
     "searchTextFor": "Search text for \"{text}\"",
     "searchTextDesc": "Search the whole input as one phrase",
     "explain": {
@@ -23791,6 +23804,7 @@
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
+      "searchOrJumpTo": "Search or jump to a page",
       "closeDialog": "Close any dialog, drawer, or modal",
       "focusSearch": "Focus search bar",
       "focusQuery": "Focus query editor",
@@ -25826,6 +25840,7 @@
       "packUnavailableHint": "Curated content for this workload hasn't shipped. Build a dashboard to chart it in the meantime.",
       "partialTelemetryKubernetes": "We found Kubernetes streams, but not the metrics this page needs (kubeletstats or cluster receiver). Check your collector's receivers.",
       "partialTelemetryHosts": "We found host streams, but not the metrics this page needs. Check your collector's hostmetrics receiver.",
+      "hostMetricsMissingTitle": "No host metrics found",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}, and {count} more",
       "hiddenFootnote": "Data sources you don't have access to also appear here.",
@@ -26609,7 +26624,8 @@
         "p95": "The slow tail — 1 call in 20 took at least this long. Measured from completed calls in your application's traces.",
         "p99": "The worst 1% of calls took at least this long. Measured from completed calls in your application's traces.",
         "load": "Total time your apps spent on calls to this database, measured from your application's traces. It shows how much traffic this database served for your apps.",
-        "attention": "How close this instance is to a limit its own engine publishes — today, connections against max_connections. The worst such ratio, not a blended score. Sorted highest first, with instances whose health cannot be read at the top, because one you cannot see is not one you know is healthy. Measured on the database server, so it is not comparable with Database time beside it."
+        "attention": "How close this instance is to a limit its own engine publishes — today, connections against max_connections. The worst such ratio, not a blended score. Sorted highest first, with instances whose health cannot be read at the top, because one you cannot see is not one you know is healthy. Measured on the database server, so it is not comparable with Database time beside it.",
+        "calls": "How many times your apps called this database, measured from your application's traces."
       },
       "failedChip": "{count} failed",
       "columnSubLabels": {
@@ -27050,7 +27066,8 @@
         "tableHealthHint": "Table size, bloat and vacuum state. Bloat and vacuum are PostgreSQL only.",
         "deadlocksLocked": "Deadlocks is an Enterprise feature. Upgrade to see which queries deadlocked against each other, and why. The other database tabs work on every plan.",
         "blockedLocked": "Blocked queries is an Enterprise feature. Upgrade to see which sessions are waiting on a lock and what is holding it. The other database tabs work on every plan.",
-        "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan."
+        "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan.",
+        "queriesHintServer": "Kinds of query your databases reported in this window, counted inside the database."
       }
     },
     "metrics": {

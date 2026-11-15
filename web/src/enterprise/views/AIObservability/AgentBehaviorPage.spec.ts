@@ -131,14 +131,13 @@ describe("AgentBehaviorPage — scope", () => {
     expect(mockListAgents).toHaveBeenCalledTimes(1);
   });
 
-  it("withholds the stream from the panel until the scope is settled", async () => {
+  it("holds the scope bar and the panel until the scope is settled", async () => {
     mockListAgents.mockReturnValue(new Promise(() => {}));
     const wrapper = mount(AgentBehaviorPage);
     await flushPromises();
 
-    const panel = wrapper.findComponent({ name: "AgentBehaviorPanel" });
-    expect(panel.props("scopeReady")).toBe(false);
-    expect(panel.props("sourceStream")).toBe("");
+    expect(wrapper.findComponent({ name: "AgentBehaviorPanel" }).exists()).toBe(false);
+    expect(wrapper.find('[data-test="agent-behavior-loading"]').exists()).toBe(true);
   });
 
   it("opens in Stream mode with the no-agent-identity banner when the window has no agents", async () => {

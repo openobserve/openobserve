@@ -92,17 +92,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :text="t('serviceVersions.nameReview.states.denied')"
       data-test="svcver-name-review-denied"
     />
-    <div
+    <OEmptyState
       v-else-if="list.isError.value"
-      class="mx-page-edge rounded-default border-border-default text-text-secondary flex items-center gap-2 border px-4 py-3 text-sm"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="loadError"
       data-test="svcver-name-review-error"
-    >
-      <OIcon name="error-outline" size="sm" class="text-status-error-text" />
-      <span>{{ loadError }}</span>
-      <OButton variant="accent-ghost" size="sm" @click="list.refetch()">{{
-        t("serviceVersions.actions.retry")
-      }}</OButton>
-    </div>
+      @action="list.refetch()"
+    />
     <OEmptyState
       v-else-if="!rows.length && page === 1"
       :title="t(`serviceVersions.nameReview.states.${EMPTY[filter]}`)"
@@ -589,7 +586,6 @@ import {
 } from "@/services/service_versions.queries";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import InfoNotice from "@/components/shared/InfoNotice.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

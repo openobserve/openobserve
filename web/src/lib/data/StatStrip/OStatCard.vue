@@ -34,7 +34,7 @@ const { t } = useI18nTyped();
 
 const props = withDefaults(
   defineProps<{
-    /** Puts the label under the value, so a narrow tile keeps its full label. */
+    /** Puts the label under the value; on a `kpi` it is the R4 strip item (20 px value, no glyph). */
     stacked?: boolean;
     label?: I18nText;
     value?: string | number;
@@ -223,7 +223,9 @@ const trendClass = computed(() =>
                 ],
           ]
         : variant === 'kpi'
-          ? 'h-5 shrink-0 items-center gap-1.5 whitespace-nowrap'
+          ? stacked
+            ? 'shrink-0 flex-col items-start whitespace-nowrap'
+            : 'h-5 shrink-0 items-center gap-1.5 whitespace-nowrap'
           : [
               'rounded-default bg-surface-base flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 max-lg:px-1.5',
               selected ? 'border-accent' : 'border-border-default',
@@ -279,6 +281,35 @@ const trendClass = computed(() =>
         <OTooltip v-if="exactTitle" :content="exactTitle" />
       </span>
       <OTooltip v-if="chipTooltip" :content="chipTooltip" />
+    </template>
+    <!-- R4 KPI strip: a 20/600 value over its 12 px label, no glyph and no box. -->
+    <template v-else-if="variant === 'kpi' && stacked">
+      <span
+        class="inline-flex h-7 items-center text-xl leading-7 font-semibold tabular-nums"
+        :class="isMuted ? 'text-text-muted' : 'text-text-heading'"
+        data-test="o-stat-card-value"
+      >
+        <OSkeleton v-if="loading" class="block h-5 w-10" data-test="o-stat-card-value-skeleton" />
+        <slot v-else name="value">{{ displayValue }}</slot>
+        <OTooltip v-if="exactTitle" :content="exactTitle" />
+      </span>
+      <span class="text-text-secondary flex min-w-0 items-center gap-1 text-xs leading-4">
+        <OTruncatedText v-if="label" data-test="o-stat-card-label">{{ label }}</OTruncatedText>
+        <OIcon
+          v-if="sub && subIcon"
+          :name="subIcon"
+          size="xs"
+          :label="sub"
+          class="text-text-label size-3.5! shrink-0"
+          data-test="o-stat-card-sub-icon"
+        >
+          <OTooltip :content="subTooltip || sub" />
+        </OIcon>
+        <OTruncatedText v-else-if="sub" class="text-text-label">{{ sub }}</OTruncatedText>
+        <span v-if="trend" class="shrink-0 font-semibold" :class="trendClass"
+          >{{ trendArrow }} {{ trend.label }}</span
+        >
+      </span>
     </template>
     <template v-else-if="variant === 'kpi'">
       <span

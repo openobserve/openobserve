@@ -89,11 +89,13 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
     expect(left.classList).toContain("gap-2");
     expect(collapsible.classList).toContain("gap-2");
 
+    const right = wrapper.vm.$refs.toolbarRightRef as HTMLElement;
+    expect(right.classList).toContain("gap-2");
     const more = wrapper.get('[data-test="logs-search-bar-utilities-menu-btn"]');
     expect(marginClassesOf(more.element)).toEqual([]);
-    expect(more.classes()).toContain("max-md:ms-auto");
+    expect(right.contains(more.element)).toBe(true);
 
-    const controls = [...collapsible.children, ...[...left.children].slice(1)];
+    const controls = [...collapsible.children];
     for (const dataTest of [
       "logs-logs-toggle",
       "logs-search-bar-reset-filters-btn",
@@ -109,8 +111,8 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
         ),
       ).toBe(true);
     }
-    expect(controls.length).toBeGreaterThanOrEqual(8);
-    for (const control of controls) {
+    expect(controls.length).toBeGreaterThanOrEqual(7);
+    for (const control of [...controls, ...right.children]) {
       expect(marginClassesOf(control), control.outerHTML.slice(0, 120)).toEqual([]);
     }
   });

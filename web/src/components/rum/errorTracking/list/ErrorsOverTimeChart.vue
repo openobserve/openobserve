@@ -63,14 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div
-      v-else-if="!hasData"
-      class="flex flex-1 items-center justify-center"
-      data-test="rum-errors-over-time-chart-empty"
-    >
-      <p class="text-text-muted">
-        {{ t("rum.noErrorsInWindow") }}
-      </p>
+    <div v-else-if="!hasData" class="flex-1 px-2" data-test="rum-errors-over-time-chart-empty">
+      <OEmptyState size="compact" icon="bar-chart" :title="t('rum.noErrorsInWindow')" />
     </div>
 
     <template v-else>
@@ -93,6 +87,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { format } from "date-fns";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { StackedBucket } from "@/utils/rum/errorIssueQueries";
 import type { RumChartMarker } from "@/enterprise/components/ServiceVersions/deployMarkers";

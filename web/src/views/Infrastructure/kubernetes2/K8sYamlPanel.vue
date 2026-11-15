@@ -61,7 +61,6 @@ const text = computed(() =>
     </div>
     <OEmptyState
       v-else
-      size="inline"
       :title="t('infra.k8s2.yamlUnavailable')"
       :text="t('infra.k8s2.objectsNotObserved')"
       data-test="k8s2-yaml-unavailable"

@@ -30,9 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("telephony.readOnly") }}
       </OInlineNotice>
 
-      <div v-if="state === 'loading'" class="flex justify-center py-10">
-        <OSpinner size="lg" data-test="telephony-settings-loading" />
-      </div>
+      <OSkeleton
+        v-if="state === 'loading'"
+        shape="block"
+        class="h-32"
+        data-test="telephony-settings-loading"
+      />
 
       <OEmptyState
         v-else-if="state === 'forbidden'"
@@ -51,15 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @action="read.refetch()"
       />
 
-      <div v-else-if="state === 'empty'" data-test="telephony-settings-hero">
-        <OEmptyState
-          :title="t('emptyState.noPhoneProvider.title')"
-          :text="t('emptyState.noPhoneProvider.description')"
-          icon="link"
-          :action-label="readOnly ? undefined : t('emptyState.noPhoneProvider.action')"
-          @action="openDialog('connect')"
-        />
-      </div>
+      <OEmptyState
+        v-else-if="state === 'empty'"
+        :title="t('emptyState.noPhoneProvider.title')"
+        :text="t('emptyState.noPhoneProvider.description')"
+        icon="link"
+        :action-label="readOnly ? undefined : t('emptyState.noPhoneProvider.action')"
+        data-test="telephony-settings-hero"
+        @action="openDialog('connect')"
+      />
 
       <TelephonyAccountCard
         v-else-if="state === 'deployment' && view"
@@ -156,7 +159,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { deleteTelephonyMutation, telephonyQuery } from "@/services/oncall.queries";
 import analytics from "@/services/product_analytics";

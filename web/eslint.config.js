@@ -1003,7 +1003,7 @@ const DISPLAY_API = {
     slots: { meta: "the default slot", footer: "the default slot", icon: "the icon prop" },
   },
   OEmptyState: {
-    values: { kind: ["first-run", "filtered", "denied", "error"], size: ["page", "inline"] },
+    values: { kind: ["first-run", "filtered", "denied", "error"], size: ["region", "compact"] },
     removed: {
       preset: "kind with title and text",
       illustration: "icon",
@@ -1020,6 +1020,8 @@ const DISPLAY_API = {
       description: "text",
     },
     slots: { title: "the title prop", description: "#text", illustration: "the icon prop" },
+    // R3: the component owns its position (region 64 px from the top, compact at the inset).
+    classBan: /^(p[ytb]?-\S+|m[ytb]?-auto|justify-\S+|items-\S+|place-\S+)$/,
   },
   OSpinner: { values: { size: ["sm", "md", "lg"] }, removed: { variant: null } },
   OSkeleton: {

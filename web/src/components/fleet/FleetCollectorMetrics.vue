@@ -50,7 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <OEmptyState
       v-else-if="values && !reporting"
-      size="inline"
       icon="bar-chart"
       :title="t('fleet.collectorMetrics.emptyTitle')"
       :text="t('fleet.collectorMetrics.emptyDescription', { name: raw(collectorName) })"

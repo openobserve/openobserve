@@ -16,8 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full flex-col overflow-hidden px-6 pt-4" data-test="organization-group-page">
-    <div v-if="loading" class="flex justify-center py-10">
-      <OSpinner size="lg" />
+    <div v-if="loading" class="flex flex-col gap-5" data-test="org-group-loading">
+      <OSkeleton preset="statStrip" :count="3" />
+      <OSkeleton preset="tableRows" />
     </div>
 
     <template v-else>
@@ -91,9 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #empty>
-              <div class="py-4 text-center">
-                {{ t("billing.billingGroup.noMembers") }}
-              </div>
+              <OEmptyState
+                :kind="memberSearch ? 'filtered' : 'first-run'"
+                :title="memberSearch ? undefined : t('billing.billingGroup.noMembers')"
+                @action="memberSearch = ''"
+              />
             </template>
             <template #cell-status="{ row }">
               <OTag type="billingGroupMemberStatus" :value="row.status" />
@@ -498,7 +501,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -551,7 +555,8 @@ export default defineComponent({
     OIcon,
     OForm,
     OFormInput,
-    OSpinner,
+    OSkeleton,
+    OEmptyState,
     OTable,
     OSearchInput,
     OUserCell,

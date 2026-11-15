@@ -134,25 +134,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <section class="flex min-w-0 flex-1 flex-col">
         <div
           v-if="loading || detailLoading"
-          class="flex flex-1 items-center justify-center"
+          class="flex min-h-0 flex-1 flex-col gap-4 p-4"
           data-test="ai-queue-workbench-loading"
         >
-          <OSpinner size="lg" />
+          <OSkeleton class="h-5 w-64" />
+          <OSkeleton shape="block" class="min-h-0 flex-1" />
         </div>
 
-        <div
+        <OEmptyState
           v-else-if="!currentItem"
-          class="text-text-secondary flex flex-1 flex-col items-center justify-center gap-2 p-8"
+          icon="check-circle"
+          :title="t('aiObservability.queues.workbench.allReviewedTitle')"
+          :text="t('aiObservability.queues.workbench.allReviewedBody')"
           data-test="ai-queue-workbench-empty"
-        >
-          <OIcon name="check-circle" class="text-status-success-text h-10 w-10" />
-          <span class="text-text-heading text-sm font-semibold">
-            {{ t("aiObservability.queues.workbench.allReviewedTitle") }}
-          </span>
-          <span class="text-center text-xs">
-            {{ t("aiObservability.queues.workbench.allReviewedBody") }}
-          </span>
-        </div>
+        />
 
         <template v-else>
           <div class="flex min-h-0 flex-1">
@@ -695,7 +690,8 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSlider from "@/lib/forms/Slider/OSlider.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";

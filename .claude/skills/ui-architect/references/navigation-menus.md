@@ -335,6 +335,6 @@ strings in `navGroups.ts` (flyout children may also use feature namespaces like
       `activeOnRoutes`, then the deepest path prefix, the same match that lights
       the rail) and keeps only the groups MainLayout's links actually emit
       (`providePageNavContext`). A grouped page shows the group's label; an
-      ungrouped one shows the org. So a new page needs no header wiring: register
+      ungrouped one leaves the line empty (never the org). So a new page needs no header wiring: register
       it in the right group and the line follows. A drill-down page passes
       `:back="{ label, to }"` instead, where `label` is the parent's own title key.

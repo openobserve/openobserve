@@ -1961,6 +1961,9 @@
     "workflows": "เวิร์กโฟลว์ (Workflows)",
     "language": "ภาษา",
     "keyboardShortcuts": "คีย์ลัด",
+    "searchOrJumpTo": "ค้นหาหรือไปที่…",
+    "jumpToTitle": "ไปที่",
+    "jumpToPlaceholder": "ค้นหาหน้า",
     "synthetic": "การตรวจสอบสังเคราะห์ (Synthetics)",
     "experience": "ประสบการณ์ใช้งาน (Experience)",
     "slos": "SLOs",
@@ -4038,7 +4041,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "You are not authorized to manage the license."
-      }
+      },
+      "usageTitle": "ปริมาณการนำเข้ารายวัน"
     },
     "value_sso_requires_ha": "✅ Requires HA mode",
     "value_rbac_requires_ha": "✅ Requires HA mode",
@@ -5047,6 +5051,7 @@
   },
   "organization": {
     "searchByNameOrId": "Search by name or ID",
+    "currentLabel": "องค์กร: {name}",
     "noOrganizationsFound": "No organizations found",
     "header": "Organizations",
     "orgBeingDeletedSwitching": "This organization is being deleted. Switching you to another organization.",
@@ -10749,7 +10754,8 @@
       "taglineAnd": "and walk you through your logs, traces, metrics and incidents.",
       "signedInAs": "Signed in as",
       "role": "บทบาท",
-      "tryOneOfThese": "Or try one of these"
+      "tryOneOfThese": "Or try one of these",
+      "panelText": "ถามเกี่ยวกับล็อก เทรซ เมตริก และเหตุการณ์ หรือขอความช่วยเหลือในการเขียนคิวรี"
     },
     "capabilities": {
       "query": {
@@ -18949,7 +18955,7 @@
       "version": "Version",
       "agentIdHint": "รหัสเอเจนต์: {ids}",
       "noAgentIdentity": "ไม่พบข้อมูลระบุตัวตนของเอเจนต์",
-      "noAgentIdentityDescription": "สแปน LLM เหล่านี้ไม่มีชื่อเอเจนต์ จึงแสดงผลตามสตรีม แมปแอตทริบิวต์ที่ระบุชื่อเอเจนต์ของคุณเพื่อดูข้อมูลแยกตามเอเจนต์",
+      "noAgentIdentityDescription": "สแปน LLM เหล่านี้ไม่มีชื่อเอเจนต์ จึงแสดงผลตามสตรีม",
       "noAgentIdentityAction": "เปิดการแมปเอเจนต์ GenAI"
     },
     "agentGraph": {
@@ -22725,6 +22731,7 @@
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
+      "searchOrJumpTo": "ค้นหาหรือไปที่หน้า",
       "closeDialog": "Close any dialog, drawer, or modal",
       "focusSearch": "Focus search bar",
       "focusQuery": "Focus query editor",
@@ -25449,7 +25456,8 @@
         "p95": "The slow tail — 1 call in 20 took at least this long. Measured from completed calls in your application's traces.",
         "p99": "The worst 1% of calls took at least this long. Measured from completed calls in your application's traces.",
         "load": "Total time your apps spent on calls to this database, measured from your application's traces. It shows how much traffic this database served for your apps.",
-        "attention": "How close this instance is to a limit its own engine publishes — today, connections against max_connections. The worst such ratio, not a blended score. Sorted highest first, with instances whose health cannot be read at the top, because one you cannot see is not one you know is healthy. Measured on the database server, so it is not comparable with Database time beside it."
+        "attention": "How close this instance is to a limit its own engine publishes — today, connections against max_connections. The worst such ratio, not a blended score. Sorted highest first, with instances whose health cannot be read at the top, because one you cannot see is not one you know is healthy. Measured on the database server, so it is not comparable with Database time beside it.",
+        "calls": "จำนวนครั้งที่แอปของคุณเรียกฐานข้อมูลนี้ วัดจากเทรซของแอปพลิเคชันของคุณ"
       },
       "failedChip": "{count} failed",
       "columnSubLabels": {
@@ -25890,7 +25898,8 @@
         "tableHealthHint": "Table size, bloat and vacuum state. Bloat and vacuum are PostgreSQL only.",
         "deadlocksLocked": "Deadlocks is an Enterprise feature. Upgrade to see which queries deadlocked against each other, and why. The other database tabs work on every plan.",
         "blockedLocked": "Blocked queries is an Enterprise feature. Upgrade to see which sessions are waiting on a lock and what is holding it. The other database tabs work on every plan.",
-        "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan."
+        "tableHealthLocked": "Table health is an Enterprise feature. Upgrade to track table size, bloat and vacuum state. The other database tabs work on every plan.",
+        "queriesHintServer": "ประเภทคิวรีที่ฐานข้อมูลของคุณรายงานในช่วงเวลานี้ นับภายในฐานข้อมูล"
       }
     },
     "metrics": {

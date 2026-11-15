@@ -68,7 +68,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="customNoDataText" #empty>
-            <OEmptyState size="inline" icon="bar-chart" :title="noDataTitle" data-test="no-data" />
+            <OEmptyState
+              :size="panelStateSize"
+              icon="bar-chart"
+              :title="noDataTitle"
+              data-test="no-data"
+              class="px-3"
+            />
           </template>
         </TableRenderer>
         <div
@@ -221,25 +227,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !loading &&
           !panelSchema.config?.curated_no_data_eligible
         "
-        size="inline"
+        :size="panelStateSize"
         icon="bar-chart"
         :title="noDataTitle"
         data-test="no-data"
-        class="noData [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2"
+        class="noData absolute! inset-0 px-3"
       />
       <div
         v-if="errorDetail?.message && !panelSchema?.error_config?.custom_error_handeling"
-        class="absolute top-[20%] h-[80%] w-full overflow-hidden text-center text-ellipsis"
+        class="absolute inset-0 overflow-hidden px-3"
         data-test="panel-schema-renderer-error-message"
       >
-        <OIcon size="md" name="warning" />
-        <div class="h-4/5 w-full">
-          {{
-            errorDetail?.code?.toString().startsWith("4")
-              ? errorDetail.message
-              : t("common.errorLoadingData")
-          }}
-        </div>
+        <OEmptyState :size="panelStateSize" kind="error" :title="panelErrorText" />
       </div>
       <div
         v-if="
@@ -248,10 +247,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !panelSchema?.error_config?.default_data_on_error &&
           panelSchema?.error_config?.custom_error_message
         "
-        class="absolute top-[20%] h-[80%] w-full overflow-hidden text-center text-ellipsis"
+        class="absolute inset-0 overflow-hidden px-3"
         data-test="panel-schema-renderer-custom-error-message"
       >
-        {{ panelSchema?.error_config?.custom_error_message }}
+        <OEmptyState
+          :size="panelStateSize"
+          kind="error"
+          :title="raw(panelSchema.error_config.custom_error_message)"
+        />
       </div>
       <div class="absolute top-0 z-999 flex w-full">
         <LoadingProgress
@@ -386,6 +389,7 @@ import { useTheme } from "@/composables/useTheme";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { chartColor } from "@/utils/chartTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import { usePanelTitle } from "@/composables/dashboard/usePanelTitle";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
@@ -1993,13 +1997,25 @@ export default defineComponent({
       }
     };
 
+    // R3: a panel taller than 240 px shows the region state, a shorter one the compact state.
+    const panelHeight = ref(0);
+    const panelStateSize = computed(() => (panelHeight.value > 240 ? "region" : "compact"));
+    // 4xx text is the query's own error; anything else, or raw transport text, gets the shared copy.
+    const panelErrorText = computed(() => {
+      const msg = errorDetail.value?.message;
+      if (!msg || !errorDetail.value?.code?.toString().startsWith("4") || isRawHttpText(msg))
+        return undefined;
+      return raw(msg);
+    });
+
     // ResizeObserver to detect chartPanelRef dimension changes
     let resizeObserver: ResizeObserver | null = null;
     let resizeTimeout: number | null = null;
 
     onMounted(() => {
       if (chartPanelRef.value) {
-        resizeObserver = new ResizeObserver(() => {
+        resizeObserver = new ResizeObserver((entries) => {
+          panelHeight.value = entries[0]?.contentRect.height ?? 0;
           // Debounce the resize handler to prevent "ResizeObserver loop" errors
           // This error occurs when the callback takes longer than one animation frame
           if (resizeTimeout) {
@@ -2722,6 +2738,8 @@ export default defineComponent({
     }
 
     return {
+      panelStateSize,
+      panelErrorText,
       hoveredQueryAnnotation,
       onChartMouseOver,
       onChartMouseOut,

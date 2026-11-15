@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-menu-data-test="iam-groups-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
+          :error="loadError"
           forbidden-resource="groups"
           :selected-ids="selectedGroupNames"
           v-model:global-filter="filterQuery"
@@ -67,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:current-page="currentPage = $event"
           @update:sort-by="sortBy = $event"
           @update:sort-order="sortOrder = $event"
+          @retry="refreshGroups"
         >
           <template #toolbar>
             <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
@@ -196,7 +198,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { forbiddenState } from "@/utils/featureGate";
+import { forbiddenState, loadErrorText } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 
 const showAddGroup = ref(false);
@@ -424,9 +426,16 @@ const groupsList = useQuery(() =>
   Object.assign(groupsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
 );
 
-// Bound to the query rather than hand-managed: `isPending` is the cold read,
-// `isFetching` is any request in flight.
-const loading = groupsList.isPending;
+// A failed read with no rows on screen is the error state, never the first-run one (K5).
+const loadError = computed(() =>
+  rows.value.length
+    ? null
+    : loadErrorText(groupsList.error.value, t("emptyState.loadError.description")),
+);
+// `isPending` is the cold read; a retry from the error state shows the skeleton again.
+const loading = computed(
+  () => groupsList.isPending.value || (!!loadError.value && groupsList.isFetching.value),
+);
 // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
 watch(
   loading,

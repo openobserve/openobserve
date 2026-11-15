@@ -98,7 +98,6 @@ test.describe('Edition Features Documentation Validation', () => {
         heroTitle: 'Get Enterprise edition',
         badgePattern: /Free up to \d+GB \/ day/,
         primaryButtonText: 'Download now',
-        featuresTitle: 'Unlock all Enterprise features',
         hasLearnMore: true,
       },
       heroLinkButtons: [
@@ -134,7 +133,6 @@ test.describe('Edition Features Documentation Validation', () => {
         heroTitle: 'Enterprise features',
         badgePattern: /Free up to \d+GB \/ day/,
         primaryButtonText: 'Get free license',
-        featuresTitle: 'Available Enterprise features',
         hasLearnMore: true,
       },
       heroLinkButtons: [

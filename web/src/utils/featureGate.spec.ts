@@ -23,6 +23,7 @@ import {
   licenseDeniedFeatures,
   licenseKeyLosses,
   licenseRequestUrl,
+  loadErrorText,
   menuState,
   splitLicenseFeatures,
   streamTypeFeature,
@@ -137,6 +138,20 @@ describe("forbiddenState", () => {
     expect(forbiddenState(forbidden({ code: 403, message: "Unauthorized Access" }))).toBe(true);
     expect(forbiddenState({ response: { status: 500, data: {} } })).toBe(false);
     expect(forbiddenState(undefined)).toBe(false);
+  });
+});
+
+describe("loadErrorText", () => {
+  it("returns the server message of a failed read and null when nothing failed or it was denied", () => {
+    const failed = { response: { status: 500, data: { message: "store not ready" } } };
+    expect(loadErrorText(failed, "fallback")).toBe("store not ready");
+    expect(loadErrorText({ message: "Request failed with status code 502" }, "fallback")).toBe(
+      "Request failed with status code 502",
+    );
+    expect(loadErrorText({ response: { status: 500, data: {} } }, "fallback")).toBe("fallback");
+    expect(loadErrorText(forbidden({ code: 403 }), "fallback")).toBeNull();
+    expect(loadErrorText({ status: 403 }, "fallback")).toBeNull();
+    expect(loadErrorText(null, "fallback")).toBeNull();
   });
 });
 

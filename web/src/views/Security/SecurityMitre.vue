@@ -5,6 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { securityTime } from "@/utils/security/time";
 import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
@@ -95,13 +96,19 @@ const history = useAlertHistorySummary();
 const lastRunAt = ref<number | null>(null);
 let detectionsReady: Promise<void> = Promise.resolve();
 
+// Axios status text is not a reason a reader can act on (K6).
+const errorReason = (message: string) =>
+  isRawHttpText(message) ? t("emptyState.loadError.description") : message;
+
 const notices = computed<SecurityNotice[]>(() => {
   const out: SecurityNotice[] = [];
   if (coverageQuery.error.value) {
     out.push({
       key: "coverage-error",
       tone: "error",
-      text: t("siem.mitrePage.coverageError", { reason: coverageQuery.error.value.message }),
+      text: t("siem.mitrePage.coverageError", {
+        reason: errorReason(coverageQuery.error.value.message),
+      }),
       dataTest: "security-mitre-coverage-error",
     });
   }
@@ -109,7 +116,7 @@ const notices = computed<SecurityNotice[]>(() => {
     out.push({
       key: "rules-error",
       tone: "error",
-      text: t("siem.overview.rulesError", { reason: rulesError.value }),
+      text: t("siem.overview.rulesError", { reason: errorReason(rulesError.value) }),
       dataTest: "security-mitre-rules-error",
     });
   }
@@ -721,7 +728,7 @@ function openDetections() {
           </div>
           <OEmptyState
             v-if="!selected.detections.length"
-            size="inline"
+            size="compact"
             icon="shield-alert-outline"
             :title="t('siem.mitrePage.noDetections')"
           />
@@ -770,7 +777,6 @@ function openDetections() {
       <template #tab-firings>
         <OEmptyState
           v-if="!recentFirings.length"
-          size="inline"
           icon="task-alt"
           :title="t('siem.mitrePage.noFirings', { range: t(`siem.range.${range}`) })"
         />

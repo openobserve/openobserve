@@ -17,9 +17,15 @@ import { computed, type ComputedRef } from "vue";
 import { useStore } from "vuex";
 
 import config from "@/aws-exports";
+import {
+  buildFeatureGateContext,
+  checkFeatureAccess,
+  isFeatureKey,
+} from "@/utils/enterpriseFeatures";
+import { featureState } from "@/utils/featureGate";
 
 import { GATE_PREDICATES } from "./navGroups";
-import type { NavGateContext } from "./ONavbar.types";
+import type { NavGateContext, SubnavChild } from "./ONavbar.types";
 
 /**
  * The flags every subnav `gate` predicate reads, mirroring EXACTLY what the
@@ -93,4 +99,31 @@ export function useNavGateContext(): ComputedRef<NavGateContext> {
 export function isGateOpen(context: NavGateContext, gate: string): boolean {
   const predicate = GATE_PREDICATES[gate];
   return predicate ? predicate(context) : true;
+}
+
+/**
+ * The children a flyout lists: registered and not hidden by the org. A FeatureKey `gate` marks an
+ * edition-locked child instead of dropping it; a plain gate, or a hidden license, drops it.
+ */
+export function visibleSubnavChildren(
+  children: SubnavChild[],
+  context: NavGateContext,
+  zoConfig: Record<string, unknown> | undefined,
+  hasRoute: (name: string) => boolean,
+): SubnavChild[] {
+  return children
+    .filter((c) => hasRoute(c.name) && !context.hiddenMenus.has(c.name))
+    .flatMap((c): SubnavChild[] => {
+      if (c.gate && isFeatureKey(c.gate)) {
+        const access = checkFeatureAccess(c.gate, buildFeatureGateContext(zoConfig));
+        if (!access.visible) return [];
+        if (!access.allowed) return [{ ...c, locked: true, lockedMessage: access.message }];
+      }
+      // The license applies once the edition allows the feature; a locked license also turns its runtime flag off.
+      const license = c.feature ? featureState(context.features, c.feature) : "enabled";
+      if (license === "hidden") return [];
+      if (license === "locked") return [{ ...c, locked: false, licenseLocked: true }];
+      if (!c.gate) return [{ ...c, locked: false }];
+      return isGateOpen(context, c.gate) ? [{ ...c, locked: false }] : [];
+    });
 }

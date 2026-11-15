@@ -22,22 +22,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @retry="emit('retry')"
     @view-all="emit('viewAll')"
   >
-    <ul class="flex flex-col" data-test="overview-data-health-rows">
-      <li
-        v-for="row in rows"
-        :key="row.key"
-        class="border-border-default flex items-center border-t"
-      >
-        <OverviewDataHealthRow class="min-w-0 flex-1" :row="row" @open="emit('open', $event)" />
-        <span v-if="askVisible" class="flex w-9 shrink-0 justify-center">
-          <OverviewAskAiButton
-            kind="health"
-            :item-key="row.key"
-            :label="row.label"
-            :show="Boolean(askTarget(row))"
-            @ask="emit('askAi', askTarget(row)!)"
-          />
-        </span>
+    <ul class="divide-border-subtle flex flex-col divide-y" data-test="overview-data-health-rows">
+      <li v-for="row in rows" :key="row.key" class="py-0.5">
+        <!-- the row's hover reaches past the column so its text lines up with the heading -->
+        <div class="-mx-3 flex items-center">
+          <OverviewDataHealthRow class="min-w-0 flex-1" :row="row" @open="emit('open', $event)" />
+          <span v-if="askVisible" class="flex w-9 shrink-0 justify-center">
+            <OverviewAskAiButton
+              kind="health"
+              :item-key="row.key"
+              :label="row.label"
+              :show="Boolean(askTarget(row))"
+              @ask="emit('askAi', askTarget(row)!)"
+            />
+          </span>
+        </div>
       </li>
     </ul>
   </OverviewSectionCard>

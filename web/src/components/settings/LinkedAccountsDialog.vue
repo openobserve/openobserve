@@ -84,12 +84,14 @@ const remove = (link: SlackMyLink): void => {
       <OEmptyState
         v-else-if="links.isError.value"
         kind="error"
+        size="compact"
         :title="t('slackApp.linkedAccounts.loadFailed')"
         data-test="linked-accounts-error"
         @action="links.refetch()"
       />
       <OEmptyState
         v-else-if="!rows.length"
+        size="compact"
         icon="link"
         :title="t('slackApp.linkedAccounts.emptyTitle')"
         :text="t('slackApp.linkedAccounts.emptyDetail')"

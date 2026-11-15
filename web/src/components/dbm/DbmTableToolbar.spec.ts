@@ -35,8 +35,8 @@ const mountToolbar = (props: Record<string, unknown> = {}, slot?: string) =>
   });
 
 describe("DbmTableToolbar", () => {
-  // The search fills what the filters leave, as on other list pages; its floor yields before the chips do.
-  it("fills the row after the filters, down to a floor, inside a shrinkable row", () => {
+  // F2: the search is a fixed 280 px field, so the filters sit beside it instead of at the far edge.
+  it("keeps the search a fixed-width field inside a shrinkable row", () => {
     const wrapper = mountToolbar();
 
     expect(wrapper.classes()).toEqual(
@@ -51,14 +51,15 @@ describe("DbmTableToolbar", () => {
       ]),
     );
     expect(wrapper.get('[data-test="dbm-samples-search"]').element.parentElement?.className).toBe(
-      "min-w-48 flex-1 max-lg:order-last max-lg:w-full max-lg:basis-full",
+      "w-70 min-w-0 max-lg:order-last max-lg:w-full max-lg:basis-full",
     );
   });
 
-  it("puts the filters before the search box and the page's notes after it", () => {
+  it("orders the view switcher, the search box, the filters and the page's notes", () => {
     const wrapper = mount(DbmTableToolbar, {
       props: { search: "", placeholder: raw("Search…"), searchDataTest: "dbm-samples-search" },
       slots: {
+        view: '<div data-test="view">Group</div>',
         filters: '<button data-test="filters">Filters</button>',
         default: '<span data-test="note">Sampled</span>',
       },
@@ -68,7 +69,7 @@ describe("DbmTableToolbar", () => {
       (el) =>
         el.getAttribute("data-test") ?? el.querySelector("[data-test]")?.getAttribute("data-test"),
     );
-    expect(order).toEqual(["filters", "dbm-samples-search", "note"]);
+    expect(order).toEqual(["view", "dbm-samples-search", "filters", "note"]);
   });
 
   it("passes the page's placeholder and data-test to the search box", () => {

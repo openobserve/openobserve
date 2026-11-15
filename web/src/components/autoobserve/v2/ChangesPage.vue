@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LiveNoticeState
       v-else-if="live.notice.value"
       :notice="live.notice.value"
-      size="page"
+      size="region"
       :busy="live.busy.value"
       data-test="autoobserve2-activity-error"
       retry-test="autoobserve2-activity-retry"
@@ -124,19 +124,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("autoobserve.activityLive.showMore", { count: capped.more }, capped.more) }}
         </OButton>
       </div>
-      <p
+      <OEmptyState
         v-else
-        class="text-text-secondary py-6 text-center text-sm"
+        kind="filtered"
         data-test="autoobserve2-activity-filter-empty"
-      >
-        {{ t("autoobserve2.activityPage.empty.filter") }}
-      </p>
+        @action="filter = 'all'"
+      />
     </template>
-    <div
-      v-else-if="!live.pending.value"
-      class="bg-surface-base border-border-subtle rounded-surface border py-6 shadow-xs"
-      data-test="autoobserve2-activity-empty"
-    >
+    <div v-else-if="!live.pending.value" data-test="autoobserve2-activity-empty">
       <LiveSurfaceEmpty surface="changes" @action="emit('see-suggestions')" />
     </div>
   </div>
@@ -147,6 +142,7 @@ import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

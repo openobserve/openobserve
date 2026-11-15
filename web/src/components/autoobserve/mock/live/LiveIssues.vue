@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LiveNoticeState
         v-if="notice"
         :notice="notice"
-        size="page"
+        size="region"
         :detail="state.detail"
         :busy="state.busy"
         :data-test="NOTICE_TEST[notice.failure]"
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LiveNoticeState
         v-else-if="!rows.length && !issues.paging.value"
         :notice="pagingOffNotice"
-        size="page"
+        size="region"
         data-test="autoobserve-live-issues-empty-off"
       />
       <OEmptyState

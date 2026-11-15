@@ -81,15 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </span>
 
-        <div
+        <OEmptyState
           v-if="!picked.length"
-          class="text-text-secondary flex flex-col items-center gap-1 py-10 text-center"
+          size="compact"
+          icon="fact-check"
+          :title="t('aiObservability.annotate.emptyTitle')"
+          :text="t('aiObservability.annotate.emptyBody')"
           data-test="annotate-drawer-empty"
-        >
-          <OIcon name="fact-check" class="text-text-disabled h-8 w-8" />
-          <span class="text-sm">{{ t("aiObservability.annotate.emptyTitle") }}</span>
-          <span class="text-xs">{{ t("aiObservability.annotate.emptyBody") }}</span>
-        </div>
+        />
 
         <div
           v-for="dimension in picked"
@@ -200,6 +199,7 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmQueuesService, { type LlmScoreConfigOption } from "@/services/llm-queues.service";
 import llmAnnotationsService, { type AnnotationScope } from "@/services/llm-annotations.service";

@@ -21,8 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('pipeline.backfillJobDetailsTitle')"
     data-test="backfill-job-details-dialog"
   >
-    <div v-if="loading" class="flex justify-center p-4">
-      <OSpinner size="lg" />
+    <div v-if="loading" class="flex flex-col gap-5">
+      <OSkeleton shape="block" class="h-8" />
+      <OSkeleton shape="block" class="h-40" />
+      <OSkeleton shape="block" class="h-24" />
     </div>
 
     <div v-else-if="job" class="flex flex-col gap-5">
@@ -226,7 +228,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import { formatDistanceToNow } from "date-fns";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";

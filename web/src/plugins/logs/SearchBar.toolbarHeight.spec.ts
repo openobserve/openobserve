@@ -62,6 +62,10 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
     expect(button.classes()).toContain(TOOLBAR_BUTTON_HEIGHT_CLASS);
     expect(button.classes()).toContain("text-compact");
   };
+  // Icon-only controls are md squares.
+  const expectToolbarSquare = (dataTest: string) => {
+    expect(wrapper!.get(`[data-test="${dataTest}"]`).classes()).toContain("size-control-md");
+  };
 
   beforeEach(() => {
     resetLogsAutoRunForTests(store);
@@ -80,19 +84,19 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
     vi.restoreAllMocks();
   });
 
-  it("gives Reset, the pinned switches and More the md control height at desktop width", async () => {
+  it("gives Reset, the pinned toggles and ⋯ the md control height at desktop width", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
     expect(wrapper.find('[data-test="logs-logs-toggle"]').exists()).toBe(true);
+    expectToolbarHeight("logs-search-bar-reset-filters-btn");
     for (const dataTest of [
-      "logs-search-bar-reset-filters-btn",
       "logs-search-bar-histogram-btn",
       "logs-search-bar-sql-mode-pinned-btn",
       "logs-search-bar-quick-mode-pinned-btn",
       "logs-search-bar-utilities-menu-btn",
     ]) {
-      expectToolbarHeight(dataTest);
+      expectToolbarSquare(dataTest);
     }
   });
 
@@ -102,7 +106,7 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
 
     expect(wrapper.find('[data-test="logs-logs-toggle"]').exists()).toBe(false);
     expectToolbarHeight("logs-view-mode-dropdown-btn");
-    expectToolbarHeight("logs-search-bar-utilities-menu-btn");
+    expectToolbarSquare("logs-search-bar-utilities-menu-btn");
   });
 
   it("raises every right-hand control to the same md control height", async () => {
@@ -119,14 +123,10 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
       await flushPromises();
 
       const classesOf = (dataTest: string) => wrapper!.get(`[data-test="${dataTest}"]`).classes();
-      expect(classesOf("logs-search-bar-more-options-btn")).toContain("size-control-md");
-      expect(classesOf("logs-search-bar-share-link-btn")).toContain("size-control-md");
-      for (const dataTest of [
-        "logs-search-bar-function-editor-pinned-btn",
-        "logs-search-bar-refresh-btn",
-      ]) {
-        expect(classesOf(dataTest)).toContain(TOOLBAR_BUTTON_HEIGHT_CLASS);
-      }
+      expect(classesOf("logs-search-bar-utilities-menu-btn")).toContain("size-control-md");
+      expect(classesOf("logs-search-bar-function-editor-pinned-btn")).toContain("size-control-md");
+      expect(classesOf("logs-search-bar-refresh-btn")).toContain(TOOLBAR_BUTTON_HEIGHT_CLASS);
+      expect(wrapper.find('[data-test="logs-search-bar-share-link-btn"]').exists()).toBe(false);
       expect(classesOf("logs-search-bar-refresh-cache-dropdown-trigger")).toContain(
         "size-control-md",
       );
@@ -143,7 +143,18 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
       ).toContain("h-control-md");
       const runButton = wrapper.get('[data-test="logs-search-bar-refresh-btn"]').element;
       expect(runButton.nextElementSibling!.classList).toContain("h-8.5!");
-      expect(classesOf("logs-search-bar-refresh-interval-btn")).toContain("size-control-md");
+      expect(classesOf("logs-search-bar-data-age-refresh")).toContain(TOOLBAR_BUTTON_HEIGHT_CLASS);
+      expect(classesOf("logs-search-bar-data-age-refresh-auto-menu")).toContain("size-control-md");
+      expect(wrapper.find('[data-test^="logs-search-bar-refresh-interval-btn"]').exists()).toBe(
+        false,
+      );
+      const runGroup = wrapper.get('[data-test="logs-search-bar-refresh-btn"]').element
+        .parentElement!;
+      expect(
+        runGroup.nextElementSibling!.querySelector(
+          '[data-test="logs-search-bar-data-age-refresh"]',
+        ),
+      ).not.toBeNull();
       // The bordered function box is the md control, so its buttons are sm to fit inside the border.
       expect(wrapper.get(".function-selector").classes()).toContain(TOOLBAR_BUTTON_HEIGHT_CLASS);
       for (const dataTest of [

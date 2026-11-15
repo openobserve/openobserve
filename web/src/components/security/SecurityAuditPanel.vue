@@ -81,6 +81,7 @@ const forbidden = computed(() => (query.error.value ? forbiddenState(query.error
         data-test="security-audit-include-reads"
       />
       <ORefreshButton
+        :last-run-at="query.dataUpdatedAt.value || null"
         :loading="query.isFetching.value"
         data-test="security-audit-refresh"
         @click="query.refetch()"
@@ -88,7 +89,7 @@ const forbidden = computed(() => (query.error.value ? forbiddenState(query.error
     </template>
     <OEmptyState
       v-if="page && !page.audit_enabled"
-      size="inline"
+      size="compact"
       icon="history"
       :title="t('siem.audit.disabled')"
       :text="t('siem.audit.disabledHint')"
@@ -132,7 +133,6 @@ const forbidden = computed(() => (query.error.value ? forbiddenState(query.error
       </template>
       <template #empty>
         <OEmptyState
-          size="inline"
           icon="task-alt"
           :title="t('siem.audit.empty')"
           :text="t('siem.audit.emptyHint')"

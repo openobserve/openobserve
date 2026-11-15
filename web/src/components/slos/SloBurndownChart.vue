@@ -108,27 +108,28 @@
       </PanelBar>
 
       <div class="h-60 w-full">
-        <div
+        <OSkeleton
           v-if="loading"
-          class="flex h-full items-center justify-center"
+          preset="chart"
+          class="h-full p-4"
           :data-test="`slos-sloburndownchart-${panel.key}-loading`"
-        >
-          <OSpinner size="lg" />
-        </div>
-        <div
+        />
+        <OEmptyState
           v-else-if="error"
-          class="flex h-full items-center justify-center px-4 text-center"
+          kind="error"
+          size="compact"
+          class="px-4"
+          :title="raw(error)"
           :data-test="`slos-sloburndownchart-${panel.key}-error`"
-        >
-          <span class="text-text-secondary text-sm">{{ error }}</span>
-        </div>
-        <div
+        />
+        <OEmptyState
           v-else-if="!hasData"
-          class="flex h-full items-center justify-center px-4 text-center"
+          size="compact"
+          class="px-4"
+          icon="bar-chart"
+          :title="t('slos.chart.empty')"
           :data-test="`slos-sloburndownchart-${panel.key}-empty`"
-        >
-          <span class="text-text-secondary text-sm">{{ t("slos.chart.empty") }}</span>
-        </div>
+        />
         <ChartRenderer
           v-else
           :data="{ options: panel.options }"
@@ -141,13 +142,14 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { format } from "date-fns";
 
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import searchService from "@/services/search";

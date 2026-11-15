@@ -610,14 +610,15 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.find('[data-test="rum-player-traces-tab-error"]').exists()).toBe(true);
     });
 
-    it("should display the error message text", async () => {
+    it("should say what failed without the raw error text", async () => {
       wrapper.unmount();
       mockSearch.mockRejectedValue(new Error("Network error"));
 
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Network error");
+      expect(wrapper.text()).toContain(i18n.global.t("rum.failedToFetchTraces"));
+      expect(wrapper.text()).not.toContain("Network error");
     });
 
     it("should render retry button in error state", async () => {

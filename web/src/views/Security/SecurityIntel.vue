@@ -11,6 +11,7 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -26,6 +27,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -106,6 +108,7 @@ const windowUs = computed(() => ({
 const tables = ref<IntelTable[]>([]);
 const indicators = ref<Indicator[]>([]);
 const loading = ref(false);
+const indicatorsLoadedAt = ref<number | null>(null);
 const loadError = ref("");
 /** The list read was refused; threat-intel lists are enrichment tables, read with their own grant. */
 const loadRefusal = shallowRef<unknown>(null);
@@ -154,6 +157,7 @@ async function loadIndicators(): Promise<boolean> {
       });
     });
     indicators.value = all;
+    indicatorsLoadedAt.value = Date.now();
     tableColumns.value = Object.fromEntries(
       list.map((tb, i) => [tb.name, reads[i]?.columns ?? []]),
     );
@@ -940,10 +944,7 @@ async function onSaved() {
       :reason="raw(forbiddenReason(loadRefusal))"
       data-test="security-intel-access-lock"
     />
-    <div
-      v-else-if="!loading && !tables.length && !loadError"
-      class="flex min-h-0 flex-1 items-center justify-center"
-    >
+    <div v-else-if="!loading && !tables.length && !loadError" class="flex min-h-0 flex-1 flex-col">
       <OEmptyState
         icon="radar"
         :title="t('siem.intel.empty.title')"
@@ -1067,16 +1068,12 @@ async function onSaved() {
           </div>
         </template>
         <template #toolbar-trailing>
-          <OButton
-            icon-only
-            variant="ghost"
-            icon="refresh"
+          <ORefreshButton
+            :last-run-at="sweep.lastRunAt.value"
             :loading="loading || sweep.running.value"
             data-test="security-intel-refresh"
             @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('siem.intel.refresh')" />
-          </OButton>
+          />
         </template>
         <template #cell-indicator="{ row }">
           <span class="text-text-heading truncate font-mono text-xs font-semibold">{{
@@ -1126,7 +1123,7 @@ async function onSaved() {
           <OEmptyState
             kind="error"
             :title="t('siem.intel.loadFailed')"
-            :text="raw(message)"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             @action="refresh"
           />
         </template>
@@ -1213,16 +1210,12 @@ async function onSaved() {
           </div>
         </template>
         <template #toolbar-trailing>
-          <OButton
-            icon-only
-            variant="ghost"
-            icon="refresh"
+          <ORefreshButton
+            :last-run-at="indicatorsLoadedAt"
             :loading="loading"
             data-test="security-intel-indicators-refresh"
             @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('siem.intel.refresh')" />
-          </OButton>
+          />
         </template>
         <template #cell-indicator="{ row }">
           <span
@@ -1275,7 +1268,7 @@ async function onSaved() {
           <OEmptyState
             kind="error"
             :title="t('siem.intel.loadFailed')"
-            :text="raw(message)"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             @action="refresh"
           />
         </template>
@@ -1361,7 +1354,7 @@ async function onSaved() {
           </div>
           <OEmptyState
             v-if="!sweep.coverage.value.length && !sweep.running.value"
-            size="inline"
+            size="compact"
             icon="fact-check"
             :title="t('siem.intel.noCoverage')"
           />

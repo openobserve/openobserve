@@ -45,20 +45,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #toolbar-trailing>
-            <OButton
-              icon-only
-              variant="ghost"
-              icon="refresh"
+            <ORefreshButton
+              :last-run-at="lastUpdatedAt"
               :loading="loading"
+              shortcut="orgManagementRefresh"
               data-test="org-management-list-refresh-btn"
               @click="getData"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut="orgManagementRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -541,6 +534,7 @@ import { useRouter } from "vue-router";
 import OrganizationServices from "@/services/organizations";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -590,6 +584,7 @@ export default defineComponent({
     OBadge,
     OrgCleanupTasksDialog,
     OButton,
+    ORefreshButton,
     ODialog,
     ODropdown,
     ODropdownItem,
@@ -612,6 +607,7 @@ export default defineComponent({
     const extendTrialDataRow = ref();
     const extendedTrial = ref(1);
     const loading = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
     const extendTrialPrompt = ref(false);
     const tabledata = ref<any>([]);
@@ -968,6 +964,7 @@ export default defineComponent({
 
           tabledata.value = data;
           resultTotal.value = responseData.length;
+          lastUpdatedAt.value = Date.now();
           loading.value = false;
           dismiss();
         })
@@ -1358,6 +1355,7 @@ export default defineComponent({
       resultTotal,
       tabledata,
       loading,
+      lastUpdatedAt,
       forbidden,
       extendedTrial,
       extendTrialPrompt,

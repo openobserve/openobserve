@@ -23,7 +23,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import searchService from "@/services/search";
 import DependencyMap, { type MapEdge, type MapNode } from "./kubernetes2/DependencyMap.vue";
@@ -58,6 +58,8 @@ const emit = defineEmits<{
   refresh: [];
   // While the map reloads, so the page's Refresh can show it.
   loading: [loading: boolean];
+  // When the map last loaded, the age the page's Refresh shows.
+  loaded: [at: number];
   "update:lowTraffic": [show: boolean];
 }>();
 
@@ -69,7 +71,6 @@ const loading = ref(false);
 const loadError = ref(false);
 const forbidden = ref(false);
 const loaded = ref(false);
-const lastUpdatedAt = ref<number | null>(null);
 const selectedEdgeId = ref<string | null>(null);
 
 const windowS = computed(() => flowWindowSeconds(props.range.start, props.range.end));
@@ -107,7 +108,7 @@ async function load() {
     series.value = parseVector(out);
     loaded.value = true;
     loadedFor = scopeKey;
-    lastUpdatedAt.value = Date.now();
+    emit("loaded", Date.now());
   } catch (e: any) {
     if (gen !== generation) return;
     loadError.value = true;
@@ -223,10 +224,6 @@ const wholeRange = computed(
   () => Math.round((props.range.end - props.range.start) / 1_000_000) === windowS.value,
 );
 
-const updatedAt = computed(() =>
-  lastUpdatedAt.value ? new Date(lastUpdatedAt.value).toLocaleTimeString() : "",
-);
-
 // Whole days or hours when exact, else minutes, so a 90 minute window does not read as 1h.
 const windowText = computed(() => {
   const minutes = Math.round(windowS.value / 60);
@@ -316,16 +313,6 @@ function onSetUp() {
         data-test="hosts-deps-show-low-traffic"
         @update:model-value="(show: unknown) => emit('update:lowTraffic', !!show)"
       />
-      <!-- The page's Refresh reloads the map; this only says how fresh it is. -->
-      <OText
-        v-if="updatedAt"
-        tag="span"
-        class="text-text-secondary ms-auto flex items-center gap-1.5 text-xs"
-        data-test="hosts-deps-updated"
-      >
-        <OSpinner v-if="loading" />
-        {{ t("refreshButton.lastRefreshed", { time: updatedAt }) }}
-      </OText>
     </div>
     <OEmptyState
       v-if="forbidden"
@@ -342,13 +329,12 @@ function onSetUp() {
       data-test="hosts-deps-error"
       @action="emit('refresh')"
     />
-    <div
+    <OSkeleton
       v-else-if="!loaded"
-      class="flex min-h-60 flex-1 items-center justify-center"
+      shape="block"
+      class="min-h-60 flex-1"
       data-test="hosts-deps-loading"
-    >
-      <OSpinner size="lg" />
-    </div>
+    />
     <OEmptyState
       v-else-if="!edges.length && allEdges.length"
       kind="filtered"

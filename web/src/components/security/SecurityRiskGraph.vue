@@ -10,7 +10,7 @@ import { Controls } from "@vue-flow/controls";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { ENTITY_KINDS, type EntityKind } from "@/utils/security/streamPlan";
@@ -89,9 +89,7 @@ function onNodeClick({ node }: { node: { data?: RiskNode } }) {
       </span>
     </div>
 
-    <div v-if="loading && !graph.nodes.length" class="flex flex-1 items-center justify-center">
-      <OSpinner size="lg" />
-    </div>
+    <OSkeleton v-if="loading && !graph.nodes.length" shape="block" class="mt-2 min-h-100 flex-1" />
     <OEmptyState
       v-else-if="!graph.nodes.length"
       icon="share"

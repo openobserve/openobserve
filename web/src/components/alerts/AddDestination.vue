@@ -147,10 +147,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :hide-actions="true"
                 data-test="prebuilt-form"
               />
-              <div v-else-if="isUpdatingDestination" class="p-3 text-center">
-                <OSpinner size="lg" data-test="add-destination-loading-indicator" />
-                <div class="text-text-muted mt-2">{{ t("alert_destinations.loadingData") }}</div>
-              </div>
+              <OSkeleton
+                v-else-if="isUpdatingDestination"
+                preset="tableRows"
+                :rows="4"
+                data-test="add-destination-loading-indicator"
+              />
 
               <!-- Template selector for prebuilt destinations -->
               <div
@@ -598,7 +600,7 @@ import {
   switchToSlackApp,
   type SlackAppDestination,
 } from "@/utils/slackAppDestination";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import {

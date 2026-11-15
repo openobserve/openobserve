@@ -17,57 +17,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto pb-4">
     <OEmptyState
-      class="w-full shrink-0"
+      class="shrink-0"
       icon="search-off"
       data-test="logs-no-fts-panel"
       :title="title"
       :text="description"
     >
       <template #actions>
-        <EmptyStateActionCard
-          :hide-chevron="true"
-          size="compact"
-          icon="search"
-          :label="t('search.noFtsRecovery.searchField')"
-          :sublabel="t('search.noFtsRecovery.searchFieldHint', { term })"
+        <OButton
+          variant="primary"
           data-test="logs-no-fts-search-fields-btn"
           @click="openFieldSearch"
-        />
-        <EmptyStateActionCard
-          :hide-chevron="true"
-          size="compact"
-          icon="list"
-          :label="t('search.noFtsRecovery.clearRun')"
-          :sublabel="t('search.noFtsRecovery.clearRunHint', { term })"
-          data-test="logs-no-fts-clear-run-btn"
-          @click="emit('clear-run')"
-        />
-        <EmptyStateActionCard
-          :hide-chevron="true"
-          size="compact"
-          v-if="configureStream"
-          icon="settings"
-          :label="t('search.freeTextSetField')"
-          :sublabel="
-            canConfigure
-              ? t('search.noFtsRecovery.configureHint')
-              : t('search.noFtsRecovery.editPermission')
-          "
-          :unavailable="!canConfigure"
-          :aria-describedby="!canConfigure ? permissionId : undefined"
-          data-test="logs-no-fts-configure-btn"
-          @click="canConfigure && emit('configure', configureStream)"
-        />
+        >
+          {{ t("search.noFtsRecovery.searchField") }}
+        </OButton>
+        <OButton data-test="logs-no-fts-clear-run-btn" @click="emit('clear-run')">
+          {{ t("search.noFtsRecovery.clearRun") }}
+        </OButton>
       </template>
-      <template v-if="streams.length > 1 && withoutText.length" #extra>
-        <span class="text-text-secondary text-sm" data-test="logs-no-fts-no-text-streams">
+      <template v-if="configureStream || (streams.length > 1 && withoutText.length)" #extra>
+        <OButton
+          v-if="configureStream"
+          variant="link"
+          :disabled="!canConfigure"
+          :disabled-reason="canConfigure ? undefined : t('search.noFtsRecovery.editPermission')"
+          data-test="logs-no-fts-configure-btn"
+          @click="emit('configure', configureStream)"
+        >
+          {{ t("search.freeTextSetField") }}
+        </OButton>
+        <span v-if="configureStream && canConfigure" class="text-text-secondary text-compact">
+          {{ t("search.noFtsRecovery.configureHint") }}
+        </span>
+        <span
+          v-if="streams.length > 1 && withoutText.length"
+          class="text-text-secondary text-compact"
+          data-test="logs-no-fts-no-text-streams"
+        >
           {{ t("search.freeTextNoTextFieldsNamed", { streams: withoutText.join(", ") }) }}
         </span>
       </template>
     </OEmptyState>
-    <span v-if="!canConfigure" :id="permissionId" class="sr-only">{{
-      t("search.noFtsRecovery.editPermission")
-    }}</span>
     <div v-if="fieldSearchOpen" class="px-page-edge w-full shrink-0 pb-4">
       <LogsNoFtsFieldSearch
         :streams="recoveryStreams"
@@ -81,10 +71,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, useId } from "vue";
+import { computed, toRef } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import LogsNoFtsFieldSearch from "./LogsNoFtsFieldSearch.vue";
 import type { NoFtsRecoveryStream, NoFtsFieldSubmission } from "./LogsNoFtsFieldSearch.schema";
 import { useNoFtsRecovery } from "./useNoFtsRecovery";
@@ -111,7 +101,6 @@ const { t } = useI18nTyped();
 const { canConfigure, fieldSearchOpen, openFieldSearch, closeFieldSearch } = useNoFtsRecovery(
   toRef(props, "configureDenied"),
 );
-const permissionId = `${useId()}-configure-reason`;
 
 const withoutText = computed(() =>
   props.streams.filter((stream) => !stream.hasTextFields).map((stream) => stream.name),

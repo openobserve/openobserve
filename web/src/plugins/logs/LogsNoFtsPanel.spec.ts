@@ -38,7 +38,7 @@ describe("LogsNoFtsPanel (J3 with scan mode off)", () => {
     const wrapper = mountPanel([{ name: "nofts", hasTextFields: true }], { term: "" });
     expect(wrapper.text()).not.toContain("“”");
     expect(wrapper.text()).toContain("clear the whole query");
-    expect(wrapper.text()).toContain("keeping excluded words");
+    expect(wrapper.text()).toContain("Search a specific field");
     wrapper.unmount();
   });
 

@@ -105,3 +105,16 @@ describe("RoleTable member count columns", () => {
     wrapper.unmount();
   });
 });
+
+describe("RoleTable failed load", () => {
+  it("shows the error state with Retry instead of the first-run one, and re-emits retry", async () => {
+    const wrapper = mountTable([], { error: "OpenFGA store not initialized yet" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="o2-table-error"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("No roles yet");
+
+    await wrapper.find('[data-test="o2-table-error-retry-btn"]').trigger("click");
+    expect(wrapper.emitted("retry")).toHaveLength(1);
+    wrapper.unmount();
+  });
+});

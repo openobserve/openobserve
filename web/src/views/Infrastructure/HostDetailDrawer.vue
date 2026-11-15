@@ -26,7 +26,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
@@ -276,59 +277,58 @@ const statusLabel = computed(() =>
       </div>
 
       <div class="border-border-default min-h-0 flex-1 overflow-y-auto border-t pt-2">
-        <div
+        <OEmptyState
           v-if="curated.face.value === 'unknown' && curated.loadError.value"
-          class="flex flex-col items-center gap-2 py-6"
+          kind="error"
+          :text="t('infra.curated.pageError')"
+          data-test="host-drawer-metrics-error"
         >
-          <OText variant="meta">{{ t("infra.curated.pageError") }}</OText>
-          <OButton
-            variant="secondary"
-            data-test="host-drawer-metrics-retry"
-            @click="resolveMetrics(true)"
-          >
-            {{ t("infra.curated.retry") }}
-          </OButton>
-        </div>
+          <template #actions>
+            <OButton data-test="host-drawer-metrics-retry" @click="resolveMetrics(true)">
+              {{ t("infra.curated.retry") }}
+            </OButton>
+          </template>
+        </OEmptyState>
         <div
           v-else-if="curated.face.value === 'unknown'"
-          class="flex justify-center py-6"
-          data-test="host-drawer-metrics-spinner"
+          class="grid grid-cols-1 gap-3 py-2"
+          data-test="host-drawer-metrics-loading"
         >
-          <OSpinner size="lg" />
+          <OSkeleton v-for="panel in 3" :key="panel" shape="block" class="h-48" />
         </div>
         <!-- The streams exist and merely stopped reporting: "install a collector"
              is the wrong instruction for a host that already had one. -->
-        <div
+        <OEmptyState
           v-else-if="curated.face.value === 'dormant'"
-          class="flex flex-col gap-2 py-6"
+          icon="hourglass-empty"
+          :title="t('infra.curated.dormantHeadline', { workload: t('menu.hosts') })"
+          :text="t('infra.curated.dormantBody')"
           data-test="host-drawer-metrics-dormant"
         >
-          <OText tag="h3" class="text-lg font-semibold">{{
-            t("infra.curated.dormantHeadline", { workload: t("menu.hosts") })
-          }}</OText>
-          <OText variant="meta">{{ t("infra.curated.dormantBody") }}</OText>
-          <OInlineNotice
-            v-if="dormantStreams.length"
-            tone="warn"
-            data-test="host-drawer-metrics-dormant-streams"
-            :message="
-              t('infra.curated.streamsStale', {
-                list: raw(dormantStreams.map((entry) => entry.name).join(', ')),
-                date: dormantDate,
-              })
-            "
-          />
-        </div>
+          <template v-if="dormantStreams.length" #extra>
+            <div class="w-full text-start">
+              <OInlineNotice
+                tone="warn"
+                data-test="host-drawer-metrics-dormant-streams"
+                :message="
+                  t('infra.curated.streamsStale', {
+                    list: raw(dormantStreams.map((entry) => entry.name).join(', ')),
+                    date: dormantDate,
+                  })
+                "
+              />
+            </div>
+          </template>
+        </OEmptyState>
 
         <!-- No host metrics at all: name the missing receiver rather than offering
              a panel editor this read-only surface does not have. -->
-        <div
+        <OEmptyState
           v-else-if="curated.face.value === 'undetected' || !hasPanels"
-          class="flex flex-col gap-2 py-6"
+          :title="t('infra.curated.hostMetricsMissingTitle')"
+          :text="t('infra.curated.partialTelemetryHosts')"
           data-test="host-drawer-metrics-undetected"
-        >
-          <OText variant="meta">{{ t("infra.curated.partialTelemetryHosts") }}</OText>
-        </div>
+        />
 
         <RenderDashboardCharts
           v-else

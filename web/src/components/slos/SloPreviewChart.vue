@@ -83,32 +83,33 @@
              that to the panel renderer — so this side has the states the
              renderer would otherwise have drawn. -->
         <template v-if="isPromql">
-          <div
+          <OSkeleton
             v-if="loading"
-            class="flex h-full items-center justify-center"
+            preset="chart"
+            class="h-full p-4"
             :data-test="`slos-slopreviewchart-${panel.key}-loading`"
-          >
-            <OSpinner size="lg" />
-          </div>
-          <div
+          />
+          <OEmptyState
             v-else-if="error"
-            class="flex h-full items-center justify-center px-4 text-center"
+            kind="error"
+            size="compact"
+            class="px-4"
+            :title="raw(error)"
             :data-test="`slos-slopreviewchart-${panel.key}-error`"
-          >
-            <span class="text-text-secondary text-sm">{{ error }}</span>
-          </div>
+          />
           <ChartRenderer
             v-else-if="panel.options"
             :data="{ options: panel.options }"
             :data-test="`slos-slopreviewchart-${panel.key}-chart`"
           />
-          <div
+          <OEmptyState
             v-else
-            class="flex h-full items-center justify-center px-4 text-center"
+            size="compact"
+            class="px-4"
+            icon="bar-chart"
+            :title="promqlEmptyNotice"
             :data-test="`slos-slopreviewchart-${panel.key}-empty`"
-          >
-            <span class="text-text-secondary text-sm">{{ promqlEmptyNotice }}</span>
-          </div>
+          />
         </template>
         <PanelSchemaRenderer
           v-else-if="panel.schema"
@@ -120,15 +121,14 @@
           searchType="ui"
           :data-test="`slos-slopreviewchart-${panel.key}-panel`"
         />
-        <div
+        <OEmptyState
           v-else
-          class="flex h-full items-center justify-center"
+          size="compact"
+          class="px-4"
+          icon="bar-chart"
+          :title="t('slos.preview.needsDefinition')"
           :data-test="`slos-slopreviewchart-${panel.key}-empty`"
-        >
-          <span class="text-text-secondary text-sm">
-            {{ t("slos.preview.needsDefinition") }}
-          </span>
-        </div>
+        />
       </div>
     </div>
   </div>
@@ -137,12 +137,13 @@
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { chartAxisLine, chartColor, chartTextColor } from "@/utils/chartTheme";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";

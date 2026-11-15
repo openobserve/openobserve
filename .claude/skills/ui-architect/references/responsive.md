@@ -240,10 +240,9 @@ the same recipe so it never takes two rows of chrome:
   pane `max-md:h-auto max-md:min-h-0`.
 - A fixed-height region whose content grows on phones scrolls: `max-lg:overflow-y-auto`,
   and grids that must size to content use `max-lg:auto-rows-min`.
-- `OEmptyState` compacts itself below md (smaller icon tile, title and padding) so
-  the whole state — action included — fits one phone screen; it
-  also scrolls with safe centering below lg. Never size an empty state per page;
-  custom hero content goes in a `max-lg:overflow-y-auto` container.
+- `OEmptyState` keeps its 64 px top offset at every width and narrows its side padding
+  below md, so the whole state fits one phone screen. Never size or centre an empty state
+  per page; custom hero content goes in a `max-lg:overflow-y-auto` container.
 - `OBanner` and `OInlineNotice` keep their one action beside the message; a long
   message wraps, so do not stack the action under it by hand.
 - Full-viewport shells use `h-dvh`, never `100vh` (mobile browser chrome overlaps it).
@@ -320,7 +319,7 @@ the same recipe so it never takes two rows of chrome:
 - **An `OEmptyState` in a scroll pane clips itself.** Its root is
   `overflow-hidden`; as a flex child of a `flex-col overflow-y-auto` pane it shrinks
   to the pane and cuts off its own list and actions instead of letting the pane
-  scroll. Give it `shrink-0`, and centre with `justify-center-safe` on the pane.
+  scroll. Give it `shrink-0`; never centre it on the pane (R3 pins it 64 px from the top).
 - **Six tiles to a row leave a title ~110px.** "DaemonSets unavailable" was cut at
   1280, every Health title at 1024 and "Contain…" at 768. Panel titles wrap to two
   lines below lg (`max-lg:line-clamp-2 max-lg:whitespace-normal`); a page whose

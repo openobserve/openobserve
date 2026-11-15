@@ -64,9 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ issue.actionLabel }}
         </OButton>
       </div>
-      <div v-if="!issues.length" class="text-text-secondary px-4 py-3 text-sm">
-        {{ t("fleet.flowIssues.noIssues") }}
-      </div>
+      <OEmptyState
+        v-if="!issues.length"
+        size="compact"
+        icon="task-alt"
+        class="px-4"
+        :title="t('fleet.flowIssues.noIssues')"
+      />
     </div>
     <div
       v-if="fleetId || !hideConfig"
@@ -99,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { SEVERITY_DOT, SEVERITY_TEXT, type IssueAction, type PathIssue } from "./flowIssues";

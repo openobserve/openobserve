@@ -175,9 +175,7 @@ describe("AwsMarketplaceSetup", () => {
     await nextTick();
 
     expect(wrapper.text()).toContain("Test error message");
-    const icon = wrapper.findComponent({ name: "OIcon" });
-    expect(icon.exists()).toBe(true);
-    expect(icon.props("name")).toBe("error");
+    expect(wrapper.find('[data-o2-empty="region"][data-kind="error"]').exists()).toBe(true);
   });
 
   it("should display payment failed state", async () => {

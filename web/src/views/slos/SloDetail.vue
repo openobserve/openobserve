@@ -291,7 +291,7 @@
       </OTabPanels>
     </div>
 
-    <OContent v-if="notFound" class="py-6">
+    <OContent v-if="notFound">
       <OEmptyState
         :title="t('slos.notFound')"
         :text="t('slos.notFoundDescription')"

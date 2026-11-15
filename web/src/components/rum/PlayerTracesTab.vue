@@ -26,37 +26,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <small>{{ t("rum.loadingErrorDetails") }}</small>
     </div>
 
-    <!-- Error state -->
-    <div
+    <OEmptyState
       v-else-if="error"
-      class="flex h-full flex-col items-center justify-center gap-4 p-4"
+      kind="error"
+      size="compact"
+      class="px-4"
+      :title="t('rum.failedToFetchTraces')"
       data-test="rum-player-traces-tab-error"
     >
-      <OIcon name="error-outline" size="lg" class="text-status-error-text" />
-      <p class="text-center">{{ error }}</p>
-      <OButton variant="secondary" @click="fetchTraces" data-test="rum-player-traces-tab-retry-btn">
-        {{ t("common.retry") }}
-      </OButton>
-    </div>
+      <template #actions>
+        <OButton
+          variant="secondary"
+          size="sm"
+          data-test="rum-player-traces-tab-retry-btn"
+          @click="fetchTraces"
+        >
+          {{ t("common.retry") }}
+        </OButton>
+      </template>
+    </OEmptyState>
 
-    <!-- Empty state -->
-    <div
+    <OEmptyState
       v-else-if="correlatedViews.length === 0"
-      class="flex h-full flex-col items-center justify-center gap-3 p-4"
+      size="compact"
+      class="px-4"
+      icon="timeline"
+      :title="t('rum.noCorrelatedTraces')"
       data-test="rum-player-traces-tab-empty"
     >
-      <OIcon name="info" size="lg" class="text-text-muted" />
-      <p class="text-text-secondary text-center">
-        {{ t("rum.noCorrelatedTraces") }}
-      </p>
-      <OTag
-        v-if="sessionTracesIncomplete"
-        type="logsResultChip"
-        value="warn"
-        data-test="rum-player-traces-tab-partial-empty"
-        >{{ t("common.partialResults") }}</OTag
-      >
-    </div>
+      <template v-if="sessionTracesIncomplete" #extra>
+        <OTag type="logsResultChip" value="warn" data-test="rum-player-traces-tab-partial-empty">{{
+          t("common.partialResults")
+        }}</OTag>
+      </template>
+    </OEmptyState>
 
     <!-- Detail view: embedded TraceDetails -->
     <div v-else-if="selectedTrace" class="flex h-full flex-col overflow-hidden">
@@ -301,6 +304,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

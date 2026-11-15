@@ -15,36 +15,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex w-full flex-col items-center justify-center gap-2 text-2xl">
-    <img
-      class="mt-[20vh] size-50"
-      data-test="no-organization-selected-image"
-      :src="getImageURL('images/common/selectOrganization.svg')"
-      alt=""
-    />
-    <div data-test="no-organization-selected-title" class="m-0 text-lg font-semibold">
-      {{ t("ticket.noOrganizationSelected") }}
-    </div>
-    <div
-      data-test="no-organization-selected-message"
-      class="text-text-secondary m-0 text-sm leading-5 font-normal"
-    >
-      {{ t("ticket.selectOrganizationForQuota") }}
-    </div>
-  </div>
+  <OEmptyState
+    icon="corporate-fare"
+    :title="t('ticket.noOrganizationSelected')"
+    :text="t('ticket.selectOrganizationForQuota')"
+    data-test="no-organization-selected"
+  />
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import { getImageURL } from "../../../utils/zincutils";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "NoOrganizationSelected",
+  components: { OEmptyState },
   setup() {
     const { t } = useI18nTyped();
 
-    return { t, getImageURL };
+    return { t };
   },
 });
 </script>

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <div
       v-if="streamMissing"
-      class="absolute inset-0 z-10 flex items-center justify-center"
+      class="absolute inset-0 z-10 flex flex-col"
       data-test="billings-usagechart-waiting"
     >
       <OEmptyState

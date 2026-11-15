@@ -261,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
+                v-if="absolutePanelMounted"
                 role="tabpanel"
                 class="col-start-1 row-start-1"
                 :class="selectedType === 'absolute' ? '' : 'pointer-events-none invisible'"
@@ -612,6 +613,14 @@ export default defineComponent({
     );
     const { t, locale } = useI18nTyped();
     const selectedType = ref("relative");
+    // The calendar and time fields cost much of the first open; they mount once Absolute shows and stay until the next open.
+    const absoluteShown = ref(false);
+    watch(selectedType, (type) => {
+      if (type === "absolute") absoluteShown.value = true;
+    });
+    const absolutePanelMounted = computed(
+      () => selectedType.value === "absolute" || absoluteShown.value,
+    );
     const selectedTime = ref({
       startTime: "00:00:00",
       endTime: "23:59:59",
@@ -713,23 +722,30 @@ export default defineComponent({
       return offset;
     };
 
+    const timezoneOption = (tz: string) => {
+      const isBrowser = tz === browserTime;
+      const zone = isBrowser ? browserTz : tz;
+      const offset = zoneOffset(zone);
+      const suffix = offset ? raw(`UTC${offset}`) : undefined;
+      if (isBrowser) {
+        return { label: t("common.browserTimeWithZone", { zone: browserTz }), suffix, value: tz };
+      }
+      if (tz === "UTC") return { label: raw(tz), suffix, value: tz };
+      return {
+        label: raw(offset ? `${tz} (UTC${offset})` : tz),
+        listLabel: raw(tz),
+        suffix,
+        value: tz,
+      };
+    };
+
+    // Every zone's offset is one Intl formatter, a long task on the picker's first open, so the
+    // closed select carries only the chosen zone and the full list is built when it opens.
     const timezoneSelectOptions = computed(() =>
-      timezoneOptions.map((tz: string) => {
-        const isBrowser = tz === browserTime;
-        const zone = isBrowser ? browserTz : tz;
-        const offset = zoneOffset(zone);
-        const suffix = offset ? raw(`UTC${offset}`) : undefined;
-        if (isBrowser) {
-          return { label: t("common.browserTimeWithZone", { zone: browserTz }), suffix, value: tz };
-        }
-        if (tz === "UTC") return { label: raw(tz), suffix, value: tz };
-        return {
-          label: raw(offset ? `${tz} (UTC${offset})` : tz),
-          listLabel: raw(tz),
-          suffix,
-          value: tz,
-        };
-      }),
+      (isTimezoneSelectOpen.value
+        ? timezoneOptions
+        : timezoneOptions.filter((tz: string) => tz === timezone.value)
+      ).map(timezoneOption),
     );
 
     let relativePeriods = [
@@ -2053,6 +2069,7 @@ export default defineComponent({
     onBeforeUnmount(stopClock);
     const onMenuOpenChange = (open: boolean) => {
       if (open) {
+        absoluteShown.value = false;
         refreshTooltipNow();
         pendingDay.value = null;
         rangeKeyAtOpen = absoluteRangeKey();
@@ -2236,6 +2253,7 @@ export default defineComponent({
       calendarMaxDate,
       timezoneSelectOptions,
       isTimezoneSelectOpen,
+      absolutePanelMounted,
     };
   },
   computed: {

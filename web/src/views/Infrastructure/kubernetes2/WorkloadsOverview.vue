@@ -517,7 +517,7 @@ function setNamespaces(namespaces: string[]) {
       >
       <OEmptyState
         v-else-if="!problems.length"
-        size="inline"
+        size="compact"
         :text="t('emptyState.noData.description')"
         :title="t('infra.k8s2.workloadsNoProblems')"
         data-test="k8s2-workloads-problems-empty"

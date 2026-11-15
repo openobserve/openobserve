@@ -254,20 +254,20 @@ describe("CuratedPageView", () => {
   // ── Faces (§6.1) ─────────────────────────────────────────────────────────
 
   describe("faces", () => {
-    it("`unknown` renders a spinner WITH the `checking` line under it", async () => {
-      // The AWS worst case is ~5s of spinner; a naked one reads as a hung page.
+    it("`unknown` renders a skeleton WITH the `checking` line above it", async () => {
+      // The AWS worst case is ~5s of loading; a bare skeleton reads as a hung page.
       wrapper = await mountView({}, { face: ref("unknown"), dashboard: ref(null) });
-      expect(wrapper.find('[data-test="curated-spinner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="curated-loading"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="curated-checking"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="curated-error"]').exists()).toBe(false);
     });
 
-    it("`loadError` swaps the spinner for an error line + Retry firing refresh({force:true})", async () => {
+    it("`loadError` swaps the skeleton for an error line + Retry firing refresh({force:true})", async () => {
       wrapper = await mountView(
         {},
         { face: ref("unknown"), dashboard: ref(null), loadError: ref(true) },
       );
-      expect(wrapper.find('[data-test="curated-spinner"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="curated-loading"]').exists()).toBe(false);
       const retry = wrapper.find('[data-test="curated-error"] button');
       expect(retry.exists()).toBe(true);
       refreshSpy.mockClear();

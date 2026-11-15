@@ -36,35 +36,35 @@ test.describe('Logs toolbar pins', () => {
     testLogger.debug('No teardown required');
   });
 
-  test('histogram is pinned by default until the user decides', {
+  test('nothing is pinned by default, so the histogram toggle lives in ⋯', {
     tag: ['@toolbarPins', '@logs', '@P0', '@all'],
   }, async () => {
     await pm.logsToolbarPinsPage.seedPinStorage();
     await pm.logsToolbarPinsPage.navigateToLogs(getOrgIdentifier());
 
-    await pm.logsToolbarPinsPage.expectPinnedVisible('histogram');
-    // A fallback, not a stored choice: nothing is written until the user toggles.
-    expect(await pm.logsToolbarPinsPage.readHistogramDecidedFlag()).toBeNull();
+    await pm.logsToolbarPinsPage.expectPinnedHidden('histogram');
+    expect(await pm.logsToolbarPinsPage.readPins()).toBeNull();
 
-    testLogger.info('Histogram renders pinned on a profile that never chose');
+    testLogger.info('A profile that never chose shows no pinned controls');
   });
 
-  test('unpinning the histogram survives a reload', {
+  test('pinning and unpinning the histogram both survive a reload', {
     tag: ['@toolbarPins', '@logs', '@P0', '@all'],
   }, async () => {
     await pm.logsToolbarPinsPage.seedPinStorage();
     await pm.logsToolbarPinsPage.navigateToLogs(getOrgIdentifier());
+
+    await pm.logsToolbarPinsPage.togglePin('histogram');
+    await pm.logsToolbarPinsPage.expectPinnedVisible('histogram');
+    await pm.logsToolbarPinsPage.reload();
     await pm.logsToolbarPinsPage.expectPinnedVisible('histogram');
 
     await pm.logsToolbarPinsPage.togglePin('histogram');
     await pm.logsToolbarPinsPage.expectPinnedHidden('histogram');
-    // Without this flag the default re-applies each load and undoes the unpin.
-    expect(await pm.logsToolbarPinsPage.readHistogramDecidedFlag()).toBe('true');
-
     await pm.logsToolbarPinsPage.reload();
     await pm.logsToolbarPinsPage.expectPinnedHidden('histogram');
 
-    testLogger.info('Unpinned histogram stayed unpinned across a reload');
+    testLogger.info('Histogram pin choice persisted across reloads');
   });
 
   test('a pinned control survives a reload', {
@@ -101,14 +101,14 @@ test.describe('Logs toolbar pins', () => {
     testLogger.info('Unknown pin key was filtered out and not re-persisted');
   });
 
-  test('corrupt pin storage falls back to the defaults', {
+  test('corrupt pin storage falls back to no pins', {
     tag: ['@toolbarPins', '@logs', '@P1', '@all'],
   }, async () => {
     await pm.logsToolbarPinsPage.seedPinStorage({ pins: 'not json at all' });
     // navigateToLogs asserts the toolbar rendered at all, which is the point here.
     await pm.logsToolbarPinsPage.navigateToLogs(getOrgIdentifier());
 
-    await pm.logsToolbarPinsPage.expectPinnedVisible('histogram');
+    await pm.logsToolbarPinsPage.expectPinnedHidden('histogram');
 
     // The next write must recover the key, not append to the garbage.
     await pm.logsToolbarPinsPage.togglePin('sqlMode');

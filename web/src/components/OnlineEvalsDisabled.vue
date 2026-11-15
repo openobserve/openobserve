@@ -16,11 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- Rendered in place of a page whose API exists only with online evaluations on. -->
 <template>
-  <OPageLayout
-    :title="t('onlineEvals.disabled.title')"
-    constrained
-    data-test="online-evals-disabled"
-  >
+  <OPageLayout :title="t('onlineEvals.disabled.title')" data-test="online-evals-disabled">
     <OEmptyState
       icon="toggle-off"
       :title="t('onlineEvals.disabled.title')"

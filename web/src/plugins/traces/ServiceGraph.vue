@@ -243,30 +243,25 @@
           class="graph-container rounded-default bg-surface-subtle relative h-full w-full overflow-hidden"
         >
           <!-- Before the first load settles an empty graph means "not fetched yet", not "no data". -->
-          <div
+          <OSkeleton
             v-if="loading || lastRunAt === null"
-            class="flex h-full items-center justify-center"
+            shape="block"
+            class="h-full"
             data-test="service-graph-loading"
+          />
+          <OEmptyState
+            v-else-if="error"
+            kind="error"
+            :text="raw(error)"
+            data-test="service-graph-error"
           >
-            <div class="flex flex-col items-center text-center">
-              <OSpinner size="lg" />
-              <div class="text-text-secondary mt-3 text-sm">
-                {{ t("traces.serviceGraph.loading") }}
-              </div>
-            </div>
-          </div>
-          <div v-else-if="error" class="flex h-full items-center justify-center p-[0.675rem]">
-            <div>
-              <OIcon name="error-outline" style="width: 4em; height: 4em" />
-              <div class="text-text-heading mt-3 text-xl font-semibold">
-                {{ error }}
-              </div>
-              <OButton variant="secondary" @click="loadServiceGraph" class="mt-4" icon="refresh">
+            <template #actions>
+              <OButton @click="loadServiceGraph">
                 {{ t("traces.serviceGraph.retry") }}
               </OButton>
-            </div>
-          </div>
-          <div v-else-if="!graphData.nodes.length" class="flex h-full items-center justify-center">
+            </template>
+          </OEmptyState>
+          <div v-else-if="!graphData.nodes.length" class="flex h-full flex-col">
             <ServiceGraphNoDataState
               @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
             />
@@ -361,9 +356,10 @@ import {
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -392,11 +388,11 @@ export default defineComponent({
     ServiceGraphSidePanel,
     OButton,
     ODialog,
-    OSpinner,
+    OSkeleton,
+    OEmptyState,
     OTooltip,
     OSelect,
     OSearchInput,
-    OIcon,
     OCard,
     ODropdown,
     ODropdownItem,
@@ -1691,7 +1687,10 @@ export default defineComponent({
           error.value = t("traces.serviceGraph.errorNetwork");
         } else {
           error.value =
-            err.response?.data?.message || err.message || t("traces.serviceGraph.errorLoadFailed");
+            err.response?.data?.message ||
+            (err.message && !isRawHttpText(err.message)
+              ? err.message
+              : t("traces.serviceGraph.errorLoadFailed"));
         }
       } finally {
         loading.value = false;

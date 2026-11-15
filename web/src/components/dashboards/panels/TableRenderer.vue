@@ -186,10 +186,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <slot name="empty">
           <OEmptyState
-            size="inline"
+            size="compact"
             icon="bar-chart"
             :title="t('panel.noData')"
             data-test="no-data"
+            class="px-3"
           />
         </slot>
       </template>

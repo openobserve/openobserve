@@ -21,21 +21,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       kind="denied"
       :title="t('emptyState.noAccess.title')"
       :text="t('emptyState.noAccess.description')"
-      size="inline"
+      size="compact"
       :data-test="`${dataTest}-no-access`"
     />
     <OEmptyState
       v-else-if="state.status === 'error'"
       kind="error"
       :title="t('emptyState.loadError.title')"
-      size="inline"
+      size="compact"
       :text="errorText"
       :data-test="`${dataTest}-error`"
     >
       <template #actions>
         <OButton
           variant="secondary"
-          icon="refresh"
+          size="sm"
           :data-test="`${dataTest}-retry-btn`"
           @click="emit('retry')"
           >{{ t("rum.analytics.retry") }}</OButton

@@ -37,8 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
-    <div v-if="loadingIncident" class="flex justify-center py-8">
-      <OSpinner size="lg" />
+    <div v-if="loadingIncident" class="flex flex-col gap-3">
+      <OSkeleton v-for="row in 3" :key="row" class="h-control-md" />
     </div>
 
     <template v-else>
@@ -163,7 +163,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormCheckboxGroup from "@/lib/forms/Checkbox/OFormCheckboxGroup.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import statusPagesService, { type StatusPageNotice } from "@/services/status_pages";
 import analytics from "@/services/product_analytics";

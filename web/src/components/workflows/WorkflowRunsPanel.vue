@@ -134,41 +134,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @row-click="openRun"
         >
           <template #empty>
-            <div class="py-10">
-              <OEmptyState
-                v-if="loadError"
-                kind="error"
-                :title="t('emptyState.loadError.title')"
-                :text="t('emptyState.loadError.description')"
-                data-test="workflow-runs-load-error"
-                @action="fetchHistory(true)"
-              />
-              <OEmptyState
-                v-else-if="!search.trim() && activeFilter !== 'all'"
-                size="inline"
-                kind="filtered"
-                :icon="filterEmpty.icon"
-                :title="filterEmpty.title"
-                :text="filterEmpty.description"
-                :action-label="t('workflow.http.runsEmptyAction')"
-                :data-test="
-                  activeFilter === 'http_request'
-                    ? 'workflow-runs-http-empty'
-                    : 'workflow-runs-filter-empty'
-                "
-                @action="onFilterChange('all')"
-              />
-              <OEmptyState
-                v-else-if="search.trim()"
-                size="inline"
-                kind="filtered"
-                :title="t('workflow.history.searchEmptyTitle')"
-                :action-label="t('workflow.history.searchEmptyAction')"
-                data-test="workflow-runs-search-empty"
-                @action="search = ''"
-              />
-              <NoData v-else />
-            </div>
+            <OEmptyState
+              v-if="loadError"
+              kind="error"
+              data-test="workflow-runs-load-error"
+              @action="fetchHistory(true)"
+            />
+            <OEmptyState
+              v-else-if="!search.trim() && activeFilter !== 'all'"
+              kind="filtered"
+              :icon="filterEmpty.icon"
+              :title="filterEmpty.title"
+              :text="filterEmpty.description"
+              :action-label="t('workflow.http.runsEmptyAction')"
+              :data-test="
+                activeFilter === 'http_request'
+                  ? 'workflow-runs-http-empty'
+                  : 'workflow-runs-filter-empty'
+              "
+              @action="onFilterChange('all')"
+            />
+            <OEmptyState
+              v-else-if="search.trim()"
+              kind="filtered"
+              :title="t('workflow.history.searchEmptyTitle')"
+              :action-label="t('workflow.history.searchEmptyAction')"
+              data-test="workflow-runs-search-empty"
+              @action="search = ''"
+            />
+            <NoData v-else />
           </template>
 
           <template #cell-start_time="{ value }">

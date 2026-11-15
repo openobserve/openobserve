@@ -249,104 +249,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #empty>
-            <div v-if="!loadingState">
-              <OEmptyState
-                :kind="filterQuery ? 'filtered' : 'first-run'"
-                :title="
-                  filterQuery
-                    ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.streams') })
-                    : t('emptyState.noStreams.title')
-                "
-                :text="
-                  filterQuery
-                    ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.streams') })
-                    : t('emptyState.noStreams.description')
-                "
-                :icon="filterQuery ? undefined : 'link'"
-                :action-label="filterQuery ? undefined : t('emptyState.noStreams.action')"
-                :secondary-action-label="
-                  filterQuery || !isSchemaUDSEnabled
-                    ? undefined
-                    : t('emptyState.noStreams.createAction')
-                "
-                @action="
-                  onStreamsEmptyStateAction(filterQuery ? 'clear-filters' : 'setup-ingestion')
-                "
-                @secondary-action="onStreamsEmptyStateAction('create')"
-              >
-                <template v-if="!filterQuery" #extra>
-                  <div class="flex flex-wrap items-center justify-center gap-2">
-                    <span class="text-text-secondary me-1 text-sm font-semibold">
-                      {{ t("logStream.emptyOr") }}
-                    </span>
-                    <EmptyStateIngestionChip
-                      data-test="log-stream-empty-kubernetes-btn"
-                      @click="
-                        router.push({
-                          name: 'ingestFromKubernetes',
-                          query: { org_identifier: store.state.selectedOrganization.identifier },
-                        })
-                      "
-                    >
-                      <img
-                        :src="getImageURL('images/common/kubernetes.svg')"
-                        class="h-3.5 w-3.5 shrink-0 object-contain"
-                        alt=""
-                      />
-                      {{ raw("Kubernetes") }}
-                    </EmptyStateIngestionChip>
-                    <EmptyStateIngestionChip
-                      data-test="log-stream-empty-aws-btn"
-                      @click="
-                        router.push({
-                          name: 'AWSConfig',
-                          query: { org_identifier: store.state.selectedOrganization.identifier },
-                        })
-                      "
-                    >
-                      <img
-                        :src="getImageURL('images/ingestion/aws.svg')"
-                        class="h-3.5 w-3.5 shrink-0 object-contain"
-                        alt=""
-                      />
-                      {{ t("logStream.emptyAws") }}
-                    </EmptyStateIngestionChip>
-                    <EmptyStateIngestionChip
-                      data-test="log-stream-empty-linux-btn"
-                      @click="
-                        router.push({
-                          name: 'ingestFromLinux',
-                          query: { org_identifier: store.state.selectedOrganization.identifier },
-                        })
-                      "
-                    >
-                      <img
-                        :src="getImageURL('images/common/linux.svg')"
-                        class="h-3.5 w-3.5 shrink-0 object-contain"
-                        alt=""
-                      />
-                      {{ raw("Linux") }}
-                    </EmptyStateIngestionChip>
-                    <EmptyStateIngestionChip
-                      data-test="log-stream-empty-windows-btn"
-                      @click="
-                        router.push({
-                          name: 'ingestFromWindows',
-                          query: { org_identifier: store.state.selectedOrganization.identifier },
-                        })
-                      "
-                    >
-                      <img
-                        :src="getImageURL('images/common/windows.svg')"
-                        class="h-3.5 w-3.5 shrink-0 object-contain"
-                        alt=""
-                      />
-                      {{ raw("Windows") }}
-                    </EmptyStateIngestionChip>
-                  </div>
-                </template>
-              </OEmptyState>
-            </div>
+            <OEmptyState
+              v-if="!loadingState"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.streams') })
+                  : t('emptyState.noStreams.title')
+              "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.streams') })
+                  : t('emptyState.noStreams.description')
+              "
+              :icon="filterQuery ? undefined : 'link'"
+              :action-label="filterQuery ? undefined : t('emptyState.noStreams.action')"
+              :secondary-action-label="
+                filterQuery || !isSchemaUDSEnabled
+                  ? undefined
+                  : t('emptyState.noStreams.createAction')
+              "
+              @action="onStreamsEmptyStateAction(filterQuery ? 'clear-filters' : 'setup-ingestion')"
+              @secondary-action="onStreamsEmptyStateAction('create')"
+            >
+              <template v-if="!filterQuery" #extra>
+                <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+                  <span class="text-text-secondary text-compact">
+                    {{ t("logStream.emptyOr") }}
+                  </span>
+                  <OButton
+                    variant="link"
+                    size="sm"
+                    data-test="log-stream-empty-kubernetes-btn"
+                    @click="
+                      router.push({
+                        name: 'ingestFromKubernetes',
+                        query: { org_identifier: store.state.selectedOrganization.identifier },
+                      })
+                    "
+                  >
+                    {{ raw("Kubernetes") }}
+                  </OButton>
+                  <OButton
+                    variant="link"
+                    size="sm"
+                    data-test="log-stream-empty-aws-btn"
+                    @click="
+                      router.push({
+                        name: 'AWSConfig',
+                        query: { org_identifier: store.state.selectedOrganization.identifier },
+                      })
+                    "
+                  >
+                    {{ t("logStream.emptyAws") }}
+                  </OButton>
+                  <OButton
+                    variant="link"
+                    size="sm"
+                    data-test="log-stream-empty-linux-btn"
+                    @click="
+                      router.push({
+                        name: 'ingestFromLinux',
+                        query: { org_identifier: store.state.selectedOrganization.identifier },
+                      })
+                    "
+                  >
+                    {{ raw("Linux") }}
+                  </OButton>
+                  <OButton
+                    variant="link"
+                    size="sm"
+                    data-test="log-stream-empty-windows-btn"
+                    @click="
+                      router.push({
+                        name: 'ingestFromWindows',
+                        query: { org_identifier: store.state.selectedOrganization.identifier },
+                      })
+                    "
+                  >
+                    {{ raw("Windows") }}
+                  </OButton>
+                </div>
+              </template>
+            </OEmptyState>
           </template>
           <template #selection-actions>
             <OButton
@@ -464,9 +449,8 @@ import streamService from "../services/stream";
 import { addCommasToNumber, formatEventCount } from "@/utils/formatters";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import analytics from "../services/product_analytics";
-import { getImageURL, verifyOrganizationStatus, formatSizeFromMB } from "../utils/zincutils";
+import { verifyOrganizationStatus, formatSizeFromMB } from "../utils/zincutils";
 import config from "@/aws-exports";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
@@ -491,7 +475,6 @@ export default defineComponent({
     OPageLayout,
     SchemaIndex,
     OEmptyState,
-    EmptyStateIngestionChip,
     AddStream,
     OButton,
     ORefreshButton,
@@ -1435,7 +1418,6 @@ export default defineComponent({
       showIndexSchemaDialog,
       isSchemaUDSEnabled,
       filterQuery,
-      getImageURL,
       verifyOrganizationStatus,
       exploreStream,
       selectedStreamType,

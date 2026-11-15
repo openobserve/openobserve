@@ -5,11 +5,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, shallowRef, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -133,6 +135,10 @@ const accessDenials = computed<AccessDenial[]>(() => [
     : []),
 ]);
 
+// Axios status text is not a reason a reader can act on (K6).
+const errorReason = (message: string) =>
+  isRawHttpText(message) ? t("emptyState.loadError.description") : message;
+
 const notices = computed<SecurityNotice[]>(() => {
   const out: SecurityNotice[] = [];
   if (streamsError.value) {
@@ -147,7 +153,9 @@ const notices = computed<SecurityNotice[]>(() => {
     out.push({
       key: "catalog-error",
       tone: "error",
-      text: t("siem.content.catalogError", { reason: catalogQuery.error.value.message }),
+      text: t("siem.content.catalogError", {
+        reason: errorReason(catalogQuery.error.value.message),
+      }),
       dataTest: "security-content-catalog-error",
     });
   }
@@ -229,7 +237,8 @@ async function loadStreams() {
     if (isForbiddenError(e)) streamsRefusal.value = e;
     else
       streamsError.value =
-        e?.response?.data?.message ?? e?.message ?? t("siem.content.streamsError");
+        e?.response?.data?.message ??
+        (e?.message && !isRawHttpText(e.message) ? e.message : t("siem.content.streamsError"));
   } finally {
     if (mine === streamsSeq) streamsLoading.value = false;
   }
@@ -246,10 +255,13 @@ const catalogQuery = useQuery(() => ({
   enabled: !!orgId.value,
 }));
 
+const lastRunAt = ref<number | null>(null);
 function refresh() {
-  void loadDetections(orgId.value);
-  void loadStreams();
-  void catalogQuery.refetch();
+  void Promise.allSettled([
+    loadDetections(orgId.value),
+    loadStreams(),
+    catalogQuery.refetch(),
+  ]).then(() => (lastRunAt.value = Date.now()));
 }
 onMounted(refresh);
 watch(orgId, refresh);
@@ -951,16 +963,12 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
     title-data-test="security-content-title"
   >
     <template #actions>
-      <OButton
-        icon-only
-        variant="ghost"
-        icon="refresh"
+      <ORefreshButton
+        :last-run-at="lastRunAt"
         :loading="streamsLoading || rulesLoading || catalogQuery.isPending.value"
         data-test="security-content-refresh"
         @click="refresh"
-      >
-        <OTooltip :content="t('siem.content.refresh')" />
-      </OButton>
+      />
     </template>
 
     <template #header-tabs>
@@ -1441,7 +1449,6 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
       <template #tab-streams>
         <OEmptyState
           v-if="!ruleStreamChecks.length"
-          size="inline"
           icon="database"
           :title="t('siem.content.noStreamsForRule')"
           :text="t('siem.content.noStreamsForRuleHint', { logsource: openRule.logsource })"
@@ -1567,7 +1574,6 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
       <template #tab-streams>
         <OEmptyState
           v-if="!openSource.streams.length"
-          size="inline"
           icon="cloud-upload"
           :title="t('siem.content.noStreamsForSource')"
           :text="
@@ -1600,7 +1606,6 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
       <template #tab-rules>
         <OEmptyState
           v-if="!sourceRulesList.length"
-          size="inline"
           icon="rule"
           :title="t('siem.content.noRulesForSource')"
         />

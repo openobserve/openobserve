@@ -71,7 +71,7 @@ describe("TracesNoDataState", () => {
 
   it("keeps only the cards and chips under an Or start another way caption below the panel (e1)", () => {
     mountState({ alternativesOnly: true });
-    expect(shellProps()).toMatchObject({ size: "inline" });
+    expect(shellProps()).toMatchObject({ size: "compact" });
     expect(wrapper.find('[data-test="o2-empty-state-title"]').text()).toBe("Or start another way");
     expect(wrapper.text()).not.toContain("Start sending traces to OpenObserve");
     expect(wrapper.text()).not.toContain("No trace streams found in this organization yet");

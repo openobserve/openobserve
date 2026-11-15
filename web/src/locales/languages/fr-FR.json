@@ -1961,6 +1961,9 @@
     "workflows": "Workflows",
     "language": "Langue",
     "keyboardShortcuts": "Raccourcis clavier",
+    "searchOrJumpTo": "Rechercher ou aller à…",
+    "jumpToTitle": "Aller à",
+    "jumpToPlaceholder": "Rechercher des pages",
     "synthetic": "Synthétiques",
     "experience": "Expérience",
     "slos": "SLO",
@@ -4039,7 +4042,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "Vous n'êtes pas autorisé à gérer la licence."
-      }
+      },
+      "usageTitle": "Ingestion quotidienne"
     },
     "value_sso_requires_ha": "✅ Nécessite le mode HA",
     "value_rbac_requires_ha": "✅ Nécessite le mode HA",
@@ -5048,6 +5052,7 @@
   },
   "organization": {
     "searchByNameOrId": "Rechercher par nom ou ID",
+    "currentLabel": "Organisation : {name}",
     "noOrganizationsFound": "Aucune organisation trouvée",
     "header": "Organisations",
     "orgBeingDeletedSwitching": "Cette organisation est en cours de suppression. Vous allez être redirigé vers une autre organisation.",
@@ -10752,7 +10757,8 @@
       "taglineAnd": "et vous guider à travers vos logs, traces, métriques et incidents.",
       "signedInAs": "Connecté en tant que",
       "role": "Rôle",
-      "tryOneOfThese": "Ou essayez l'un d'entre eux"
+      "tryOneOfThese": "Ou essayez l'un d'entre eux",
+      "panelText": "Posez vos questions sur vos logs, traces, métriques et incidents, ou faites-vous aider pour écrire une requête."
     },
     "capabilities": {
       "query": {
@@ -18952,7 +18958,7 @@
       "version": "Version",
       "agentIdHint": "ID de l'agent : {ids}",
       "noAgentIdentity": "Aucune identité d'agent trouvée",
-      "noAgentIdentityDescription": "Ces spans LLM ne portent aucun nom d'agent, ils sont donc affichés par flux. Mappez l'attribut qui nomme votre agent pour les afficher par agent.",
+      "noAgentIdentityDescription": "Ces spans LLM ne portent aucun nom d'agent, ils sont donc affichés par flux.",
       "noAgentIdentityAction": "Ouvrir le mappage des agents GenAI"
     },
     "agentGraph": {
@@ -22728,6 +22734,7 @@
     },
     "actions": {
       "openCheatsheet": "Ouvrir un aide-mémoire sur les raccourcis clavier",
+      "searchOrJumpTo": "Rechercher ou aller à une page",
       "closeDialog": "Fermez une boîte de dialogue, un tiroir ou une fenêtre modale",
       "focusSearch": "Barre de recherche Focus",
       "focusQuery": "Éditeur de requêtes Focus",
@@ -25452,7 +25459,8 @@
         "p95": "La queue lente — 1 appel sur 20 a pris au moins ce temps. Mesuré à partir des appels terminés dans les traces de votre application.",
         "p99": "Le pire 1 % des appels a pris au moins ce temps. Mesuré à partir des appels terminés dans les traces de votre application.",
         "load": "Temps total que vos applications ont consacré aux appels vers cette base de données, mesuré à partir des traces de votre application. Il indique le volume de trafic que cette base de données a servi pour vos applications.",
-        "attention": "À quel point cette instance est proche d'une limite publiée par son propre moteur — aujourd'hui, les connexions par rapport à max_connections. Le pire ratio de ce type, pas un score pondéré. Trié du plus élevé au plus bas, avec les instances dont la santé ne peut pas être lue en haut, car une instance que vous ne pouvez pas voir n'est pas une instance dont vous savez qu'elle est saine. Mesuré sur le serveur de base de données, il n'est donc pas comparable avec le temps de base de données à côté."
+        "attention": "À quel point cette instance est proche d'une limite publiée par son propre moteur — aujourd'hui, les connexions par rapport à max_connections. Le pire ratio de ce type, pas un score pondéré. Trié du plus élevé au plus bas, avec les instances dont la santé ne peut pas être lue en haut, car une instance que vous ne pouvez pas voir n'est pas une instance dont vous savez qu'elle est saine. Mesuré sur le serveur de base de données, il n'est donc pas comparable avec le temps de base de données à côté.",
+        "calls": "Nombre d'appels de vos applications à cette base de données, mesuré à partir des traces de votre application."
       },
       "failedChip": "{count} échoués",
       "columnSubLabels": {
@@ -25893,7 +25901,8 @@
         "tableHealthHint": "Taille, fragmentation et état du vacuum des tables. La fragmentation et le vacuum ne concernent que PostgreSQL.",
         "deadlocksLocked": "Les interblocages sont une fonctionnalité Enterprise. Mettez à niveau pour voir quelles requêtes ont été mutuellement bloquées et pourquoi. Les autres onglets de base de données fonctionnent sur tous les plans.",
         "blockedLocked": "Les requêtes bloquées sont une fonctionnalité Enterprise. Mettez à niveau pour voir quelles sessions attendent un verrou et ce qui le retient. Les autres onglets de base de données fonctionnent sur tous les plans.",
-        "tableHealthLocked": "La santé des tables est une fonctionnalité Enterprise. Mettez à niveau pour suivre la taille, la fragmentation et l'état du vacuum des tables. Les autres onglets de base de données fonctionnent sur tous les plans."
+        "tableHealthLocked": "La santé des tables est une fonctionnalité Enterprise. Mettez à niveau pour suivre la taille, la fragmentation et l'état du vacuum des tables. Les autres onglets de base de données fonctionnent sur tous les plans.",
+        "queriesHintServer": "Types de requêtes signalés par vos bases de données sur cette période, comptés dans la base de données."
       }
     },
     "metrics": {

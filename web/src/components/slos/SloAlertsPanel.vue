@@ -65,17 +65,7 @@
       :title="t('slos.alerts.emptyTitle')"
       :text="t('slos.alerts.emptyHint')"
       data-test="slo-alerts-empty"
-    >
-      <template #actions>
-        <EmptyStateActionCard
-          icon="add"
-          :label="t('slos.alerts.add')"
-          :sublabel="t('slos.alerts.emptyActionDesc')"
-          data-test="slo-alerts-empty-add"
-          @click="startCreate"
-        />
-      </template>
-    </OEmptyState>
+    />
 
     <ul v-else class="flex flex-col gap-2" data-test="slo-alerts-list">
       <li
@@ -114,7 +104,6 @@ import { useI18nTyped } from "@/types/i18n";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import SloAlertForm from "@/components/slos/SloAlertForm.vue";

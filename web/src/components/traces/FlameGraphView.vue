@@ -120,15 +120,8 @@
         />
       </div>
 
-      <!-- Empty State -->
-      <div
-        v-if="!hasData"
-        class="absolute inset-0 flex items-center justify-center bg-white"
-        style="top: 3.75rem"
-      >
-        <div class="text-text-secondary text-center">
-          <div class="text-sm">{{ t("traces.flameGraphView.noSpansToDisplay") }}</div>
-        </div>
+      <div v-if="!hasData" class="bg-surface-base absolute inset-0" style="top: 3.75rem">
+        <OEmptyState icon="flame" :title="t('traces.flameGraphView.noSpansToDisplay')" />
       </div>
     </div>
 
@@ -182,6 +175,7 @@ import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { getContrastTextColor } from "@/utils/traces/traceColors";
 import { escapeHtml } from "@/utils/html";
 import ChartZoomControls from "@/components/traces/ChartZoomControls.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import {
   CHART_ZOOM_STEP,
   panRange,

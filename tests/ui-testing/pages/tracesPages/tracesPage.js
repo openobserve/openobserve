@@ -91,6 +91,7 @@ export class TracesPage {
     this.sqlModeToggle = '[data-cy="syntax-guide-button"]';
     this.dateTimeDropdown = '[data-test="logs-search-bar-date-time-dropdown"]';
     this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
+    // A menu item inside the toolbar ⋯ (openMoreActionsMenu).
     this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
 
     // Main Components
@@ -1713,6 +1714,7 @@ export class TracesPage {
    * without it (components/common/ShareButton.vue).
    */
   async clickShareLinkAndGetUrl(buttonSelector = this.shareLinkButton) {
+    if (buttonSelector === this.shareLinkButton) await this.openMoreActionsMenu();
     const shareBtn = this.page.locator(buttonSelector);
     await expect(shareBtn, 'Share button must be enabled — needs web_url configured').toBeEnabled({ timeout: 10000 });
     await shareBtn.click();
@@ -1749,6 +1751,7 @@ export class TracesPage {
   }
 
   async clickShareLinkButton() {
+    await this.openMoreActionsMenu();
     await this.page.locator(this.shareLinkButton).click();
     await this.page.waitForTimeout(1000);
   }
@@ -3448,8 +3451,12 @@ export class TracesPage {
   // Source: web/src/plugins/traces/SearchBar.vue, PanelContainer.vue, metrics/TracesLatencyHeatmap.vue
   // ============================================
 
+  /** Opens the toolbar ⋯ unless it is already open: share, export, alerts and RED charts live there. */
   async openMoreActionsMenu() {
-    await this.page.locator('[data-test="traces-search-bar-more-actions-btn"]').click();
+    const trigger = this.page.locator('[data-test="traces-search-bar-more-menu-btn"]');
+    await trigger.waitFor({ state: 'visible', timeout: 10000 });
+    if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 5000 });
   }
 
   async clickAddRedChartsToDashboard() {

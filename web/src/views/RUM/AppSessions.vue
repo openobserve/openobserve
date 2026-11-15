@@ -310,20 +310,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :default-columns="false"
               >
                 <template #empty>
-                  <div
+                  <OEmptyState
                     v-if="hasSegmentFilteredOutAllRows"
-                    class="flex flex-col items-center gap-2 py-8"
+                    kind="filtered"
+                    :text="t('rum.noMatchingSessions')"
                     data-test="rum-app-sessions-segment-empty"
                   >
-                    <p>{{ t("rum.noMatchingSessions") }}</p>
-                    <OButton
-                      variant="secondary"
-                      data-test="rum-app-sessions-reset-segments-btn"
-                      @click="resetSegments"
-                    >
-                      {{ t("rum.resetFilters") }}
-                    </OButton>
-                  </div>
+                    <template #actions>
+                      <OButton
+                        data-test="rum-app-sessions-reset-segments-btn"
+                        @click="resetSegments"
+                      >
+                        {{ t("rum.resetFilters") }}
+                      </OButton>
+                    </template>
+                  </OEmptyState>
                   <NoData v-else />
                 </template>
                 <template #cell-action_play="{ row }">
@@ -508,6 +509,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ShareButton from "@/components/common/ShareButton.vue";

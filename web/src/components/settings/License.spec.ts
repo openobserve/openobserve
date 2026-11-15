@@ -184,7 +184,7 @@ describe("License.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should show loading spinner while fetching license data", async () => {
+    it("should show a loading skeleton while fetching license data", async () => {
       vi.mocked(licenseServer.get_license).mockImplementation(
         () =>
           new Promise((resolve) =>
@@ -194,9 +194,7 @@ describe("License.vue", () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      // Check if loading text is present initially
-      const hasLoadingText = wrapper.text().includes("Loading license information");
-      expect(hasLoadingText).toBe(true);
+      expect(wrapper.find('[aria-busy="true"]').exists()).toBe(true);
     });
 
     it("should call loadLicenseData on mount", async () => {

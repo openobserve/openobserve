@@ -28,13 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-text-secondary text-xs">{{ hypotheses.length }}</span>
     </div>
 
-    <p
+    <OEmptyState
       v-if="hypotheses.length === 0"
+      size="compact"
+      icon="lightbulb-outline"
+      :title="t('alerts.incidents.rcaSummary.noHypotheses')"
       data-test="rca-hypotheses-empty"
-      class="text-text-secondary text-compact m-0 mt-2"
-    >
-      {{ t("alerts.incidents.rcaSummary.noHypotheses") }}
-    </p>
+    />
 
     <ul
       v-if="rows.length > 0"
@@ -191,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, useId } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
   RcaEvidenceEntry,

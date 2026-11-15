@@ -10,7 +10,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
@@ -457,7 +458,7 @@ function copy(text: string) {
       </div>
       <OEmptyState
         v-else
-        size="inline"
+        size="compact"
         icon="info-outline"
         :title="t('siem.drawer.noEntities')"
         :text="t('siem.drawer.noEntitiesHint')"
@@ -480,27 +481,23 @@ function copy(text: string) {
     </template>
 
     <template #tab-detections>
-      <div v-if="matching" class="flex items-center justify-center gap-2 py-10">
-        <OSpinner size="lg" />
-        <span class="text-text-secondary text-sm">{{ t("siem.drawer.evaluating") }}</span>
+      <div v-if="matching" class="flex flex-col gap-2">
+        <OSkeleton v-for="row in 4" :key="row" class="h-10" />
       </div>
       <OEmptyState
         v-else-if="!runnable.length"
-        size="inline"
         icon="rule"
         :title="t('siem.drawer.noRules')"
         :text="t('siem.drawer.noRulesHint')"
       />
       <OEmptyState
         v-else-if="matchError"
-        size="inline"
         kind="error"
         :title="t('siem.drawer.matchError')"
-        :text="raw(matchError)"
+        :text="isRawHttpText(matchError) ? t('emptyState.loadError.description') : raw(matchError)"
       />
       <OEmptyState
         v-else-if="!matched.length"
-        size="inline"
         icon="task-alt"
         :title="t('siem.drawer.noMatches')"
         :text="t('siem.drawer.noMatchesHint', runnable.length)"

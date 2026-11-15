@@ -91,27 +91,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div class="flex items-center justify-center py-8">
-            <OEmptyState
-              :kind="search ? 'filtered' : 'first-run'"
-              :title="
-                search
-                  ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
-                  : t('emptyState.noRemoteTasks.title')
-              "
-              :text="
-                search
-                  ? t('emptyState.filtered.description', {
-                      noun: t('emptyState.filtered.fallbackNoun'),
-                    })
-                  : t('emptyState.noRemoteTasks.description')
-              "
-              :icon="search ? undefined : 'link'"
-              data-test="ai-remote-tasks-empty-state"
-              :action-label="search ? undefined : t('emptyState.noRemoteTasks.action')"
-              @action="onEmptyAction(search ? 'clear-filters' : 'create')"
-            />
-          </div>
+          <OEmptyState
+            :kind="search ? 'filtered' : 'first-run'"
+            :title="
+              search
+                ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+                : t('emptyState.noRemoteTasks.title')
+            "
+            :text="
+              search
+                ? t('emptyState.filtered.description', {
+                    noun: t('emptyState.filtered.fallbackNoun'),
+                  })
+                : t('emptyState.noRemoteTasks.description')
+            "
+            :icon="search ? undefined : 'link'"
+            data-test="ai-remote-tasks-empty-state"
+            :action-label="search ? undefined : t('emptyState.noRemoteTasks.action')"
+            @action="onEmptyAction(search ? 'clear-filters' : 'create')"
+          />
         </template>
 
         <template #cell-name="{ row }">

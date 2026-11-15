@@ -33,39 +33,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   closes the list, so a border under the final row would double it.
 -->
 <template>
-  <div
-    class="border-border-default rounded-surface w-full max-w-2xl overflow-hidden text-left"
-    :data-test="dataTest"
-  >
-    <p
-      class="border-border-subtle bg-surface-panel text-text-secondary text-2xs border-b px-3 py-1.5 font-semibold"
-    >
-      {{ title }}
-    </p>
-    <div
-      v-for="check in checks"
-      :key="check.id"
-      class="border-border-subtle flex flex-col gap-0.5 px-3 py-1.5 not-last:border-b"
-      :data-test="`${rowTestPrefix}${check.id}`"
-    >
-      <div class="flex items-center gap-2">
-        <span
-          class="text-2xs text-text-inverse grid size-3.5 shrink-0 place-items-center rounded-full leading-none font-semibold"
-          :class="STATUS_TONES[check.status]"
-        >
-          {{ STATUS_GLYPHS[check.status] }}
+  <div class="w-full max-w-105 text-start" :data-test="dataTest">
+    <p class="text-text-secondary text-xs font-medium">{{ title }}</p>
+    <ul class="mt-2 flex flex-col gap-2">
+      <li
+        v-for="check in checks"
+        :key="check.id"
+        class="flex items-start gap-2"
+        :data-status="check.status"
+        :data-test="`${rowTestPrefix}${check.id}`"
+      >
+        <OIcon
+          :name="STATUS_ICONS[check.status]"
+          size="sm"
+          :class="['mt-0.5 shrink-0', STATUS_TONES[check.status]]"
+        />
+        <span class="flex min-w-0 flex-col">
+          <span class="text-text-body text-compact leading-5">{{ check.title }}</span>
+          <span v-if="check.detail" class="text-text-secondary text-xs">{{ check.detail }}</span>
         </span>
-        <span class="text-text-heading min-w-0 text-xs font-semibold">{{ check.title }}</span>
-      </div>
-      <span v-if="check.detail" class="text-text-secondary text-2xs ps-5.5 leading-relaxed">
-        {{ check.detail }}
-      </span>
-    </div>
+      </li>
+    </ul>
   </div>
 </template>
 
 <script setup lang="ts">
-import { raw, type I18nText } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { I18nText } from "@/types/i18n";
 
 export type DbmCheckStatus = "ok" | "fail" | "note";
 
@@ -88,14 +83,14 @@ defineProps<{
 }>();
 
 const STATUS_TONES: Record<DbmCheckStatus, string> = {
-  ok: "bg-status-success-text",
-  fail: "bg-status-error-text",
-  note: "bg-status-warning-text",
+  ok: "text-status-success-text",
+  fail: "text-status-error-text",
+  note: "text-text-secondary",
 };
 
-const STATUS_GLYPHS: Record<DbmCheckStatus, I18nText> = {
-  ok: raw("✓"),
-  fail: raw("✕"),
-  note: raw("!"),
+const STATUS_ICONS: Record<DbmCheckStatus, IconName> = {
+  ok: "check-circle",
+  fail: "cancel",
+  note: "info",
 };
 </script>

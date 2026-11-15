@@ -22,22 +22,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="h-24"
       data-test="metrics-detail-used-in-loading"
     />
-    <OInlineNotice
+    <OEmptyState
       v-else-if="status === 'error'"
-      tone="err"
-      :message="t('metrics.explorer.detail.usedIn.error')"
+      kind="error"
+      size="compact"
+      :title="t('metrics.explorer.detail.usedIn.error')"
       data-test="metrics-detail-used-in-error"
     >
       <template #actions>
         <OButton
           variant="secondary"
-          icon="replay"
+          size="sm"
           data-test="metrics-detail-used-in-retry"
           @click="emit('retry')"
           >{{ t("metrics.explorer.retry") }}</OButton
         >
       </template>
-    </OInlineNotice>
+    </OEmptyState>
     <template v-else-if="usage">
       <OInlineNotice
         v-if="usage.unparsed"
@@ -50,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-if="!groups.length"
-        size="inline"
+        size="compact"
         icon="search-off"
         :title="t('metrics.explorer.detail.usedIn.empty')"
         data-test="metrics-detail-used-in-empty"

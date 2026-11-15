@@ -29,7 +29,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -257,19 +258,21 @@ const setRedactTools = (value: unknown) => {
         <span class="text-text-heading text-sm font-semibold">{{
           t("aiChatShare.existingShares")
         }}</span>
-        <div v-if="sharesLoading" class="flex justify-center py-3">
-          <OSpinner size="lg" />
-        </div>
-        <span v-else-if="sharesError" class="text-status-negative text-xs">
-          {{ t("aiChatShare.loadFailed") }}
-        </span>
-        <span
+        <OSkeleton v-if="sharesLoading" preset="tableRows" :rows="2" />
+        <OEmptyState
+          v-else-if="sharesError"
+          size="compact"
+          kind="error"
+          :title="t('aiChatShare.loadFailed')"
+          data-test="ai-chat-share-dialog-shares-error"
+        />
+        <OEmptyState
           v-else-if="shares.length === 0"
-          class="text-text-secondary text-xs"
+          size="compact"
+          icon="share"
+          :title="t('aiChatShare.noShares')"
           data-test="ai-chat-share-dialog-no-shares"
-        >
-          {{ t("aiChatShare.noShares") }}
-        </span>
+        />
         <template v-else>
           <AiChatShareRow
             v-for="share in shares"

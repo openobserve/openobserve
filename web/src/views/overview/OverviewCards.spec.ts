@@ -61,7 +61,7 @@ const stateSections: Array<[string, OverviewSection<never>, string]> = [
 ];
 
 describe("OverviewSectionCard", () => {
-  it("draws every card with the Kubernetes overview panel chrome", () => {
+  it("sits on the page surface with a 14 px heading and its subtitle on one line", () => {
     const w = mount(OverviewSectionCard, {
       props: {
         section: "x",
@@ -72,32 +72,24 @@ describe("OverviewSectionCard", () => {
       },
       global,
     });
-    expect(w.get('[data-test="overview-x-card"]').classes()).toEqual(
-      expect.arrayContaining([
-        "bg-surface-panel",
-        "border-border-default",
-        "rounded-surface",
-        "border",
-      ]),
-    );
-    const title = w.get("h3");
+    const classes = w.get('[data-test="overview-x-card"]').classes();
+    for (const box of ["border", "rounded-surface", "bg-surface-panel"])
+      expect(classes).not.toContain(box);
+    const title = w.get("h2");
     expect(title.text()).toBe("X");
-    expect(title.element.parentElement!.classList.contains("p-3")).toBe(true);
-    expect(title.element.parentElement!.classList.contains("items-baseline")).toBe(true);
+    expect(title.classes()).toEqual(expect.arrayContaining(["text-sm", "font-semibold"]));
     const sub = w.get('[data-test="overview-x-subtitle"]');
     expect(sub.text()).toBe("Sub");
     expect(sub.classes()).toContain("text-text-secondary");
   });
 
-  it("centres the empty message and keeps the header action", () => {
+  it("shows the empty message under the heading and keeps the header action", () => {
     const w = mount(OverviewSectionCard, {
       props: { section: "x", title: raw("X"), view: "empty", linkLabel: raw("Add") },
       slots: { empty: '<p data-test="empty-slot">none</p>' },
       global,
     });
-    const slot = w.get('[data-test="empty-slot"]').element.parentElement!;
-    expect(slot.classList.contains("justify-center")).toBe(true);
-    expect(slot.classList.contains("flex-1")).toBe(true);
+    expect(w.get('[data-test="empty-slot"]').text()).toBe("none");
     expect(w.get('[data-test="overview-x-view-all"]').text()).toBe("Add");
     expect(w.find('[data-test="overview-x-subtitle"]').exists()).toBe(false);
   });
@@ -146,16 +138,9 @@ describe("OverviewAlertsCard", () => {
       .findAll('[data-test^="overview-alerts-box-"]:not([data-test="overview-alerts-box-count"])')
       .map((b) => b.attributes("data-test")!.replace("overview-alerts-box-", ""));
 
-  it("renders the firing rows compact", () => {
+  it("renders each firing alert as one row button", () => {
     const rows = mountAlerts().findAllComponents(OverviewRowButton);
-    expect(rows.length).toBeGreaterThan(0);
-    for (const r of rows) expect(r.props("compact")).toBe(true);
-  });
-
-  it("reserves no label padding on a box without the button", () => {
-    const label = (w: ReturnType<typeof mountAlerts>) =>
-      box(w, "critical").get("span.text-text-label");
-    expect(label(mountAlerts()).classes()).not.toContain("pe-6");
+    expect(rows.length).toBe(2);
   });
 
   it("states the active rules and the rules failing to evaluate under the title", () => {
@@ -169,37 +154,31 @@ describe("OverviewAlertsCard", () => {
     );
   });
 
-  it("shows critical, warning, open incidents and failing rules as four boxes", () => {
+  it("shows critical, warning, open incidents and failing rules as one quiet line", () => {
     const w = mountAlerts({ incidentsState: "ok", incidentsTotal: 6 });
     expect(boxKeys(w)).toEqual(["critical", "warning", "incidents", "failing"]);
-    expect(w.get('[data-test="overview-alerts-boxes"]').classes()).toContain("grid-cols-4");
     const count = (key: string) => box(w, key).get('[data-test="overview-alerts-box-count"]');
     expect(box(w, "critical").text()).toBe("2Critical level");
     expect(box(w, "warning").text()).toBe("1Warning level");
     expect(box(w, "incidents").text()).toBe("6Open incidents");
     expect(box(w, "failing").text()).toBe("4Rules failing");
     expect(count("critical").classes()).toEqual(
-      expect.arrayContaining(["text-xl", "font-semibold", "text-status-negative"]),
+      expect.arrayContaining(["font-semibold", "text-status-negative"]),
     );
     expect(count("warning").classes()).toContain("text-status-warning-text");
     expect(count("incidents").classes()).toContain("text-text-heading");
     expect(count("failing").classes()).toContain("text-status-negative");
     const frame = (key: string) => w.get(`[data-test="overview-alerts-frame-${key}"]`).classes();
-    expect(frame("critical")).toEqual(
-      expect.arrayContaining(["bg-status-error-bg", "border-status-negative"]),
-    );
-    expect(frame("warning")).toEqual(
-      expect.arrayContaining(["bg-status-warning-bg", "border-status-warning-text"]),
-    );
-    expect(frame("failing")).toContain("bg-status-error-bg");
-    expect(frame("incidents")).not.toContain("bg-status-error-bg");
+    for (const key of ["critical", "warning", "incidents", "failing"]) {
+      expect(frame(key)).not.toContain("border");
+      expect(frame(key)).not.toContain("bg-status-error-bg");
+    }
   });
 
   it("drops the incidents box when incidents are unavailable, and keeps zeros neutral", () => {
     for (const incidentsState of [undefined, "locked", "unavailable", "error"]) {
       const w = mountAlerts({ incidentsState });
       expect(boxKeys(w)).toEqual(["critical", "warning", "failing"]);
-      expect(w.get('[data-test="overview-alerts-boxes"]').classes()).toContain("grid-cols-3");
     }
     const zero = mountAlerts({
       section: alertsWith({
@@ -210,9 +189,6 @@ describe("OverviewAlertsCard", () => {
     expect(
       box(zero, "critical").get('[data-test="overview-alerts-box-count"]').classes(),
     ).toContain("text-text-heading");
-    expect(zero.get('[data-test="overview-alerts-frame-critical"]').classes()).toEqual(
-      expect.arrayContaining(["border-border-default", "hover:border-border-strong"]),
-    );
   });
 
   it("links each box to the list that shows exactly the rows it counts", async () => {
@@ -292,7 +268,7 @@ describe("OverviewAlertsCard", () => {
     expect(rows[1].text()).toContain("16m");
   });
 
-  it("fills the list area with a centred all-clear naming the rules being evaluated", () => {
+  it("says all clear on one line, naming the rules being evaluated", () => {
     const w = mountAlerts({
       section: alertsWith({
         firing: [],
@@ -300,9 +276,7 @@ describe("OverviewAlertsCard", () => {
       }),
     });
     const clear = w.get('[data-test="overview-alerts-none-firing"]');
-    expect(clear.classes()).toEqual(
-      expect.arrayContaining(["flex-1", "items-center", "justify-center"]),
-    );
+    expect(clear.classes()).toEqual(expect.arrayContaining(["flex", "items-center"]));
     expect(clear.find("svg").exists()).toBe(true);
     expect(clear.get("p").text()).toBe("No alerts firing right now");
     expect(clear.get("p").classes()).toContain("text-text-heading");
@@ -347,7 +321,7 @@ describe("OverviewAlertsCard", () => {
   });
 
   it("titles the card alerts and incidents only where incidents exist", () => {
-    const title = (props: Record<string, unknown>) => mountAlerts(props).get("h3").text();
+    const title = (props: Record<string, unknown>) => mountAlerts(props).get("h2").text();
     expect(title({ incidentsState: "ok", incidentsTotal: 0 })).toBe("Alerts and incidents");
     expect(title({ incidentsState: "error" })).toBe("Alerts and incidents");
     expect(title({ incidentsState: "locked" })).toBe("Alerts");
@@ -525,7 +499,7 @@ describe("OverviewDataHealthCard", () => {
     const w = mountHealth();
     expect(status(w, "failing").text()).toBe("Needs action");
     expect(status(w, "failing").classes()).toEqual(
-      expect.arrayContaining(["text-xs", "font-semibold", "text-status-error-text"]),
+      expect.arrayContaining(["text-xs", "font-medium", "text-status-error-text"]),
     );
     expect(status(w, "quiet").classes()).toContain("text-status-warning-text");
     expect(status(w, "schema").classes()).toContain("text-status-info-text");
@@ -537,7 +511,12 @@ describe("OverviewDataHealthCard", () => {
     expect(dot("delivery").attributes("aria-hidden")).toBe("true");
     expect(value(w, "failing").text()).toBe("4");
     expect(value(w, "failing").classes()).toEqual(
-      expect.arrayContaining(["text-sm", "font-semibold", "tabular-nums", "text-status-negative"]),
+      expect.arrayContaining([
+        "text-compact",
+        "font-semibold",
+        "tabular-nums",
+        "text-status-negative",
+      ]),
     );
     expect(status(w, "quiet").text()).toBe("Warning");
     expect(value(w, "quiet").text()).toBe("3");
@@ -651,15 +630,18 @@ describe("OverviewTopStreamsCard", () => {
       .map((r) => r.attributes("data-test")!)
       .filter((id) => !/-(share|bar|size)-/.test(id) && id !== "overview-streams-top");
 
-  it("keeps the default row padding, which the lower cards tighten", () => {
-    expect(mountTop().find('[data-test^="overview-streams-top-"] span.py-0\\.5').exists()).toBe(
-      true,
-    );
+  it("keeps each stream on one row with its type and share beside the name", () => {
+    const w = mountTop();
+    const share = w.get('[data-test="overview-streams-top-share-logs-app_logs"]');
+    expect(
+      share.element.closest('[data-test="overview-streams-top-logs-app_logs"]'),
+    ).not.toBeNull();
+    expect(share.element.parentElement!.classList.contains("items-baseline")).toBe(true);
   });
 
   it("is titled by data size, says whose streams, and links to all streams", () => {
     const w = mountTop();
-    expect(w.get("h3").text()).toBe("Top streams by data size");
+    expect(w.get("h2").text()).toBe("Top streams by data size");
     expect(w.get('[data-test="overview-streams-subtitle"]').text()).toBe(
       "Largest streams you can access",
     );
@@ -693,7 +675,12 @@ describe("OverviewTopStreamsCard", () => {
       expect.arrayContaining(["h-2.5", "bg-border-default"]),
     );
     expect(w.get('[data-test="overview-streams-top-size-logs-app_logs"]').classes()).toEqual(
-      expect.arrayContaining(["text-text-heading", "text-sm", "font-semibold", "tabular-nums"]),
+      expect.arrayContaining([
+        "text-text-heading",
+        "text-compact",
+        "font-semibold",
+        "tabular-nums",
+      ]),
     );
     expect(segment("metrics-cpu_usage").classes()).toContain("bg-signal-metrics");
   });
@@ -755,7 +742,7 @@ describe("OverviewLimitCard", () => {
 
   it("titles the card by limit and storage and explains the UTC day", () => {
     const w = mountLimit();
-    expect(w.get("h3").text()).toBe("Ingest limit and storage");
+    expect(w.get("h2").text()).toBe("Ingest limit and storage");
     expect(w.get('[data-test="overview-limit-subtitle"]').text()).toBe(
       "Daily limit counts the UTC day, not a rolling 24h",
     );
@@ -786,10 +773,10 @@ describe("OverviewLimitCard", () => {
     else expect(tag.exists()).toBe(false);
   });
 
-  it("boxes the days over the limit with the real allowed count", () => {
+  it("states the days over the limit with the real allowed count, without a box", () => {
     const w = mountLimit();
     const days = w.get('[data-test="overview-limit-days-box"]');
-    expect(days.classes()).toEqual(expect.arrayContaining(["border", "rounded-default"]));
+    expect(days.classes()).not.toContain("border");
     expect(days.text()).toContain("Days over limit this month");
     expect(w.get('[data-test="overview-limit-days-over"]').text()).toBe("1 of 3 allowed");
     expect(w.get('[data-test="overview-limit-block-note"]').text()).toBe(
@@ -890,7 +877,7 @@ describe("OverviewLimitCard", () => {
   it("shows only the data size, titled data size, when the limit is locked", () => {
     const w = mountLimit({ status: "locked", reason: "secret internal reason" });
     expect(w.find('[data-test="overview-storage-card"]').exists()).toBe(true);
-    expect(w.get("h3").text()).toBe("Data size");
+    expect(w.get("h2").text()).toBe("Data size");
     expect(w.find('[data-test="overview-storage-subtitle"]').exists()).toBe(false);
     expect(w.find('[data-test="overview-limit-body"]').exists()).toBe(false);
     expect(w.find('[role="separator"]').exists()).toBe(false);
@@ -902,7 +889,7 @@ describe("OverviewLimitCard", () => {
     config.isCloud = "true";
     try {
       const w = mountLimit();
-      expect(w.get("h3").text()).toBe("Data size");
+      expect(w.get("h2").text()).toBe("Data size");
       expect(w.find('[data-test="overview-limit-body"]').exists()).toBe(false);
       expect(w.get('[data-test="overview-storage-total"]').text()).toBe("2.00 GB");
     } finally {
@@ -945,10 +932,10 @@ describe("OverviewSignalCards", () => {
   const mountSignals = (props: Record<string, unknown> = {}) =>
     mount(OverviewSignalCards, { props: { ...base, section: o.streams, ...props }, global });
 
-  it("always shows logs, metrics and traces as three aligned cards", () => {
+  it("always shows logs, metrics and traces as three aligned columns", () => {
     const w = mountSignals();
     expect(w.get('[data-test="overview-signal-cards"]').classes()).toEqual(
-      expect.arrayContaining(["grid-cols-3", "gap-3"]),
+      expect.arrayContaining(["grid-cols-3", "gap-x-8"]),
     );
     expect(w.findAll('[data-test$="-card"]').map((c) => c.attributes("data-test"))).toEqual([
       "overview-signal-logs-card",
@@ -965,13 +952,13 @@ describe("OverviewSignalCards", () => {
     expect(w.get('[data-test="overview-signal-traces-swatch"]').classes()).toContain(
       "bg-signal-traces",
     );
-    expect(w.get('[data-test="overview-signal-metrics-card"] h3').text()).toBe("Metrics");
+    expect(w.get('[data-test="overview-signal-metrics-card"] h2').text()).toBe("Metrics");
   });
 
   it("lists streams, events and data size as label and value rows", () => {
     const w = mountSignals();
     const stats = w.get('[data-test="overview-signal-logs-stats"]');
-    expect(stats.findAll("dt")[0].element.parentElement!.classList.contains("border-t")).toBe(true);
+    expect(stats.classes()).toEqual(expect.arrayContaining(["divide-y", "divide-border-subtle"]));
     expect(stats.findAll("dt").map((d) => d.text())).toEqual(["Streams", "Events", "Data size"]);
     expect(w.get('[data-test="overview-signal-logs-streams"]').text()).toBe("4");
     expect(w.get('[data-test="overview-signal-logs-events"]').text()).toBe("1000");
@@ -1037,14 +1024,14 @@ describe("type roles", () => {
     });
     const signals = mount(OverviewSignalCards, { props: { ...base, section: o2.streams }, global });
     for (const w of [health, top, alerts, limit]) {
-      expect(w.get("h3").classes()).toEqual(expect.arrayContaining(["text-sm", "font-semibold"]));
+      expect(w.get("h2").classes()).toEqual(expect.arrayContaining(["text-sm", "font-semibold"]));
     }
-    const valueClasses = ["text-sm", "font-semibold", "tabular-nums"];
+    const valueClasses = ["text-compact", "font-semibold", "tabular-nums"];
     expect(top.get('[data-test="overview-streams-top-size-logs-app_logs"]').classes()).toEqual(
       expect.arrayContaining(valueClasses),
     );
     expect(limit.get('[data-test="overview-storage-total"]').classes()).toEqual(
-      expect.arrayContaining(valueClasses),
+      expect.arrayContaining(["text-sm", "font-semibold", "tabular-nums"]),
     );
     expect(signals.get('[data-test="overview-signal-logs-streams"]').classes()).toEqual(
       expect.arrayContaining(valueClasses),
@@ -1052,11 +1039,7 @@ describe("type roles", () => {
     expect(health.get('[data-test="overview-data-health-value-quiet"]').classes()).toEqual(
       expect.arrayContaining(valueClasses),
     );
-    const labels = [
-      ...signals.findAll("dt"),
-      ...limit.findAll(".text-text-label"),
-      ...alerts.findAll('[data-test="overview-alerts-boxes"] .text-text-label'),
-    ];
+    const labels = [...signals.findAll("dt"), ...limit.findAll(".text-text-label")];
     expect(labels.length).toBeGreaterThan(5);
     for (const label of labels) expect(label.classes()).toContain("text-xs");
   });
@@ -1113,9 +1096,9 @@ describe("Ask AI on the overview cards", () => {
       expect(w.emitted("askAi")![0][0]).not.toHaveProperty("level");
     });
 
-    it("reserves end padding on the box label for the Ask AI icon", () => {
-      const label = mountAlerts().get('[data-test="overview-alerts-box-critical"]').findAll("span");
-      expect(label.some((n) => n.classes().includes("pe-6"))).toBe(true);
+    it("sizes the count line's Ask AI button to the 28 px count buttons", () => {
+      const btn = ask(mountAlerts(), "box-critical");
+      expect(btn.classes()).toContain("size-control-sm");
     });
 
     it("leaves a zero box without the button", () => {

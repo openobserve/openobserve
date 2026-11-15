@@ -35,11 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="onRowClick"
     >
       <template #empty>
-        <div data-test="no-triggers-message" class="py-8 text-center">
-          <span class="text-text-secondary text-sm">
-            {{ t("alerts.noTriggersLoaded") }}
-          </span>
-        </div>
+        <OEmptyState :title="t('alerts.noTriggersLoaded')" data-test="no-triggers-message" />
       </template>
 
       <template #cell-alert_name="{ row }">
@@ -165,6 +161,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import incidentsService, { type ExternalAlertPayload } from "@/services/incidents";
@@ -191,6 +188,7 @@ export default defineComponent({
     OButton,
     ODialog,
     OTruncatedText,
+    OEmptyState,
   },
   props: {
     triggers: {

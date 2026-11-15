@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState
             kind="error"
             :title="t('emptyState.loadError.title')"
-            :text="raw(message)"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             data-test="dbm-table-health-error"
             @action="onRefresh()"
           />
@@ -275,6 +275,7 @@ import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 // The shared in-cell magnitude bar from the core Table library — the same one

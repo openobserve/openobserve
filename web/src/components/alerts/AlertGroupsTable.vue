@@ -51,16 +51,12 @@
     </template>
 
     <template #toolbar-trailing>
-      <OButton
-        icon-only
-        variant="ghost"
-        icon="refresh"
+      <ORefreshButton
+        :last-run-at="lastRunAt"
         :loading="loading"
         data-test="alerts-alertgroupstable-refresh"
         @click="emit('refresh')"
-      >
-        <OTooltip side="bottom" :content="t('alerts.groups.refresh')" />
-      </OButton>
+      />
     </template>
 
     <template #cell-level="{ row }">
@@ -283,6 +279,7 @@ import {
 } from "@/utils/downtimes/quickMute";
 import { formatInZone } from "@/utils/oncall";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -305,6 +302,8 @@ const props = withDefaults(
   defineProps<{
     groups: AlertGroup[];
     loading?: boolean;
+    /** Epoch-ms of the last successful load, shown as the refresh age. */
+    lastRunAt?: number | null;
     loadError?: boolean;
     alertId?: string;
     alertName?: string;
@@ -315,6 +314,7 @@ const props = withDefaults(
   }>(),
   {
     loading: false,
+    lastRunAt: null,
     loadError: false,
     alertId: "",
     alertName: "",

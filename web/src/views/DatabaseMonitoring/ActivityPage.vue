@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState
             kind="error"
             :title="t('emptyState.loadError.title')"
-            :text="raw(message)"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             data-test="dbm-activity-error"
             @action="onRefresh()"
           />
@@ -324,6 +324,7 @@ import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";

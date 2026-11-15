@@ -133,26 +133,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :style="{ minHeight: reservedHeight }"
             data-test="autoobserve-analysis-comparison-error"
           >
-            <p role="alert" class="text-status-error-text flex items-center gap-1.5 text-xs">
-              <OIcon name="error-outline" size="xs" />
-              {{ comparisonMissing ?? t("autoobserve.issueLive.compare.failed") }}
-              <OButton
-                v-if="!comparisonMissing || comparisonCanRetry"
-                variant="accent-ghost"
-                size="sm"
-                data-test="autoobserve-analysis-comparison-retry"
-                @click="emit('retry-comparison')"
-                >{{ t("autoobserve.issueLive.spark.retry") }}</OButton
-              >
-            </p>
+            <OEmptyState
+              size="compact"
+              kind="error"
+              role="alert"
+              :title="comparisonMissing ?? t('autoobserve.issueLive.compare.failed')"
+            >
+              <template v-if="!comparisonMissing || comparisonCanRetry" #actions>
+                <OButton
+                  variant="secondary"
+                  size="sm"
+                  data-test="autoobserve-analysis-comparison-retry"
+                  @click="emit('retry-comparison')"
+                  >{{ t("autoobserve.issueLive.spark.retry") }}</OButton
+                >
+              </template>
+            </OEmptyState>
           </div>
-          <p
+          <OEmptyState
             v-else-if="!issue.analysis.comparison?.rows.length"
-            class="text-text-secondary text-xs"
+            size="compact"
+            icon="bar-chart"
+            :title="t('autoobserve.issueLive.compare.empty')"
             data-test="autoobserve-analysis-comparison-empty"
-          >
-            {{ t("autoobserve.issueLive.compare.empty") }}
-          </p>
+          />
           <ul v-else class="flex flex-col gap-3">
             <li
               v-for="(row, i) in issue.analysis.comparison?.rows ?? []"
@@ -329,6 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";

@@ -23,11 +23,11 @@
         </OButton>
       </template>
 
-      <div v-if="isLoading" class="flex flex-1 items-center justify-center">
-        <OSpinner size="lg" />
+      <div v-if="isLoading" class="px-page-edge pt-3">
+        <OSkeleton preset="tableRows" :rows="8" />
       </div>
 
-      <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
+      <template v-else-if="forbidden">
         <LicenseDeniedState
           v-if="Array.isArray(forbidden)"
           :features="forbidden"
@@ -40,21 +40,16 @@
           :text="t('emptyState.noAccess.description')"
           data-test="llm-providers-forbidden"
         />
-      </div>
+      </template>
 
-      <div v-else-if="!providers.length" class="flex flex-1 items-center justify-center">
-        <!-- First-run state — uses the same `no-llm-providers` preset the
-             OTable's #empty slot uses for the filtered case, so the empty
-             surface in this page reads consistently with the rest of the
-             app (matches Scorers' "Add a Provider First" treatment). -->
-        <OEmptyState
-          :title="t('llmProviders.empty.title')"
-          :text="t('llmProviders.empty.description')"
-          data-test="llm-providers-empty-state"
-          :action-label="t('emptyState.noLlmProviders.action')"
-          @action="openCreate()"
-        />
-      </div>
+      <OEmptyState
+        v-else-if="!providers.length"
+        :title="t('llmProviders.empty.title')"
+        :text="t('llmProviders.empty.description')"
+        data-test="llm-providers-empty-state"
+        :action-label="t('emptyState.noLlmProviders.action')"
+        @action="openCreate()"
+      />
 
       <div v-else class="min-h-0 flex-1">
         <OTable
@@ -157,7 +152,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { type Provider } from "@/services/online-evals.service";
 import { deleteProviderMutation, providersQuery } from "@/services/online-evals.service.queries";

@@ -65,7 +65,7 @@ read it once, it is the backbone of everything below.
    hand-rolled `<div class="header">…<h1>` or a `q-toolbar`
    ([header-spec](references/header-spec.md), guidelines H1–H8). One 56 px band: a
    context line above an 18 px title, actions on the right. The context line is
-   derived from the route (the rail group, else the org); a detail, editor or import
+   derived from the route (the rail group, else an empty slot, never the org); a detail, editor or import
    page passes **`:back="{ label, to }"`** and it becomes a real "‹ Parent" link on
    `useSmartBack` (H4, N3). The title sits at the same x and y on every page and
    never changes on a tab click. Peer tabs (`#header-tabs`) always sit on their own

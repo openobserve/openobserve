@@ -224,13 +224,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <template #error="{ message }">
-          <OEmptyState
-            kind="error"
-            :title="t('emptyState.loadError.title')"
-            :text="raw(message)"
-            @action="refresh"
-          />
+        <template #error>
+          <OEmptyState kind="error" @action="refresh" />
         </template>
       </OTable>
     </div>

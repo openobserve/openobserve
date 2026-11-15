@@ -320,49 +320,78 @@ Hide the truncated line while open so it is not said twice; do not draw a second
 ### OEmptyState
 
 **Import:** `@/lib/core/EmptyState/OEmptyState.vue`
-**Use when:** Every empty state, inside the table body or panel that is empty (never instead
-of the frame). Four kinds in one component (K5), each telling the one next step:
+**Use when:** Every empty, error and denied state, inside the table body or panel that is empty
+(never instead of the frame). Four kinds in one component (K5), each telling the one next step:
 
 | `kind` | Says | Action |
 | --- | --- | --- |
 | `first-run` (default) | What this is and why you would use it | One primary, the header's words: "New alert" (H6) |
-| `filtered` | No rows match; which filters are on | Clear filters (default label) (F5) |
+| `filtered` | No rows match ("No matches" by default) | Clear filters (default label) (F5) |
 | `denied` | No access, and who can grant it (`contact`) | None, or "Request access" |
-| `error` | What failed, in plain words (K6) | Retry (default label, refresh icon) |
+| `error` | What failed, in plain words (K6): "Couldn't load this data" by default | Retry (default label) |
 
 **A failed load is `error`, never `first-run` (K5).** No pager under an empty table (D5).
-**Don't use for:** Loading (skeletons, K4) or field validation errors (inline, K2).
-**Key props:**
+**Don't use for:** Loading (skeletons after 150 ms, K4) or field validation errors (inline, K2).
 
-- `kind` (above) · `size` (`page` default: 40 px icon tile, 16/600 title, 14 px text at 44ch;
-  `inline`: 32 px tile, 14 px title, 13 px text — inside a table body, list or dropdown)
-- `title` · `text` (I18nText) · `icon` (IconName; the kind sets a default; the tile is neutral,
-  red-tinted only for `error`)
-- `actionLabel` + `@action` (an `lg` 36 px button: primary for first-run, secondary otherwise) ·
-  `secondaryActionLabel` + `@secondary-action`. With a listener and no label, `error` shows
-  Retry and `filtered` shows Clear filters.
-- `requestId` (string, mono under an error) · `contact` (I18nText, denied)
+**Two variants (R3), set by `size`:**
 
-**Slots:** `#text` (rich text), `#actions` (onboarding cards such as `EmptyStateIngestionCard`
-in place of the buttons), `#extra` (content below)
+- `region` (default): a table body, a page body, or a panel taller than 240 px. It places itself
+  64 px below its container's top and centres horizontally, so it never moves with page height:
+  a 20 px icon in a 40 px neutral tile, title 14/600, text 13 px up to 420 px, md (32 px) buttons,
+  one primary (first-run) plus at most one secondary.
+- `compact`: a panel 240 px tall or less, a rail, a list inside a drawer or popover, a cell. A
+  16 px icon inline with a 13/500 title, text under it, one sm button, left-aligned. It adds no
+  horizontal padding: it sits at its container's content inset (add `px-*` only where there is none).
+
+Do not centre it or pad it from outside: no `flex items-center justify-center`, `place-items-center`,
+`m-auto` or `py-*` wrapper. `local/o2-display-api` rejects position classes on it.
+
+**Key props:** `kind` · `size` (`region` | `compact`) · `title` · `text` (I18nText; `filtered`,
+`denied` and `error` fill in their own copy when no title is given) · `icon` (IconName; the kind
+sets a default; the tile is neutral, the icon red only for `error`) · `actionLabel` + `@action`
+(with a listener and no label, `error` shows Retry and `filtered` shows Clear filters) ·
+`secondaryActionLabel` + `@secondary-action` (region only) · `requestId` · `contact`.
+Raw transport text ("Request failed with status code 500") never reaches `text`: filter it with
+`isRawHttpText` from `@/lib/core/EmptyState/emptyStateCopy` and let the kind's copy speak.
+
+**Slots:** `#text` (rich text), `#actions` (`OButton`s only, md in a region and sm in compact, to
+keep a `data-test` on the button; never cards, tiles or chips), `#extra` (content below, such as a
+plain checklist or a row of `variant="link"` buttons; no card frame)
 **Emits:** `action`, `secondary-action` (no payload)
-**Removed:** `preset` (and `presets.ts`) → `kind` + `title`/`text`; `illustration` (and the 35
-SVGs), `backdrop`, `toneIcon` → `icon`; `variant`, `filtered` → `kind`; `hideAction`; `actions`
-cards → the two action labels; `actionIcon`; `description` → `text`; sizes hero/block/compact →
-`page`, slim → `inline`. `local/o2-display-api` rejects all of them.
-**In a scroll pane:** pass `class="shrink-0"` so it does not clip its own `#extra` list, and
-centre with `justify-center-safe` on the pane.
+**Removed:** `size="page"` → `region`, `size="inline"` → `compact`; the tile actions
+`EmptyStateIngestionCard` / `EmptyStateIngestionChip` (deleted). `preset`, `illustration`,
+`backdrop`, `toneIcon`, `variant`, `filtered`, `hideAction`, `actions`, `actionIcon`,
+`description` stay removed. `local/o2-display-api` rejects all of them.
+**In a scroll pane:** pass `class="shrink-0"` so it does not clip its own `#extra` list.
+
+**Whole-page failure (R3):** when every data panel on a page fails for the same reason, render one
+region `OEmptyState` for the page instead of one per panel; a panel that fails on its own keeps a
+compact error. `useAllPanelsFailed` from `@/lib/feedback/RegionStatus/useAllPanelsFailed` decides it:
+
+```ts
+const { allFailed, kind } = useAllPanelsFailed(() => [
+  { pending: alerts.isPending.value, error: alerts.error.value },
+  { pending: health.isPending.value, error: health.error.value },
+]);
+```
+
+```vue
+<OEmptyState v-if="allFailed" :kind="kind!" @action="refreshAll" />
+<template v-else><!-- the panels, each with its own compact error --></template>
+```
+
 **Example:**
 
 ```vue
 <OEmptyState
   :kind="search ? 'filtered' : 'first-run'"
-  :title="search ? t('alerts.noMatch') : t('alerts.emptyTitle')"
+  :title="search ? undefined : t('alerts.emptyTitle')"
   :text="search ? undefined : t('alerts.emptyText')"
   :action-label="search ? undefined : t('alerts.newAlert')"
   @action="search ? (search = '') : openCreate()"
 />
-<OEmptyState v-if="isError" kind="error" :title="t('alerts.loadFailed')" @action="refetch" />
+<OEmptyState v-if="isError" kind="error" @action="refetch" />
+<OEmptyState v-if="panelEmpty" size="compact" :title="t('panel.noData')" />
 ```
 
 **Family:** Composes `OButton`, `OIcon`. Standalone.

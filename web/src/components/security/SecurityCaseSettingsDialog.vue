@@ -11,7 +11,8 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { caseSettingsQuery, saveCaseSettingsMutation } from "@/services/securityCases.queries";
 import {
@@ -96,15 +97,21 @@ async function onSubmit(value: CaseSettingsValues) {
       <OInlineNotice v-if="saveError" tone="err" data-test="security-case-settings-save-error">{{
         saveError
       }}</OInlineNotice>
-      <OInlineNotice v-if="loadError" tone="err" data-test="security-case-settings-load-error">{{
-        loadError
-      }}</OInlineNotice>
+      <OEmptyState
+        v-if="loadError"
+        kind="error"
+        size="compact"
+        :title="loadError"
+        data-test="security-case-settings-load-error"
+        @action="settings.refetch()"
+      />
       <div
         v-else-if="!defaults"
-        class="flex justify-center py-6"
+        class="flex flex-col gap-4"
         data-test="security-case-settings-loading"
       >
-        <OSpinner size="lg" />
+        <OSkeleton shape="block" class="h-14" />
+        <OSkeleton shape="block" class="h-14" />
       </div>
       <OForm
         v-else-if="open"

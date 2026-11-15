@@ -215,7 +215,6 @@ const mountExplorer = (
       stubs: {
         OPageHeader: true,
         DateTimePickerDashboard: true,
-        AutoRefreshInterval: true,
         MetricCard: true,
         PrefixFilterPanel: true,
         LabelFilterBar: true,
@@ -465,22 +464,33 @@ describe("MetricsExplorer wiring", () => {
   });
 
   describe("the toolbar refresh control", () => {
-    it("is a labeled 'Refresh' button, not an icon-only control", () => {
-      // Icon-only refresh was easy to miss next to the date picker; the control
-      // now carries its label like the other toolbar actions.
-      const wrapper = mountExplorer({
-        OButton: {
-          template: '<button v-bind="$attrs"><slot /></button>',
-        },
-      });
+    it("is the shared refresh button with the data age, as on Logs and Traces", () => {
+      const wrapper = mountExplorer();
 
-      const btn = wrapper.find('[data-test="metrics-explorer-refresh"]');
-      expect(btn.exists()).toBe(true);
-      // t() is mocked to echo the key — the label must come from i18n.
-      expect(btn.text()).toContain("metrics.explorer.refresh");
-      expect(btn.attributes("size")).toBeUndefined();
-      // Same treatment as the logs/traces Run Query button.
-      expect(btn.attributes("variant")).toBe("primary");
+      const refresh = wrapper.findComponent({ name: "ORefreshButton" });
+      expect(refresh.exists()).toBe(true);
+      expect(refresh.props("dataTest")).toBe("metrics-explorer-refresh");
+      expect(refresh.props("shortcut")).toBe("metricsRefresh");
+      expect(wrapper.find('[data-test="metrics-explorer-more-btn"]').exists()).toBe(true);
+    });
+
+    it("carries auto-refresh in its own menu, with no separate Auto button", async () => {
+      const wrapper = mountExplorer();
+      const refresh = wrapper.findComponent({ name: "ORefreshButton" });
+      expect(refresh.props("autoRefresh")).toBe(0);
+      expect(wrapper.find('[data-test="metrics-auto-refresh"]').exists()).toBe(false);
+
+      refresh.vm.$emit("update:autoRefresh", 30);
+      await flushPromises();
+      expect((wrapper.vm as any).refreshInterval).toBe(30);
+      expect(wrapper.findComponent({ name: "ORefreshButton" }).props("autoRefresh")).toBe(30);
+    });
+
+    it("stays in Visualize, where auto-refresh still re-runs the chart", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("visualize");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "ORefreshButton" }).exists()).toBe(true);
     });
   });
 
@@ -2273,13 +2283,13 @@ describe("MetricsExplorer wiring", () => {
       );
     });
 
-    it("Visualize shows Run but no Refresh button; the refresh shortcut still re-runs without recording", async () => {
+    it("Visualize keeps Refresh after Run for its auto-refresh menu; refresh re-runs without recording", async () => {
       const wrapper = withButtons();
       (wrapper.vm as any).setMode("visualize");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find(RUN).exists()).toBe(true);
-      expect(wrapper.find('[data-test="metrics-explorer-refresh"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-refresh"]').exists()).toBe(true);
       shortcuts.handlers.metricsRefresh();
       expect(visualizeRunQuery).toHaveBeenCalledTimes(1);
       expect(visualizeOnUserRun).not.toHaveBeenCalled();

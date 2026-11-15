@@ -194,30 +194,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Error -->
-        <div v-else-if="error" class="flex flex-1 flex-col items-center justify-center text-center">
-          <OIcon name="error-outline" size="xl" class="text-error-600 mb-3" />
-          <div class="text-text-heading mb-2 text-sm">
-            {{ t("traces.sessionDetail.failedToLoad") }}
-          </div>
-          <div class="text-text-muted mb-3 max-w-[30rem] text-sm">
-            {{ error }}
-          </div>
-          <OButton variant="secondary" @click="load">{{ t("traces.sessionDetail.retry") }}</OButton>
-        </div>
+        <OEmptyState
+          v-else-if="error"
+          kind="error"
+          :title="t('traces.sessionDetail.failedToLoad')"
+          :text="isRawHttpText(error) ? t('emptyState.loadError.description') : raw(error)"
+          data-test="session-detail-error"
+        >
+          <template #actions>
+            <OButton @click="load">{{ t("traces.sessionDetail.retry") }}</OButton>
+          </template>
+        </OEmptyState>
 
         <!-- Not found -->
-        <div
+        <OEmptyState
           v-else-if="!detail"
-          class="flex flex-1 flex-col items-center justify-center text-center"
-        >
-          <OIcon name="search-off" size="xl" class="text-text-muted mb-3" />
-          <div class="text-text-heading mb-2 text-sm">
-            {{ t("traces.sessionDetail.sessionNotFound") }}
-          </div>
-          <div class="text-text-muted max-w-[30rem] text-sm">
-            {{ t("traces.sessionDetail.noSpansFound", { id: sessionId }) }}
-          </div>
-        </div>
+          icon="search-off"
+          :title="t('traces.sessionDetail.sessionNotFound')"
+          :text="t('traces.sessionDetail.noSpansFound', { id: sessionId })"
+          data-test="session-detail-not-found"
+        />
 
         <!-- Content -->
         <template v-else>
@@ -731,13 +727,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- empty state -->
-                    <div
+                    <OEmptyState
                       v-if="filteredTraces.length === 0"
-                      class="text-text-muted flex flex-col items-center justify-center gap-2 py-12"
-                    >
-                      <OIcon name="search-off" size="lg" />
-                      <span class="text-compact">{{ t("traces.sessionDetail.noTurnsMatch") }}</span>
-                    </div>
+                      kind="filtered"
+                      :title="t('traces.sessionDetail.noTurnsMatch')"
+                    />
                   </div>
 
                   <!-- Pretty (transcript) view — reuses ThreadView, rendered from the
@@ -870,12 +864,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTooltip>
                   </span>
                 </div>
-                <div
+                <OEmptyState
                   v-else-if="!spansFailed.size"
-                  class="text-text-muted px-3 py-5 text-center text-xs"
-                >
-                  {{ t("traces.sessionDetail.rail.noTools") }}
-                </div>
+                  size="compact"
+                  class="px-3"
+                  :title="t('traces.sessionDetail.rail.noTools')"
+                />
               </div>
 
               <!-- Cost Hotspots -->
@@ -1022,6 +1016,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";

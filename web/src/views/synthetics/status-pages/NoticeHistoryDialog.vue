@@ -29,12 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emit('update:open', false)"
   >
     <div class="flex flex-col gap-3">
-      <div v-if="loading" class="flex justify-center py-8">
-        <OSpinner size="lg" />
+      <div v-if="loading" class="flex flex-col gap-2">
+        <OSkeleton v-for="row in 3" :key="row" shape="block" class="h-20" />
       </div>
-      <p v-else-if="notices.length === 0" class="text-text-secondary py-8 text-center text-sm">
-        {{ t("statusPages.notices.empty") }}
-      </p>
+      <OEmptyState
+        v-else-if="notices.length === 0"
+        size="compact"
+        :title="t('statusPages.notices.empty')"
+      />
       <div
         v-for="notice in notices"
         v-else
@@ -199,7 +201,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";

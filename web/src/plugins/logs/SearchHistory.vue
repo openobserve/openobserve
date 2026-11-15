@@ -38,20 +38,13 @@
       </div>
 
       <div>
-        <OButton
-          icon-only
-          variant="ghost"
-          icon="refresh"
+        <ORefreshButton
+          :last-run-at="lastUpdatedAt"
           :loading="isLoading"
+          shortcut="searchHistoryRefresh"
           data-test="search-history-get-history-btn"
           @click="fetchSearchHistory"
-        >
-          <OTooltip
-            side="bottom"
-            :content="t('search_history.get_history')"
-            shortcut="searchHistoryRefresh"
-          />
-        </OButton>
+        />
       </div>
     </template>
     <template #banner>
@@ -306,13 +299,13 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -337,10 +330,10 @@ export default defineComponent({
     OTab,
     QueryEditor,
     OButton,
+    ORefreshButton,
     OCopyButton,
     OIcon,
     OTag,
-    OTooltip,
     OTruncatedText,
     OTable,
     OTimeCell,
@@ -394,6 +387,7 @@ export default defineComponent({
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref<ForbiddenState>(false);
     const moreDetailsToDisplay = ref("");
 
@@ -547,6 +541,7 @@ export default defineComponent({
           );
         });
         dataToBeLoaded.value = filteredHits;
+        lastUpdatedAt.value = Date.now();
         isLoading.value = false;
         if (pendingPageRestore) {
           pendingPageRestore = false;
@@ -795,6 +790,7 @@ export default defineComponent({
       t,
       route,
       isLoading,
+      lastUpdatedAt,
       forbidden,
       updateDateTime,
       searchDateTimeRef,

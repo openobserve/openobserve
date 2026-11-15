@@ -1961,6 +1961,9 @@
     "workflows": "工作流",
     "language": "语言",
     "keyboardShortcuts": "键盘快捷键",
+    "searchOrJumpTo": "搜索或跳转到…",
+    "jumpToTitle": "跳转到",
+    "jumpToPlaceholder": "搜索页面",
     "synthetic": "合成监控",
     "experience": "体验",
     "slos": "SLO",
@@ -4039,7 +4042,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "您无权管理许可证。"
-      }
+      },
+      "usageTitle": "每日摄取量"
     },
     "value_sso_requires_ha": "✅ 需要 HA 模式",
     "value_rbac_requires_ha": "✅ 需要 HA 模式",
@@ -5048,6 +5052,7 @@
   },
   "organization": {
     "searchByNameOrId": "按名称或 ID 搜索",
+    "currentLabel": "组织：{name}",
     "noOrganizationsFound": "未找到组织",
     "header": "组织",
     "orgBeingDeletedSwitching": "此组织正在被删除。正在为您切换到另一个组织。",
@@ -10752,7 +10757,8 @@
       "taglineAnd": "并引导您查看日志、追踪、指标和事件。",
       "signedInAs": "登录身份",
       "role": "角色",
-      "tryOneOfThese": "或者试试其中一个"
+      "tryOneOfThese": "或者试试其中一个",
+      "panelText": "询问你的日志、追踪、指标和事件，或获取编写查询的帮助。"
     },
     "capabilities": {
       "query": {
@@ -18952,7 +18958,7 @@
       "version": "版本",
       "agentIdHint": "Agent ID：{ids}",
       "noAgentIdentity": "未找到 Agent 身份",
-      "noAgentIdentityDescription": "这些 LLM Span 没有 Agent 名称，因此按数据流显示。映射用于指定 Agent 名称的属性后，即可按 Agent 查看它们。",
+      "noAgentIdentityDescription": "这些 LLM Span 没有 Agent 名称，因此按数据流显示。",
       "noAgentIdentityAction": "打开 GenAI Agent 映射"
     },
     "agentGraph": {
@@ -22728,6 +22734,7 @@
     },
     "actions": {
       "openCheatsheet": "打开键盘快捷键备忘单",
+      "searchOrJumpTo": "搜索或跳转到页面",
       "closeDialog": "关闭任何对话框、抽屉或模态",
       "focusSearch": "聚焦搜索栏",
       "focusQuery": "聚焦查询编辑器",
@@ -25452,7 +25459,8 @@
         "p95": "慢速尾部——每 20 次调用中就有 1 次至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
         "p99": "最慢的 1% 调用至少耗时这么久。根据应用程序追踪中已完成的调用测得。",
         "load": "你的应用调用此数据库所花费的总时间，根据应用程序的追踪测得。它反映了此数据库为你的应用承载了多少流量。",
-        "attention": "该实例与其自身引擎发布的上限之间的接近程度——目前为连接数与 max_connections 的比值。取最差值而非综合得分。按从高到低排序，健康状况无法读取的实例排在顶部，因为看不见的实例无法确认是健康的。在数据库服务器上测量，因此与旁边的数据库耗时不可比。"
+        "attention": "该实例与其自身引擎发布的上限之间的接近程度——目前为连接数与 max_connections 的比值。取最差值而非综合得分。按从高到低排序，健康状况无法读取的实例排在顶部，因为看不见的实例无法确认是健康的。在数据库服务器上测量，因此与旁边的数据库耗时不可比。",
+        "calls": "你的应用调用此数据库的次数，根据应用的追踪数据测量。"
       },
       "failedChip": "{count} 次失败",
       "columnSubLabels": {
@@ -25893,7 +25901,8 @@
         "tableHealthHint": "表大小、膨胀和清理状态。膨胀和清理仅适用于 PostgreSQL。",
         "deadlocksLocked": "死锁是企业版功能。升级以查看哪些查询相互死锁以及原因。其他数据库选项卡在任何计划中都可用。",
         "blockedLocked": "被阻塞的查询是企业版功能。升级以查看哪些会话正在等待锁以及是什么持有锁。其他数据库选项卡在任何计划中都可用。",
-        "tableHealthLocked": "表健康状况是企业版功能。升级以跟踪表大小、膨胀和清理状态。其他数据库选项卡在任何计划中都可用。"
+        "tableHealthLocked": "表健康状况是企业版功能。升级以跟踪表大小、膨胀和清理状态。其他数据库选项卡在任何计划中都可用。",
+        "queriesHintServer": "此时间范围内数据库上报的查询种类，在数据库内部统计。"
       }
     },
     "metrics": {

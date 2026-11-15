@@ -494,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Empty state -->
                       <OEmptyState
                         v-if="!tier.prices.length"
-                        size="inline"
+                        size="compact"
                         :title="t('modelPricing.noPricesDefined')"
                         :text="t('modelPricing.noPricesDesc')"
                       />

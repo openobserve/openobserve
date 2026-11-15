@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  DbmTableToolbar — the leading half of a DBM list table's toolbar: a fixed-width
-  search box, then whatever controls the page adds beside it.
+  DbmTableToolbar — the leading half of a DBM list table's toolbar, in the house
+  order: the page's view switcher, a 280 px search box, its filters, then notes.
 
   Eight tables opened their `#toolbar` slot with the same flex row and the same
   `w-64` search box; only the placeholder and the `data-test` changed. The
@@ -29,9 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex min-w-0 flex-1 flex-wrap items-center gap-2 overflow-hidden max-lg:overflow-visible max-md:contents"
   >
     <!-- contents on phones: the filters share the table toolbar's first row with the date and refresh, search takes the next. -->
-    <!-- Filters first, then a search that fills the rest of the row, as on the app's other list pages. -->
-    <slot name="filters" />
-    <div class="min-w-48 flex-1 max-lg:order-last max-lg:w-full max-lg:basis-full">
+    <slot name="view" />
+    <div class="w-70 min-w-0 max-lg:order-last max-lg:w-full max-lg:basis-full">
       <OSearchInput
         :model-value="search"
         :placeholder="placeholder"
@@ -40,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onSearch"
       />
     </div>
+    <slot name="filters" />
     <slot />
   </div>
 </template>

@@ -177,9 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ul>
 
                   <!-- No results message -->
-                  <div v-else class="text-text-muted p-4 text-center">
-                    {{ t("search.noResult") }}
-                  </div>
+                  <OEmptyState v-else size="compact" kind="filtered" class="px-3" />
                 </div>
 
                 <!-- Selected Count Footer -->
@@ -200,48 +198,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="h-full">
               <div class="relative-position h-full w-full overflow-auto">
                 <!-- Loading State -->
-                <div v-if="loading" class="flex h-full flex-col items-center justify-center py-20">
-                  <OSpinner
-                    size="lg"
-                    class="mb-4"
-                    data-test="traces-analysis-dashboard-loading-indicator"
+                <div
+                  v-if="loading"
+                  class="grid grid-cols-1 gap-3 p-3 md:grid-cols-2"
+                  data-test="traces-analysis-dashboard-loading-indicator"
+                >
+                  <OSkeleton
+                    v-for="panel in Math.max(selectedDimensions.length, 2)"
+                    :key="panel"
+                    shape="block"
+                    class="h-60"
                   />
-                  <div class="text-sm">
-                    {{ t("latencyInsights.analyzingDimensions") }}
-                  </div>
-                  <div class="text-text-secondary mt-2 text-xs">
-                    {{
-                      t("latencyInsights.computingDistributions", {
-                        count: selectedDimensions.length,
-                      })
-                    }}
-                  </div>
                 </div>
 
                 <!-- Error State -->
-                <div
+                <OEmptyState
                   v-else-if="error"
+                  kind="error"
+                  :title="t('latencyInsights.failedToLoad')"
+                  :text="isRawHttpText(error) ? t('emptyState.loadError.description') : raw(error)"
                   data-test="traces-analysis-dashboard-error"
-                  class="flex h-full flex-col items-center justify-center py-20"
                 >
-                  <OIcon
-                    name="error-outline"
-                    class="mb-4"
-                    style="width: 3.75rem; height: 3.75rem"
-                  />
-                  <div class="mb-2 text-sm">
-                    {{ t("latencyInsights.failedToLoad") }}
-                  </div>
-                  <div class="text-text-secondary text-sm">{{ error }}</div>
-                  <OButton
-                    variant="secondary"
-                    class="mt-4"
-                    data-test="traces-analysis-dashboard-retry-btn"
-                    @click="loadAnalysis"
-                  >
-                    {{ t("latencyInsights.retryButton") }}
-                  </OButton>
-                </div>
+                  <template #actions>
+                    <OButton data-test="traces-analysis-dashboard-retry-btn" @click="loadAnalysis">
+                      {{ t("latencyInsights.retryButton") }}
+                    </OButton>
+                  </template>
+                </OEmptyState>
 
                 <!-- Every dimension removed (sidebar or panel X) -->
                 <OEmptyState
@@ -304,8 +287,9 @@ import {
   COMPARISON_COLORS,
 } from "@/composables/useLatencyInsightsDashboard";
 import { selectDimensionsFromData } from "@/composables/useDimensionSelector";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";

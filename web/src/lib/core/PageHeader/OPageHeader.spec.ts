@@ -199,22 +199,35 @@ describe("OPageHeader context line (H4)", () => {
     expect(contextText()).toBe("Data");
   });
 
-  it("names the org on an ungrouped page", async () => {
-    await mountAt("/logs", { title: raw("Logs") }, {}, links);
+  it("keeps an empty, hidden slot on an ungrouped page, never the org", async () => {
+    const store = { state: { selectedOrganization: { label: "acme-prod", identifier: "acme" } } };
+    const router = makeRouter();
+    await router.push("/logs");
+    wrapper = mount(OPageHeader, {
+      props: { title: raw("Logs") },
+      attachTo: document.body,
+      global: { plugins: [i18n, router], provide: { store } },
+    });
+    await flushPromises();
     expect(contextText()).toBe("");
-    expect(byTest("o-page-header-context-label").exists()).toBe(true);
+    expect(byTest("o-page-header-context").classes()).toContain("h-4");
+    expect(byTest("o-page-header-context-label").attributes("aria-hidden")).toBe("true");
   });
 
-  it("names the org instead of a group spelled like the title", async () => {
+  it("shows the group to assistive tech once it names one", async () => {
+    await mountAt("/alerts/destinations", { title: raw("Alerts") }, {}, links);
+    expect(byTest("o-page-header-context-label").attributes("aria-hidden")).toBeUndefined();
+  });
+
+  it("leaves the line empty instead of a group spelled like the title", async () => {
     await mountAt("/pipelines", { title: raw("data") }, {}, links);
-    expect(contextText()).not.toBe("Data");
-    expect(byTest("o-page-header-context-label").exists()).toBe(true);
+    expect(contextText()).toBe("");
   });
 
-  it("names the org when the rail does not emit the group", async () => {
+  it("leaves the line empty when the rail does not emit the group", async () => {
     const lone: NavItem[] = [{ title: raw("Alerts"), icon: "a", link: "/alerts", name: "logs" }];
     await mountAt("/alerts", { title: raw("Alerts") }, {}, lone);
-    expect(contextText()).not.toBe("Reliability");
+    expect(contextText()).toBe("");
   });
 
   it("takes an explicit context over the derived one", async () => {
@@ -250,7 +263,7 @@ describe("OPageHeader context line (H4)", () => {
     },
   );
 
-  it("names the org when the rail group is spelled like the title", async () => {
+  it("leaves the line empty when the rail group is spelled like the title", async () => {
     await mountAt("/iam/users", { title: raw("access") }, {}, links, false, "Access");
     expect(contextText()).toBe("");
   });
@@ -260,7 +273,7 @@ describe("OPageHeader context line (H4)", () => {
     expect(contextText()).toBe("Security");
   });
 
-  it("names the org on a shared page the flat rail does not hold", async () => {
+  it("leaves the line empty on a shared page the flat rail does not hold", async () => {
     await mountAt("/alert-destinations", { title: raw("Destinations") }, {}, securityLinks, true);
     expect(contextText()).toBe("");
   });

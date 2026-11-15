@@ -247,9 +247,7 @@ export class SanityPage {
     // Histogram Methods
     // ================================================================
     async clickHistogramToggle() {
-        // Histogram has an inline toolbar button at normal viewport widths
-        // (data-test="logs-search-bar-histogram-btn"). It moves into the
-        // utilities ("More") menu only at narrow viewports (shouldMoveButtonsToMenu).
+        // The histogram toggle is a ⋯ item; a toolbar copy exists only when the user pinned it.
         const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
         const isInline = await inlineBtn.isVisible({ timeout: 1000 }).catch(() => false);
         if (isInline) {
@@ -268,20 +266,14 @@ export class SanityPage {
         await this.page.waitForTimeout(100);
     }
 
-    // Returns true when the histogram OSwitch is currently ON.
-    // OSwitch surfaces its state via a nested `role="switch"` element carrying
-    // `aria-checked="true|false"`. At normal viewport widths the histogram button
-    // is inline; at narrow widths it lives inside the utilities menu.
+    // Returns true when the histogram is ON: a pinned toolbar copy reports aria-pressed,
+    // the ⋯ item's OSwitch reports aria-checked on its role="switch".
     async isHistogramOn() {
-        // Check the inline histogram button first (normal viewport).
         const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
         const isInline = await inlineBtn.isVisible({ timeout: 1000 }).catch(() => false);
         if (isInline) {
-            const switchControl = inlineBtn.locator('[role="switch"]');
-            const aria = await switchControl.getAttribute('aria-checked');
-            return aria === 'true';
+            return (await inlineBtn.getAttribute('aria-pressed')) === 'true';
         }
-        // Narrow-viewport fallback: read state from the menu item OSwitch.
         const menuHistogramBtn = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
         const isMenuItemVisible = await menuHistogramBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (!isMenuItemVisible) {

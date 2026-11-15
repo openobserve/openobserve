@@ -53,31 +53,27 @@
         </template>
 
         <template #empty>
-          <div class="flex items-center justify-center py-8">
-            <OEmptyState
-              :kind="hasFilters ? 'filtered' : 'first-run'"
-              :title="
-                hasFilters
-                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.scoreConfigs') })
-                  : t('emptyState.noScoreConfigs.title')
-              "
-              :text="
-                hasFilters
-                  ? t('emptyState.filtered.description', {
-                      noun: t('emptyState.nouns.scoreConfigs'),
-                    })
-                  : t('emptyState.noScoreConfigs.description')
-              "
-              :icon="hasFilters ? undefined : 'dashboard'"
-              :action-label="hasFilters ? undefined : t('emptyState.noScoreConfigs.action')"
-              :secondary-action-label="
-                hasFilters ? undefined : t('emptyState.noScoreConfigs.import')
-              "
-              @action="onEmptyAction(hasFilters ? 'clear-filters' : 'create')"
-              @secondary-action="onEmptyAction('import')"
-              data-test="score-config-empty-state"
-            />
-          </div>
+          <OEmptyState
+            :kind="hasFilters ? 'filtered' : 'first-run'"
+            :title="
+              hasFilters
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.scoreConfigs') })
+                : t('emptyState.noScoreConfigs.title')
+            "
+            :text="
+              hasFilters
+                ? t('emptyState.filtered.description', {
+                    noun: t('emptyState.nouns.scoreConfigs'),
+                  })
+                : t('emptyState.noScoreConfigs.description')
+            "
+            :icon="hasFilters ? undefined : 'dashboard'"
+            :action-label="hasFilters ? undefined : t('emptyState.noScoreConfigs.action')"
+            :secondary-action-label="hasFilters ? undefined : t('emptyState.noScoreConfigs.import')"
+            @action="onEmptyAction(hasFilters ? 'clear-filters' : 'create')"
+            @secondary-action="onEmptyAction('import')"
+            data-test="score-config-empty-state"
+          />
         </template>
 
         <template #cell-type="{ row }">

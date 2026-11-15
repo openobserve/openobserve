@@ -52,44 +52,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="status === 'noSelection'"
         :title="t('traces.comparison.noSelectionTitle')"
         :text="t('traces.comparison.noSelectionBody')"
-        class="my-auto shrink-0"
+        class="shrink-0"
         icon="filter-list"
         data-test="traces-comparison-no-selection"
       >
-        <template #actions>
-          <div
-            class="flex w-full flex-col items-center gap-2 pt-3"
-            data-test="traces-drill-down-presets"
-          >
-            <span class="text-text-secondary text-xs">{{
+        <template #extra>
+          <div class="flex flex-col items-center gap-1" data-test="traces-drill-down-presets">
+            <span class="text-text-secondary text-compact">{{
               t("traces.drillDownPanel.presetsTitle")
             }}</span>
-            <div class="flex w-full flex-wrap justify-center gap-3">
-              <EmptyStateActionCard
+            <div class="flex flex-wrap justify-center gap-x-3 gap-y-1">
+              <OButton
                 v-for="preset in presets"
                 :key="preset.id"
-                :icon="preset.icon"
-                :label="preset.label"
-                :sublabel="preset.description"
+                variant="link"
+                size="sm"
                 :data-test="`traces-drill-down-preset-${preset.id}`"
                 @click="pickPreset(preset.id)"
-              />
+              >
+                {{ preset.label }}
+                <OTooltip :content="preset.description" />
+              </OButton>
             </div>
+            <span
+              v-if="presetNote"
+              class="text-text-secondary text-xs"
+              data-test="traces-drill-down-preset-empty"
+            >
+              {{ presetNote }}
+            </span>
           </div>
-        </template>
-        <template v-if="presetNote" #extra>
-          <span class="text-text-secondary text-xs" data-test="traces-drill-down-preset-empty">
-            {{ presetNote }}
-          </span>
         </template>
       </OEmptyState>
       <div
         v-else-if="status === 'loading'"
-        class="flex flex-1 flex-col items-center justify-center gap-2 py-12"
+        class="flex flex-col gap-3"
         data-test="traces-comparison-loading"
       >
-        <OSpinner size="lg" />
-        <span class="text-text-secondary text-sm">{{ t("traces.comparison.loading") }}</span>
+        <OSkeleton preset="chart" class="h-40" />
+        <OSkeleton preset="tableRows" :rows="6" />
       </div>
       <OEmptyState
         v-else-if="status === 'error'"
@@ -236,9 +237,8 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -287,24 +287,19 @@ const org = computed<string>(() => store.state.selectedOrganization?.identifier 
 const picked = shallowRef<ComparisonSelection | null>(null);
 const active = computed<ComparisonSelection | null>(() => props.selection ?? picked.value);
 const presetNote = ref<I18nText | null>(null);
-const presets = computed<
-  { id: ComparisonPreset; icon: IconName; label: I18nText; description: I18nText }[]
->(() => [
+const presets = computed<{ id: ComparisonPreset; label: I18nText; description: I18nText }[]>(() => [
   {
     id: "errors",
-    icon: "error-outline",
     label: t("traces.drillDownPanel.presetErrors"),
     description: t("traces.drillDownPanel.presetErrorsDesc"),
   },
   {
     id: "slowest",
-    icon: "hourglass-empty",
     label: t("traces.drillDownPanel.presetSlowest"),
     description: t("traces.drillDownPanel.presetSlowestDesc"),
   },
   {
     id: "recent",
-    icon: "history-toggle-off",
     label: t("traces.drillDownPanel.presetRecent"),
     description: t("traces.drillDownPanel.presetRecentDesc"),
   },

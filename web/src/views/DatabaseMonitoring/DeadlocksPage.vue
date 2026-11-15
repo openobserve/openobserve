@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState
             kind="error"
             :title="t('emptyState.loadError.title')"
-            :text="raw(message)"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             data-test="dbm-deadlocks-error"
             @action="onRefresh()"
           />
@@ -83,23 +83,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @clear="clearScope"
               />
             </template>
-            <!-- What a ROW means. Not a data-processing mode — the reader is
-                 choosing between "name the bug" and "give me a timestamp". -->
-            <OToggleGroup
-              v-model="grouping"
-              class="shrink-0"
-              mobile-dropdown
-              data-test="dbm-deadlocks-grouping"
-            >
-              <OToggleGroupItem value="pairs" data-test="dbm-deadlocks-grouping-pairs">
-                {{ t("dbm.deadlocks.grouping.pairs") }}
-                <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.pairsHint')" />
-              </OToggleGroupItem>
-              <OToggleGroupItem value="events" data-test="dbm-deadlocks-grouping-events">
-                {{ t("dbm.deadlocks.grouping.events") }}
-                <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.eventsHint')" />
-              </OToggleGroupItem>
-            </OToggleGroup>
+            <template #view>
+              <!-- What a ROW means. Not a data-processing mode — the reader is
+                   choosing between "name the bug" and "give me a timestamp". -->
+              <OToggleGroup
+                v-model="grouping"
+                class="shrink-0"
+                mobile-dropdown
+                data-test="dbm-deadlocks-grouping"
+              >
+                <OToggleGroupItem value="pairs" data-test="dbm-deadlocks-grouping-pairs">
+                  {{ t("dbm.deadlocks.grouping.pairs") }}
+                  <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.pairsHint')" />
+                </OToggleGroupItem>
+                <OToggleGroupItem value="events" data-test="dbm-deadlocks-grouping-events">
+                  {{ t("dbm.deadlocks.grouping.events") }}
+                  <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.eventsHint')" />
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </template>
           </DbmTableToolbar>
         </template>
 
@@ -436,6 +438,7 @@ import DbmLockEmptyState, {
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -753,7 +756,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
     hideable: true,
     accessorKey: "objects",
     header: t("dbm.deadlocks.columns.objects"),
-    size: 104,
+    size: 136,
     meta: { align: "right" },
     enableSorting: false,
   },

@@ -115,27 +115,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Body -->
-    <div
+    <OEmptyState
       v-if="!props.spans || props.spans.length === 0"
-      class="text-text-secondary flex flex-1 items-center justify-center text-sm"
-    >
-      {{ t("traces.threadView.noSpansLoaded") }}
-    </div>
-    <div
-      v-else-if="turns.length === 0"
-      class="text-text-secondary flex flex-1 items-center justify-center px-4 text-center text-sm"
-    >
-      <!-- Single inline span: the message, the <code> token and the period must
-           flow as one text run. As separate flex items the browser strips the
-           whitespace between them, dropping the space after "with". The space is
-           concatenated into the interpolation so no template-whitespace
-           collapsing (or formatter re-wrap) can drop it. -->
-      <span>
+      :title="t('traces.threadView.noSpansLoaded')"
+    />
+    <OEmptyState v-else-if="turns.length === 0">
+      <template #text>
+        <!-- One inline run, so the space after "with" survives whitespace collapsing. -->
         {{ t("traces.threadView.noLlmTurns") + " " }}
         <code class="text-text-body font-mono">{{ raw("gen_ai.operation.name = chat") }}</code
         >.
-      </span>
-    </div>
+      </template>
+    </OEmptyState>
     <div v-else class="thread-scroll-body bg-surface-base flex-1 overflow-auto px-4 py-3">
       <!-- System prompt (global — identical across traces in a session). -->
       <div
@@ -316,6 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, inject, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export interface Props {

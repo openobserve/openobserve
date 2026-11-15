@@ -39,6 +39,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import { readTopBarMemory, rememberTopBar } from "@/utils/topBarMemory";
+import { useRoute } from "vue-router";
 
 interface OrgOption {
   label: I18nText;
@@ -61,6 +63,24 @@ const { t } = useI18nTyped();
 
 const open = ref(false);
 const searchQuery = ref("");
+
+// A reload knows the org only from the URL until the list loads, so the last name seen for it holds its width.
+const route = useRoute();
+const rememberedOrg = readTopBarMemory().org;
+const triggerLabel = computed<I18nText | undefined>(() => {
+  if (props.current?.label) return props.current.label;
+  const urlOrg = route?.query?.org_identifier;
+  return rememberedOrg && rememberedOrg.identifier === urlOrg
+    ? (rememberedOrg.label as I18nText)
+    : undefined;
+});
+watch(
+  () => [props.current?.identifier, props.current?.label] as const,
+  ([identifier, label]) => {
+    if (identifier && label) rememberTopBar({ org: { identifier, label } });
+  },
+  { immediate: true },
+);
 
 // Matches both the display name and the identifier.
 const filtered = computed<OrgOption[]>(() => {
@@ -201,39 +221,37 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
 </script>
 
 <template>
-  <div data-test="navbar-organizations-select" class="md:max-xl:w-56 md:max-xl:min-w-20">
+  <div data-test="navbar-organizations-select" class="min-w-0">
     <ODropdown v-model:open="open" side="bottom" align="end">
       <template #trigger>
         <OButton
-          variant="secondary"
-          size="sm"
+          variant="ghost"
           data-test="navbar-organizations-select-trigger"
-          class="text-text-body! w-56 max-md:w-28 md:max-xl:w-full"
-          :class="open ? 'ring-focus-ring-accent ring-2 ring-inset' : ''"
+          class="max-w-56 max-md:max-w-24"
+          :aria-label="
+            triggerLabel ? t('organization.currentLabel', { name: triggerLabel }) : undefined
+          "
         >
           <template #icon>
-            <OIcon name="domain" size="sm" class="shrink-0 opacity-60" />
+            <OIcon name="domain" size="sm" class="shrink-0 max-md:hidden" />
           </template>
-          <OTruncatedText v-if="current?.label" class="flex-1 text-left">{{
-            current.label
+          <OTruncatedText v-if="triggerLabel" class="min-w-0 text-start">{{
+            triggerLabel
           }}</OTruncatedText>
-          <OSkeleton
-            v-else
-            class="h-3 flex-1"
-            data-test="navbar-organizations-select-placeholder"
-          />
+          <OSkeleton v-else class="h-3 w-16" data-test="navbar-organizations-select-placeholder" />
           <template #icon-end>
             <OIcon
-              name="arrow-drop-down"
+              name="expand-more"
               size="sm"
-              class="shrink-0 opacity-70 transition-transform"
+              class="shrink-0 transition-transform"
               :class="open ? 'rotate-180' : ''"
             />
           </template>
         </OButton>
       </template>
 
-      <div data-test="organization-menu-list" class="flex w-94 max-w-[98vw] flex-col">
+      <!-- The menu surface caps at 20rem with its padding and edge, so a wider list overflows it. -->
+      <div data-test="organization-menu-list" class="flex w-76 max-w-full flex-col">
         <!-- Header: title + count -->
         <div class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5">
           <span class="text-compact text-text-heading font-semibold">
@@ -342,16 +360,3 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
     </ODropdown>
   </div>
 </template>
-
-<style scoped>
-/* keep(lib-override:o2-button): dark-only, element-scoped re-point of OButton's
-   ghost-primary tokens for the navbar organization switcher trigger. The custom properties are READ by OButton's
-   own internal DOM, so they have to be declared on the button element itself —
-   there is no utility that sets them. Scoping appends [data-v] to the
-   [data-test] compound, which is OButton's root and therefore carries this
-   component's scope id. Was a global in styles/utilities.css (W1.d). */
-.dark [data-test="navbar-organizations-select-trigger"] {
-  --color-button-ghost-primary-active-bg: var(--color-primary-900);
-  --color-button-ghost-primary-text: var(--color-primary-200);
-}
-</style>
