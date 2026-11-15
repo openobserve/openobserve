@@ -445,6 +445,9 @@ export function outcomeActionLabel(
 /** The server's own first line for an error the client has no copy for; `null` when it adds nothing. */
 export function unknownCauseOf(error: AssistantError | undefined): string | null {
   if (error?.code !== "unknown") return null;
+  // Only a 4xx names something the user can change; a 5xx line is internal and stays in Details.
+  const status = error.httpStatus ?? 0;
+  if (status < 400 || status >= 500) return null;
   const line = (error.serverMessage ?? "").trim().split("\n")[0].trim();
   if (!line || REASON_PHRASES.has(line.toLowerCase())) return null;
   return line.length > CAUSE_MAX ? `${line.slice(0, CAUSE_MAX - 1)}…` : line;

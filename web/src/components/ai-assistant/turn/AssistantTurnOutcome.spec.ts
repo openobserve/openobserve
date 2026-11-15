@@ -258,13 +258,18 @@ describe("AssistantTurnOutcome", () => {
     ).toBe(false);
   });
 
-  it("says the server's cause under an unknown failure, else its HTTP status", () => {
+  it("says the server's cause under an unknown 4xx, else its HTTP status", () => {
     const withCause = toAssistantError({
-      status: 500,
-      body: { code: 500, message: "stream app_logs not found\nat search.rs:12" },
+      status: 404,
+      body: { code: 404, message: "stream app_logs not found\nat search.rs:12" },
     });
     expect(withCause.code).toBe("unknown");
     expect(bodies(mountOutcome({ error: withCause }))).toEqual(["stream app_logs not found"]);
+    const internal = toAssistantError({
+      status: 500,
+      body: { code: 500, message: "panicked at src/handler.rs:88\nbacktrace" },
+    });
+    expect(bodies(mountOutcome({ error: internal }))).toEqual(["The server returned HTTP 500."]);
     const bare = toAssistantError({
       status: 500,
       body: { code: 500, message: "Internal Server Error" },
