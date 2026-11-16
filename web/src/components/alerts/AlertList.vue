@@ -978,6 +978,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("common.retry") }}
                     </OButton>
                     <OButton
+                      v-if="stateFilters.length"
                       variant="outline"
                       size="sm"
                       icon-left="format-list-bulleted"
@@ -1092,7 +1093,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OEmptyState>
               </template>
 
-              <template v-if="statusUnavailable && !statusErrorEmpty" #footer-note>
+              <template
+                v-if="(statusUnavailable || listLoadFailed) && !statusErrorEmpty"
+                #footer-note
+              >
                 <span
                   class="text-status-warning-text inline-flex flex-wrap items-center gap-x-2"
                   role="alert"
@@ -1672,6 +1676,8 @@ export default defineComponent({
     const forbidden = ref<ForbiddenState>(false);
     // The server could not read run state, so blank live fields are unknown, not quiet.
     const statusUnavailable = ref(false);
+    // The current scope's read failed: its rows and counts are unknown, so nothing may claim it is quiet.
+    const listLoadFailed = ref(false);
     const oTableRef: any = ref(null);
     // The table's own progress line is the region's one loader while it keeps rows, so the refresh button keeps its age.
     const tableKeepsRows = computed(() => !!oTableRef.value?.keepingRows);
@@ -2051,7 +2057,8 @@ export default defineComponent({
       const c = stateCounts.value;
       const hasData = c.total > 0;
       const v = (n: number): string | number => (hasData ? n : "—");
-      const live = (n: number): string | number => (statusUnavailable.value ? "—" : v(n));
+      const live = (n: number): string | number =>
+        statusUnavailable.value || listLoadFailed.value ? "—" : v(n);
       const share = hasData ? c.total : undefined;
       // Severity-descending, matching the Incidents / Eval Jobs strips; Total stays last.
       return [
@@ -2207,12 +2214,14 @@ export default defineComponent({
     // The live tiles read "—" while run state is unknown, so a table they emptied is a failure, not "nothing firing".
     const statusErrorEmpty = computed(
       () =>
-        statusUnavailable.value &&
-        stateFilterEmptied.value &&
-        stateFilters.value.some((f) => LIVE_STATE_KEYS.includes(f)),
+        (listLoadFailed.value && displayedAlerts.value.length === 0) ||
+        (statusUnavailable.value &&
+          stateFilterEmptied.value &&
+          stateFilters.value.some((f) => LIVE_STATE_KEYS.includes(f))),
     );
     const noFiringTitle = computed<I18nText | undefined>(() => {
-      if (statusUnavailable.value || !stateFilterEmptied.value) return undefined;
+      if (statusUnavailable.value || listLoadFailed.value || !stateFilterEmptied.value)
+        return undefined;
       if (stateFilters.value.join() !== "firing") return undefined;
       return searchAcrossFolders.value
         ? t("alerts.noAlertsFiringAnyFolder")
@@ -2564,13 +2573,17 @@ export default defineComponent({
     dropListLink();
     // FolderList mirrors a folder-less link to "default" in this same flush; only a user's pick may end the link's scope.
     let ignoreFolderSync = false;
-    // The in-list editor closes onto this same instance, so a `?state=` it navigates with applies here too.
+    // The in-list editor closes onto this same instance, so a `?state=` or `?all_folders=` link applies here too.
     watch(
-      () => router.currentRoute.value.query.state,
-      (state) => {
+      [
+        () => router.currentRoute.value.query.state,
+        () => router.currentRoute.value.query.all_folders,
+      ],
+      ([state, allFolders]) => {
         const route = router.currentRoute.value;
-        if (state === undefined || route.name !== "alertList") return;
-        stateFilters.value = readFilterKeys(state, isAlertStateKey);
+        if ((state === undefined && allFolders === undefined) || route.name !== "alertList") return;
+        stateFilters.value =
+          state === undefined ? ["firing"] : readFilterKeys(state, isAlertStateKey);
         levelFilter.value = parseQueryChoice(route.query.level, ALERT_LEVEL_FILTERS);
         // Same as a fresh mount: the link's scope, and no search left over to hide the linked rows.
         searchAcrossFolders.value = route.query.all_folders === ALERT_LIST_ALL_FOLDERS;
@@ -2725,6 +2738,9 @@ export default defineComponent({
         folderId = "";
       }
 
+      const isCurrentScope = () =>
+        allFolders ? !!query || !!searchAcrossFolders.value : folderId == activeFolderId.value;
+
       // Painting the same rows twice is safe: uuids are stable per alert, and
       // the route-driven dialogs below run once, on the fresh result. Returns
       // false when the folder changed mid-flight and the render was skipped.
@@ -2878,11 +2894,12 @@ export default defineComponent({
         //this is the condition where we are checking the if the folderId is not equal to the activeFolderId
         //if it is not equal then we are returning  and if is not search across folders then we are returning as well as in previous step we are anyways storing in the store for future use
         //this will prevent the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
-        if (allFolders ? !query && !searchAcrossFolders.value : folderId != activeFolderId.value) {
+        if (!isCurrentScope()) {
           return false;
         }
         //here we are actually assigning the localAllAlerts to the allAlerts to avoid the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
         allAlerts.value = localAllAlerts;
+        listLoadFailed.value = false;
         statusUnavailable.value = rows.some((r: any) => r?.status_unavailable);
         //this is the condition where we are setting the filteredResults
         //1. If it is search across folders then also we are setting the filteredResults(which contains the filtered alerts)
@@ -2964,6 +2981,13 @@ export default defineComponent({
         dismiss();
         if (obsolete()) return;
         forbidden.value = forbiddenState(error);
+        if (refreshResults && isCurrentScope()) {
+          listLoadFailed.value = !forbidden.value;
+          if (!painted) {
+            allAlerts.value = [];
+            filteredResults.value = [];
+          }
+        }
         if (!forbidden.value) {
           toast({
             variant: "error",
@@ -4956,6 +4980,7 @@ export default defineComponent({
       noTemplatesEmpty,
       noFiringTitle,
       statusUnavailable,
+      listLoadFailed,
       levelFilter,
       levelFilterLabel,
       clearLevelFilter,

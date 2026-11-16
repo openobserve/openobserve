@@ -2443,6 +2443,37 @@ describe("AlertList - filters from the Overview links", () => {
     },
   );
 
+  it("shows the status error, not the quiet state or the old folder's rows, when a new scope fails to load", async () => {
+    alertsDB = [
+      { ...makeAlert(1), last_outcome: "normal" } as any,
+      {
+        ...makeAlert(2, { folder_id: "ops", folder_name: "Ops" }),
+        last_outcome: "firing",
+        firing_started_at: 1_800_000_000_000_000,
+      } as any,
+    ];
+    alertsSvc.listByFolderId.mockImplementation(async (...args: any[]) => ({
+      data: { list: alertsDB.filter((a) => !args[6] || a.folder_id === args[6]) },
+    }));
+    const wrapper = await withQuery({});
+    expect(wrapper.find('[data-test="alert-list-empty-no-firing"]').exists()).toBe(true);
+
+    alertsSvc.listByFolderId.mockRejectedValueOnce({ response: { status: 500 } });
+    wrapper.vm.searchAcrossFolders = true;
+    await flushPromises();
+    expect(alertsSvc.listByFolderId.mock.lastCall[6]).toBe("");
+    expect(wrapper.find('[data-test="alert-list-empty-no-firing"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-empty-show-all"]').exists()).toBe(true);
+    expect(wrapper.vm.filteredResults).toHaveLength(0);
+    expect(wrapper.vm.summaryStats.find((s: any) => s.key === "firing").value).toBe("—");
+
+    await wrapper.get('[data-test="alert-list-empty-status-retry"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-2"]);
+  });
+
   it.each([
     [
       "edit",
@@ -2498,29 +2529,36 @@ describe("AlertList - filters from the Overview links", () => {
     expect(await act(wrapper.vm, wrapper.vm.displayedAlerts[0])).toBe("production");
   });
 
-  it("keeps an all-folders link applied when the folder list mirrors its missing folder", async () => {
-    const folders = [
-      { folderId: "default", name: "Default" },
-      { folderId: "production", name: "Production" },
-    ];
-    store.state.organizationData.foldersByType = { alerts: folders } as any;
-    queryClient.setQueryData(
-      foldersQuery(store.state.selectedOrganization.identifier, "alerts").queryKey,
-      folders,
-    );
-    router.currentRoute.value.query = { state: ALERT_LIST_ALL_STATES, folder: "production" };
-    const wrapper: any = await mountAlertList({
-      renderTable: false,
-      realFolders: true,
-      keepRoute: true,
-    });
-    await flushPromises();
-    expect(wrapper.vm.activeFolderId).toBe("production");
+  it.each([
+    ["with a state", { state: "firing", all_folders: "true" }],
+    ["alone", { all_folders: "true" }],
+  ])(
+    "applies an all-folders link %s to a mounted list, despite the folder list mirroring its missing folder",
+    async (_case, linkQuery) => {
+      const folders = [
+        { folderId: "default", name: "Default" },
+        { folderId: "production", name: "Production" },
+      ];
+      store.state.organizationData.foldersByType = { alerts: folders } as any;
+      queryClient.setQueryData(
+        foldersQuery(store.state.selectedOrganization.identifier, "alerts").queryKey,
+        folders,
+      );
+      router.currentRoute.value.query = { state: ALERT_LIST_ALL_STATES, folder: "production" };
+      const wrapper: any = await mountAlertList({
+        renderTable: false,
+        realFolders: true,
+        keepRoute: true,
+      });
+      await flushPromises();
+      expect(wrapper.vm.activeFolderId).toBe("production");
 
-    await router.push({ name: "alertList", query: { state: "firing", all_folders: "true" } });
-    await flushPromises();
-    expect(wrapper.vm.searchAcrossFolders).toBe(true);
-  });
+      await router.push({ name: "alertList", query: linkQuery });
+      await flushPromises();
+      expect(wrapper.vm.searchAcrossFolders).toBe(true);
+      expect(router.currentRoute.value.query.all_folders).toBeUndefined();
+    },
+  );
 
   it("strips state, level and scope from the URL after reading them, keeping other keys", async () => {
     const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
