@@ -5,8 +5,11 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const {
   orgId, uniqueName, isOnCallAvailable, getRoutingConfig,
-  seedOnCallStream, createPagingAlert, waitForPages, createTeam, deleteTeamById,
+  seedOnCallStream, createPagingAlert, waitForPages, createTeam, deleteTeamById, setDefaultTeam,
 } = require('../utils/oncall-seed.js');
+const { DEFAULT_TEAM_LOCK, acquireOrgLock } = require('../utils/oncall-org-lock.js');
+
+const LOCK_WAIT_MS = 25 * 60 * 1000;
 const { deleteAlertInDefaultFolder, deleteLogStream, resolveOnCallResponse } = require('../utils/regression-alert-fixtures.js');
 
 test.describe('On-call: an unrouted page opens cleanly (ENT#3151)', {
@@ -16,13 +19,18 @@ test.describe('On-call: an unrouted page opens cleanly (ENT#3151)', {
   const created = { stream: null, alertId: null, pageId: null, teamId: null, skip: '' };
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(360000);
+    // testInfo.timeout ignores setTimeout inside a hook, so the lock's wait is budgeted here rather than via testInfo.
+    test.setTimeout(360000 + LOCK_WAIT_MS);
     const page = await browser.newPage();
+    let releaseLock = null;
+    let priorDefault = null;
     try {
       const probe = await isOnCallAvailable(page);
       if (!probe.available) { created.skip = probe.reason || 'on-call is not available'; return; }
-      const routing = await getRoutingConfig(page);
-      if (routing?.default_team_id) { created.skip = 'the org has a default team, so no page can be unrouted'; return; }
+      // Held until the page has opened: a default team nominated meanwhile by another spec would claim it.
+      releaseLock = await acquireOrgLock(DEFAULT_TEAM_LOCK, { timeout: LOCK_WAIT_MS });
+      priorDefault = (await getRoutingConfig(page))?.default_team_id ?? null;
+      if (priorDefault) await setDefaultTeam(page, null);
       // An org with no team at all opens no record, so a bystander team makes the firing unrouted rather than ignored.
       created.teamId = (await createTeam(page, { name: uniqueName('ovn_a_unrouted_team') })).id;
       created.stream = uniqueName('ovn_a_unrouted_s');
@@ -32,7 +40,12 @@ test.describe('On-call: an unrouted page opens cleanly (ENT#3151)', {
       const pages = await waitForPages(page, { alertId: alert.id, expectTeamId: null });
       created.pageId = pages[0].id;
     } finally {
-      await page.close();
+      try {
+        if (priorDefault) await setDefaultTeam(page, priorDefault);
+      } finally {
+        releaseLock?.();
+        await page.close();
+      }
     }
   });
 

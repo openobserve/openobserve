@@ -8,6 +8,12 @@ const { ingestBase } = require('./ingest-url.js');
 const v1 = () => `${baseUrl()}/api/${orgId()}`;
 const v2 = () => `${baseUrl()}/api/v2/${orgId()}`;
 
+// api() hands back non-2xx responses, so a read-back must throw or a failed lookup reads as undefined and passes a negative assertion.
+async function okJson(res, what) {
+  if (!res.ok()) throw new Error(`${what} failed: HTTP ${res.status()} — ${(await res.text().catch(() => '')).slice(0, 200)}`);
+  return res.json();
+}
+
 /** A disabled scheduled alert whose threshold is never reached. */
 function quietAlert(name, stream) {
   return {
@@ -45,7 +51,7 @@ function incidentAlert(name, stream) {
 }
 
 async function readOrgConfig(page) {
-  return (await api(page, 'get', `${v1()}/config`)).json();
+  return okJson(await api(page, 'get', `${v1()}/config`), 'Reading the org config');
 }
 
 async function ingestLogs(page, stream, rows) {
@@ -66,14 +72,13 @@ async function deleteAlertInDefaultFolder(page, id) {
 
 /** The id of the incident one of whose alert groups came from this alert, or null. */
 async function findIncidentIdForAlert(page, alertId) {
-  const list = await (await api(page, 'get', `${v2()}/alerts/incidents?limit=1000`)).json();
+  const list = await okJson(await api(page, 'get', `${v2()}/alerts/incidents?limit=1000`), 'Listing incidents');
   const hit = (list.incidents || []).find((i) => (i.alert_groups || []).some((g) => g.alert_id === alertId));
   return hit ? hit.id : null;
 }
 
 async function incidentStatus(page, id) {
-  const res = await api(page, 'get', `${v2()}/alerts/incidents/${id}`);
-  const body = await res.json();
+  const body = await okJson(await api(page, 'get', `${v2()}/alerts/incidents/${id}`), `Reading incident ${id}`);
   return (body.incident || body).status;
 }
 
@@ -96,7 +101,7 @@ async function createHttpDestination(page, { name, url, template, headers }) {
 }
 
 async function getDestination(page, name) {
-  return (await api(page, 'get', `${v1()}/alerts/destinations/${name}`)).json();
+  return okJson(await api(page, 'get', `${v1()}/alerts/destinations/${name}`), `Reading destination ${name}`);
 }
 
 async function deleteDestination(page, name) {

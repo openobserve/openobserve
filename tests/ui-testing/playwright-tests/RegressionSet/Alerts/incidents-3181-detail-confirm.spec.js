@@ -19,7 +19,7 @@ test.describe('Incident detail: Resolve and Reopen confirm before they act (ENT#
     const page = await browser.newPage();
     try {
       const config = await readOrgConfig(page);
-      if (config.incidents_enabled !== true) return;
+      expect(config.incidents_enabled, 'incidents must be enabled on this server; this spec runs only in the ENT overlay').toBe(true);
       created.stream = uniqueName('ovn_inc3181_s');
       const rows = [{ _timestamp: Date.now() * 1000, level: 'error', service_name: uniqueName('svc3181'), msg: 'seed' }];
       const ing = await ingestLogs(page, created.stream, rows);
@@ -48,7 +48,7 @@ test.describe('Incident detail: Resolve and Reopen confirm before they act (ENT#
   });
 
   test('Resolve and Reopen each open a confirm and send nothing until confirmed', { tag: ['@bug-3181', '@P3'] }, async ({ page }, testInfo) => {
-    test.skip(!created.incidentId, 'incidents are not enabled on this server');
+    expect(created.incidentId, 'setup must have opened an incident for the alert').toBeTruthy();
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     const pm = new PageManager(page);
