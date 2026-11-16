@@ -822,6 +822,11 @@ async fn write_entries_inner(
     Ok(req_stats)
 }
 
+/// The memory circuit breaker alone, for callers that refuse a write before reading its body.
+pub fn check_memory_circuit_breaker() -> Result<()> {
+    ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))
+}
+
 pub async fn check_ingestion_allowed(
     org_id: &str,
     stream_type: StreamType,
@@ -860,8 +865,7 @@ pub async fn check_ingestion_allowed(
         }
     }
 
-    // check memory circuit breaker
-    ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
+    check_memory_circuit_breaker()?;
 
     // check disk circuit breaker
     ingester::check_disk_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;

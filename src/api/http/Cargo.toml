@@ -103,6 +103,7 @@ jsonschema = { version = "0.38", default-features = false }
 opentelemetry-proto.workspace = true
 openobserve-core = { workspace = true, features = ["test-utils"] }
 openobserve-synthetics.workspace = true
+prost.workspace = true
 sea-orm.workspace = true
 svix-ksuid.workspace = true
 o2_enterprise = { workspace = true, default-features = false, features = ["test-utils"] }

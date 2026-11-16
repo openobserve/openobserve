@@ -65,4 +65,5 @@ tracing-opentelemetry.workspace = true
 
 [dev-dependencies]
 arrow-schema.workspace = true
+tower.workspace = true
 tracing-subscriber.workspace = true
