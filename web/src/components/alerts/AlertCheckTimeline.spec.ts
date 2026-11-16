@@ -12,9 +12,11 @@ const mountTimeline = (frequency: number, period: number) =>
   });
 
 describe("AlertCheckTimeline", () => {
-  it("draws the checks on a time axis without a caption restating them", () => {
+  it("says how often it checks and how much data each check reads", () => {
     const wrapper = mountTimeline(10, 30);
-    expect(wrapper.find('[data-test="add-alert-check-timeline-caption"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="add-alert-check-timeline-caption"]').text()).toBe(
+      "Every 10 min we read the last 30 min of data.",
+    );
     expect(wrapper.text()).toContain("Now");
     expect(wrapper.text()).toContain("40 min ago");
   });

@@ -37,6 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-text-heading text-sm font-medium">
               {{ t("alerts.sections.rows.whichEvents") }}
             </div>
+            <div class="text-text-secondary mt-0.5 text-xs" data-test="anomaly-which-events-help">
+              {{ whichEventsHelp }}
+            </div>
           </div>
           <OFormToggleGroup name="query_mode" data-test="anomaly-query-tabs">
             <OToggleGroupItem
@@ -299,6 +302,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ detectionWindowError }}
             </div>
             <div
+              v-if="lookBackWindowHint"
+              class="text-text-secondary pt-1 text-xs"
+              data-test="anomaly-detection-window-hint"
+            >
+              {{ lookBackWindowHint }}
+            </div>
+            <div
               v-if="legacyWindowWarning"
               class="text-status-warning-text pt-1 text-xs"
               data-test="anomaly-detection-window-legacy-warning"
@@ -328,6 +338,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="anomaly-training-window"
               class="alert-v3-input max-w-30 min-w-30"
             />
+            <div
+              class="text-text-secondary pt-1 text-xs"
+              data-test="anomaly-training-window-floor-hint"
+            >
+              {{ t("alerts.anomaly.trainingWindowFloorHint", { days: minTrainingDays }) }}
+            </div>
           </OSettingRow>
           <OSettingRow
             :label="t('alerts.anomaly.retrainEvery')"
@@ -537,6 +553,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
   ANOMALY_BALANCED_BAND_WIDTH,
+  ANOMALY_MIN_TRAINING_DAYS,
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
   anomalyIntervalSeconds,
@@ -659,6 +676,12 @@ export default defineComponent({
     const queryMode = form.useStore((s: any) => s.values.query_mode);
     const customSql = form.useStore((s: any) => s.values.custom_sql);
     const filterRows = form.useStore((s: any): AnomalyFilterRow[] => s.values.filters ?? []);
+    const whichEventsHelp = computed(() => {
+      if (queryMode.value === "custom_sql") return t("alerts.sections.rows.whichEventsSql");
+      return filterRows.value.length > 0
+        ? t("alerts.sections.rows.whichEventsFiltered")
+        : t("alerts.sections.rows.whichEventsAll");
+    });
     const detectionFunction = form.useStore((s: any) => s.values.detection_function);
     const detectionFunctionField = form.useStore((s: any) => s.values.detection_function_field);
     const histogramIntervalValue = form.useStore((s: any) => s.values.histogram_interval_value);
@@ -785,6 +808,28 @@ export default defineComponent({
       if (bandWidth.value === "" || !Number.isFinite(k) || k < 1 || k > 10) return raw("");
       if (!modelState.value.current) return t("alerts.anomaly.manualModelRequired");
       return t("alerts.anomaly.manualSensitivityHelp");
+    });
+
+    // §4.6: the floor is computed locally from the form's own values — no server dependency.
+    const currentWindowFloor = computed(() =>
+      lookBackWindowFloorSeconds(
+        Number(scheduleIntervalValue.value),
+        String(scheduleIntervalUnit.value),
+        Number(histogramIntervalValue.value),
+        String(histogramIntervalUnit.value),
+      ),
+    );
+
+    // Suppressed while the field is in error, so the floor is stated once, not twice.
+    const lookBackWindowHint = computed(() => {
+      if (detectionWindowError.value) return raw("");
+      const floor = currentWindowFloor.value;
+      if (floor === null) return raw("");
+      return t("alerts.anomaly.lookBackWindowMinimum", {
+        min: formatAnomalySeconds(floor),
+        // Twice the floor plus the 10-minute absence allowance; absence detection is on by default.
+        recommended: formatAnomalySeconds(2 * floor + 600),
+      });
     });
 
     const storedTripleUntouched = computed(() => {
@@ -1093,6 +1138,7 @@ export default defineComponent({
     };
 
     return {
+      whichEventsHelp,
       raw,
       t,
       store,
@@ -1126,6 +1172,7 @@ export default defineComponent({
       histogramIntervalError,
       scheduleIntervalError,
       detectionWindowError,
+      lookBackWindowHint,
       legacyWindowWarning,
       sensitivityTiers,
       autoSensitivity,
@@ -1142,6 +1189,7 @@ export default defineComponent({
       onBudgetTier,
       sensitivityError,
       sensitivityTooltip,
+      minTrainingDays: ANOMALY_MIN_TRAINING_DAYS,
       onCustomSqlChange,
     };
   },

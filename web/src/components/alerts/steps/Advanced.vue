@@ -247,6 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSettingRow
                 v-if="tierShows('rowTemplate')"
                 :label="t('alerts.plain.rowTemplate')"
+                :description="t('alerts.sections.rows.rowTemplate')"
                 fill
               >
                 <div class="flex flex-col gap-2">

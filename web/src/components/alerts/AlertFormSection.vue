@@ -28,6 +28,8 @@ const props = defineProps<{
   /** 1-based position among the editor's sections. */
   index: number;
   title: I18nText;
+  /** One sentence under the title. */
+  help: I18nText;
   /** False while another section is in view: its step buttons hide so only one pair shows. */
   current?: boolean;
 }>();
@@ -35,6 +37,7 @@ const props = defineProps<{
 const emit = defineEmits<{ go: [id: AlertSectionId] }>();
 
 const { t } = useI18nTyped();
+const total = ALERT_SECTIONS.length;
 const def = computed(() => ALERT_SECTIONS.find((section) => section.id === props.id));
 const icon = computed(() => def.value?.icon);
 const previous = computed(() => ALERT_SECTIONS[props.index - 2]);
@@ -50,7 +53,7 @@ provide(SETTING_ROW_BARE_KEY, true);
     class="max-lg:border-border-default flex flex-col max-lg:border-b max-lg:last:border-b-0 [&_[data-snap-stop]]:scroll-mt-24"
   >
     <header
-      class="bg-surface-base sticky top-0 z-30 flex items-center gap-3 px-4 pt-4 pb-3 max-lg:static max-lg:z-auto max-lg:pt-3"
+      class="bg-surface-base sticky top-0 z-30 flex items-start gap-3 px-4 pt-4 pb-3 max-lg:static max-lg:z-auto max-lg:pt-3"
     >
       <span
         v-if="icon"
@@ -59,7 +62,14 @@ provide(SETTING_ROW_BARE_KEY, true);
       >
         <OIcon :name="icon" size="sm" />
       </span>
-      <div class="flex min-w-0 flex-1 flex-col">
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span class="text-text-secondary text-xs" :data-test="`add-alert-section-${id}-eyebrow`">
+          {{
+            def?.optional
+              ? t("alerts.sections.eyebrowOptional", { n: index, total })
+              : t("alerts.sections.eyebrow", { n: index, total })
+          }}
+        </span>
         <h2
           class="text-text-heading m-0 text-xl font-semibold focus:outline-none"
           tabindex="-1"
@@ -68,6 +78,9 @@ provide(SETTING_ROW_BARE_KEY, true);
         >
           {{ title }}
         </h2>
+        <p class="text-text-secondary m-0 text-sm" :data-test="`add-alert-section-${id}-help`">
+          {{ help }}
+        </p>
       </div>
       <OButton
         v-if="previous"

@@ -45,7 +45,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!sectionTargets?.settingsSchedule"
           >
             <!-- Silence Notification (Cooldown) -->
-            <OSettingRow :label="t('alerts.plain.cooldown')" required fill>
+            <OSettingRow
+              :label="t('alerts.plain.cooldown')"
+              :description="t('alerts.sections.rows.cooldown')"
+              required
+              fill
+            >
               <div class="me-2 flex w-fit flex-col gap-1">
                 <div class="flex items-center">
                   <div class="w-21.75">
@@ -169,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isForecastMode"
               ref="periodFieldRef"
               :label="t('alerts.plain.lookBack')"
+              :description="t('alerts.sections.rows.lookBack')"
               required
               fill
             >
@@ -206,7 +212,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OSettingRow>
 
             <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-            <OSettingRow ref="silenceFieldRef" :label="t('alerts.plain.cooldown')" required fill>
+            <OSettingRow
+              ref="silenceFieldRef"
+              :label="t('alerts.plain.cooldown')"
+              :description="t('alerts.sections.rows.cooldown')"
+              required
+              fill
+            >
               <div class="me-2 flex w-fit flex-col gap-1">
                 <div class="flex items-center">
                   <div class="w-21.75">
