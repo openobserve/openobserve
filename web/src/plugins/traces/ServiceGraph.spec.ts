@@ -2356,5 +2356,30 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       await flushPromises();
       expect(wrapper.vm.showSidePanel).toBe(false);
     });
+
+    it("puts a dependency node's kind in the route, so a reload reopens that datastore", async () => {
+      mockRouterPush.mockImplementation(({ query }: { query: Record<string, string> }) => {
+        mockRoute.query = query;
+      });
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: {
+          nodes: [
+            { id: "valkey", label: "valkey", requests: 1, errors: 0, service_type: "database" },
+          ],
+          edges: [],
+        },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.handleNodeClick({ dataType: "node", data: wrapper.vm.graphData.nodes[0] });
+      await flushPromises();
+      expect(mockRoute.query).toMatchObject({ panelSvc: "valkey", panelKind: "database" });
+
+      wrapper.unmount();
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      expect(wrapper.vm.selectedNode.service_type).toBe("database");
+    });
   });
 });

@@ -122,6 +122,23 @@ export function whereText(
     .join(" · ");
 }
 
+/** A service's places, a named one before outside Kubernetes; the first is the one the Versions tab opens on. */
+export function versionPlaces(
+  rows: { where_key: string; where?: Place | null }[],
+  t: TranslateFn,
+): { key: string; label: string; outside: boolean }[] {
+  const seen = new Map<string, { label: string; outside: boolean }>();
+  for (const row of rows)
+    if (!seen.has(row.where_key))
+      seen.set(row.where_key, {
+        label: whereText(row.where_key, row.where, t),
+        outside: isOutsideK8s(row.where_key, row.where),
+      });
+  return [...seen]
+    .map(([key, place]) => ({ key, ...place }))
+    .sort((a, b) => Number(a.outside) - Number(b.outside) || a.key.localeCompare(b.key));
+}
+
 /** A "… in {where}" sentence, or its outside-Kubernetes wording, so no sentence reads "in Outside Kubernetes". */
 export function whereSentence(
   keys: { in: I18nKey; outside: I18nKey },
@@ -288,7 +305,7 @@ export function isNoiseChange(metric: string, value: NoiseInput) {
   return straddles || !value.delta || changeRoundsToZero(metric, value.delta, value.b);
 }
 
-// Warm-up names its end only while that end is ahead; a passed end or an org without an epoch reads time-less.
+// The org epoch is no evidence about one scope's versions, so a scope not tracked yet never reads as pre-existing.
 function noVerdictState(
   tracking: Tracking | null | undefined,
   now: number,

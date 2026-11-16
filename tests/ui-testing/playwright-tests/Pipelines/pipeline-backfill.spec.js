@@ -32,6 +32,12 @@ test.use({
   }
 });
 
+async function getBuildType(page) {
+  const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/+$/, "");
+  const response = await page.request.get(`${baseUrl}/api/${process.env["ORGNAME"]}/config`);
+  return (await response.json()).build_type;
+}
+
 test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@backfill', '@pipelinesBackfill'] }, () => {
   let pageManager;
 
@@ -246,6 +252,9 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
 
     // Auth is handled via storageState - no login needed
     pageManager = new PageManager(page);
+
+    const buildType = await getBuildType(page);
+    test.skip(buildType === "opensource", "Backfill is Enterprise-only; OSS shows the upgrade screen");
 
     // Navigate first so page is on the same origin (required for in-browser fetch)
     await page.goto(
@@ -670,5 +679,21 @@ test.describe("Pipeline Backfill Jobs Tests", { tag: ['@all', '@pipelines', '@ba
     }
 
     testLogger.info('Test completed: Error indicator check');
+  });
+});
+
+test.describe("Pipeline Backfill upgrade screen", { tag: ['@all', '@pipelines', '@backfill', '@pipelinesBackfill'] }, () => {
+  test("should show the upgrade screen for the backfill page on an OSS build", {
+    tag: ['@pipelinesBackfill', '@pipelines', '@oss', '@P2', '@all']
+  }, async ({ page }) => {
+    await page.goto(`${process.env.ZO_BASE_URL}/web/?org_identifier=${process.env["ORGNAME"]}`);
+    const buildType = await getBuildType(page);
+    test.skip(buildType !== "opensource", `Runs only on an OSS backend (build: ${buildType})`);
+
+    await page.goto(
+      `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/backfill?org_identifier=${process.env["ORGNAME"]}`
+    );
+    await expect(page).toHaveURL(/\/enterprise-locked\?feature=pipelineBackfill/);
+    await expect(page.locator('[data-test="enterprise-feature-locked"]')).toBeVisible({ timeout: 15000 });
   });
 });

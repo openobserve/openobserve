@@ -33,4 +33,9 @@ describe("dimensionLabel", () => {
     expect(dimensionLabel("aws-ecs-cluster", t)).toBe("Aws Ecs Cluster");
     expect(dimensionLabel("environment", t)).toBe("Environment");
   });
+
+  it("drops the K8s prefix in the compact form a narrow chip uses", () => {
+    expect(dimensionLabel("k8s-namespace", t, true)).toBe("Namespace");
+    expect(dimensionLabel("k8s-pod-name", t, true)).toBe("Pod Name");
+  });
 });

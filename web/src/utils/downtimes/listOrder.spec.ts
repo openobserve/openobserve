@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 import type { DowntimeListItem } from "@/services/downtimes";
-import { isEditable, isFinished, sortDowntimeRows } from "./listOrder";
+import { isDeletable, isEditable, isFinished, sortDowntimeRows } from "./listOrder";
 
 const row = (
   id: string,
@@ -28,6 +28,45 @@ describe("finished rows", () => {
       row("s1", "scheduled", 10, "next"),
     ];
     expect(sortDowntimeRows(rows).map((r) => r.id)).toEqual(["s1", "s2", "e3", "e2", "e1"]);
+  });
+});
+
+describe("isDeletable", () => {
+  const HOUR = 3_600_000_000;
+  const once = {
+    repeat: "none",
+    starts_at: 10 * HOUR,
+    ends_at: 12 * HOUR,
+    timezone: "UTC",
+    duration_secs: 7200,
+    weekdays: [],
+  };
+  const finished = (modules: string[], cancelled_at?: number) =>
+    ({
+      status: cancelled_at === undefined ? "ended" : "ended_early",
+      targets: modules.map((module) => ({ module, folders: { kind: "all" } })),
+      schedule: once,
+      cancelled_at,
+    }) as unknown as DowntimeListItem;
+
+  it("offers Delete on a finished row without an SLO target", () => {
+    expect(isDeletable(finished(["alerts"]))).toBe(true);
+  });
+
+  it("hides Delete on a finished SLO row whose window started", () => {
+    expect(isDeletable(finished(["alerts", "slos"]))).toBe(false);
+    expect(isDeletable(finished(["slos"], 11 * HOUR))).toBe(false);
+  });
+
+  it("offers Delete on an SLO row cancelled before its first window", () => {
+    const cancelled = { ...finished(["slos"], 9 * HOUR), status: "cancelled" } as DowntimeListItem;
+    expect(isDeletable(cancelled)).toBe(true);
+  });
+
+  it("offers no Delete on an active or scheduled row", () => {
+    expect(isDeletable({ ...finished(["alerts"]), status: "active" } as DowntimeListItem)).toBe(
+      false,
+    );
   });
 });
 

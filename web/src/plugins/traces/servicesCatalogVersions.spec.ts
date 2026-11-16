@@ -5,7 +5,7 @@ import {
   envCatalogRows,
   showsEnvColumn,
   mergeCatalogVersions,
-  environmentPredicate,
+  catalogEnvCounts,
   catalogMatches,
   catalogVerdictRank,
   catalogPlace,
@@ -21,10 +21,20 @@ import {
   servingIdle,
   servingHealthSql,
   versionTrafficKey,
-  catalogColumnVisibility,
   CATALOG_COLUMN_SIZES,
   catalogEnvColumn,
+  catalogPanelRow,
+  catalogCellGap,
+  catalogFilterEmptyText,
+  catalogCellReason,
+  sharedCellGap,
+  errorRateLabel,
+  catalogVersionSort,
+  catalogFilterQuery,
+  catalogFiltersFromQuery,
 } from "./servicesCatalogVersions";
+import type { TranslateFn } from "@/types/i18n";
+import { NO_ENV } from "@/services/service_versions.envs";
 import type { Scope, ServicesResponse } from "@/services/service_versions";
 import producer from "@/test/unit/fixtures/serviceVersions/producer.json";
 const scope = (where_key: string): Scope => ({
@@ -64,28 +74,22 @@ describe("catalog identity", () => {
     ).toBeUndefined();
   });
 });
-describe("environment filtering", () => {
-  const response = (keys: string[]): ServicesResponse => ({
-    services: [],
-    envs: [{ env: "prod", where_keys: keys }],
+describe("catalogEnvCounts", () => {
+  it("counts each row under every env the Env filter matches it by, a row with no scope under No env", () => {
+    const rows = [
+      { versionScope: scope("east") },
+      { versionScope: { ...scope("west"), envs: ["prod", "staging"] } },
+      { versionScope: { ...scope("default"), env: "default", no_env: true } },
+      {},
+      { infer_service_name: "postgres" },
+    ];
+    const counts = catalogEnvCounts(rows);
+    expect(Object.fromEntries(counts)).toEqual({ prod: 2, staging: 1, [NO_ENV]: 3 });
+    for (const [env, count] of counts)
+      expect(rows.filter((row) => catalogMatches(row, env, "", "ready", false))).toHaveLength(
+        count,
+      );
   });
-  it("uses resolved keys through the 200-key boundary", () => {
-    const value = environmentPredicate(
-      response(Array.from({ length: 200 }, (_, i) => String(i))),
-      "prod",
-    );
-    expect(value.postfilter).toBe(false);
-    expect(value.sql).toContain("o2_service_where IN");
-  });
-  it("switches at 201 and requires resolved postfiltering", () => {
-    expect(
-      environmentPredicate(response(Array.from({ length: 201 }, (_, i) => String(i))), "prod"),
-    ).toEqual({ sql: "o2_service_env = 'prod'", postfilter: true });
-  });
-  it("fails closed for an unmatched environment", () =>
-    expect(environmentPredicate(response([]), "missing").sql).toBe("1=0"));
-  it("escapes SQL literals", () =>
-    expect(environmentPredicate(response(["cluster'o"]), "prod").sql).toContain("'cluster''o'"));
 });
 
 describe("catalog filters and severity", () => {
@@ -175,29 +179,14 @@ describe("Health of the version serving now", () => {
     expect(servingHealthSql("default", "(kind)", false, false)).not.toContain("infer_service_name");
   });
 });
-describe("catalog columns at 1600 px", () => {
-  it("hides the latency extras and Deployed by default and lets a saved choice restore them", () => {
-    expect(catalogColumnVisibility(true, {})).toEqual({
-      p50_latency_ns: false,
-      p99_latency_ns: false,
-      avg_duration_ns: false,
-      max_duration_ns: false,
-      version_deployed: false,
-    });
-    expect(catalogColumnVisibility(true, { p99_latency_ns: true }).p99_latency_ns).toBe(true);
-    expect(catalogColumnVisibility(true, { version_deployed: true }).version_deployed).toBe(true);
-    expect(catalogColumnVisibility(false, {})).toEqual({});
-  });
-});
 describe("catalog Env and Version cells at 1600 px", () => {
   it("drops the env word with Env = All envs and keeps it once one env is picked", () => {
-    expect(catalogEnvColumn("")).toEqual({ size: 130, hideKey: true });
+    expect(catalogEnvColumn("")).toEqual({ size: 100, hideKey: true });
     expect(catalogEnvColumn("prod")).toEqual({ size: 157, hideKey: false });
   });
   it("narrows Version so a rebuilt version cuts only its version text", () => {
     expect(CATALOG_COLUMN_SIZES.service_versions).toBe(179);
     expect(CATALOG_COLUMN_SIZES.version_verdict).toBeGreaterThanOrEqual(169);
-    expect(CATALOG_COLUMN_SIZES.status).toBeGreaterThanOrEqual(98);
   });
 });
 describe("a scope seen in more than one env", () => {
@@ -365,6 +354,31 @@ describe("catalog rows a real producer scope feeds", () => {
   });
 });
 
+describe("catalogFilterEmptyText", () => {
+  const t = ((key: string, p: Record<string, string> = {}) =>
+    key.endsWith(".filter")
+      ? `${p.label}=${p.value}`
+      : p.filters
+        ? `${key}: ${p.filters}`
+        : key) as TranslateFn;
+  it.each([
+    {
+      view: { env: "prod", verdict: "" },
+      text: "serviceVersions.catalog.filterEmpty.noMatch: serviceVersions.catalog.env=prod",
+    },
+    {
+      view: { env: NO_ENV, verdict: "regressed" },
+      text: "serviceVersions.catalog.filterEmpty.noMatch: serviceVersions.catalog.env=serviceVersions.env.noEnv and serviceVersions.catalog.deployVerdict=serviceVersions.verdict.regressed",
+    },
+    {
+      view: { env: "", verdict: "", search: " zz " },
+      text: "serviceVersions.catalog.filterEmpty.noMatchSearch: serviceVersions.catalog.filterEmpty.search=serviceVersions.catalog.filterEmpty.quoted",
+    },
+  ])("names each active filter by its control's label", ({ view, text }) => {
+    expect(catalogFilterEmptyText({ ...view, locale: "en" }, t)).toBe(text);
+  });
+});
+
 describe("catalogFooterNote", () => {
   const view = { env: "", byVerdict: true, locale: "en-US" };
   const launch = { counts: {}, total: 2, noVersion: 0, launchDay: true };
@@ -406,7 +420,7 @@ describe("a deploy recorded after tracking started but not judged yet", () => {
   });
   it("leaves a scope tracking has not reached to the warm-up state", () => {
     expect(catalogVerdictValue({ ...unjudged(), tracking_started: false } as Scope)).toBe(
-      undefined,
+      "pre_tracking",
     );
   });
 });
@@ -443,12 +457,12 @@ describe("one classification for the verdict chip and the verdict filter", () =>
 describe("a scope deploy tracking has not reached yet", () => {
   const untracked = (): Scope =>
     ({ ...scope("east"), newest_version: "2.0", tracking_started: false }) as Scope;
-  it("is never First version and takes no verdict filter value or count", () => {
+  it("is never First version and is filed and counted under Before tracking", () => {
     expect(isFirstVersion(untracked())).toBe(false);
-    expect(catalogVerdictValue(untracked())).toBeUndefined();
+    expect(catalogVerdictValue(untracked())).toBe("pre_tracking");
     expect(catalogVerdictRank(untracked())).toBe(1);
     const response: ServicesResponse = { services: [untracked()], envs: [] };
-    expect(catalogSummary(response, "").counts).toEqual({});
+    expect(catalogSummary(response, "").counts).toEqual({ pre_tracking: 1 });
   });
   it("is still First version once the processor has reached it", () => {
     expect(isFirstVersion({ ...untracked(), tracking_started: true } as Scope)).toBe(true);
@@ -530,5 +544,87 @@ describe("Health of one build beside another build of the same version text", ()
     expect(versionTrafficKey("orders", "east", "2.4.0", "")).toBe(
       versionTrafficKey("orders", "east", "2.4.0", null),
     );
+  });
+});
+describe("the catalog row a service panel route opens", () => {
+  const rows = [
+    { id: "a", service_name: "querier", where_key: "" },
+    { id: "b", service_name: "querier", where_key: "k8s:c1/o2" },
+    {
+      id: "c",
+      service_name: "querier",
+      where_key: "",
+      infer_service_name: "querier",
+      infer_service_type: "rpc",
+    },
+    { id: "d", service_name: "ingester", where_key: "k8s:c1/o2" },
+  ];
+  it.each([
+    { service: "querier", where: "k8s:c1/o2", kind: "", id: "b" },
+    { service: "querier", where: "", kind: "", id: "a" },
+    { service: "querier", where: "default", kind: "", id: "a" },
+    { service: "ingester", where: "default", kind: "", id: "d" },
+    { service: "router", where: "", kind: "", id: undefined },
+    { service: "querier", where: "", kind: "rpc", id: "c" },
+    { service: "querier", where: "", kind: "database", id: undefined },
+  ])("opens $service '$kind' at '$where' on row $id", ({ service, where, kind, id }) => {
+    expect(catalogPanelRow(rows, service, where, kind)?.id).toBe(id);
+  });
+});
+describe("the reason an empty version cell gives", () => {
+  it.each([
+    { row: { where_key: "" }, key: "serviceVersions.catalog.notReported" },
+    { row: { where_key: "k8s:c1/o2", infer_service_name: "db" }, key: null },
+    { row: { where_key: "k8s:c1/o2" }, key: "serviceVersions.catalog.notTracked" },
+  ])("$key", ({ row, key }) => {
+    expect(catalogCellGap(row)).toBe(key);
+  });
+  const t = ((key: string) => key) as TranslateFn;
+  it.each([
+    {
+      name: "says a gap every scopeless row shares once, in the header",
+      rows: [{ where_key: "" }, { where_key: "" }, { where_key: "e", versionScope: scope("e") }],
+      shared: "serviceVersions.catalog.notReported",
+      cells: ["", "", ""],
+    },
+    {
+      name: "keeps a reason on each cell when the rows' reasons differ",
+      rows: [{ where_key: "" }, { where_key: "k8s:c1/o2" }, { infer_service_name: "db" }],
+      shared: null,
+      cells: ["serviceVersions.catalog.notReported", "serviceVersions.catalog.notTracked", ""],
+    },
+  ])("$name", ({ rows, shared, cells }) => {
+    const gap = sharedCellGap(rows);
+    expect(gap).toBe(shared);
+    expect(rows.map((row) => catalogCellReason(row, gap, t))).toEqual(cells);
+  });
+});
+describe("catalog cell values", () => {
+  it.each([
+    { rate: 0.004, errors: 2, label: "<0.01%" },
+    { rate: 0, errors: 0, label: "0.00%" },
+    { rate: 12.345, errors: 9, label: "12.35%" },
+  ])("prints $rate% with $errors errors as $label", ({ rate, errors, label }) => {
+    expect(errorRateLabel(rate, errors)).toBe(label);
+  });
+  it("sorts Version and Deployed by the shown version and the deploy time", () => {
+    const deployed = {
+      ...scope("east"),
+      newest_version: "1.10.0",
+      newest_verdict: { verdict: "ok", deploy: { at: 5 } },
+    } as Scope;
+    expect(catalogVersionSort("service_versions", deployed)).toBe("1.10.0");
+    expect(catalogVersionSort("version_deployed", deployed)).toBe(5);
+    expect(catalogVersionSort("version_deployed", undefined)).toBe(0);
+    expect(catalogVersionSort("total_requests", deployed)).toBeNull();
+  });
+  it("keeps only non-default filters in the URL and reads them back", () => {
+    const query = catalogFilterQuery(
+      { tab: "services-catalog", catalogType: "rpc" },
+      { env: "prod", verdict: "", type: "service" },
+      "service",
+    );
+    expect(query).toEqual({ tab: "services-catalog", catalogEnv: "prod" });
+    expect(catalogFiltersFromQuery(query)).toEqual({ env: "prod", verdict: "", type: "" });
   });
 });

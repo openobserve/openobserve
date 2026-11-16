@@ -32,6 +32,9 @@ import serviceStreamsService from "@/services/service_streams";
 import type { Alias, Collision, Scope } from "@/services/service_versions";
 import stage7 from "@/test/unit/fixtures/serviceVersions/stage7.json";
 import stage8 from "@/test/unit/fixtures/serviceVersions/stage8.json";
+import en from "@/locales/languages/en-US.json";
+import config from "@/aws-exports";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 const transport = vi.hoisted(() => ({
   get: vi.fn(),
@@ -118,7 +121,13 @@ function answer(url: string, config: { params?: Record<string, unknown> }) {
   const params = config?.params || {};
   if (url.endsWith("/service_identity/overrides"))
     return Promise.resolve({ data: stage7.overrides });
-  if (url.endsWith("/service_identity/envs")) return Promise.resolve({ data: stage7.envs });
+  if (url.endsWith("/service_identity/envs"))
+    return Promise.resolve({
+      data: {
+        ...stage7.envs,
+        envs: [...stage7.envs.envs, { ...stage7.envs.envs[0], env: "", no_env: true }],
+      },
+    });
   if (url.endsWith("/service_versions/_services"))
     return Promise.resolve({
       data: { ...stage7.services_rum, services: catalog, stripped_versions: stripped },
@@ -482,14 +491,21 @@ describe("Name review states", () => {
 });
 
 describe("Unresolved group", () => {
-  it("lists detection keys and placeholder names, never trace or alias rows", () => {
+  it("lists detection keys and placeholder names, never trace, alias or span-sending rows", () => {
+    const sendsSpans = (service_name: string) => ({
+      service_name,
+      display_source: "detection" as const,
+      logs_streams: [],
+      traces_streams: ["default"],
+      metrics_streams: [],
+    });
     const rows = unresolvedFrom(
-      rowsGolden,
+      [...rowsGolden, sendsSpans("ai-gateway"), sendsSpans("unknown_service:node")],
       stage8.unresolved.placeholder_names.map((entry) => entry.service),
     );
     const names = rows.map((entry) => entry.name);
     expect(names).toEqual(expect.arrayContaining(["nats", "openobserve", "unknown_service:node"]));
-    for (const key of ["checkoutservice", "payments-api", "legacy-cart", "querier"])
+    for (const key of ["checkoutservice", "payments-api", "legacy-cart", "querier", "ai-gateway"])
       expect(names).not.toContain(key);
     const ambiguous = rows.find((entry) => entry.name === "openobserve")!;
     expect(ambiguous.candidates).toEqual(["compactor", "ingester", "querier"]);
@@ -516,9 +532,9 @@ describe("Unresolved group", () => {
     await flushPromises();
     const table = byTest("svcver-unresolved-table").text();
     expect(table).toContain(
-      "One detected name covers pods of 3 trace services (compactor, ingester, querier)",
+      "One detected name covers pods of 3 trace services (compactor, ingester, and querier)",
     );
-    expect(table).not.toContain("No trace service runs on these pods");
+    expect(table).toContain(en.serviceVersions.nameReview.unresolved.reasonName);
     expect(table).toContain("Placeholder name sent by the SDK");
     expect(table).not.toContain("SDK placeholder; the name is shown as is");
     expect(table).not.toContain("Map pods");
@@ -553,11 +569,15 @@ describe("Unresolved group", () => {
       ],
     });
     await flushPromises();
-    expect(byTest("svcver-unresolved-pods").text()).toBe(
-      "No trace service runs on these pods; the detected name is shown as is",
+    expect(byTest("svcver-unresolved-sub").text()).toBe(
+      en.serviceVersions.nameReview.unresolved.introPods,
     );
-    expect(wrapper.findAll('[data-test="svcver-unresolved-pods"]')).toHaveLength(1);
     expect(byTest("svcver-unresolved-table").text()).not.toContain("these pods");
+    const table = wrapper
+      .findAllComponents({ name: "OTable" })
+      .find((candidate) => candidate.attributes("data-test") === "svcver-unresolved-table");
+    const ids = (table?.props("columns") as OTableColumnDef[]).map(({ id }) => id);
+    expect(ids).not.toContain("why");
   });
 
   it("never claims pods while a row without pods is in the group", async () => {
@@ -704,17 +724,20 @@ describe("Discovered Services", () => {
     entry.display_name || entry.service_name;
   const keys = new Set(rowsGolden.map(shownName));
   const traced = new Set(
-    rowsGolden.filter((entry) => entry.display_source === "trace").map(shownName),
+    rowsGolden.filter((entry) => entry.traces_streams.length > 0).map(shownName),
   );
+  const versionTile = (rows: typeof scopes) =>
+    `${en.serviceVersions.discovered.tiles.versioned}${
+      new Set(rows.filter((row) => row.newest_version).map((row) => row.service)).size
+    }`;
 
   it("counts two detected keys of one trace service as one service in the footer", async () => {
     await mountDiscovered();
     const vm = wrapper!.vm as unknown as { searchQuery: string };
     vm.searchQuery = "PaymentService";
     await flushPromises();
-    const footer = wrapper!.text();
-    expect(footer).toContain("1 service (");
-    expect(footer).not.toContain("2 services");
+    expect(wrapper!.findComponent({ name: "OTable" }).props("totalCount")).toBe(1);
+    expect(byTest("discovered-services-footer-instances").text()).toContain("2");
   });
 
   it("names the workload Name review proposes instead of none", async () => {
@@ -736,7 +759,7 @@ describe("Discovered Services", () => {
     expect(tile("envs")).toBe(`Envs detected${stage7.envs.envs.length}prod`);
     expect(tile("overrides")).toContain(String(stage7.overrides.total));
     expect(tile("names")).toBe("Names to review3Review →");
-    expect(tile("versions")).toBe("Versions2");
+    expect(tile("versions")).toBe(versionTile(catalog));
     expect(tile("versions")).not.toContain("raw");
     await byTest("svcver-tile-overrides-view").trigger("click");
     expect(wrapper!.emitted("navigate-to-env-versions")).toHaveLength(1);
@@ -749,15 +772,75 @@ describe("Discovered Services", () => {
     expect(notice.html()).not.toContain("bg-banner-info");
   });
 
+  it("offers no View or Review link on a zero count", async () => {
+    lists.proposed = { aliases: [], total: 0 };
+    transport.get.mockImplementation((url: string, init: { params?: Record<string, unknown> }) =>
+      url.endsWith("/service_identity/overrides")
+        ? Promise.resolve({ data: { overrides: [], total: 0 } })
+        : answer(url, init),
+    );
+    await mountDiscovered();
+    expect(tile("overrides")).toContain("0");
+    expect(tile("names")).toContain("0");
+    expect(byTest("svcver-tile-overrides-view").exists()).toBe(false);
+    expect(byTest("svcver-tile-names-review").exists()).toBe(false);
+  });
+
   it.each([
-    [0, "Versions2"],
-    [1, "Versions21 git hash stripped"],
-    [3, "Versions23 git hashes stripped"],
+    ["true", ["k8s_workload", "env", "version"]],
+    ["false", ["k8s_workload"]],
+  ])(
+    "keeps the pre-versions columns first and adds new ones after them (enterprise %s)",
+    async (enterprise, added) => {
+      const previous = [config.isEnterprise, config.isCloud];
+      config.isEnterprise = enterprise;
+      config.isCloud = "false";
+      try {
+        await mountDiscovered();
+      } finally {
+        [config.isEnterprise, config.isCloud] = previous;
+      }
+      const table = wrapper!.findComponent({ name: "OTable" });
+      const columns = table.props("columns") as OTableColumnDef[];
+      expect(columns.map(({ id }) => id)).toEqual([
+        "service_name",
+        "workload",
+        "identity",
+        "telemetry",
+        "last_seen",
+        ...added,
+      ]);
+      expect(Object.values(table.props("columnVisibility") ?? {})).not.toContain(false);
+    },
+  );
+
+  it.each([
+    ["nats", "env", en.serviceVersions.discovered.noTraces],
+    ["nats", "version", en.serviceVersions.discovered.noTraces],
+    ["nats", "k8s_workload", en.serviceVersions.discovered.noWorkload],
+    ["checkoutservice", "env", en.serviceVersions.discovered.noTracePlace],
+    ["payments-api", "version", en.serviceVersions.catalog.notTracked],
+  ])("marks an empty %s %s cell with the shared dash and its reason", async (key, column, why) => {
+    catalog = scopes.map((entry) =>
+      entry.service === "PaymentService" ? { ...entry, newest_version: null } : entry,
+    );
+    await mountDiscovered();
+    (wrapper!.vm as unknown as { searchQuery: string }).searchQuery = key;
+    await flushPromises();
+    const mark = byTest(`o2-table-cell-${column}`).find('[data-test="svcver-not-compared"]');
+    expect(mark.find('[aria-hidden="true"]').text()).toBe("—");
+    expect(mark.find(".sr-only").text()).toBe(why);
+  });
+
+  it.each([
+    [0, ""],
+    [1, "1 git hash stripped"],
+    [3, "3 git hashes stripped"],
   ])("says how many git hashes were stripped only when some were (%i)", async (count, text) => {
     catalog = [...scopes, { ...scopes[0], scope_key: "other", newest_version: "v-other" }];
     stripped = count;
     await mountDiscovered();
-    expect(tile("versions")).toBe(text);
+    expect(tile("versions")).toBe(`${versionTile(catalog)}${text}`);
   });
 
   it("shows the trace name with detected as, and the joined env and version", async () => {
@@ -773,45 +856,39 @@ describe("Discovered Services", () => {
       "prod",
     );
     expect(byTest("o2-table-cell-version").text()).toBe(version);
-    expect(byTest("o2-table-cell-workload").text()).toBe("payments");
-    vm.searchQuery = "nats";
-    await flushPromises();
-    expect(byTest("o2-table-cell-env").find('[data-test="svcver-env-chip"]').exists()).toBe(false);
-    expect(byTest("o2-table-cell-version").text()).toBe("—");
-    expect(
-      byTest("svcver-discovered-no-version").findComponent({ name: "OTooltip" }).props("content"),
-    ).toBe("no version");
-    expect(byTest("o2-table-cell-workload").text()).toBe("—");
-    expect(byTest("svcver-discovered-banner").text()).toContain("Service = name from traces.");
-    expect(byTest("svcver-discovered-banner").classes()).toContain("bg-surface-panel");
-    expect(byTest("svcver-discovered-banner").classes()).not.toContain("bg-banner-info-bg");
+    expect(byTest("o2-table-cell-k8s_workload").text()).toBe("payments");
+    expect(byTest("svcver-discovered-help").attributes("aria-label")).toBe(
+      en.serviceVersions.discovered.banner,
+    );
   });
 
-  it("searches by key or display, groups by key and sorts by display", async () => {
+  it("searches by key or display, groups and sorts by display", async () => {
     await mountDiscovered();
     const vm = wrapper!.vm as unknown as {
       searchQuery: string;
       sortColumn: string;
       sortOrder: string;
-      visibleGroups: { service_name: string }[];
+      visibleGroups: { name: string; instances: { service_name: string }[] }[];
     };
     vm.searchQuery = "PaymentService";
     await flushPromises();
-    expect(vm.visibleGroups.map((group) => group.service_name).sort()).toEqual([
+    expect(vm.visibleGroups.map((group) => group.name)).toEqual(["PaymentService"]);
+    expect(vm.visibleGroups[0].instances.map((entry) => entry.service_name).sort()).toEqual([
       "payments-api",
       "paymentservice",
     ]);
     vm.searchQuery = "legacy";
     await flushPromises();
-    expect(vm.visibleGroups.map((group) => group.service_name)).toEqual(["legacy-cart"]);
+    expect(vm.visibleGroups[0].instances.map((entry) => entry.service_name)).toEqual([
+      "legacy-cart",
+    ]);
     vm.searchQuery = "";
     vm.sortColumn = "service_name";
     vm.sortOrder = "asc";
     await flushPromises();
-    const order = vm.visibleGroups.map((group) => group.service_name);
-    expect(order).toHaveLength(new Set(rowsGolden.map((entry) => entry.service_name)).size);
-    // By key checkoutservice sorts before legacy-cart; by display CartService sorts first.
-    expect(order.indexOf("legacy-cart")).toBeLessThan(order.indexOf("checkoutservice"));
+    const order = vm.visibleGroups.map((group) => group.name);
+    expect(order).toHaveLength(keys.size);
+    expect(order).toEqual([...order].sort((a, b) => a.localeCompare(b)));
   });
 
   it("titles the drawer with the display name", async () => {

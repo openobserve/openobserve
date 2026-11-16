@@ -16,8 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col gap-5" data-test="downtime-schedule">
+    <p v-if="locked" class="text-text-secondary text-xs" data-test="downtime-schedule-locked">
+      {{ t("alerts.downtimes.validation.lockedAfterStart") }}
+    </p>
     <OFormToggleGroup
       name="schedule.repeat"
+      :disabled="locked"
       data-test="downtime-schedule-repeat"
       @update:model-value="onRepeatChange"
     >
@@ -38,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="schedule.start_date"
           :label="t('alerts.downtimes.scheduleForm.startDate')"
           required
+          :disabled="locked"
           data-test="downtime-schedule-start-date"
           @update:model-value="onStartChange('start_date', $event)"
         />
@@ -45,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="schedule.start_time"
           :label="t('alerts.downtimes.scheduleForm.startTime')"
           required
+          :disabled="locked"
           data-test="downtime-schedule-start-time"
           @update:model-value="onStartChange('start_time', $event)"
         />
@@ -79,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="multiple"
         :label="t('alerts.downtimes.scheduleForm.days')"
         label-position="top"
+        :disabled="locked"
         data-test="downtime-schedule-weekdays"
       >
         <OToggleGroupItem
@@ -95,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="schedule.start_date"
         :label="t('alerts.downtimes.scheduleForm.startsOn')"
         required
+        :disabled="locked"
         data-test="downtime-schedule-starts-on"
       />
       <div class="flex flex-wrap items-start gap-3 max-md:flex-col">
@@ -102,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="schedule.start_time"
           :label="t('alerts.downtimes.scheduleForm.startsAt')"
           required
+          :disabled="locked"
           data-test="downtime-schedule-start-time"
         />
         <OFormInput
@@ -111,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :help-text="t('alerts.downtimes.scheduleForm.durationHelp')"
           width="sm"
           required
+          :disabled="locked"
           data-test="downtime-schedule-duration"
         />
       </div>
@@ -130,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       searchable
       required
       width="md"
+      :disabled="locked"
       data-test="downtime-schedule-timezone"
     />
 
@@ -167,6 +178,9 @@ import OFormDate from "@/lib/forms/Date/OFormDate.vue";
 import OFormTime from "@/lib/forms/Time/OFormTime.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+
+// A started downtime keeps its schedule (D4): only the end and the until day stay editable.
+withDefaults(defineProps<{ locked?: boolean }>(), { locked: false });
 
 const { t } = useI18nTyped();
 const form = inject(FORM_CONTEXT_KEY, null);
