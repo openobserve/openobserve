@@ -17,7 +17,12 @@ const onUpdate = (value: AcceptableValue) => emit("update:modelValue", String(va
     :model-value="modelValue"
     :disabled="disabled"
     :aria-label="label"
-    class="grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] gap-2"
+    class="grid gap-2"
+    :class="
+      columns === 2
+        ? 'grid-cols-2 max-sm:grid-cols-1'
+        : 'grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))]'
+    "
     @update:model-value="onUpdate"
   >
     <RadioGroupItem

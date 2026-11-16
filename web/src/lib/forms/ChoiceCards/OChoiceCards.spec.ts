@@ -32,4 +32,10 @@ describe("OChoiceCards", () => {
     await wrapper.get('[data-test="card-b"]').trigger("click");
     expect(wrapper.emitted("update:modelValue")).toBeUndefined();
   });
+
+  it("fits as many cards per row as the width allows unless two columns are asked for", () => {
+    const grid = (props = {}) => mountCards(props).get('[role="radiogroup"]').classes();
+    expect(grid()).toContain("grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))]");
+    expect(grid({ columns: 2 })).toContain("grid-cols-2");
+  });
 });
