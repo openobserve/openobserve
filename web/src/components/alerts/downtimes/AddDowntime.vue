@@ -174,6 +174,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OFormToggleGroup>
             </div>
+            <div
+              v-if="groupScopeLines.length || groupLimitIsLost"
+              class="text-text-secondary mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+              data-test="downtime-form-group-scope"
+            >
+              <span v-for="(line, i) in groupScopeLines" :key="i">{{ line }}</span>
+              <span
+                v-if="groupLimitIsLost && !values.targets.alerts.ids_open"
+                class="text-input-error-text"
+                role="alert"
+                data-test="downtime-form-group-scope-error"
+              >
+                {{ t("alerts.downtimes.validation.groupLimitLost") }}
+              </span>
+              <OButton
+                variant="ghost-primary"
+                size="xs"
+                :disabled="isSubmitting"
+                data-test="downtime-form-group-scope-clear"
+                @click="clearGroupScope"
+              >
+                {{ t("alerts.downtimes.form.groupScopeClear") }}
+              </OButton>
+            </div>
           </div>
 
           <div class="bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col max-lg:flex-none">
@@ -394,6 +418,7 @@ import {
   saveDowntimeMutation,
 } from "@/services/downtimes.queries";
 import type {
+  AlertGroupRef,
   DowntimeDetail,
   DowntimeStatus,
   PreviewRequest,
@@ -413,7 +438,10 @@ import {
   buildTargets,
   defaultDowntimeValues,
   downtimeToFormValues,
+  groupLimitLost,
   hasIdentity,
+  keptAlertGroups,
+  keptEndOnClear,
   movePastWindow,
   unnarrowedModules,
   type DowntimeFormValues,
@@ -448,6 +476,7 @@ import DowntimeNotifySection from "./DowntimeNotifySection.vue";
 import DowntimePreviewPane from "./DowntimePreviewPane.vue";
 import DowntimeSummary from "./DowntimeSummary.vue";
 import { browserTimezone } from "@/utils/timezoneAliases";
+import { groupRefLabels } from "@/utils/alerts/ackState";
 import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
@@ -694,7 +723,7 @@ const resetToken = ref(0);
 const loadedFrom = ref("");
 const loadRow = (row: DowntimeDetail) => {
   loadedFrom.value = sourceId.value;
-  let loaded = downtimeToFormValues(row);
+  let loaded = downtimeToFormValues(row, isEdit.value ? "edit" : "duplicate");
   if (!isEdit.value) {
     loaded.name = t("alerts.downtimes.copyOf", { name: row.name });
     // A duplicate is a new row, so it carries no version to check.
@@ -763,6 +792,54 @@ const autoName = useAutoName({
   apply: (name: string) => form.setFieldValue("name", name),
   enabled: () => !isEdit.value && !duplicateId.value,
 });
+
+// ── Group scope of a loaded mute ────────────────────────────────────────────
+// Built from what Save sends, so the note never describes a scope that will not be saved.
+const groupScopeLines = computed<I18nText[]>(() => {
+  const byAlert = new Map<string, AlertGroupRef[]>();
+  for (const g of keptAlertGroups(values.value)) {
+    byAlert.set(g.alert_id, [...(byAlert.get(g.alert_id) ?? []), g]);
+  }
+  const lines: I18nText[] = [];
+  for (const [alertId, groups] of byAlert) {
+    const alert = itemName("alerts", alertId) ?? alertId;
+    const labels = groups
+      .map(groupRefLabels)
+      .filter((l): l is string => !!l)
+      .join("; ");
+    lines.push(
+      labels
+        ? t(
+            "alerts.downtimes.form.groupScope",
+            { count: groups.length, alert, labels },
+            groups.length,
+          )
+        : t(
+            "alerts.downtimes.form.groupScopeNoLabels",
+            { count: groups.length, alert },
+            groups.length,
+          ),
+    );
+  }
+  const end = keptEndOnClear(values.value);
+  if (end) {
+    lines.push(
+      end.group_key
+        ? t("alerts.downtimes.form.groupScopeEndsOnGroupClear")
+        : t("alerts.downtimes.form.groupScopeEndsOnAlertClear"),
+    );
+  }
+  return lines;
+});
+
+// Save refuses a lost group limit; the note keeps "Mute all groups" and the reason on screen.
+const groupLimitIsLost = computed(() => groupLimitLost(values.value));
+
+// Widening a mute is an explicit act: both fields go out as null on the next save.
+const clearGroupScope = () => {
+  form.setFieldValue("alert_groups", null);
+  form.setFieldValue("end_on_clear", null);
+};
 
 // ── Modules and tabs ────────────────────────────────────────────────────────
 const chosenModules = computed(() => MODULE_ORDER.filter((m) => values.value.modules.includes(m)));
@@ -918,7 +995,12 @@ const downtimeDraft = useEditorDraft<DowntimeFormValues>({
   snapshot: () => ({ ...values.value }),
   apply: (data) => {
     // The loaded version is kept, so saving the draft replaces a newer server row as the restore dialog warns.
-    form.reset({ ...data, version: values.value.version });
+    // A draft saved before groups existed has no such keys; it keeps the loaded scope instead of widening it.
+    const scope = {
+      alert_groups: values.value.alert_groups,
+      end_on_clear: values.value.end_on_clear,
+    };
+    form.reset({ ...scope, ...data, version: values.value.version });
     resetToken.value += 1;
   },
   base: () => (isEdit.value ? storedDowntime(detailQuery.data.value) : undefined),

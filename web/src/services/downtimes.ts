@@ -179,8 +179,10 @@ export interface DowntimeRequest {
   notifications?: DowntimeNotifications;
   /** The loaded row's version; a newer stored row answers 409. */
   version?: number;
-  alert_groups?: AlertGroupRef[];
-  end_on_clear?: EndOnClear;
+  /** Omitted keeps the stored value on an edit; null clears it. */
+  alert_groups?: AlertGroupRef[] | null;
+  /** Omitted keeps the stored value on an edit; null clears it. */
+  end_on_clear?: EndOnClear | null;
 }
 
 /** Exactly one of the two, with the loaded row's version when known. */
