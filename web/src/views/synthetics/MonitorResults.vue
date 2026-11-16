@@ -54,7 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-relative-time="timeState.relativeTimePeriod ?? ''"
         data-test="synthetic-monitor-results-date-time"
         class=""
-        @on:date-change="onDateChange"
+        :range="timeHost.range.value"
+        @apply="timeHost.onApply"
+        @on:date-change="timeHost.onDateChange"
       />
       <OButton
         variant="outline"
@@ -88,6 +90,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="refresh"
       />
     </template>
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="synthetic-monitor-results-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <div class="min-h-0 flex-1 overflow-hidden">
       <MonitorRuns
         ref="runsRef"
@@ -171,6 +179,8 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -395,6 +405,15 @@ async function onDateChange(value: any) {
   await nextTick();
   runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
 }
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("synthetics.pageTitle"),
+  url: false,
+  initial: () => pageRange(timeState.value),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: (value) => void onDateChange(value),
+});
 
 async function refresh() {
   if (isRefreshing.value) return;

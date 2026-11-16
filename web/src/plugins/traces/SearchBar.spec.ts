@@ -359,13 +359,15 @@ const sharedStubs = {
       queryRangeRestrictionInHour: null,
       queryRangeRestrictionMsg: null,
     },
-    emits: ["on:date-change", "on:timezone-change"],
+    emits: ["on:date-change", "on:timezone-change", "apply"],
     setup() {
       return {
         setRelativeTime: vi.fn(),
         setAbsoluteTime: vi.fn(),
         setDateType: vi.fn(),
         refresh: vi.fn(),
+        setCustomDate: vi.fn(() => true),
+        undo: vi.fn(() => true),
       };
     },
   },
@@ -554,6 +556,59 @@ describe("SearchBar", () => {
     wrapper?.unmount();
     desktopWidthSpy.mockRestore();
     vi.clearAllMocks();
+  });
+
+  // -------------------------------------------------------------------------
+  describe("Search around context view", () => {
+    const picker = () => wrapper.findComponent('[data-test="logs-search-bar-date-time-dropdown"]');
+    const landDate = async () => {
+      picker().vm.$emit("on:date-change", {
+        startTime: 1_000_000,
+        endTime: 2_000_000,
+        valueType: "absolute",
+        userChangedValue: true,
+      });
+      await flushPromises();
+    };
+
+    it("runs a move of its own window at once, once", async () => {
+      wrapper = mountSearchBar({ contextView: true });
+      picker().vm.$emit("apply", { kind: "fixed", startUs: 1, endUs: 2 }, { source: "step" });
+      await landDate();
+      expect(wrapper.emitted("searchdata")).toHaveLength(1);
+      expect(wrapper.emitted("leave-context-view")).toBeUndefined();
+    });
+
+    it("leaves on a range applied from the panel", () => {
+      wrapper = mountSearchBar({ contextView: true });
+      picker().vm.$emit("apply", { kind: "rolling", span: "1h" }, { source: "panel" });
+      expect(wrapper.emitted("leave-context-view")).toHaveLength(1);
+    });
+
+    it("leaves on Run query, which sends what the query bar shows", () => {
+      wrapper = mountSearchBar({ contextView: true });
+      (wrapper.vm as unknown as { searchData: () => void }).searchData();
+      expect(wrapper.emitted("leave-context-view")).toHaveLength(1);
+      expect(wrapper.emitted("searchdata")).toHaveLength(1);
+    });
+
+    it("goes back through the picker's undo and runs the restored range once", async () => {
+      wrapper = mountSearchBar({ contextView: true });
+      const run = vi.fn();
+      const bar = wrapper.vm as unknown as { undoToResults: (r: () => void) => boolean };
+      expect(bar.undoToResults(run)).toBe(true);
+      await landDate();
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(wrapper.emitted("searchdata")).toBeUndefined();
+    });
+
+    it("does not undo once the window has moved inside the view", async () => {
+      wrapper = mountSearchBar({ contextView: true });
+      picker().vm.$emit("apply", { kind: "fixed", startUs: 1, endUs: 2 }, { source: "step" });
+      await landDate();
+      const bar = wrapper.vm as unknown as { undoToResults: (r: () => void) => boolean };
+      expect(bar.undoToResults(vi.fn())).toBe(false);
+    });
   });
 
   // -------------------------------------------------------------------------

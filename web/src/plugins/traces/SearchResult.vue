@@ -226,6 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :row-href="traceDetailsHref"
           @row-click="expandRowDetail"
           @open-in-new-tab="openTraceInNewTab"
+          @search-around="(request) => $emit('search:around', request)"
           @page-change="(page: number) => changePage(page)"
           @cross-page="(page: number) => changePage(page, { fromCrossing: true })"
           @rows-per-page-change="changeRowsPerPage"
@@ -343,6 +344,7 @@ export default defineComponent({
     "ask-ai",
     "send-to-ai-chat",
     "open-mobile-fields",
+    "search:around",
   ],
   methods: {
     toggleErrorOnly() {

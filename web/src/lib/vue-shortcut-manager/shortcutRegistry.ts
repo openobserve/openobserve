@@ -352,6 +352,12 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         allowInDialog: true,
       },
       {
+        id: "logsSearchAround",
+        key: "a",
+        descriptionKey: "common.searchAround",
+        allowInDialog: true,
+      },
+      {
         id: "logsRowFocusMove",
         display: "↑ / ↓",
         descriptionKey: "shortcuts.actions.logsRowFocusMove",

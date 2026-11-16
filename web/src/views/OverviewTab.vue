@@ -41,11 +41,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             endTime: absoluteTime.endTime,
           }"
           :default-relative-time="relativeTime"
-          @on:date-change="onDateChange"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
       </div>
     </div>
 
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="overview-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <OBanner
       v-if="showOverviewCards && overviewRefreshFailed"
       variant="warning"
@@ -816,6 +824,8 @@ import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSess
 import { useRouter } from "vue-router";
 import anomalyService from "@/services/anomaly_detection";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -960,6 +970,22 @@ const onDateChange = (value: any) => {
   }
   loadAll();
 };
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("home.tabOverview"),
+  url: false,
+  initial: () =>
+    dateTimeType.value === "absolute"
+      ? {
+          kind: "fixed",
+          startUs: absoluteTime.value.startTime,
+          endUs: absoluteTime.value.endTime,
+        }
+      : pageRange({ valueType: "relative", relativeTimePeriod: relativeTime.value }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: onDateChange,
+});
 
 interface ServiceCard {
   id: string;

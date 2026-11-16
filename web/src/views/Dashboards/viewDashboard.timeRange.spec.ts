@@ -451,7 +451,8 @@ describe("ViewDashboard time range gate", () => {
 
   describe("org range guard (O2)", () => {
     const DAY = 24 * 60 * MINUTE;
-    const strip = () => wrapper.findComponent({ name: "StaleRangeStrip" });
+    const strip = () => wrapper.findComponent({ name: "TimeRangeGuardStrip" });
+    const held = () => strip().props("guard");
 
     beforeEach(() => {
       mockState.organizationData.organizationSettings = { range_guard_days: 30 };
@@ -467,8 +468,7 @@ describe("ViewDashboard time range gate", () => {
       await pick(absolute(end - 90 * DAY, end));
 
       expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
-      expect(strip().exists()).toBe(true);
-      expect(String(strip().props("runLabel"))).toMatch(/timeRangeHost\.guardRun|Run on/);
+      expect(held()).toMatchObject({ days: 30, from: { kind: "rolling", span: "15m" } });
     });
 
     it("runs the held range from the strip", async () => {
@@ -480,7 +480,7 @@ describe("ViewDashboard time range gate", () => {
       await flushPromises();
 
       expect(wrapper.vm.selectedDate).toEqual(absolute(end - 90 * DAY, end));
-      expect(strip().exists()).toBe(false);
+      expect(held()).toBeNull();
     });
 
     it("goes back to the old range from the strip", async () => {
@@ -492,7 +492,7 @@ describe("ViewDashboard time range gate", () => {
       await flushPromises();
 
       expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
-      expect(strip().exists()).toBe(false);
+      expect(held()).toBeNull();
     });
 
     it("never asks when the org has no guard", async () => {
@@ -503,7 +503,7 @@ describe("ViewDashboard time range gate", () => {
       await pick(absolute(end - 90 * DAY, end));
 
       expect(wrapper.vm.selectedDate).toEqual(absolute(end - 90 * DAY, end));
-      expect(strip().exists()).toBe(false);
+      expect(held()).toBeNull();
     });
   });
 

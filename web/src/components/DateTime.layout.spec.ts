@@ -236,10 +236,11 @@ describe("DateTime layout", () => {
       expect(el("date-time-resolved")!.textContent).not.toMatch(/GMT|IST/);
     });
 
-    it("tags every range that re-resolves against now as live, and an exact one as fixed", async () => {
+    it("tags a running range live and an ended calendar period with when it changes", async () => {
       createWrapper({ defaultRelativeTime: "calendar:day:-1" });
       await openMenu();
-      expect(el("date-time-preview-live")?.textContent).toContain("live");
+      expect(el("date-time-preview-changes")?.textContent).toContain("changes at midnight");
+      expect(el("date-time-preview-live")).toBeNull();
       expect(el("date-time-preview-fixed")).toBeNull();
       wrapper!.vm.pickChip("1h");
       await openMenu();
@@ -297,8 +298,9 @@ describe("DateTime layout", () => {
       expect(text("yesterday")).toBe("Yesterday Oct 7");
       expect(text("this-week")).toBe("This week Oct 4 – now");
       expect(text("last-week")).toBe("Previous week Sep 27 – Oct 3");
-      expect(text("last-month")).toBe("Previous month Sep 1 – 30, 2026");
-      expect(text("last-quarter")).toBe("Previous quarter Jul 1 – Sep 30, 2026");
+      // Rows name the whole period they cover, which then carries the year (ui-spec x2).
+      expect(text("last-month")).toBe("Previous month Sep 2026 · Sep 1 – 30");
+      expect(text("last-quarter")).toBe("Previous quarter Q3 2026 · Jul 1 – Sep 30");
     });
 
     it("lists Recent once, without the applied range or anything a chip or calendar row already offers", async () => {
@@ -506,8 +508,8 @@ describe("DateTime layout", () => {
 
       expect(rowTests()).toEqual(["date-time-list-calendar-yesterday"]);
       expect(el("date-time-resolved-name")?.textContent).toBe("Yesterday");
-      // A calendar period re-resolves against now, so it is live, never fixed.
-      expect(el("date-time-preview-live")).not.toBeNull();
+      // An ended calendar period re-resolves at midnight, so it says when it changes, never fixed.
+      expect(el("date-time-preview-changes")).not.toBeNull();
       expect(el("date-time-preview-fixed")).toBeNull();
 
       await pressInBar("Enter");

@@ -638,8 +638,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             :disabled="pageLoading"
             @click="searchAround(rowData)"
-            >{{ t("common.searchAround") }}</OButton
-          >
+            >{{ t("common.searchAround") }}
+            <OShortcut
+              id="logsSearchAround"
+              class="ms-1.5 max-md:hidden"
+              data-test="logs-detail-table-search-around-kbd"
+          /></OButton>
         </div>
         <div class="w-1/12 items-end" style="display: contents">
           <OButton
@@ -680,9 +684,11 @@ import {
   onBeforeMount,
   onMounted,
   computed,
+  getCurrentInstance,
   watch,
   type PropType,
 } from "vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -1166,6 +1172,22 @@ export default defineComponent({
       () =>
         searchObj.data.stream.selectedStream.length <= 1 || !!rowData.value?.[STREAM_NAME_FIELD],
     );
+
+    const instance = getCurrentInstance();
+    useShortcuts([
+      {
+        id: "logsSearchAround",
+        handler: () => {
+          const shown =
+            props.streamType !== "enrichment_tables" &&
+            canSearchAroundStream.value &&
+            hasAggregationQuery.value == false &&
+            !props.pageLoading;
+          const table = instance?.proxy as { searchAround?: (row: unknown) => void } | null;
+          if (shown) table?.searchAround?.(rowData.value);
+        },
+      },
+    ]);
 
     const { rowSeverity } = useLogSeverity();
     const severity = computed(() =>

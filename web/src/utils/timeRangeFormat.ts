@@ -117,22 +117,71 @@ export const timeRangeKindTag = (
   return t("dateTime.changesWhen", { when: nextChangeText(range.unit, ctx) });
 };
 
+/** `Dec 31`, the last day of a fixed range still in progress, else null. */
+export const timeRangeEndText = (range: TimeRange, ctx: TimeRangeContext): string | null => {
+  if (range.kind !== "fixed" || rangeState(range, ctx) !== "fixed-in-progress") return null;
+  const end = civilDay(range.endUs, ctx.zone);
+  // An exclusive midnight end is the day before it.
+  const last = end.midnight ? addDays(end, -1) : end;
+  return dayText(last, ctx, last.year !== thisYear(ctx));
+};
+
 /** `ends Dec 31` for a fixed range still in progress, else null. */
 export const timeRangeEndsNote = (
   range: TimeRange,
   ctx: TimeRangeContext,
   t: TranslateFn = gt,
 ): I18nText | null => {
-  if (range.kind !== "fixed" || rangeState(range, ctx) !== "fixed-in-progress") return null;
-  const end = civilDay(range.endUs, ctx.zone);
-  // An exclusive midnight end is the day before it.
-  const last = end.midnight ? addDays(end, -1) : end;
-  return t("dateTime.endsWhen", { when: dayText(last, ctx, last.year !== thisYear(ctx)) });
+  const when = timeRangeEndText(range, ctx);
+  return when === null ? null : t("dateTime.endsWhen", { when });
 };
+
+/** `Jan 1`, the day an ended calendar period turns into the next one; null for any other range. */
+export const timeRangeChangeText = (range: TimeRange, ctx: TimeRangeContext): string | null =>
+  range.kind === "calendar" && rangeState(range, ctx) === "calendar-ended"
+    ? nextChangeText(range.unit, ctx)
+    : null;
 
 /** The zone offset at the range's start, for badges and share text. */
 export const timeRangeZoneText = (range: TimeRange, ctx: TimeRangeContext): string =>
   formatZoneOffset(ctx.zone, Math.floor(resolveRange(range, ctx).startUs / MICROS_PER_MS));
+
+export type FixedPeriodUnit = "month" | "quarter" | "half" | "year";
+
+/** A fixed range that is exactly one month, quarter, half or year, moved by one such period (civil `yyyy/MM/dd` days). */
+export const shiftFixedPeriod = (
+  range: TimeRange,
+  ctx: TimeRangeContext,
+  by: number,
+): { start: string; end: string; unit: FixedPeriodUnit } | null => {
+  if (range.kind !== "fixed") return null;
+  const start = civilDay(range.startUs, ctx.zone);
+  const end = civilDay(range.endUs, ctx.zone);
+  if (!start.midnight || !end.midnight || start.day !== 1 || end.day !== 1) return null;
+  const months = end.year * 12 + end.month - (start.year * 12 + start.month);
+  const unit = periodUnit(months, start.month, ctx);
+  if (!unit) return null;
+  const day = (civil: CivilDay) =>
+    `${civil.year}/${String(civil.month).padStart(2, "0")}/${String(civil.day).padStart(2, "0")}`;
+  return {
+    start: day(addMonths(start, months * by)),
+    end: day(addMonths(end, months * by)),
+    unit,
+  };
+};
+
+// The same alignment rules timeRangeName uses to name a fixed period.
+const periodUnit = (
+  months: number,
+  startMonth: number,
+  ctx: TimeRangeContext,
+): FixedPeriodUnit | null => {
+  if (months === 1) return "month";
+  if (months === 3 && (startMonth - 1) % 3 === 0) return "quarter";
+  if (months === 6 && (startMonth === 1 || startMonth === 7)) return "half";
+  if (months !== 12) return null;
+  return startMonth === 1 || ctx.fiscalYearStartMonth === startMonth ? "year" : null;
+};
 
 const labelInput = (range: TimeRange, ctx: TimeRangeContext, t: TranslateFn): RangeLabelInput => {
   const { startUs, endUs } = resolveRange(range, ctx);
@@ -174,7 +223,8 @@ const monthName = (day: CivilDay, locale: string): string =>
 const nextChangeText = (unit: CalendarUnit, ctx: TimeRangeContext): string => {
   const running = resolveRange({ kind: "calendar", unit, offset: 0 }, ctx);
   const start = civilDay(running.startUs, ctx.zone);
-  const next = unit === "week" ? addDays(start, 7) : addMonths(start, UNIT_MONTHS[unit] ?? 1);
+  const days = unit === "day" ? 1 : unit === "week" ? 7 : 0;
+  const next = days ? addDays(start, days) : addMonths(start, UNIT_MONTHS[unit] ?? 1);
   return dayText(next, ctx, false);
 };
 

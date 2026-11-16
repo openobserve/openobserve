@@ -58,6 +58,7 @@
           v-model="refreshInterval"
           trigger
           :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+          :range-span-us="refreshRangeSpanUs"
           @trigger="refreshData"
           class="hover:bg-interactive-hover-bg h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-refresh-interval"
@@ -162,6 +163,12 @@
       </div>
     </div>
     <OSeparator />
+    <TimeRangeGuardStrip
+      :guard="rangeGuard"
+      data-test="dashboard-viewpanel-range-guard"
+      @run="timeGate.confirmGuard"
+      @back="timeGate.dismissGuard"
+    />
     <div class="flex flex-1 overflow-hidden">
       <div class="flex h-full w-full flex-col">
         <div class="flex h-full w-full">
@@ -302,6 +309,9 @@ import PanelViewToggle from "@/components/dashboards/PanelViewToggle.vue";
 import { usePanelDataView } from "@/composables/dashboard/usePanelDataView";
 // import _ from "lodash-es";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import useTimeRangeContext from "@/composables/useTimeRangeContext";
+import { heldGuard } from "@/composables/usePageTimeRange";
 import { parseDuration } from "@/utils/date";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import { replaceHistogramInterval } from "@/utils/dashboard/histogramIntervalReplacer";
@@ -350,6 +360,7 @@ const PanelErrorButtons = defineAsyncComponent(() => {
 export default defineComponent({
   name: "ViewPanel",
   components: {
+    TimeRangeGuardStrip,
     OSeparator,
     DateTimePickerDashboard,
     DashboardErrorsComponent,
@@ -708,11 +719,20 @@ export default defineComponent({
 
     const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
 
+    const timeRangeContext = useTimeRangeContext();
     const timeGate = useDashboardTimeGate({
       applied: selectedDate,
       isAutoRunOn: () => isAutoRunOn.value,
       showInPicker: (value) =>
         dateTimePickerRef.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone)),
+      guardDays: () => timeRangeContext.rangeGuardDays.value,
+    });
+    const rangeGuard = computed(() =>
+      heldGuard(timeGate.held.value, timeRangeContext.rangeGuardDays.value, 1),
+    );
+    const refreshRangeSpanUs = computed(() => {
+      const span = Number(selectedDate.value?.endTime) - Number(selectedDate.value?.startTime);
+      return Number.isFinite(span) && span > 0 ? span : null;
     });
 
     const showApplyHint = computed(
@@ -1031,6 +1051,8 @@ export default defineComponent({
     });
 
     return {
+      rangeGuard,
+      refreshRangeSpanUs,
       t,
       isMobile,
       isCancelShown,

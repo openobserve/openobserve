@@ -23718,8 +23718,8 @@
     "searchAroundWindow": "Search around",
     "placeholderShort": "Try 7d or yesterday",
     "tagLive": "live",
-    "tagLiveHint": "Live: moves with now",
-    "tagFixedHint": "Fixed: these exact times",
+    "tagLiveHint": "Live: follows now",
+    "tagFixedHint": "Fixed: always these exact times",
     "goLiveHint": "Switch to Last {duration} and follow now",
     "aroundInstant": "{window} around {instant}",
     "sameWindow": "same window",
@@ -23800,7 +23800,20 @@
     "weeksAgo": "{count} week ago | {count} weeks ago",
     "monthsAgo": "{count} month ago | {count} months ago",
     "quartersAgo": "{count} quarter ago | {count} quarters ago",
-    "yearsAgo": "{count} year ago | {count} years ago"
+    "yearsAgo": "{count} year ago | {count} years ago",
+    "pinThisRange": "Pin this range",
+    "fromPage": "from {page}",
+    "backOne": "Back one {unit}",
+    "forwardOne": "Forward one {unit}",
+    "unitDay": "day",
+    "unitWeek": "week",
+    "unitMonth": "month",
+    "unitQuarter": "quarter",
+    "unitYear": "year",
+    "inProgressRefresh": "In progress: results up to now, refresh runs until {end}",
+    "becomesOn": "Becomes {dates} on {when}",
+    "tagFixedFilling": "Fixed: always these dates. Still filling until {end}",
+    "unitHalf": "half"
   },
   "shortcuts": {
     "then": "then",
@@ -34410,6 +34423,7 @@
     "backToResults": "Back to results",
     "keepFilters": "Keep filters",
     "refreshTooFast": "Too fast for {span}",
-    "refreshFastest": "Fastest for {range} is {interval}"
+    "refreshFastest": "Fastest for {range} is {interval}",
+    "contextStripTraces": "All traces {window} around {instant}. Your filter is off for this view."
   }
 }

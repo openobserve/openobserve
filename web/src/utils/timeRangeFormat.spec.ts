@@ -17,7 +17,10 @@ import { describe, expect, it } from "vitest";
 import type { TranslateFn } from "@/types/i18n";
 import {
   formatTimeRange,
+  shiftFixedPeriod,
+  timeRangeChangeText,
   timeRangeCopyText,
+  timeRangeEndText,
   timeRangeEndsNote,
   timeRangeKindTag,
   timeRangeName,
@@ -127,5 +130,62 @@ describe("older calendar offsets", () => {
     const resolved = resolveRange(range, ctx);
     expect(reading).toMatchObject({ type: "timestamp", startMicros: resolved.startUs });
     expect((reading as { endMicros: number }).endMicros).toBe(resolved.endUs);
+  });
+});
+
+describe("timeRangeEndText and timeRangeChangeText", () => {
+  it("names the last day of a fixed range still in progress", () => {
+    const q4 = { kind: "fixed" as const, startUs: ist(2026, 10, 1), endUs: ist(2027, 1, 1) };
+    expect(timeRangeEndText(q4, ctx)).toBe("Dec 31");
+    const q3 = { kind: "fixed" as const, startUs: ist(2026, 7, 1), endUs: ist(2026, 10, 1) };
+    expect(timeRangeEndText(q3, ctx)).toBeNull();
+  });
+
+  it("names the day an ended calendar period turns over, and nothing for a live one", () => {
+    expect(timeRangeChangeText({ kind: "calendar", unit: "quarter", offset: -1 }, ctx)).toBe(
+      "Jan 1",
+    );
+    expect(timeRangeChangeText({ kind: "calendar", unit: "day", offset: -1 }, ctx)).toBe("Nov 13");
+    expect(timeRangeChangeText({ kind: "calendar", unit: "quarter", offset: 0 }, ctx)).toBeNull();
+  });
+});
+
+describe("shiftFixedPeriod", () => {
+  const fixed = (startUs: number, endUs: number) => ({ kind: "fixed" as const, startUs, endUs });
+
+  it("steps a quarter by a quarter, not by its day count", () => {
+    expect(shiftFixedPeriod(fixed(ist(2026, 7, 1), ist(2026, 10, 1)), ctx, -1)).toEqual({
+      start: "2026/04/01",
+      end: "2026/07/01",
+      unit: "quarter",
+    });
+    expect(shiftFixedPeriod(fixed(ist(2026, 7, 1), ist(2026, 10, 1)), ctx, 1)).toEqual({
+      start: "2026/10/01",
+      end: "2027/01/01",
+      unit: "quarter",
+    });
+  });
+
+  it("steps months, halves and years across the year boundary", () => {
+    expect(shiftFixedPeriod(fixed(ist(2026, 1, 1), ist(2026, 2, 1)), ctx, -1)).toEqual({
+      start: "2025/12/01",
+      end: "2026/01/01",
+      unit: "month",
+    });
+    expect(shiftFixedPeriod(fixed(ist(2026, 1, 1), ist(2026, 7, 1)), ctx, -1)).toEqual({
+      start: "2025/07/01",
+      end: "2026/01/01",
+      unit: "half",
+    });
+    expect(shiftFixedPeriod(fixed(ist(2025, 1, 1), ist(2026, 1, 1)), ctx, 1)).toEqual({
+      start: "2026/01/01",
+      end: "2027/01/01",
+      unit: "year",
+    });
+  });
+
+  it("leaves a range that is no period to its own width", () => {
+    expect(shiftFixedPeriod(fixed(ist(2026, 7, 2), ist(2026, 10, 1)), ctx, -1)).toBeNull();
+    expect(shiftFixedPeriod(fixed(ist(2026, 2, 1), ist(2026, 5, 1)), ctx, -1)).toBeNull();
   });
 });

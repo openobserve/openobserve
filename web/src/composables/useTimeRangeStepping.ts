@@ -20,6 +20,7 @@ import {
   onDeactivated,
   onMounted,
   ref,
+  shallowRef,
   watch,
   type ComputedRef,
   type Ref,
@@ -28,16 +29,19 @@ import {
   parseCalendarToken,
   resolveCalendarPeriod,
   shiftCalendarToken,
+  type CalendarUnit,
 } from "@/utils/dashboard/calendarPeriods";
 import { convertToUtcTimestamp } from "@/utils/zincutils";
 import { exceedsRangeRestriction } from "@/utils/timeRangeRail";
 import { formatRangeDuration, formatRangeLabel } from "@/utils/timeRangeLabel";
 import { popUndoStep, pushUndoStep, type TimeRangeUndoStep } from "@/utils/timeRangeUndo";
-import type { TimeRangeApplyMeta } from "@/utils/timeRangeModel";
+import type { TimeRangeApplyMeta, TimeRangeContext } from "@/utils/timeRangeModel";
+import { formatTimeRange, shiftFixedPeriod, type FixedPeriodUnit } from "@/utils/timeRangeFormat";
+import { weekStartsOn } from "@/utils/weekStart";
 import { registerShortcuts } from "@/lib/vue-shortcut-manager/composables";
 import { getManager } from "@/lib/vue-shortcut-manager/manager";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import {
   MICROS_PER_MINUTE,
   MICROS_PER_SECOND,
@@ -47,6 +51,17 @@ import {
 } from "@/composables/useTimeRangeZone";
 import { MAX_CUSTOM_RELATIVE_VALUE, type TimeRangeLimits } from "@/composables/useTimeRangeLimits";
 import type { TimeRangeFields } from "@/composables/useTimeRangeFields";
+
+type StepUnit = CalendarUnit | FixedPeriodUnit;
+
+const UNIT_KEYS: Record<StepUnit, I18nKey> = {
+  half: "dateTime.unitHalf",
+  day: "dateTime.unitDay",
+  week: "dateTime.unitWeek",
+  month: "dateTime.unitMonth",
+  quarter: "dateTime.unitQuarter",
+  year: "dateTime.unitYear",
+};
 
 // Toolbar pickers on screen, oldest first; the newest acts on the keys.
 let shortcutPickers: { token: symbol; act: Record<string, () => void> }[] = [];
@@ -159,11 +174,11 @@ export default function useTimeRangeStepping(
 
   const undoStack = ref<TimeRangeUndoStep[]>([]);
   // The live range the chain last left, kept apart from the stack, whose oldest steps drop past its limit.
-  let liveOrigin: TimeRangeUndoStep | null = null;
+  const liveOrigin = shallowRef<TimeRangeUndoStep | null>(null);
 
   const clearUndo = () => {
     undoStack.value = [];
-    liveOrigin = null;
+    liveOrigin.value = null;
   };
 
   // A range the page sets replaces the one undo leads back from, unless it echoes or answers this picker's own emit.
@@ -199,8 +214,8 @@ export default function useTimeRangeStepping(
       endUs: endTime,
       ran,
     };
-    if (undoStack.value.length === 0) liveOrigin = null;
-    if (step.selectedType === "relative" && step.calendarToken === null) liveOrigin = step;
+    if (undoStack.value.length === 0) liveOrigin.value = null;
+    if (step.selectedType === "relative" && step.calendarToken === null) liveOrigin.value = step;
     undoStack.value = pushUndoStep(undoStack.value, step);
   };
 
@@ -209,7 +224,7 @@ export default function useTimeRangeStepping(
     if (!popped) return;
     const { step } = popped;
     undoStack.value = popped.rest;
-    if (popped.rest.length === 0) liveOrigin = null;
+    if (popped.rest.length === 0) liveOrigin.value = null;
     selectedType.value = step.selectedType;
     calendarToken.value = step.calendarToken;
     relativePeriod.value = step.relativePeriod;
@@ -266,11 +281,16 @@ export default function useTimeRangeStepping(
   };
 
   // A chain of steps that began on a rolling range goes back to it once `]` reaches where it began, or now.
-  const returnToLiveOrigin = (endUs: number): boolean => {
-    const origin = liveOrigin;
-    if (props.maxDate || !origin || origin.selectedType !== "relative") return false;
+  const liveOriginAt = (endUs: number): TimeRangeUndoStep | null => {
+    const origin = liveOrigin.value;
+    if (props.maxDate || !origin || origin.selectedType !== "relative") return null;
     const reach = Math.min(origin.endUs, Date.now() * 1000) - MICROS_PER_SECOND;
-    if (origin.calendarToken !== null || endUs < reach) return false;
+    return origin.calendarToken !== null || endUs < reach ? null : origin;
+  };
+
+  const returnToLiveOrigin = (endUs: number): boolean => {
+    const origin = liveOriginAt(endUs);
+    if (!origin) return false;
     captureUndo();
     selectedType.value = "relative";
     calendarToken.value = null;
@@ -299,12 +319,44 @@ export default function useTimeRangeStepping(
     closeMenu();
   };
 
+  // A fixed range that is exactly a month, quarter, half or year moves by that period (§3), as instants.
+  const fixedPeriodStep = (by: -1 | 1) => {
+    if (selectedType.value !== "absolute") return null;
+    const { startTime, endTime } = getConsumableDateTime();
+    const fixed = { kind: "fixed" as const, startUs: startTime, endUs: endTime };
+    const shifted = shiftFixedPeriod(fixed, rangeContext(), by);
+    if (!shifted) return null;
+    return {
+      startUs: civilDayStart(shifted.start),
+      endUs: civilDayStart(shifted.end),
+      unit: shifted.unit,
+    };
+  };
+
+  // False leaves the shift to the other paths; true when the period path handled or refused it.
+  const shiftFixedPeriodRange = (direction: "prev" | "next"): boolean => {
+    const period = fixedPeriodStep(direction === "prev" ? -1 : 1);
+    if (!period) return false;
+    if (period.startUs >= forwardCeilingMicros()) return true;
+    if (exceedsRangeRestriction(period.startUs, period.endUs, props.queryRangeRestrictionInHour)) {
+      showRestrictionToast();
+      return true;
+    }
+    captureUndo();
+    fields.writeInstants(period.startUs, period.endUs);
+    selectedType.value = "absolute";
+    saveDate("absolute", false, "step");
+    closeMenu();
+    return true;
+  };
+
   // Moves the range by its own length as an absolute range; a user step, so it is not marked programmatic.
   const shiftTimeRange = (direction: "prev" | "next") => {
     if (selectedType.value === "relative" && calendarToken.value !== null) {
       shiftCalendarPeriod(calendarToken.value, direction);
       return;
     }
+    if (shiftFixedPeriodRange(direction)) return;
     if (shiftWholeDays(direction)) return;
     const { startTime, endTime } = getConsumableDateTime();
     const duration = endTime - startTime;
@@ -329,6 +381,8 @@ export default function useTimeRangeStepping(
     if (selectedType.value === "relative") {
       return (parseCalendarToken(calendarToken.value)?.offset ?? 0) === 0;
     }
+    const period = fixedPeriodStep(1);
+    if (period) return period.startUs >= forwardCeilingMicros();
     const span = wholeDaySpan();
     if (span) return civilDayStart(addCivilDays(span.from, span.days)) >= forwardCeilingMicros();
     const { endUTC } = fields.getUTCTimeStamp();
@@ -442,7 +496,58 @@ export default function useTimeRangeStepping(
     return formatRangeDuration(0, span);
   });
 
-  // The window a step would move to, for the ‹ › tooltips.
+  const rangeContext = (): TimeRangeContext => ({
+    nowUs: Date.now() * 1000,
+    zone: zone.value,
+    weekStart: weekStartsOn(),
+    locale: clock.intlLocale.value,
+    fiscalYearStartMonth: null,
+  });
+
+  // A calendar period, or a single whole day, steps by its unit and is named by it.
+  const stepUnit = (): StepUnit | null => {
+    if (selectedType.value === "relative") {
+      return parseCalendarToken(calendarToken.value)?.unit ?? null;
+    }
+    return fixedPeriodStep(-1)?.unit ?? (wholeDaySpan()?.days === 1 ? "day" : null);
+  };
+
+  // The named period a fixed-period step lands on: `Q2 2026 · Apr 1 – Jun 30`.
+  const fixedStepWindow = (by: -1 | 1): string | null => {
+    const period = fixedPeriodStep(by);
+    if (!period) return null;
+    const fixed = { kind: "fixed" as const, startUs: period.startUs, endUs: period.endUs };
+    return formatTimeRange(fixed, rangeContext(), "row");
+  };
+
+  // The named period a calendar step lands on: `Q2 2026 · Apr 1 – Jun 30`, or `This quarter`.
+  const calendarStepWindow = (by: -1 | 1): string => {
+    const token = calendarToken.value;
+    const shifted = token ? shiftCalendarToken(token, by) : null;
+    const period = parseCalendarToken(shifted);
+    const range = shifted ? resolveCalendarPeriod(shifted, zone.value) : null;
+    if (!period || !range) return "";
+    const ctx = rangeContext();
+    if (period.offset === 0) return formatTimeRange({ kind: "calendar", ...period }, ctx, "row");
+    const fixed = { kind: "fixed" as const, startUs: range.startTime, endUs: range.endTime };
+    return formatTimeRange(fixed, ctx, "row");
+  };
+
+  const stepTitles = (unit: StepUnit | null, duration: string) => {
+    if (!unit) {
+      return {
+        prev: String(t("dateTime.previousDuration", { duration })),
+        next: String(t("dateTime.nextDuration", { duration })),
+      };
+    }
+    const name = String(t(UNIT_KEYS[unit]));
+    return {
+      prev: String(t("dateTime.backOne", { unit: name })),
+      next: String(t("dateTime.forwardOne", { unit: name })),
+    };
+  };
+
+  // The window a step would move to, for the ‹ › tooltips; `]` that returns to the live origin says so.
   const stepTooltip = computed(() => {
     const range = pendingRange.value;
     const valid = !!range && range.endTime > range.startTime;
@@ -452,20 +557,42 @@ export default function useTimeRangeStepping(
       formatRangeLabel({ startUs, endUs }, { ...labelOptions(), surface: "row" });
     const nextBlocked = isNextShiftDisabled();
     const ceiling = forwardCeilingMicros();
+    const unit = stepUnit();
+    const titles = stepTitles(unit, duration);
+    const onCalendar = selectedType.value === "relative" && calendarToken.value !== null;
+    const nextEnd = valid ? Math.min(range.endTime + span, ceiling) : 0;
+    const prevPeriod = fixedStepWindow(-1);
+    const nextPeriod = fixedStepWindow(1);
+    const origin =
+      valid && !nextBlocked && !onCalendar && nextPeriod === null ? liveOriginAt(nextEnd) : null;
+    const originRange = origin
+      ? resolveRelativePeriod(`${origin.relativeValue}${origin.relativePeriod}`, Date.now())
+      : null;
+    const nextWindow = () => {
+      if (!valid || nextBlocked) return "";
+      if (onCalendar) return calendarStepWindow(1);
+      if (nextPeriod !== null) return nextPeriod;
+      if (originRange) {
+        const live = String(t("dateTime.tagLive"));
+        return `${live} · ${windowText(originRange.startTime, originRange.endTime)}`;
+      }
+      return windowText(range.endTime, nextEnd);
+    };
+    const nextTitle = nextBlocked
+      ? String(t("dateTime.alreadyAtNow"))
+      : origin
+        ? String(t("dateTime.backTo", { range: origin.label }))
+        : titles.next;
     return {
       prev: {
-        title: String(t("dateTime.previousDuration", { duration })),
-        window: valid ? windowText(range.startTime - span, range.startTime) : "",
+        title: titles.prev,
+        window: !valid
+          ? ""
+          : onCalendar
+            ? calendarStepWindow(-1)
+            : (prevPeriod ?? windowText(range.startTime - span, range.startTime)),
       },
-      next: {
-        title: String(
-          nextBlocked ? t("dateTime.alreadyAtNow") : t("dateTime.nextDuration", { duration }),
-        ),
-        window:
-          valid && !nextBlocked
-            ? windowText(range.endTime, Math.min(range.endTime + span, ceiling))
-            : "",
-      },
+      next: { title: nextTitle, window: nextWindow() },
       zoom: zoomOutBlocked.value
         ? limits.maxLimitText()
         : valid

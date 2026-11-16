@@ -54,7 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :default-relative-time="relativeTime"
           data-test="workflow-runs-date-picker"
-          @on:date-change="updateDateTime"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
         <OButton
           v-if="testRunCount > 0"
@@ -80,6 +82,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="workflow-runs-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <div class="flex min-h-0 flex-1 flex-col gap-2 p-2">
       <!-- Offered only once the workflow has or had an endpoint; every other workflow keeps today's list. -->
       <div v-if="showTriggerFilter" class="flex shrink-0 flex-wrap items-center gap-2">
@@ -317,6 +325,8 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -663,6 +673,15 @@ const updateDateTime = (value: any) => {
   }
   fetchHistory();
 };
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("workflow.runs.title"),
+  url: false,
+  initial: () => ({ kind: "rolling", span: relativeTime.value }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: updateDateTime,
+});
 
 const openRun = (row: any) => {
   if (!row?.run_id) return;

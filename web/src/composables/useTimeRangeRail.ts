@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, nextTick, ref, type ComputedRef, type Ref } from "vue";
-import { parseCalendarToken, resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
+import {
+  parseCalendarToken,
+  resolveCalendarPeriod,
+  resolveCalendarPeriodBounds,
+} from "@/utils/dashboard/calendarPeriods";
+import { timeRangeName } from "@/utils/timeRangeFormat";
+import { weekStartsOn } from "@/utils/weekStart";
 import { CALENDAR_RAIL_ITEMS, formatCivilDay } from "@/utils/timeRangeRail";
 import {
   TIME_RANGE_CHIP_SETS,
@@ -35,6 +41,7 @@ import {
 } from "@/utils/timeRangeLabel";
 import useTimeRangeHistory, {
   isRelativeHistoryEntry,
+  sameHistoryEntry,
   type TimeRangeHistoryEntry,
 } from "@/composables/useTimeRangeHistory";
 import useTimeRangePins from "@/composables/useTimeRangePins";
@@ -49,6 +56,7 @@ export interface TimeRangeRailProps {
   preset: TimeRangePreset;
   queryRangeRestrictionInHour: number;
   narrowedByQuery: { startUs: number; endUs: number } | null;
+  hostName: string;
 }
 
 export interface TimeRangeRailDeps {
@@ -128,13 +136,31 @@ export default function useTimeRangeRail(props: TimeRangeRailProps, deps: TimeRa
     };
   };
 
-  // "Nov 11, 00:00 – now" for today, "Nov 8 – now" for a period so far, "Nov 1 – 7" for a finished one.
+  // The fixed name of the whole period a calendar token covers (`Q3 2026`), so rows show the same object typing gives.
+  const periodName = (token: string): string | null => {
+    const whole = resolveCalendarPeriodBounds(token, zone.value, tooltipNow.value);
+    if (!whole) return null;
+    const ctx = {
+      nowUs: tooltipNow.value * 1000,
+      zone: zone.value,
+      weekStart: weekStartsOn(),
+      locale: intlLocale.value,
+      fiscalYearStartMonth: null,
+    };
+    return timeRangeName({ kind: "fixed", startUs: whole.startTime, endUs: whole.endTime }, ctx);
+  };
+
+  // "Nov 11, 00:00 – now" for today, "Q4 2026 · Oct 1 – now" for a period so far, "Q3 2026 · Jul 1 – Sep 30" for a finished one.
   const calendarMeta = (token: string, range: { startTime: number; endTime: number }) => {
     const period = parseCalendarToken(token);
+    const name = periodName(token);
+    const named = (text: string) => (name ? `${name} · ${text}` : text);
     if (period?.offset !== 0) {
-      return formatRangeDates(
-        { startUs: range.startTime, endUs: range.endTime, calendar: true },
-        labelOptions(),
+      return named(
+        formatRangeDates(
+          { startUs: range.startTime, endUs: range.endTime, calendar: true, name, period: !!name },
+          labelOptions(),
+        ),
       );
     }
     const day = convertUnixTime(range.startTime).date;
@@ -142,7 +168,7 @@ export default function useTimeRangeRail(props: TimeRangeRailProps, deps: TimeRa
       period.unit === "day"
         ? `${dayLabel(day)} 00:00`
         : formatCivilDay(day, zone.value, tooltipNow.value, intlLocale.value);
-    return String(t("common.timeRangeUntilNow", { start }));
+    return named(String(t("common.timeRangeUntilNow", { start })));
   };
 
   // A live entry shows where it resolves now; a fixed one its length.
@@ -206,6 +232,14 @@ export default function useTimeRangeRail(props: TimeRangeRailProps, deps: TimeRa
     calendarTokens: calendarRows.value.flatMap((row) => (row.period ? [row.period] : [])),
   }));
 
+  // A range applied on another page says where it came from; this page's own need no tag.
+  const recentMeta = (entry: TimeRangeHistoryEntry): string => {
+    const meta = entryDuration(entry);
+    if (!entry.source || entry.source === props.hostName) return meta;
+    const from = String(t("dateTime.fromPage", { page: entry.source }));
+    return meta ? `${from} · ${meta}` : from;
+  };
+
   const recentRows = computed<TimeRangeListRow[]>(() => {
     if (!showRail.value) return [];
     const entries = timeRangeHistory.entries.value;
@@ -221,7 +255,7 @@ export default function useTimeRangeRail(props: TimeRangeRailProps, deps: TimeRa
           kind: "recent",
           testId: `date-time-list-recent-${index}`,
           label: entryLabel(entry),
-          meta: entryDuration(entry),
+          meta: recentMeta(entry),
         }),
       ];
     });
@@ -272,8 +306,9 @@ export default function useTimeRangeRail(props: TimeRangeRailProps, deps: TimeRa
   // Recent never shows what a pin, chip or calendar row offers, so storing it would only push out ranges it does show.
   const recordEntry = (entry: TimeRangeHistoryEntry) => {
     if (isOfferedElsewhere(entry, offeredElsewhere.value)) return;
-    if (isRelativeHistoryEntry(entry)) timeRangeHistory.addRelative(entry.relative);
-    else timeRangeHistory.add(entry.startUs, entry.endUs);
+    const source = props.hostName || undefined;
+    if (isRelativeHistoryEntry(entry)) timeRangeHistory.addRelative(entry.relative, source);
+    else timeRangeHistory.add(entry.startUs, entry.endUs, source);
   };
 
   const recentEntry = (id: string): TimeRangeHistoryEntry | undefined =>
@@ -290,6 +325,24 @@ export default function useTimeRangeRail(props: TimeRangeRailProps, deps: TimeRa
   const pinRecentRow = (rowId: string) => {
     const entry = recentEntry(rowId.slice("recent-".length));
     const id = entry ? timeRangePins.pin(entry) : null;
+    if (id) editingPinRowId.value = `pinned-${id}`;
+    listCursor.value = -1;
+  };
+
+  const pinIdOf = (entry: TimeRangeHistoryEntry | null): string | null =>
+    entry
+      ? (timeRangePins.pins.value.find((pin) => sameHistoryEntry(pin.range, entry))?.id ?? null)
+      : null;
+
+  // The summary star pins or unpins the applied range; a new pin opens its name field, as from a row.
+  const togglePin = (entry: TimeRangeHistoryEntry | null) => {
+    if (!entry) return;
+    const existing = pinIdOf(entry);
+    if (existing) {
+      timeRangePins.unpin(existing);
+      return;
+    }
+    const id = timeRangePins.pin(entry);
     if (id) editingPinRowId.value = `pinned-${id}`;
     listCursor.value = -1;
   };
@@ -330,6 +383,8 @@ export default function useTimeRangeRail(props: TimeRangeRailProps, deps: TimeRa
     recentEntry,
     removeRecentRange,
     pinOf,
+    pinIdOf,
+    togglePin,
     pinRecentRow,
     unpinRow,
     removeRecentRow,

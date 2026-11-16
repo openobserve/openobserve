@@ -50,9 +50,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-label="row.meta ? `${row.label}, ${row.meta}` : row.label"
         :data-test="row.testId"
         :data-active="index === active ? 'true' : undefined"
-        class="o-range-list__row rounded-default text-compact relative mx-1 flex h-7 items-center gap-2 px-2 max-md:h-10"
+        class="rounded-default text-compact relative mx-1 flex h-7 items-center gap-2 px-2 forced-colors:aria-disabled:text-[color:GrayText] forced-colors:data-active:bg-[color:Highlight] forced-colors:data-active:forced-color-adjust-none forced-colors:data-active:**:text-[color:HighlightText]! pointer-coarse:h-10"
         :class="[
-          index === active ? 'bg-surface-subtle' : '',
+          index === active
+            ? 'bg-surface-subtle outline-border-strong outline-1 -outline-offset-1'
+            : '',
           row.disabled
             ? 'text-text-disabled cursor-not-allowed'
             : 'text-text-heading cursor-pointer',
@@ -70,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- An option holds no controls; Alt+P and Delete pin and remove from the keyboard. -->
         <span
           v-if="row.kind !== 'example'"
-          class="inline-flex size-5 shrink-0 items-center justify-center"
+          class="inline-flex size-5 shrink-0 items-center justify-center pointer-coarse:size-9"
           aria-hidden="true"
         >
           <OButton
@@ -148,7 +150,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-else-if="row.meta"
           class="inline-flex max-w-[60%] shrink-0 items-center gap-1 text-xs tabular-nums"
-          :class="index === active ? 'text-text-body' : 'text-text-secondary'"
+          :class="[
+            index === active ? 'text-text-body' : 'text-text-secondary',
+            { 'forced-colors:text-[color:CanvasText]': row.reason },
+          ]"
           :data-test="row.reason ? `${row.testId}-reason` : undefined"
         >
           <OIcon v-if="row.reason" name="lock" size="xs" class="shrink-0" />
@@ -156,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <span
           v-if="row.kind !== 'example'"
-          class="inline-flex size-5.5 shrink-0 items-center justify-center"
+          class="inline-flex size-5.5 shrink-0 items-center justify-center pointer-coarse:size-9"
           aria-hidden="true"
         >
           <OButton
@@ -254,8 +259,10 @@ const cue = ref<ScrollCue>(null);
 
 const pieces = (row: TimeRangeListRow) => splitLabelMatches(row.label, row.match);
 
-// A phone has no hover, so its Recent rows always show pin and remove.
-const showsActions = (index: number) => index === props.active || isMobile.value;
+// A touch screen has no hover, so its Recent rows always show pin and remove.
+const coarsePointer =
+  typeof window !== "undefined" && (window.matchMedia?.("(pointer: coarse)")?.matches ?? false);
+const showsActions = (index: number) => index === props.active || isMobile.value || coarsePointer;
 
 // The pointer moves the same cursor the arrow keys do, so only one row is ever lit.
 const onRowPointer = (index: number, row: TimeRangeListRow) => {
@@ -299,17 +306,3 @@ watch(
   { immediate: true },
 );
 </script>
-
-<style scoped>
-/* Forced colours drop backgrounds, so the cursor row keeps a system highlight. */
-@media (forced-colors: active) {
-  .o-range-list__row[data-active] {
-    forced-color-adjust: none;
-    background-color: Highlight;
-    color: HighlightText;
-  }
-  .o-range-list__row[aria-disabled] {
-    color: GrayText;
-  }
-}
-</style>

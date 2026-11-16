@@ -42,6 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DbmPageChrome title-data-test="dbm-deadlocks-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="dbm-deadlocks-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
       <OTable
         :enable-column-resize="true"
         :data="tableRows"
@@ -116,6 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-deadlocks-date-time"
               class="h-8"
+              :range="timeHost.range.value"
+              @apply="timeHost.onApply"
               @on:date-change="onDateChange"
             />
             <ORefreshButton
@@ -492,6 +500,7 @@ import {
 import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
 import { DBM_ORIGIN_QUERY_KEY } from "@/utils/dbm/queryDetailOrigin";
 import { DBM_STATUS_TONES } from "@/utils/dbm/tones";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -523,6 +532,7 @@ const {
   run,
   onRefresh,
   onDateChange,
+  timeHost,
 } = useDbmListPage({
   load: () => load(),
   context: () => dbmContext,

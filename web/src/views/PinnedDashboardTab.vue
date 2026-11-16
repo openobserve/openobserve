@@ -49,19 +49,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="border-border-default flex shrink-0 items-center justify-end gap-2 border-b px-4 py-2"
       >
-        <DateTimePickerDashboard
+        <DateTime
           preset="dashboard"
           v-if="selectedDate"
           ref="dateTimePicker"
           size="sm"
-          v-model="selectedDate"
-          @update:model-value="setTime"
+          :range="timeHost.range.value"
           data-test="pinned-dashboard-date-time-picker"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
         <AutoRefreshInterval
           v-model="refreshInterval"
           trigger
           :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+          :range-span-us="refreshRangeSpanUs"
           @trigger="refreshData"
           size="sm"
         />
@@ -79,6 +81,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OTooltip>
       </div>
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="pinned-dashboard-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
       <div class="min-h-0 flex-1 overflow-auto">
         <RenderDashboardCharts
           ref="renderRef"
@@ -95,12 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick, provide } from "vue";
+import { computed, ref, onMounted, watch, nextTick, provide } from "vue";
 import { useStore } from "vuex";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { getDashboard } from "@/utils/commons";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import DateTime from "@/components/DateTime.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import usePageTimeRange, { pageRange, type PageDateChange } from "@/composables/usePageTimeRange";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -214,6 +224,31 @@ const setTime = () => {
     // ignore storage failures (e.g. quota, private mode)
   }
 };
+
+const timeHost = usePageTimeRange({
+  preset: "dashboard",
+  source: t("menu.dashboard"),
+  url: false,
+  initial: () => pageRange(selectedDate.value),
+  panelCount: () =>
+    (dashboardData.value?.tabs ?? []).reduce(
+      (sum: number, tab: { panels?: unknown[] }) => sum + (tab.panels?.length ?? 0),
+      0,
+    ),
+  onRange: (value: PageDateChange) => {
+    selectedDate.value = {
+      startTime: value.startTime,
+      endTime: value.endTime,
+      relativeTimePeriod: value.relativeTimePeriod ?? null,
+      valueType: value.valueType === "absolute" ? "absolute" : "relative",
+    };
+    setTime();
+  },
+});
+const refreshRangeSpanUs = computed(() => {
+  const win = resolveWindow();
+  return win && win.endTime > win.startTime ? win.endTime - win.startTime : null;
+});
 
 const refreshData = () => {
   setTime();

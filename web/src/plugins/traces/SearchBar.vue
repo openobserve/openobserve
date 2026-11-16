@@ -332,6 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :retention-days="tracesStreamLimits.retentionDays"
             class="h-8.5! max-lg:me-auto"
             @on:date-change="updateDateTime"
+            @apply="onRangeApply"
             @on:timezone-change="updateTimezone"
           />
           <RecentSearchesButton
@@ -556,6 +557,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-graph-date-time-picker"
               class="h-8.5!"
               @on:date-change="updateDateTime"
+              @apply="onRangeApply"
             />
             <OButton
               data-test="service-graph-refresh-btn"
@@ -610,6 +612,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="services-catalog-date-time-picker"
               class="h-8.5!"
               @on:date-change="updateDateTime"
+              @apply="onRangeApply"
             />
           </div>
         </div>
@@ -680,9 +683,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OTooltip :content="t('nlMode.toggle')" />
         </OButton>
+        <OBadge
+          v-if="contextView"
+          variant="default-soft"
+          size="sm"
+          class="absolute end-10 top-1 z-10"
+          data-test="traces-search-bar-context-view-chip"
+          >{{ t("timeRangeHost.filterOff") }}</OBadge
+        >
         <UnifiedQueryEditor
           v-show="!showFilterBuilder"
           ref="queryEditorRef"
+          :class="{ 'opacity-60': contextView }"
           editor-id="traces-query-editor"
           data-test-prefix="traces-search-bar"
           v-model:query="searchObj.data.editorValue"
@@ -780,6 +792,9 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import DateTime from "@/components/DateTime.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { contextViewKeeps } from "@/utils/searchAroundWindow";
+import type { TimeRangeApplyMeta } from "@/utils/timeRangeModel";
 import ShareButton from "@/components/common/ShareButton.vue";
 import { fixedShareLabel, withRollingPeriod } from "@/utils/shareTimeRange";
 import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
@@ -866,6 +881,7 @@ import {
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OBadge,
     OPageHeaderStatus,
     OSeparator,
     DateTime,
@@ -907,8 +923,14 @@ export default defineComponent({
     "apply-saved-view",
     "drill-down",
     "recent-restore",
+    "leave-context-view",
   ],
   props: {
+    /** Search around's context view is on screen: the typed filter is not what the results used. */
+    contextView: {
+      type: Boolean,
+      default: false,
+    },
     fieldValues: {
       type: Object,
       default: () => {},
@@ -924,7 +946,8 @@ export default defineComponent({
   methods: {
     searchData() {
       if (this.searchObj?.loading == false) {
-        // this.searchObj.runQuery = true;
+        // Run query always sends what the query bar shows, so it leaves the context view.
+        this.$emit("leave-context-view");
         this.$emit("searchdata");
       }
     },
@@ -1247,6 +1270,31 @@ export default defineComponent({
       }
     }, 2500);
 
+    // The context view runs its own window moves at once; Back to results runs the restored range.
+    let runAfterDate: (() => void) | null = null;
+    let contextMoves = 0;
+    const onRangeApply = (_range: unknown, meta: TimeRangeApplyMeta) => {
+      if (!props.contextView || runAfterDate) return;
+      if (!contextViewKeeps(meta.source)) return emit("leave-context-view");
+      contextMoves += 1;
+      runAfterDate = () => emit("searchdata");
+    };
+    const enterContextWindow = (range: { start: number; end: number }): boolean => {
+      contextMoves = 0;
+      runAfterDate = () => emit("searchdata");
+      if (dateTimeRef.value?.setCustomDate("absolute", range) !== false) return true;
+      runAfterDate = null;
+      return false;
+    };
+    const undoToResults = (run: () => void): boolean => {
+      const picker = dateTimeRef.value as { undo?: () => boolean } | null;
+      if (contextMoves > 0 || !picker?.undo) return false;
+      runAfterDate = run;
+      if (picker.undo()) return true;
+      runAfterDate = null;
+      return false;
+    };
+
     const updateDateTime = async (value: object) => {
       if (router.currentRoute.value.name !== "traces") return;
       if (
@@ -1302,6 +1350,13 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       await nextTick();
+
+      if (runAfterDate) {
+        const run = runAfterDate;
+        runAfterDate = null;
+        run();
+        return;
+      }
 
       if (
         value.valueType === "absolute" &&
@@ -1796,6 +1851,9 @@ export default defineComponent({
     const showPinnedSavedViews = computed(() => pinnedFit.value.savedViews);
 
     return {
+      onRangeApply,
+      enterContextWindow,
+      undoToResults,
       t,
       router,
       store,

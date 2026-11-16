@@ -18,10 +18,12 @@
            (right-aligned) so it reads as a page-level control, not a per-tab
            filter. Refresh re-queries everything. -->
       <div class="flex items-center justify-end gap-2 px-5 pt-3">
-        <DateTimePickerDashboard
+        <DateTime
           preset="explorer-auto"
           ref="dateTimePickerRef"
-          v-model="selectedDate"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
           class="flex-none"
           data-test="scorer-detail-runs-window"
         />
@@ -35,6 +37,12 @@
           @click="refreshRuns"
         />
       </div>
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="scorer-detail-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
 
       <!-- ── KPI strip ── -->
       <!-- KPI strip — identical card layout + text styles to the LLM
@@ -364,7 +372,9 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import DateTime from "@/components/DateTime.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import ScorerVersionsTab from "./ScorerVersionsTab.vue";
 import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
@@ -561,6 +571,21 @@ const selectedDate = ref<any>({
   startTime: null,
   endTime: null,
   relativeTimePeriod: "24h",
+});
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("onlineEvals.tabs.scorers"),
+  url: false,
+  initial: () => pageRange(selectedDate.value),
+  onRange: (value) => {
+    selectedDate.value = {
+      valueType: value.valueType === "absolute" ? "absolute" : "relative",
+      startTime: value.startTime ?? null,
+      endTime: value.endTime ?? null,
+      relativeTimePeriod: value.relativeTimePeriod ?? null,
+    };
+  },
 });
 
 const dateWindow = ref<ScorerRunsWindow>({

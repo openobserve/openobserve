@@ -140,6 +140,7 @@ const dateTimeStub = defineComponent({
         emit("on:date-change", {
           startTime: end - DAY_US,
           endTime: end,
+          relativeTimePeriod: "1d",
           valueType: "relative",
           userChangedValue: true,
         });

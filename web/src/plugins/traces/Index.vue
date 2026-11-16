@@ -64,6 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <SearchBar
               data-test="logs-search-bar"
               ref="searchBarRef"
+              :context-view="tracesContextOn"
+              @leave-context-view="tracesContext = null"
               :fieldValues="fieldValues"
               :isLoading="searchObj.loading"
               :activeTab="activeTab"
@@ -225,6 +227,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="traces-search-bar-stale-range-strip"
                         @run="() => searchData()"
                       />
+                      <StaleRangeStrip
+                        v-if="tracesContextText"
+                        :text="tracesContextText"
+                        :run-label="t('timeRangeHost.applyFilter')"
+                        :back-label="t('timeRangeHost.backToResults')"
+                        back-shortcut-id="timeRangeUndo"
+                        data-test="traces-search-around-context-strip"
+                        @run="applyTracesContextFilter"
+                        @back="backFromTracesContext"
+                      />
                       <SearchResult
                         class="min-h-0 flex-1"
                         ref="searchResultRef"
@@ -246,6 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @ask-ai="onAskAiTracing"
                         @send-to-ai-chat="sendToAiChat"
                         @open-mobile-fields="mobileFieldsOpen = true"
+                        @search:around="onTracesSearchAround"
                       />
                     </div>
                   </div>
@@ -389,6 +402,14 @@ import { isBareTracesQuery, tracesQueryKey } from "@/plugins/traces/tracesPageRe
 import { openRecentOnItsPage, takeRecentLanding } from "@/utils/queryHistory/routes";
 import { isLeavingRoute, trackPendingNavigation } from "@/utils/pendingNavigation";
 import type { HistoryTime, QueryHistoryEntry } from "@/services/query_history";
+import { searchAroundPickerRange } from "@/composables/useLogs/searchAround";
+import { searchAroundWindow } from "@/utils/searchAroundWindow";
+import {
+  contextViewOn,
+  contextViewStripText,
+  rowAnchorUs,
+  type TracesContextView,
+} from "@/plugins/traces/tracesContextView";
 
 interface TracesSavedView {
   version?: number;
@@ -455,6 +476,7 @@ correlationFilters.watchQuery();
 
 const searchResultRef = ref<any>(null);
 const searchBarRef = ref(null);
+const tracesContext = ref<TracesContextView | null>(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(90);
@@ -726,7 +748,7 @@ const canWriteTracesUrl = () =>
 
 function buildSearch(reuseLastWindow = false) {
   try {
-    let query = searchObj.data.editorValue.trim();
+    let query = tracesContextOn.value ? "" : searchObj.data.editorValue.trim();
     var req = getDefaultRequest();
     req.query.from = searchObj.data.resultGrid.currentPage * searchObj.meta.resultGrid.rowsPerPage;
     req.query.size = parseInt(searchObj.meta.resultGrid.rowsPerPage, 10);
@@ -2050,9 +2072,72 @@ const onFiltersReset = () => {
   searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
 };
 
+// §4 context view: the unfiltered window around a row, on screen while the typed query is unchanged.
+const tracesContextOn = computed(() =>
+  contextViewOn(tracesContext.value, searchObj.data.editorValue),
+);
+const tracesContextText = computed(() =>
+  tracesContextOn.value && tracesContext.value
+    ? contextViewStripText(tracesContext.value, store.state.timezone, t)
+    : null,
+);
+type ContextBar = {
+  dateTimeRef?: {
+    setRelativeTime: (period: string) => void;
+    setAbsoluteTime: (startUs: number, endUs: number) => void;
+  };
+  enterContextWindow?: (range: { start: number; end: number }) => boolean;
+  undoToResults?: (run: () => void) => boolean;
+};
+const onTracesSearchAround = (request: { row: any; seconds: number; keepFilters: boolean }) => {
+  const anchorUs = rowAnchorUs(request.row, searchObj.meta.searchMode);
+  const bar = searchBarRef.value as ContextBar | null;
+  if (anchorUs === null || !bar?.enterContextWindow) return;
+  const range = searchAroundPickerRange(
+    searchAroundWindow(anchorUs, request.seconds),
+    store.state.timezone,
+  );
+  // Keep filters is no context view: the range moves and runs like any drag-zoom.
+  if (request.keepFilters) {
+    bar.enterContextWindow(range);
+    return;
+  }
+  const datetime = searchObj.data.datetime;
+  tracesContext.value = {
+    typedQuery: String(searchObj.data.editorValue ?? ""),
+    anchorUs,
+    seconds: request.seconds,
+    previous: {
+      type: String(datetime.type ?? "relative"),
+      startTime: Number(datetime.startTime),
+      endTime: Number(datetime.endTime),
+      relativeTimePeriod: String(datetime.relativeTimePeriod ?? ""),
+    },
+  };
+  if (!bar.enterContextWindow(range)) tracesContext.value = null;
+};
+const applyTracesContextFilter = () => {
+  tracesContext.value = null;
+  searchData();
+};
+const backFromTracesContext = async () => {
+  const previous = tracesContext.value?.previous;
+  tracesContext.value = null;
+  const bar = searchBarRef.value as ContextBar | null;
+  if (bar?.undoToResults?.(() => searchData())) return;
+  if (previous && bar?.dateTimeRef) {
+    if (previous.type === "relative" && previous.relativeTimePeriod)
+      bar.dateTimeRef.setRelativeTime(previous.relativeTimePeriod);
+    else bar.dateTimeRef.setAbsoluteTime(previous.startTime, previous.endTime);
+    await nextTick();
+  }
+  searchData();
+};
+
 // With Auto Run off a picked range sits over the old results until Run, so say which range they are.
 const staleRangeText = computed(() => {
   if (searchObj.loading) return null;
+  if (tracesContextOn.value) return null;
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) return null;
   const queried = staleQueriedRange(
     tracesRunTimeSelection(searchObj.meta.lastRunSignature),

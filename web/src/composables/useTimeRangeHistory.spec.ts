@@ -190,4 +190,21 @@ describe("useTimeRangeHistory", () => {
     api.remove(range(1));
     expect(api.entries.value).toEqual([]);
   });
+  it("keeps the page a range was applied on, and moves it to the newest page that applied it", () => {
+    const { api } = setup();
+    api.add(range(1).startUs, range(1).endUs, "Logs");
+    api.addRelative("6h", "Traces");
+    expect(api.entries.value).toEqual([
+      { relative: "6h", source: "Traces" },
+      { ...range(1), source: "Logs" },
+    ]);
+    api.add(range(1).startUs, range(1).endUs, "Traces");
+    expect(api.entries.value[0]).toEqual({ ...range(1), source: "Traces" });
+    expect(api.entries.value).toHaveLength(2);
+  });
+
+  it("drops a source that is not text when reading", () => {
+    localStorage.setItem(KEY, JSON.stringify([{ ...range(1), source: 42 }]));
+    expect(readTimeRangeHistory(KEY)).toEqual([range(1)]);
+  });
 });

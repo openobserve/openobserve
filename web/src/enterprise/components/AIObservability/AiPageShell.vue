@@ -75,7 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="dateDisabled"
           :data-test="`${dataTest}-date-time`"
           class="h-8"
-          @on:date-change="$emit('date-change', $event)"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
       </OTooltip>
       <!-- Labeled primary Refresh button, matching the Metrics explorer toolbar.
@@ -96,6 +98,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-if="$slots.subnav" #subnav><slot name="subnav" /></template>
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      :data-test="`${dataTest}-range-guard`"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <slot />
   </OPageLayout>
 </template>
@@ -106,6 +114,8 @@ import { ref } from "vue";
 import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import DateTime from "@/components/DateTime.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import usePageTimeRange, { pageRange, type PageDateChange } from "@/composables/usePageTimeRange";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import AiSectionTabs from "./AiSectionTabs.vue";
 import { useAiSectionTabs } from "./aiSectionTabs";
@@ -116,7 +126,7 @@ import AiLastRefreshed from "./AiLastRefreshed.vue";
 const { t } = useI18nTyped();
 const { hasTabs, header } = useAiSectionTabs();
 
-defineProps<{
+const props = defineProps<{
   /** Page prefix — the header derives `${dataTest}-page`,
       `${dataTest}-date-time`, `${dataTest}-refresh-btn` from it, reproducing
       each page's existing data-test values unchanged. */
@@ -142,10 +152,18 @@ defineProps<{
   dateDisabledTooltip?: I18nText;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "date-change", payload: unknown): void;
   (e: "refresh"): void;
 }>();
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: props.title,
+  url: false,
+  initial: () => pageRange(props.dateState),
+  onRange: (value: PageDateChange) => emit("date-change", value),
+});
 
 // Exposed for parity with the per-page usage, which held a `dateTimeRef` to
 // the picker. Pages that need the imperative handle can access it via a

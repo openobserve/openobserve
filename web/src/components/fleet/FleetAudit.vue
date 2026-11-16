@@ -16,6 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="card-container flex min-h-0 flex-1 flex-col overflow-hidden" data-test="fleet-audit">
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="fleet-audit-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <OTable
       class="min-h-0 flex-1"
       :data="audit.rows.value"
@@ -101,8 +107,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               startTime: customRange.from * 1000,
               endTime: customRange.to * 1000,
             }"
+            :range="timeHost.range.value"
             data-test="fleet-audit-date-picker"
-            @on:date-change="onCustomRange"
+            @apply="timeHost.onApply"
+            @on:date-change="timeHost.onDateChange"
           />
           <ORefreshButton
             layout="inline"
@@ -152,6 +160,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import DateTime from "@/components/DateTime.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef, OTablePaginationParams } from "@/lib/core/Table/OTable.types";
@@ -269,6 +279,19 @@ function onCustomRange(value: { startTime: number; endTime: number }) {
   };
   page.value = 1;
 }
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("fleet.tabs.audit"),
+  url: false,
+  initial: () => ({
+    kind: "fixed",
+    startUs: customRange.value.from * 1000,
+    endUs: customRange.value.to * 1000,
+  }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: (value) => onCustomRange(value as { startTime: number; endTime: number }),
+});
 
 function clearFilters() {
   anchor.value = Date.now();

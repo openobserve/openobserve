@@ -62,17 +62,17 @@ import OnlineEvals from "./OnlineEvals.vue";
 import { useAiDateRange } from "@/enterprise/composables/useAiDateRange";
 
 const PickerStub = defineComponent({
-  name: "DateTimePickerDashboard",
+  name: "DateTime",
   inheritAttrs: false,
-  props: { modelValue: { type: Object, default: null } },
-  emits: ["update:modelValue"],
+  props: { range: { type: Object, default: null } },
+  emits: ["on:date-change", "apply"],
   setup(props, { expose }) {
     expose({ getConsumableDateTime: () => picker.window });
     return () =>
       h("div", {
         "data-test": "picker-stub",
-        "data-type": props.modelValue?.valueType,
-        "data-period": props.modelValue?.relativeTimePeriod ?? "",
+        "data-type": props.range?.kind === "fixed" ? "absolute" : "relative",
+        "data-period": props.range?.span ?? "",
       });
   },
 });
@@ -136,7 +136,7 @@ function mountPage() {
     global: {
       plugins: [store],
       stubs: {
-        DateTimePickerDashboard: PickerStub,
+        DateTime: PickerStub,
         AgentScopeCascade: true,
         AiLastRefreshed: true,
         OTable: ScoresTableStub,
@@ -228,11 +228,12 @@ describe("OnlineEvals Quality range", () => {
     const wrapper = mountPage();
     await flushPromises();
     picker.window = { startTime: START, endTime: START + 7 * DAY };
-    wrapper.findComponent(PickerStub).vm.$emit("update:modelValue", {
+    wrapper.findComponent(PickerStub).vm.$emit("on:date-change", {
       valueType: "relative",
       relativeTimePeriod: "7d",
       startTime: START,
       endTime: START + 7 * DAY,
+      userChangedValue: true,
     });
     await flushPromises();
     expect(listWindow()).toBe(7 * DAY);

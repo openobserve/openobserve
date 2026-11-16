@@ -550,11 +550,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-global-date-time-picker"
           />
         </Teleport>
-        <StaleRangeStrip
-          v-if="rangeGuardText"
-          :text="rangeGuardText.text"
-          :run-label="rangeGuardText.run"
-          :back-label="rangeGuardText.back"
+        <TimeRangeGuardStrip
+          :guard="rangeGuard"
           data-test="dashboard-range-guard-strip"
           @run="timeGate.confirmGuard"
           @back="timeGate.dismissGuard"
@@ -754,7 +751,8 @@ import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import { urlTimeToMicros } from "@/utils/dashboard/urlTimeParams";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import { heldGuard } from "@/composables/usePageTimeRange";
 import useTimeRangeContext from "@/composables/useTimeRangeContext";
 import { formatTimeRange } from "@/utils/timeRangeFormat";
 import { rangeFromLegacy } from "@/utils/timeRangeModel";
@@ -899,7 +897,7 @@ export default defineComponent({
     OBanner,
     OPageLayout,
     DateTimePickerDashboard,
-    StaleRangeStrip,
+    TimeRangeGuardStrip,
     ShareButton,
     PublicLinksPanel,
     AutoRefreshInterval,
@@ -1147,18 +1145,9 @@ export default defineComponent({
     const visiblePanelCount = (): number =>
       currentDashboardData.data?.tabs?.find((tab: any) => tab.tabId === selectedTabId.value)?.panels
         ?.length ?? 0;
-    const rangeGuardText = computed(() => {
-      const held = timeGate.held.value;
-      const days = timeRangeContext.rangeGuardDays.value;
-      if (!held || days === null) return null;
-      const from = legacyRangeText(held.from, "toast");
-      const next = legacyRangeText(held.to, "toast");
-      return {
-        text: t("timeRangeHost.guardHeld", { range: from, next, days }),
-        run: t("timeRangeHost.guardRun", visiblePanelCount()),
-        back: t("dateTime.backTo", { range: from }),
-      };
-    });
+    const rangeGuard = computed(() =>
+      heldGuard(timeGate.held.value, timeRangeContext.rangeGuardDays.value, visiblePanelCount()),
+    );
     const printRangeText = computed(() => legacyRangeText(selectedDate.value, "print"));
 
     const onTimePickerHide = () => {
@@ -3094,7 +3083,7 @@ export default defineComponent({
     ]);
 
     return {
-      rangeGuardText,
+      rangeGuard,
       printRangeText,
       isMobile,
       hasTimeRow,

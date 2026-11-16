@@ -79,7 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-date-time-dropdown"
               :retention-days="rumStreamLimits.retentionDays"
               :query-range-restriction-in-hour="rumStreamLimits.queryRangeRestrictionInHour"
-              @on:date-change="updateDateChange"
+              :range="timeHost.range.value"
+              @apply="timeHost.onApply"
+              @on:date-change="timeHost.onDateChange"
             />
             <!-- Run query button (also bound to the refresh shortcut) -->
             <OButton
@@ -119,6 +121,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end bg-card-glass-bg -->
     </div>
     <!-- end toolbar wrapper -->
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="rum-errors-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <ODrawer
       v-if="isMobile"
       v-model:open="mobileFieldsOpen"
@@ -331,6 +339,8 @@ import { addCommasToNumber } from "@/utils/formatters";
 import { useStore } from "vuex";
 import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
@@ -778,6 +788,14 @@ const updateDateChange = (date: any) => {
   const userApplied = date.valueType === "relative" || date.userChangedValue === true;
   if (!isLoading.value.length && userApplied) runQuery();
 };
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("rum.errorTracking"),
+  url: false,
+  initial: () => pageRange(errorTrackingState.data.datetime),
+  onRange: updateDateChange,
+});
 
 const runQuery = () => {
   errorTrackingState.data.resultGrid.currentPage = 0;

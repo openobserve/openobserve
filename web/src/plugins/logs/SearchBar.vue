@@ -3296,8 +3296,22 @@ export default defineComponent({
       );
     });
     // A range picked in the panel leaves the context view; moves of its own window keep it.
+    // Moves of the context view's own window; Back to results is one undo step only while there are none.
+    let contextMoves = 0;
     const onRangeApply = (_range: unknown, meta: TimeRangeApplyMeta) => {
       if (!contextViewKeeps(meta.source)) searchObj.data.searchAround.windowQuery = null;
+      else if (searchObj.data.searchAround.windowQuery) contextMoves += 1;
+    };
+    const enteredContextView = () => (contextMoves = 0);
+    // Back to results runs the restored range itself, so the undo's own apply must not run it too.
+    let runAfterUndo: (() => void) | null = null;
+    const undoToResults = (run: () => void): boolean => {
+      const picker = dateTimeRef.value as { undo?: () => boolean } | null;
+      if (contextMoves > 0 || !picker?.undo) return false;
+      runAfterUndo = run;
+      if (picker.undo()) return true;
+      runAfterUndo = null;
+      return false;
     };
 
     const updateDateTime = async (value: object) => {
@@ -3381,6 +3395,13 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       await nextTick();
+
+      if (runAfterUndo) {
+        const run = runAfterUndo;
+        runAfterUndo = null;
+        run();
+        return;
+      }
 
       if (
         value.userChangedValue !== false &&
@@ -5540,6 +5561,8 @@ export default defineComponent({
       refreshRangeStartUs,
       refreshRangeSpanUs,
       contextViewOn,
+      enteredContextView,
+      undoToResults,
       onRangeApply,
       narrowedByQuery,
       shareRollingLabel,

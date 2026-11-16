@@ -519,6 +519,7 @@ describe("SearchResult", () => {
         "ask-ai",
         "send-to-ai-chat",
         "open-mobile-fields",
+        "search:around",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);

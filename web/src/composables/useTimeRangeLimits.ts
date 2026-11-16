@@ -23,6 +23,7 @@ import {
   retentionFloorMicros,
 } from "@/utils/timeRangeList";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { MAX_FUTURE_US } from "@/utils/timeRangeModel";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCivilDays, MICROS_PER_HOUR, type TimeRangeZone } from "@/composables/useTimeRangeZone";
 
@@ -104,7 +105,14 @@ export default function useTimeRangeLimits(props: TimeRangeLimitProps, clock: Ti
   const boundedRange = (startUs: number, endUs: number): { start: number; end: number } | null => {
     if (!Number.isFinite(startUs) || !Number.isFinite(endUs) || endUs <= startUs) return null;
     if (startBoundError(startUs) !== null) return null;
-    return { start: startUs, end: Math.min(endUs, selectionCeilingMicros()) };
+    return { start: startUs, end: keptEnd(startUs, endUs, selectionCeilingMicros()) };
+  };
+
+  // A started fixed range may end up to ten years past now and stays in progress (§2); further is cut to the ceiling.
+  const keptEnd = (startUs: number, endUs: number, ceiling: number): number => {
+    if (endUs <= ceiling) return endUs;
+    const inProgress = !props.maxDate && Number.isFinite(ceiling) && startUs <= ceiling;
+    return inProgress && endUs <= ceiling + MAX_FUTURE_US ? endUs : ceiling;
   };
 
   // A parent's range is trusted before the calendar's floor and a clock skew past now, within the years every zone can show.
@@ -114,7 +122,10 @@ export default function useTimeRangeLimits(props: TimeRangeLimitProps, clock: Ti
     const ceiling = Math.min(trustedCeilingMicros(), LATEST_INSTANT_US);
     const slack = props.maxDate || ceiling === LATEST_INSTANT_US ? 0 : CLOCK_SKEW_MICROS;
     if (startUs < 0 || startUs >= ceiling + slack) return null;
-    const end = endUs > ceiling + slack ? ceiling : endUs;
+    const end =
+      endUs <= ceiling + slack || ceiling === LATEST_INSTANT_US
+        ? Math.min(endUs, ceiling + slack)
+        : keptEnd(startUs, endUs, ceiling);
     return end > startUs ? { start: startUs, end } : null;
   };
 

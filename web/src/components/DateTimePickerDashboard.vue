@@ -151,6 +151,9 @@ export default defineComponent({
       dateTimePicker.value.setSavedDate(dateObj);
     };
 
+    // The picker's own undo, for a page control that goes back a step; false before mount or with nothing to undo.
+    const undo = (): boolean => dateTimePicker.value?.undo() ?? false;
+
     const onHide = () => {
       emit("hide");
     };
@@ -177,6 +180,7 @@ export default defineComponent({
       setCustomDate,
       getConsumableDateTime,
       setSavedDate,
+      undo,
       onShow,
       onHide,
       onTimezoneChange,

@@ -15,13 +15,23 @@
 
 import { computed, ref, type ComputedRef, type Ref } from "vue";
 import { convertToUtcTimestamp } from "@/utils/zincutils";
-import { parseCalendarToken, resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
+import {
+  parseCalendarToken,
+  resolveCalendarPeriod,
+  resolveCalendarPeriodBounds,
+} from "@/utils/dashboard/calendarPeriods";
 import { formatDurationMicros } from "@/utils/timeRangeRail";
 import { formatRangeDates, formatRangeDuration } from "@/utils/timeRangeLabel";
 import { anchorWindowLabel, dropZeroMilliseconds } from "@/utils/timeRangeAnchor";
 import { formatReadingNote, readingNote } from "@/utils/timeRangeNotes";
 import type { ParsedTimeInput, TimeTextAnswer } from "@/utils/dateTimeRangeParse";
-import { timeRangeEndsNote, timeRangeName } from "@/utils/timeRangeFormat";
+import {
+  timeRangeChangeText,
+  timeRangeEndText,
+  timeRangeEndsNote,
+  timeRangeKindTag,
+  timeRangeName,
+} from "@/utils/timeRangeFormat";
 import type { TimeRangeContext, TimeRangeKind } from "@/utils/timeRangeModel";
 import { weekStartsOn } from "@/utils/weekStart";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -39,6 +49,10 @@ export interface SummaryLine {
   duration: string;
   live?: boolean;
   fixed?: boolean;
+  /** An ended calendar period's tag (`changes Jan 1`) and its tooltip, in place of live. */
+  changes?: { tag: string; hint: string };
+  /** The fixed tag's tooltip when it differs from the plain one (a range still filling). */
+  fixedHint?: string;
   note?: string;
   warning?: boolean;
   ready?: boolean;
@@ -159,7 +173,41 @@ export default function useTimeRangeSummary(
       labelOptions(),
     );
     const same = range.replace(/\s/g, "") === name.replace(/\s/g, "");
-    return { name, range: same ? "" : range, duration: "", live: true };
+    const changes = endedCalendarTag(period);
+    return {
+      name,
+      range: same ? "" : range,
+      duration: "",
+      live: !changes,
+      changes: changes ?? undefined,
+    };
+  };
+
+  // An ended calendar period is not live: it says when it turns into the next one, and to what.
+  const endedCalendarTag = (period: string): { tag: string; hint: string } | null => {
+    const token = parseCalendarToken(period);
+    if (!token || token.offset === 0) return null;
+    const ctx = rangeContext();
+    const tag = String(timeRangeKindTag({ kind: "calendar", ...token }, ctx, t));
+    const running = `calendar:${token.unit}:0`;
+    const next = resolveCalendarPeriodBounds(running, zone.value, tooltipNow.value);
+    const when = timeRangeChangeText({ kind: "calendar", ...token }, ctx);
+    if (!next || !when) return { tag, hint: tag };
+    const dates = formatRangeDates(
+      { startUs: next.startTime, endUs: next.endTime, calendar: true },
+      labelOptions(),
+    );
+    return { tag, hint: String(t("dateTime.becomesOn", { dates, when })) };
+  };
+
+  // A fixed range still filling notes when it ends, and its tag's tooltip says so.
+  const inProgress = (range: { startTime: number; endTime: number }): Partial<SummaryLine> => {
+    const fixed = { kind: "fixed" as const, startUs: range.startTime, endUs: range.endTime };
+    const ctx = rangeContext();
+    const ends = timeRangeEndsNote(fixed, ctx, t);
+    const end = timeRangeEndText(fixed, ctx);
+    if (!ends || !end) return {};
+    return { note: String(ends), fixedHint: String(t("dateTime.tagFixedFilling", { end })) };
   };
 
   const resolvedLine = computed<SummaryLine>(() => {
@@ -171,7 +219,7 @@ export default function useTimeRangeSummary(
     if (selectedType.value === "relative" && !fixedOnly.value) {
       return liveLine(deps.currentRelativePeriod(), range.startTime, range.endTime);
     }
-    const line = fixedLine(range.startTime, range.endTime);
+    const line = { ...fixedLine(range.startTime, range.endTime), ...inProgress(range) };
     return zoneRedrawn.value ? { ...line, note: String(t("dateTime.sameWindow")) } : line;
   });
 
@@ -220,7 +268,9 @@ export default function useTimeRangeSummary(
     const notes = [noteFor(tag ? first : reading, inputAsUtc.value)];
     const ends = timeRangeEndsNote(range, ctx);
     if (ends) notes.push(String(ends));
-    return { ...line, note: notes.filter(Boolean).join(" · "), ready: true };
+    const lastDay = ends ? timeRangeEndText(range, ctx) : null;
+    const fixedHint = lastDay ? String(t("dateTime.tagFixedFilling", { end: lastDay })) : undefined;
+    return { ...line, note: notes.filter(Boolean).join(" · "), ready: true, fixedHint };
   };
 
   const calendarLine = (token: string, typedName?: string): SummaryLine | null => {

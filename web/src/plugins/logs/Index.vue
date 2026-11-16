@@ -321,6 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :text="contextViewText"
                         :run-label="t('timeRangeHost.applyFilter')"
                         :back-label="t('timeRangeHost.backToResults')"
+                        back-shortcut-id="timeRangeUndo"
                         data-test="logs-search-around-context-strip"
                         @run="applyContextFilter"
                         @back="leaveContextView"
@@ -431,6 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :text="contextViewText"
                         :run-label="t('timeRangeHost.applyFilter')"
                         :back-label="t('timeRangeHost.backToResults')"
+                        back-shortcut-id="timeRangeUndo"
                         data-test="logs-search-around-context-strip"
                         @run="applyContextFilter"
                         @back="leaveContextView"
@@ -933,6 +935,7 @@ export default defineComponent({
         searchAroundPickerRange(range, this.store.state.timezone),
       );
       if (!applied) this.searchObj.data.searchAround.windowQuery = null;
+      else this.searchBarRef?.enteredContextView?.();
     },
     searchData() {
       this.autoRun.engine.requestRun("run");
@@ -4074,7 +4077,13 @@ export default defineComponent({
     const leaveContextView = async () => {
       const previous = searchObj.data.searchAround.windowQuery?.previous;
       searchObj.data.searchAround.windowQuery = null;
-      const picker = (searchBarRef.value as { dateTimeRef?: any } | null)?.dateTimeRef;
+      const bar = searchBarRef.value as {
+        dateTimeRef?: any;
+        handleRunQueryFn?: () => void;
+        undoToResults?: (run: () => void) => boolean;
+      } | null;
+      if (bar?.undoToResults?.(() => bar.handleRunQueryFn?.())) return;
+      const picker = bar?.dateTimeRef;
       if (previous && picker) {
         if (previous.type === "relative" && previous.relativeTimePeriod)
           picker.setRelativeTime(previous.relativeTimePeriod);

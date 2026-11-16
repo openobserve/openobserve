@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="date-time-prev-btn"
         variant="ghost"
         size="icon-xs-sq"
-        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! disabled:text-text-disabled! h-auto! rounded-e-none! border-e! max-md:hidden"
+        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! disabled:text-text-disabled! h-auto! rounded-e-none! border-e! max-md:hidden forced-colors:disabled:text-[color:GrayText]! pointer-coarse:min-w-10"
         icon-left="chevron-left"
         :aria-label="stepTooltip.prev.title"
         :disabled="disable || disablePrevShift"
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               fieldAppearance,
             'max-md:rounded-default!': !hideRangeShift,
           }"
-          class="justify-start! max-md:max-w-full max-md:min-w-0"
+          class="min-w-0 justify-start! max-md:max-w-full pointer-coarse:min-h-10"
           :aria-label="triggerAriaLabel"
           :disabled="disable"
           @mouseenter="onTriggerHover(true)"
@@ -86,18 +86,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left>
             <OIcon name="schedule" size="sm" :class="{ 'max-md:hidden': !fieldAppearance }" />
           </template>
+          <!-- Clipped, never ellipsised: the label steps down to a whole form that fits (§6). -->
           <span
-            class="date-time-label flex min-w-0 flex-1 text-start whitespace-pre tabular-nums max-md:min-w-16"
+            ref="triggerLabelEl"
+            class="date-time-label flex min-w-0 flex-1 overflow-hidden text-start whitespace-pre tabular-nums max-md:min-w-16"
             :class="fieldAppearance ? 'font-normal' : 'font-semibold'"
+            data-test="date-time-trigger-label"
             ><span v-if="triggerParts.name" class="shrink-0" data-test="date-time-trigger-name">{{
               triggerParts.name
             }}</span
             ><span
               v-if="triggerParts.dates"
-              class="min-w-0 overflow-hidden text-ellipsis whitespace-pre"
+              class="shrink-0 whitespace-pre"
               data-test="date-time-trigger-dates"
               >{{ triggerParts.name ? ` · ${triggerParts.dates}` : triggerParts.dates }}</span
             ></span
+          >
+          <OBadge
+            v-if="triggerEnds"
+            data-test="date-time-trigger-ends"
+            variant="primary-soft"
+            size="sm"
+            class="shrink-0 gap-1 forced-colors:border forced-colors:border-[color:CanvasText]"
+            ><span class="bg-accent size-1.5 rounded-full" aria-hidden="true" />{{
+              triggerEnds
+            }}</OBadge
           >
           <OIcon
             v-if="narrowedByQuery"
@@ -106,12 +119,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-secondary shrink-0"
             data-test="date-time-trigger-narrowed"
           />
+          <span
+            v-if="zoneBadgeText && triggerParts.zoneDot"
+            data-test="date-time-zone-dot"
+            class="bg-text-secondary size-1.5 shrink-0 rounded-full forced-colors:bg-[color:CanvasText]"
+            aria-hidden="true"
+          />
           <OBadge
-            v-if="zoneBadgeText"
+            v-else-if="zoneBadgeText"
             data-test="date-time-zone-badge"
             variant="default-soft"
             size="sm"
-            class="shrink-0 tabular-nums"
+            class="shrink-0 tabular-nums forced-colors:border forced-colors:border-[color:CanvasText]"
             >{{ zoneBadgeText }}</OBadge
           >
           <template #icon-right
@@ -132,7 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="flex shrink-0 flex-col gap-1.5 px-3 pt-2.5 pb-2" data-test="date-time-top-bar">
           <div class="flex min-w-0 items-center gap-2">
-            <div v-if="!hideClipboard" class="relative min-w-0 flex-1" @focusout="onBarFocusOut">
+            <div
+              v-if="!hideClipboard"
+              class="relative min-w-0 flex-1 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight]"
+              @focusout="onBarFocusOut"
+            >
               <OInput
                 ref="inputBar"
                 v-model="inputText"
@@ -193,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 isTimezoneSelectOpen = false;
                 zoneQuery = '';
               "
-              class="w-auto! max-w-36 min-w-0 shrink-0 [&_[role=combobox]]:h-8!"
+              class="w-auto! max-w-36 min-w-0 shrink-0 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight] [&_[role=combobox]]:h-8!"
             >
               <template #trigger>
                 <span
@@ -204,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OSelect>
           </div>
-          <div class="flex h-6 min-w-0 items-center gap-2">
+          <div class="flex h-6 min-w-0 items-center gap-2 pointer-coarse:h-9">
             <div
               v-if="summaryError"
               :id="inputErrorId"
@@ -227,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               data-test="date-time-resolved"
               :data-preview="previewLine ? 'true' : undefined"
-              class="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap tabular-nums"
+              class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap tabular-nums"
             >
               <span
                 v-if="shownLine.name"
@@ -246,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="isDraft"
                 variant="primary-soft"
                 size="sm"
-                class="shrink-0"
+                class="shrink-0 forced-colors:border forced-colors:border-[color:CanvasText]"
                 data-test="date-time-draft-tag"
                 >{{ t("dateTime.draft") }}</OBadge
               >
@@ -254,26 +277,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="shownLine.live"
                 variant="primary-soft"
                 size="sm"
-                class="shrink-0"
+                class="shrink-0 forced-colors:border forced-colors:border-[color:CanvasText]"
                 data-test="date-time-preview-live"
                 >{{ t("dateTime.tagLive")
                 }}<OTooltip :content="t('dateTime.tagLiveHint')" side="bottom"
               /></OBadge>
               <OBadge
+                v-else-if="shownLine.changes"
+                variant="default-soft"
+                size="sm"
+                class="shrink-0 forced-colors:border forced-colors:border-[color:CanvasText]"
+                data-test="date-time-preview-changes"
+                >{{ shownLine.changes.tag
+                }}<OTooltip :content="raw(shownLine.changes.hint)" side="bottom"
+              /></OBadge>
+              <OBadge
                 v-else-if="shownLine.fixed"
                 variant="default-soft"
                 size="sm"
-                class="shrink-0"
+                class="shrink-0 forced-colors:border forced-colors:border-[color:CanvasText]"
                 data-test="date-time-preview-fixed"
                 >{{ t("dateTime.fixed")
-                }}<OTooltip :content="t('dateTime.tagFixedHint')" side="bottom"
+                }}<OTooltip
+                  :content="
+                    shownLine.fixedHint ? raw(shownLine.fixedHint) : t('dateTime.tagFixedHint')
+                  "
+                  side="bottom"
               /></OBadge>
               <span
                 v-if="shownLine.range"
                 class="text-compact shrink-0"
-                :class="previewLine ? 'text-toggle-item-active-text' : 'text-text-secondary'"
+                :class="[
+                  previewLine ? 'text-toggle-item-active-text' : 'text-text-secondary',
+                  { 'max-md:hidden': shownRangeShort },
+                ]"
                 data-test="date-time-resolved-range"
                 >{{ shownLine.range }}</span
+              >
+              <span
+                v-if="shownRangeShort"
+                class="text-compact shrink-0 md:hidden"
+                :class="previewLine ? 'text-toggle-item-active-text' : 'text-text-secondary'"
+                data-test="date-time-resolved-range-short"
+                >{{ shownRangeShort }}</span
               >
               <!-- The duration gives way first: once its box is narrower than the tag, the tag wraps out of sight. -->
               <span
@@ -284,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OBadge
                   variant="default-soft"
                   size="sm"
-                  class="shrink-0"
+                  class="shrink-0 forced-colors:border forced-colors:border-[color:CanvasText]"
                   data-test="date-time-resolved-duration"
                   >{{ shownLine.duration }}</OBadge
                 >
@@ -315,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="date-time-summary-apply-btn"
                 variant="primary"
                 size="xs"
-                class="h-6! shrink-0 gap-1.5! px-2!"
+                class="h-6! shrink-0 gap-1.5! px-2! pointer-coarse:h-9!"
                 :disabled="applyDisabled"
                 @click="onApplyClick"
                 >{{ t("common.apply") }}<span aria-hidden="true">{{ raw("↵") }}</span></OButton
@@ -332,10 +378,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs-sq"
                   icon-left="content-copy"
-                  class="enabled:text-text-secondary! disabled:text-text-disabled! max-md:hidden"
+                  class="enabled:text-text-secondary! disabled:text-text-disabled! max-md:hidden pointer-coarse:size-9!"
                   :aria-label="t('common.copyRange')"
                   :disabled="copyDisabled"
                   @click="copyRange"
+                />
+              </OTooltip>
+              <OTooltip
+                v-if="showPinButton"
+                :content="appliedPinned ? t('dateTime.unpin') : t('dateTime.pinThisRange')"
+                shortcut="alt+p"
+                side="bottom"
+                align="end"
+              >
+                <OButton
+                  data-test="date-time-pin-btn"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  :icon-left="appliedPinned ? 'star' : 'star-outline'"
+                  class="pointer-coarse:size-9!"
+                  :class="[
+                    appliedPinned ? 'text-accent!' : 'text-text-secondary!',
+                    { 'max-md:hidden': appliedIsToken },
+                  ]"
+                  :aria-label="t('dateTime.pinThisRange')"
+                  :aria-pressed="appliedPinned"
+                  @click="toggleAppliedPin"
                 />
               </OTooltip>
               <OTooltip
@@ -348,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="date-time-freeze-btn"
                   variant="outline"
                   size="xs"
-                  class="h-6! shrink-0 px-2!"
+                  class="h-6! shrink-0 px-2! pointer-coarse:h-9!"
                   :aria-label="t('dateTime.freezeAt', { range: freezeLabel })"
                   @click="freezeRange"
                   >{{ t("dateTime.freeze") }}</OButton
@@ -364,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="date-time-live-btn"
                   variant="outline"
                   size="xs"
-                  class="text-text-link! h-6! shrink-0 gap-1.5! px-2!"
+                  class="text-text-link! h-6! shrink-0 gap-1.5! px-2! pointer-coarse:h-9!"
                   :aria-label="t('dateTime.goLiveHint', { duration: liveDurationLabel })"
                   @click="goLive"
                   ><span class="bg-accent size-1.5 rounded-full" aria-hidden="true" />{{
@@ -407,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="flex h-full flex-col">
             <div
               v-if="showChips && !typing"
-              class="border-border-subtle flex h-9 shrink-0 items-center gap-2 border-b px-3 max-md:h-11"
+              class="border-border-subtle flex h-9 shrink-0 items-center gap-2 border-b px-3 pointer-coarse:h-11"
               data-test="date-time-chips"
             >
               <OToggleGroup
@@ -424,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   focusable-unavailable
                   :tooltip="chip.reason ? raw(chip.reason) : undefined"
                   :aria-label="chip.title"
-                  class="o-time-chip data-[state=on]:bg-accent! data-[state=on]:text-text-inverse! data-disabled:border-border-default h-6! tabular-nums data-disabled:border data-disabled:bg-transparent! max-md:h-8! max-md:min-w-10 forced-colors:data-[state=on]:bg-[color:Highlight]! forced-colors:data-[state=on]:text-[color:HighlightText]! forced-colors:data-[state=on]:forced-color-adjust-none"
+                  class="o-time-chip data-[state=on]:bg-accent! data-[state=on]:text-text-inverse! data-disabled:border-border-default h-6! tabular-nums data-disabled:border data-disabled:bg-transparent! forced-colors:data-disabled:text-[color:GrayText]! forced-colors:data-[state=on]:bg-[color:Highlight]! forced-colors:data-[state=on]:text-[color:HighlightText]! forced-colors:data-[state=on]:forced-color-adjust-none pointer-coarse:h-8! pointer-coarse:min-w-10"
                   :data-test="`date-time-chip-${chip.label}`"
                   >{{ raw(chip.label) }}<OTooltip v-if="!chip.disabled" :content="chip.title"
                 /></OToggleGroupItem>
@@ -464,7 +532,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <div class="flex h-9 shrink-0 items-center gap-1 ps-1 pe-2" data-test="date-time-footer">
+        <div
+          class="flex h-9 shrink-0 items-center gap-1 ps-1 pe-2 pointer-coarse:h-11"
+          data-test="date-time-footer"
+        >
           <template v-if="calendarMode">
             <OTooltip v-if="!fixedOnly" :content="t('dateTime.backToList')">
               <OButton
@@ -472,7 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-sq"
                 icon-left="arrow-back"
-                class="text-text-secondary! shrink-0"
+                class="text-text-secondary! shrink-0 pointer-coarse:size-9!"
                 :aria-label="t('dateTime.backToList')"
                 @click="closeCalendar"
               />
@@ -484,7 +555,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @keydown.enter="onTimeFieldEnter"
             >
               <OTime
-                class="min-w-0"
+                class="min-w-0 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight]"
                 size="sm"
                 :aria-label="t('common.timeRangeStart')"
                 :prefix="fieldsBlank ? undefined : startDayLabel"
@@ -511,7 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 aria-hidden="true"
               />
               <OTime
-                class="min-w-0"
+                class="min-w-0 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight]"
                 :class="{ '[&_input]:text-text-label': calendarPreviewDay && pendingDay }"
                 size="sm"
                 :aria-label="t('common.timeRangeEnd')"
@@ -539,7 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="date-time-apply-btn"
                 variant="primary"
                 size="xs"
-                class="shrink-0 px-3!"
+                class="shrink-0 px-3! pointer-coarse:h-9!"
                 :disabled="applyDisabled"
                 @click="onApplyClick"
               >
@@ -553,7 +624,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="xs"
               icon-left="calendar-month"
-              class="text-text-heading!"
+              class="text-text-heading! pointer-coarse:h-9!"
               @click="openCalendar"
               >{{ t("dateTime.pickDates") }}</OButton
             >
@@ -575,7 +646,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs-sq"
                   icon-left="chevron-left"
-                  class="enabled:text-text-secondary! disabled:text-text-disabled!"
+                  class="enabled:text-text-secondary! disabled:text-text-disabled! forced-colors:disabled:text-[color:GrayText]! pointer-coarse:size-9!"
                   :aria-label="stepTooltip.prev.title"
                   :disabled="disable || disablePrevShift"
                   @click="shiftTimeRange('prev')"
@@ -597,7 +668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs-sq"
                   icon-left="chevron-right"
-                  class="enabled:text-text-secondary! disabled:text-text-disabled!"
+                  class="enabled:text-text-secondary! disabled:text-text-disabled! forced-colors:disabled:text-[color:GrayText]! pointer-coarse:size-9!"
                   :aria-label="stepTooltip.next.title"
                   :disabled="disable || isNextShiftDisabled()"
                   @click="shiftTimeRange('next')"
@@ -613,7 +684,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-xs-sq"
                   icon-left="zoom-out"
-                  class="enabled:text-text-secondary! disabled:text-text-disabled!"
+                  class="enabled:text-text-secondary! disabled:text-text-disabled! forced-colors:disabled:text-[color:GrayText]! pointer-coarse:size-9!"
                   :aria-label="stepTooltip.zoom"
                   :disabled="disable || zoomOutBlocked"
                   @click="zoomOut"
@@ -636,6 +707,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #content>
         <span class="flex flex-col tabular-nums" data-test="date-time-trigger-tooltip">
           <span>{{ triggerTooltip.stamps }}</span>
+          <span
+            v-if="triggerTooltip.progress"
+            class="text-text-secondary text-xs"
+            data-test="date-time-trigger-tooltip-progress"
+            >{{ triggerTooltip.progress }}</span
+          >
           <span class="text-text-secondary text-xs">{{ triggerTooltip.detail }}</span>
         </span>
       </template>
@@ -653,7 +730,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="date-time-next-btn"
         variant="ghost"
         size="icon-xs-sq"
-        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! disabled:text-text-disabled! h-auto! rounded-none! border-s! max-md:hidden"
+        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! disabled:text-text-disabled! h-auto! rounded-none! border-s! max-md:hidden forced-colors:disabled:text-[color:GrayText]! pointer-coarse:min-w-10"
         icon-left="chevron-right"
         :aria-label="stepTooltip.next.title"
         :disabled="disable || isNextShiftDisabled()"
@@ -670,7 +747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="date-time-zoom-out-btn"
         variant="ghost"
         size="icon-xs-sq"
-        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! disabled:text-text-disabled! h-auto! border-s! max-md:hidden forced-colors:disabled:text-[color:GrayText]!"
+        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! disabled:text-text-disabled! h-auto! border-s! max-md:hidden forced-colors:disabled:text-[color:GrayText]! pointer-coarse:min-w-10"
         :class="showUndo ? 'rounded-none!' : 'rounded-s-none!'"
         icon-left="zoom-out"
         :aria-label="stepTooltip.zoom"
@@ -683,7 +760,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="date-time-undo-btn"
         variant="ghost"
         size="icon-xs-sq"
-        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! h-auto! rounded-s-none! border-s!"
+        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! h-auto! rounded-s-none! border-s! forced-colors:disabled:text-[color:GrayText]! pointer-coarse:min-w-10"
         icon-left="undo"
         :aria-label="undoTooltip"
         :disabled="disable || !undoAvailable"
@@ -752,10 +829,13 @@ import {
   type TimeRange,
   type TimeRangeApplyMeta,
   type TimeRangeCapabilities,
+  type TimeRangeContext,
   type TimeRangeHostPreset,
   type TimeRangeKind,
 } from "@/utils/timeRangeModel";
 import { readOrgTimeRangeSettings } from "@/utils/orgTimeRangeSettings";
+import { timeRangeEndText, timeRangeEndsNote, timeRangeName } from "@/utils/timeRangeFormat";
+import { rollingShortName, triggerLabelForms, type TriggerLabelForm } from "@/utils/timeRangeForms";
 import {
   formatRangeCopyText,
   formatRangeDates,
@@ -798,6 +878,7 @@ const UNIT_SECONDS: Record<string, number> = {
   w: 604_800,
   M: 2_678_400,
 };
+const TWO_DAYS_US = 2 * 86_400_000_000;
 // Units of a fixed length, largest first; weeks and months keep their own unit when zoomed.
 const EXACT_UNIT_SECONDS: Record<string, number> = { d: 86_400, h: 3_600, m: 60, s: 1 };
 
@@ -1045,11 +1126,21 @@ export default defineComponent({
     watch(calendarToken, () => (calendarName.value = null), { flush: "sync" });
     // A typed period name (`Q4 2026`) stays only on the exact instants it was typed for; a zone redraw keeps them.
     const namedRange = ref<{ name: string; startUs: number; endUs: number } | null>(null);
+    const rangeContext = (): TimeRangeContext => ({
+      nowUs: tooltipNow.value * 1000,
+      zone: zone.value,
+      weekStart: weekStartsOn(),
+      locale: intlLocale.value,
+      fiscalYearStartMonth: fiscalYearStartMonth.value,
+    });
+    // A fixed range that is exactly a period is named by the formatter, however it was made.
     const absoluteLabelInput = (startUs: number, endUs: number): RangeLabelInput => {
       const named = namedRange.value;
-      return named && named.startUs === startUs && named.endUs === endUs
-        ? { startUs, endUs, name: named.name, period: true }
-        : { startUs, endUs };
+      if (named && named.startUs === startUs && named.endUs === endUs) {
+        return { startUs, endUs, name: named.name, period: true };
+      }
+      const name = timeRangeName({ kind: "fixed", startUs, endUs }, rangeContext());
+      return name ? { startUs, endUs, name, period: true } : { startUs, endUs };
     };
     // Type and relative selection last applied; closing without Apply restores these.
     let appliedSelection = {
@@ -1971,9 +2062,19 @@ export default defineComponent({
       };
     };
 
+    // A fixed range still filling ends at now, or with today when it is whole days (§2).
+    const triggerLabelRange = computed<RangeLabelInput | null>(() => {
+      const range = triggerRange.value;
+      const nowUs = tooltipNow.value * 1000;
+      if (!range || range.live || !(range.endUs > nowUs)) return range;
+      const wholeDays = isZoneMidnight(range.startUs) && nowUs - range.startUs >= TWO_DAYS_US;
+      const endUs = wholeDays ? civilDayStart(addCivilDays(convertUnixTime(nowUs).date, 1)) : nowUs;
+      return { ...range, endUs, period: false };
+    });
+
     const triggerLabel = computed(() => {
       if (props.triggerText) return props.triggerText;
-      const range = triggerRange.value;
+      const range = triggerLabelRange.value;
       if (!range) {
         return showsApplied.value
           ? appliedDisplayValue.value || getDisplayValue.value
@@ -1992,8 +2093,7 @@ export default defineComponent({
       });
     });
 
-    // The name never truncates on the trigger; its dates give way first.
-    const triggerParts = computed<{ name: string; dates: string }>(() => {
+    const fullTriggerParts = computed<TriggerLabelForm>(() => {
       const label = String(triggerLabel.value);
       const range = triggerRange.value;
       const name = range?.name && !fixedOnly.value && !props.triggerText ? range.name : "";
@@ -2005,6 +2105,84 @@ export default defineComponent({
         : { name: label, dates: "" };
     });
 
+    // The label's whole forms, widest first; the trigger shows the first that fits its slot (§6).
+    const triggerForms = computed<TriggerLabelForm[]>(() => {
+      const full = fullTriggerParts.value;
+      const range = triggerLabelRange.value;
+      if (!range || props.triggerText || fixedOnly.value) return [full];
+      const period = appliedCalendarToken.value ?? appliedPeriod.value;
+      const kind = range.live
+        ? range.calendar
+          ? "calendar"
+          : "live"
+        : full.name
+          ? "named"
+          : "fixed";
+      return triggerLabelForms({
+        kind,
+        dashboard: props.preset === "dashboard",
+        name: full.name,
+        shortName: kind === "live" && period ? rollingShortName(period) : null,
+        dates: full.dates,
+        duration: formatRangeDuration(range.startUs, range.endUs),
+      });
+    });
+    const triggerFormIndex = ref(0);
+    const triggerParts = computed<TriggerLabelForm>(() => {
+      const forms = triggerForms.value;
+      return forms[Math.min(triggerFormIndex.value, forms.length - 1)];
+    });
+
+    const triggerLabelEl = ref<HTMLElement | null>(null);
+    let fitRun = 0;
+    // Steps down one whole form at a time until the label no longer overflows its slot.
+    const fitTriggerLabel = async () => {
+      const label = triggerLabelEl.value;
+      if (!label) return;
+      const run = ++fitRun;
+      triggerFormIndex.value = 0;
+      await nextTick();
+      while (
+        run === fitRun &&
+        triggerFormIndex.value < triggerForms.value.length - 1 &&
+        label.scrollWidth > label.clientWidth + 1
+      ) {
+        triggerFormIndex.value += 1;
+        await nextTick();
+      }
+    };
+    let slotObserver: ResizeObserver | null = null;
+    // Set up once mounted: the forms read state declared further down this setup.
+    onMounted(() => {
+      watch(
+        () => triggerForms.value.map((form) => `${form.name}|${form.dates}`).join("/"),
+        () => fitTriggerLabel(),
+      );
+      document.fonts?.ready?.then(() => fitTriggerLabel());
+      if (typeof ResizeObserver === "undefined") {
+        fitTriggerLabel();
+        return;
+      }
+      // A refit settles inside one frame, so its own size change never notifies again.
+      slotObserver = new ResizeObserver(() => fitTriggerLabel());
+      for (const box of [groupEl.value?.parentElement, groupEl.value, triggerLabelEl.value]) {
+        if (box) slotObserver.observe(box);
+      }
+    });
+    onBeforeUnmount(() => slotObserver?.disconnect());
+
+    // A fixed range still filling says when it ends, on the trigger and in its tooltip.
+    const appliedEndText = computed(() => {
+      const applied = appliedModel();
+      return applied ? timeRangeEndText(applied, rangeContext()) : null;
+    });
+    const triggerEnds = computed(() => {
+      const applied = appliedModel();
+      const note =
+        applied && !props.triggerText ? timeRangeEndsNote(applied, rangeContext(), t) : null;
+      return note ? String(note) : "";
+    });
+
     // Line 1 the full stamps, line 2 zone, kind and length; the label alone can round them.
     const triggerTooltip = computed(() => {
       const range = triggerRange.value;
@@ -2014,12 +2192,16 @@ export default defineComponent({
         kindText(range.live),
         formatRangeDuration(range.startUs, range.endUs),
       ].join(" · ");
-      return { stamps: formatRangeStamps(range, labelOptions()), detail };
+      const end = appliedEndText.value;
+      const progress = end ? String(t("dateTime.inProgressRefresh", { end })) : "";
+      return { stamps: formatRangeStamps(range, labelOptions()), detail, progress };
     });
 
     const triggerAriaLabel = computed(() =>
       t("dateTime.triggerLabel", {
-        label: String(triggerLabel.value),
+        label: triggerEnds.value
+          ? `${String(triggerLabel.value)}, ${triggerEnds.value}`
+          : String(triggerLabel.value),
         zone: formatZoneOffset(zone.value, tooltipNow.value),
       }),
     );
@@ -2248,6 +2430,12 @@ export default defineComponent({
         return;
       }
       if (moveListCursorToEnd(event)) return;
+      if (event.altKey && event.code === "KeyP" && listCursor.value < 0 && showPinButton.value) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleAppliedPin();
+        return;
+      }
       if (event.key !== "Escape") return;
       const target = event.target;
       // A pin's name field cancels its own edit.
@@ -2762,6 +2950,14 @@ export default defineComponent({
       return limit ? { message: raw(limit) } : null;
     });
 
+    // On a phone the summary drops this year's year, which the trigger already carries (§6).
+    const shownRangeShort = computed(() => {
+      const range = shownLine.value.range;
+      const year = String(new Date(tooltipNow.value).getFullYear());
+      const short = range.replace(new RegExp(`,? ${year}$`), "");
+      return short !== range ? short : "";
+    });
+
     // The panel holds a draft while its selection or typed text differs from the applied range.
     const isDraft = computed(
       () =>
@@ -2773,7 +2969,10 @@ export default defineComponent({
 
     const showFreezeButton = computed(() => {
       const applied = appliedModel();
-      return !isDraft.value && !isForm.value && applied !== null && applied.kind !== "fixed";
+      // Only a live range freezes; an ended calendar period already names fixed dates (§3).
+      const live =
+        applied?.kind === "rolling" || (applied?.kind === "calendar" && applied.offset === 0);
+      return !isDraft.value && !isForm.value && live;
     });
 
     const freezeLabel = computed(() => {
@@ -2792,6 +2991,22 @@ export default defineComponent({
       saveDate("absolute", false, "freeze");
       recordSelection();
       closeMenu();
+    };
+
+    // The summary star pins the applied range (§9); a draft has nothing applied to pin yet.
+    const appliedPinned = computed(() => rail.pinIdOf(appliedHistoryEntry()) !== null);
+    const appliedIsToken = computed(() => appliedType.value === "relative");
+    const showPinButton = computed(
+      () =>
+        showRail.value && !isDraft.value && !previewLine.value && appliedHistoryEntry() !== null,
+    );
+    const toggleAppliedPin = () => rail.togglePin(appliedHistoryEntry());
+
+    // The undo button's step for a page's own control, such as Back to results; false when there is none.
+    const undo = (): boolean => {
+      if (!undoAvailable.value || props.disable) return false;
+      undoRange();
+      return true;
     };
 
     const showLiveButton = computed(
@@ -3026,6 +3241,16 @@ export default defineComponent({
       chipsNotes,
       listHeading,
       setCursorRow,
+      showPinButton,
+      shownRangeShort,
+      appliedPinned,
+      appliedIsToken,
+      toggleAppliedPin,
+      undo,
+      triggerEnds,
+      triggerLabelEl,
+      fitTriggerLabel,
+      triggerFormIndex,
     };
   },
   computed: {

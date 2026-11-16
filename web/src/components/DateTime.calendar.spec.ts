@@ -440,7 +440,7 @@ describe("DateTime calendar", () => {
       await flushPromises();
       expect(wrapper!.vm.pendingDay).toBe("2026/10/03");
       expect(el("date-time-resolved-duration")?.textContent?.trim()).toBe("1d");
-      expect(wrapper!.vm.stepTooltip.prev.title).toBe("Previous 1d");
+      expect(wrapper!.vm.stepTooltip.prev.title).toBe("Back one day");
 
       wrapper!.vm.applyAndClose();
       await flushPromises();

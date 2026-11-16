@@ -378,6 +378,20 @@ describe("DateTimePickerDashboard", () => {
       });
     });
 
+    it("forwards undo to the picker and returns whether a step was undone", () => {
+      const mockUndo = vi.fn().mockReturnValue(true);
+      wrapper.vm.dateTimePicker = { undo: mockUndo };
+
+      expect(wrapper.vm.undo()).toBe(true);
+      expect(mockUndo).toHaveBeenCalledTimes(1);
+    });
+
+    it("undoes nothing before the picker mounts", () => {
+      wrapper.vm.dateTimePicker = null;
+
+      expect(wrapper.vm.undo()).toBe(false);
+    });
+
     it("should handle null dateTimePicker gracefully", async () => {
       wrapper.vm.dateTimePicker = null;
 

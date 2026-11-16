@@ -40,6 +40,8 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import HostDetailDrawer from "./HostDetailDrawer.vue";
 import HostsDependenciesView from "./HostsDependenciesView.vue";
@@ -155,6 +157,15 @@ const onDateChange = (date: {
   if (hostsState.value !== "detected") return;
   reload();
 };
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("menu.hosts"),
+  url: false,
+  initial: () => ({ kind: "rolling", span: HOSTS_DEFAULT_RELATIVE_PERIOD }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: (value) => onDateChange(value as Parameters<typeof onDateChange>[0]),
+});
 
 // ── URL-carried state (design 4.7: flat routes remount, params persist) ─────
 const first = (v: unknown): string | undefined => {
@@ -512,7 +523,9 @@ const osToggleLabel = (slug: string) =>
           default-type="relative"
           :default-relative-time="HOSTS_DEFAULT_RELATIVE_PERIOD"
           data-test-name="hosts-date-time"
-          @on:date-change="onDateChange"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
         <!-- Icon-only on phones so the actions share the title row; sr-only keeps the button named. -->
         <OButton
@@ -530,6 +543,12 @@ const osToggleLabel = (slug: string) =>
     </template>
 
     <!-- Detection unresolved: a spinner, never a false "set up" flash. -->
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="hosts-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <div v-if="hostsState === 'unknown'" class="flex min-h-60 items-center justify-center">
       <OSpinner size="lg" />
     </div>

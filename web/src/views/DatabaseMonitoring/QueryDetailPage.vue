@@ -57,6 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-relative-time="range.relativeTimePeriod ?? undefined"
         data-test-name="dbm-detail-date-time"
         class="h-8"
+        :range="timeHost.range.value"
+        @apply="timeHost.onApply"
         @on:date-change="onDateChange"
       />
       <OButton
@@ -81,6 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="flex flex-col gap-4 pt-3">
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="dbm-query-detail-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
       <!-- OUTSIDE the tabs, deliberately, and the main thing a tabbed redesign
            gets wrong: identity is not a section, it is the answer to "which
            query am I reading". A plan tree or a caller list with the statement
@@ -1345,6 +1353,8 @@ import { buildIncidentSummary } from "@/utils/dbm/incidentSummary";
 import { deltaFor, isCriticalErrorRate } from "@/utils/dbm/insights";
 import { resolveCalls, resolveDatabaseTime } from "@/utils/dbm/overlapMetrics";
 import { escapeSingleQuotes } from "@/utils/zincutils";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -3233,7 +3243,7 @@ const syncUrl = () => {
   router.replace({ query: { ...route.query, ...queryParams.value } }).catch(() => {});
 };
 
-const onDateChange = (value: DbmDateChange) => {
+const applyDate = (value: DbmDateChange) => {
   setRange(value);
   syncUrl();
   // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
@@ -3247,6 +3257,15 @@ const onDateChange = (value: DbmDateChange) => {
     });
   }
 };
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("menu.databases"),
+  url: false,
+  initial: () => pageRange(range.value),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: (value) => applyDate(value as DbmDateChange),
+});
+const onDateChange = timeHost.onDateChange;
 
 // ─── AI ──────────────────────────────────────────────────────────────────────
 

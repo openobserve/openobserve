@@ -35,7 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         :default-relative-time="relativeTime"
         data-test="pipeline-history-date-picker"
-        @on:date-change="updateDateTime"
+        :range="timeHost.range.value"
+        @apply="timeHost.onApply"
+        @on:date-change="timeHost.onDateChange"
       />
     </Teleport>
     <!-- A phone header only has room for the title and the date, so the filters become a toolbar row in the body. -->
@@ -81,6 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </Teleport>
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="pipeline-history-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <div class="min-h-0 flex-1 overflow-hidden">
       <div
         data-test="pipeline-history-table"
@@ -463,6 +471,8 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import * as dateUtils from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -809,6 +819,14 @@ const updateDateTime = (value: any) => {
   pagination.value.page = 1;
   fetchPipelineHistory();
 };
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("pipeline.history"),
+  initial: () => ({ kind: "rolling", span: relativeTime.value }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: updateDateTime,
+});
 
 const onPaginationChange = (params: { page: number; size: number }) => {
   pagination.value.page = params.page;

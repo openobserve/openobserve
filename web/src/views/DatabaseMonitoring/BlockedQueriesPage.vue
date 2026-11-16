@@ -38,6 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DbmPageChrome title-data-test="dbm-blocked-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="dbm-blocked-queries-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
       <OTable
         :enable-column-resize="true"
         :data="tableRows"
@@ -117,6 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-blocked-date-time"
               class="h-8"
+              :range="timeHost.range.value"
+              @apply="timeHost.onApply"
               @on:date-change="onDateChange"
             />
             <ORefreshButton
@@ -503,6 +511,7 @@ import {
 import { countClaim, formatAge, formatClock } from "@/utils/dbm/format";
 import { buildDbmNotCollectingChecks } from "@/utils/dbm/notCollecting";
 import { DBM_STATUS_TONES } from "@/utils/dbm/tones";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -534,6 +543,7 @@ const {
   run,
   onRefresh,
   onDateChange,
+  timeHost,
 } = useDbmListPage({
   load: () => load(),
   context: () => dbmContext,

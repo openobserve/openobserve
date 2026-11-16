@@ -318,7 +318,7 @@ onMounted(async () => {
   >
     <template #default="{ weekDays, grid }">
       <RangeCalendarHeader
-        class="flex items-center justify-between"
+        class="pointer-coarse:bg-surface-overlay flex items-center justify-between pointer-coarse:sticky pointer-coarse:top-0 pointer-coarse:z-1"
         :class="compact ? 'mb-0.5' : fill ? 'mb-1' : 'mb-3'"
       >
         <RangeCalendarPrev
@@ -410,12 +410,12 @@ onMounted(async () => {
                 @blur="hideStruckReason"
                 :class="[
                   bandRange
-                    ? 'text-compact relative mx-auto w-8'
+                    ? 'text-compact relative mx-auto w-8 pointer-coarse:w-full'
                     : fill
                       ? 'w-full text-xs'
                       : 'w-8 text-xs',
                   todayClass,
-                  compact ? 'h-6.5' : 'h-8',
+                  compact ? 'h-6.5 pointer-coarse:h-9' : 'h-8 pointer-coarse:h-10',
                 ]"
                 class="rounded-default ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-disabled:text-datepicker-day-disabled-text data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text flex cursor-pointer items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:hover:bg-transparent data-unavailable:cursor-not-allowed data-unavailable:line-through data-unavailable:hover:bg-transparent"
                 >{{ dayNumber(d) }}</RangeCalendarCellTrigger

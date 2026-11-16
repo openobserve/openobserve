@@ -32,7 +32,10 @@ export interface RelativeHistoryEntry {
   relative: string;
 }
 
-export type TimeRangeHistoryEntry = AbsoluteHistoryEntry | RelativeHistoryEntry;
+/** `source` names the page that applied the range, for Recent's `from {page}`. */
+export type TimeRangeHistoryEntry = (AbsoluteHistoryEntry | RelativeHistoryEntry) & {
+  source?: string;
+};
 
 // Bumped on every write so each mounted picker re-reads the shared list.
 const version = ref(0);
@@ -63,10 +66,14 @@ export const isValidHistoryEntry = (value: unknown): value is TimeRangeHistoryEn
   );
 };
 
-const normalizeEntry = (entry: TimeRangeHistoryEntry): TimeRangeHistoryEntry =>
-  isRelativeHistoryEntry(entry)
+const normalizeEntry = (entry: TimeRangeHistoryEntry): TimeRangeHistoryEntry => {
+  const range: TimeRangeHistoryEntry = isRelativeHistoryEntry(entry)
     ? { relative: entry.relative }
     : { startUs: entry.startUs, endUs: entry.endUs };
+  return typeof entry.source === "string" && entry.source
+    ? { ...range, source: entry.source }
+    : range;
+};
 
 export const readTimeRangeHistory = (key: string): TimeRangeHistoryEntry[] => {
   const unsaved = memory.get(key);
@@ -130,14 +137,15 @@ export default function useTimeRangeHistory() {
 
   const push = (entry: TimeRangeHistoryEntry) => {
     if (!isValidHistoryEntry(entry)) return;
-    const rest = readTimeRangeHistory(storageKey.value).filter((e) => !sameHistoryEntry(e, entry));
-    writeTimeRangeHistory(storageKey.value, [entry, ...rest].slice(0, TIME_RANGE_HISTORY_LIMIT));
+    const stored = normalizeEntry(entry);
+    const rest = readTimeRangeHistory(storageKey.value).filter((e) => !sameHistoryEntry(e, stored));
+    writeTimeRangeHistory(storageKey.value, [stored, ...rest].slice(0, TIME_RANGE_HISTORY_LIMIT));
   };
 
-  const add = (startUs: number, endUs: number) =>
-    push({ startUs: Math.round(startUs), endUs: Math.round(endUs) });
+  const add = (startUs: number, endUs: number, source?: string) =>
+    push({ startUs: Math.round(startUs), endUs: Math.round(endUs), source });
 
-  const addRelative = (period: string) => push({ relative: period });
+  const addRelative = (period: string, source?: string) => push({ relative: period, source });
 
   const remove = (entry: TimeRangeHistoryEntry) => {
     const rest = readTimeRangeHistory(storageKey.value).filter((e) => !sameHistoryEntry(e, entry));

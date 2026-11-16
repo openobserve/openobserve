@@ -15,6 +15,10 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTime from "@/components/DateTime.vue";
+import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
+import useTimeRangeContext from "@/composables/useTimeRangeContext";
+import { formatTimeRange } from "@/utils/timeRangeFormat";
 import QueryEditor from "@/components/QueryEditor.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -71,15 +75,30 @@ watch(
   },
 );
 let dateReady = false;
-const onDateChange = (d: { startTime: number; endTime: number }) => {
+const timeRangeContext = useTimeRangeContext();
+const storeRange = (d: { startTime?: number; endTime?: number }) => {
   if (!dateReady) return;
-  const s = Number.isFinite(d.startTime) ? Math.trunc(d.startTime) : rangeStart.value;
-  const e = Number.isFinite(d.endTime) ? Math.trunc(d.endTime) : rangeEnd.value;
-  if (s === rangeStart.value && e === rangeEnd.value) return;
+  const s = Number.isFinite(d.startTime) ? Math.trunc(Number(d.startTime)) : rangeStart.value;
+  const e = Number.isFinite(d.endTime) ? Math.trunc(Number(d.endTime)) : rangeEnd.value;
   rangeStart.value = s;
   rangeEnd.value = e;
-  loadEvents();
 };
+const timeHost = usePageTimeRange({
+  preset: "explorer-manual",
+  source: t("panel.logExplorer.title"),
+  url: false,
+  initial: () => ({ kind: "fixed", startUs: rangeStart.value, endUs: rangeEnd.value }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  hasResults: () => events.value.length > 0,
+  onRange: storeRange,
+  run: () => void runQuery(),
+});
+const staleText = computed(() => {
+  const queried = timeHost.stale.value ? timeHost.queried.value : null;
+  if (!queried) return null;
+  const range = formatTimeRange(queried, timeRangeContext.now(), "toast");
+  return t("search.resultsAreForRange", { range });
+});
 
 // ── Search state ──────────────────────────────────────────────────────────────
 const events = ref<any[]>([]);
@@ -711,6 +730,7 @@ async function restoreEventDetail() {
 watch(pageSize, () => goToPage(0));
 onMounted(async () => {
   dateReady = true;
+  timeHost.markQueried();
   await loadEvents();
   await restoreEventDetail();
 });
@@ -792,10 +812,11 @@ function openInLogs() {
           <DateTime
             preset="explorer-manual"
             :capabilities="{ kinds: ['rolling', 'fixed'] }"
-            default-type="absolute"
-            :default-absolute-time="{ startTime: rangeStart, endTime: rangeEnd }"
+            :range="timeHost.range.value"
+            :queried-range="timeHost.queried.value"
             data-test-name="dashboard-log-drawer-date-time"
-            @on:date-change="onDateChange"
+            @apply="timeHost.onApply"
+            @on:date-change="timeHost.onDateChange"
           />
           <OButton
             size="sm"
@@ -837,11 +858,17 @@ function openInLogs() {
             icon-left="refresh"
             :loading="loading"
             data-test="log-explorer-run"
-            @click="runQuery"
+            @click="timeHost.runQuery"
           >
             <OTooltip :content="t('panel.logExplorer.runQuery')" />
           </OButton>
         </div>
+        <StaleRangeStrip
+          v-if="staleText"
+          :text="staleText"
+          data-test="dashboard-log-drawer-stale-strip"
+          @run="timeHost.runQuery"
+        />
         <div v-if="showSql" class="px-2 pb-2">
           <div class="border-border-default rounded-default overflow-hidden border">
             <QueryEditor
@@ -851,7 +878,7 @@ function openInLogs() {
               hide-nl-toggle
               data-test-prefix="log-explorer-editor"
               @update:query="customSql = $event"
-              @run-query="runQuery"
+              @run-query="timeHost.runQuery"
             />
           </div>
         </div>

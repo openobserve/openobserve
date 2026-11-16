@@ -206,13 +206,13 @@ describe("DateTime QA run 3", () => {
       expect(String(wrapper!.vm.triggerLabel)).toContain("21:25");
     });
 
-    it("never truncates the dashboard name; the dates give way first", async () => {
+    it("never cuts the dashboard name or dates mid-text; whole forms step down instead", async () => {
       createWrapper({ defaultRelativeTime: "24h", preset: "dashboard" });
       await flushPromises();
       expect(el("date-time-trigger-name")!.textContent).toBe("Last 24 hours");
       expect(el("date-time-trigger-name")!.className).toContain("shrink-0");
       expect(el("date-time-trigger-name")!.className).not.toContain("truncate");
-      expect(el("date-time-trigger-dates")!.className).toContain("text-ellipsis");
+      expect(el("date-time-trigger-dates")!.className).not.toContain("text-ellipsis");
     });
   });
 

@@ -34,8 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           endTime: absoluteTime.endTime,
         }"
         :default-relative-time="relativeTime"
+        :range="timeHost.range.value"
         data-test="alert-history-date-picker"
-        @on:date-change="updateDateTime"
+        @apply="timeHost.onApply"
+        @on:date-change="timeHost.onDateChange"
       />
       <OSelect
         v-model="selectedAlert"
@@ -81,6 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="onRefreshClick"
       />
     </template>
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="alert-history-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <div
       class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 lg:hidden"
     >
@@ -563,6 +571,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { formatDate } from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -1028,6 +1038,14 @@ const updateDateTime = (value: any) => {
   currentPage.value = 1;
   fetchAlertHistory();
 };
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("alerts.history"),
+  initial: () => ({ kind: "rolling", span: relativeTime.value }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: updateDateTime,
+});
 
 const onPaginationChange = (params: { page: number; size: number }) => {
   currentPage.value = params.page;

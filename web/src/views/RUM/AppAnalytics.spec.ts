@@ -126,7 +126,7 @@ describe("AppAnalytics shell", () => {
       global: {
         plugins: [router, store],
         stubs: {
-          DateTimePickerDashboard: {
+          DateTime: {
             template: "<div data-test='date-picker-stub' />",
             props: ["modelValue"],
             methods: { setSavedDate: (d: unknown) => setSavedDateSpy(d) },
@@ -933,7 +933,7 @@ describe("AppAnalytics shell", () => {
         global: {
           plugins: [router, store],
           stubs: {
-            DateTimePickerDashboard: {
+            DateTime: {
               props: ["modelValue"],
               setup: (_: unknown, { expose }: { expose: (e: object) => void }) => {
                 expose({ setSavedDate });
@@ -967,7 +967,7 @@ describe("AppAnalytics shell", () => {
         global: {
           plugins: [router, store],
           stubs: {
-            DateTimePickerDashboard: {
+            DateTime: {
               props: ["modelValue"],
               setup: (_: unknown, { expose }: { expose: (e: object) => void }) => {
                 expose({ setSavedDate });
@@ -1169,7 +1169,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", { timeout: 20000 }, (
         global: {
           plugins: [router, store],
           stubs: {
-            DateTimePickerDashboard: { template: "<div />", props: ["modelValue"] },
+            DateTime: { template: "<div />", props: ["modelValue"] },
             ShareButton: { template: "<button data-test='share-stub' />", props: ["url"] },
             TrendsPanel: { name: "TrendsPanel", template: "<div />" },
             PathsFlow: { name: "PathsFlow", template: "<div />" },

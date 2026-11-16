@@ -35,6 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DbmPageChrome title-data-test="dbm-metrics-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="dbm-metrics-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
       <!-- Above the rail and the charts, so it stays put while they scroll, as on every other tab. -->
       <div
         class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-1.5"
@@ -50,6 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-relative-time="range.relativeTimePeriod ?? undefined"
           data-test-name="dbm-metrics-date-time"
           class="h-8"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
           @on:date-change="onDateChange"
         />
         <ORefreshButton
@@ -393,6 +401,7 @@ import {
 import { DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { buildMetricsUrl } from "@/utils/metrics/buildMetricsUrl";
 import type { MetricStream } from "@/utils/metrics/metricFamily";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 
 const PanelSchemaRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/PanelSchemaRenderer.vue"),
@@ -415,6 +424,7 @@ const {
   run,
   onRefresh,
   onDateChange,
+  timeHost,
 } = useDbmListPage({
   load: () => load(),
   syncUrl: () => syncUrl(),
