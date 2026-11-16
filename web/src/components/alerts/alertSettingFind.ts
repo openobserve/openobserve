@@ -39,7 +39,26 @@ export type AlertFindId =
   | "cooldown"
   | "name"
   | "folder"
-  | "suppressRepeats";
+  | "suppressRepeats"
+  | AnomalyFindId;
+
+/** Controls only the anomaly ("When unusual") editor has. */
+export type AnomalyFindId =
+  | "anomalyQuery"
+  | "anomalyFunction"
+  | "anomalyResolution"
+  | "anomalyTraining"
+  | "anomalyRetrain"
+  | "anomalySensitivity"
+  | "anomalyNotifications"
+  | "anomalyDestination"
+  | "anomalyTemplate"
+  | "anomalyDirection"
+  | "anomalyWindowShare"
+  | "anomalyPriority"
+  | "anomalyTags"
+  | "anomalyCheckEvery"
+  | "anomalyLookBack";
 
 export interface AlertFindEntry {
   id: AlertFindId;
@@ -356,7 +375,179 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     groupKey: MORE,
     targets: ["alert-tags-input"],
   },
+  {
+    id: "anomalyQuery",
+    labelKey: "alerts.sections.rows.whichEvents",
+    aliases: ["filters", "filter", "sql", "query", "where", "events"],
+    section: "condition",
+    tier: "shown",
+    groupKey: "alerts.find.groups.query",
+    targets: ["anomaly-query-tabs"],
+  },
+  {
+    id: "anomalyFunction",
+    labelKey: "alerts.detectionFunction",
+    aliases: ["function", "measure", "count", "avg", "sum", "field", "metric"],
+    section: "condition",
+    tier: "shown",
+    groupKey: "alerts.find.groups.condition",
+    targets: ["anomaly-detection-function", "anomaly-detection-function-row"],
+  },
+  {
+    id: "anomalyResolution",
+    labelKey: "alerts.anomaly.detectionResolution",
+    aliases: ["resolution", "histogram", "interval", "bucket"],
+    section: "condition",
+    tier: "shown",
+    groupKey: "alerts.find.groups.condition",
+    targets: ["anomaly-histogram-interval-value", "anomaly-detection-resolution-row"],
+  },
+  {
+    id: "anomalyTraining",
+    labelKey: "alerts.trainingWindow",
+    aliases: ["training", "train", "history", "baseline", "learn"],
+    section: "condition",
+    tier: "shown",
+    groupKey: "alerts.find.groups.condition",
+    targets: ["anomaly-training-window", "anomaly-training-window-row"],
+  },
+  {
+    id: "anomalyRetrain",
+    labelKey: "alerts.anomaly.retrainEvery",
+    aliases: ["retrain", "retraining", "refresh model"],
+    section: "condition",
+    tier: "shown",
+    groupKey: "alerts.find.groups.condition",
+    targets: ["anomaly-retrain-interval", "anomaly-retrain-every-row"],
+  },
+  {
+    id: "anomalySensitivity",
+    labelKey: "alerts.sensitivity",
+    aliases: ["sensitivity", "threshold", "band", "budget", "noise", "how unusual"],
+    section: "condition",
+    tier: "shown",
+    groupKey: "alerts.find.groups.condition",
+    targets: ["anomaly-budget-tiers", "anomaly-sensitivity-tier", "anomaly-sensitivity-row"],
+  },
+  {
+    id: "anomalyNotifications",
+    labelKey: "alerts.anomaly.notifications",
+    aliases: ["notify", "notification", "alerting", "enable alerts"],
+    section: "notify",
+    tier: "shown",
+    groupKey: "alerts.find.groups.destinations",
+    targets: ["anomaly-alert-enabled", "anomaly-notifications-row"],
+  },
+  {
+    id: "anomalyDestination",
+    labelKey: "alerts.destination",
+    aliases: ["destination", "channel", "recipients", "notify"],
+    section: "notify",
+    tier: "shown",
+    groupKey: "alerts.find.groups.destinations",
+    targets: ["anomaly-destination", "anomaly-destination-row", "anomaly-notifications-row"],
+  },
+  {
+    id: "anomalyTemplate",
+    labelKey: "alerts.templateOverride.label",
+    aliases: ["template", "message", "body", "payload"],
+    section: "notify",
+    tier: "shown",
+    groupKey: "alerts.find.groups.destinations",
+    targets: ["anomaly-template-row", "anomaly-notifications-row"],
+  },
+  {
+    id: "anomalyDirection",
+    labelKey: "alerts.anomaly.alertDirection",
+    aliases: ["direction", "spike", "drop", "above", "below", "both"],
+    section: "notify",
+    tier: "shown",
+    groupKey: "alerts.find.groups.condition",
+    targets: ["anomaly-alert-direction", "anomaly-alert-direction-row"],
+  },
+  {
+    id: "anomalyWindowShare",
+    labelKey: "alerts.anomaly.windowShare",
+    aliases: ["window", "share", "fire", "recover", "percent", "flapping"],
+    section: "notify",
+    tier: "shown",
+    groupKey: "alerts.find.groups.condition",
+    targets: ["anomaly-window-buckets", "anomaly-window-share-row"],
+  },
+  {
+    id: "anomalyPriority",
+    labelKey: "alerts.priority",
+    aliases: ["urgency", "severity", "p1"],
+    section: "notify",
+    tier: "shown",
+    groupKey: MORE,
+    targets: ["anomaly-priority-select", "anomaly-priority-row"],
+  },
+  {
+    id: "anomalyTags",
+    labelKey: "alerts.tags",
+    aliases: ["tag", "labels", "label"],
+    section: "notify",
+    tier: "shown",
+    groupKey: MORE,
+    targets: ["anomaly-tags-input", "anomaly-tags-row"],
+  },
+  {
+    id: "anomalyCheckEvery",
+    labelKey: "alerts.anomaly.checkEvery",
+    aliases: ["frequency", "interval", "how often", "run every", "schedule"],
+    section: "schedule",
+    tier: "shown",
+    groupKey: "alerts.find.groups.schedule",
+    targets: ["anomaly-schedule-interval-value", "anomaly-check-every-row"],
+  },
+  {
+    id: "anomalyLookBack",
+    labelKey: "alerts.anomaly.lookBackWindow",
+    aliases: ["lookback", "look back", "period", "window", "time range"],
+    section: "schedule",
+    tier: "shown",
+    groupKey: "alerts.find.groups.schedule",
+    targets: ["anomaly-detection-window-value", "anomaly-look-back-row"],
+  },
 ];
+
+/** Settings the anomaly editor shares with the other alert types. */
+const ANOMALY_SHARED_FIND_IDS: ReadonlySet<AlertFindId> = new Set<AlertFindId>([
+  "howItChecks",
+  "streamType",
+  "stream",
+  "name",
+  "folder",
+]);
+
+const ANOMALY_ONLY_FIND_IDS: ReadonlySet<AlertFindId> = new Set<AnomalyFindId>([
+  "anomalyQuery",
+  "anomalyFunction",
+  "anomalyResolution",
+  "anomalyTraining",
+  "anomalyRetrain",
+  "anomalySensitivity",
+  "anomalyNotifications",
+  "anomalyDestination",
+  "anomalyTemplate",
+  "anomalyDirection",
+  "anomalyWindowShare",
+  "anomalyPriority",
+  "anomalyTags",
+  "anomalyCheckEvery",
+  "anomalyLookBack",
+]);
+
+/** Whether the entry belongs only to the anomaly editor. */
+export function isAnomalyOnlyFindId(id: AlertFindId): id is AnomalyFindId {
+  return ANOMALY_ONLY_FIND_IDS.has(id);
+}
+
+/** Whether the entry has a control in the anomaly editor. */
+export function isAnomalyFindId(id: AlertFindId): boolean {
+  return isAnomalyOnlyFindId(id) || ANOMALY_SHARED_FIND_IDS.has(id);
+}
 
 /** Whether the id is one of the tiered settings, so it may need revealing first. */
 export function isTieredSetting(id: AlertFindId): id is AlertSettingId {

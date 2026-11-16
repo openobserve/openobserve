@@ -34,12 +34,17 @@ export type FieldMetaMap = Record<string, { errors?: readonly unknown[] } | unde
 export interface AlertSectionsFormData extends Omit<ReadBackAlert, "is_real_time"> {
   is_real_time?: string | boolean;
   name?: string;
+  creates_incident?: boolean;
   children?: { alert_id?: string }[];
   composite_condition?: { expression?: string } | null;
 }
 
 /** The slice of the anomaly config the section list reads. */
 export interface AlertSectionsAnomalyConfig {
+  query_mode?: string;
+  custom_sql?: string;
+  detection_function?: string;
+  detection_function_field?: string;
   alert_enabled?: boolean;
   alert_destination_ids?: string[];
   schedule_interval_value?: number | string;
@@ -56,6 +61,8 @@ export interface AlertFormSectionsInput {
   /** Builder/SQL threshold on an aggregate rather than on the event count. */
   isAggregationEnabled: Ref<boolean>;
   isEditing: Ref<boolean>;
+  /** Incidents exist in this build and org, so `creates_incident` reaches someone. */
+  incidentsEnabled?: Ref<boolean>;
   /** Sections holding unsaved edits; edit mode only. */
   changedSections?: Ref<ReadonlySet<AlertSectionId>>;
   /** Sections the user has moved past; until then a section reports no progress or problem. */
@@ -139,6 +146,14 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     return eventCountText(fd.trigger_condition, t);
   };
 
+  // Until the detection is fully described there is nothing for the step to be done with.
+  const anomalyConditionMissing = (): boolean => {
+    const anomaly = input.anomalyConfig.value ?? {};
+    if (anomaly.query_mode === "custom_sql") return !hasValue(anomaly.custom_sql);
+    if (!hasValue(anomaly.detection_function)) return true;
+    return anomaly.detection_function !== "count" && !hasValue(anomaly.detection_function_field);
+  };
+
   const notifyCount = (fd: AlertSectionsFormData): number => {
     if (mode.value === "anomaly") {
       const anomaly = input.anomalyConfig.value ?? {};
@@ -146,6 +161,33 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     }
     const oncall = hasDeliveryTarget({ oncall_team: fd.oncall_team }) ? 1 : 0;
     return (fd.destinations?.length ?? 0) + (fd.workflows?.length ?? 0) + oncall;
+  };
+
+  const opensIncident = (fd: AlertSectionsFormData): boolean =>
+    input.incidentsEnabled?.value === true &&
+    mode.value !== "anomaly" &&
+    fd.creates_incident === true;
+
+  const notifySummary = (fd: AlertSectionsFormData, count: number): I18nText => {
+    const incident = opensIncident(fd);
+    if (!incident) {
+      if (count === 0) return t("alerts.sections.notify.nobody");
+      return count === 1 && fd.destinations?.length === 1
+        ? raw(fd.destinations[0])
+        : t("alerts.sections.notify.destinationCount", { count }, count);
+    }
+    const listed = (fd.destinations?.length ?? 0) + (fd.workflows?.length ?? 0);
+    if (listed > 0) {
+      const targets =
+        listed === 1 && fd.destinations?.length === 1
+          ? raw(fd.destinations[0])
+          : t("alerts.sections.notify.destinationCount", { count: listed }, listed);
+      return t("alerts.sections.notify.targetsAndIncident", { targets });
+    }
+    const team = fd.oncall_team?.trim();
+    return team && hasDeliveryTarget({ oncall_team: team })
+      ? t("alerts.sections.notify.incidentForTeam", { team: raw(team) })
+      : t("alerts.sections.notify.incident");
   };
 
   const schedulePhrase = (fd: AlertSectionsFormData): I18nText => {
@@ -186,19 +228,19 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
             summary: t("alerts.sections.watch.childCount", { count }, count),
           };
         }
-        return { missing: false, summary: conditionPhrase(fd) };
+        // No stream means nothing to count yet, so the step cannot be done.
+        const incomplete =
+          mode.value !== "composite" &&
+          (!hasValue(fd.stream_name) || (mode.value === "anomaly" && anomalyConditionMissing()));
+        return { missing: false, empty: incomplete, summary: conditionPhrase(fd) };
       }
       case "notify": {
         const count = notifyCount(fd);
+        const incident = opensIncident(fd);
         return {
           missing: false,
-          empty: count === 0,
-          summary:
-            count === 0
-              ? t("alerts.sections.notify.nobody")
-              : count === 1 && fd.destinations?.length === 1
-                ? raw(fd.destinations[0])
-                : t("alerts.sections.notify.destinationCount", { count }, count),
+          empty: count === 0 && !incident,
+          summary: notifySummary(fd, count),
         };
       }
       case "schedule":
@@ -233,7 +275,12 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       } else if (seen && !("empty" in facts && facts.empty)) {
         state = input.isEditing.value ? "saved" : "done";
       }
-      return { id, title: t(navKey), summary: facts.summary, state, stateLabel };
+      // A saved alert's name is fixed, so its last step holds only the optional details.
+      const title =
+        id === "details" && input.isEditing.value
+          ? t("alerts.sections.details.editTitle")
+          : t(navKey);
+      return { id, title, summary: facts.summary, state, stateLabel };
     });
   });
 

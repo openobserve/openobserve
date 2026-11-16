@@ -257,13 +257,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div :key="draftFormKey" class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
+      <div
+        :key="draftFormKey"
+        class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto"
+        @focusin="onSectionInteract"
+        @pointerdown="onSectionInteract"
+      >
         <aside
           class="border-border-default max-lg:bg-surface-base flex w-53 shrink-0 flex-col gap-3 overflow-y-auto border-e px-2 py-3 max-lg:sticky max-lg:top-0 max-lg:z-1 max-lg:w-auto max-lg:gap-2 max-lg:border-e-0 max-lg:border-b max-lg:px-3 max-lg:py-2"
           data-test="add-alert-section-nav"
         >
           <OCommandSearch
-            v-if="!isAnomalyMode"
             v-model="settingFind.query.value"
             :items="settingFind.items.value"
             :label="t('alerts.find.label')"
@@ -362,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :current="activeSection === 'condition'"
             :index="2"
             :title="t('alerts.sections.condition.title')"
-            :help="t('alerts.sections.condition.help')"
+            :help="conditionHelp"
             @go="goToSection"
           >
             <div data-test="add-alert-query-card" data-snap-stop>
@@ -511,6 +515,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @add="onTierAdd"
                 @toggle="onTierToggle('condition')"
               />
+              <div
+                :ref="(el) => setSectionTarget('narrowPreview', el)"
+                class="empty:hidden"
+                data-test="add-alert-narrow-preview"
+              />
             </div>
           </AlertFormSection>
 
@@ -604,8 +613,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             id="details"
             :current="activeSection === 'details'"
             :index="5"
-            :title="t('alerts.sections.details.title')"
-            :help="t('alerts.sections.details.help')"
+            :title="
+              beingUpdated || anomalyEditMode
+                ? t('alerts.sections.details.editTitle')
+                : t('alerts.sections.details.title')
+            "
+            :help="
+              beingUpdated || anomalyEditMode
+                ? t('alerts.sections.details.editHelp')
+                : t('alerts.sections.details.help')
+            "
             @go="goToSection"
           >
             <div class="flex flex-col" data-snap-stop>
@@ -746,78 +763,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSnapScroll>
 
         <aside
-          class="border-border-default flex w-83 shrink-0 flex-col gap-3 overflow-y-auto border-s p-3 max-lg:w-auto max-lg:border-s-0 max-lg:border-t"
+          class="border-border-default w-83 shrink-0 flex-col overflow-y-auto border-s p-3 max-lg:w-auto max-lg:border-s-0 max-lg:border-t"
+          :class="railInCondition ? 'hidden' : 'flex'"
           data-test="add-alert-rail"
         >
-          <div
-            v-if="!isCompositeMode"
-            class="bg-surface-base border-border-default rounded-surface flex shrink-0 flex-col overflow-hidden border"
-          >
-            <div
-              class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2 select-none"
-            >
-              <span class="text-sm font-medium">{{ t("alerts.preview") }}</span>
-            </div>
-            <div class="h-60 min-h-0">
-              <AnomalyDataPreview v-if="isAnomalyMode" :config="anomalyConfig" />
-              <template v-else>
+          <!-- Below lg the steps stack, so the preview moves next to the condition it previews. -->
+          <Teleport :to="sectionTargets.narrowPreview" :disabled="!railInCondition">
+            <div class="flex flex-col gap-3 max-lg:pt-3" data-test="add-alert-rail-content">
+              <div
+                v-if="!isCompositeMode"
+                class="bg-surface-base border-border-default rounded-surface flex shrink-0 flex-col overflow-hidden border"
+              >
                 <div
-                  v-if="!formData.stream_name"
-                  class="flex h-full flex-col items-center justify-center gap-2 px-3"
+                  class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2 select-none"
                 >
-                  <OIcon name="query-stats" size="lg" class="opacity-20" />
-                  <span class="text-text-secondary text-center text-sm font-medium">
-                    {{ t("alerts.previewEmptyState") }}
-                  </span>
+                  <span class="text-sm font-medium">{{ t("alerts.preview") }}</span>
                 </div>
-                <PreviewAlert
-                  v-else
-                  ref="previewAlertRef"
-                  class="h-full w-full"
-                  :formData="formData"
-                  :query="previewQuery"
-                  :selectedTab="formData.query_condition.type || 'custom'"
-                  :isAggregationEnabled="isAggregationEnabled"
-                  :isUsingBackendSql="isUsingBackendSql"
-                  :isEditorOpen="isEditorOpen"
-                  :previewDateTime="previewDateTimeValue"
-                  labelled-limit
-                  @schema-updated="handleSqlSchemaUpdated"
+                <div class="h-60 min-h-0">
+                  <AnomalyDataPreview v-if="isAnomalyMode" :config="anomalyConfig" />
+                  <template v-else>
+                    <div
+                      v-if="!formData.stream_name"
+                      class="flex h-full flex-col items-center justify-center gap-2 px-3"
+                    >
+                      <OIcon name="query-stats" size="lg" class="opacity-20" />
+                      <span class="text-text-secondary text-center text-sm font-medium">
+                        {{ t("alerts.previewEmptyState") }}
+                      </span>
+                    </div>
+                    <PreviewAlert
+                      v-else
+                      ref="previewAlertRef"
+                      class="h-full w-full"
+                      :formData="formData"
+                      :query="previewQuery"
+                      :selectedTab="formData.query_condition.type || 'custom'"
+                      :isAggregationEnabled="isAggregationEnabled"
+                      :isUsingBackendSql="isUsingBackendSql"
+                      :isEditorOpen="isEditorOpen"
+                      :previewDateTime="previewDateTimeValue"
+                      labelled-limit
+                      @schema-updated="handleSqlSchemaUpdated"
+                    />
+                  </template>
+                </div>
+              </div>
+              <div
+                v-show="isCompositeMode"
+                :ref="(el) => setSectionTarget('compositePreview', el)"
+                class="empty:hidden"
+              />
+              <p
+                v-if="railVerdict"
+                class="m-0 flex items-start gap-2 text-sm"
+                :class="railVerdict.tone === 'fires' ? 'text-text-heading' : 'text-text-body'"
+                data-test="add-alert-rail-verdict"
+              >
+                <OIcon
+                  :name="RAIL_VERDICT_ICONS[railVerdict.tone].name"
+                  :class="RAIL_VERDICT_ICONS[railVerdict.tone].class"
+                  size="sm"
+                  class="mt-0.5 shrink-0"
                 />
-              </template>
+                <span>{{ railVerdict.text }}</span>
+              </p>
+              <p
+                v-if="alertSentence"
+                class="text-text-body m-0 text-sm"
+                data-test="add-alert-rail-sentence"
+              >
+                {{ alertSentence }}
+              </p>
+              <AlertRecentRuns
+                v-if="isEditingAlert && editAlertId"
+                :alert-id="editAlertId"
+                :folder-id="editFolderId"
+              />
             </div>
-          </div>
-          <div
-            v-show="isCompositeMode"
-            :ref="(el) => setSectionTarget('compositePreview', el)"
-            class="empty:hidden"
-          />
-          <p
-            v-if="railVerdict"
-            class="m-0 flex items-start gap-2 text-sm"
-            :class="railVerdict.tone === 'fires' ? 'text-text-heading' : 'text-text-body'"
-            data-test="add-alert-rail-verdict"
-          >
-            <OIcon
-              :name="RAIL_VERDICT_ICONS[railVerdict.tone].name"
-              :class="RAIL_VERDICT_ICONS[railVerdict.tone].class"
-              size="sm"
-              class="mt-0.5 shrink-0"
-            />
-            <span>{{ railVerdict.text }}</span>
-          </p>
-          <p
-            v-if="alertSentence"
-            class="text-text-body m-0 text-sm"
-            data-test="add-alert-rail-sentence"
-          >
-            {{ alertSentence }}
-          </p>
-          <AlertRecentRuns
-            v-if="isEditingAlert && editAlertId"
-            :alert-id="editAlertId"
-            :folder-id="editFolderId"
-          />
+          </Teleport>
         </aside>
       </div>
 
@@ -960,17 +983,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
-import {
-  defineComponent,
-  computed,
-  watch,
-  provide,
-  ref,
-  reactive,
-  onMounted,
-  onBeforeUnmount,
-  nextTick,
-} from "vue";
+import { defineComponent, computed, watch, provide, ref, reactive, onMounted, nextTick } from "vue";
 import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -1027,7 +1040,12 @@ import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
 import { getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval } from "@/utils/queryUtils";
 import AlertOptionalHeading from "./AlertOptionalHeading.vue";
 import OCommandSearch from "@/lib/forms/CommandSearch/OCommandSearch.vue";
-import { isTieredSetting, type AlertFindId } from "./alertSettingFind";
+import {
+  isAnomalyFindId,
+  isAnomalyOnlyFindId,
+  isTieredSetting,
+  type AlertFindId,
+} from "./alertSettingFind";
 import { useAlertSettingFind } from "@/composables/alerts/useAlertSettingFind";
 import AlertFormSection from "./AlertFormSection.vue";
 import AlertTierLinks from "./AlertTierLinks.vue";
@@ -1577,6 +1595,12 @@ export default defineComponent({
       if (qc.type === "promql") return !String(qc.promql ?? "").trim();
       return false;
     });
+    // Same gate as the incident switch in AlertSettings: a prefilled flag elsewhere opens nothing.
+    const incidentsEnabled = computed(
+      () =>
+        (config.isEnterprise === "true" || config.isCloud === "true") &&
+        store.state.zoConfig?.incidents_enabled === true,
+    );
     const { items: sectionItems } = useAlertFormSections({
       extraErrors: computed(() => ({
         condition: submitAttempted.value && querySaveProblem.value ? 1 : 0,
@@ -1588,6 +1612,7 @@ export default defineComponent({
       isAnomalyMode: alertForm.isAnomalyMode,
       isAggregationEnabled: alertForm.isAggregationEnabled,
       isEditing: computed(() => alertForm.beingUpdated.value || alertForm.anomalyEditMode.value),
+      incidentsEnabled,
       changedSections: unsaved.sections,
       visited: visitedSections,
       t: alertForm.t,
@@ -1598,10 +1623,13 @@ export default defineComponent({
     const alertSentence = computed(() => {
       if (alertForm.isAnomalyMode.value) return "";
       if (isCompositeMode.value) {
-        return describeCompositeInPlainWords(alertForm.formData.value, alertForm.t);
+        return describeCompositeInPlainWords(alertForm.formData.value, alertForm.t, {
+          incidentsEnabled: incidentsEnabled.value,
+        });
       }
       return describeAlertInPlainWords(alertForm.formData.value, alertForm.t, {
         aggregationEnabled: alertForm.isAggregationEnabled.value,
+        incidentsEnabled: incidentsEnabled.value,
       });
     });
 
@@ -1642,11 +1670,7 @@ export default defineComponent({
         case "compareWithPast":
           return scheduled && fd.query_condition?.type === "sql";
         case "createsIncident":
-          return (
-            !anomaly &&
-            (config.isEnterprise === "true" || config.isCloud === "true") &&
-            store.state.zoConfig?.incidents_enabled === true
-          );
+          return !anomaly && incidentsEnabled.value;
         case "oncall":
           return !anomaly && store.state.zoConfig?.oncall_enabled === true;
         default:
@@ -1700,11 +1724,18 @@ export default defineComponent({
 
     const findAvailable = (id: AlertFindId): boolean => {
       const fd = alertForm.formData.value;
+      if (alertForm.isAnomalyMode.value) {
+        if (id === "name" || id === "folder") {
+          return !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value;
+        }
+        return isAnomalyFindId(id);
+      }
+      if (isAnomalyOnlyFindId(id)) return false;
       const composite = isCompositeMode.value;
       const mode = fd.query_condition?.type || "custom";
       // SQL shows its own Simple/Multi toggle outside the tiered group-by row.
       if (id === "groupBy" && mode === "sql" && !composite) {
-        return fd.is_real_time === "false" && !alertForm.isAnomalyMode.value;
+        return fd.is_real_time === "false";
       }
       if (isTieredSetting(id)) return tierAvailable(id);
       switch (id) {
@@ -1744,14 +1775,29 @@ export default defineComponent({
       reveal: (el) => snapScrollRef.value?.revealElement(el),
     });
 
-    // A section opens all its settings while they fit the view; a group the user toggled is left alone.
+    // A section opens all its settings while they fit the view; one the user touched is never closed under them.
     const userToggledTiers = new Set<AlertSectionId>();
+    const touchedSections = new Set<AlertSectionId>();
     const autoOpenedTiers = reactive(new Set<AlertSectionId>());
     const onTierToggle = (section: AlertSectionId) => {
       userToggledTiers.add(section);
       autoOpenedTiers.delete(section);
       tiers.toggle(section);
     };
+    const onSectionInteract = (event: Event) => {
+      const target = event.target as Element | null;
+      // Section jumps focus the heading, which is navigation rather than a touch.
+      if (event.type === "focusin" && target?.matches?.("[data-snap-heading]")) return;
+      const section = target?.closest?.("[data-snap-section]")?.getAttribute("data-snap-section");
+      if (ALERT_SECTIONS.some((def) => def.id === section)) {
+        touchedSections.add(section as AlertSectionId);
+      }
+    };
+    // Discard remounts the form, so what the user touched before no longer pins any section.
+    watch(alertEditorDraft.formKey, () => {
+      userToggledTiers.clear();
+      touchedSections.clear();
+    });
     const sectionsScroller = () => (snapScrollRef.value as { $el?: HTMLElement } | null)?.$el;
     const overflowsView = (id: AlertSectionId, scroller: HTMLElement): boolean => {
       const section = scroller.querySelector<HTMLElement>(`[data-snap-section="${id}"]`);
@@ -1763,11 +1809,12 @@ export default defineComponent({
       );
       return Math.max(top, ...bottoms) - top > scroller.clientHeight;
     };
+    // Runs only right after an auto-open, never as content grows, so a toggle never folds the rows around it.
     const closeOverflowingTiers = () => {
       const scroller = sectionsScroller();
       if (!scroller) return;
       for (const id of autoOpenedTiers) {
-        if (!overflowsView(id, scroller)) continue;
+        if (touchedSections.has(id) || !overflowsView(id, scroller)) continue;
         autoOpenedTiers.delete(id);
         tiers.collapse(id);
       }
@@ -1784,23 +1831,9 @@ export default defineComponent({
       await nextTick();
       closeOverflowingTiers();
     };
-    let tierResizeObserver: ResizeObserver | null = null;
-    const observeTierContent = () => {
-      tierResizeObserver?.disconnect();
-      const content = sectionsScroller()?.firstElementChild;
-      if (!content || typeof ResizeObserver === "undefined") return;
-      tierResizeObserver ??= new ResizeObserver(closeOverflowingTiers);
-      tierResizeObserver.observe(content);
-    };
     onMounted(() => {
       nextTick(openSettingsThatFit);
-      observeTierContent();
     });
-    // Discard remounts the keyed form, so the observer must follow the new content element.
-    watch(snapScrollRef, () => {
-      nextTick(observeTierContent);
-    });
-    onBeforeUnmount(() => tierResizeObserver?.disconnect());
     watch(
       () => [
         lgUp.value,
@@ -1811,6 +1844,15 @@ export default defineComponent({
       openSettingsThatFit,
       { flush: "post" },
     );
+
+    const railInCondition = computed(() => !lgUp.value && !!sectionTargets.narrowPreview);
+
+    const conditionHelp = computed(() => {
+      if (isCompositeMode.value) return alertForm.t("alerts.sections.condition.helpComposite");
+      if (alertForm.isAnomalyMode.value)
+        return alertForm.t("alerts.sections.condition.helpAnomaly");
+      return alertForm.t("alerts.sections.condition.help");
+    });
 
     // A one-click link adds the setting itself, so the click is never only a reveal.
     const onTierAdd = (id: AlertSettingId) => {
@@ -1984,7 +2026,10 @@ export default defineComponent({
       tiers,
       onTierAdd,
       onTierToggle,
+      onSectionInteract,
       autoOpenedTiers,
+      railInCondition,
+      conditionHelp,
       settingFind,
       alertNameSuggestion,
       nameHasUnsupportedChars,

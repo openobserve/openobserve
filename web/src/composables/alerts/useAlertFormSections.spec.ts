@@ -21,7 +21,12 @@ const scheduled = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const setup = (formData: Record<string, unknown>, meta: FieldMetaMap = {}, editing = false) =>
+const setup = (
+  formData: Record<string, unknown>,
+  meta: FieldMetaMap = {},
+  editing = false,
+  incidentsEnabled = true,
+) =>
   useAlertFormSections({
     fieldMeta: ref(meta),
     formData: ref(formData),
@@ -29,6 +34,7 @@ const setup = (formData: Record<string, unknown>, meta: FieldMetaMap = {}, editi
     isAnomalyMode: ref(formData.is_real_time === "anomaly"),
     isAggregationEnabled: ref(false),
     isEditing: ref(editing),
+    incidentsEnabled: ref(incidentsEnabled),
     t,
   });
 
@@ -102,6 +108,69 @@ describe("useAlertFormSections", () => {
     expect(byId(items.value, "notify")).toMatchObject({ state: "none", summary: "No one yet" });
   });
 
+  it("does not tick the condition before a stream is picked", () => {
+    const { items } = setup(scheduled());
+    expect(byId(items.value, "condition").state).toBe("none");
+  });
+
+  it("mentions the incident when it is the only one told", () => {
+    const { items } = setup(scheduled({ stream_name: "k8s_logs", creates_incident: true }));
+    expect(byId(items.value, "notify")).toMatchObject({
+      state: "done",
+      summary: "Opens an incident",
+    });
+  });
+
+  it("ignores a stored incident flag where incidents are off", () => {
+    const { items } = setup(
+      scheduled({ stream_name: "k8s_logs", creates_incident: true }),
+      {},
+      false,
+      false,
+    );
+    expect(byId(items.value, "notify")).toMatchObject({ state: "none", summary: "No one yet" });
+  });
+
+  it("adds the incident to the destinations it also notifies", () => {
+    const { items } = setup(
+      scheduled({ stream_name: "k8s_logs", creates_incident: true, destinations: ["slack"] }),
+    );
+    expect(byId(items.value, "notify").summary).toBe("slack and an incident");
+  });
+
+  it("names the step after its optional details while editing", () => {
+    const { items } = setup(scheduled({ stream_name: "k8s_logs", name: "errors" }), {}, true);
+    expect(byId(items.value, "details").title).toBe("Details");
+  });
+
+  describe("anomaly condition", () => {
+    const anomalySetup = (anomaly: Record<string, unknown>) =>
+      useAlertFormSections({
+        fieldMeta: ref({}),
+        formData: ref(scheduled({ stream_name: "k8s_logs", is_real_time: "anomaly" })),
+        anomalyConfig: ref(anomaly),
+        isAnomalyMode: ref(true),
+        isAggregationEnabled: ref(false),
+        isEditing: ref(false),
+        t,
+      });
+
+    it("waits for the measured field before ticking the step", () => {
+      const { items } = anomalySetup({ query_mode: "filters", detection_function: "avg" });
+      expect(byId(items.value, "condition").state).toBe("none");
+    });
+
+    it("waits for the SQL in SQL mode", () => {
+      const { items } = anomalySetup({ query_mode: "custom_sql", custom_sql: " " });
+      expect(byId(items.value, "condition").state).toBe("none");
+    });
+
+    it("ticks a complete detection", () => {
+      const { items } = anomalySetup({ query_mode: "filters", detection_function: "count" });
+      expect(byId(items.value, "condition").state).toBe("done");
+    });
+  });
+
   describe("on-call delivery", () => {
     const { isEnterprise, isCloud } = config;
     afterEach(() => {
@@ -116,6 +185,14 @@ describe("useAlertFormSections", () => {
         state: "done",
         summary: "1 destination",
       });
+    });
+
+    it("names the on-call team an incident is opened for", () => {
+      config.isEnterprise = "true";
+      const { items } = setup(
+        scheduled({ stream_name: "cpu", oncall_team: "team-1", creates_incident: true }),
+      );
+      expect(byId(items.value, "notify").summary).toBe("Opens an incident for team-1");
     });
 
     it("ignores an on-call team where on-call does not exist", () => {

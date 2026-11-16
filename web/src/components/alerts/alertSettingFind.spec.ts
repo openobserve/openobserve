@@ -5,6 +5,8 @@ import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 import {
   ALERT_FIND_ENTRIES,
+  isAnomalyFindId,
+  isAnomalyOnlyFindId,
   isTieredSetting,
   matchScore,
   searchAlertSettings,
@@ -100,6 +102,14 @@ describe("searchAlertSettings", () => {
     const found = ids("template");
     expect(found.indexOf("template")).toBeLessThan(found.indexOf("rowTemplate"));
     expect(found).toContain("rowTemplate");
+  });
+
+  it("finds anomaly settings only through the anomaly filter", () => {
+    expect(top("sensitivity", isAnomalyFindId)).toBe("anomalySensitivity");
+    expect(top("look back", isAnomalyFindId)).toBe("anomalyLookBack");
+    expect(top("cooldown", isAnomalyFindId)).toBeUndefined();
+    expect(top("stream", isAnomalyFindId)).toBe("stream");
+    expect(top("sensitivity", (id) => !isAnomalyOnlyFindId(id))).toBeUndefined();
   });
 
   it("leaves out settings that do not apply", () => {

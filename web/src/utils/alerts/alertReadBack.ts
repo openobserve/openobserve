@@ -27,6 +27,7 @@ export interface ReadBackAlert {
   destinations?: string[];
   workflows?: string[];
   oncall_team?: string | null;
+  creates_incident?: boolean;
   pending_period_sec?: number | string | null;
   query_condition?: {
     type?: string;
@@ -53,6 +54,7 @@ export interface ReadBackCompositeAlert {
   destinations?: string[];
   workflows?: string[];
   oncall_team?: string | null;
+  creates_incident?: boolean;
   pending_period_sec?: number | string | null;
   trigger_condition?: { silence?: number | string | null };
   composite_condition?: { expression?: string } | null;
@@ -101,8 +103,16 @@ const durationText = (minutes: number, t: TranslateFn): I18nText =>
     ? t("alerts.summary.hourCount", { n: minutes / 60 }, minutes / 60)
     : t("alerts.summary.minuteCount", { n: minutes }, minutes);
 
-function whoText(alert: ReadBackAlert | ReadBackCompositeAlert, t: TranslateFn): I18nText {
-  if (!hasDeliveryTarget(alert)) return t("alerts.readBack.nobody");
+function whoText(
+  alert: ReadBackAlert | ReadBackCompositeAlert,
+  t: TranslateFn,
+  incidentsEnabled: boolean,
+): I18nText {
+  if (!hasDeliveryTarget(alert)) {
+    return incidentsEnabled && alert.creates_incident === true
+      ? t("alerts.readBack.incident")
+      : t("alerts.readBack.nobody");
+  }
   const names: string[] = [...(alert.destinations ?? [])];
   if (!names.length && alert.workflows?.length) names.push(t("alerts.readBack.workflow"));
   if (!names.length && alert.oncall_team) names.push(t("alerts.alertSettings.oncallTeamTarget"));
@@ -200,11 +210,11 @@ const cooldownText = (silenceValue: unknown, t: TranslateFn) => {
 export function describeAlertInPlainWords(
   alert: ReadBackAlert,
   t: TranslateFn,
-  opts: { aggregationEnabled?: boolean } = {},
+  opts: { aggregationEnabled?: boolean; incidentsEnabled?: boolean } = {},
 ): I18nText {
   if (!alert?.stream_name) return raw("");
   return t("alerts.readBack.sentence", {
-    who: whoText(alert, t),
+    who: whoText(alert, t, opts.incidentsEnabled === true),
     what: whatText(alert, t, opts.aggregationEnabled ?? true),
     hold: holdText(alert, t),
     schedule: scheduleText(alert, t),
@@ -216,11 +226,12 @@ export function describeAlertInPlainWords(
 export function describeCompositeInPlainWords(
   alert: ReadBackCompositeAlert,
   t: TranslateFn,
+  opts: { incidentsEnabled?: boolean } = {},
 ): I18nText {
   const expression = alert?.composite_condition?.expression?.trim();
   if (!expression) return raw("");
   return t("alerts.readBack.composite", {
-    who: whoText(alert, t),
+    who: whoText(alert, t, opts.incidentsEnabled === true),
     expression: nameResolvedExpression(expression, alert.children ?? []),
     hold: holdText(alert, t),
     cooldown: cooldownText(alert.trigger_condition?.silence, t),
