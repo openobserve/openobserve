@@ -1491,8 +1491,7 @@ describe("AddAlert (OForm owner)", () => {
 
       wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
       await flushPromises();
-      expect(wrapper.find('[data-test="add-alert-details-name-auto"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="add-alert-details-name-suggest"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="add-alert-details-name-auto"]').exists()).toBe(true);
 
       const input = wrapper.get('[data-test="add-alert-details-name-input"] input');
       await input.setValue("checkout errors");

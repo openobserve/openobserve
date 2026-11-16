@@ -257,6 +257,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ message }}
           </div>
+          <span
+            v-if="!windowShareMessages.length"
+            class="text-text-secondary text-xs"
+            data-test="anomaly-window-share-hint"
+          >
+            {{ windowShareHint }}
+          </span>
         </div>
       </OSettingRow>
     </div>
@@ -279,7 +286,11 @@ import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
 import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
-import { ANOMALY_DIRECTION_KEYS, anomalyWindowShareErrors } from "./AnomalyDetectionConfig.schema";
+import {
+  ANOMALY_DIRECTION_KEYS,
+  anomalyWindowShareEffective,
+  anomalyWindowShareErrors,
+} from "./AnomalyDetectionConfig.schema";
 
 export default defineComponent({
   name: "AnomalyAlerting",
@@ -363,6 +374,10 @@ export default defineComponent({
         .map((key) => t(key as any)),
     );
 
+    const windowShareHint = computed(() =>
+      t("alerts.anomaly.windowShareHint", anomalyWindowShareEffective(props.config)),
+    );
+
     // One name reads better than "1 destination"; more than one is a count.
     const destinationStatus = computed(() => {
       const ids = props.config.alert_destination_ids;
@@ -434,6 +449,7 @@ export default defineComponent({
       directionModel,
       windowShareErrors,
       windowShareMessages,
+      windowShareHint,
     };
   },
 });

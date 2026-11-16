@@ -91,6 +91,7 @@ const hint = computed(() => {
   <OSettingRow
     v-if="sql"
     :label="t('alerts.sections.backtest.label')"
+    :description="t('alerts.sections.backtest.help')"
     fill
     data-test="add-alert-backtest"
   >

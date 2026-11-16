@@ -57,6 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-text-heading text-sm font-medium">
               {{ t("alerts.sections.rows.whichEvents") }}
             </div>
+            <div class="text-text-secondary mt-0.5 text-xs" data-test="add-alert-which-events-help">
+              {{ whichEventsHelp }}
+            </div>
           </div>
           <div v-if="shouldShowTabs" class="flex items-center gap-2">
             <OButton
@@ -871,7 +874,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!sectionTargets?.querySchedule"
               >
                 <!-- Check every row -->
-                <OSettingRow :label="t('alerts.queryConfig.checkEvery')" required fill>
+                <OSettingRow
+                  :label="t('alerts.queryConfig.checkEvery')"
+                  required
+                  :description="t('alerts.sections.rows.checkEvery')"
+                  fill
+                >
                   <div class="flex flex-col gap-1">
                     <div class="flex items-center gap-2 max-md:flex-wrap">
                       <!-- Minutes/hours mode: number input -->
@@ -1348,7 +1356,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!sectionTargets?.querySchedule"
               >
                 <!-- Check every -->
-                <OSettingRow :label="t('alerts.queryConfig.checkEvery')" required fill>
+                <OSettingRow
+                  :label="t('alerts.queryConfig.checkEvery')"
+                  required
+                  :description="t('alerts.sections.rows.checkEvery')"
+                  fill
+                >
                   <div class="flex flex-col gap-1">
                     <div class="flex items-center gap-2">
                       <template v-if="frequencyMode !== 'cron'">
@@ -3304,6 +3317,13 @@ export default defineComponent({
         { label: raw("SQL"), value: "sql" },
       ];
     });
+    const whichEventsHelp = computed(() => {
+      if (localTab.value === "sql") return t("alerts.sections.rows.whichEventsSql");
+      if (localTab.value === "promql") return t("alerts.sections.rows.whichEventsPromql");
+      return leafFilterCount.value > 0
+        ? t("alerts.sections.rows.whichEventsFiltered")
+        : t("alerts.sections.rows.whichEventsAll");
+    });
     // Hide tabs completely for real-time alerts (only one option)
     const shouldShowTabs = computed(() => {
       return props.isRealTime === "false";
@@ -3989,6 +4009,7 @@ export default defineComponent({
       store,
       localTab,
       tabOptions,
+      whichEventsHelp,
       shouldShowTabs,
       updateTab,
       conditionsBuilderRef,

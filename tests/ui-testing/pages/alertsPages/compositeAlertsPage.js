@@ -80,7 +80,7 @@ export class CompositeAlertsPage {
 
       // ---- settings -----------------------------------------------------
       stalePolicyBase: 'alerts-composite-stale-policy',
-      stalePolicyHelp: '[data-test="alerts-composite-stale-policy-row-info"]',
+      stalePolicyHelp: '[data-test="alerts-composite-stale-policy-help"]',
 
       // ---- live preview --------------------------------------------------
       preview: '[data-test="alerts-composite-preview"]',

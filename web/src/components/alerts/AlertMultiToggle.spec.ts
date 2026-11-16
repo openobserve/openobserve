@@ -141,18 +141,19 @@ describe("AlertMultiToggle", () => {
       expect(labels).not.toContain(i18n.global.t("alerts.multiAlert.perGroup"));
     });
 
-    it("explains the per-unit choice behind the info icon in the matching unit", () => {
-      const info = (unit: "group" | "series") =>
-        mountToggle({ enabled: false, unit })
-          .get('[data-test="alerts-alertmultitoggle-row-info"]')
-          .attributes("aria-label");
-      expect(info("group")).toBe(i18n.global.t("alerts.multiAlert.perGroupDescription"));
-      expect(info("series")).toBe(i18n.global.t("alerts.multiAlert.perSeriesDescription"));
+    it("describes the ON state in the matching unit", () => {
+      const group = mountToggle({ enabled: true, unit: "group" });
+      expect(group.text()).toContain(i18n.global.t("alerts.multiAlert.perGroupDescription"));
+
+      const series = mountToggle({ enabled: true, unit: "series" });
+      expect(series.text()).toContain(i18n.global.t("alerts.multiAlert.perSeriesDescription"));
     });
 
-    it("shows no helper text under the choice", () => {
-      const w = mountToggle({ enabled: false, unit: "group" });
-      expect(w.text()).not.toContain(i18n.global.t("alerts.multiAlert.simpleDescription"));
+    it("describes the OFF state the same way for both, since simple is simple", () => {
+      for (const unit of ["group", "series"] as const) {
+        const w = mountToggle({ enabled: false, unit });
+        expect(w.text()).toContain(i18n.global.t("alerts.multiAlert.simpleDescription"));
+      }
     });
   });
 
