@@ -434,11 +434,20 @@ export const loadSampleData = async (
   return result;
 };
 
+// a 429 carries no Retry-After, so the wait doubles until the per-second quota frees up
+const RATE_LIMIT_DELAYS_MS = [1000, 2000, 4000, 8000];
+
 const ignoreMissing = async (fn: () => Promise<unknown>) => {
-  try {
-    await fn();
-  } catch (e: any) {
-    if (e?.response?.status !== 404) throw e;
+  for (let tries = 0; ; tries++) {
+    try {
+      await fn();
+      return;
+    } catch (e: any) {
+      const status = e?.response?.status;
+      if (status === 404) return;
+      if (status !== 429 || tries >= RATE_LIMIT_DELAYS_MS.length) throw e;
+      await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_DELAYS_MS[tries]));
+    }
   }
 };
 
@@ -578,15 +587,14 @@ export const removeSampleData = async (
     }
   });
   // the sample alerts and pipeline are gone by name; the cascade would also take the user's own
-  await step("streams", () =>
-    Promise.all(
-      SAMPLE_STREAM_SET.map((s) =>
-        attempt(failures, () =>
-          ignoreMissing(() => streamService.delete(org, s.name, s.type, false)),
-        ),
-      ),
-    ),
-  );
+  // one at a time: a burst of deletes trips a per-second stream delete quota
+  await step("streams", async () => {
+    for (const s of SAMPLE_STREAM_SET) {
+      await attempt(failures, () =>
+        ignoreMissing(() => streamService.delete(org, s.name, s.type, false)),
+      );
+    }
+  });
   try {
     await sampleDataService.deleteState(org);
   } catch (e) {
