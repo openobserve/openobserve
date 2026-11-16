@@ -275,6 +275,18 @@ describe("ThreadView", () => {
       expect(assistantBubble.text()).toContain("Hi there!");
     });
 
+    it("preserves placeholders and Markdown in the assistant reply", () => {
+      const llm = makeLLMSpan({
+        gen_ai_output_messages: JSON.stringify([
+          { role: "assistant", content: "**Email**: <PERSON_1>" },
+        ]),
+      });
+      wrapper = mountThreadView({ spans: [llm] });
+      const reply = wrapper.get(".thread-bubble--assistant");
+      expect(reply.text()).toContain("<PERSON_1>");
+      expect(reply.get("strong").text()).toBe("Email");
+    });
+
     it("should render the system prompt section when the first turn carries a system message", () => {
       const llm = makeLLMSpan({
         gen_ai_input_messages: JSON.stringify([

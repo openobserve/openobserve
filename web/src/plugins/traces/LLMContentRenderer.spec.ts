@@ -19,7 +19,6 @@ import i18n from "@/locales";
 import DOMPurify from "dompurify";
 
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
-import { marked } from "marked";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 
 // Mock DOMPurify
@@ -29,17 +28,15 @@ vi.mock("dompurify", () => ({
   },
 }));
 
-// Mock marked
-vi.mock("marked", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("marked")>();
-  return {
-    ...actual,
-    marked: {
-      ...actual.marked,
-      parse: vi.fn((md) => `<p>${md}</p>`),
-    },
-  };
-});
+const { parseMarkdown } = vi.hoisted(() => ({
+  parseMarkdown: vi.fn((md: string) => `<p>${md}</p>`),
+}));
+
+vi.mock("marked", () => ({
+  Marked: class {
+    parse = parseMarkdown;
+  },
+}));
 
 // Mock CodeQueryEditor (Monaco wrapper, not needed in unit tests)
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
@@ -1329,7 +1326,7 @@ describe("LLMContentRenderer", () => {
 
         wrapper.vm.renderMarkdown("Hello world");
         expect(DOMPurify.sanitize).toHaveBeenCalled();
-        expect(marked.parse).toHaveBeenCalled();
+        expect(parseMarkdown).toHaveBeenCalledWith("Hello world");
       });
     });
   });

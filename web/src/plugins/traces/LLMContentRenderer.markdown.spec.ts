@@ -18,6 +18,7 @@ import { enableAutoUnmount, mount } from "@vue/test-utils";
 import { marked } from "marked";
 import i18n from "@/locales";
 import LLMContentRenderer from "./LLMContentRenderer.vue";
+import { renderMarkdown } from "./markdown";
 
 enableAutoUnmount(afterEach);
 
@@ -81,8 +82,60 @@ describe("LLM content Markdown with real parsing and sanitization", () => {
     expect(wrapper.get(".message-content").text()).toContain(lastToken);
   });
 
-  it("does not change HTML rendering for other Markdown consumers", () => {
-    render([{ role: "user", content: "<b>literal HTML</b>" }]);
-    expect(marked.parse("<b>bold</b>")).toContain("<b>bold</b>");
+  it("preserves placeholders in the shared trace renderer", () => {
+    expect(renderMarkdown("My email is <PERSON_1>.")).toContain("My email is &lt;PERSON_1&gt;.");
+  });
+
+  it("preserves GFM tables, fenced code and autolinks in the shared renderer", () => {
+    const message = document.createElement("div");
+    message.innerHTML = renderMarkdown(
+      `| Name |\n| --- |\n| Alice |\n\n\`\`\`text\n${token}\n\`\`\`\n\nSee <https://example.com>`,
+    );
+    expect(message.querySelector("td")?.textContent).toBe("Alice");
+    expect(message.querySelector("pre code")?.textContent).toBe(`${token}\n`);
+    expect(message.querySelector("a")?.getAttribute("href")).toBe("https://example.com");
+  });
+});
+
+describe.each([
+  [
+    "preview",
+    (content: string) => render([{ role: "assistant", content }]).get(".message-content").element,
+  ],
+  [
+    "shared trace renderer",
+    (content: string) => {
+      const message = document.createElement("div");
+      message.innerHTML = renderMarkdown(content);
+      return message;
+    },
+  ],
+] as const)("%s Markdown behavior", (_name, renderMessage) => {
+  it("parses Markdown inside literal tag blocks", () => {
+    const message = renderMessage("<instructions>\nDo **X**.\n- a\n- b\n</instructions>");
+    expect(message.querySelector("strong")?.textContent).toBe("X");
+    expect(message.querySelectorAll("li")).toHaveLength(2);
+    expect(message.textContent).toContain("<instructions>");
+    expect(message.textContent).toContain("</instructions>");
+    expect(message.querySelector("instructions")).toBeNull();
+  });
+
+  it("decodes entities once inside literal tag blocks", () => {
+    const message = renderMessage("<note>\nTom &amp; Jerry\n</note>");
+    expect(message.textContent?.trim()).toBe("<note>\nTom & Jerry\n</note>");
+  });
+
+  it("is isolated from app-wide Markdown options", () => {
+    const originalOptions = { ...marked.defaults };
+    try {
+      marked.setOptions({ breaks: true, gfm: true });
+      const message = renderMessage("line one\nline two");
+      expect(message.textContent?.trim()).toBe("line one\nline two");
+      expect(message.querySelector("br")).toBeNull();
+      expect(marked.parse("line one\nline two")).toContain("<br>");
+      expect(marked.parse("<b>bold</b>")).toContain("<b>bold</b>");
+    } finally {
+      marked.setOptions(originalOptions);
+    }
   });
 });
