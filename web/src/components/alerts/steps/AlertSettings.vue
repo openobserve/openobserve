@@ -500,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, inject, ref, type PropType } from "vue";
+import { computed, defineComponent, inject, ref, watch, type PropType } from "vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -758,13 +758,25 @@ export default defineComponent({
       }
     };
 
-    // Period typed → cross-step CASCADE (period drives frequency / cron /
-    // timezone / silence). The ancestor AddAlert listens to @update:trigger
-    // (updateTriggerCondition → setFieldValue) and writes the whole
-    // trigger_condition into the ONE form, so the visible silence field
-    // auto-fills. The period field value itself is already written into the form
-    // by its own OFormInput binding; it rides on the emit so the parent write
-    // does not revert it.
+    // Baseline the linked fields are measured against; re-taken whenever the period changes from outside the handler.
+    let baselinePeriod = Number(props.formData?.trigger_condition?.period);
+    let lastHandledPeriod: unknown;
+    let followedFrequency: number | null = null;
+    let followedSilence: number | null = null;
+    // Runs after the handler (pre-flush), so a user edit is recognised by lastHandledPeriod and kept as ours.
+    watch(
+      () => props.formData?.trigger_condition?.period,
+      (period) => {
+        if (String(period) === String(lastHandledPeriod)) return;
+        baselinePeriod = Number(period);
+        followedFrequency = null;
+        followedSilence = null;
+      },
+    );
+    const isLinked = (value: unknown, followed: number) =>
+      value === undefined || value === null || value === "" || Number(value) === followed;
+
+    // Check every / Quiet after alerting follow the period only while still linked, so user-set and saved values survive.
     const handlePeriodChange = (val: unknown) => {
       const periodValue = Number(val);
       // Spread the FRESH form value, not `props.formData.trigger_condition`.
@@ -779,12 +791,24 @@ export default defineComponent({
         ...currentTrigger,
         period: val,
       };
+      lastHandledPeriod = val;
+      const minFrequency = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
+      // A new alert's default frequency is raised to the refresh floor, so that raised value is still linked.
+      followedFrequency ??= Math.max(baselinePeriod, minFrequency);
+      followedSilence ??= baselinePeriod;
       if (periodValue && periodValue > 0) {
-        const minFrequency = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
-        if (periodValue >= minFrequency) nextTrigger.frequency = periodValue;
-        nextTrigger.cron = convertMinutesToCron(periodValue);
+        if (periodValue >= minFrequency && isLinked(nextTrigger.frequency, followedFrequency)) {
+          nextTrigger.frequency = periodValue;
+          followedFrequency = periodValue;
+        }
+        // A cron schedule the user wrote is what runs the alert, so the period must not replace it.
+        if (nextTrigger.frequency_type !== "cron")
+          nextTrigger.cron = convertMinutesToCron(periodValue);
         if (!nextTrigger.timezone) nextTrigger.timezone = getBrowserTimezone();
-        nextTrigger.silence = periodValue;
+        if (isLinked(nextTrigger.silence, followedSilence)) {
+          nextTrigger.silence = periodValue;
+          followedSilence = periodValue;
+        }
       }
       emit("update:trigger", nextTrigger);
     };

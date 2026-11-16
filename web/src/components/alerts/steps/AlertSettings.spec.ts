@@ -21,14 +21,15 @@
 // makeAlertSettingsShape / createAlertSettingsSchema.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
-import { defineComponent, nextTick } from "vue";
+import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
+import { defineComponent, inject, nextTick, type Ref } from "vue";
 import { createStore } from "vuex";
 import { z } from "zod";
 import i18n from "@/locales";
 import config from "@/aws-exports";
 import AlertSettings from "./AlertSettings.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
   makeAlertSettingsShape,
   makeSilenceSchema,
@@ -265,6 +266,155 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(typeof trigger.cron).toBe("string");
     expect(trigger.cron.length).toBeGreaterThan(0);
     expect(trigger.timezone).toBeTruthy();
+  });
+
+  describe("period cascade keeps user-set Check every / Quiet after alerting", () => {
+    type TriggerValues = Record<string, unknown>;
+    interface LiveForm {
+      useStore: <T>(
+        selector: (state: { values: { trigger_condition: TriggerValues } }) => T,
+      ) => Ref<T>;
+      setFieldValue: (name: string, value: unknown) => void;
+      state: { values: { trigger_condition: TriggerValues } };
+    }
+
+    // Wires the step like AddAlert: formData is the live form read-view and update:trigger writes back into the form.
+    const LiveStep = defineComponent({
+      components: { AlertSettings },
+      setup() {
+        const form = inject(FORM_CONTEXT_KEY) as LiveForm;
+        const formData = form.useStore((state) => state.values);
+        const onTrigger = (trigger: TriggerValues) =>
+          form.setFieldValue("trigger_condition", trigger);
+        return { formData, onTrigger };
+      },
+      template: `
+        <AlertSettings
+          :form-data="formData"
+          is-real-time="false"
+          :destinations="[]"
+          :formatted-destinations="[]"
+          @update:trigger="onTrigger"
+        />
+      `,
+    });
+
+    const defaults = { period: 10, frequency: 10, silence: 10, frequency_type: "minutes" };
+
+    const mountLive = (trigger: TriggerValues = defaults, minAutoRefreshInterval = 60) =>
+      mount(
+        defineComponent({
+          components: { OForm, LiveStep },
+          setup: () => ({
+            schema: parentSchema,
+            defaultValues: { trigger_condition: { ...trigger }, destinations: [] },
+          }),
+          template: `
+            <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+              <LiveStep />
+            </OForm>
+          `,
+        }),
+        {
+          global: {
+            plugins: [makeStore({ min_auto_refresh_interval: minAutoRefreshInterval }), i18n],
+          },
+        },
+      );
+
+    const liveForm = (host: VueWrapper) =>
+      (host.findComponent({ name: "OForm" }).vm as unknown as { form: LiveForm }).form;
+
+    // Loads values after mount, the way an edit fetch, prefill or JSON editor re-seeds the form.
+    const loadTrigger = async (host: VueWrapper, trigger: TriggerValues) => {
+      liveForm(host).setFieldValue("trigger_condition", { ...trigger });
+      await flushPromises();
+    };
+
+    const typePeriod = async (host: VueWrapper, value: string) => {
+      await host.find('[data-test="alert-settings-period-input"] input').setValue(value);
+      // The period input debounces its update by 300ms.
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await flushPromises();
+      return liveForm(host).state.values.trigger_condition;
+    };
+
+    const saved = { period: 15, frequency: 5, silence: 30, frequency_type: "minutes" };
+
+    it("editing a saved alert (5/15/30) loaded after mount: changing only the period keeps frequency and silence", async () => {
+      const host = mountLive();
+      await loadTrigger(host, saved);
+
+      const trigger = await typePeriod(host, "20");
+
+      expect(trigger).toMatchObject({ period: "20", frequency: 5, silence: 30 });
+    });
+
+    it("keeps a hand-written cron schedule when only the period changes", async () => {
+      const host = mountLive();
+      await loadTrigger(host, {
+        ...saved,
+        frequency_type: "cron",
+        cron: "0 9 * * *",
+        timezone: "UTC",
+      });
+
+      const trigger = await typePeriod(host, "20");
+
+      expect(trigger.period).toBe("20");
+      expect(trigger.cron).toBe("0 9 * * *");
+    });
+
+    it("new alert defaults (10/10/10): frequency and silence follow the period, across keystrokes", async () => {
+      const host = mountLive();
+
+      await typePeriod(host, "3");
+      const trigger = await typePeriod(host, "30");
+
+      expect(trigger).toMatchObject({ frequency: 30, silence: 30 });
+    });
+
+    it("a default frequency raised to the refresh floor still follows the period", async () => {
+      const host = mountLive({ ...defaults, frequency: 30 }, 1800);
+
+      const trigger = await typePeriod(host, "60");
+
+      expect(trigger).toMatchObject({ frequency: 60, silence: 60 });
+    });
+
+    it("Check every set first (5), then period 20: frequency stays 5, default silence follows", async () => {
+      const host = mountLive();
+      liveForm(host).setFieldValue("trigger_condition.frequency", 5);
+
+      const trigger = await typePeriod(host, "20");
+
+      expect(trigger).toMatchObject({ frequency: 5, silence: 20 });
+    });
+
+    it("Quiet after alerting changed by the user stops following later period edits", async () => {
+      const host = mountLive();
+
+      await typePeriod(host, "20");
+      liveForm(host).setFieldValue("trigger_condition.silence", 45);
+      const trigger = await typePeriod(host, "25");
+
+      expect(trigger).toMatchObject({ frequency: 25, silence: 45 });
+    });
+
+    it("a form re-seeded without remount re-links fields that match its new period", async () => {
+      const host = mountLive();
+      await typePeriod(host, "20");
+      await loadTrigger(host, {
+        period: 15,
+        frequency: 15,
+        silence: 15,
+        frequency_type: "minutes",
+      });
+
+      const trigger = await typePeriod(host, "40");
+
+      expect(trigger).toMatchObject({ frequency: 40, silence: 40 });
+    });
   });
 
   it("period cleared: emits update:trigger without cascading", () => {
