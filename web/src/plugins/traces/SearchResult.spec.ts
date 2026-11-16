@@ -290,7 +290,7 @@ describe("SearchResult", () => {
     });
   });
 
-  it("hands the RED charts the page's chart filter over the typed one (Codex pass 2 B-3)", async () => {
+  it("hands the RED charts the page's chart filter over the typed one", async () => {
     const dashboard = () => wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
     await wrapper.setProps({ chartFilter: "service_name = 'a'" });
     expect(dashboard().props("filter")).toBe("service_name = 'a'");

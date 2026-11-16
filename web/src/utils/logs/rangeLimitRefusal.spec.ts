@@ -85,7 +85,7 @@ describe("chipsWithinLimit", () => {
     expect(chipsWithinLimit(chips, 2).map((c) => c.value)).toEqual(["15m", "1h"]);
   });
 
-  it("checks a chip by the span it resolves to, so a fall-back week is 169 h (Codex pass 2 B-4)", () => {
+  it("checks a chip by the span it resolves to, so a fall-back week is 169 h", () => {
     const zone = process.env.TZ;
     process.env.TZ = "America/New_York";
     vi.useFakeTimers({ toFake: ["Date"] });

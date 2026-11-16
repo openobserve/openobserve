@@ -85,7 +85,7 @@ describe("LogsNoEventsState", () => {
     expect(text).toContain("No events in Oct 1 – 31");
   });
 
-  it("dates the empty range in the user's locale (Codex pass 2 B-6)", () => {
+  it("dates the empty range in the user's locale", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-16T03:00:00Z"));
     const locale = i18n.global.locale;

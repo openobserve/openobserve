@@ -393,7 +393,7 @@ describe("useStreamFields Composable", () => {
       }
     });
 
-    it("labels the header with the rows' offset when fields are selected (Codex pass 2 B-5)", () => {
+    it("labels the header with the rows' offset when fields are selected", () => {
       const zone = store.state.timezone;
       store.state.timezone = "America/New_York";
       searchObj.data.stream.selectedFields = ["message"];

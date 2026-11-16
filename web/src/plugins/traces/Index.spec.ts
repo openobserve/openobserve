@@ -1004,7 +1004,7 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(setRange).toHaveBeenCalledWith({ kind: "fixed", ...LOGS_RANGE });
       });
 
-      it("dates the offered range in the user's locale (Codex pass 2 B-6)", async () => {
+      it("dates the offered range in the user's locale", async () => {
         localStorage.setItem(historyKey(), JSON.stringify([{ ...LOGS_RANGE, source: "Logs" }]));
         const locale = i18n.global.locale;
         (i18n.global as any).locale = "fr";
@@ -5050,7 +5050,7 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
-  describe("context view and linked range (Codex pass 1)", () => {
+  describe("context view and linked range", () => {
     const fakeBar = {
       setEditorValue: vi.fn(),
       enterContextWindow: vi.fn(),
@@ -5112,7 +5112,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(ownRequests().at(-1)?.filter).toBe("");
     });
 
-    it("Keep filters after a filters-off Search around runs with the typed filter (Codex pass 2 B-1)", async () => {
+    it("Keep filters after a filters-off Search around runs with the typed filter", async () => {
       wrapper = mountWithBar();
       await flushPromises();
       mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
@@ -5128,7 +5128,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(ownRequests().at(-1)?.filter).not.toBe("");
     });
 
-    it("hands the RED charts the rows' filter, none in the context view (Codex pass 2 B-3)", async () => {
+    it("hands the RED charts the rows' filter, none in the context view", async () => {
       // The mock search state is not reactive, so the filter is in place before the first read.
       mockSearchObj.data.editorValue = "service_name = 'api'";
       wrapper = mountWithBar();
@@ -5172,28 +5172,25 @@ describe("Index.vue (Main Traces Page)", () => {
             true,
           ),
       ],
-    ])(
-      "%s on a refused link's stream runs (Codex pass 2 B-2)",
-      async (_name, apply: (vm: any) => unknown) => {
-        wrapper = mountWithBar();
-        await flushPromises();
-        mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
-        tracesRangeLink.fromLink = true;
-        tracesRangeLink.refusal = {
-          asked: { startUs: 0, endUs: 1 },
-          period: "7d",
-          allowed: "1d",
-          allowedPeriod: "24h",
-          stream: "default",
-        };
-        mockFetchQueryDataWithHttpStream.mockClear();
-        await apply(wrapper.vm);
-        await flushPromises();
-        expect(tracesRangeLink.refusal).toBeNull();
-        expect(tracesRangeLink.fromLink).toBe(false);
-        await vi.waitFor(() => expect(ownRequests().length).toBeGreaterThan(0), { timeout: 2000 });
-      },
-    );
+    ])("%s on a refused link's stream runs", async (_name, apply: (vm: any) => unknown) => {
+      wrapper = mountWithBar();
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      tracesRangeLink.fromLink = true;
+      tracesRangeLink.refusal = {
+        asked: { startUs: 0, endUs: 1 },
+        period: "7d",
+        allowed: "1d",
+        allowedPeriod: "24h",
+        stream: "default",
+      };
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await apply(wrapper.vm);
+      await flushPromises();
+      expect(tracesRangeLink.refusal).toBeNull();
+      expect(tracesRangeLink.fromLink).toBe(false);
+      await vi.waitFor(() => expect(ownRequests().length).toBeGreaterThan(0), { timeout: 2000 });
+    });
 
     it("Back from a moved context window restores the earlier relative range in the picker", async () => {
       wrapper = mountWithBar();

@@ -570,6 +570,7 @@ pub async fn prepare_update_by_id(
     }
 
     validate_schedule(&mut report)?;
+    validate_calendar_periods(&report)?;
 
     if report.dashboards.is_empty() {
         return Err(ReportError::NoDashboards);
@@ -1565,6 +1566,23 @@ mod tests {
             assert!(created.is_err(), "{created:?}");
             assert_eq!(created, updated);
         }
+    }
+
+    #[tokio::test]
+    async fn update_by_id_rejects_a_calendar_period_it_cannot_resolve() {
+        let saved = config::CONFIG.load_full();
+        let mut cfg = config::config::init();
+        cfg.common.report_server_url = "http://report-server.example".to_string();
+        config::CONFIG.store(std::sync::Arc::new(cfg));
+        let mut report = with_period("calendar:fortnight:-1");
+        report.name = "weekly".to_string();
+        let updated = update_by_id("org_a", "r1", None, report).await;
+        config::CONFIG.store(saved);
+        assert!(
+            matches!(&updated, Err(ReportError::InvalidCalendarPeriod(p)) if p == "calendar:fortnight:-1"),
+            "{:?}",
+            updated.map_err(|e| e.to_string())
+        );
     }
 
     #[test]

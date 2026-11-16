@@ -44,7 +44,7 @@ describe("RangeLimitStrip", () => {
     (i18n.global as any).locale = locale;
   });
 
-  it("dates a refused fixed range in the user's locale (Codex pass 2 B-6)", () => {
+  it("dates a refused fixed range in the user's locale", () => {
     (i18n.global as any).locale = "fr";
     const text = mountStrip().text();
     expect(text).toMatch(/oct\./);

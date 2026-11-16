@@ -90,7 +90,7 @@ describe("share link kinds", () => {
       (i18n.global as any).locale = original;
     });
 
-    it("dates a fixed window in the user's locale (Codex pass 2 B-6)", () => {
+    it("dates a fixed window in the user's locale", () => {
       (i18n.global as any).locale = "fr";
       const startUs = Date.UTC(2026, 9, 3, 8, 0) * 1000;
       const endUs = Date.UTC(2026, 9, 5, 9, 0) * 1000;
