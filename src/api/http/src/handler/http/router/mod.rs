@@ -3497,7 +3497,6 @@ mod tests {
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
     async fn enterprise_stubs_refuse_before_reading_the_request_in_the_oss_build() {
-        // Every OSS-mounted enterprise stub and the refusal it gives for any input (#3526).
         #[rustfmt::skip]
         const ENTERPRISE_STUBS: &[(&str, &str, u16, &str)] = &[
             ("GET", "/api/v2/default/downtimes", 403, "Not Supported"),
