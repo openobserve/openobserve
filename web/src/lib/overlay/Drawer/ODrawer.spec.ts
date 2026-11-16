@@ -465,5 +465,26 @@ describe("ODrawer", () => {
       expect(wrapper.emitted("after-close")).toHaveLength(1);
       wrapper.unmount();
     });
+
+    it("leaves focus the page took while the drawer was closing", async () => {
+      const row = document.createElement("tr");
+      row.tabIndex = 0;
+      row.scrollIntoView = vi.fn();
+      const editor = document.createElement("textarea");
+      document.body.append(row, editor);
+      const wrapper = mountWith(() => row);
+      editor.focus();
+      const event = closeEvent();
+
+      await findDrawerPanel(wrapper).vm.$emit("closeAutoFocus", event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(editor);
+      expect(row.scrollIntoView).not.toHaveBeenCalled();
+      expect(wrapper.emitted("after-close")).toHaveLength(1);
+      wrapper.unmount();
+      row.remove();
+      editor.remove();
+    });
   });
 });

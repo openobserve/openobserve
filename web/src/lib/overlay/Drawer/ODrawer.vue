@@ -117,7 +117,19 @@ onDeactivated(() => {
 });
 onActivated(() => (hostAway.value = false));
 
+function focusMovedOutside(): boolean {
+  const active = document.activeElement;
+  const content = bodyRef.value?.closest("[data-o2-drawer]");
+  return active instanceof HTMLElement && active !== document.body && !content?.contains(active);
+}
+
 function handleCloseAutoFocus(event: Event) {
+  // A non-modal drawer leaves the page live while it animates out, so focus placed there since wins over the return target.
+  if (!hostAway.value && !awaySinceOpen && focusMovedOutside()) {
+    event.preventDefault();
+    emit("after-close");
+    return;
+  }
   if (hostAway.value || awaySinceOpen) event.preventDefault();
   const target = hostAway.value ? null : props.returnFocusTo?.();
   if (target?.isConnected) {
