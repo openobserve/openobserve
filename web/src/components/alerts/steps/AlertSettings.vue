@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center">
                   <div class="w-21.75">
                     <OFormInput
-                      :aria-label="t('alerts.silenceNotification')"
+                      :aria-label="t('alerts.plain.cooldown')"
                       name="trigger_condition.silence"
                       type="number"
                       min="0"
@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center">
                   <div class="w-21.75">
                     <OFormInput
-                      :aria-label="t('alerts.silenceNotification')"
+                      :aria-label="t('alerts.plain.cooldown')"
                       name="trigger_condition.silence"
                       type="number"
                       min="0"
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center gap-2">
                   <div class="w-21.75">
                     <OFormInput
-                      :aria-label="t('alerts.summary.pendingPeriod')"
+                      :aria-label="t('alerts.plain.forAtLeast')"
                       name="_ui.pendingPeriod"
                       type="number"
                       min="0"
@@ -280,9 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OFormInput>
                   </div>
                   <OSelect
-                    :aria-label="
-                      t('common.unitFor', { label: t('alerts.queryConfig.pendingPeriod') })
-                    "
+                    :aria-label="t('common.unitFor', { label: t('alerts.plain.forAtLeast') })"
                     class="max-w-25 min-w-20"
                     :model-value="pendingPeriodUnit"
                     :options="pendingPeriodUnitOptions"

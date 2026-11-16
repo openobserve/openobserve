@@ -1286,6 +1286,84 @@ describe("AddAlert (OForm owner)", () => {
       );
     });
 
+    it("never folds a section the user has touched when the form re-fits", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.vm.autoOpenedTiers.has("notify")).toBe(true);
+      const rect = vi
+        .spyOn(Element.prototype, "getBoundingClientRect")
+        .mockReturnValue({ top: 0, bottom: 5000 } as DOMRect);
+      try {
+        wrapper
+          .get('[data-snap-section="notify"]')
+          .element.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+        wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+        await flushPromises();
+      } finally {
+        rect.mockRestore();
+      }
+      expect(wrapper.vm.tiers.view("notify").expanded).toBe(true);
+      expect(wrapper.vm.tiers.view("condition").expanded).toBe(false);
+    });
+
+    it("does not count a jump that focuses a section heading as touching it", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const rect = vi
+        .spyOn(Element.prototype, "getBoundingClientRect")
+        .mockReturnValue({ top: 0, bottom: 5000 } as DOMRect);
+      try {
+        wrapper
+          .get('[data-snap-section="notify"] [data-snap-heading]')
+          .element.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+        wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+        await flushPromises();
+      } finally {
+        rect.mockRestore();
+      }
+      expect(wrapper.vm.tiers.view("notify").expanded).toBe(false);
+    });
+
+    it("moves the preview under the condition step below lg and back beside it at lg", async () => {
+      breakpoint.lgUp!.value = false;
+      wrapper = mountAlert();
+      await flushPromises();
+      const inCondition = () =>
+        wrapper.find('[data-test="add-alert-narrow-preview"] [data-test="add-alert-rail-content"]');
+      expect(inCondition().exists()).toBe(true);
+      expect(wrapper.get('[data-test="add-alert-rail"]').classes()).toContain("hidden");
+
+      breakpoint.lgUp!.value = true;
+      await flushPromises();
+      expect(inCondition().exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="add-alert-rail"] [data-test="add-alert-rail-content"]').exists(),
+      ).toBe(true);
+    });
+
+    it("keeps Find a setting and fits the condition subtitle for anomaly and composite", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const help = () => wrapper.get('[data-test="add-alert-section-condition-help"]').text();
+      expect(help()).toContain("how many is a problem");
+
+      wrapper.vm.form.setFieldValue("is_real_time", "anomaly");
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-find-setting"]').exists()).toBe(true);
+      expect(help()).toBe(
+        "Choose what to measure and how unusual a value must be before it alerts you.",
+      );
+      wrapper.vm.settingFind.query.value = "sensitivity";
+      await flushPromises();
+      expect(wrapper.vm.settingFind.items.value.map((i: { id: string }) => i.id)).toEqual([
+        "anomalySensitivity",
+      ]);
+
+      wrapper.vm.form.setFieldValue("is_real_time", "composite");
+      await flushPromises();
+      expect(help()).toBe("Pick the alerts to combine and how they must fire together.");
+    });
+
     it("keeps Save outlined while stepping and primary on the last step", async () => {
       wrapper = mountAlert();
       await flushPromises();
@@ -1387,7 +1465,7 @@ describe("AddAlert (OForm owner)", () => {
       wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-rail-sentence"]').text()).toBe(
-        "Alerts nobody yet when 3+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
+        "Won't notify anyone yet. Fires when 3+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
       );
       expect(wrapper.find('[data-test="add-alert-read-back"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="alerts-alert-summary"]').exists()).toBe(false);
@@ -1526,6 +1604,16 @@ describe("AddAlert (OForm owner)", () => {
   });
 
   describe("edit header and tucked settings", () => {
+    it("titles the last step for its optional details, since the name is fixed", async () => {
+      wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
+      await flushPromises();
+      expect(wrapper.get('[data-test="add-alert-section-details-title"]').text()).toBe("Details");
+      expect(wrapper.get('[data-test="add-alert-section-details-help"]').text()).toBe(
+        "The name stays as saved. Everything here is optional.",
+      );
+      expect(wrapper.find('[data-test="add-alert-details-name-input"]').exists()).toBe(false);
+    });
+
     it("keeps a header Disable through the next Save and does not count it as unsaved", async () => {
       wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
       await flushPromises();

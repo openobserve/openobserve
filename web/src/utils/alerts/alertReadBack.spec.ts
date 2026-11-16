@@ -34,7 +34,19 @@ const alert = (over: Partial<ReadBackAlert> = {}): ReadBackAlert => ({
 describe("describeAlertInPlainWords", () => {
   it("says nobody is alerted yet when no destination is picked", () => {
     expect(describeAlertInPlainWords(alert(), t)).toBe(
-      "Alerts nobody yet when 3+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
+      "Won't notify anyone yet. Fires when 3+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
+    );
+  });
+
+  it("says an incident opens when nobody else is told", () => {
+    expect(
+      describeAlertInPlainWords(alert({ creates_incident: true }), t, { incidentsEnabled: true }),
+    ).toMatch(/^Opens an incident when 3\+ events turn up/);
+  });
+
+  it("ignores a stored incident flag where incidents are off", () => {
+    expect(describeAlertInPlainWords(alert({ creates_incident: true }), t)).toMatch(
+      /^Won't notify anyone yet\. Fires when/,
     );
   });
 
@@ -93,7 +105,7 @@ describe("describeAlertInPlainWords", () => {
       t,
     );
     expect(text).toBe(
-      "Alerts nobody yet when avg of latency_ms is > 500 over 5 minutes, checked on the cron schedule 0 */5 * * * *.",
+      "Won't notify anyone yet. Fires when avg of latency_ms is > 500 over 5 minutes, checked on the cron schedule 0 */5 * * * *.",
     );
   });
 
@@ -113,7 +125,7 @@ describe("describeAlertInPlainWords", () => {
       { aggregationEnabled: false },
     );
     expect(text).toBe(
-      "Alerts nobody yet when 3+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
+      "Won't notify anyone yet. Fires when 3+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
     );
   });
 

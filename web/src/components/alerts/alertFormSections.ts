@@ -33,7 +33,8 @@ export type AlertSectionSlot =
   | "anomalyTraining"
   | "anomalySchedule"
   | "compositeCondition"
-  | "compositePreview";
+  | "compositePreview"
+  | "narrowPreview";
 
 /** Teleport targets a step renders its slices into; absent or null keeps the slice inline. */
 export type AlertSectionTargets = Partial<Record<AlertSectionSlot, HTMLElement | null>>;
