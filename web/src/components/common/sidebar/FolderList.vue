@@ -255,7 +255,7 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ["update:folders", "update:activeFolderId"],
+  emits: ["update:folders", "update:activeFolderId", "folders-loaded"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
@@ -311,7 +311,9 @@ export default defineComponent({
 
     onMounted(async () => {
       // A folder-list 403 must not strand the folder selection below.
-      await getFoldersListByType(store, props.type).catch(() => null);
+      await getFoldersListByType(store, props.type)
+        .then(() => emit("folders-loaded"))
+        .catch(() => null);
       const urlFolder = router.currentRoute.value.query.folder as string | undefined;
       if (urlFolder) {
         activeFolderId.value = fallbackFolder(urlFolder);

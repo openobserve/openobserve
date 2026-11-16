@@ -623,6 +623,7 @@ pub async fn list_synthetics(
         &org_id,
         &user_email.user_id,
         params.folder_id.as_deref(),
+        false,
     )
     .await
     {
@@ -652,6 +653,7 @@ async fn listable_synthetics_folders(
     org_id: &str,
     user_id: &str,
     folder: Option<&str>,
+    allow_empty: bool,
 ) -> Result<Option<Vec<String>>, Response> {
     let folder_type = o2_openfga::meta::mapping::OFGA_MODELS
         .get("synthetic_folder")
@@ -659,7 +661,7 @@ async fn listable_synthetics_folders(
     let listable = db::authz::listable_folders(org_id, user_id, folder_type)
         .await
         .map_err(|e| MetaHttpResponse::forbidden(e.to_string()))?;
-    admit_listable(listable, folder).map_err(MetaHttpResponse::forbidden)
+    admit_listable(listable, folder, allow_empty).map_err(MetaHttpResponse::forbidden)
 }
 
 /// `Err` says which list access is missing; `None` (every folder) admits any request.
@@ -667,11 +669,12 @@ async fn listable_synthetics_folders(
 fn admit_listable(
     listable: Option<Vec<String>>,
     folder: Option<&str>,
+    allow_empty: bool,
 ) -> Result<Option<Vec<String>>, &'static str> {
     let Some(folders) = listable else {
         return Ok(None);
     };
-    if folders.is_empty() {
+    if folders.is_empty() && !allow_empty {
         return Err("You cannot list any synthetics folder; ask an admin for list access to one.");
     }
     if folder.is_some_and(|folder| !folders.iter().any(|f| f == folder)) {
@@ -687,7 +690,8 @@ pub(crate) async fn listable_folders(
     user_id: Option<&str>,
 ) -> Result<Vec<config::meta::folder::Folder>, Response> {
     #[cfg(feature = "enterprise")]
-    let listable = listable_synthetics_folders(org_id, user_id.unwrap_or_default(), None).await?;
+    let listable =
+        listable_synthetics_folders(org_id, user_id.unwrap_or_default(), None, false).await?;
     #[cfg(not(feature = "enterprise"))]
     let listable: Option<Vec<String>> = None;
     let mut folders =
@@ -2614,7 +2618,9 @@ pub async fn list_locations(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
-    let listable = match listable_synthetics_folders(&org_id, &user_email.user_id, None).await {
+    // A direct grant on one check opens its editor, which needs every location to pick from.
+    let listable = match listable_synthetics_folders(&org_id, &user_email.user_id, None, true).await
+    {
         Ok(listable) => listable,
         Err(resp) => return resp,
     };
@@ -2646,12 +2652,15 @@ mod tests {
     #[test]
     fn listing_needs_a_listable_folder_and_shows_only_listable_ones() {
         let team = || Some(vec!["team".to_string()]);
-        assert_eq!(admit_listable(None, None), Ok(None));
-        assert_eq!(admit_listable(None, Some("any")), Ok(None));
-        assert_eq!(admit_listable(team(), None), Ok(team()));
-        assert_eq!(admit_listable(team(), Some("team")), Ok(team()));
-        assert!(admit_listable(team(), Some("default")).is_err());
-        assert!(admit_listable(Some(vec![]), None).is_err());
+        assert_eq!(admit_listable(None, None, false), Ok(None));
+        assert_eq!(admit_listable(None, Some("any"), false), Ok(None));
+        assert_eq!(admit_listable(team(), None, false), Ok(team()));
+        assert_eq!(admit_listable(team(), Some("team"), false), Ok(team()));
+        assert!(admit_listable(team(), Some("default"), false).is_err());
+        assert!(admit_listable(Some(vec![]), None, false).is_err());
+        // Locations admit an empty set: an editor opened by a check grant needs the picker.
+        assert_eq!(admit_listable(Some(vec![]), None, true), Ok(Some(vec![])));
+        assert_eq!(admit_listable(team(), None, true), Ok(team()));
 
         let folders = || {
             ["default", "team"].map(|id| config::meta::folder::Folder {

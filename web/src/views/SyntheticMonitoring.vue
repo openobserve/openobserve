@@ -111,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"
           @update:activeFolderId="updateActiveFolderId"
+          @folders-loaded="clearFolderFailure"
         />
       </div>
 
@@ -819,8 +820,7 @@ async function loadFolders() {
     const folders = await getFoldersListByType(store, "synthetics");
     const folder = selectSyntheticsFolder(folders, route.query.folder as string | undefined);
     activeFolderId.value = folder ?? "";
-    foldersFailed.value = false;
-    foldersForbidden.value = false;
+    clearFolderFailure();
   } catch (err) {
     console.error("[synthetics] failed to load folders", err);
     foldersFailed.value = true;
@@ -828,6 +828,12 @@ async function loadFolders() {
   } finally {
     foldersLoaded.value = true;
   }
+}
+
+// The sidebar refetches on remount, so its success must lift a denial this page saw earlier.
+function clearFolderFailure() {
+  foldersFailed.value = false;
+  foldersForbidden.value = false;
 }
 
 /** Refresh retries a failed folder load, since no check can be read without a folder. */

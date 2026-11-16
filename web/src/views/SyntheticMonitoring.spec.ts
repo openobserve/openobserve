@@ -443,7 +443,7 @@ describe("SyntheticMonitoring", () => {
       { status: 403, forbidden: true, error: null },
       { status: 500, forbidden: false, error: "synthetics.checkDetails.foldersUnavailable" },
     ])(
-      "shows a $status folder-list failure, not an empty list, and Retry reloads it",
+      "shows a $status folder-list failure until a remounted folder list loads, and Retry reloads it",
       async ({ status, forbidden, error }) => {
         vi.mocked(getFoldersListByType).mockRejectedValue({ response: { status, data: {} } });
         wrapper = mountPage(withFolderList);
@@ -457,6 +457,19 @@ describe("SyntheticMonitoring", () => {
         mt.vm.$emit("retry");
         await flushPromises();
         expect(getFoldersListByType).toHaveBeenCalledTimes(calls + 1);
+
+        vi.mocked(getFoldersListByType).mockResolvedValue([
+          { folderId: "default", name: "Default" },
+        ]);
+        (wrapper.vm as any).activeSection = "private";
+        await flushPromises();
+        (wrapper.vm as any).activeSection = "checks";
+        await flushPromises();
+        const back = wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+        expect(back.props("forbidden")).toBe(false);
+        expect(back.props("error") ?? null).toBeNull();
+        expect(back.props("loading")).toBe(false);
+        expect(back.props("data")).toEqual([]);
       },
     );
   });
