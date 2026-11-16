@@ -47,8 +47,9 @@ use o2_enterprise::enterprise::{
     },
     common::config::get_config as get_o2_config,
 };
-use openobserve_core::ai_chat::admission::{
-    AdmitError, TURN_LIMIT, is_uuid, normalize_uuid, prompt_title, resolve_owner,
+use openobserve_core::ai_chat::{
+    admission::{AdmitError, TURN_LIMIT, is_uuid, normalize_uuid, prompt_title, resolve_owner},
+    projection::{DeleteRequest, delete_confirmation_requests},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -1139,9 +1140,8 @@ pub async fn get(
         Err(resp) => return resp,
     };
     let newest = records.last().filter(|r| recent_turn(r, now));
-    let pending = pending_approval_in(&events, newest, now)
-        .filter(|_| unanswered(confirmations_in(&events, newest, now), answers))
-        .or_else(|| {
+    let pending =
+        waiting_call(&requests_in(&events, newest), &answers_of(newest), now).or_else(|| {
             waiting_cards(cards.as_deref().unwrap_or_default(), &user_email, now)
                 .remove(&row.session_id)
         });
@@ -2091,21 +2091,17 @@ async fn list_pending(
             Some((row, turn.turn_id.as_str(), turn.started_at))
         })
         .collect();
-    let sessions: Vec<(String, i64)> = chats
-        .iter()
-        .map(|(r, _, started)| (r.session_id.clone(), *started))
-        .collect();
-    let (pending, answers, cards) = tokio::join!(
+    let (pending, cards) = tokio::join!(
         openobserve_core::ai_chat::pending_confirmations(org_id, &chats),
-        super::turn_marks::answers_since(org_id, user_email, &sessions),
         ai_approvals::list_waiting(org_id, now),
     );
     let mut pending: HashMap<String, String> = pending?
         .into_iter()
-        .filter(|(session_id, (_, asked))| {
-            unanswered(*asked, answers.get(session_id).copied().unwrap_or(0))
+        .filter_map(|(session_id, requests)| {
+            let newest = newest.iter().find(|r| r.session_id == session_id);
+            let call = waiting_call(&requests, &answers_of(newest), now)?;
+            Some((session_id, call))
         })
-        .map(|(session_id, (call, _))| (session_id, call))
         .collect();
     let cards = cards.unwrap_or_else(|e| {
         log::warn!("[AI-CHAT] cannot read the waiting approvals of {org_id}: {e}");
@@ -2117,9 +2113,39 @@ async fn list_pending(
     Ok(pending)
 }
 
-/// The newest turn still waits while it asked more confirmations than the member has answered.
-fn unanswered(asked: usize, answered: usize) -> bool {
-    asked > answered
+/// The call (maybe empty) of the newest request `now` can still answer and no answer covers.
+/// An answer naming a request covers only it; one naming none covers every request before it.
+fn waiting_call(
+    requests: &[(String, DeleteRequest)],
+    answers: &[(Option<String>, i64)],
+    now: i64,
+) -> Option<String> {
+    let named = |id: &str| requests.iter().any(|(key, _)| key == id);
+    let covered = |key: &str, request: &DeleteRequest| {
+        answers.iter().any(|(id, at)| match id.as_deref() {
+            Some(id) if named(id) => id == key,
+            _ => request.asked_at.is_none_or(|asked| asked <= *at),
+        })
+    };
+    requests
+        .iter()
+        .rev()
+        .filter(|(_, request)| request.live(now / 1000))
+        .find(|(key, request)| !covered(key.as_str(), request))
+        .map(|(_, request)| request.call.clone())
+}
+
+/// The `(id, at ms)` of each confirmation answered in the newest turn.
+fn answers_of(newest: Option<&TurnRecord>) -> Vec<(Option<String>, i64)> {
+    newest
+        .map(ai_chat_turns::decisions_of)
+        .unwrap_or_default()
+        .iter()
+        .map(|d| {
+            let id = d["id"].as_str().map(str::to_string);
+            (id, d["at"].as_i64().unwrap_or(i64::MAX))
+        })
+        .collect()
 }
 
 /// How many confirmations the member answered in this chat since its newest turn started.
@@ -2139,32 +2165,28 @@ async fn answers_in_newest(
         .unwrap_or(0)
 }
 
-/// The newest turn's confirmation requests: one per call id, or per event without one.
-fn confirmations_in(events: &[DurableEvent], newest: Option<&TurnRecord>, now: i64) -> usize {
-    let Some(newest) = newest else {
-        return 0;
+/// The newest turn's delete requests by key, oldest first: one per call id, or per event without.
+fn requests_in(
+    events: &[DurableEvent],
+    newest: Option<&TurnRecord>,
+) -> Vec<(String, DeleteRequest)> {
+    let Some(start) = newest.and_then(|r| r.start_seq) else {
+        return Vec::new();
     };
-    let Some(start) = newest.start_seq else {
-        return 0;
-    };
-    let end = newest.end_seq.unwrap_or(i64::MAX);
-    let asked: std::collections::HashSet<String> = events
-        .iter()
-        .filter(|e| (start..=end).contains(&e.seq))
-        .filter_map(|e| {
-            let call = openobserve_core::ai_chat::projection::delete_confirmation_call(
-                &e.event_type,
-                &e.data,
-                now / 1000,
-            )?;
-            Some(if call.is_empty() {
+    let end = newest.and_then(|r| r.end_seq).unwrap_or(i64::MAX);
+    let mut requests: Vec<(String, DeleteRequest)> = Vec::new();
+    for e in events.iter().filter(|e| (start..=end).contains(&e.seq)) {
+        for request in delete_confirmation_requests(&e.event_type, &e.data) {
+            let key = if request.call.is_empty() {
                 format!("#{}", e.seq)
             } else {
-                call
-            })
-        })
-        .collect();
-    asked.len()
+                request.call.clone()
+            };
+            requests.retain(|(k, _)| *k != key);
+            requests.push((key, request));
+        }
+    }
+    requests
 }
 
 /// A current copy's pending flag: its own, until the newest turn ages out of the window.
@@ -2175,29 +2197,6 @@ fn still_pending(known: bool, newest: Option<&TurnRecord>, now: i64) -> bool {
 /// Whether a newest turn is young enough for its confirmation request to be reported.
 fn recent_turn(record: &TurnRecord, now: i64) -> bool {
     record.started_at >= now - PENDING_APPROVAL_MAX_AGE
-}
-
-/// The call id (empty: unknown) of the confirmation request the newest turn stored and `now` can
-/// still answer.
-fn pending_approval_in(
-    events: &[DurableEvent],
-    newest: Option<&TurnRecord>,
-    now: i64,
-) -> Option<String> {
-    let newest = newest?;
-    let start = newest.start_seq?;
-    let end = newest.end_seq.unwrap_or(i64::MAX);
-    events
-        .iter()
-        .rev()
-        .filter(|e| (start..=end).contains(&e.seq))
-        .find_map(|e| {
-            openobserve_core::ai_chat::projection::delete_confirmation_call(
-                &e.event_type,
-                &e.data,
-                now / 1000,
-            )
-        })
 }
 
 /// The oldest undecided, unexpired card `user_email` raised in each chat, by session.
@@ -3555,8 +3554,7 @@ mod tests {
         )
     }
 
-    /// A delete request whose tool ended at `ended_ms`, and whose sentinel may carry its own
-    /// expiry.
+    /// A delete request whose tool ended at `ended_ms`, its sentinel maybe carrying its own expiry.
     fn timed_delete_request(seq: i64, call: &str, ended_ms: i64, own: Option<i64>) -> DurableEvent {
         let mut sentinel = serde_json::json!({"type": "delete_confirmation", "resource_type": "alert", "id": "a1"});
         if let Some(at) = own {
@@ -3569,6 +3567,20 @@ mod tests {
                 "type": "tool", "state": {"status": "completed", "output": sentinel.to_string(),
                 "time": {"start": ended_ms - 5, "end": ended_ms}}}}),
         )
+    }
+
+    /// The call the newest turn still waits on, given `(id, at ms)` answers.
+    fn waiting_in(
+        events: &[DurableEvent],
+        newest: Option<&TurnRecord>,
+        answers: &[(Option<String>, i64)],
+        now: i64,
+    ) -> Option<String> {
+        waiting_call(&requests_in(events, newest), answers, now)
+    }
+
+    fn answer(id: &str, at_ms: i64) -> (Option<String>, i64) {
+        (Some(id.to_string()), at_ms)
     }
 
     /// A turn of seqs 0..=5 whose answer text grows over two events and gains a second part.
@@ -3701,15 +3713,20 @@ mod tests {
         let mut events = answer_turn();
         events.push(delete_request(6, "call_1"));
         let newest = turn_record(0, Some(9), TURN_COMPLETED);
-        assert_eq!(confirmations_in(&events, Some(&newest), 0), 1);
-        assert!(!unanswered(confirmations_in(&events, Some(&newest), 0), 1));
+        let first = [answer("call_1", 1)];
+        assert_eq!(requests_in(&events, Some(&newest)).len(), 1);
+        assert_eq!(waiting_in(&events, Some(&newest), &first, 0), None);
         // The turn resumed and asked again; one answer covers only the first request.
         events.push(delete_request(7, "call_2"));
         events.push(delete_request(8, "call_2"));
-        assert_eq!(confirmations_in(&events, Some(&newest), 0), 2);
-        assert!(unanswered(confirmations_in(&events, Some(&newest), 0), 1));
-        assert!(!unanswered(confirmations_in(&events, Some(&newest), 0), 2));
-        assert_eq!(confirmations_in(&events, None, 0), 0);
+        assert_eq!(requests_in(&events, Some(&newest)).len(), 2);
+        assert_eq!(
+            waiting_in(&events, Some(&newest), &first, 0).as_deref(),
+            Some("call_2")
+        );
+        let both = [answer("call_1", 1), answer("call_2", 2)];
+        assert_eq!(waiting_in(&events, Some(&newest), &both, 0), None);
+        assert!(requests_in(&events, None).is_empty());
     }
 
     #[test]
@@ -3723,12 +3740,10 @@ mod tests {
         let inside = at(ended_ms + DELETE_CONFIRMATION_TTL_MS - 1);
         let past = at(ended_ms + DELETE_CONFIRMATION_TTL_MS);
         assert_eq!(
-            pending_approval_in(&live, Some(&newest), inside).as_deref(),
+            waiting_in(&live, Some(&newest), &[], inside).as_deref(),
             Some("call_live")
         );
-        assert_eq!(confirmations_in(&live, Some(&newest), inside), 1);
-        assert_eq!(pending_approval_in(&live, Some(&newest), past), None);
-        assert_eq!(confirmations_in(&live, Some(&newest), past), 0);
+        assert_eq!(waiting_in(&live, Some(&newest), &[], past), None);
         // The sentinel's own expiry wins over the tool's end time.
         let mut own = answer_turn();
         own.push(timed_delete_request(
@@ -3738,16 +3753,61 @@ mod tests {
             Some(ended_ms + 10),
         ));
         assert_eq!(
-            pending_approval_in(&own, Some(&newest), at(ended_ms + 10)),
+            waiting_in(&own, Some(&newest), &[], at(ended_ms + 10)),
             None
         );
         // A legacy request with no time keeps the turn window as its only bound.
         let mut legacy = answer_turn();
         legacy.push(delete_request(6, "call_old"));
         assert_eq!(
-            pending_approval_in(&legacy, Some(&newest), past).as_deref(),
+            waiting_in(&legacy, Some(&newest), &[], past).as_deref(),
             Some("call_old")
         );
+    }
+
+    /// An answer to an expired request must not hide a live one, as a count of answers did.
+    #[test]
+    fn an_answer_to_an_expired_request_leaves_the_live_one_pending() {
+        use openobserve_core::ai_chat::projection::DELETE_CONFIRMATION_TTL_MS;
+        let newest = turn_record(0, Some(9), TURN_COMPLETED);
+        let mut events = answer_turn();
+        events.push(timed_delete_request(6, "call_old", 1_000, None));
+        let asked_ms = 1_000 + DELETE_CONFIRMATION_TTL_MS;
+        events.push(timed_delete_request(7, "call_new", asked_ms, None));
+        let now = (asked_ms + 1) * 1000;
+        let to_old = [answer("call_old", asked_ms + 1)];
+        assert_eq!(
+            waiting_in(&events, Some(&newest), &to_old, now).as_deref(),
+            Some("call_new")
+        );
+        // A batch card's answer names no call; it covers every request asked before it.
+        let early = [answer("apr_batch", asked_ms - 1)];
+        assert_eq!(
+            waiting_in(&events, Some(&newest), &early, now).as_deref(),
+            Some("call_new")
+        );
+        let late = [answer("apr_batch", asked_ms)];
+        assert_eq!(waiting_in(&events, Some(&newest), &late, now), None);
+        assert_eq!(
+            waiting_in(&events, Some(&newest), &[(None, asked_ms)], now),
+            None
+        );
+        // The answers are the decisions recorded on the newest turn.
+        let decided = TurnRecord {
+            decisions: Some(
+                serde_json::json!([
+                    {"approved": true, "by": "a@x.io", "at": 5, "id": "call_old"},
+                    {"approved": false, "by": "a@x.io", "at": 6}
+                ])
+                .to_string(),
+            ),
+            ..newest.clone()
+        };
+        assert_eq!(
+            answers_of(Some(&decided)),
+            vec![answer("call_old", 5), (None, 6)]
+        );
+        assert!(answers_of(None).is_empty());
     }
 
     #[test]
@@ -3789,6 +3849,53 @@ mod tests {
         assert!(marked.pending_approval && marked.in_progress());
     }
 
+    /// A recorded 2.x chat whose one tool call became a delete awaiting the user's confirmation.
+    fn v2_delete_chat() -> Vec<DurableEvent> {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../core/src/ai_chat/testdata/v2_user_text_and_tools.json"
+        );
+        let body: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let mut events: Vec<DurableEvent> = body["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| DurableEvent::from_sync_event(e).unwrap())
+            .collect();
+        let sentinel = serde_json::json!({"type": "delete_confirmation", "resource_type": "alert", "id": "a1"});
+        let tool = &mut events[2].data["message"]["content"][0];
+        assert_eq!(tool["type"], "tool");
+        tool["name"] = "o2_delete".into();
+        tool["state"]["content"] =
+            serde_json::json!([{"type": "text", "text": sentinel.to_string()}]);
+        events
+    }
+
+    /// 2.x re-records a whole message on every change, so each snapshot repeats its requests.
+    #[test]
+    fn a_2x_delete_request_is_pending_once_however_often_it_is_recorded() {
+        let mut events = v2_delete_chat();
+        let call = events[2].data["message"]["content"][0]["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let last = events.last().unwrap().seq;
+        let newest = turn_record(0, Some(last + 1), TURN_COMPLETED);
+        assert_eq!(requests_in(&events, Some(&newest)).len(), 1);
+        assert_eq!(
+            waiting_in(&events, Some(&newest), &[], 0).as_deref(),
+            Some(call.as_str())
+        );
+        let mut again = events[2].clone();
+        again.seq = last + 1;
+        events.push(again);
+        assert_eq!(requests_in(&events, Some(&newest)).len(), 1);
+        let answered = [answer(&call, 1)];
+        assert_eq!(waiting_in(&events, Some(&newest), &answered, 0), None);
+        let later = turn_record(last + 2, None, TURN_RUNNING);
+        assert_eq!(waiting_in(&events, Some(&later), &[], 0), None);
+    }
+
     #[test]
     fn a_pending_approval_is_read_from_the_newest_turn_only() {
         let mut events = answer_turn();
@@ -3796,13 +3903,13 @@ mod tests {
         events.push(text_part(7, "msg_a", "prt_3", "Confirm the delete above."));
         let newest = turn_record(0, Some(7), TURN_COMPLETED);
         assert_eq!(
-            pending_approval_in(&events, Some(&newest), 0).as_deref(),
+            waiting_in(&events, Some(&newest), &[], 0).as_deref(),
             Some("call_9")
         );
         let later = turn_record(8, None, TURN_RUNNING);
-        assert_eq!(pending_approval_in(&events, Some(&later), 0), None);
-        assert_eq!(pending_approval_in(&answer_turn(), Some(&newest), 0), None);
-        assert_eq!(pending_approval_in(&events, None, 0), None);
+        assert_eq!(waiting_in(&events, Some(&later), &[], 0), None);
+        assert_eq!(waiting_in(&answer_turn(), Some(&newest), &[], 0), None);
+        assert_eq!(waiting_in(&events, None, &[], 0), None);
     }
 
     #[test]
@@ -4285,7 +4392,12 @@ mod tests {
         events.push(delete_request(6, "call_9"));
         let old = turn(now - 2 * MICROS_PER_DAY);
         assert_eq!(
-            pending_approval_in(&events, Some(&old).filter(|r| recent_turn(r, now)), now),
+            waiting_in(
+                &events,
+                Some(&old).filter(|r| recent_turn(r, now)),
+                &[],
+                now
+            ),
             None
         );
     }

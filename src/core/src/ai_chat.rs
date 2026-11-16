@@ -373,11 +373,12 @@ pub async fn read_committed_prefix(
     })
 }
 
-/// Chats whose newest turn asked to confirm a delete: the last call id and how many it asked.
+/// Chats whose newest turn asked to confirm a delete: each request by its key (its call id, or
+/// `#seq` without one), oldest first.
 pub async fn pending_confirmations(
     org_id: &str,
     chats: &[(&ai_chat_sessions::Model, &str, i64)],
-) -> std::result::Result<HashMap<String, (String, usize)>, ReadError> {
+) -> std::result::Result<HashMap<String, Vec<(String, projection::DeleteRequest)>>, ReadError> {
     let newest: Vec<(&ai_chat_sessions::Model, &str, i64)> = chats
         .iter()
         .filter(|(c, ..)| c.last_committed_seq > NO_SEQ && c.last_event_at.is_some())
@@ -405,8 +406,7 @@ pub async fn pending_confirmations(
         quoted(newest.iter().map(|(_, turn, _)| *turn).collect()),
     );
     let rows = search_rows(org_id, sql, start, end).await?;
-    let now_ms = now_micros() / 1000;
-    let mut pending: HashMap<String, (String, HashSet<String>)> = HashMap::new();
+    let mut pending: HashMap<String, Vec<(String, projection::DeleteRequest)>> = HashMap::new();
     for row in rows {
         let Some((chat, ..)) = newest
             .iter()
@@ -417,29 +417,24 @@ pub async fn pending_confirmations(
         if row.seq > chat.last_committed_seq {
             continue;
         }
-        // A split event cannot be parsed from one row; it still marks the chat as waiting.
-        let call = match row.to_verified_event() {
-            Ok(event) => {
-                projection::delete_confirmation_call(&event.event_type, &event.data, now_ms)
-            }
-            Err(_) => Some(String::new()),
+        // A split event cannot be parsed from one row; it still waits, timed by the row's write.
+        let requests = match row.to_verified_event() {
+            Ok(event) => projection::delete_confirmation_requests(&event.event_type, &event.data),
+            Err(_) => vec![projection::DeleteRequest::unreadable(row.timestamp / 1000)],
         };
-        if let Some(call) = call {
+        let entry = pending.entry(row.session_id.clone()).or_default();
+        for request in requests {
             // One request is one call id; an unreadable one counts once per event.
-            let key = if call.is_empty() {
+            let key = if request.call.is_empty() {
                 format!("#{}", row.seq)
             } else {
-                call.clone()
+                request.call.clone()
             };
-            let entry = pending.entry(row.session_id).or_default();
-            entry.0 = call;
-            entry.1.insert(key);
+            entry.retain(|(k, _)| *k != key);
+            entry.push((key, request));
         }
     }
-    Ok(pending
-        .into_iter()
-        .map(|(session, (call, asked))| (session, (call, asked.len())))
-        .collect())
+    Ok(pending)
 }
 
 /// Rewrites committed rows with fresh timestamps (caller holds the lease); returns how many.
