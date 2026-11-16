@@ -2301,14 +2301,27 @@ describe("AlertList - filters from the Overview links", () => {
     expect(wrapper.vm.stateCounts).toMatchObject({ firing: 1, acknowledged: acked });
   });
 
-  it("warns instead of claiming nothing fires when the run state could not be read", async () => {
+  it("shows one status error when the run state could not be read: in the table while the tiles empty it, else in the footer", async () => {
     alertsSvc.listByFolderId.mockResolvedValue({
       data: { list: [makeAlert(93)], status_unavailable: true },
     });
     const wrapper = await withQuery({});
-    expect(wrapper.vm.stateEmptyTitle).toBe(i18n.global.t("alerts.firingStatusUnknown"));
-    expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(true);
+    const errorState = wrapper
+      .findAllComponents({ name: "OEmptyState" })
+      .find((c: any) => c.attributes("data-test") === "alert-list-empty-status-error");
+    expect(errorState?.props("variant")).toBe("warning");
+    expect(wrapper.find('[data-test="alert-list-empty-no-firing"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(false);
     expect(wrapper.vm.summaryStats.find((s: any) => s.key === "firing").value).toBe("—");
+    const calls = alertsSvc.listByFolderId.mock.calls.length;
+    await wrapper.get('[data-test="alert-list-empty-status-retry"]').trigger("click");
+    await flushPromises();
+    expect(alertsSvc.listByFolderId.mock.calls.length).toBeGreaterThan(calls);
+
+    wrapper.vm.stateFilters = [];
+    await flushPromises();
+    expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
   });
 
   it("strips state, level and scope from the URL after reading them, keeping other keys", async () => {
@@ -4293,6 +4306,8 @@ describe("AlertList - first run and the alert library", () => {
     router.currentRoute.value.query = {};
     const wrapper = await mountList();
     expect(wrapper.vm.stateFilters).toEqual(["firing"]);
+    expect(emptyState(wrapper).attributes("data-test")).toBe("alert-list-empty-no-firing");
+    expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
     const folderTitle = emptyState(wrapper).props("title");
     expect(folderTitle).toBeTruthy();
     expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(false);

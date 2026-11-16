@@ -964,18 +964,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @action="routeTo('alertTemplates')"
                 />
                 <OEmptyState
+                  v-else-if="statusErrorEmpty"
+                  size="inline"
+                  variant="warning"
+                  icon="warning"
+                  tone-icon
+                  role="alert"
+                  :title="t('alerts.statusUnavailableTitle')"
+                  :description="t('alerts.statusUnavailableDescription')"
+                  data-test="alert-list-empty-status-error"
+                >
+                  <template #actions>
+                    <OButton
+                      variant="primary"
+                      size="sm"
+                      icon-left="refresh"
+                      :loading="fetching"
+                      data-test="alert-list-empty-status-retry"
+                      @click="refreshAlerts"
+                    >
+                      {{ t("common.retry") }}
+                    </OButton>
+                    <OButton
+                      variant="outline"
+                      size="sm"
+                      icon-left="format-list-bulleted"
+                      data-test="alert-list-empty-show-all"
+                      @click="stateFilters = []"
+                    >
+                      {{ t("alerts.showAllAlerts") }}
+                    </OButton>
+                  </template>
+                </OEmptyState>
+                <OEmptyState
+                  v-else-if="noFiringTitle"
+                  size="block"
+                  preset="no-alerts"
+                  variant="neutral"
+                  illustration="check"
+                  :title="noFiringTitle"
+                  :description="
+                    searchAcrossFolders
+                      ? t('alerts.noAlertsFiringAnyFolderDescription')
+                      : t('alerts.noAlertsFiringThisFolderDescription')
+                  "
+                  data-test="alert-list-empty-no-firing"
+                >
+                  <template #actions>
+                    <EmptyStateActionCard
+                      icon="format-list-bulleted"
+                      :label="t('alerts.showAllAlerts')"
+                      data-test="alert-list-empty-show-all"
+                      @click="stateFilters = []"
+                    />
+                  </template>
+                </OEmptyState>
+                <OEmptyState
                   v-else
                   size="block"
                   preset="no-alerts"
                   :filtered="listFiltered"
-                  :title="stateEmptyTitle"
-                  :description="
-                    !stateEmptyTitle
-                      ? undefined
-                      : statusUnavailable
-                        ? t('alerts.firingStatusUnknownDescription')
-                        : t('alerts.noAlertsFiringDescription')
-                  "
                   @action="
                     (id) =>
                       id === 'clear-filters' &&
@@ -1038,14 +1086,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OEmptyState>
               </template>
 
-              <template v-if="statusUnavailable" #footer-note>
+              <template v-if="statusUnavailable && !statusErrorEmpty" #footer-note>
                 <span
                   class="text-status-warning-text inline-flex flex-wrap items-center gap-x-2"
-                  role="status"
+                  role="alert"
                   data-test="alert-list-status-unavailable"
                 >
                   <OIcon name="warning" size="xs" />
-                  {{ t("alerts.statusUnavailableNote") }}
+                  {{ t("alerts.statusUnavailableTitle") }}
                   <OButton
                     variant="ghost-warning"
                     size="xs"
@@ -1452,6 +1500,13 @@ const ALERT_STATE_KEYS = [
   "notify_failed",
 ] as const;
 const ALERT_LEVEL_FILTERS = ["critical", "warning"] as const;
+// Tiles counted from run state, which the server omits when `status_unavailable` is set.
+const LIVE_STATE_KEYS: readonly AlertStateKey[] = [
+  "firing",
+  "acknowledged",
+  "error",
+  "notify_failed",
+];
 
 type AlertRowRef = { alert_id?: unknown; folder_name?: { id?: unknown } };
 type AlertStateKey = (typeof ALERT_STATE_KEYS)[number];
@@ -2154,9 +2209,16 @@ export default defineComponent({
       () =>
         !!(filterQuery.value || searchQuery.value || levelFilter.value) || stateFilterEmptied.value,
     );
-    const stateEmptyTitle = computed<I18nText | undefined>(() => {
-      if (!stateFilterEmptied.value || stateFilters.value.join() !== "firing") return undefined;
-      if (statusUnavailable.value) return t("alerts.firingStatusUnknown");
+    // The live tiles read "—" while run state is unknown, so a table they emptied is a failure, not "nothing firing".
+    const statusErrorEmpty = computed(
+      () =>
+        statusUnavailable.value &&
+        stateFilterEmptied.value &&
+        stateFilters.value.some((f) => LIVE_STATE_KEYS.includes(f)),
+    );
+    const noFiringTitle = computed<I18nText | undefined>(() => {
+      if (statusUnavailable.value || !stateFilterEmptied.value) return undefined;
+      if (stateFilters.value.join() !== "firing") return undefined;
       return searchAcrossFolders.value
         ? t("alerts.noAlertsFiringAnyFolder")
         : t("alerts.noAlertsFiringThisFolder");
@@ -4845,7 +4907,8 @@ export default defineComponent({
       stateFilters,
       stateFilterEmptied,
       listFiltered,
-      stateEmptyTitle,
+      statusErrorEmpty,
+      noFiringTitle,
       statusUnavailable,
       levelFilter,
       levelFilterLabel,
