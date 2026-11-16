@@ -10410,31 +10410,12 @@
     "hoursAgo": "{count} 小时前",
     "daysAgo": "{count} 天前",
     "cards": {
-      "firingAlerts": "触发中的告警",
-      "failingRules": "失败的规则",
-      "openIncidents": "未解决事件",
-      "pipelineErrors": "流水线错误",
-      "pipelinesOf": "共 {enabled} 个已启用",
-      "quietStreams": "静默数据流",
-      "firingNone": "无触发",
-      "noAlertRules": "无告警规则",
-      "noEnabledRules": "无已启用规则",
-      "failingNone": "无失败",
-      "failingNote": "上次评估出错",
-      "incidentsNone": "无未解决",
-      "noPipelines": "无流水线",
-      "noStreams": "无数据流",
-      "quietNote": "过去 7 天内停止写入",
-      "criticalUnit": "{count} 个处于严重级别",
-      "deliveryFailures": "告警投递失败",
-      "deliveryNote": "已触发但无法通知的告警",
-      "oldestFiring": "最早触发已持续 {age}"
+      "openIncidents": "未解决事件"
     },
     "state": {
       "tileForbidden": "无访问权限",
       "tileLocked": "已锁定",
       "tileError": "无法加载",
-      "tileUnavailable": "不可用",
       "sectionLocked": "需企业许可证方可使用",
       "sectionForbidden": "您的角色无法查看此数据。请联系组织管理员获取访问权限。"
     },

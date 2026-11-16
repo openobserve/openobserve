@@ -10405,31 +10405,12 @@
     "hoursAgo": "{count} 小時前",
     "daysAgo": "{count} 天前",
     "cards": {
-      "firingAlerts": "觸發中警示",
-      "failingRules": "失敗規則",
-      "openIncidents": "未解決事件",
-      "pipelineErrors": "管線錯誤",
-      "pipelinesOf": "已啟用 {enabled} 個",
-      "quietStreams": "沉寂串流",
-      "firingNone": "目前無觸發",
-      "noAlertRules": "無警示規則",
-      "noEnabledRules": "無已啟用規則",
-      "failingNone": "目前無失敗",
-      "failingNote": "上次評估發生錯誤",
-      "incidentsNone": "目前無未解決事件",
-      "noPipelines": "無管線",
-      "noStreams": "無串流",
-      "quietNote": "過去 7 天已停止寫入",
-      "criticalUnit": "{count} 個為嚴重等級",
-      "deliveryFailures": "警示傳送失敗",
-      "deliveryNote": "已觸發但無法通知的警示",
-      "oldestFiring": "最久觸發已持續 {age}"
+      "openIncidents": "未解決事件"
     },
     "state": {
       "tileForbidden": "無存取權",
       "tileLocked": "已鎖定",
       "tileError": "無法載入",
-      "tileUnavailable": "無法使用",
       "sectionLocked": "需企業授權才能使用",
       "sectionForbidden": "您的角色無法查看此數據。請聯絡組織管理員取得存取權。"
     },

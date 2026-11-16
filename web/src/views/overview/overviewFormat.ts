@@ -209,12 +209,6 @@ export function firingRows(alerts: OverviewAlertsData | undefined): OverviewFiri
   return alerts?.firing ?? [];
 }
 
-export function oldestKnownFiring(
-  alerts: OverviewAlertsData | undefined,
-): OverviewFiringAlert | undefined {
-  return firingRows(alerts).find((row) => hasKnownSince(row.since));
-}
-
 // firing_by_level counts every firing rule, so it is the total the capped list is cut from
 export function firingTotal(alerts: OverviewAlertsData | undefined): number {
   if (!alerts?.firing_by_level) return firingCount(alerts);
@@ -230,7 +224,7 @@ export function levelTone(level: OverviewAlertLevel): "error" | "warning" | "suc
 
 export type AttentionKey = "firing" | "failing" | "incidents" | "pipelines" | "quiet";
 
-// the headline tiles' order, so the status line reads in the same order as the strip below it
+// the order the status line lists what needs attention
 export const ATTENTION_ORDER: AttentionKey[] = [
   "firing",
   "failing",
@@ -298,7 +292,7 @@ export function overviewChecks(input: OverviewChecksInput): AttentionCheck[] {
     };
   };
   const o = input.overview;
-  // a disabled rule watches nothing, matching the tiles' "No enabled rules" note
+  // a disabled rule watches nothing, so it cannot count as quiet
   const hasRules = (d: OverviewAlertsData) => d.enabled > 0;
   const firing = fromSection("firing", o?.alerts, (d) => firingCount(d), hasRules);
   const checks = [

@@ -10570,31 +10570,12 @@
     "hoursAgo": "{count}h ago",
     "daysAgo": "{count}d ago",
     "cards": {
-      "firingAlerts": "Firing alerts",
-      "failingRules": "Failing rules",
-      "openIncidents": "Open incidents",
-      "pipelineErrors": "Pipeline errors",
-      "pipelinesOf": "of {enabled} enabled",
-      "quietStreams": "Quiet streams",
-      "firingNone": "None firing",
-      "noAlertRules": "No alert rules",
-      "noEnabledRules": "No enabled rules",
-      "failingNone": "None failing",
-      "failingNote": "Last evaluation errored",
-      "incidentsNone": "None open",
-      "noPipelines": "No pipelines",
-      "noStreams": "No streams",
-      "quietNote": "Stopped writing in the last 7 days",
-      "criticalUnit": "{count} at critical level",
-      "deliveryFailures": "Alert delivery failures",
-      "deliveryNote": "Alerts that fired but could not notify",
-      "oldestFiring": "Oldest firing for {age}"
+      "openIncidents": "Open incidents"
     },
     "state": {
       "tileForbidden": "No access",
       "tileLocked": "Locked",
       "tileError": "Could not load",
-      "tileUnavailable": "Not available",
       "sectionLocked": "Available with an enterprise license",
       "sectionForbidden": "Your role cannot see this data. Ask an org admin for access."
     },

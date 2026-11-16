@@ -10410,31 +10410,12 @@
     "hoursAgo": "{count} godz. temu",
     "daysAgo": "{count} d. temu",
     "cards": {
-      "firingAlerts": "Wyzwolone alerty",
-      "failingRules": "Reguły z błędami",
-      "openIncidents": "Otwarte incydenty",
-      "pipelineErrors": "Błędy potoku",
-      "pipelinesOf": "z {enabled} włączonych",
-      "quietStreams": "Ciche strumienie",
-      "firingNone": "Brak wyzwolonych",
-      "noAlertRules": "Brak reguł alertów",
-      "noEnabledRules": "Brak włączonych reguł",
-      "failingNone": "Brak błędów",
-      "failingNote": "Ostatnia ewaluacja zakończyła się błędem",
-      "incidentsNone": "Brak otwartych",
-      "noPipelines": "Brak potoków",
-      "noStreams": "Brak strumieni",
-      "quietNote": "Zaprzestały zapisu w ciągu ostatnich 7 dni",
-      "criticalUnit": "{count} na poziomie krytycznym",
-      "deliveryFailures": "Błędy dostarczania alertów",
-      "deliveryNote": "Alerty, które zostały wyzwolone, ale nie mogły powiadomić",
-      "oldestFiring": "Najstarszy wyzwolony od {age}"
+      "openIncidents": "Otwarte incydenty"
     },
     "state": {
       "tileForbidden": "Brak dostępu",
       "tileLocked": "Zablokowane",
       "tileError": "Nie można załadować",
-      "tileUnavailable": "Niedostępne",
       "sectionLocked": "Dostępne w licencji enterprise",
       "sectionForbidden": "Twoja rola nie może wyświetlić tych danych. Poproś administratora organizacji o dostęp."
     },

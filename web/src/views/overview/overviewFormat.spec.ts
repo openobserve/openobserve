@@ -26,7 +26,6 @@ import {
   limitBarVariant,
   limitStatus,
   mergeTopStreams,
-  oldestKnownFiring,
   isUnderOnePercent,
   overviewChecks,
   overviewStatus,
@@ -254,14 +253,6 @@ describe("firing totals", () => {
     expect(hasKnownSince(0)).toBe(false);
     expect(hasKnownSince(-5)).toBe(false);
     expect(hasKnownSince(1_699_996_400_000_000)).toBe(true);
-  });
-
-  it("takes the oldest age from the first firing row with a known since", () => {
-    const [first, second] = alerts.firing;
-    const rows = [{ ...first, since: 0 }, second];
-    expect(oldestKnownFiring({ ...alerts, firing: rows })?.name).toBe(second.name);
-    expect(oldestKnownFiring({ ...alerts, firing: [{ ...first, since: 0 }] })).toBeUndefined();
-    expect(oldestKnownFiring(undefined)).toBeUndefined();
   });
 });
 

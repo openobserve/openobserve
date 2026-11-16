@@ -10410,31 +10410,12 @@
     "hoursAgo": "{count}h her",
     "daysAgo": "{count}d her",
     "cards": {
-      "firingAlerts": "Ausgelöste Alarme",
-      "failingRules": "Fehlerhafte Regeln",
-      "openIncidents": "Offene Vorfälle",
-      "pipelineErrors": "Pipeline-Fehler",
-      "pipelinesOf": "von {enabled} aktiviert",
-      "quietStreams": "Inaktive Streams",
-      "firingNone": "Keine ausgelöst",
-      "noAlertRules": "Keine Alarmregeln",
-      "noEnabledRules": "Keine aktivierten Regeln",
-      "failingNone": "Keine fehlerhaft",
-      "failingNote": "Letzte Auswertung fehlgeschlagen",
-      "incidentsNone": "Keine offen",
-      "noPipelines": "Keine Pipelines",
-      "noStreams": "Keine Streams",
-      "quietNote": "Keine Schreibvorgänge in den letzten 7 Tagen",
-      "criticalUnit": "{count} auf kritischer Stufe",
-      "deliveryFailures": "Fehler bei der Alarmzustellung",
-      "deliveryNote": "Alarme, die ausgelöst wurden, aber nicht benachrichtigen konnten",
-      "oldestFiring": "Ältester ausgelöst seit {age}"
+      "openIncidents": "Offene Vorfälle"
     },
     "state": {
       "tileForbidden": "Kein Zugriff",
       "tileLocked": "Gesperrt",
       "tileError": "Laden fehlgeschlagen",
-      "tileUnavailable": "Nicht verfügbar",
       "sectionLocked": "Verfügbar mit einer Enterprise-Lizenz",
       "sectionForbidden": "Ihre Rolle kann diese Daten nicht sehen. Bitten Sie einen Organisations-Administrator um Zugriff."
     },

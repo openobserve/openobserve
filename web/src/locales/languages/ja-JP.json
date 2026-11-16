@@ -10410,31 +10410,12 @@
     "hoursAgo": "{count}時間前",
     "daysAgo": "{count}日前",
     "cards": {
-      "firingAlerts": "発火中のアラート",
-      "failingRules": "失敗しているルール",
-      "openIncidents": "未解決のインシデント",
-      "pipelineErrors": "パイプラインエラー",
-      "pipelinesOf": "うち {enabled} 件有効",
-      "quietStreams": "停止中のストリーム",
-      "firingNone": "発火なし",
-      "noAlertRules": "アラートルールなし",
-      "noEnabledRules": "有効なルールなし",
-      "failingNone": "失敗なし",
-      "failingNote": "前回の評価でエラー",
-      "incidentsNone": "未解決なし",
-      "noPipelines": "パイプラインなし",
-      "noStreams": "ストリームなし",
-      "quietNote": "過去 7 日間に書き込みが停止",
-      "criticalUnit": "クリティカルレベルが {count} 件",
-      "deliveryFailures": "アラート配信の失敗",
-      "deliveryNote": "発火したが通知できなかったアラート",
-      "oldestFiring": "最も古い発火から {age}"
+      "openIncidents": "未解決のインシデント"
     },
     "state": {
       "tileForbidden": "アクセス権限なし",
       "tileLocked": "ロック済み",
       "tileError": "読み込めませんでした",
-      "tileUnavailable": "利用できません",
       "sectionLocked": "エンタープライズライセンスで利用可能",
       "sectionForbidden": "お使いのロールではこのデータを表示できません。組織の管理者にアクセス権を依頼してください。"
     },

@@ -10410,31 +10410,12 @@
     "hoursAgo": "{count} uur geleden",
     "daysAgo": "{count} d geleden",
     "cards": {
-      "firingAlerts": "Afgaande alarmen",
-      "failingRules": "Falende regels",
-      "openIncidents": "Open incidenten",
-      "pipelineErrors": "Pipelinefouten",
-      "pipelinesOf": "van {enabled} ingeschakeld",
-      "quietStreams": "Stille streams",
-      "firingNone": "Geen afgaande",
-      "noAlertRules": "Geen alarmregels",
-      "noEnabledRules": "Geen ingeschakelde regels",
-      "failingNone": "Geen falende",
-      "failingNote": "Laatste evaluatie gaf een fout",
-      "incidentsNone": "Geen open",
-      "noPipelines": "Geen pipelines",
-      "noStreams": "Geen streams",
-      "quietNote": "Geen nieuwe data in de afgelopen 7 dagen",
-      "criticalUnit": "{count} op kritiek niveau",
-      "deliveryFailures": "Fouten bij alarmlevering",
-      "deliveryNote": "Alarmen die afgingen maar geen melding konden versturen",
-      "oldestFiring": "Langst afgaand: {age}"
+      "openIncidents": "Open incidenten"
     },
     "state": {
       "tileForbidden": "Geen toegang",
       "tileLocked": "Vergrendeld",
       "tileError": "Kon niet laden",
-      "tileUnavailable": "Niet beschikbaar",
       "sectionLocked": "Beschikbaar met een enterprise-licentie",
       "sectionForbidden": "Je rol kan deze gegevens niet zien. Vraag een org-beheerder om toegang."
     },

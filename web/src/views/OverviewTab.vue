@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="pageState !== 'forbidden' && !errorIsForbidden"
       class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
     >
-      <OverviewStatusLine v-if="showStatusLine" :status="status" />
+      <OverviewStatusLine v-if="showOverviewCards" :status="status" />
       <div class="ms-auto flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
@@ -65,18 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </OBanner>
-
-    <OverviewHeadlineStrip
-      v-if="showOverviewCards"
-      :overview="overview"
-      :pending="overviewPending"
-      :failed="overviewFailed"
-      :forbidden="overviewForbidden"
-      :incidents-state="incidentsTile"
-      :incidents-total="incidentsTotal"
-      @select="onHeadlineSelect"
-      @ask-ai="onAskAi"
-    />
 
     <div
       v-if="showOverviewCards"
@@ -841,10 +829,6 @@ import OverviewSectionError from "./OverviewSectionError.vue";
 import OverviewSectionEmpty from "./OverviewSectionEmpty.vue";
 import HomeNoDataState from "./HomeNoDataState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OverviewHeadlineStrip, {
-  type OverviewTarget,
-  type IncidentsTile,
-} from "./overview/OverviewHeadlineStrip.vue";
 import OverviewAlertsCard, { type AlertsBoxTarget } from "./overview/OverviewAlertsCard.vue";
 import OverviewDataHealthCard from "./overview/OverviewDataHealthCard.vue";
 import OverviewTopStreamsCard from "./overview/OverviewTopStreamsCard.vue";
@@ -866,7 +850,7 @@ import {
   type OverviewSignal,
 } from "./overview/overviewFormat";
 import { overviewKeys } from "@/services/overview.querykeys";
-import type { OrgOverview } from "@/ts/interfaces/overview";
+import type { IncidentsTile, OrgOverview } from "@/ts/interfaces/overview";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
@@ -1332,11 +1316,6 @@ const status = computed(() =>
       incidents: incidentsCheck.value,
     }),
   ),
-);
-// The cards already show every count and problem, so the line speaks only when none can.
-const showStatusLine = computed(
-  () =>
-    showOverviewCards.value && status.value.kind !== "danger" && status.value.kind !== "warning",
 );
 
 // only the flag-on page can tell that nothing is watched
@@ -1929,20 +1908,9 @@ const onSignalOpen = (signal: OverviewSignal) => {
 };
 
 const onAlertsSelect = (target: AlertsBoxTarget) => {
-  if (target === "critical" || target === "warning") openAlertList(ALERT_LIST_FILTERS[target]);
-  else onHeadlineSelect(target);
-};
-
-const onHeadlineSelect = (target: OverviewTarget) => {
   if (target in ALERT_LIST_FILTERS)
     openAlertList(ALERT_LIST_FILTERS[target as keyof typeof ALERT_LIST_FILTERS]);
-  else if (target === "pipelines") goToPipelines("errored");
-  else if (target === "quiet") goToStreams();
-  else if (incidentsLicenseLocked.value) return;
-  else if (incidentsTile.value === "locked") openUpgradeDialog();
-  else if (incidentsTile.value !== "unavailable" && incidentsTile.value !== "forbidden") {
-    goToIncidentList();
-  }
+  else goToIncidentList();
 };
 
 const onAskAi = (target: OverviewAskAiTarget) => {

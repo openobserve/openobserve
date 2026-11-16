@@ -10410,31 +10410,12 @@
     "hoursAgo": "{count} ч назад",
     "daysAgo": "{count} дн. назад",
     "cards": {
-      "firingAlerts": "Срабатывающие оповещения",
-      "failingRules": "Правила со сбоями",
-      "openIncidents": "Открытые инциденты",
-      "pipelineErrors": "Ошибки конвейера",
-      "pipelinesOf": "из {enabled} включённых",
-      "quietStreams": "Неактивные потоки",
-      "firingNone": "Нет срабатывающих",
-      "noAlertRules": "Нет правил оповещения",
-      "noEnabledRules": "Нет включённых правил",
-      "failingNone": "Нет сбоев",
-      "failingNote": "Последняя проверка завершилась ошибкой",
-      "incidentsNone": "Нет открытых",
-      "noPipelines": "Нет конвейеров",
-      "noStreams": "Нет потоков",
-      "quietNote": "Данные не поступали последние 7 дней",
-      "criticalUnit": "{count} на критическом уровне",
-      "deliveryFailures": "Сбои доставки оповещений",
-      "deliveryNote": "Сработавшие оповещения, которые не удалось доставить",
-      "oldestFiring": "Самое давнее срабатывание: {age}"
+      "openIncidents": "Открытые инциденты"
     },
     "state": {
       "tileForbidden": "Нет доступа",
       "tileLocked": "Заблокировано",
       "tileError": "Не удалось загрузить",
-      "tileUnavailable": "Недоступно",
       "sectionLocked": "Доступно с корпоративной лицензией",
       "sectionForbidden": "Ваша роль не позволяет видеть эти данные. Запросите доступ у администратора организации."
     },

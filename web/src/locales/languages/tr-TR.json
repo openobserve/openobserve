@@ -10410,31 +10410,12 @@
     "hoursAgo": "{count} sa önce",
     "daysAgo": "{count} gün önce",
     "cards": {
-      "firingAlerts": "Tetiklenmiş uyarılar",
-      "failingRules": "Hata veren kurallar",
-      "openIncidents": "Açık vakalar",
-      "pipelineErrors": "İşlem hattı hataları",
-      "pipelinesOf": "/ {enabled} etkin",
-      "quietStreams": "Sessiz akışlar",
-      "firingNone": "Tetiklenen yok",
-      "noAlertRules": "Uyarı kuralı yok",
-      "noEnabledRules": "Etkin kural yok",
-      "failingNone": "Hata veren yok",
-      "failingNote": "Son değerlendirme hata verdi",
-      "incidentsNone": "Açık olan yok",
-      "noPipelines": "İşlem hattı yok",
-      "noStreams": "Akış yok",
-      "quietNote": "Son 7 gündür yazmıyor",
-      "criticalUnit": "{count} tanesi kritik seviyede",
-      "deliveryFailures": "Uyarı gönderim hataları",
-      "deliveryNote": "Tetiklenen ancak bildirimi iletilemeyen uyarılar",
-      "oldestFiring": "En eski tetiklenme: {age}"
+      "openIncidents": "Açık vakalar"
     },
     "state": {
       "tileForbidden": "Erişim yok",
       "tileLocked": "Kilitli",
       "tileError": "Yüklenemedi",
-      "tileUnavailable": "Kullanılamıyor",
       "sectionLocked": "Kurumsal lisansla kullanılabilir",
       "sectionForbidden": "Rolünüz bu verileri göremez. Erişim için bir kuruluş yöneticisinden izin isteyin."
     },

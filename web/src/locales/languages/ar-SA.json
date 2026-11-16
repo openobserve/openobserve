@@ -10410,31 +10410,12 @@
     "hoursAgo": "منذ {count}h",
     "daysAgo": "منذ {count}d",
     "cards": {
-      "firingAlerts": "التنبيهات قيد الإطلاق",
-      "failingRules": "القواعد الفاشلة",
-      "openIncidents": "الحوادث المفتوحة",
-      "pipelineErrors": "أخطاء مسار المعالجة",
-      "pipelinesOf": "من {enabled} مفعّل",
-      "quietStreams": "التدفقات الهادئة",
-      "firingNone": "لا شيء قيد الإطلاق",
-      "noAlertRules": "لا توجد قواعد تنبيه",
-      "noEnabledRules": "لا توجد قواعد مفعّلة",
-      "failingNone": "لا شيء فاشل",
-      "failingNote": "حدث خطأ في آخر تقييم",
-      "incidentsNone": "لا شيء مفتوح",
-      "noPipelines": "لا توجد مسارات معالجة",
-      "noStreams": "لا توجد تدفقات",
-      "quietNote": "توقفت عن الكتابة خلال آخر 7 أيام",
-      "criticalUnit": "{count} في المستوى الحرج",
-      "deliveryFailures": "إخفاقات تسليم التنبيهات",
-      "deliveryNote": "تنبيهات أُطلقت لكن تعذّر إشعارها",
-      "oldestFiring": "أقدم تنبيه قيد الإطلاق منذ {age}"
+      "openIncidents": "الحوادث المفتوحة"
     },
     "state": {
       "tileForbidden": "لا يوجد وصول",
       "tileLocked": "مقفل",
       "tileError": "تعذّر التحميل",
-      "tileUnavailable": "غير متاح",
       "sectionLocked": "متاح بترخيص المؤسسات",
       "sectionForbidden": "لا يمكن لدورك رؤية هذه البيانات. اطلب من مسؤول المؤسسة منحك الوصول."
     },
