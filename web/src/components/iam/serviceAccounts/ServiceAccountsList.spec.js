@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeAll, beforeEach, vi, afterAll, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
+import { routerKey } from "vue-router";
 
 // Mock service_accounts service
 vi.mock("@/services/service_accounts", async (importOriginal) => {
@@ -152,6 +153,7 @@ describe("ServiceAccountsList Component", () => {
       global: {
         plugins: [[{ platform }], [i18n]],
         provide: {
+          [routerKey]: mockRouter,
           store,
           platform,
         },
@@ -222,6 +224,32 @@ describe("ServiceAccountsList Component", () => {
       wrapper.unmount();
     }
     vi.clearAllMocks();
+  });
+
+  it("opens a cold Command K account edit after the delayed list arrives", async () => {
+    wrapper.unmount();
+    queryClient.clear();
+    mockServiceAccountsState.service_accounts_users = [];
+    let completeList;
+    vi.mocked(service_accounts.list).mockReturnValueOnce(
+      new Promise((resolve) => {
+        completeList = resolve;
+      }),
+    );
+    mockRouter.currentRoute.value.query = { action: "update", email: "delayed@example.com" };
+    wrapper = mount(ServiceAccountsList, {
+      global: {
+        plugins: [i18n],
+        provide: { store, platform, [routerKey]: mockRouter },
+        stubs: { AddServiceAccount: true, ODialog: true, ODrawer: true },
+      },
+    });
+    await flushPromises();
+    expect(wrapper.vm.showAddUserDialog).toBe(false);
+    completeList({ data: { data: [{ email: "delayed@example.com", first_name: "Delayed" }] } });
+    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.vm.showAddUserDialog).toBe(true));
+    expect(wrapper.vm.selectedUser.email).toBe("delayed@example.com");
   });
 
   describe("Service Accounts List", () => {
@@ -1309,7 +1337,7 @@ describe("ServiceAccountsList Component", () => {
       wrapper = mount(ServiceAccountsList, {
         global: {
           plugins: [i18n],
-          provide: { store, platform },
+          provide: { store, platform, [routerKey]: mockRouter },
           stubs: { AddServiceAccount: true, ODialog: true, ODrawer: true },
         },
       });

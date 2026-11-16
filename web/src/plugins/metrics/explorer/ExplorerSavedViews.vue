@@ -106,6 +106,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+} from "@/components/commandPalette/useRecentlyViewed";
 import { computed, ref } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -260,6 +264,7 @@ const clearView = () => {
 };
 
 const applyView = async (view: ViewSummary) => {
+  const scope = captureRecentVisitScope();
   try {
     // Uncached: a shared view must apply as it is saved now.
     const res: any = await savedViews.getViewDetail(orgId.value, view.view_id);
@@ -268,6 +273,12 @@ const applyView = async (view: ViewSummary) => {
     activeViewId.value = view.view_id;
     activeViewState.value = query;
     emit("apply", query);
+    recordResourceVisit(scope, {
+      type: "saved_view",
+      id: view.view_id,
+      name: view.view_name,
+      route_ref: { view_id: view.view_id, view_type: "metrics_explorer" },
+    });
   } catch (err) {
     showError(err, t("metrics.explorer.views.applyFailed"));
   }

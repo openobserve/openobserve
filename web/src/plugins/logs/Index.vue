@@ -959,6 +959,12 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
+    let completePaletteLanding!: () => void;
+    const paletteLandingReady = new Promise<void>((resolve) => {
+      completePaletteLanding = resolve;
+    });
+    provide("logsPaletteLandingReady", paletteLandingReady);
+    onBeforeUnmount(completePaletteLanding);
     const signalLocks = useLicenseLocks();
     const {
       searchObj,
@@ -1337,6 +1343,10 @@ export default defineComponent({
     };
 
     const executeGridRun = async (ctx: RunContext) => {
+      if (typeof router.currentRoute.value.query.saved_view_id === "string") {
+        autoRun.engine.cancelGeneration(ctx.generation.id, { cause: "replace" });
+        return;
+      }
       const generationId = ctx.generation.id;
       const ranQuery = ctx.signature.query;
       autoRun.adoptHandOver(ctx);
@@ -1359,6 +1369,10 @@ export default defineComponent({
     };
 
     const executeHistogramRun = async (ctx: RunContext) => {
+      if (typeof router.currentRoute.value.query.saved_view_id === "string") {
+        autoRun.engine.cancelGeneration(ctx.generation.id, { cause: "replace" });
+        return;
+      }
       const generationId = ctx.generation.id;
       try {
         searchObj.meta.histogramDirtyFlag = false;
@@ -1480,6 +1494,10 @@ export default defineComponent({
     };
 
     const executePatternsRun = async (ctx: RunContext) => {
+      if (typeof router.currentRoute.value.query.saved_view_id === "string") {
+        autoRun.engine.cancelGeneration(ctx.generation.id, { cause: "replace" });
+        return;
+      }
       autoRun.engine.registerAbort(ctx.generation.id, () => cancelPatterns());
       await extractPatternsForCurrentQuery(
         !!searchObj.meta.clearCache,
@@ -1635,7 +1653,7 @@ export default defineComponent({
               else endLogsArrival();
             } else {
               searchObj.loading = true;
-              loadLogsData("landing", { origin: currentInitOrigin() ?? undefined });
+              await loadLogsData("landing", { origin: currentInitOrigin() ?? undefined });
             }
           } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
             await loadPatternsData();
@@ -1683,6 +1701,8 @@ export default defineComponent({
         console.error("Failed to setup logs tab:", error);
         searchObj.loading = false;
         searchObj.loadingStream = false;
+      } finally {
+        completePaletteLanding();
       }
     }
 
@@ -3254,6 +3274,10 @@ export default defineComponent({
     };
 
     const executePanelRun = async (ctx: RunContext) => {
+      if (typeof router.currentRoute.value.query.saved_view_id === "string") {
+        autoRun.engine.cancelGeneration(ctx.generation.id, { cause: "replace" });
+        return;
+      }
       autoRun.beginPanelRun(ctx.generation.id, () =>
         searchBarRef.value?.cancelVisualizeQueries?.(),
       );

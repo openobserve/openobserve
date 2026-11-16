@@ -126,6 +126,9 @@ const {
   mockStopUrlSync: vi.fn(),
 }));
 
+const mockGetSavedViewDetail = vi.hoisted(() => vi.fn());
+vi.mock("@/services/saved_views", () => ({ default: { getViewDetail: mockGetSavedViewDetail } }));
+
 vi.mock("@/aws-exports", () => ({ default: { isCloud: "false", isEnterprise: "true" } }));
 
 vi.mock("@/composables/useTraces", () => ({
@@ -245,6 +248,165 @@ describe("Traces page load states", () => {
 
   it("registers as AppTraces, the name MainLayout's keep-alive list matches", () => {
     expect((Index as any).name).toBe("AppTraces");
+  });
+
+  it("restores a Command K traces view after metadata loads without a streaming search", async () => {
+    setRouteQuery({ saved_view_id: "trace-view" });
+    mockGetSavedViewDetail.mockResolvedValueOnce({
+      data: {
+        view_type: "traces",
+        view_name: "API traces",
+        data: {
+          version: 1,
+          stream: { label: "default", value: "default" },
+          editorValue: "service_name = 'api'",
+          datetime: { type: "relative", relativeTimePeriod: "30m", startTime: 0, endTime: 0 },
+          searchMode: "traces",
+          sortBy: "start_time",
+          sortOrder: "desc",
+          selectedFields: ["service_name"],
+        },
+      },
+    });
+    wrapper = mount(Index, { attachTo: node, global: globalOptions });
+    await waitFor(() => expect(searchObj.data.editorValue).toBe("service_name = 'api'"));
+    await flushPromises();
+    expect(mockGetSavedViewDetail).toHaveBeenCalledTimes(1);
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(searchObj.data.stream.selectedFields).toEqual(["service_name"]);
+    expect(router.replace).toHaveBeenLastCalledWith({
+      query: expect.not.objectContaining({ saved_view_id: expect.anything() }),
+    });
+  });
+
+  it("does not stream the old traces query when a same-page saved view omits the tab", async () => {
+    const route = ref({
+      query: { stream: "default", tab: "traces" } as Record<string, string>,
+      name: "traces",
+    });
+    routeSpy.mockReturnValue(route as never);
+    wrapper = mount(Index, { attachTo: node, global: globalOptions });
+    await waitFor(() => expect(searchObj.loadingStream).toBe(false));
+    expect(searchObj.meta.searchMode).toBe("traces");
+    mockFetch.mockClear();
+    let completeView!: (value: unknown) => void;
+    mockGetSavedViewDetail.mockReturnValueOnce(
+      new Promise((resolve) => {
+        completeView = resolve;
+      }),
+    );
+    route.value = { name: "traces", query: { saved_view_id: "same-page-view" } };
+    await flushPromises();
+    expect(mockGetSavedViewDetail).toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+    completeView({
+      data: {
+        view_type: "traces",
+        view_name: "Saved",
+        data: {
+          version: 1,
+          stream: { label: "default", value: "default" },
+          editorValue: "service_name = 'restored'",
+          datetime: { type: "relative", relativeTimePeriod: "30m", startTime: 0, endTime: 0 },
+          searchMode: "traces",
+          sortBy: "start_time",
+          sortOrder: "desc",
+          selectedFields: [],
+        },
+      },
+    });
+    await flushPromises();
+    expect(searchObj.data.editorValue).toBe("service_name = 'restored'");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("abandons a saved view whose schema finishes after navigation to another stream", async () => {
+    const slow = { ...streamList.list[0], name: "slow-schema" };
+    const other = { ...streamList.list[0], name: "other" };
+    mockGetStreams.mockResolvedValue({ list: [...streamList.list, slow, other] });
+    const route = ref({
+      name: "traces",
+      query: { stream: "default", tab: "spans" } as Record<string, string>,
+    });
+    routeSpy.mockReturnValue(route as never);
+    wrapper = mount(Index, { attachTo: node, global: globalOptions });
+    await waitFor(() => expect(searchObj.loadingStream).toBe(false));
+    mockFetch.mockClear();
+    let finishSchema!: (value: unknown) => void;
+    mockGetStream.mockImplementation((name: string) =>
+      name === "slow-schema"
+        ? new Promise((resolve) => {
+            finishSchema = resolve;
+          })
+        : Promise.resolve(name === "other" ? other : streamList.list[0]),
+    );
+    mockGetSavedViewDetail.mockResolvedValueOnce({
+      data: {
+        view_type: "traces",
+        view_name: "Delayed schema",
+        data: {
+          version: 1,
+          stream: { label: "slow-schema", value: "slow-schema" },
+          editorValue: "stale_saved_filter",
+          datetime: { type: "relative", relativeTimePeriod: "30m", startTime: 0, endTime: 0 },
+          searchMode: "traces",
+          sortBy: "duration",
+          sortOrder: "asc",
+          selectedFields: ["service_name"],
+        },
+      },
+    });
+    route.value = { name: "traces", query: { saved_view_id: "schema-view" } };
+    await waitFor(() => expect(mockGetStream).toHaveBeenCalledWith("slow-schema", "traces", true));
+    route.value = { name: "traces", query: { stream: "other", tab: "spans" } };
+    await flushPromises();
+    finishSchema(slow);
+    await flushPromises();
+    expect(searchObj.data.stream.selectedStream.value).toBe("other");
+    expect(searchObj.data.editorValue).not.toBe("stale_saved_filter");
+    expect(searchObj.meta.searchMode).toBe("spans");
+  });
+
+  it("loads another Command K stream on the active traces page without remounting", async () => {
+    const other = { ...streamList.list[0], name: "other" };
+    mockGetStreams.mockResolvedValue({ list: [...streamList.list, other] });
+    mockGetStream.mockImplementation((name: string) =>
+      Promise.resolve(name === "other" ? other : streamList.list[0]),
+    );
+    const route = ref({
+      query: { stream: "default", tab: "spans" } as Record<string, string>,
+      name: "traces",
+    });
+    routeSpy.mockReturnValue(route as never);
+    wrapper = mount(Index, { attachTo: node, global: globalOptions });
+    await waitFor(() => expect(searchObj.loadingStream).toBe(false));
+    route.value = { name: "traces", query: { stream: "other" } };
+    await flushPromises();
+    expect(searchObj.data.stream.selectedStream.value).toBe("other");
+    expect(mockGetStream).toHaveBeenCalledWith("other", "traces", true);
+  });
+
+  it("ignores a saved view response after its destination has changed", async () => {
+    setRouteQuery({ saved_view_id: "old-view" });
+    let finish!: (value: unknown) => void;
+    mockGetSavedViewDetail.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    wrapper = mount(Index, { attachTo: node, global: globalOptions });
+    await waitFor(() => expect(mockGetSavedViewDetail).toHaveBeenCalled());
+    setRouteQuery({});
+    finish({
+      data: {
+        view_type: "traces",
+        view_name: "Old",
+        data: { stream: { value: "default" }, editorValue: "stale" },
+      },
+    });
+    await flushPromises();
+    expect(searchObj.data.editorValue).not.toBe("stale");
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   describe("no false onboarding on a cold load", () => {

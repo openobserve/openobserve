@@ -21,6 +21,25 @@ const fakeEvent = (over: Record<string, unknown>) =>
   }) as any;
 
 describe("ShortcutManager", () => {
+  it("leaves editor-consumed keyboard events with the editor", () => {
+    const manager = new ShortcutManager();
+    const handler = vi.fn();
+    manager.register({ key: "ctrl+k", handler, allowInInput: true });
+    const event = new KeyboardEvent("keydown", { key: "k", ctrlKey: true, cancelable: true });
+    event.preventDefault();
+    manager.handleKeyDown(event);
+    expect(handler).not.toHaveBeenCalled();
+  });
+  it("does not trigger shortcuts during IME composition", () => {
+    const manager = new ShortcutManager();
+    const handler = vi.fn();
+    manager.register({ key: "ctrl+k", handler, allowInInput: true });
+    manager.handleKeyDown(
+      new KeyboardEvent("keydown", { key: "k", ctrlKey: true, isComposing: true }),
+    );
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   let manager: ShortcutManager;
 
   beforeEach(() => {

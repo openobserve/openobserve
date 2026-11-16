@@ -30475,5 +30475,30 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "commandPalette": {
+    "title": "搜尋頁面、資源和操作",
+    "placeholder": "搜尋名稱和 ID",
+    "all": "全部",
+    "moreTypes": "更多類型",
+    "pages": "頁面",
+    "actions": "建立",
+    "recent": "最近瀏覽",
+    "localHistory": "本機歷史",
+    "clearRecent": "清除最近瀏覽",
+    "historyStorageUnavailable": "無法儲存最近瀏覽",
+    "recentUnavailable": "此項目目前無法使用",
+    "loading": "搜尋中…",
+    "showMore": "顯示更多",
+    "continueSearch": "繼續搜尋此類型",
+    "partial": "部分結果無法使用",
+    "changed": "資源已變更，請重新搜尋以繼續。",
+    "failed": "無法完成搜尋",
+    "offline": "目前離線，仍可查看最近瀏覽。",
+    "sourceUnavailable": "此資源類型目前無法使用",
+    "emptyHelp": "輸入名稱或 ID 搜尋資源",
+    "globalShortcut": "開啟全域搜尋",
+    "searchAgain": "重新搜尋",
+    "resourceSearch": "資源搜尋"
   }
 }

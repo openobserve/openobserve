@@ -198,6 +198,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+} from "@/components/commandPalette/useRecentlyViewed";
+import {
   computed,
   defineAsyncComponent,
   onBeforeMount,
@@ -595,7 +599,7 @@ watch(
   { immediate: false },
 );
 
-const editPipelineId = (() => {
+let editPipelineId = (() => {
   const route = router.currentRoute.value;
   return route.name === "pipelineEditor" && route.query.id ? String(route.query.id) : null;
 })();
@@ -668,6 +672,11 @@ onBeforeRouteUpdate((to) => {
 
 const pipelineDraft = useEditorDraft<PipelineDraftData>({
   kind: "pipeline",
+  leaveOnRouteUpdate: (to, from) =>
+    to.path !== from.path ||
+    to.query.id !== from.query.id ||
+    (typeof to.query.palette_intent === "string" &&
+      to.query.palette_intent !== from.query.palette_intent),
   entityLabel: () => t("common.editorDraft.entities.pipeline"),
   entityId: () => editPipelineId,
   snapshot: () => ({
@@ -720,13 +729,57 @@ onBeforeMount(() => {
   getFunctions();
 });
 
+watch(
+  () =>
+    [
+      router.currentRoute.value.name,
+      router.currentRoute.value.query.id,
+      router.currentRoute.value.query.palette_intent,
+    ] as const,
+  async ([name, id, intent], [previousName, previousId, previousIntent]) => {
+    if (name !== "pipelineEditor" && name !== "createPipeline") return;
+    if (
+      name === previousName &&
+      id === previousId &&
+      (typeof intent !== "string" || intent === previousIntent)
+    )
+      return;
+    editPipelineId = name === "pipelineEditor" && typeof id === "string" ? id : null;
+    resetPipelineData();
+    pipelineObj.isEditPipeline = !!editPipelineId;
+    const found = editPipelineId ? await getPipeline() : name === "createPipeline";
+    if (!found) return;
+    await pipelineDraft.start();
+    const current = router.currentRoute.value;
+    if (
+      current.name !== "createPipeline" ||
+      current.query.palette_intent !== intent ||
+      typeof intent !== "string"
+    )
+      return;
+    const query = { ...current.query };
+    delete query.action;
+    delete query.palette_intent;
+    await router.replace({ query });
+  },
+);
+
 // Initialize Vue Flow composables
 const { getSelectedEdges, removeEdges } = useVueFlow();
 
 onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
   // Drafts apply after the reset/load above, so a continued draft is never overwritten by them.
-  void pipelineLoaded.then((found) => (found ? pipelineDraft.start() : undefined));
+  void pipelineLoaded.then(async (found) => {
+    if (!found) return;
+    await pipelineDraft.start();
+    const route = router.currentRoute.value;
+    if (route.name !== "createPipeline" || typeof route.query.palette_intent !== "string") return;
+    const query = { ...route.query };
+    delete query.action;
+    delete query.palette_intent;
+    await router.replace({ query });
+  });
 
   // Add keyboard handler for edge deletion
   const handleKeydown = (event: KeyboardEvent) => {
@@ -789,10 +842,18 @@ onUnmounted(() => {
 /** Loads the edited pipeline; resolves false when it is gone or could not be read. */
 const getPipeline = (): Promise<boolean> => {
   const route = router.currentRoute.value;
+  const recentScope = captureRecentVisitScope();
+  const org = store.state.selectedOrganization.identifier;
 
   return pipelineService
-    .getPipelines(store.state.selectedOrganization.identifier)
+    .getPipelines(org)
     .then(async (response) => {
+      if (
+        store.state.selectedOrganization.identifier !== org ||
+        router.currentRoute.value.query.id !== route.query.id ||
+        router.currentRoute.value.name !== "pipelineEditor"
+      )
+        return false;
       const _pipeline = response.data.list.find(
         (pipeline: Pipeline) => pipeline.pipeline_id === route.query.id,
       );
@@ -840,6 +901,12 @@ const getPipeline = (): Promise<boolean> => {
         node.type = node.io_type;
       });
 
+      recordResourceVisit(recentScope, {
+        type: "pipeline",
+        id: _pipeline.pipeline_id,
+        name: _pipeline.name,
+        route_ref: { pipeline_id: _pipeline.pipeline_id },
+      });
       pipelineObj.currentSelectedPipeline = _pipeline;
       pipelineObj.pipelineWithoutChange = JSON.parse(JSON.stringify(_pipeline));
       serverPipeline = projectPipeline(_pipeline);

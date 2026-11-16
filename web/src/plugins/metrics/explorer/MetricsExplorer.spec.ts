@@ -185,6 +185,9 @@ vi.mock("@/lib/vue-shortcut-manager", async (importOriginal) => ({
     list.forEach((s) => (shortcuts.handlers[s.id] = s.handler)),
 }));
 
+const getSavedViewDetail = vi.hoisted(() => vi.fn());
+vi.mock("@/services/saved_views", () => ({ default: { getViewDetail: getSavedViewDetail } }));
+
 import MetricsExplorer from "./MetricsExplorer.vue";
 import analytics from "@/services/product_analytics";
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
@@ -281,6 +284,28 @@ const mountExplorer = (
   });
 
 describe("MetricsExplorer wiring", () => {
+  it("stages a Command K metrics view without querying charts until Run", async () => {
+    routerState.query = { saved_view_id: "metric-view" };
+    getSavedViewDetail.mockResolvedValueOnce({
+      data: {
+        view_type: "metrics_explorer",
+        view_name: "API metrics",
+        data: { version: 1, state: { search: "http", period: "30m" } },
+      },
+    });
+    const wrapper = mountExplorer({ ShareButton: true });
+    await flushPromises();
+    expect(getSavedViewDetail).toHaveBeenCalledWith("org1", "metric-view");
+    expect(grid.paused.value).toBe(true);
+    expect(grid.requestPreview).not.toHaveBeenCalled();
+    expect(grid.runDetailQuery).not.toHaveBeenCalled();
+    expect(routerState.replace).toHaveBeenCalledWith({
+      name: "metrics",
+      query: { org_identifier: "org1", search: "http", period: "30m" },
+    });
+    wrapper.unmount();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     grid.pagedCards.value = [CARD];

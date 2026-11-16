@@ -30480,5 +30480,30 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "commandPalette": {
+    "title": "Sayfa, kaynak ve eylem ara",
+    "placeholder": "Ad ve kimlik ara",
+    "all": "Tümü",
+    "moreTypes": "Diğer türler",
+    "pages": "Sayfalar",
+    "actions": "Oluştur",
+    "recent": "Son ziyaretler",
+    "localHistory": "Yerel geçmiş",
+    "clearRecent": "Son ziyaretleri temizle",
+    "historyStorageUnavailable": "Ziyaretler kaydedilemiyor",
+    "recentUnavailable": "Bu öğe şu anda kullanılamıyor",
+    "loading": "Aranıyor…",
+    "showMore": "Daha fazla göster",
+    "continueSearch": "Bu türü aramaya devam et",
+    "partial": "Bazı sonuçlar kullanılamıyor",
+    "changed": "Kaynaklar değişti. Yeniden arayın.",
+    "failed": "Arama tamamlanamadı",
+    "offline": "Çevrimdışısınız. Son ziyaretler kullanılabilir.",
+    "sourceUnavailable": "Bu kaynak türü şu anda kullanılamıyor",
+    "emptyHelp": "Kaynak aramak için ad veya kimlik girin",
+    "globalShortcut": "Genel aramayı aç",
+    "searchAgain": "Yeniden ara",
+    "resourceSearch": "Kaynak arama"
   }
 }

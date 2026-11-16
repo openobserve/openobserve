@@ -293,6 +293,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 // @ts-nocheck
+import savedViewsService from "@/services/saved_views";
+import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+} from "@/components/commandPalette/useRecentlyViewed";
 import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import {
@@ -926,6 +931,7 @@ async function getQueryData(
 ) {
   let boundTraceId: string | null = null;
   try {
+    if (typeof router.currentRoute.value.query.saved_view_id === "string") return false;
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
     }
@@ -1641,6 +1647,12 @@ async function loadPageData({ leftOrg = "" } = {}) {
   if (generation !== pageGeneration) return;
   pageLoaded = true;
   pendingLanding = null;
+  if (typeof query.saved_view_id === "string") {
+    if (fields) await fields.fieldsReady;
+    await restorePaletteTracesView(query.saved_view_id);
+    searchObj.loadingStream = false;
+    return;
+  }
   if (searchObj.data.stream.selectedStream.value) {
     // Only a restore from recent searches is a user run; any other landing runs without recording.
     if (landing) {
@@ -2011,9 +2023,19 @@ watch(
   () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
   ([routeName, tab]) => {
     // A cached page applies the URL it returns to on activation, not while it sits in the cache.
-    if (routeName !== "traces" || !pageActive.value) return;
+    if (
+      routeName !== "traces" ||
+      !pageActive.value ||
+      typeof router.currentRoute.value.query.saved_view_id === "string"
+    )
+      return;
     const mode = supportedTraceSearchMode(tab);
     if (mode !== searchObj.meta.searchMode) {
+      const stream = router.currentRoute.value.query.stream;
+      if (typeof stream === "string" && stream !== searchObj.data.stream.selectedStream.value) {
+        searchObj.meta.searchMode = mode;
+        return;
+      }
       onSearchModeChange(mode);
       return;
     }
@@ -2406,8 +2428,20 @@ const onApplySavedView = async (view: TracesSavedView) => {
 };
 
 /** Applies a stream, filter, window and mode in place, then runs unless only loading. */
-const applyTracesView = async (view: TracesSavedView, run: boolean) => {
+const applyTracesView = async (
+  view: TracesSavedView,
+  run: boolean,
+  isCurrent: () => boolean = () => true,
+) => {
   const seq = ++savedViewApplySeq;
+  const viewOrg = store.state.selectedOrganization.identifier;
+  const viewSubject = store.state.userInfo?.email;
+  const stale = () =>
+    !isCurrent() ||
+    seq !== savedViewApplySeq ||
+    store.state.selectedOrganization.identifier !== viewOrg ||
+    store.state.userInfo?.email !== viewSubject ||
+    router.currentRoute.value.name !== "traces";
   const streamName = view.stream?.value;
   const streamChanged = streamName !== searchObj.data.stream.selectedStream.value;
   if (
@@ -2418,19 +2452,19 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
       variant: "warning",
       message: t("traces.savedViewStreamMissing", { stream: streamName }),
     });
-    return;
+    return false;
   }
   if (streamChanged) {
     searchObj.data.stream.selectedStream = { label: streamName, value: streamName };
     // Not onChangeStream: it runs a search of its own before the view is restored.
     await extractFields();
-    if (seq !== savedViewApplySeq) return;
+    if (stale()) return false;
   }
 
   searchObj.meta.searchMode = view.searchMode;
   searchObj.data.datetime = { ...searchObj.data.datetime, ...view.datetime };
   await syncSavedViewDateTime(view.datetime);
-  if (seq !== savedViewApplySeq) return;
+  if (stale()) return false;
   searchObj.data.editorValue = view.editorValue;
   searchBarRef.value?.setEditorValue?.(view.editorValue);
   searchObj.meta.resultGrid.sortBy = view.sortBy;
@@ -2446,14 +2480,68 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   delete query.trace_id;
   delete query.span_id;
   if (canWriteTracesUrl()) await router.replace({ query });
-  if (seq !== savedViewApplySeq) return;
+  if (stale()) return false;
 
   if (view.editorValue && searchObj.data.stream.selectedStreamFields.length) {
     restoreFilters(view.editorValue);
   }
   if (streamChanged) refreshOpenFieldValues();
   if (run) runQueryFn();
+  return true;
 };
+
+let paletteViewSeq = 0;
+const restorePaletteTracesView = async (id: string) => {
+  const seq = ++paletteViewSeq;
+  const org = store.state.selectedOrganization.identifier;
+  const scope = captureRecentVisitScope();
+  try {
+    const response = await savedViewsService.getViewDetail(org, id);
+    if (
+      seq !== paletteViewSeq ||
+      store.state.selectedOrganization.identifier !== org ||
+      router.currentRoute.value.query.saved_view_id !== id
+    )
+      return;
+    const payload = response.data;
+    if (
+      payload.view_type !== "traces" ||
+      !payload.data?.stream?.value ||
+      (payload.data.version !== undefined && payload.data.version !== 1)
+    )
+      throw new Error("Unsupported saved view");
+    const isCurrent = () =>
+      seq === paletteViewSeq &&
+      store.state.selectedOrganization.identifier === org &&
+      router.currentRoute.value.name === "traces" &&
+      router.currentRoute.value.query.saved_view_id === id;
+    if (!(await applyTracesView(payload.data, false, isCurrent))) return;
+    if (
+      seq !== paletteViewSeq ||
+      store.state.selectedOrganization.identifier !== org ||
+      router.currentRoute.value.query.saved_view_id !== id
+    )
+      return;
+    recordResourceVisit(scope, {
+      type: "saved_view",
+      id,
+      name: payload.view_name,
+      route_ref: { view_id: id, view_type: "traces" },
+    });
+    const query = { ...router.currentRoute.value.query };
+    delete query.saved_view_id;
+    await router.replace({ query });
+  } catch {
+    if (seq === paletteViewSeq && store.state.selectedOrganization.identifier === org)
+      toast({ variant: "error", message: t("search.errorWhileApplyingSavedView") });
+  }
+};
+watch(
+  () => router.currentRoute.value.query.saved_view_id,
+  (id) => {
+    if (typeof id === "string" && pageLoaded) void restorePaletteTracesView(id);
+  },
+);
 
 const onRecentRestore = (entry: QueryHistoryEntry, when: RestoreTime, run: boolean) => {
   if (entry.source !== "traces") {
@@ -2505,22 +2593,40 @@ const applyStreamChange = async (newStream: string) => {
   await onChangeStream();
 };
 
-// Back and Forward across a catalog stream switch move the shared stream, so the Traces and Spans tabs agree.
 watch(
   () => [router.currentRoute.value.name, router.currentRoute.value.query.stream] as const,
-  ([routeName, stream]) => {
-    if (routeName !== "traces" || !pageActive.value || !pageLoaded) return;
-    if (activeTab.value !== "services-catalog" || typeof stream !== "string") return;
-    if (stream === searchObj.data.stream.selectedStream.value) return;
+  async ([routeName, stream]) => {
+    if (
+      routeName !== "traces" ||
+      !pageActive.value ||
+      !pageLoaded ||
+      typeof router.currentRoute.value.query.saved_view_id === "string"
+    )
+      return;
+    if (typeof stream !== "string" || stream === searchObj.data.stream.selectedStream.value) return;
     if (!searchObj.data.stream.streamLists.some((s: any) => s.value === stream)) return;
+    const org = store.state.selectedOrganization.identifier;
     searchObj.data.stream.selectedStream = { label: stream, value: stream };
-    // A stream switch clears the query, so undoing it brings back the query its entry was left with.
     const query = router.currentRoute.value.query.query;
     searchObj.data.editorValue = typeof query === "string" ? b64DecodeUnicode(query) || "" : "";
-    void extractFields().then(() => {
-      if (searchObj.data.editorValue && searchObj.data.stream.selectedStreamFields.length)
-        restoreFilters(searchObj.data.editorValue);
-    });
+    await extractFields();
+    if (
+      !pageActive.value ||
+      store.state.selectedOrganization.identifier !== org ||
+      router.currentRoute.value.query.stream !== stream ||
+      searchObj.data.stream.selectedStream.value !== stream
+    )
+      return;
+    if (searchObj.data.editorValue && searchObj.data.stream.selectedStreamFields.length)
+      restoreFilters(searchObj.data.editorValue);
+    loadLocalLogFilterField(searchObj.meta.searchMode);
+    rebuildColumns();
+    if (
+      activeTab.value !== "services-catalog" &&
+      activeTab.value !== "service-graph" &&
+      !isAutoRunOff()
+    )
+      runQueryFn(false);
   },
 );
 

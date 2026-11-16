@@ -279,6 +279,7 @@ const useLogs = (t: TranslateFn) => {
       resetFunctions();
 
       const query = router.currentRoute.value.query;
+      const paletteRestoreAtStart = typeof query.saved_view_id === "string";
       const fromUrl = !options.ignoreUrl && (!!query.stream || query.sql_mode === "true");
       try {
         // The URL search waits on all of these, so they run side by side rather than one after another.
@@ -308,7 +309,11 @@ const useLogs = (t: TranslateFn) => {
         // Cancel pressed while the metadata loaded means no search until the user runs one.
         const userCancelled = autoRun.engine.userCancelCount() !== cancelsAtStart;
         const result =
-          searchObj.data.stream.selectedStream.length > 0 && !userSearchSent && !userCancelled
+          !paletteRestoreAtStart &&
+          typeof router.currentRoute.value.query.saved_view_id !== "string" &&
+          searchObj.data.stream.selectedStream.length > 0 &&
+          !userSearchSent &&
+          !userCancelled
             ? autoRun.request(fromUrl ? "url" : reason, { origin: options.origin })
             : "skipped-ineligible";
         // A run that is about to start keeps loading on, or the histogram flashes "No data" first.

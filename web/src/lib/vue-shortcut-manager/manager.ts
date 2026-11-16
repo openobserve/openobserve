@@ -205,6 +205,7 @@ export class ShortcutManager {
   // ---------- Event Handler ----------
 
   handleKeyDown(e: KeyboardEvent): void {
+    if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
     const key = this.parseEvent(e);
 
     if (!key || key === "") return;

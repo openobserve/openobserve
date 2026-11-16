@@ -119,10 +119,10 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
   const originalIsCloud = config.isCloud;
   const originalZoConfig = { ...store.state.zoConfig };
 
-  const mountSearchBar = () =>
+  const mountSearchBar = (landingReady: Promise<void> = Promise.resolve()) =>
     mount(SearchBar, {
       global: {
-        provide: { store },
+        provide: { store, logsPaletteLandingReady: landingReady },
         plugins: [i18n, router],
         stubs: { QueryEditor: true },
       },
@@ -677,6 +677,61 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
   });
 
   describe("saved views and run-state hygiene (TRANSIENT_SEARCH_KEYS)", () => {
+    it("waits for a cold page's stream metadata before restoring a faster saved-view response", async () => {
+      await router.replace({ name: "logs", query: {} });
+      await setup();
+      const view = JSON.parse(JSON.stringify(wrapper!.vm.getSearchObj()));
+      view.data.query = "level = 'error'";
+      view.data.editorValue = "level = 'error'";
+      view.data.stream.selectedStream = ["app_logs"];
+      view.data.resultGrid = { ...(view.data.resultGrid ?? {}), colOrder: {}, colSizes: {} };
+      wrapper!.unmount();
+      let completeLanding!: () => void;
+      const landingReady = new Promise<void>((resolve) => {
+        completeLanding = resolve;
+      });
+      getViewDetail.mockResolvedValueOnce({
+        status: 200,
+        data: { view_name: "Errors", view_type: "logs", data: view },
+      });
+      await router.replace({ name: "logs", query: { saved_view_id: "cold-view" } });
+      wrapper = mountSearchBar(landingReady);
+      const searchObj = wrapper.vm.searchObj;
+      searchObj.data.stream.streamLists = [];
+      wrapper.vm.dateTimeRef = { setSavedDate: vi.fn() };
+      const logs = vi.fn();
+      wrapper.vm.autoRun.setExecutors({ logs, patterns: vi.fn(), histogram: vi.fn() });
+      await flushPromises();
+      expect(getViewDetail).toHaveBeenCalled();
+      expect(toastMock).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      searchObj.data.stream.streamLists = [{ label: "app_logs", value: "app_logs" }];
+      completeLanding();
+      await flushPromises();
+      expect(router.currentRoute.value.query.saved_view_id).toBeUndefined();
+      expect(searchObj.data.query).toBe("level = 'error'");
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("restores a Command K saved view without executing a search", async () => {
+      await router.replace({ name: "logs", query: {} });
+      const { logs, searchObj } = await setup();
+      const view = JSON.parse(JSON.stringify(wrapper!.vm.getSearchObj()));
+      view.data.stream.selectedStream = ["app_logs"];
+      view.data.resultGrid = { ...(view.data.resultGrid ?? {}), colOrder: {}, colSizes: {} };
+      getViewDetail.mockResolvedValueOnce({
+        status: 200,
+        data: { view_name: "Errors", view_type: "logs", data: view },
+      });
+      wrapper!.vm.dateTimeRef = { setSavedDate: vi.fn() };
+      vi.useFakeTimers();
+      await wrapper!.vm.applySavedView({ view_id: "v1", view_name: "Errors" }, "restore");
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(logs).not.toHaveBeenCalled();
+      expect(searchObj.shouldIgnoreWatcher).toBe(false);
+      expect(store.state.savedViewFlag).toBe(false);
+      vi.useRealTimers();
+    });
+
     it("applies a view saved before this change: its liveMode and download request never land (L-29)", async () => {
       await router.replace({ name: "logs", query: {} });
       const { searchObj, logs } = await setup();

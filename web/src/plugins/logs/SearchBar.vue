@@ -1784,6 +1784,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
+import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+} from "@/components/commandPalette/useRecentlyViewed";
 import { saveFunctionMutation } from "@/services/jstransform.queries";
 import {
   createSavedViewMutation,
@@ -2227,6 +2231,7 @@ export default defineComponent({
       checkTimestampAlias,
     } = logsUtils();
     const { getSavedViews, setSelectedStreams, onStreamChange, cancelQuery } = useSearchBar(t);
+    const paletteLandingReady = inject<Promise<void>>("logsPaletteLandingReady", Promise.resolve());
     const { loadStreamLists, extractFields } = useStreamFields();
     const { cancelPatterns } = usePatterns(t);
     const autoRun = useLogsAutoRun();
@@ -3774,7 +3779,10 @@ export default defineComponent({
       await writeLogsUrl("replace", currentQuery);
     };
 
-    const applySavedView = async (item) => {
+    let savedViewLoadSeq = 0;
+    const applySavedView = async (item, mode: "run" | "restore" = "run") => {
+      const loadSeq = ++savedViewLoadSeq;
+      const recentScope = captureRecentVisitScope();
       savedViewDropdownModel.value = false;
       autoRun.engine.resetScope("saved-view");
       clearPermalink();
@@ -3782,14 +3790,24 @@ export default defineComponent({
       searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
       const viewOrg = store.state.selectedOrganization.identifier;
-      const leftViewOrg = () => store.state.selectedOrganization.identifier !== viewOrg;
-      savedviewsService
+      const routeViewId = router.currentRoute.value.query.saved_view_id;
+      const leftViewOrg = () =>
+        loadSeq !== savedViewLoadSeq ||
+        store.state.selectedOrganization.identifier !== viewOrg ||
+        (mode === "restore" &&
+          typeof routeViewId === "string" &&
+          router.currentRoute.value.query.saved_view_id !== routeViewId);
+      return savedviewsService
         .getViewDetail(viewOrg, item.view_id)
         .then(async (res) => {
+          if (mode === "restore") await paletteLandingReady;
           if (leftViewOrg()) return;
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
+            if ((res.data.view_type ?? "logs") !== "logs")
+              throw new Error("Unsupported saved view");
             const extractedObj = res.data.data;
+            if (mode === "restore") extractedObj.meta.refreshInterval = 0;
 
             // A saved view's columns are an explicit user choice, not a system
             // FTS default, so they must persist and never be auto-overridden.
@@ -4151,22 +4169,31 @@ export default defineComponent({
               variant: "success",
             });
             markSavedViewApplied(item.view_id);
-            setTimeout(async () => {
+            const completeSavedView = async () => {
               if (leftViewOrg()) return;
               try {
                 searchObj.loadingHistogram = false;
                 searchObj.meta.refreshHistogram = true;
-                // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
                 searchObj.communicationMethod = "streaming";
                 await extractFields();
-                autoRun.engine.requestRun("saved-view", { op: "full" });
-                store.dispatch("setSavedViewFlag", false);
-                searchObj.shouldIgnoreWatcher = false;
-              } catch (e) {
-                searchObj.shouldIgnoreWatcher = false;
-                console.log("Error while applying saved view", e);
+                if (leftViewOrg()) return;
+                recordResourceVisit(recentScope, {
+                  type: "saved_view",
+                  id: item.view_id,
+                  name: res.data.view_name ?? item.view_name,
+                  route_ref: { view_id: item.view_id, view_type: "logs" },
+                });
+                if (mode === "run") autoRun.engine.requestRun("saved-view", { op: "full" });
+                else autoRun.engine.resetScope("saved-view");
+              } finally {
+                if (!leftViewOrg()) {
+                  store.dispatch("setSavedViewFlag", false);
+                  searchObj.shouldIgnoreWatcher = false;
+                }
               }
-            }, 1000);
+            };
+            if (mode === "restore") await completeSavedView();
+            else setTimeout(() => void completeSavedView(), 1000);
 
             if (
               extractedObj.data.resultGrid.colOrder &&
@@ -4194,6 +4221,7 @@ export default defineComponent({
               searchObj.data.resultGrid.colSizes[searchObj.data.stream.selectedStream] =
                 extractedObj.data.resultGrid.colSizes[searchObj.data.stream.selectedStream];
             }
+            return true;
           } else {
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
@@ -4214,6 +4242,34 @@ export default defineComponent({
           console.log("Error while applying saved view", err);
         });
     };
+
+    let paletteSavedViewSeq = 0;
+    watch(
+      () =>
+        [
+          router.currentRoute.value.query.saved_view_id,
+          store.state.selectedOrganization.identifier,
+        ] as const,
+      async ([id]) => {
+        const seq = ++paletteSavedViewSeq;
+        if (typeof id !== "string" || router.currentRoute.value.name !== "logs") {
+          savedViewLoadSeq++;
+          searchObj.shouldIgnoreWatcher = false;
+          store.dispatch("setSavedViewFlag", false);
+          return;
+        }
+        await nextTick();
+        if (seq !== paletteSavedViewSeq) return;
+        const restored = await applySavedView({ view_id: id, view_name: "" }, "restore");
+        if (!restored) return;
+        if (seq !== paletteSavedViewSeq || router.currentRoute.value.query.saved_view_id !== id)
+          return;
+        const query = { ...router.currentRoute.value.query };
+        delete query.saved_view_id;
+        await router.replace({ query });
+      },
+      { immediate: true, flush: "post" },
+    );
 
     // @submit handler — the schema already gated the name (required + the
     // `/^[A-Za-z0-9 _-]+$/` alphanumeric rule) in create mode and the

@@ -22,6 +22,10 @@ import {
   type LabelMatchOp,
 } from "@/components/promql/labelBoolean";
 import { useStore } from "vuex";
+import {
+  captureRecentVisitScope,
+  recordLoadedStream,
+} from "@/components/commandPalette/useRecentlyViewed";
 import useStreams from "@/composables/useStreams";
 import useHttpStreamingSearch from "@/composables/useStreamingSearch";
 import { createPromQLChunkProcessor } from "@/composables/dashboard/promqlChunkProcessor";
@@ -610,6 +614,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   /** One stream's labels from its own schema; a failure leaves it unknown, so readers fail open. */
   const loadStreamSchema = (name: string): Promise<void> => {
     const generation = orgGeneration;
+    const recentScope = captureRecentVisitScope();
     // Keyed by org generation: a request still pending for the previous org must not stand in for this one.
     const key = `${generation}:${name}`;
     const pending = streamSchemaInFlight.get(key);
@@ -619,6 +624,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         if (generation !== orgGeneration) return;
         const labels = labelsOf({ ...(response?.data ?? {}), name } as MetricStream);
         if (labels) labelsByStream.value = { ...labelsByStream.value, [name]: labels };
+        recordLoadedStream(recentScope, "metrics", name);
       })
       .catch(() => undefined)
       .finally(() => {
@@ -630,8 +636,17 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   /** Labels for just these streams, without the org-wide schema sweep `ensureSchemas` runs. */
   const ensureStreamSchemas = async (names: string[]): Promise<void> => {
+    const recentScope = captureRecentVisitScope();
+    const uniqueNames = [...new Set(names)];
+    for (const name of uniqueNames) {
+      if (
+        labelsByStream.value[name] ||
+        (schemaLoaded.value && cards.value.some((card) => card.name === name))
+      )
+        recordLoadedStream(recentScope, "metrics", name);
+    }
     if (schemaLoaded.value) return;
-    const missing = [...new Set(names)].filter((name) => !labelsByStream.value[name]);
+    const missing = uniqueNames.filter((name) => !labelsByStream.value[name]);
     await Promise.all(missing.map(loadStreamSchema));
   };
 

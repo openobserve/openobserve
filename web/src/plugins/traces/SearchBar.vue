@@ -748,6 +748,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // @ts-nocheck
 import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+} from "@/components/commandPalette/useRecentlyViewed";
+import {
   defineComponent,
   ref,
   watch,
@@ -1653,12 +1657,19 @@ export default defineComponent({
     let applySavedViewSeq = 0;
     const applySavedView = async (view) => {
       const seq = ++applySavedViewSeq;
+      const scope = captureRecentVisitScope();
       try {
         // Uncached on purpose, as in logs: applying must use the server's current copy.
         const res = await savedViewsService.getViewDetail(orgId.value, view.view_id);
         if (seq !== applySavedViewSeq) return;
         markSavedViewApplied(view.view_id, res.data.data);
         emit("apply-saved-view", res.data.data);
+        recordResourceVisit(scope, {
+          type: "saved_view",
+          id: view.view_id,
+          name: res.data.view_name ?? view.view_name,
+          route_ref: { view_id: view.view_id, view_type: "traces" },
+        });
       } catch (err) {
         if (seq !== applySavedViewSeq) return;
         toast({ message: t("search.errorWhileApplyingSavedView"), variant: "error" });

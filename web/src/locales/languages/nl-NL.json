@@ -30480,5 +30480,30 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "commandPalette": {
+    "title": "Pagina’s, bronnen en acties zoeken",
+    "placeholder": "Namen en ID’s zoeken",
+    "all": "Alles",
+    "moreTypes": "Meer typen",
+    "pages": "Pagina’s",
+    "actions": "Maken",
+    "recent": "Recente bezoeken",
+    "localHistory": "Lokale geschiedenis",
+    "clearRecent": "Recente bezoeken wissen",
+    "historyStorageUnavailable": "Bezoeken kunnen niet worden opgeslagen",
+    "recentUnavailable": "Dit item is momenteel niet beschikbaar",
+    "loading": "Zoeken…",
+    "showMore": "Meer tonen",
+    "continueSearch": "Dit type verder doorzoeken",
+    "partial": "Sommige resultaten zijn niet beschikbaar",
+    "changed": "Bronnen zijn gewijzigd. Zoek opnieuw.",
+    "failed": "Zoeken kon niet worden voltooid",
+    "offline": "Offline. Recente bezoeken blijven beschikbaar.",
+    "sourceUnavailable": "Dit brontype is niet beschikbaar",
+    "emptyHelp": "Voer een naam of ID in",
+    "globalShortcut": "Globaal zoeken openen",
+    "searchAgain": "Opnieuw zoeken",
+    "resourceSearch": "Bronnen zoeken"
   }
 }

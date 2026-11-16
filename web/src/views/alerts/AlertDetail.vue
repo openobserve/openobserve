@@ -409,7 +409,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+  removeFailedRecentVisit,
+  resourceFailureStatus,
+} from "@/components/commandPalette/useRecentlyViewed";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -537,11 +543,14 @@ const isAnomalyAlert = computed(() => alert.value?.alert_type === "anomaly_detec
 const handleReferenceOpen = async (open: boolean) => {
   referenceDrawerOpen.value = open;
   if (!open || !orgId.value || !alertId.value) return;
+  const request = captureDetailRequest();
   try {
-    const response = await alertsService.getCompositeReferences(orgId.value, alertId.value);
+    const response = await alertsService.getCompositeReferences(request.org, request.id);
+    if (!isCurrentDetailRequest(request)) return;
     compositeReferences.value = response.data.references ?? [];
     hiddenReferenceCount.value = response.data.hidden_reference_count ?? 0;
   } catch {
+    if (!isCurrentDetailRequest(request)) return;
     compositeReferences.value = [];
     hiddenReferenceCount.value = 0;
   }
@@ -602,10 +611,13 @@ const sloName = ref("");
 
 const fetchSloName = async () => {
   if (!orgId.value || !sloId.value || anomalyLocked.value) return;
+  const request = captureDetailRequest();
   try {
-    const res = await sloService.get(orgId.value, sloId.value);
+    const res = await sloService.get(request.org, sloId.value);
+    if (!isCurrentDetailRequest(request)) return;
     sloName.value = res.data?.name || "";
   } catch {
+    if (!isCurrentDetailRequest(request)) return;
     // Contained deliberately: this runs inside the mount chain, and letting it
     // reject would abandon everything sequenced after it — the history fetch
     // included — leaving a page that looks empty rather than one missing a name.
@@ -873,17 +885,53 @@ const onAnomalyEndMute = async () => {
   }
 };
 
+let detailGeneration = 0;
+const captureDetailRequest = () => ({
+  generation: detailGeneration,
+  org: orgId.value,
+  id: alertId.value,
+  folder: routeFolderId.value,
+  subject: store.state.userInfo?.email,
+});
+const isCurrentDetailRequest = (request: ReturnType<typeof captureDetailRequest>) =>
+  request.generation === detailGeneration &&
+  request.org === orgId.value &&
+  request.id === alertId.value &&
+  request.folder === routeFolderId.value &&
+  request.subject === store.state.userInfo?.email;
+onBeforeUnmount(() => {
+  detailGeneration++;
+});
+
 const fetchAlert = async () => {
   if (!orgId.value || !alertId.value) return;
+  const request = captureDetailRequest();
+  const recentScope = captureRecentVisitScope();
+  const recentId = request.id;
+  const recentFolder = String(route.query.folder ?? "default");
   try {
-    const res = await alertsService.get_by_alert_id(orgId.value, alertId.value);
+    const res = await alertsService.get_by_alert_id(request.org, request.id);
+    if (!isCurrentDetailRequest(request)) return;
     alert.value = res.data;
     notFound.value = !res.data;
+    if (res.data)
+      recordResourceVisit(recentScope, {
+        type: "alert",
+        id: recentId,
+        name: res.data.name,
+        route_ref: {
+          alert_id: recentId,
+          folder_id: recentFolder,
+          alert_type: res.data.alert_type ?? (res.data.is_real_time ? "realtime" : "scheduled"),
+        },
+      });
     // Same tick as the assignment, not down in onMounted: setting alert.value
     // queues the render, so any await before this one lets the default History
     // tab mount and fire a fetch for a page that is about to switch away.
     if (isAnomalyAlert.value) activeTab.value = "charts";
-  } catch {
+  } catch (error) {
+    if (!isCurrentDetailRequest(request)) return;
+    removeFailedRecentVisit(recentScope, "alert", recentId, resourceFailureStatus(error));
     alert.value = null;
     notFound.value = true;
   }
@@ -891,28 +939,33 @@ const fetchAlert = async () => {
 
 const fetchGroups = async () => {
   if (!orgId.value || !alertId.value) return;
+  const request = captureDetailRequest();
   loadingGroups.value = true;
   try {
-    const res = await alertsService.list_groups(orgId.value, alertId.value);
+    const res = await alertsService.list_groups(request.org, request.id);
+    if (!isCurrentDetailRequest(request)) return;
     groupData.value = res.data;
     groupsLoadError.value = false;
   } catch {
+    if (!isCurrentDetailRequest(request)) return;
     groupData.value = null;
     groupsLoadError.value = true;
   } finally {
-    loadingGroups.value = false;
+    if (isCurrentDetailRequest(request)) loadingGroups.value = false;
   }
 };
 
 const fetchTransitions = async () => {
   if (!orgId.value || !alertId.value) return;
+  const request = captureDetailRequest();
   loadingTransitions.value = true;
   try {
     const res = await alertsService.list_group_transitions(
-      orgId.value,
-      alertId.value,
+      request.org,
+      request.id,
       historyGroupFilter.value?.group_key,
     );
+    if (!isCurrentDetailRequest(request)) return;
     const list: AlertGroupTransition[] = res.data?.list || [];
     // A simple alert's history is the rollup row, whose group_key is "".
     // The backend cannot be asked for it directly — an empty group_key query
@@ -921,9 +974,10 @@ const fetchTransitions = async () => {
     // multi-alert; without a Group column they would be unreadable.
     transitions.value = isMultiAlert.value ? list : list.filter((tr) => tr.group_key === "");
   } catch {
+    if (!isCurrentDetailRequest(request)) return;
     transitions.value = [];
   } finally {
-    loadingTransitions.value = false;
+    if (isCurrentDetailRequest(request)) loadingTransitions.value = false;
   }
 };
 
@@ -991,20 +1045,34 @@ const editAlert = () => {
   });
 };
 
-onMounted(async () => {
-  await fetchAlert();
-  await fetchSloName();
-  if (isCompositeAlert.value) return;
-  // Multi-alerts land on Groups (the reason the page exists for them); everything
-  // else has no groups tab, so History is the only sensible default. The alert is
-  // fetched exactly once and never re-fetched, so handling the initial load here
-  // is enough — a separate watch on isMultiAlert would just re-fire fetchGroups().
-  if (isMultiAlert.value) {
-    activeTab.value = "groups";
-    await fetchGroups();
-  }
-  // Anomaly configs never write to the transitions table.
-  if (isAnomalyAlert.value) return;
-  await fetchTransitions();
-});
+watch(
+  () => [orgId.value, alertId.value, routeFolderId.value, store.state.userInfo?.email] as const,
+  async () => {
+    detailGeneration++;
+    const request = captureDetailRequest();
+    alert.value = null;
+    notFound.value = false;
+    groupData.value = null;
+    transitions.value = [];
+    historyGroupFilter.value = null;
+    referenceDrawerOpen.value = false;
+    compositeReferences.value = [];
+    hiddenReferenceCount.value = 0;
+    loadingGroups.value = false;
+    loadingTransitions.value = false;
+    sloName.value = "";
+    activeTab.value = "history";
+    await fetchAlert();
+    if (!isCurrentDetailRequest(request)) return;
+    await fetchSloName();
+    if (!isCurrentDetailRequest(request) || isCompositeAlert.value) return;
+    if (isMultiAlert.value) {
+      activeTab.value = "groups";
+      await fetchGroups();
+    }
+    if (!isCurrentDetailRequest(request) || isAnomalyAlert.value) return;
+    await fetchTransitions();
+  },
+  { immediate: true },
+);
 </script>

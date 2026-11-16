@@ -30480,5 +30480,30 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "commandPalette": {
+    "title": "Seiten, Ressourcen und Aktionen suchen",
+    "placeholder": "Namen und IDs suchen",
+    "all": "Alle",
+    "moreTypes": "Weitere Typen",
+    "pages": "Seiten",
+    "actions": "Erstellen",
+    "recent": "Letzte Besuche",
+    "localHistory": "Lokaler Verlauf",
+    "clearRecent": "Letzte Besuche löschen",
+    "historyStorageUnavailable": "Besuche können nicht gespeichert werden",
+    "recentUnavailable": "Dieser Eintrag ist derzeit nicht verfügbar",
+    "loading": "Suche…",
+    "showMore": "Mehr anzeigen",
+    "continueSearch": "Diesen Typ weitersuchen",
+    "partial": "Einige Ergebnisse sind nicht verfügbar",
+    "changed": "Ressourcen wurden geändert. Bitte erneut suchen.",
+    "failed": "Suche konnte nicht abgeschlossen werden",
+    "offline": "Offline. Letzte Besuche bleiben verfügbar.",
+    "sourceUnavailable": "Dieser Ressourcentyp ist nicht verfügbar",
+    "emptyHelp": "Name oder ID zum Suchen eingeben",
+    "globalShortcut": "Globale Suche öffnen",
+    "searchAgain": "Erneut suchen",
+    "resourceSearch": "Ressourcensuche"
   }
 }

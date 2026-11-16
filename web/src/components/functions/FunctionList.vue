@@ -265,6 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OPageLayout>
     <div v-else class="min-h-0 flex-1">
       <AddFunction
+        :key="functionEditorKey"
         v-model="formData"
         :isUpdated="isUpdated"
         class="p-2"
@@ -334,6 +335,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+} from "@/components/commandPalette/useRecentlyViewed";
 import { defineAsyncComponent, defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -410,6 +415,7 @@ export default defineComponent({
     const { locked: pipelinesLocked, lockedReason: pipelinesLockedReason } =
       useLicenseLock("pipelines");
     const formData: any = ref({});
+    const functionEditorKey = ref(0);
     const showAddJSTransformDialog: any = ref(false);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
@@ -545,29 +551,6 @@ export default defineComponent({
     // Bridge for consumers still reading `searchObj.data.transforms`.
     watch(jsTransforms, (rows) => (searchObj.data.transforms = rows), { immediate: true });
 
-    // The ?action= deep links open a dialog off the first non-empty result, so
-    // they are latched: a cached paint followed by a fresh one must not open it
-    // twice. Was folded into the row mapping, which ran on every paint.
-    let deepLinkOpened = false;
-    watch(
-      functions.data,
-      (list) => {
-        if (!list || deepLinkOpened) return;
-        const { action, name } = router.currentRoute.value.query;
-        if (action == "add") {
-          deepLinkOpened = true;
-          showAddUpdateFn({ row: undefined });
-        } else if (action == "update") {
-          const row = list.find((data: any) => data.name == name);
-          if (row) {
-            deepLinkOpened = true;
-            showAddUpdateFn({ row });
-          }
-        }
-      },
-      { immediate: true },
-    );
-
     // Bound to the refresh button: always reaches the server.
     const refreshJSTransforms = () => functions.refetch();
 
@@ -609,6 +592,7 @@ export default defineComponent({
     });
 
     const showAddUpdateFn = (props: any) => {
+      functionEditorKey.value++;
       formData.value = props.row;
       let action;
       if (!props.row) {
@@ -641,6 +625,13 @@ export default defineComponent({
           page: "Functions",
         });
       }
+      if (props.row)
+        recordResourceVisit(captureRecentVisitScope(), {
+          type: "function",
+          id: props.row.name,
+          name: props.row.name,
+          route_ref: { function_name: props.row.name },
+        });
       addTransform();
 
       analytics.track("Button Click", {
@@ -649,6 +640,50 @@ export default defineComponent({
         page: "Functions",
       });
     };
+
+    let handledFunctionIntent = "";
+    watch(
+      () => [
+        functions.data.value,
+        router.currentRoute.value.query.action,
+        router.currentRoute.value.query.name,
+        router.currentRoute.value.query.palette_intent,
+      ],
+      () => {
+        const list = functions.data.value;
+        const { action, name, palette_intent } = router.currentRoute.value.query;
+        if (!action) {
+          handledFunctionIntent = "";
+          return;
+        }
+        if (!list) return;
+        if (
+          showAddJSTransformDialog.value &&
+          ((action === "update" && formData.value?.name === name) ||
+            (action === "add" && !isUpdated.value && !palette_intent))
+        )
+          return;
+        const key = JSON.stringify([action, name, palette_intent]);
+        if (key === handledFunctionIntent) return;
+        if (action === "add") {
+          handledFunctionIntent = key;
+          showAddUpdateFn({});
+          if (typeof palette_intent === "string") {
+            const query = { ...router.currentRoute.value.query };
+            delete query.action;
+            delete query.palette_intent;
+            void router.replace({ query });
+          }
+        } else if (action === "update") {
+          const row = list.find((item) => item.name === name);
+          if (row) {
+            handledFunctionIntent = key;
+            showAddUpdateFn({ row });
+          }
+        }
+      },
+      { immediate: true },
+    );
 
     const refreshList = () => {
       router.push({
@@ -1024,6 +1059,7 @@ export default defineComponent({
       addTransform,
       deleteFn,
       isUpdated,
+      functionEditorKey,
       showAddUpdateFn,
       showDeleteDialogFn,
       showAddJSTransformDialog,

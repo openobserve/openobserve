@@ -858,6 +858,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { toast } from "@/lib/feedback/Toast/useToast";
+import savedViewsService from "@/services/saved_views";
+import { explorerViewToQuery } from "@/utils/metrics/explorerSavedView";
+import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+} from "@/components/commandPalette/useRecentlyViewed";
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -1036,7 +1043,9 @@ export default defineComponent({
       useLicenseLock("dashboards");
     const router = useRouter();
     const route = useRoute();
+    const paletteViewStaged = ref(typeof route.query.saved_view_id === "string");
     const grid = useMetricsExplorerGrid(t);
+    if (paletteViewStaged.value) grid.paused.value = true;
 
     const scrollRef = ref<HTMLElement | null>(null);
     const dateTimePickerRef = ref<any>(null);
@@ -1289,7 +1298,7 @@ export default defineComponent({
       // fired a query each. Setting it here closes that window.
       // Visualize has no detail view; one left set would reopen on the way back.
       if (v === "visualize") closeDetail();
-      grid.paused.value = v === "visualize" || !!detailMetric.value;
+      grid.paused.value = paletteViewStaged.value || v === "visualize" || !!detailMetric.value;
       mode.value = v;
     };
 
@@ -1319,7 +1328,7 @@ export default defineComponent({
 
     // Paused whenever off screen: a mode switch changes the slice, and its sweep re-queries every card.
     watch(
-      () => isGridMode.value && !detailMetric.value,
+      () => isGridMode.value && !detailMetric.value && !paletteViewStaged.value,
       (on) => {
         grid.paused.value = !on;
       },
@@ -2042,6 +2051,48 @@ export default defineComponent({
     const activeViewState = ref<ExplorerViewState | null>(null);
 
     // Applying is a navigation: the route watcher below applies the state.
+    let paletteViewSeq = 0;
+    const restorePaletteMetricsView = async (id: string) => {
+      const seq = ++paletteViewSeq;
+      const org = store.state.selectedOrganization.identifier;
+      const scope = captureRecentVisitScope();
+      paletteViewStaged.value = true;
+      grid.paused.value = true;
+      try {
+        const response = await savedViewsService.getViewDetail(org, id);
+        if (
+          seq !== paletteViewSeq ||
+          store.state.selectedOrganization.identifier !== org ||
+          route.query.saved_view_id !== id
+        )
+          return;
+        const payload = response.data;
+        const query =
+          payload.view_type === "metrics_explorer" ? explorerViewToQuery(payload.data) : null;
+        if (!query) throw new Error("Unsupported saved view");
+        activeViewId.value = id;
+        activeViewState.value = query;
+        await router.replace({ name: "metrics", query: { org_identifier: org, ...query } });
+        if (seq !== paletteViewSeq || store.state.selectedOrganization.identifier !== org) return;
+        recordResourceVisit(scope, {
+          type: "saved_view",
+          id,
+          name: payload.view_name,
+          route_ref: { view_id: id, view_type: "metrics_explorer" },
+        });
+      } catch {
+        if (seq === paletteViewSeq && store.state.selectedOrganization.identifier === org)
+          toast({ variant: "error", message: t("search.errorWhileApplyingSavedView") });
+      }
+    };
+    watch(
+      () => [route.query.saved_view_id, store.state.selectedOrganization.identifier] as const,
+      ([id]) => {
+        if (typeof id === "string") void restorePaletteMetricsView(id);
+      },
+      { immediate: true },
+    );
+
     const onApplyView = (query: ExplorerViewState) => {
       router
         .push({
@@ -2441,7 +2492,9 @@ export default defineComponent({
      * new one loads, so there is no skeleton flash.
      */
     const onRefresh = async (opts?: { manual?: boolean }) => {
-      if (refreshing.value) return;
+      if (refreshing.value || (paletteViewStaged.value && opts?.manual === false)) return;
+      paletteViewStaged.value = false;
+      grid.paused.value = mode.value === "visualize" || !!detailMetric.value;
 
       // VISUALIZE: refresh means "re-run the query in the chart" — exactly ONE
       // query — and nothing else.

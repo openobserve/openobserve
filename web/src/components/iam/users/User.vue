@@ -286,6 +286,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+} from "@/components/commandPalette/useRecentlyViewed";
 import { orgUsersQuery, assignableRolesQuery, allUserRolesQuery } from "@/services/users.queries";
 import { rolesQuery } from "@/services/iam.queries";
 import { userKeys } from "@/services/users.querykeys";
@@ -1127,12 +1131,19 @@ export default defineComponent({
       // The row already stores the canonical role VALUE, so it seeds the role
       // select directly (matches an option, shows its label).
       selectedUser.value = { ...props.row };
+      recordResourceVisit(captureRecentVisitScope(), {
+        type: "user",
+        id: props.row.rawEmail ?? props.row.email,
+        name: props.row.first_name || props.row.rawEmail || props.row.email,
+        route_ref: { email: props.row.rawEmail ?? props.row.email },
+      });
       showUpdateUserDialog.value = true;
     };
 
     let openAddUserTimer: ReturnType<typeof setTimeout> | undefined;
 
     const addUser = (props: any, is_updated: boolean) => {
+      if (showAddUserDialog.value || showUpdateUserDialog.value) return;
       isUpdated.value = is_updated;
       // A manually opened dialog consumes the ?email= latch so the post-save repaint cannot reopen it.
       deepLinkOpened = true;
@@ -1142,6 +1153,12 @@ export default defineComponent({
         // The row already stores the canonical role VALUE, so AddUser's role
         // select matches an option directly (see updateUser).
         selectedUser.value = { ...props.row };
+        recordResourceVisit(captureRecentVisitScope(), {
+          type: "user",
+          id: props.row.rawEmail ?? props.row.email,
+          name: props.row.first_name || props.row.rawEmail || props.row.email,
+          route_ref: { email: props.row.rawEmail ?? props.row.email },
+        });
         analytics.track("Button Click", {
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
@@ -1178,6 +1195,17 @@ export default defineComponent({
         });
       }
     };
+    watch(
+      () => [router.currentRoute.value.query.action, router.currentRoute.value.query.email],
+      ([action, email]) => {
+        if (action !== "update" || typeof email !== "string") return;
+        const row = usersState.users.find(
+          (user: { rawEmail?: string; email: string }) => (user.rawEmail ?? user.email) === email,
+        );
+        if (row) addUser({ row }, true);
+      },
+    );
+
     const toggleExpand = (row: any) => {
       if (!row.showGroups) {
         row.showGroups = true;

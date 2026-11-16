@@ -30480,5 +30480,30 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "commandPalette": {
+    "title": "페이지, 리소스 및 작업 검색",
+    "placeholder": "이름 및 ID 검색",
+    "all": "전체",
+    "moreTypes": "추가 유형",
+    "pages": "페이지",
+    "actions": "만들기",
+    "recent": "최근 방문",
+    "localHistory": "로컬 기록",
+    "clearRecent": "최근 방문 지우기",
+    "historyStorageUnavailable": "최근 방문을 저장할 수 없습니다",
+    "recentUnavailable": "현재 이 항목을 사용할 수 없습니다",
+    "loading": "검색 중…",
+    "showMore": "더 보기",
+    "continueSearch": "이 유형 계속 검색",
+    "partial": "일부 결과를 사용할 수 없습니다",
+    "changed": "리소스가 변경되었습니다. 다시 검색하세요.",
+    "failed": "검색을 완료하지 못했습니다",
+    "offline": "오프라인입니다. 최근 방문은 계속 볼 수 있습니다.",
+    "sourceUnavailable": "현재 이 리소스 유형을 사용할 수 없습니다",
+    "emptyHelp": "이름 또는 ID로 리소스 검색",
+    "globalShortcut": "전체 검색 열기",
+    "searchAgain": "다시 검색",
+    "resourceSearch": "리소스 검색"
   }
 }

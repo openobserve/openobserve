@@ -122,3 +122,51 @@ describe("MainLayout — AI chat shortcut gate", () => {
     expect(store.state.isAiChatEnabled).toBe(true);
   });
 });
+
+describe("MainLayout — global resource search shortcut", () => {
+  let wrapper: VueWrapper | undefined;
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = undefined;
+    resetManager();
+    document.querySelector('[data-test="other-dialog"]')?.remove();
+  });
+  it("registers global Command K and toggles it from an editor input", async () => {
+    resetManager();
+    wrapper = mountMainLayout();
+    await flushPromises();
+    const shortcut = getManager()?.getById("commandPalette");
+    expect(shortcut?.key).toBe("ctrl+k");
+    expect(shortcut?.allowInInput).toBe(true);
+    const input = document.createElement("textarea");
+    input.className = "inputarea";
+    const editor = document.createElement("div");
+    editor.className = "monaco-editor";
+    editor.append(input);
+    document.body.append(editor);
+    input.focus();
+    shortcut?.handler(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }));
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "CommandPalette" }).props("open")).toBe(true);
+    shortcut?.handler(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }));
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "CommandPalette" }).props("open")).toBe(false);
+    editor.remove();
+  });
+  it("does not open while composing text or over another modal", async () => {
+    resetManager();
+    wrapper = mountMainLayout();
+    await flushPromises();
+    const shortcut = getManager()?.getById("commandPalette");
+    shortcut?.handler(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, isComposing: true }));
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "CommandPalette" }).props("open")).toBe(false);
+    const dialog = document.createElement("div");
+    dialog.role = "dialog";
+    dialog.dataset.test = "other-dialog";
+    document.body.append(dialog);
+    shortcut?.handler(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }));
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "CommandPalette" }).props("open")).toBe(false);
+  });
+});

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { isPaletteSavedViewPending } from "@/components/commandPalette/useRecentlyViewed";
 import { ref } from "vue";
 import { savedViewsQuery } from "@/services/saved_views.queries";
 import { viewTypeOf } from "@/services/saved_views";
@@ -308,6 +309,7 @@ export const useSearchBar = (t: TranslateFn) => {
   };
 
   const onStreamChange = async (queryStr: string, options: StreamChangeOptions = {}) => {
+    const restoringSavedView = isPaletteSavedViewPending("logs") || searchObj.shouldIgnoreWatcher;
     const token = bumpSelectionToken();
     const autoRun = useLogsAutoRun();
     const editorOrigin = options.origin === "editor";
@@ -406,7 +408,7 @@ export const useSearchBar = (t: TranslateFn) => {
         searchObj.meta.showHistogram = false;
       }
 
-      if (legacyAutoRun) {
+      if (legacyAutoRun && !restoringSavedView) {
         searchObj.meta.refreshHistogram = true;
         handleQueryData();
       } else {
@@ -433,7 +435,7 @@ export const useSearchBar = (t: TranslateFn) => {
         });
         if (stale()) return;
         searchObj.loading = false;
-        if (!editorOrigin) autoRun.request("stream");
+        if (!editorOrigin && !restoringSavedView) autoRun.request("stream");
       }
     } catch (e: any) {
       console.info("Error while getting stream data:", e);

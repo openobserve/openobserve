@@ -30480,5 +30480,30 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "commandPalette": {
+    "title": "Buscar páginas, recursos y acciones",
+    "placeholder": "Buscar nombres e ID",
+    "all": "Todo",
+    "moreTypes": "Más tipos",
+    "pages": "Páginas",
+    "actions": "Crear",
+    "recent": "Visitas recientes",
+    "localHistory": "Historial local",
+    "clearRecent": "Borrar visitas recientes",
+    "historyStorageUnavailable": "No se pueden guardar las visitas",
+    "recentUnavailable": "Este elemento no está disponible",
+    "loading": "Buscando…",
+    "showMore": "Mostrar más",
+    "continueSearch": "Continuar con este tipo",
+    "partial": "Algunos resultados no están disponibles",
+    "changed": "Los recursos cambiaron. Vuelve a buscar.",
+    "failed": "No se pudo completar la búsqueda",
+    "offline": "Sin conexión. Las visitas recientes siguen disponibles.",
+    "sourceUnavailable": "Este tipo de recurso no está disponible",
+    "emptyHelp": "Introduce un nombre o ID para buscar",
+    "globalShortcut": "Abrir búsqueda global",
+    "searchAgain": "Buscar de nuevo",
+    "resourceSearch": "Búsqueda de recursos"
   }
 }

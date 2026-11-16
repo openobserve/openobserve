@@ -237,6 +237,13 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.global",
     shortcuts: [
+      {
+        id: "commandPalette",
+        keyForWindows: "ctrl+k",
+        keyForMac: "meta+k",
+        descriptionKey: "commandPalette.globalShortcut",
+        allowInInput: true,
+      },
       { id: "openCheatsheet", key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
       { id: "closeDialog", key: "escape", descriptionKey: "shortcuts.actions.closeDialog" },
       {
@@ -700,8 +707,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     shortcuts: [
       {
         id: "k8sPalette",
-        keyForWindows: "ctrl+k",
-        keyForMac: "meta+k",
+        keyForWindows: "ctrl+shift+k",
+        keyForMac: "meta+shift+k",
         descriptionKey: "shortcuts.actions.k8sPalette",
         allowInInput: true,
       },
