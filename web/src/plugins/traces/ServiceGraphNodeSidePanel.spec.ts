@@ -2119,7 +2119,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     });
 
-    it("filters RED charts, Operations, recent spans and resource tables by the escaped where", async () => {
+    it("filters RED charts, Operations and resource tables by the escaped where", async () => {
       givenSchema(["service_name", "o2_service_where", "o2_service_version"]);
       openAt(WHERE_A);
       wrapper = mountAt();
@@ -2139,13 +2139,6 @@ describe("ServiceGraphNodeSidePanel", () => {
       (wrapper.vm as any).onTabChange("metrics");
       await flushPromises();
       expect(vi.mocked(streamTraceRows).mock.calls.at(-1)?.[0].sql).toContain(predicate);
-
-      vi.mocked(streamTraceRows).mockClear();
-      (wrapper.vm as any).operationsViewMode = "spans";
-      await flushPromises();
-      const spanSqls = sqls().filter((sql) => sql.includes("SELECT operation_name, duration"));
-      expect(spanSqls).toHaveLength(2);
-      for (const sql of spanSqls) expect(sql).toContain(predicate);
     });
 
     it("reloads every source query when the where picker moves to a second where", async () => {

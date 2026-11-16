@@ -2057,12 +2057,7 @@ export default defineComponent({
     );
 
     // Recent Operations State
-    const operationsViewMode = ref<"aggregated" | "spans">("aggregated");
     const recentOperations = ref<any[]>([]);
-    const recentSpanData = ref<{ errorSpans: any[]; slowSpans: any[] }>({
-      errorSpans: [],
-      slowSpans: [],
-    });
     const loadingOperations = ref(false);
 
     // Dynamic resource tabs state
@@ -2412,16 +2407,6 @@ export default defineComponent({
     const formatOperationLatency = (microseconds: number): string =>
       microseconds ? formatTimeWithSuffix(microseconds) : "—";
 
-    // Helper: Format Span Timestamp (from nanoseconds)
-    const formatSpanTimestamp = (nanoseconds: number): string => {
-      const date = new Date(nanoseconds / 1000000);
-      return date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-    };
-
     // ── Sorting state ──────────────────────────────────────────────────────
     const sortBy = ref<string>("");
     const sortOrder = ref<"asc" | "desc" | "">("");
@@ -2630,67 +2615,6 @@ export default defineComponent({
       }
     };
 
-    // Fetch recent spans (error spans + slowest spans)
-    const fetchRecentSpans = async () => {
-      if (!props.selectedNode || !props.visible || props.streamFilter === "all") return;
-
-      loadingOperations.value = true;
-      recentSpanData.value = { errorSpans: [], slowSpans: [] };
-      const scope = serviceFilter();
-
-      try {
-        const streamName = props.streamFilter || "default";
-        const range = {
-          org: store.state.selectedOrganization.identifier,
-          startTime: props.timeRange.startTime,
-          endTime: props.timeRange.endTime,
-        };
-
-        const [errorHits, slowHits] = await Promise.all([
-          streamTraceRows<any>({
-            ...range,
-            sql: `SELECT operation_name, duration, start_time FROM "${streamName}" WHERE ${serviceFilter()} AND span_status = 'ERROR' ORDER BY start_time DESC`,
-            size: 5,
-            keepPartial: true,
-          }),
-          streamTraceRows<any>({
-            ...range,
-            sql: `SELECT operation_name, duration FROM "${streamName}" WHERE ${serviceFilter()} ORDER BY duration DESC`,
-            size: 20,
-            keepPartial: true,
-          }),
-        ]);
-
-        if (scope !== serviceFilter()) return;
-        recentSpanData.value = {
-          errorSpans: errorHits.map((s: any) => ({
-            name: s.operation_name || "unknown",
-            duration: s.duration || 0,
-            timestampDisplay: s.start_time ? formatSpanTimestamp(s.start_time) : "",
-          })),
-          slowSpans: slowHits.map((s: any) => ({
-            name: s.operation_name || "unknown",
-            duration: s.duration || 0,
-          })),
-        };
-      } catch (error) {
-        console.error("Failed to fetch recent spans:", error);
-        if (scope === serviceFilter()) recentSpanData.value = { errorSpans: [], slowSpans: [] };
-      } finally {
-        if (scope === serviceFilter()) loadingOperations.value = false;
-      }
-    };
-
-    // Dispatch fetch based on current view mode
-    const fetchOperations = () => {
-      if (operationsViewMode.value === "aggregated") {
-        fetchAggregatedOperations();
-      } else {
-        fetchRecentSpans();
-      }
-    };
-
-    // Watch for panel visibility, node, stream filter, and view mode changes
     watch(
       () => [
         props.visible,
@@ -2698,7 +2622,6 @@ export default defineComponent({
         props.streamFilter,
         props.timeRange.startTime,
         props.timeRange.endTime,
-        operationsViewMode.value,
         // Re-fetch once the schema resolves the model column (request vs
         // response) — otherwise a model node's operations query fires with the
         // wrong column and returns "No operations found".
@@ -2713,7 +2636,7 @@ export default defineComponent({
           recentOperations.value = [];
           return;
         }
-        fetchOperations();
+        fetchAggregatedOperations();
       },
       { immediate: true },
     );
@@ -3285,7 +3208,6 @@ export default defineComponent({
       // Recent Operations
       loadingOperations,
       recentOperations,
-      operationsViewMode,
       operationsTableColumns,
       operationsTableRows,
       navigateToTraces,
