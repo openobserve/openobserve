@@ -18,7 +18,10 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use async_trait::async_trait;
-use config::meta::alerts::{incidents::AlertKind, rca_runs::RunSummaryFields};
+use config::meta::alerts::{
+    incidents::AlertKind,
+    rca_runs::{AutoRunOpts, RunSummaryFields, RunTrigger},
+};
 use futures::{StreamExt, TryStreamExt};
 use infra::table::{
     alert_incidents::CaseFilter,
@@ -41,9 +44,9 @@ use serde::{Deserialize, Serialize};
 
 use super::ports::SearchAdapter;
 use crate::alerts::incidents::{
-    FINDING_KIND_DIMENSION, FINDING_STREAM_NAME_DIMENSION, FINDING_STREAM_TYPE_DIMENSION,
-    FindingIncident, FindingPager, OncallPager, finding_dimensions, incidents_enabled,
-    open_finding_incident, resolve_finding_firing,
+    AutoStart, FINDING_KIND_DIMENSION, FINDING_STREAM_NAME_DIMENSION,
+    FINDING_STREAM_TYPE_DIMENSION, FindingIncident, FindingPager, OncallPager, finding_dimensions,
+    incidents_enabled, open_finding_incident, resolve_finding_firing, start_automatic_rca,
 };
 
 /// Prefixes every finding's trigger id, so it can never equal an alert's id in `alert_id`.
@@ -111,6 +114,23 @@ impl InvestigationPort for IncidentInvestigation {
             .zip(&subjects)
             .map(|(r, s)| r.org == org && open.contains_key(s))
             .collect())
+    }
+
+    /// The first run just finished, so the cooldown is skipped; the new run extends its report.
+    async fn reanalyse(&self, org: &str, incident_id: &str) -> anyhow::Result<bool> {
+        let (org, incident_id) = (org.to_string(), incident_id.to_string());
+        // Spawned, so the hook's timeout cannot drop a start between its writes.
+        let started = tokio::spawn(async move {
+            start_automatic_rca(
+                &org,
+                &incident_id,
+                RunTrigger::EvidenceSettled,
+                AutoRunOpts::evidence_settled(),
+            )
+            .await
+        })
+        .await?;
+        Ok(started == AutoStart::Started)
     }
 }
 

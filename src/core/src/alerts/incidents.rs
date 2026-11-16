@@ -536,6 +536,25 @@ enum MuteChange<'a> {
     Retarget { from: &'a str, to: &'a str },
 }
 
+/// What an automatic start did; `NotStarted(None)` has nothing new to record.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, PartialEq)]
+pub(crate) enum AutoStart {
+    Started,
+    NotStarted(Option<&'static str>),
+}
+
+#[cfg(feature = "enterprise")]
+impl AutoStart {
+    /// Why no run started, `None` when one did or runs.
+    pub(crate) fn off_reason(&self) -> Option<&'static str> {
+        match self {
+            Self::Started => None,
+            Self::NotStarted(reason) => *reason,
+        }
+    }
+}
+
 /// Extract semantic dimensions using configured distinguish_by groups only
 /// This replaces the current fallback that uses ALL labels
 #[cfg(feature = "enterprise")]
@@ -2063,6 +2082,9 @@ pub async fn correlate_external_event(
             org_id,
             incident_id,
             config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+            config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
+                config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+            ),
         )
         .await;
     }
@@ -4732,6 +4754,9 @@ async fn join_ops_incident(
                 org_id,
                 &existing.id,
                 config::meta::alerts::rca_runs::RunTrigger::AutoNewAlertType,
+                config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
+                    config::meta::alerts::rca_runs::RunTrigger::AutoNewAlertType,
+                ),
             )
             .await;
         }
@@ -5102,13 +5127,19 @@ async fn membership_on_join(
     muted_by: Option<&str>,
     remembered: bool,
 ) {
-    use config::meta::alerts::rca_runs::RunTrigger;
+    use config::meta::alerts::rca_runs::{AutoRunOpts, RunTrigger};
 
     let unmuted = muted_by.is_none();
     if !remembered {
         spawn_membership_check(org_id, incident_id, alert_id, unmuted, muted_by);
     } else if unmuted {
-        start_automatic_rca(org_id, incident_id, RunTrigger::AutoNewAlertType).await;
+        start_automatic_rca(
+            org_id,
+            incident_id,
+            RunTrigger::AutoNewAlertType,
+            AutoRunOpts::for_trigger(RunTrigger::AutoNewAlertType),
+        )
+        .await;
     }
 }
 
@@ -5120,7 +5151,7 @@ fn spawn_membership_check(
     then_rca: bool,
     muted_by: Option<&str>,
 ) {
-    use config::meta::alerts::rca_runs::RunTrigger;
+    use config::meta::alerts::rca_runs::{AutoRunOpts, RunTrigger};
     use o2_enterprise::enterprise::alerts::incident_membership as membership;
 
     let (org, incident, alert) = (
@@ -5135,7 +5166,13 @@ fn spawn_membership_check(
                 after_member_removed(&org, &incident, &removal, muted_by.as_deref()).await;
             }
             _ if then_rca => {
-                start_automatic_rca(&org, &incident, RunTrigger::AutoNewAlertType).await;
+                start_automatic_rca(
+                    &org,
+                    &incident,
+                    RunTrigger::AutoNewAlertType,
+                    AutoRunOpts::for_trigger(RunTrigger::AutoNewAlertType),
+                )
+                .await;
             }
             _ => {}
         }
@@ -5712,20 +5749,20 @@ pub fn rca_off_reason_for(analysis_on: bool, agent_available: bool) -> Option<&'
 #[cfg(feature = "enterprise")]
 pub(crate) const SYSTEM_USER_EMAIL: &str = "system@openobserve.ai";
 
-/// The one start path of automatic runs; returns why none started, `None` when one did or runs.
+/// The one start path of automatic runs.
 #[cfg(feature = "enterprise")]
-async fn start_automatic_rca(
+pub(crate) async fn start_automatic_rca(
     org_id: &str,
     incident_id: &str,
     trigger: config::meta::alerts::rca_runs::RunTrigger,
-) -> Option<&'static str> {
-    use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
+    opts: config::meta::alerts::rca_runs::AutoRunOpts,
+) -> AutoStart {
     use o2_enterprise::enterprise::alerts::rca_service;
 
     use super::rca_runs::{RunSubject, StartOutcome, StartRun};
 
     if !rca_will_run(org_id, incident_id).await {
-        return rca_not_run_reason();
+        return AutoStart::NotStarted(rca_not_run_reason());
     }
     match infra::table::alert_incidents::get(org_id, incident_id).await {
         Ok(Some(incident)) if incident.rca_off_reason.is_some() => {
@@ -5735,19 +5772,19 @@ async fn start_automatic_rca(
             );
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
             // Already recorded, so there is nothing new to say.
-            return None;
+            return AutoStart::NotStarted(None);
         }
         Ok(_) => {}
         Err(e) => {
             log::error!("[INCIDENTS::RCA] Could not read incident {org_id}/{incident_id}: {e}");
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return Some(RCA_OFF_START_FAILED);
+            return AutoStart::NotStarted(Some(RCA_OFF_START_FAILED));
         }
     }
 
     // A refusal starts nothing and charges nothing; the meter runs after the start.
     #[cfg(feature = "cloud")]
-    let usage_feature = if trigger == RunTrigger::AutoNewIncident {
+    let usage_feature = if trigger == config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident {
         crate::trial_quota::TrialQuotaFeature::NewIncident
     } else {
         crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
@@ -5762,17 +5799,17 @@ async fn start_automatic_rca(
         );
         // No verdict is coming, so nothing may go on holding a page for one.
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-        return Some(RCA_OFF_QUOTA);
+        return AutoStart::NotStarted(Some(RCA_OFF_QUOTA));
     }
 
     let outcome = super::rca_runs::start_run(StartRun {
         org_id: org_id.to_string(),
         subject: RunSubject::Incident(incident_id.to_string()),
         trigger,
-        mode: RunMode::Fresh,
+        mode: opts.mode,
         started_by: "system".to_string(),
         guidance: None,
-        skip_cooldown: trigger == RunTrigger::AutoNewIncident,
+        skip_cooldown: opts.skip_cooldown,
         oncall_subjects: None,
         context_used: None,
     })
@@ -5784,7 +5821,7 @@ async fn start_automatic_rca(
                 "[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping {} trigger",
                 trigger.as_str()
             );
-            return None;
+            return AutoStart::NotStarted(None);
         }
         Ok(StartOutcome::CoolingDown) => {
             log::debug!(
@@ -5792,12 +5829,12 @@ async fn start_automatic_rca(
                 trigger.as_str()
             );
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return Some(RCA_OFF_COOLING_DOWN);
+            return AutoStart::NotStarted(Some(RCA_OFF_COOLING_DOWN));
         }
         Err(e) => {
             log::error!("[INCIDENTS::RCA] Could not start a run for {org_id}/{incident_id}: {e}");
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return Some(RCA_OFF_START_FAILED);
+            return AutoStart::NotStarted(Some(RCA_OFF_START_FAILED));
         }
     };
 
@@ -5813,8 +5850,7 @@ async fn start_automatic_rca(
             RcaLaunch {
                 trigger,
                 user_email: SYSTEM_USER_EMAIL.to_string(),
-                // Automatic runs stand on their own.
-                build_on_previous: false,
+                build_on_previous: opts.builds_on_previous(),
                 // Metered inside, right before the turn starts.
                 usage_permit: None,
                 // Automatic runs carry no guidance.
@@ -5832,7 +5868,7 @@ async fn start_automatic_rca(
             );
         }
     });
-    None
+    AutoStart::Started
 }
 
 /// Pages a new incident's on-call record and blast radius; the record decides L0.
@@ -5925,8 +5961,12 @@ async fn start_new_incident_rca(
         org_id,
         incident_id,
         config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+        config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
+            config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+        ),
     )
-    .await)
+    .await
+    .off_reason())
 }
 
 /// An un-muted incident's analysis.
@@ -5954,6 +5994,9 @@ async fn start_unmuted_incident_rca(
             org_id,
             incident_id,
             config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+            config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
+                config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+            ),
         )
         .await;
     }
@@ -6186,8 +6229,15 @@ pub async fn trigger_rca_for_incident(
     } else {
         None
     };
+    // A resume continues a session that already read the bundle.
+    let evidence = if resume.is_none() {
+        crate::autoobserve::next_step::evidence_for_incident(&org_id, &incident_id, &run_id).await
+    } else {
+        None
+    };
     let context =
-        rca_service::build_incident_context(&org_id, &incident_id, previous_analysis).await;
+        rca_service::build_incident_context(&org_id, &incident_id, previous_analysis, evidence)
+            .await;
     let context = rca_service::rca_context_json(&context);
 
     #[cfg(feature = "cloud")]
@@ -6758,6 +6808,9 @@ async fn reopen_follow_ups(
             org_id,
             incident_id,
             config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
+            config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
+                config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
+            ),
         )
         .await;
     }
