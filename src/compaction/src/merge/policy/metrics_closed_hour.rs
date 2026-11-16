@@ -58,14 +58,14 @@ pub(super) async fn plan(
 ) -> RoundPlan {
     let (files, legacy_files) = split_legacy_metrics(files);
     let mut batches = legacy_batches(legacy_files, limits);
-    let mut plan = indexed_plan(files, limits, schema, stream).await;
+    let mut plan = plan_indexed_merge(files, limits, schema, stream).await;
     batches.append(&mut plan.batches);
     plan.batches = batches;
     plan
 }
 
 /// The hash-ordered files: a pre-merge while over the merge-group cap, else the indexed merge.
-async fn indexed_plan(
+async fn plan_indexed_merge(
     mut files: Vec<FileKey>,
     limits: &BatchLimits<'_>,
     schema: &Arc<Schema>,

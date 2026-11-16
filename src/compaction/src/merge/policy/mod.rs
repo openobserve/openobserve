@@ -134,7 +134,7 @@ impl MergePolicy {
             MergeRule::SizeBounded(mode) => size_bounded::plan(&files, limits, mode),
             MergeRule::MetricsOpenHour => metrics_open_hour::plan(files, limits),
             MergeRule::MetricsClosedHour => {
-                metrics_closed_hour::plan(files, limits, schema, &self.window.stream()).await
+                metrics_closed_hour::plan(files, limits, schema, &self.window.stream_key()).await
             }
             #[cfg(feature = "enterprise")]
             MergeRule::Downsampling(rule) => downsampling::plan(files, rule),
@@ -217,7 +217,7 @@ pub(super) struct MergeWindow {
 }
 
 impl MergeWindow {
-    pub(super) fn stream(&self) -> String {
+    pub(super) fn stream_key(&self) -> String {
         format!("{}/{}/{}", self.org_id, self.stream_type, self.stream_name)
     }
 

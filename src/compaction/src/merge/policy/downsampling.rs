@@ -65,7 +65,9 @@ fn select_from_rules(
         return None;
     }
     if offset % day_micros(1) == 0 {
-        if let Some(rule) = rule_at(rules, now, job_range_end(offset, PartitionTimeLevel::Daily)) {
+        if let Some(rule) =
+            first_eligible_rule(rules, now, job_range_end(offset, PartitionTimeLevel::Daily))
+        {
             return Some((
                 PartitionTimeLevel::Daily,
                 MergeRule::Downsampling(rule.clone()),
@@ -75,11 +77,11 @@ fn select_from_rules(
             return None;
         }
     }
-    rule_at(rules, now, job_range_end(offset, partition_level))
+    first_eligible_rule(rules, now, job_range_end(offset, partition_level))
         .map(|rule| (partition_level, MergeRule::Downsampling(rule.clone())))
 }
 
-fn rule_at<'a>(
+fn first_eligible_rule<'a>(
     rules: &[&'a DownsamplingRule],
     now: i64,
     range_end: i64,

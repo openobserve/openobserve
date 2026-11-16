@@ -23,7 +23,7 @@ use config::{
     meta::stream::{FileKey, StreamParams, StreamType},
     metrics,
 };
-use infra::{file_list as infra_file_list, schema::get_settings};
+use infra::{file_list as infra_file_list, schema};
 use search_service::file_list;
 use tokio::sync::mpsc;
 
@@ -44,7 +44,7 @@ pub async fn merge_by_stream(
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
 
-    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+    let schema = schema::get(org_id, stream_name, stream_type).await?;
     if schema == Schema::empty() {
         // the stream was deleted: nothing is left to merge
         mark_job_done(job_id).await;
@@ -55,14 +55,14 @@ pub async fn merge_by_stream(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] offset: {offset}"
     );
 
-    let settings = get_settings(org_id, stream_name, stream_type).await;
+    let settings = schema::get_settings(org_id, stream_name, stream_type).await;
     let policy = Arc::new(MergePolicy::resolve(
         &StreamParams::new(org_id, stream_name, stream_type),
         &schema,
         settings.as_deref(),
         offset,
     ));
-    let files = window_files(&policy).await?;
+    let files = query_window_files(&policy).await?;
     if files.is_empty() {
         mark_job_done(job_id).await;
         return Ok(());
@@ -89,7 +89,7 @@ async fn mark_job_done(job_id: i64) {
 }
 
 /// The files of the window the policy plans over.
-async fn window_files(policy: &MergePolicy) -> Result<Vec<FileKey>, anyhow::Error> {
+async fn query_window_files(policy: &MergePolicy) -> Result<Vec<FileKey>, anyhow::Error> {
     let window = policy.window();
     let max_original_size = if policy.reads_whole_window() {
         i64::MAX
@@ -109,7 +109,7 @@ async fn window_files(policy: &MergePolicy) -> Result<Vec<FileKey>, anyhow::Erro
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{}] date range: [{},{}], files: {}",
-        window.stream(),
+        window.stream_key(),
         window.date_start,
         window.date_end,
         files.len(),
@@ -119,7 +119,7 @@ async fn window_files(policy: &MergePolicy) -> Result<Vec<FileKey>, anyhow::Erro
 
 /// Builds the window's bloom filters; a failure only leaves files on the regular search path.
 async fn build_blooms(window: &MergeWindow, outcome: RoundOutcome) {
-    let stream = window.stream();
+    let stream = window.stream_key();
     let date_start = &window.date_start;
     let build_start = std::time::Instant::now();
     match crate::bloom::compact::build_for_stream(
@@ -146,7 +146,7 @@ async fn build_blooms(window: &MergeWindow, outcome: RoundOutcome) {
 
 /// Marks the job done, re-arms it for another round, or leaves it Running for the retry.
 async fn settle_job(window: &MergeWindow, job_id: i64, needs_another_round: bool) {
-    let stream = window.stream();
+    let stream = window.stream_key();
     let date_start = &window.date_start;
     // the range settled mid-round: stay Running so check_running_jobs re-arms a whole-range retry
     if window.is_incremental && crate::is_past_hour(window.job_end) {

@@ -169,7 +169,7 @@ async fn commit_results(
         if check_guard.contains(&batch_id) {
             log::warn!(
                 "[COMPACTOR] merge files for stream: [{}] found error files, batch_id: {batch_id} duplicate",
-                window.stream()
+                window.stream_key()
             );
             continue;
         }

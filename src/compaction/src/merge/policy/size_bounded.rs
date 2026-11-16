@@ -35,7 +35,7 @@ pub(super) fn batches(
 ) -> Vec<PlannedBatch> {
     size_bounded_groups(files, limits)
         .into_iter()
-        .map(|group| within_size_target(group, limits.max_file_size as i64))
+        .map(|group| take_size_bounded_prefix(group, limits.max_file_size as i64))
         // a group cut down to one file has nothing left to merge with
         .filter(|group| group.len() > 1)
         .map(|group| (group, mode.clone()))
@@ -43,7 +43,7 @@ pub(super) fn batches(
 }
 
 /// The leading files of `group` whose original and compressed sizes both sum within the target.
-fn within_size_target(group: Vec<FileKey>, max_file_size: i64) -> Vec<FileKey> {
+fn take_size_bounded_prefix(group: Vec<FileKey>, max_file_size: i64) -> Vec<FileKey> {
     let mut original_size = 0;
     let mut compressed_size = 0;
     group
