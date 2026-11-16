@@ -1,4 +1,19 @@
-use sea_orm::{Database, DatabaseConnection};
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, IntoActiveModel, Schema, Set};
 
 use super::*;
 
@@ -38,7 +53,7 @@ async fn fixture() -> DatabaseConnection {
         "CREATE TABLE alerts (id TEXT,org TEXT,folder_id TEXT,name TEXT,enabled BOOLEAN,is_real_time BOOLEAN,context_attributes TEXT)",
         "CREATE TABLE alert_composites (id TEXT,org TEXT,folder_id TEXT,name TEXT,enabled BOOLEAN,context_attributes TEXT)",
         "CREATE TABLE anomaly_detection_config (anomaly_id TEXT,org_id TEXT,folder_id TEXT,name TEXT,enabled BOOLEAN)",
-        "CREATE TABLE synthetics_checks (id TEXT,org_id TEXT,folder_id TEXT,name TEXT,enabled BOOLEAN)",
+        "CREATE TABLE synthetics (id TEXT,org_id TEXT,folder_id TEXT,name TEXT,enabled BOOLEAN)",
         "CREATE TABLE pipeline (id TEXT,org TEXT,name TEXT,enabled BOOLEAN,kind TEXT)",
         "CREATE TABLE users (email TEXT,first_name TEXT,last_name TEXT)",
         "CREATE TABLE org_users (email TEXT,org_id TEXT,role INTEGER)",
@@ -205,7 +220,7 @@ async fn safe_projections_keep_disabled_user_pipelines_and_separate_account_role
     let conn = fixture().await;
     for sql in [
         "INSERT INTO pipeline VALUES ('user','org','Disabled',false,'user'),('internal','org','Internal',true,'evaluation')",
-        "INSERT INTO synthetics_checks VALUES ('s','org','ps','Probe',false)",
+        "INSERT INTO synthetics VALUES ('s','org','ps','Probe',false)",
         "INSERT INTO users VALUES ('a@example.invalid','Alice','Human'),('sa@example.invalid','Service','Account'),('agent@example.invalid','Agent','')",
         "INSERT INTO org_users VALUES ('a@example.invalid','org',4),('sa@example.invalid','org',5),('agent@example.invalid','org',6)",
     ] {
@@ -230,6 +245,77 @@ async fn safe_projections_keep_disabled_user_pipelines_and_separate_account_role
     assert_eq!(accounts.items.len(), 2);
     assert!(
         load_page_with(&conn, "org' OR 1=1 --", ResourceKind::User, None, 20)
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn synthetic_projection_uses_the_actual_entity_schema_without_secret_columns() {
+    use infra::table::entity::{folders, synthetics_checks};
+
+    let conn = Database::connect("sqlite::memory:").await.unwrap();
+    let backend = conn.get_database_backend();
+    let schema = Schema::new(backend);
+    for statement in [
+        schema.create_table_from_entity(folders::Entity),
+        schema.create_table_from_entity(synthetics_checks::Entity),
+    ] {
+        conn.execute(backend.build(&statement)).await.unwrap();
+    }
+    folders::ActiveModel {
+        id: Set("folder-primary-key".into()),
+        org: Set("org".into()),
+        folder_id: Set("public-folder".into()),
+        name: Set("Probe folder".into()),
+        description: Set(None),
+        icon: Set(None),
+        r#type: Set(3),
+    }
+    .insert(&conn)
+    .await
+    .unwrap();
+    synthetics_checks::Model {
+        id: "check".into(),
+        org_id: "org".into(),
+        folder_id: "folder-primary-key".into(),
+        name: "Probe".into(),
+        enabled: false,
+        target: "https://example.invalid/never-executed".into(),
+        secrets: "unreadable-secret-payload".repeat(4096),
+        ..Default::default()
+    }
+    .into_active_model()
+    .insert(&conn)
+    .await
+    .unwrap();
+    let page = super::load_page_with(&conn, "org", ResourceKind::Synthetic, None, 20, 4096)
+        .await
+        .unwrap();
+    assert_eq!(page.items.len(), 1);
+    let check = &page.items[0];
+    assert_eq!(check.folder_id.as_deref(), Some("public-folder"));
+    assert_eq!(check.folder_name.as_deref(), Some("Probe folder"));
+    assert_eq!(check.enabled, Some(false));
+    assert_eq!(
+        check.route_ref,
+        ResourceRoute::Synthetic {
+            check_id: "check".into(),
+            folder_id: "public-folder".into()
+        }
+    );
+    let json = serde_json::to_value(check).unwrap();
+    assert!(json.get("secrets").is_none() && json.get("target").is_none());
+    assert!(
+        refresh_with(&conn, "org", ResourceKind::Synthetic, "check")
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        load_page_with(&conn, "other", ResourceKind::Synthetic, None, 20)
             .await
             .unwrap()
             .items

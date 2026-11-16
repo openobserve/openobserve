@@ -542,7 +542,7 @@ fn selection(kind: ResourceKind) -> &'static str {
             "SELECT id,name,NULL AS folder_id,NULL AS folder_name,enabled,NULL AS attributes,NULL AS payload,NULL AS alert_type FROM pipeline WHERE org=$1 AND kind='user'"
         }
         ResourceKind::Synthetic => {
-            "SELECT s.id,s.name,f.folder_id,f.name AS folder_name,s.enabled,NULL AS attributes,NULL AS payload,NULL AS alert_type FROM synthetics_checks s JOIN folders f ON f.id=s.folder_id WHERE s.org_id=$1 AND f.org=$1 AND f.type=3"
+            "SELECT s.id,s.name,f.folder_id,f.name AS folder_name,s.enabled,NULL AS attributes,NULL AS payload,NULL AS alert_type FROM synthetics s JOIN folders f ON f.id=s.folder_id WHERE s.org_id=$1 AND f.org=$1 AND f.type=3"
         }
         ResourceKind::User => {
             "SELECT u.email AS id,trim(u.first_name || ' ' || u.last_name) AS name,NULL AS folder_id,NULL AS folder_name,NULL AS enabled,NULL AS attributes,NULL AS payload,NULL AS alert_type FROM org_users o JOIN users u ON u.email=o.email WHERE o.org_id=$1 AND o.role NOT IN (5,6)"
