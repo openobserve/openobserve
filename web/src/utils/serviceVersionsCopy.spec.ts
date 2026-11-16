@@ -169,6 +169,13 @@ describe("warm-up end time", () => {
     expect(noVerdictRule({ epoch: now - 2 * hour, warmup_ends_at: now - hour }, t, now, true)).toBe(
       "running before deploy tracking started",
     );
+    const ended = { epoch: now - 2 * hour, warmup_ends_at: now - hour };
+    expect(noVerdictRule(ended, t, now, false, true)).toBe(
+      "version metrics have not reached this window",
+    );
+    expect(noVerdictRule(ended, t, now - 2 * hour, false, true)).toBe(
+      "deploy tracking is warming up",
+    );
   });
 });
 describe("one noise judgement", () => {

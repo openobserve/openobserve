@@ -33735,7 +33735,8 @@
         "none": "first version",
         "previous_by_first_seen": "previous by first seen (no deploy history)",
         "pre_existing": "running before deploy tracking started",
-        "warming_up": "deploy tracking is warming up"
+        "warming_up": "deploy tracking is warming up",
+        "no_data": "version metrics have not reached this window"
       },
       "notServingRequests": "Requests, {window}",
       "notServingNote": "Nothing to compare until {version} serves traffic.",
@@ -33921,7 +33922,8 @@
       "rollbackRecoveredBare": "Rolled back to {version} from {from} · recovered.",
       "rollbackStillWorseBare": "Rolled back to {version} from {from} · still worse.",
       "preExistingSince": "Running before deploy tracking started ({epoch}); verdicts start with the next deploy",
-      "okImproved": "OK · {n} requests"
+      "okImproved": "OK · {n} requests",
+      "noData": "Not enough data yet. Version metrics have not reached this window."
     },
     "evidence": {
       "traces": "Traces",

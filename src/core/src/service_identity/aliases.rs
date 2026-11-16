@@ -573,8 +573,11 @@ async fn create_locked<C: ConnectionTrait + TransactionTrait>(
         allow_collisions: request.allow_collisions,
         ..Default::default()
     };
+    let committed = committed(conn, org).await?;
+    if row.kind == "rename" {
+        reject_traced_rename(&row.alias, &committed.summaries)?;
+    }
     if !request.allow_collisions {
-        let committed = committed(conn, org).await?;
         reject_collisions(std::slice::from_ref(&row), &committed)?;
     }
     written(conn, org, row).await
@@ -615,9 +618,14 @@ async fn update_locked<C: ConnectionTrait + TransactionTrait>(
     if accept {
         row.allow_collisions = request.allow_collisions;
     }
-    if accept && !request.allow_collisions {
+    if accept {
         let committed = committed(conn, org).await?;
-        reject_collisions(std::slice::from_ref(&row), &committed)?;
+        if row.kind == "rename" {
+            reject_traced_rename(&row.alias, &committed.summaries)?;
+        }
+        if !request.allow_collisions {
+            reject_collisions(std::slice::from_ref(&row), &committed)?;
+        }
     }
     written(conn, org, row).await
 }
@@ -654,10 +662,19 @@ async fn bulk_locked<C: ConnectionTrait + TransactionTrait>(
             next
         })
         .collect();
-    let collisions = if accept && !request.allow_collisions {
-        collisions_of(&next, &committed(conn, org).await?)
+    let committed = if accept {
+        Some(committed(conn, org).await?)
     } else {
-        Vec::new()
+        None
+    };
+    if let Some(committed) = &committed {
+        for row in next.iter().filter(|row| row.kind == "rename") {
+            reject_traced_rename(&row.alias, &committed.summaries)?;
+        }
+    }
+    let collisions = match &committed {
+        Some(committed) if !request.allow_collisions => collisions_of(&next, committed),
+        _ => Vec::new(),
     };
     let colliding: BTreeSet<&str> = collisions.iter().map(|c| c.alias_key.as_str()).collect();
     next.retain(|row| !colliding.contains(row.alias_key.as_str()));
@@ -887,6 +904,24 @@ fn reject_collisions(rows: &[AliasRow], committed: &Committed) -> Result<(), Res
         axum::Json(json!({"error": "alias_collision", "collisions": collisions})),
     )
         .into_response())
+}
+
+// Every display shows a live trace name, so a rename of one would never be seen.
+#[cfg(feature = "enterprise")]
+fn reject_traced_rename(alias: &str, summaries: &[WhereSummaryRecord]) -> Result<(), Response> {
+    let key = config::meta::service_identity::service_key(alias);
+    let Some(traced) = display_feed::trace_scopes(summaries)
+        .into_iter()
+        .find(|scope| config::meta::service_identity::service_key(&scope.service) == key)
+    else {
+        return Ok(());
+    };
+    let message = format!(
+        "\"{}\" is the service.name its traces report, and that name is always shown. \
+         To rename it, change service.name where the service is instrumented.",
+        traced.service
+    );
+    Err(error(StatusCode::CONFLICT, &message))
 }
 
 #[cfg(feature = "enterprise")]
@@ -1210,6 +1245,16 @@ mod tests {
             assert_eq!(status, StatusCode::CONFLICT);
             assert_eq!(body["error"], "alias_collision");
             assert_eq!(body["collisions"][0]["suggested_qualifier"], "pentest");
+            let traced = create("rename", "", "Stock-Svc", "Inventory", true);
+            let error = create_with(&conn, org, "a", traced, 2).await.unwrap_err();
+            let (status, body) = status_and_body(error).await;
+            assert_eq!(status, StatusCode::CONFLICT);
+            assert!(
+                body["error"].as_str().unwrap().contains("service.name"),
+                "{body}"
+            );
+            let placeholder = create("rename", "", "unknown_service:node", "Node app", false);
+            create_with(&conn, org, "a", placeholder, 2).await.unwrap();
             let allowed = create("k8s_workload", "pentest", "alertquerier", "querier", true);
             let row = create_with(&conn, org, "admin@example.com", allowed, 3)
                 .await
@@ -1394,14 +1439,34 @@ mod tests {
                 (learned.kind.as_str(), learned.scope.as_str()),
                 ("rename", "shop")
             );
-            let edit = |canonical: &str| AliasUpdate {
-                status: "active".into(),
+            let edit = |status: &str, canonical: &str| AliasUpdate {
+                status: status.into(),
                 canonical: Some(canonical.into()),
                 allow_collisions: false,
             };
-            let row = update_with(&conn, org, "a", &learned.alias_key, edit("Warehouse"), 20)
-                .await
-                .unwrap();
+            // Its traces report stock-svc, so an accepted rename of it could never show.
+            let traced = update_with(&conn, org, "a", &learned.alias_key, edit("active", "W"), 19);
+            let (status, body) = status_and_body(traced.await.unwrap_err()).await;
+            assert_eq!(status, StatusCode::CONFLICT);
+            assert!(body["error"].as_str().unwrap().contains("service.name"));
+            let bulk = AliasBulk {
+                action: "accept".into(),
+                alias_keys: Some(vec![learned.alias_key.clone()]),
+                filter: None,
+                allow_collisions: true,
+            };
+            let error = bulk_with(&conn, org, "a", bulk, 19).await.unwrap_err();
+            assert_eq!(status_and_body(error).await.0, StatusCode::CONFLICT);
+            let row = update_with(
+                &conn,
+                org,
+                "a",
+                &learned.alias_key,
+                edit("rejected", "Warehouse"),
+                20,
+            )
+            .await
+            .unwrap();
             assert_eq!(
                 (
                     row.kind.as_str(),
@@ -1410,7 +1475,7 @@ mod tests {
                 ),
                 ("rename", "shop", "Warehouse")
             );
-            let error = update_with(&conn, org, "a", &learned.alias_key, edit(" "), 21)
+            let error = update_with(&conn, org, "a", &learned.alias_key, edit("active", " "), 21)
                 .await
                 .unwrap_err();
             assert_eq!(status_and_body(error).await.0, StatusCode::BAD_REQUEST);

@@ -393,7 +393,7 @@ pub async fn imaged_by_scopes<C: ConnectionTrait>(
     Ok(out)
 }
 
-/// Live versions per scope key for one org, the grouped form of [`count_by_scope`].
+/// Live non-empty versions per scope key for one org; a service that never reported one has none.
 pub async fn versions_by_scope<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -403,6 +403,7 @@ pub async fn versions_by_scope<C: ConnectionTrait>(
         .column(Column::ScopeKey)
         .column_as(Expr::cust("COUNT(*)"), "versions")
         .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Version.ne(""))
         .filter(live())
         .group_by(Column::ScopeKey)
         .into_tuple::<(String, i64)>()
@@ -1090,6 +1091,57 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_fenced_deploy_below_its_version_delete_is_not_reported_stored() {
+        use super::super::entity::service_version_deploys as deploys;
+        for db in dbs("sv_deploy_floor").await {
+            let records: Vec<_> = [obs("deleted", 10, 100), obs("kept", 10, 100)]
+                .into_iter()
+                .map(|o| o.to_record(ORG, 1))
+                .collect();
+            merge_upsert_many(&db, records.clone()).await.unwrap();
+            tombstone(&db, &records[0].version_key, 200, None).await;
+            let deploy = |record: &ServiceVersionRecord| deploys::Model {
+                deploy_key: sha256::digest(
+                    serde_json::json!([
+                        ORG,
+                        "ingester",
+                        &record.where_key,
+                        "region",
+                        &record.version,
+                        150
+                    ])
+                    .to_string(),
+                ),
+                org_id: ORG.into(),
+                service_name: "ingester".into(),
+                where_key: record.where_key.clone(),
+                scope_key: record.scope_key.clone(),
+                cluster: "region".into(),
+                to_version: record.version.clone(),
+                to_version_key: record.version_key.clone(),
+                kind: "deploy".into(),
+                entry_source: "traffic".into(),
+                at: 150,
+                source_streams: "[]".into(),
+                serving_versions: "[]".into(),
+                full_serving: "[]".into(),
+                ..Default::default()
+            };
+            let stored = super::super::service_version_deploys::put_fenced_batch(
+                &db,
+                ORG,
+                "region",
+                1,
+                records.iter().map(deploy).collect(),
+            )
+            .await
+            .unwrap();
+            let versions: Vec<_> = stored.iter().map(|row| row.to_version.as_str()).collect();
+            assert_eq!(versions, ["kept"]);
+        }
+    }
+
+    #[tokio::test]
     async fn tombstone_under_newer_traffic_floors_the_row_and_stays_live() {
         for db in dbs("sv_floor_live").await {
             let mut o = obs("v1", 100, 500);
@@ -1532,6 +1584,12 @@ mod tests {
                 other_service.to_record(ORG, 1),
             ];
             merge_upsert_many(&db, records.clone()).await.unwrap();
+            let by_scope = versions_by_scope(&db, ORG).await.unwrap();
+            assert_eq!(by_scope[&records[0].scope_key], 2);
+            assert!(
+                !by_scope.contains_key(&records[3].scope_key),
+                "{by_scope:?}"
+            );
             let one_scope = ListQuery {
                 service_name: Some("ingester".to_string()),
                 where_key: Some("k8s:obs-region/openobserve".to_string()),

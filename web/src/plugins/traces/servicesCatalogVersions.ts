@@ -4,6 +4,7 @@ import type { LocationQuery } from "vue-router";
 import { envEntries, inEnv, NO_ENV } from "@/services/service_versions.envs";
 import { verdictCode } from "@/enterprise/components/ServiceVersions/verdictText";
 import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/traces/serviceHealth";
+import { serviceKey, serviceKeySql } from "@/utils/serviceCount";
 import {
   isOutsideK8s,
   sameBuild,
@@ -88,14 +89,15 @@ export function mergeCatalogVersions<
   T extends { service_name: string; where_key?: string; infer_service_name?: string },
 >(rows: T[], scopes: Scope[]) {
   const byIdentity = new Map(
-    scopes.map((scope) => [JSON.stringify([scope.service, scope.where_key]), scope]),
+    scopes.map((scope) => [JSON.stringify([serviceKey(scope.service), scope.where_key]), scope]),
   );
   return rows.map((row) => {
     const versionScope = row.infer_service_name
       ? undefined
-      : byIdentity.get(JSON.stringify([row.service_name, row.where_key || ""]));
+      : byIdentity.get(JSON.stringify([serviceKey(row.service_name), row.where_key || ""]));
     return {
       ...row,
+      service_name: versionScope?.service ?? row.service_name,
       versionScope,
       place: row.where_key ? catalogPlace(row.where_key, versionScope) : undefined,
     };
@@ -112,20 +114,35 @@ export function catalogPanelRow<
   },
 >(rows: T[], service: string, where: string, kind = "", system?: string) {
   // A kind names a dependency row, which can share its name with an instrumented service.
-  const own = rows.filter(
-    (row) =>
-      row.service_name === service &&
-      (kind
-        ? row.infer_service_name &&
-          row.infer_service_type === kind &&
-          (system === undefined || (row.infer_service_system || "") === system)
-        : !row.infer_service_name),
+  // Instrumented rows fold their name like the catalog read does; dependency names are kept as sent.
+  const own = rows.filter((row) =>
+    kind
+      ? row.service_name === service &&
+        row.infer_service_name &&
+        row.infer_service_type === kind &&
+        (system === undefined || (row.infer_service_system || "") === system)
+      : !row.infer_service_name && serviceKey(row.service_name) === serviceKey(service),
   );
   return (
     own.find((row) => (row.where_key || "") === where) ??
     own.find((row) => !row.where_key) ??
     own[0]
   );
+}
+
+/** Every raw span spelling of an instrumented service across the catalog's rows, places included. */
+export function catalogSpellings(
+  rows: { service_name: string; infer_service_name?: string; service_names?: string[] }[],
+  service: string,
+) {
+  const key = serviceKey(service);
+  return [
+    ...new Set(
+      rows
+        .filter((row) => !row.infer_service_name && serviceKey(row.service_name) === key)
+        .flatMap((row) => row.service_names ?? [row.service_name]),
+    ),
+  ];
 }
 
 /** Why a version cell of a row with no registry scope is empty; null for an inferred row, which never has versions. */
@@ -353,7 +370,12 @@ export function servingIdle(
   const version = scope?.current_version;
   if (!complete || !version || !scope?.signals?.includes("traces")) return false;
   return !traffic.get(
-    versionTrafficKey(row.service_name, row.where_key || "", version, scope.current_image),
+    versionTrafficKey(
+      serviceKey(row.service_name),
+      row.where_key || "",
+      version,
+      scope.current_image,
+    ),
   )?.requests;
 }
 
@@ -366,23 +388,40 @@ export function servingHealthSql(
 ) {
   const own = hasInferColumns ? " AND (infer_service_name IS NULL OR infer_service_name = '')" : "";
   const image = hasImageColumn ? "NULLIF(o2_service_image, '')" : "";
-  return `SELECT o2_service_where AS where_key, service_name, o2_service_version AS version,
+  const service = serviceKeySql("service_name");
+  return `SELECT o2_service_where AS where_key, ${service} AS service_name, o2_service_version AS version,
   ${image || "CAST(NULL AS VARCHAR)"} AS image,
   COUNT(*) FILTER (WHERE ${requestPredicate}) AS total_requests,
   COUNT(*) FILTER (WHERE ${requestPredicate} AND span_status = 'ERROR') AS error_count
 FROM "${stream}"
 WHERE o2_service_version IS NOT NULL AND o2_service_version <> ''${own}
-GROUP BY o2_service_where, service_name, o2_service_version${image ? `, ${image}` : ""}`;
+GROUP BY o2_service_where, ${service}, o2_service_version${image ? `, ${image}` : ""}`;
 }
 
-/** One build's traffic key; an empty image is the imageless build, as the backend reads it. */
+/** One build's traffic key over a folded service key; an empty image is the imageless build, as the backend reads it. */
 export function versionTrafficKey(
-  service: string,
+  key: string,
   whereKey: string,
   version: string,
   image?: string | null,
 ) {
-  return JSON.stringify([service, whereKey, version, image || null]);
+  return JSON.stringify([key, whereKey, version, image || null]);
+}
+
+/** The serving-health read's rows by build; the read already folds service_name, and a key folds again into another service. */
+export function versionTrafficFrom(hits: Record<string, unknown>[]) {
+  const traffic = new Map<string, VersionTraffic>();
+  for (const hit of hits)
+    traffic.set(
+      versionTrafficKey(
+        String(hit.service_name ?? ""),
+        String(hit.where_key ?? ""),
+        String(hit.version ?? ""),
+        hit.image == null ? null : String(hit.image),
+      ),
+      { requests: Number(hit.total_requests ?? 0), errors: Number(hit.error_count ?? 0) },
+    );
+  return traffic;
 }
 
 /** Health of the version serving now, so a recovered rollback reads Healthy; else the row's whole-range health. */
@@ -399,7 +438,7 @@ export function servingStatus(
   if (!version) return row.status;
   const bucket = traffic.get(
     versionTrafficKey(
-      row.service_name,
+      serviceKey(row.service_name),
       row.where_key || "",
       version,
       row.versionScope?.current_image,
