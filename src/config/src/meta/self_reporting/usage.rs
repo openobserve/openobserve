@@ -26,7 +26,7 @@ use crate::{
         db_monitoring::DBM_SERVER_STREAM,
         search::{SearchEventContext, SearchEventType},
         slo::stream::SLO_SLICES_STREAM,
-        stream::{FileMeta, StreamType},
+        stream::{FileMeta, RUM_REPLAY_RESOURCE_STREAM, StreamType},
     },
 };
 
@@ -55,11 +55,12 @@ pub const INTERNAL_STREAM_NAMES: [&str; 13] = [
 ];
 
 /// Streams `is_system_stream` matches that hold customer data; internalStreams.ts lists them.
-pub const USER_SOURCED_STREAM_NAMES: [&str; 6] = [
+pub const USER_SOURCED_STREAM_NAMES: [&str; 7] = [
     DBM_SERVER_STREAM,
     "_rumdata",
     "_rumlog",
     "_sessionreplay",
+    RUM_REPLAY_RESOURCE_STREAM,
     "synthetics_results",
     "synthetics_step_results",
 ];

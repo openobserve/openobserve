@@ -370,7 +370,9 @@ function mountSessionViewer(router = createTestRouter()) {
           },
         }),
         MobileSessionPlayer: defineComponent({
-          template: '<div data-test="stub-mobile-player" />',
+          props: ["imageResources"],
+          template:
+            '<div data-test="stub-mobile-player" :data-images="JSON.stringify([...(imageResources ?? [])])" />',
           setup(_props, { expose }) {
             expose({ seekTo: (...args: any[]) => playerStubs.mobileSeek?.(...args) });
             return {};
@@ -1234,6 +1236,219 @@ describe("SessionViewer.vue — geo fields in the session lookup (o2-enterprise#
     expect(sql).toContain("min(start)");
     for (const fragment of present) expect(sql).toContain(fragment);
     for (const field of absent) expect(sql).not.toContain(field);
+    wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — application_id in the session lookup", () => {
+  const lookupSql = () =>
+    vi
+      .mocked(searchService.search)
+      .mock.calls.map((call: any[]) => String(call[0]?.query?.query?.sql ?? ""))
+      .find((sql) => sql.includes("min(start)")) ?? "";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetStreaming(rowsResponder(fixtureRows));
+  });
+
+  afterEach(() => {
+    replaySchema.fields = { geo_info_country: true, geo_info_city: true };
+  });
+
+  it("selects min(application_id) when the _sessionreplay schema has it", async () => {
+    replaySchema.fields = { application_id: true };
+    const wrapper = await mountLoaded();
+
+    expect(lookupSql()).toContain("min(application_id) as application_id,");
+    wrapper.unmount();
+  });
+
+  it("omits application_id when the _sessionreplay schema lacks it", async () => {
+    replaySchema.fields = { geo_info_country: true };
+    const wrapper = await mountLoaded();
+
+    expect(lookupSql()).toContain("min(start)");
+    expect(lookupSql()).not.toContain("application_id");
+    wrapper.unmount();
+  });
+
+  const RES_STREAM = "_o2_rum_sessionreplay_resource";
+  const resId = (n: number) => n.toString(16).padStart(32, "0");
+  const imageBody = (ids: string[]) => (row: any) => ({
+    ...row,
+    segment: JSON.stringify({
+      records: [
+        {
+          type: 10,
+          timestamp: row.start,
+          data: {
+            wireframes: ids.map((resourceId, i) => ({ id: i, type: "image", resourceId })),
+          },
+        },
+        { type: 11, timestamp: row.end, data: {} },
+      ],
+    }),
+  });
+  const resourceSqls = () => streaming.sqls.filter((sql) => sql.includes(RES_STREAM));
+  const loadedImages = (wrapper: any) =>
+    JSON.parse(
+      wrapper.find('[data-test="stub-mobile-player"]').attributes("data-images") ?? "[]",
+    ) as [string, string][];
+
+  async function mountAndroid(
+    ids: string[],
+    stored: Record<string, any>,
+    lookup: Record<string, any> = {},
+  ) {
+    replaySchema.fields = { application_id: true };
+    vi.mocked(searchService.search).mockResolvedValueOnce({
+      data: {
+        hits: [{ ...sessionLookupRow, source: "android", application_id: "app-42", ...lookup }],
+      },
+    } as any);
+    const segments = rowsResponder(fixtureRows, imageBody(ids));
+    resetStreaming((sql, from) => {
+      if (!sql.includes(RES_STREAM)) return segments(sql, from);
+      return from > 0
+        ? []
+        : Object.entries(stored)
+            .filter(([id]) => sql.includes(`'${id}'`))
+            .map(([resource_id, row]) => ({ resource_id, ...row }));
+    });
+    return mountLoaded();
+  }
+
+  it("loads the images a mobile session references from the resource stream", async () => {
+    const ids = [resId(1), resId(2)];
+    const wrapper = await mountAndroid(ids, {
+      [ids[0]]: { mime: "image/webp", image: "QUJD" },
+      [ids[1]]: { mime: "image/png", image: "REVG" },
+    });
+
+    const [sql] = resourceSqls();
+    expect(sql).toContain("select resource_id, min(mime) as mime, min(image) as image from");
+    expect(sql).toContain("group by resource_id");
+    expect(sql).toContain("application_id='app-42'");
+    expect(sql).toContain(`resource_id IN ('${ids[0]}','${ids[1]}')`);
+    expect(loadedImages(wrapper)).toEqual([
+      [ids[0], "data:image/webp;base64,QUJD"],
+      [ids[1], "data:image/png;base64,REVG"],
+    ]);
+    wrapper.unmount();
+  });
+
+  it("searches from 31 days before the session's arrival to a minute after its last row", async () => {
+    const id = resId(1);
+    const SECOND = 1_000_000;
+    const minTs = 1692884313968000;
+    const maxTs = 1692884769270000 + 5 * SECOND;
+    const wrapper = await mountAndroid(
+      [id],
+      { [id]: { mime: "image/png", image: "QUJD" } },
+      { max_ts: maxTs },
+    );
+
+    const [images] = queryPayload.build.mock.calls
+      .map((call: any[]) => call[0])
+      .filter((payload: any) => payload.size === 1)
+      .map((payload: any) => payload.timestamps);
+    expect(images).toEqual({
+      startTime: minTs - 31 * 86_400 * SECOND,
+      endTime: maxTs + 60 * SECOND,
+    });
+    wrapper.unmount();
+  });
+
+  it("queries the images in chunks of 100 ids", async () => {
+    const ids = Array.from({ length: 250 }, (_, i) => resId(i + 1));
+    const wrapper = await mountAndroid(ids, {});
+
+    const counts = resourceSqls().map((sql) => (sql.match(/'[0-9a-f]{32}'/g) ?? []).length);
+    expect(counts).toEqual([100, 100, 50]);
+    wrapper.unmount();
+  });
+
+  it("leaves an image that is not in the stream out of the map without failing the session", async () => {
+    const [have, missing] = [resId(1), resId(2)];
+    const wrapper = await mountAndroid([have, missing], {
+      [have]: { mime: "image/png", image: "QUJD" },
+    });
+
+    expect(loadedImages(wrapper)).toEqual([[have, "data:image/png;base64,QUJD"]]);
+    expect(wrapper.find('[data-test="stub-mobile-player"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("asks again for the ids of a failed image query when the next batch of records arrives", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const [first, later] = [resId(1), resId(2)];
+    replaySchema.fields = { application_id: true };
+    vi.mocked(searchService.search).mockResolvedValueOnce({
+      data: { hits: [{ ...sessionLookupRow, source: "android", application_id: "app-42" }] },
+    } as any);
+    const rows = manyRows(30);
+    const segments = rowsResponder(rows, (row: any) =>
+      imageBody(row.start === S ? [first] : [first, later])(row),
+    );
+    let failed = false;
+    resetStreaming((sql, from) => {
+      if (!sql.includes(RES_STREAM)) return segments(sql, from);
+      if (from > 0) return [];
+      if (!failed) {
+        failed = true;
+        return { error: { message: "boom" } };
+      }
+      return [first, later]
+        .filter((id) => sql.includes(`'${id}'`))
+        .map((resource_id) => ({ resource_id, mime: "image/png", image: "QUJD" }));
+    });
+    const wrapper = await mountLoaded();
+
+    expect(error).toHaveBeenCalledWith("Failed to load session replay images:", expect.anything());
+    const sqls = resourceSqls();
+    expect(sqls[0]).toContain(`resource_id IN ('${first}')`);
+    expect(sqls[1]).toContain(`'${first}'`);
+    expect(sqls[1]).toContain(`'${later}'`);
+    expect(loadedImages(wrapper)).toEqual([
+      [first, "data:image/png;base64,QUJD"],
+      [later, "data:image/png;base64,QUJD"],
+    ]);
+    expect(wrapper.find('[data-test="stub-mobile-player"]').exists()).toBe(true);
+    error.mockRestore();
+    wrapper.unmount();
+  });
+
+  it("asks for one row per resource id so repeated uploads cannot crowd out other images", async () => {
+    const wrapper = await mountAndroid([resId(1), resId(2)], {});
+
+    expect(resourceSqls()[0]).toMatch(/group by resource_id$/);
+    wrapper.unmount();
+  });
+
+  it("refuses a stored mime type that is not an image type", async () => {
+    const id = resId(1);
+    const wrapper = await mountAndroid([id], {
+      [id]: { mime: "text/html", image: "QUJD" },
+    });
+
+    expect(loadedImages(wrapper)).toEqual([]);
+    wrapper.unmount();
+  });
+
+  it("does not query the resource stream when no wireframe references an image", async () => {
+    const wrapper = await mountAndroid([], {});
+
+    expect(resourceSqls()).toEqual([]);
+    wrapper.unmount();
+  });
+
+  it("does not query the resource stream for a browser session", async () => {
+    replaySchema.fields = { application_id: true };
+    resetStreaming(rowsResponder(fixtureRows, imageBody([resId(1)])));
+    const wrapper = await mountLoaded();
+
+    expect(resourceSqls()).toEqual([]);
     wrapper.unmount();
   });
 });

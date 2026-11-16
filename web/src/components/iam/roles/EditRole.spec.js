@@ -1251,13 +1251,19 @@ describe("EditRole - RUM presets", () => {
 
   beforeEach(() => {
     ctl.resources = RUM_RESOURCE_CATALOG;
-    ctl.logStreams = [{ name: "app" }, { name: "_rumdata" }, { name: "_sessionreplay" }];
+    ctl.logStreams = [
+      { name: "app" },
+      { name: "_rumdata" },
+      { name: "_sessionreplay" },
+      { name: "_o2_rum_sessionreplay_resource" },
+    ];
   });
 
-  it("rum_viewer stages exactly read on _rumdata and _sessionreplay, LIST on logs and sourcemaps, and no rum_analytics", async () => {
+  it("rum_viewer stages exactly read on _rumdata, _sessionreplay and the replay image stream, LIST on logs and sourcemaps, and no rum_analytics", async () => {
     const wrapper = await mountWithPreset("rum_viewer");
     expect(staged(wrapper)).toEqual([
       "logs:_all_default AllowList",
+      "logs:_o2_rum_sessionreplay_resource AllowGet",
       "logs:_rumdata AllowGet",
       "logs:_sessionreplay AllowGet",
       "sourcemaps:_all_default AllowList",
@@ -1269,6 +1275,7 @@ describe("EditRole - RUM presets", () => {
     const wrapper = await mountWithPreset("rum_editor");
     expect(staged(wrapper)).toEqual([
       "logs:_all_default AllowList",
+      "logs:_o2_rum_sessionreplay_resource AllowGet",
       "logs:_rumdata AllowGet",
       "logs:_sessionreplay AllowGet",
       "rum_analytics:_all_default AllowDelete",
@@ -1294,7 +1301,7 @@ describe("EditRole - RUM presets", () => {
     mockToast.mockClear();
     await mountWithPreset("rum_viewer");
     expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "info", message: expect.stringContaining("2 of 2") }),
+      expect.objectContaining({ variant: "info", message: expect.stringContaining("3 of 3") }),
     );
   });
 });

@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { RUM_REPLAY_RESOURCE_STREAM } from "@/utils/internalStreams";
+
 export type RumPreset = "rum_viewer" | "rum_editor";
 
-// The browser SDK ingests into these two log streams; every RUM tab reads them.
-export const RUM_STREAMS = ["_rumdata", "_sessionreplay"];
+// RUM tabs and the mobile replay player read these log streams.
+export const RUM_STREAMS = ["_rumdata", "_sessionreplay", RUM_REPLAY_RESOURCE_STREAM];
 export const RUM_STREAM_ROW_PERMS = ["AllowGet"] as const;
 
 // GET /{org}/streams checks `logs:_all_<org>`, and ALLOW_GET there would read every log stream.

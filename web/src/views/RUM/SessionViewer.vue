@@ -228,6 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :timeline="mobileTimeline"
               :events="segmentEvents"
               :is-loading="segmentsLoading"
+              :image-resources="imageResources"
               class="min-h-0 flex-1"
               @ready="handlePlayerReady"
               @seek-request="requestSeek"
@@ -294,6 +295,7 @@ import VideoPlayer from "@/components/rum/VideoPlayer.vue";
 import MobileSessionPlayer from "@/components/rum/MobileSessionPlayer.vue";
 import {
   buildMobileTimeline,
+  imageResourceIds,
   isMobileReplaySource,
   type MobileTimeline,
 } from "@/composables/rum/useMobileSessionReplay";
@@ -332,7 +334,7 @@ import {
   generateTraceContext,
   getUUID,
 } from "@/utils/zincutils";
-import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
+import { sqlEquals, sqlIn } from "@/utils/query/sqlFilterBuilder";
 import { collapseViewDocuments } from "@/utils/rum/viewDocuments";
 import { RUM_CORRELATION_TRACES_STREAM, normalizeTraceId, rumField } from "@/utils/rum/fields";
 import useCorrelatedTracesStream, {
@@ -395,6 +397,7 @@ import {
   type LoaderState,
   type RetryOptions,
 } from "@/utils/rum/sessionReplayLoader";
+import { RUM_REPLAY_RESOURCE_STREAM } from "@/utils/internalStreams";
 import { MAX_IN_FLIGHT, nextBatches } from "@/utils/rum/sessionReplayLoadPlan";
 import {
   LIVE_OVERLAP_US,
@@ -434,6 +437,10 @@ const SECOND_US = 1_000_000;
 // Events flush in independent 30 s batches plus retry backoff, so their window runs a minute either side of the replay rows.
 const EVENTS_TAIL_US = 60_000_000;
 const DEFAULT_LOOKUP_US = 30 * DAY_US;
+// The SDK skips re-sending an image for 30 days, so a later session's image can sit that far back.
+const IMAGE_LOOKBACK_US = 31 * DAY_US;
+const IMAGE_ID_CHUNK = 100;
+const IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 const WATCHDOG_MS = 2000;
 const EVENTS_PAGE_SIZE = 150;
 const RUM_EVENT_TYPES = ["action", "view", "error", "resource"];
@@ -730,6 +737,10 @@ const mobileTimeline = computed(() =>
 
 const mobileRecords = computed(() => mobileTimeline.value.records);
 
+// Replaced as a whole, so the player's prop changes each time more images arrive.
+const imageResources = shallowRef<Map<string, string>>(new Map());
+const imageIdsAsked = new Set<string>();
+
 const activePlayer = computed(() =>
   isMobileReplay.value ? mobilePlayerRef.value : videoPlayerRef.value,
 );
@@ -975,11 +986,16 @@ const getSession = async () => {
     ? "min(case when has_full_snapshot then start end) as replay_start,"
     : "";
 
+  // Only newer streams carry the application_id column.
+  const appField = performanceState.data.streams["_sessionreplay"]["schema"]["application_id"]
+    ? "min(application_id) as application_id,"
+    : "";
+
   const timestampColumn = store.state.zoConfig.timestamp_column;
   const range = routeRangeUs();
   const req = {
     query: {
-      sql: `select min(${timestampColumn}) as zo_sql_timestamp, max(${timestampColumn}) as max_ts, min(start) as start_time, max(end) as end_time, ${replayStartField} min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where ${sqlEquals("session_id", getSessionId.value)} order by zo_sql_timestamp`,
+      sql: `select min(${timestampColumn}) as zo_sql_timestamp, max(${timestampColumn}) as max_ts, min(start) as start_time, max(end) as end_time, ${replayStartField} ${appField} min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where ${sqlEquals("session_id", getSessionId.value)} order by zo_sql_timestamp`,
       start_time: range.start,
       end_time: range.end,
       from: 0,
@@ -1023,6 +1039,45 @@ const getSession = async () => {
     retryAttempt.value = 0;
   }
 };
+
+const imageResourcesSql = (applicationId: string, ids: string[]) =>
+  `select resource_id, min(mime) as mime, min(image) as image from "${RUM_REPLAY_RESOURCE_STREAM}" where ${sqlEquals("application_id", applicationId)} and ${sqlIn("resource_id", ids)} group by resource_id`;
+
+// Rows can repeat per id (retried uploads), hence the group by in the SQL above.
+const loadImageChunk = async (applicationId: string, ids: string[]) => {
+  const window = serverWindowUs(IMAGE_LOOKBACK_US, EVENTS_TAIL_US);
+  const { hits } = await runStreamQuery(
+    buildSegmentRequest(imageResourcesSql(applicationId, ids), 0, ids.length, window),
+    "logs",
+  );
+  const found = new Map(imageResources.value);
+  for (const hit of hits) {
+    if (!IMAGE_MIME_TYPES.has(hit.mime) || typeof hit.image !== "string") continue;
+    found.set(hit.resource_id, `data:${hit.mime};base64,${hit.image}`);
+  }
+  imageResources.value = found;
+};
+
+// Only failed queries are retried, so each id is asked for once.
+const loadImageResources = async () => {
+  const applicationId = sessionState.data.selectedSession?.application_id;
+  if (!isMobileReplay.value || !applicationId) return;
+  const ids = imageResourceIds(mobileRecords.value).filter((id) => !imageIdsAsked.has(id));
+  ids.forEach((id) => imageIdsAsked.add(id));
+  for (let i = 0; i < ids.length; i += IMAGE_ID_CHUNK) {
+    const chunk = ids.slice(i, i + IMAGE_ID_CHUNK);
+    try {
+      await loadImageChunk(applicationId, chunk);
+    } catch (error) {
+      if (cancelled) return;
+      console.error("Failed to load session replay images:", error);
+      chunk.forEach((id) => imageIdsAsked.delete(id));
+    }
+    if (cancelled) return;
+  }
+};
+
+watch(mobileRecords, () => void loadImageResources());
 
 // buildQueryPayload encodes its own template SQL, so SQL assigned after it must be re-encoded in base64 mode.
 const setRequestSql = (req: any, sql: string) => {

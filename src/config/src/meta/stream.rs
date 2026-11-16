@@ -108,6 +108,8 @@ impl PartialEq for DataField {
     }
 }
 
+/// Holds the images mobile session replay uploads, one row per image.
+pub const RUM_REPLAY_RESOURCE_STREAM: &str = "_o2_rum_sessionreplay_resource";
 pub const MIN_DATA_RETENTION_DAYS: i64 = 3;
 pub const DEFAULT_DATA_RETENTION_DAYS: i64 = 3650;
 // Date math in the retention callers overflows past this; no stored data can be that old.
