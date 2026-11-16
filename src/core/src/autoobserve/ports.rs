@@ -858,10 +858,14 @@ mod tests {
                 .await
                 .unwrap();
             let req = engine_request(&sql, (0, DAY_US), (0, 1_000), MAX_HOOK_TIMEOUT);
-            let planned =
-                ::search::sql::Sql::new(&req.query.into(), META_ORG_ID, StreamType::Logs, None)
-                    .await
-                    .unwrap();
+            let planned = ::search::sql::Sql::new(
+                &req.query.try_into().unwrap(),
+                META_ORG_ID,
+                StreamType::Logs,
+                None,
+            )
+            .await
+            .unwrap();
             let equal: Vec<(String, String)> =
                 planned.equal_items.values().flatten().cloned().collect();
             assert!(
