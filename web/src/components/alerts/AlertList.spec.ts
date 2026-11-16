@@ -2284,6 +2284,33 @@ describe("AlertList - filters from the Overview links", () => {
     expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["undelivered"]);
   });
 
+  it.each([
+    ["one open firing", { firing_started_at: 1_800_000_000_000_000 }, 0],
+    [
+      "acked groups still firing",
+      {
+        groups_firing: 2,
+        ack: { acked_by: "a@example.com", acked_at: 1, ack_source: "ui", groups_acked: 1 },
+      },
+      1,
+    ],
+  ])("shows and counts an errored evaluation during %s as firing", async (_case, live, acked) => {
+    alertsDB = [{ ...makeAlert(91), last_outcome: "error", ...live } as any];
+    const wrapper = await withQuery({});
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.alert_id)).toEqual(["alert-91"]);
+    expect(wrapper.vm.stateCounts).toMatchObject({ firing: 1, acknowledged: acked });
+  });
+
+  it("warns instead of claiming nothing fires when the run state could not be read", async () => {
+    alertsSvc.listByFolderId.mockResolvedValue({
+      data: { list: [makeAlert(93)], status_unavailable: true },
+    });
+    const wrapper = await withQuery({});
+    expect(wrapper.vm.stateEmptyTitle).toBe(i18n.global.t("alerts.firingStatusUnknown"));
+    expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(true);
+    expect(wrapper.vm.summaryStats.find((s: any) => s.key === "firing").value).toBe("—");
+  });
+
   it("strips state, level and scope from the URL after reading them, keeping other keys", async () => {
     const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
     await withQuery({

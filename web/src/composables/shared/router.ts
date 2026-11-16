@@ -1011,10 +1011,18 @@ const useRoutes = () => {
     {
       // Old Firing bookmarks land on the same rows: the list's Firing tile across every folder.
       path: "alerts/firing",
-      redirect: (to: any) => ({
-        name: "alertList",
-        query: { ...to.query, state: "firing", all_folders: ALERT_LIST_ALL_FOLDERS },
-      }),
+      redirect: (to: any) =>
+        // A bookmark naming one alert opens that alert's page, where its firing detail lives.
+        typeof to.query.alert === "string" && to.query.alert
+          ? {
+              name: "alertDetail",
+              params: { alert_id: to.query.alert },
+              query: { org_identifier: to.query.org_identifier },
+            }
+          : {
+              name: "alertList",
+              query: { ...to.query, state: "firing", all_folders: ALERT_LIST_ALL_FOLDERS },
+            },
     },
     {
       // Notification destinations and templates: alerting configuration, so

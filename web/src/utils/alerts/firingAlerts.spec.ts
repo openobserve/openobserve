@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { isFiringNow, type FiringRow } from "./firingAlerts";
+import { ackCanChange, isFiringNow, type FiringRow } from "./firingAlerts";
 
 const row = (over: Partial<FiringRow>): FiringRow => ({
   alert_id: "a",
@@ -37,5 +37,19 @@ describe("isFiringNow", () => {
     [{ last_outcome: "firing", enabled: true }, true],
   ])("reads %j", (over, expected) => {
     expect(isFiringNow(row(over))).toBe(expected);
+  });
+});
+
+describe("ackCanChange", () => {
+  const ack = { acked_by: "a@example.com", acked_at: 1, ack_source: "ui" as const, groups_acked: 2 };
+  it.each([
+    [{}, true],
+    [{ ack }, false],
+    [{ ack, multi_alert: true, groups_firing: 3 }, true],
+    [{ ack, multi_alert: true, groups_firing: 2 }, false],
+    [{ ack, multi_alert: true, groups_firing: 2, groups_firing_is_lower_bound: true }, true],
+    [{ ack, multi_alert: true }, false],
+  ])("reads %j", (row, expected) => {
+    expect(ackCanChange(row)).toBe(expected);
   });
 });

@@ -969,7 +969,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   preset="no-alerts"
                   :filtered="listFiltered"
                   :title="stateEmptyTitle"
-                  :description="stateEmptyTitle ? t('alerts.noAlertsFiringDescription') : undefined"
+                  :description="
+                    !stateEmptyTitle
+                      ? undefined
+                      : statusUnavailable
+                        ? t('alerts.firingStatusUnknownDescription')
+                        : t('alerts.noAlertsFiringDescription')
+                  "
                   @action="
                     (id) =>
                       id === 'clear-filters' &&
@@ -1030,6 +1036,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                 </OEmptyState>
+              </template>
+
+              <template v-if="statusUnavailable" #footer-note>
+                <span
+                  class="text-status-warning-text inline-flex flex-wrap items-center gap-x-2"
+                  role="status"
+                  data-test="alert-list-status-unavailable"
+                >
+                  <OIcon name="warning" size="xs" />
+                  {{ t("alerts.statusUnavailableNote") }}
+                  <OButton
+                    variant="ghost-warning"
+                    size="xs"
+                    :loading="fetching"
+                    data-test="alert-list-status-unavailable-retry"
+                    @click="refreshAlerts"
+                  >
+                    {{ t("common.retry") }}
+                  </OButton>
+                </span>
               </template>
 
               <template #selection-actions>
@@ -1313,6 +1339,7 @@ import {
   outcomeLabel,
   shouldShowRunOutcome,
 } from "@/utils/alerts/runOutcome";
+import { ackCanChange, isFiringNow } from "@/utils/alerts/firingAlerts";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import { oncallTeamsQuery } from "@/services/oncall.queries";
@@ -1578,6 +1605,8 @@ export default defineComponent({
     const refreshing = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref<ForbiddenState>(false);
+    // The server could not read run state, so blank live fields are unknown, not quiet.
+    const statusUnavailable = ref(false);
     const oTableRef: any = ref(null);
     // The table's own progress line is the region's one loader while it keeps rows, so the refresh button keeps its age.
     const tableKeepsRows = computed(() => !!oTableRef.value?.keepingRows);
@@ -1852,9 +1881,10 @@ export default defineComponent({
     const isMutedFiring = (row: { active_downtime?: unknown; last_outcome?: unknown }): boolean =>
       !!row.active_downtime && isFiringOutcome(row.last_outcome);
 
-    // Counts muted firings too: a downtime silences the notification, not the firing state.
+    // Counts muted firings too, and an open firing whose latest evaluation errored before any recovery.
     const isFiringRow = (row: any): boolean =>
-      showRunOutcome(row) && isFiringOutcome(row?.last_outcome);
+      (showRunOutcome(row) && isFiringOutcome(row?.last_outcome)) ||
+      (!!row?.enabled && isFiringNow(row));
 
     // The list's ack exists only while it is in force, so it needs no firing check of its own.
     const isAckedFiring = (row: any): boolean => isFiringRow(row) && !!row?.ack;
@@ -1971,6 +2001,7 @@ export default defineComponent({
       const c = stateCounts.value;
       const hasData = c.total > 0;
       const v = (n: number): string | number => (hasData ? n : "—");
+      const live = (n: number): string | number => (statusUnavailable.value ? "—" : v(n));
       const share = hasData ? c.total : undefined;
       // Severity-descending, matching the Incidents / Eval Jobs strips; Total stays last.
       return [
@@ -1986,7 +2017,7 @@ export default defineComponent({
         {
           key: "firing",
           label: t("alerts.summaryFiring"),
-          value: v(c.firing),
+          value: live(c.firing),
           icon: "notifications-active",
           tone: "error",
           max: share,
@@ -1995,7 +2026,7 @@ export default defineComponent({
         {
           key: "acknowledged",
           label: t("alerts.ack.tile"),
-          value: v(c.acknowledged),
+          value: live(c.acknowledged),
           icon: "person",
           tone: "blue",
           max: share,
@@ -2004,7 +2035,7 @@ export default defineComponent({
         {
           key: "error",
           label: t("alerts.summaryEvalError"),
-          value: v(c.error),
+          value: live(c.error),
           icon: "report-problem",
           tone: "error",
           max: share,
@@ -2013,7 +2044,7 @@ export default defineComponent({
         {
           key: "notify_failed",
           label: t("alerts.summaryDeliveryFailed"),
-          value: v(c.notify_failed),
+          value: live(c.notify_failed),
           icon: "notifications-paused",
           tone: "error",
           max: share,
@@ -2125,6 +2156,7 @@ export default defineComponent({
     );
     const stateEmptyTitle = computed<I18nText | undefined>(() => {
       if (!stateFilterEmptied.value || stateFilters.value.join() !== "firing") return undefined;
+      if (statusUnavailable.value) return t("alerts.firingStatusUnknown");
       return searchAcrossFolders.value
         ? t("alerts.noAlertsFiringAnyFolder")
         : t("alerts.noAlertsFiringThisFolder");
@@ -2745,6 +2777,7 @@ export default defineComponent({
             last_outcome_since: data.last_outcome_since ?? null,
             active_downtime: data.active_downtime ?? null,
             ack: data.ack ?? null,
+            firing_started_at: data.firing_started_at ?? null,
             selected: false,
             type: data.condition.type,
             // The SLO this alert belongs to (Feature 5, Phase 2). Read from the
@@ -2780,6 +2813,7 @@ export default defineComponent({
         }
         //here we are actually assigning the localAllAlerts to the allAlerts to avoid the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
         allAlerts.value = localAllAlerts;
+        statusUnavailable.value = rows.some((r: any) => r?.status_unavailable);
         //this is the condition where we are setting the filteredResults
         //1. If it is search across folders then also we are setting the filteredResults(which contains the filtered alerts)
         //2. If it is not search across folders then we are setting the filteredResults to the alerts(which contains all the alerts)
@@ -3022,11 +3056,8 @@ export default defineComponent({
       downtimeLink(row.active_downtime, store.state.selectedOrganization?.identifier ?? "");
 
     // A multi-alert is offered Acknowledge while any firing group is still un-acked.
-    const canAcknowledgeRow = (row: any): boolean => {
-      if (!isAlertScopedMute(row) || !isFiringRow(row)) return false;
-      if (!row.ack) return true;
-      return !!row.multi_alert && (row.ack.groups_acked ?? 0) < (row.groups_firing ?? 0);
-    };
+    const canAcknowledgeRow = (row: any): boolean =>
+      isAlertScopedMute(row) && isFiringRow(row) && ackCanChange(row);
 
     const refreshAfter = async (ok: boolean) => {
       if (ok) await refreshAlerts();
@@ -4815,6 +4846,7 @@ export default defineComponent({
       stateFilterEmptied,
       listFiltered,
       stateEmptyTitle,
+      statusUnavailable,
       levelFilter,
       levelFilterLabel,
       clearLevelFilter,

@@ -71,6 +71,14 @@ export interface FiringSignals {
   groups_firing?: number | null;
 }
 
+/** The fields the ack rule reads, `multi_alert` being whether the alert evaluates per group now. */
+export interface AckSignals {
+  multi_alert?: boolean;
+  groups_firing?: number | null;
+  groups_firing_is_lower_bound?: boolean | null;
+  ack?: Pick<AlertListAck, "groups_acked"> | null;
+}
+
 export interface FiringPage {
   list: FiringRow[];
   /** The run state could not be read, so every row's live fields are blank. */
@@ -89,3 +97,10 @@ export const isFiringNow = (row: FiringSignals): boolean =>
     row.last_outcome === "notify_failed" ||
     row.firing_started_at != null ||
     (row.last_outcome === "error" && (row.groups_firing ?? 0) > 0));
+
+/** Whether an ack can change anything; a lower-bound group count may hide groups still unacked. */
+export const ackCanChange = (row: AckSignals): boolean => {
+  if (!row.ack) return true;
+  if (!row.multi_alert || row.groups_firing == null) return false;
+  return !!row.groups_firing_is_lower_bound || (row.ack.groups_acked ?? 0) < row.groups_firing;
+};

@@ -60,7 +60,11 @@ export const alertsListQuery = (
       const res = await (options
         ? alerts.listByFolderId(...args, undefined, options)
         : alerts.listByFolderId(...args));
-      return res.data?.list ?? [];
+      const list = res.data?.list ?? [];
+      // Rows stay the cached shape every patch edits; each one carries that its live fields are unknown.
+      return res.data?.status_unavailable
+        ? list.map((row: Record<string, unknown>) => ({ ...row, status_unavailable: true }))
+        : list;
     },
     staleTime: LIVE_STALE_TIME,
   });
