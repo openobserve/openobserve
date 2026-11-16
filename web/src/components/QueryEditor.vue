@@ -87,9 +87,7 @@
         class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
         :data-test="`${dataTestPrefix}-placeholder`"
       >
-        <span class="text-text-secondary min-w-0 truncate font-mono text-sm">{{
-          placeholder
-        }}</span>
+        <span class="query-editor-placeholder-typewriter min-w-0">{{ placeholder }}</span>
       </div>
       <CodeQueryEditor
         :ref="(el) => (editorRef = el)"
