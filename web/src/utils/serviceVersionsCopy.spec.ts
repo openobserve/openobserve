@@ -150,13 +150,14 @@ describe("warm-up end time", () => {
     const ended = { epoch: now - 2 * hour, warmup_ends_at: now - hour };
     expect(noVerdictText(ended, t, now, true)).toContain("Running before deploy tracking");
   });
-  it("ends warm-up at its end, also for a scope not tracked yet", () => {
+  // The org epoch says nothing about this scope's versions, so a scope not tracked yet never reads as pre-existing.
+  it("names the warm-up end only while it is ahead; a passed end on a scope not tracked yet reads time-less", () => {
     const ended = { epoch: now - 2 * hour, warmup_ends_at: now - hour };
     expect(noVerdictText(ended, t, now, false)).toBe(
-      `Running before deploy tracking started (${formatDeployTime(now - 2 * hour)}); verdicts start with the next deploy`,
+      "Deploy tracking is warming up. Deploy verdicts start with your next deploy.",
     );
     expect(noVerdictText(ended, t, now - 2 * hour, false)).toContain(formatDeployTime(now - hour));
-    expect(noVerdictRule(ended, t, now, false)).toBe("running before deploy tracking started");
+    expect(noVerdictRule(ended, t, now, false)).toBe("deploy tracking is warming up");
   });
   it("words a picker rule in the same state as the sentence", () => {
     expect(noVerdictRule({ epoch: null, warmup_ends_at: null }, t, now)).toBe(

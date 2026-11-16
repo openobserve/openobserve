@@ -1073,14 +1073,16 @@ function handleRowClick(row: any) {
 }
 
 const serviceGroups = computed((): ServiceGroup[] => {
-  const groupMap: Record<string, ServiceRecord[]> = {};
+  // A Map, so a service named like an Object prototype key (constructor, __proto__) groups like any name.
+  const groupMap = new Map<string, ServiceRecord[]>();
   for (const s of services.value) {
     const name = serviceIdentityOf(s);
-    if (!groupMap[name]) groupMap[name] = [];
-    groupMap[name].push(s);
+    const group = groupMap.get(name);
+    if (group) group.push(s);
+    else groupMap.set(name, [s]);
   }
 
-  return Object.entries(groupMap)
+  return [...groupMap]
     .map(([name, instances]) => {
       let latestSeen = 0;
       for (const inst of instances) {

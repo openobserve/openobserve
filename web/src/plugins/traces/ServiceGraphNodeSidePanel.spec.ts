@@ -2214,6 +2214,41 @@ describe("ServiceGraphNodeSidePanel", () => {
       }
     });
 
+    it("keeps the new stream's resource rows when the old stream's read fails late", async () => {
+      const resource = {
+        id: "host",
+        label: "Host",
+        groupField: "host_name",
+        colId: "host",
+        colLabel: "Host",
+        environment: "runtime",
+      };
+      let failOld: (error: Error) => void = () => {};
+      try {
+        wrapper = mountPanel({ streamFilter: "stream-a" });
+        await flushPromises();
+        const vm = wrapper.vm as any;
+        vi.mocked(streamTraceRows).mockImplementationOnce(
+          () => new Promise((_resolve, reject) => (failOld = reject)),
+        );
+        const oldRead = vm.fetchResourceData(resource);
+        await wrapper.setProps({ streamFilter: "stream-b" });
+        await flushPromises();
+        vi.mocked(streamTraceRows).mockResolvedValueOnce([
+          { host_name: "new-host", request_count: 10 },
+        ]);
+        await vm.fetchResourceData(resource);
+        failOld(new Error("stream-a unavailable"));
+        await oldRead;
+        await flushPromises();
+        expect(vm.resourceTabError.host || "").toBe("");
+        expect(vm.resourceTabData.host.map((row: any) => row.name)).toEqual(["new-host"]);
+        expect(vm.resourceTabLoading.host).toBe(false);
+      } finally {
+        vi.mocked(streamTraceRows).mockReset().mockResolvedValue([]);
+      }
+    });
+
     it.each([
       { from: "catalog row without a place", route: "", node: rowAt(""), scoped: "" },
       {

@@ -305,14 +305,15 @@ export function isNoiseChange(metric: string, value: NoiseInput) {
   return straddles || !value.delta || changeRoundsToZero(metric, value.delta, value.b);
 }
 
-// Warm-up lasts until its end, also for a scope not tracked yet; only an org without an epoch warms up time-less.
+// The org epoch is no evidence about one scope's versions, so a scope not tracked yet never reads as pre-existing.
 function noVerdictState(
   tracking: Tracking | null | undefined,
   now: number,
   scopeStarted?: boolean,
 ) {
   const end = tracking?.epoch ? tracking.warmup_ends_at : null;
-  if (end && end > now) return "warming";
-  if (tracking?.epoch) return "preExistingSince";
-  return trackingNotStarted(tracking, scopeStarted) ? "warmingUntimed" : "preExisting";
+  const warming = end && end > now ? end : null;
+  if (trackingNotStarted(tracking, scopeStarted)) return warming ? "warming" : "warmingUntimed";
+  if (warming) return "warming";
+  return tracking?.epoch ? "preExistingSince" : "preExisting";
 }

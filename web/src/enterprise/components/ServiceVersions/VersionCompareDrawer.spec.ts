@@ -877,14 +877,14 @@ describe("no-verdict states", () => {
     expect(notice).toMatch(/^serviceVersions\.catalog\.warmingUp \{"time":"[^"]+"\}$/);
     expect(wrapper.text()).not.toContain("firstVersion");
   });
-  it("ends warm-up at its end time, also while the scope is still not tracked", () => {
+  it("drops the warm-up time once it has passed while the scope is still not tracked", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(tracking.warmup_ends_at / 1000 + 90 * 60_000);
     const rows = [row("v2", "k2", { tracking_started: false })];
     const wrapper = render(firstLook(), rows, [], { tracking });
     vi.useRealTimers();
-    expect(wrapper.get('[data-test="svcver-no-verdict"]').text()).toContain(
-      "serviceVersions.sentence.preExistingSince",
+    expect(wrapper.get('[data-test="svcver-no-verdict"]').text()).toBe(
+      "serviceVersions.catalog.warmingUpNoEpoch {}",
     );
   });
   it("shows a window with no rollup rows as missing data, never 0 and 0 requests", () => {
@@ -895,7 +895,7 @@ describe("no-verdict states", () => {
     data.arms.b = { ...data.arms.b, has_rollup: false };
     data.traces = { status: "insufficient", requests: { a: 0, b: 0, rate_a: 0, rate_b: 0 } };
     const wrapper = render(data, [row("v1", "k1"), row("v2", "k2")], [], { tracking });
-    expect(wrapper.get('[data-test="svcver-no-verdict"]').text()).toContain("preExistingSince");
+    expect(wrapper.get('[data-test="svcver-no-verdict"]').text()).toContain("warmingUp");
     expect(wrapper.find('[data-test="svcver-summary-tiles"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("requestsPair");
   });
@@ -986,8 +986,7 @@ describe("a no-verdict drawer's picker uses the no-verdict wording", () => {
   const tracking = { epoch: 1_000_000, warmup_ends_at: 2_000_000 };
   it("names a warming scope as warming up", () => {
     const rows = [row("v2", "k2", { tracking_started: false })];
-    const warming = { ...tracking, warmup_ends_at: Date.now() * 1000 + 3_600_000_000 };
-    const label = autoLabel(render(firstLook(), rows, [], { tracking: warming }));
+    const label = autoLabel(render(firstLook(), rows, [], { tracking }));
     expect(label).toContain("baselineRule.warming_up");
     expect(label).not.toContain("baselineRule.none");
   });

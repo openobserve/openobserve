@@ -830,7 +830,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 import { resolveTraceStream } from "@/utils/traces/streamSelection";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, type LocationQuery } from "vue-router";
 import { useServicePanelRoute } from "./composables/useServicePanelRoute";
 import config from "@/aws-exports";
 import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
@@ -1116,6 +1116,14 @@ watch(
       typeFilter.value = validType(filters.type) || "service";
   },
 );
+// Filter and range writes each carry the other's keys: two replaces in one tick both start from the old route.
+function withCatalogRange(query: LocationQuery) {
+  return catalogRangeQuery(query, searchObj.data.datetime);
+}
+function withCatalogFilters(query: LocationQuery) {
+  const filters = { env: versionEnv.value, verdict: versionVerdict.value, type: typeFilter.value };
+  return catalogFilterQuery(query, filters, "service");
+}
 watch(
   [
     versionEnv,
@@ -1136,7 +1144,8 @@ watch(
     )
       return;
     const next = catalogFilterQuery(route.query, { env, verdict, type }, "service");
-    if (JSON.stringify(next) !== JSON.stringify(route.query)) void router.replace({ query: next });
+    if (JSON.stringify(next) !== JSON.stringify(route.query))
+      void router.replace({ query: withCatalogRange(next) });
   },
   { immediate: true },
 );
@@ -2360,7 +2369,7 @@ watch(
     const current = router.currentRoute.value.query;
     const next = catalogRangeQuery(current, searchObj.data.datetime);
     if (["period", "from", "to"].some((key) => current[key] !== next[key]))
-      void router.replace({ query: next });
+      void router.replace({ query: withCatalogFilters(next) });
   },
   { immediate: true },
 );

@@ -566,7 +566,7 @@ describe("ServiceIdentitySetup", () => {
       ]);
     });
 
-    it("counts the service card out of the discovered services, by display name", async () => {
+    it("counts the service card out of the discovered services, by display name and qualifier", async () => {
       queryClient.clear();
       const response = analytics();
       Object.assign(response.data.dimensions[0], {
@@ -579,14 +579,15 @@ describe("ServiceIdentitySetup", () => {
           { service_name: row.service_name, display_name: row.display_name },
           { service_name: "legacy-key", display_name: row.display_name },
           { service_name: "nats" },
+          { service_name: "nats-eu", display_name: "nats", display_qualifier: "eu" },
         ],
       } as any);
       wrapper = mountComponent();
       await flushPromises();
       (wrapper.vm as any).openInsightDialog(row.service_name, "primary");
       await flushPromises();
-      expect((wrapper.vm as any).insightData.total).toBe(2);
-      expect((wrapper.vm as any).insightData.coverage).toBe(50);
+      expect((wrapper.vm as any).insightData.total).toBe(3);
+      expect((wrapper.vm as any).insightData.coverage).toBe(33);
       queryClient.clear();
     });
 

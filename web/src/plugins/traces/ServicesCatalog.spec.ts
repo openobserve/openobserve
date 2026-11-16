@@ -3751,6 +3751,28 @@ describe("ServicesCatalog Env and Deploy verdict filters", () => {
     routerState.currentRoute.value = { query: routeQuery };
   });
 
+  it("writes an env pick and a range change made in one tick into the same URL", async () => {
+    serve("k8s:c1/prod");
+    routerState.currentRoute.value = {
+      name: "traces",
+      query: { tab: "services-catalog", stream: "default", period: "15m" },
+    };
+    try {
+      view = mountServicesCatalog({ stubs });
+      await flushPromises();
+      mockRouterReplace.mockClear();
+      void view.get('[data-test="pick-env"]').trigger("click");
+      mockSearchObj.data.datetime.relativeTimePeriod = "1h";
+      await flushPromises();
+      expect(mockRouterReplace).toHaveBeenLastCalledWith({
+        query: expect.objectContaining({ catalogEnv: "prod", period: "1h" }),
+      });
+    } finally {
+      mockSearchObj.data.datetime.relativeTimePeriod = "15m";
+      routerState.currentRoute.value = { query: routeQuery };
+    }
+  });
+
   it("explains filters that hide every row, keeps the rail rows and clears the filters", async () => {
     serve("k8s:c1/prod");
     view = mountServicesCatalog({ stubs });

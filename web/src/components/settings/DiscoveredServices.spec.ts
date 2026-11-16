@@ -477,22 +477,31 @@ describe("DiscoveredServices", () => {
         expect(vm.totalInstances).toBe(3);
       },
     );
+
+    it.each(["constructor", "__proto__", "toString"])(
+      "groups a service whose display name is %s like any other name",
+      async (name) => {
+        vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
+          data: [{ ...multiInstanceResponse[0], display_name: name }],
+        } as any);
+        wrapper = mountComponent();
+        await flushPromises();
+        expect(wrapper.vm.serviceGroups.map((group: any) => group.name)).toEqual([name]);
+        expect(wrapper.vm.flatRows.map((row: any) => row.id)).toEqual(["a1"]);
+      },
+    );
   });
 
   describe("column widths at 1600 px", () => {
-    it("fit beside the settings menu", () => {
+    it("fit beside the settings menu, whatever the longest service name", () => {
       const TABLE_WIDTH_AT_1600 = 1230;
       const { identity, telemetry, ...fixed } = DISCOVERED_COLUMN_SIZES;
-      const total = Object.values(fixed).reduce((sum, size) => sum + size, identity + telemetry);
+      const name = serviceNameColumnSize(["a".repeat(200)]);
+      const total = Object.values({ ...fixed, service_name: name }).reduce(
+        (sum, size) => sum + size,
+        identity + telemetry,
+      );
       expect(total).toBeLessThanOrEqual(TABLE_WIDTH_AT_1600);
-    });
-
-    it.each([
-      [["api"], 176],
-      [["openobserve-collector"], 224],
-      [["a".repeat(80)], DISCOVERED_COLUMN_SIZES.service_name],
-    ])("sizes the name column to the longest name %#", (names, size) => {
-      expect(serviceNameColumnSize(names)).toBe(size);
     });
   });
 

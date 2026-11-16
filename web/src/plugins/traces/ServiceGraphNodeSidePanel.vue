@@ -2729,7 +2729,7 @@ export default defineComponent({
       };
       resourceTabData.value = { ...resourceTabData.value, [config.id]: [] };
       resourceTabError.value = { ...resourceTabError.value, [config.id]: "" };
-      const scope = serviceFilter();
+      const scope = opsContext();
 
       try {
         const streamName = props.streamFilter || "default";
@@ -2753,7 +2753,7 @@ export default defineComponent({
           keepPartial: true,
         });
 
-        if (scope !== serviceFilter()) return;
+        if (scope !== opsContext()) return;
         resourceTabData.value = {
           ...resourceTabData.value,
           [config.id]: hits.map((row: any) => ({
@@ -2767,7 +2767,7 @@ export default defineComponent({
           })),
         };
       } catch (error: any) {
-        if (scope !== serviceFilter()) return;
+        if (scope !== opsContext()) return;
         // No data entry, so reopening the tab reads again instead of showing a failure as empty.
         const data = { ...resourceTabData.value };
         delete data[config.id];
@@ -2780,7 +2780,7 @@ export default defineComponent({
           }),
         };
       } finally {
-        if (scope === serviceFilter())
+        if (scope === opsContext())
           resourceTabLoading.value = {
             ...resourceTabLoading.value,
             [config.id]: false,

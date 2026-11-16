@@ -2895,6 +2895,7 @@ async function loadDiscoveredServiceCount() {
       .map((record) => ({
         service_name: record.service_name,
         display_name: record.display_name,
+        display_qualifier: record.display_qualifier,
         all_dimensions: record.all_dimensions,
         disambiguation: record.disambiguation,
       }));
