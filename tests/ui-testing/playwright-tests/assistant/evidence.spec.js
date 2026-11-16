@@ -188,9 +188,17 @@ test.describe("assistant evidence", () => {
     );
   });
 
-  test("EVID-08 a navigation frame becomes a link card that opens only on its click", { tag: ["@mock"] }, async ({ page }) => {
+  async function autoNavigationOff() {
+    const toggle = assistant.container().locator('[data-test="assistant-composer-auto-navigation-btn"]');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+  }
+
+  test("EVID-08 with Auto Navigation off, a navigation frame becomes a link card that opens only on its click", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await expect.poll(() => page.url(), { timeout: 15_000 }).not.toContain("from=NaN");
+    // Auto navigation is on by default and would open the link itself.
+    await autoNavigationOff();
     const before = page.url();
     await ask(page, "navigation_card");
     const card = assistant.answer().locator('[data-test="assistant-link-card"]');

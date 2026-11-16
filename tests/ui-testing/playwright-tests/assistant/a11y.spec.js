@@ -86,6 +86,17 @@ test.describe("assistant accessibility", () => {
     await expect(assistant.settings(tab)).toBeVisible({ timeout: 30_000 });
   }
 
+  // At 812 px the sheet opens full (its half leaves the transcript under 240 px), so peek is two steps down.
+  async function snapToPeek(page) {
+    await expect(assistant.sheet).toHaveAttribute("data-snap", "full");
+    await page.keyboard.press("ArrowDown");
+    await expect(assistant.sheet).toHaveAttribute("data-snap", "half");
+    await page.keyboard.press("ArrowDown");
+    await expect(assistant.sheet).toHaveAttribute("data-snap", "peek");
+    // The sheet slides to peek, so checks wait until it sits 3.5 rem tall.
+    await expect.poll(() => assistant.sheet.evaluate((el) => Math.round(el.getBoundingClientRect().height))).toBeLessThanOrEqual(57);
+  }
+
   /** Every visible interactive element inside the scope smaller than the touch minimum, by data-test. */
   function smallTargets(page, scope) {
     return page.evaluate(
@@ -362,8 +373,7 @@ test.describe("assistant accessibility", () => {
       await expectClean(page, `reduced-motion-streaming-${width}`);
       if (width === 375) {
         await assistant.sheet.locator('[data-test="assistant-shell-sheet-handle"]').focus();
-        await page.keyboard.press("ArrowDown");
-        await expect(assistant.sheet).toHaveAttribute("data-snap", "peek");
+        await snapToPeek(page);
         expect(await animations(), "sheet at peek").toEqual([]);
         await expectClean(page, "reduced-motion-sheet-peek-375");
       }
@@ -482,7 +492,7 @@ test.describe("assistant accessibility", () => {
       });
 
       if (width === 768) {
-        test("A11Y-06 at 768 every row door kebab, history kebab and earlier message action opens or acts by touch", { tag: ["@mock", "@responsive"] }, async ({
+        test("A11Y-06 at 768 every row kebab, history kebab and earlier message action opens or acts by touch", { tag: ["@mock", "@responsive"] }, async ({
           context,
           page,
         }) => {
@@ -499,7 +509,7 @@ test.describe("assistant accessibility", () => {
             const kebab = kebabs.nth(i);
             expect(await opaque(kebab), `row ${i} kebab is shown without hover`).toBe(true);
             await kebab.tap();
-            await expect(page.locator('[role="menu"] [data-test="ai-entry-log-row-explain"]')).toBeVisible();
+            await expect(page.locator('[role="menu"] [data-test="logs-search-result-row-menu-copy"]')).toBeVisible();
             await page.keyboard.press("Escape");
             await expect(page.locator('[role="menu"]')).toHaveCount(0);
           }
@@ -651,8 +661,7 @@ test.describe("assistant accessibility", () => {
     await start(context, page);
     await openOnLogs(page);
     await assistant.sheet.locator('[data-test="assistant-shell-sheet-handle"]').focus();
-    await page.keyboard.press("ArrowDown");
-    await expect(assistant.sheet).toHaveAttribute("data-snap", "peek");
+    await snapToPeek(page);
     await page.locator('[data-test="main-content"]').evaluate((el) => el.querySelector("button, a[href], input, [tabindex='0']")?.focus());
     expect(await obscuredWhileTabbing(page, '[data-test="assistant-shell-sheet"]')).toEqual([]);
   });

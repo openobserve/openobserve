@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-// WP-07 doors with the flag on (DOOR-01…12, SEC-05, PERF-01; `99` §6.8).
+// WP-07 doors with the flag on (DOOR-01…12, SEC-05, PERF-01; `99` §6.8). Logs uses the add-to-chat sparkle: it stages, never sends.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -12,6 +12,8 @@ import { AssistantPage } from "../../pages/assistantPage.js";
 const loadHarness = () => import("./harness/setup.mjs");
 
 const DOOR_ID = /^ai-entry-[a-z-]+-(explain|troubleshoot|add|ask|fix|generate)$/;
+const ROW_ADD = "logs-search-result-ai-btn";
+const RECORD_ADD = "logs-detail-ai-context-btn";
 const fixture = (name) => JSON.parse(readFileSync(join(__dirname, "harness", "fixtures", name), "utf8"));
 
 test.describe("assistant doors", () => {
@@ -68,19 +70,19 @@ test.describe("assistant doors", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("DOOR-01 explains a log row by keyboard in one activation", { tag: ["@mock", "@stack-ee", "@responsive"] }, async ({ page }) => {
+  test("DOOR-01 adds a log row to the chat by keyboard in one activation and sends nothing", { tag: ["@mock", "@stack-ee", "@responsive"] }, async ({ page }) => {
     await gotoLogs(page);
     await focusRowToolbar(page);
-    await tabTo(page, "ai-entry-log-row-explain");
+    await tabTo(page, ROW_ADD);
     await page.keyboard.press("Enter");
-    await expect(assistant.transcript()).toContainText("Explain this log row from stream `e2e_automate`");
-    await expect.poll(() => streamRequests(page)).toBe(1);
-    expect(JSON.stringify(await lastRequest(page))).toContain("Log row");
+    await expect(assistant.container()).toBeVisible();
+    await expect(assistant.allChips()).toHaveCount(1);
+    expect(await streamRequests(page)).toBe(0);
     expect((await entryEvents(page)).at(-1)).toMatchObject({
       entry_kind: "object_verb",
-      entry_verb: "explain",
+      entry_verb: "add_to_chat",
       object_kind: "log_row",
-      sends: true,
+      sends: false,
       gate: "available",
     });
   });
@@ -102,28 +104,22 @@ test.describe("assistant doors", () => {
     return item;
   }
 
-  test("DOOR-02 Add field to chat keeps the record drawer open beside the pinned panel, ticks, and sends only on Send", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
+  test("DOOR-02 Add field and Add record close the record drawer, stage their chips in the pinned panel and send only on Send", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await gotoLogs(page);
     await assistant.open("header");
     const drawer = await openRecordDrawer(page);
     await (await fieldMenuItem(page, 0, "ai-entry-log-field-add")).click();
-    await expect(drawer).toBeVisible();
-    // The harness rows carry one field, so the second add is the record itself.
-    const record = page.locator('[data-test="ai-entry-log-record-add"]');
-    await record.click();
-    await expect(drawer).toBeVisible();
-    await expect(record).toHaveAttribute("data-door-state", "added");
+    await expect(drawer).toBeHidden();
+    await openRecordDrawer(page);
+    await page.locator(`[data-test="${RECORD_ADD}"]`).click();
+    await expect(drawer).toBeHidden();
     const panel = assistant.container();
     await expect(panel).toBeVisible();
     await assistant.openMore();
     await expect(assistant.allChips()).toHaveCount(2);
-    // The drawer stops at the panel's edge instead of covering it (U4).
-    const [drawerBox, panelBox] = [await drawer.boundingBox(), await panel.boundingBox()];
-    expect(drawerBox.x + drawerBox.width).toBeLessThanOrEqual(panelBox.x + 1);
     expect(await streamRequests(page)).toBe(0);
     await panel.locator('[data-test="assistant-send"]').click();
     await expect.poll(() => streamRequests(page)).toBe(1);
-    await expect(drawer).toBeVisible();
   });
 
   test("DOOR-02 after a reload with the panel pinned, the record drawer still stops at the panel's edge", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
@@ -141,45 +137,14 @@ test.describe("assistant doors", () => {
     await expect(drawer).toBeVisible();
   });
 
-  test("DOOR-02 Explain from an open record drawer opens the panel beside it without remounting the drawer", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
-    await gotoLogs(page);
-    const drawer = await openRecordDrawer(page);
-    const tableTab = page.locator('[data-test="log-detail-table-tab"]').first();
-    await tableTab.click();
-    await expect(tableTab).toHaveAttribute("aria-selected", "true");
-    await page.evaluate(() => {
-      window.__drawerBody = document.querySelector('[data-test="log-detail-tab-container"]');
-    });
-    await page.locator('[data-test="ai-entry-log-record-explain"]').click();
-    await expect(assistant.container()).toBeVisible();
-    await expect.poll(() => streamRequests(page)).toBe(1);
-    await expect(drawer).toBeVisible();
-    await expect(tableTab).toHaveAttribute("aria-selected", "true");
-    expect(await page.evaluate(() => window.__drawerBody?.isConnected)).toBe(true);
-    // The drawer slides to its new edge, so the gap is read once it settles.
-    await expect
-      .poll(async () => {
-        const [drawerBox, panelBox] = [await drawer.boundingBox(), await assistant.container().boundingBox()];
-        return Math.round(drawerBox.x + drawerBox.width - panelBox.x);
-      })
-      .toBeLessThanOrEqual(1);
-    await expect
-      .poll(() => page.evaluate(() => !!document.activeElement?.closest("[data-assistant-root]")))
-      .toBe(true);
-  });
-
-  test("DOOR-02 with the panel hidden, Add field from the record drawer leaves the toast's Open usable", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
+  test("DOOR-02 with the panel hidden, Add field from the record drawer opens the panel with the chip", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
     await gotoLogs(page);
     const drawer = await openRecordDrawer(page);
     await (await fieldMenuItem(page, 0, "ai-entry-log-field-add")).click();
-    const open = page.locator('[data-test="o-toast-action-btn"]').filter({ hasText: "Open" }).first();
-    await expect(open).toBeVisible();
-    await open.focus();
-    await expect(open).toBeFocused();
-    await open.click();
     await expect(assistant.container()).toBeVisible();
     await expect(assistant.tray().locator('[data-test="assistant-context-chip-field"]')).toHaveCount(1);
-    await expect(drawer).toBeVisible();
+    await expect(drawer).toBeHidden();
+    expect(await streamRequests(page)).toBe(0);
   });
 
   test("DOOR-02 closing the pinned panel keeps the record drawer, its tab and the focus", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
@@ -209,44 +174,14 @@ test.describe("assistant doors", () => {
     await gotoLogs(page);
     await openRecordDrawer(page);
     await (await fieldMenuItem(page, 0, "ai-entry-log-field-add")).click();
+    // A successful add closes the drawer, so the second Add reopens it.
+    await openRecordDrawer(page);
     const again = await fieldMenuItem(page, 0, "ai-entry-log-field-add");
     await expect(again).toHaveAttribute("data-door-state", "added");
     await again.click();
     await again.click().catch(() => undefined);
     await expect.poll(() => stagedLabels(page)).toHaveLength(1);
     expect(await streamRequests(page)).toBe(0);
-  });
-
-  test("DOOR-03 explains three selected rows as one chip with a reproducing query, capped above 20", { tag: ["@mock"] }, async ({ page }) => {
-    await gotoLogs(page);
-    const boxes = table(page).locator('tbody [role="checkbox"]');
-    for (let i = 0; i < 3; i += 1) await boxes.nth(i).click();
-    const door = page.locator('[data-test="ai-entry-log-rows-explain"]');
-    await expect(door).toContainText("Explain these 3 rows");
-    await door.click();
-    await expect(assistant.transcript()).toContainText("Explain these 3 log rows from `e2e_automate`");
-    await expect(assistant.transcript()).toContainText("Query · reproduces the rows");
-    await page.locator('[data-test="logs-search-result-selection-clear"]').click();
-    for (let i = 0; i < 21; i += 1) await boxes.nth(i).click();
-    await expect(door).toHaveAttribute("aria-disabled", "true");
-  });
-
-  test("CTX-05 a door refuses the 21st row with the cap line and no In chat tick", { tag: ["@mock"] }, async ({ page }) => {
-    test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
-    await gotoLogs(page);
-    const boxes = table(page).locator('tbody [role="checkbox"]');
-    for (let i = 0; i < 21; i += 1) await boxes.nth(i).click();
-    const door = page.locator('[data-test="ai-entry-log-rows-explain"]');
-    await expect(door).toHaveAttribute("aria-disabled", "true");
-    await door.hover();
-    await expect(page.getByText("Select up to 20 rows to explain at once", { exact: true }).first()).toBeVisible();
-    // The door stays focusable and clickable while inert, so the activation is forced past Playwright's aria-disabled check.
-    await door.click({ force: true });
-    await door.press("Enter");
-    await page.waitForTimeout(500);
-    await expect(door).toHaveAttribute("data-door-state", "unavailable");
-    expect(await streamRequests(page)).toBe(0);
-    expect(await stagedLabels(page)).toEqual([]);
   });
 
   test("DOOR-05 the empty-state door names SQL mode and the absolute range", { tag: ["@mock"] }, async ({ page }) => {
@@ -269,27 +204,29 @@ test.describe("assistant doors", () => {
     await expect(prompt).toContainText(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
   });
 
-  test("DOOR-08 a row Explain while an answer runs is staged and sent only on Send", { tag: ["@mock"] }, async ({ page }) => {
+  test("DOOR-08 a row Add while an answer runs is staged and sends nothing more", { tag: ["@mock"] }, async ({ page }) => {
     await gotoLogs(page);
     await assistant.open("header");
     await assistant.send("first question", "slow");
     await expect(assistant.composerState()).toHaveAttribute("data-state", /running|busy|working|streaming/);
     await focusRowToolbar(page);
-    await tabTo(page, "ai-entry-log-row-explain");
+    await tabTo(page, ROW_ADD);
     await page.keyboard.press("Enter");
-    await expect(assistant.container()).toContainText("Added to the chat. Send it when the current answer finishes.");
+    // The composer hides its chips while an answer runs; they show again once it stops.
+    await assistant.stop();
+    await expect(assistant.allChips()).toHaveCount(1);
     expect(await streamRequests(page)).toBe(1);
   });
 
-  test("DOOR-11 a send door never sends over an unfinished draft", { tag: ["@mock"] }, async ({ page }) => {
+  test("DOOR-11 a row Add never sends or replaces an unfinished draft", { tag: ["@mock"] }, async ({ page }) => {
     await gotoLogs(page);
     await assistant.open("header");
     await assistant.composer().fill("half a thought");
     await focusRowToolbar(page);
-    await tabTo(page, "ai-entry-log-row-explain");
+    await tabTo(page, ROW_ADD);
     await page.keyboard.press("Enter");
-    await expect(assistant.composer()).toHaveValue(/half a thought\nExplain this log row/);
-    await expect(assistant.container()).toContainText("Added to your message. Press Send when ready.");
+    await expect(assistant.allChips()).toHaveCount(1);
+    await expect(assistant.composer()).toHaveValue("half a thought");
     expect(await streamRequests(page)).toBe(0);
     expect((await entryEvents(page)).at(-1)).toMatchObject({ sends: false });
   });
@@ -299,7 +236,8 @@ test.describe("assistant doors", () => {
     await focusRowToolbar(page);
     await openRecordDrawer(page);
     // The drawer's doors mount after the drawer itself.
-    await expect(page.locator('[data-test="ai-entry-log-record-add"]')).toBeVisible();
+    await expect(page.locator(`[data-test="${RECORD_ADD}"]`)).toBeVisible();
+    await fieldMenuItem(page, 0, "ai-entry-log-field-add");
     const ids = await page.locator('[data-test^="ai-entry-"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-test")));
     expect(ids.length).toBeGreaterThan(0);
     for (const id of ids.filter((id) => id !== "ai-entry-secondary")) expect(id).toMatch(DOOR_ID);
@@ -391,8 +329,10 @@ test.describe("assistant doors", () => {
       await expect(cell(page)).toBeVisible({ timeout: 5_000 });
     }).toPass({ timeout: 60_000 });
     await focusRowToolbar(page);
-    await tabTo(page, "ai-entry-log-row-explain");
+    await tabTo(page, ROW_ADD);
     await page.keyboard.press("Enter");
+    await expect(assistant.allChips()).toHaveCount(1);
+    await assistant.send("what is in this row?");
     await expect.poll(() => streamRequests(page)).toBe(1);
     const body = (await streamBodies(page)).at(-1);
     expect(body).not.toContain("hunter22");
@@ -400,44 +340,54 @@ test.describe("assistant doors", () => {
     expect(body).toContain("[redacted]");
   });
 
-  test("PERF-01 door activations paint their tick within 100 ms p95 at 4× CPU throttle", { tag: ["@mock"] }, async ({ page }) => {
+  test("PERF-01 row Add activations paint their chip within 100 ms p95 at 4× CPU throttle", { tag: ["@mock"] }, async ({ page }) => {
     test.skip(!process.env.O2_VITE_DEV, "reads the app's modules through the dev server's module graph");
     await gotoLogs(page);
+    await page.evaluate(async () => {
+      window.__assistantStore = (await import("/web/src/composables/assistant/index.ts")).assistantStore;
+    });
+    const chipCount = () =>
+      page.evaluate(() => {
+        const state = window.__assistantStore.state;
+        return state.sessions[state.shell.activeSid ?? ""]?.composer.chips.length ?? 0;
+      });
     // The composer holds at most 20 rows, so each round starts from an empty one.
     const clearChips = () =>
-      page.evaluate(async () => {
-        const m = await import("/web/src/composables/assistant/index.ts");
-        const state = m.assistantStore.state;
-        const sid = state.shell.activeSid;
-        for (const chip of [...(state.sessions[sid ?? ""]?.composer.chips ?? [])]) m.assistantStore.removeChip(sid, chip.id);
+      page.evaluate(() => {
+        const store = window.__assistantStore;
+        const sid = store.state.shell.activeSid;
+        for (const chip of [...(store.state.sessions[sid ?? ""]?.composer.chips ?? [])]) store.removeChip(sid, chip.id);
       });
     const cdp = await page.context().newCDPSession(page);
     await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
-    // Two untimed Adds under the throttle load the prompt builders and warm the toast; a built bundle fetches them as one chunk.
+    // Two untimed Adds under the throttle load the prompt builders and open the panel; a built bundle fetches them as one chunk.
     for (const row of [20, 21]) {
+      const before = await chipCount();
       await focusRowToolbar(page, row);
-      await tabTo(page, "ai-entry-log-row-add");
+      await tabTo(page, ROW_ADD);
       await page.keyboard.press("Enter");
-      await expect(page.locator('[data-test="ai-entry-log-row-add"][data-door-state="added"]')).toBeVisible();
+      await expect.poll(chipCount).toBe(before + 1);
     }
     const times = [];
     for (const round of [0, 1]) {
       await clearChips();
       for (let i = 0; i < 10; i += 1) {
         await focusRowToolbar(page, round * 10 + i);
-        await tabTo(page, "ai-entry-log-row-add");
-        // Timed in the page from the keydown to the first frame after the tick, so no CDP round trip is counted.
+        await tabTo(page, ROW_ADD);
+        // Timed in the page from the keydown to the first frame after the chip renders, so no CDP round trip is counted.
         await page.evaluate(() => {
-          const door = document.activeElement;
+          const state = window.__assistantStore.state;
+          const count = () => state.sessions[state.shell.activeSid ?? ""]?.composer.chips.length ?? 0;
+          const before = count();
           window.__perf = null;
           let start = 0;
           document.addEventListener("keydown", () => (start = performance.now()), { capture: true, once: true });
           const done = new MutationObserver(() => {
-            if (door.getAttribute("data-door-state") !== "added") return;
+            if (count() <= before) return;
             done.disconnect();
             requestAnimationFrame(() => (window.__perf = performance.now() - start));
           });
-          done.observe(door, { attributes: true, attributeFilter: ["data-door-state"] });
+          done.observe(document.body, { childList: true, subtree: true, characterData: true });
         });
         await page.keyboard.press("Enter");
         await expect.poll(() => page.evaluate(() => window.__perf)).not.toBeNull();
@@ -453,17 +403,16 @@ test.describe("assistant doors", () => {
     if (!process.env.CI) expect(p95).toBeLessThanOrEqual(100);
   });
 
-  test("touch: the row kebab mirrors the doors below md with 2.75rem items", { tag: ["@mock"] }, async ({ page }) => {
+  test("touch: the row kebab opens below md with 2.75rem items", { tag: ["@mock"] }, async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await gotoLogs(page);
     const kebab = page.locator('[data-test="logs-search-result-row-menu"]').first();
     await expect(kebab).toBeVisible();
     await kebab.click();
-    const item = page.locator('[role="menu"] [data-test="ai-entry-log-row-explain"]');
+    const item = page.locator('[role="menu"] [data-test="logs-search-result-row-menu-copy"]');
     await expect(item).toBeVisible();
     const box = await item.boundingBox();
     expect(box.height).toBeGreaterThanOrEqual(44);
-    await expect(page.locator('[role="menu"]')).toContainText("Sends this row and asks the assistant to explain it");
   });
 
   test("DOOR-06 the DBM fix door opens its own Database thread, not the open chat", { tag: ["@mock"] }, async ({ page }) => {

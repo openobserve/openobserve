@@ -95,7 +95,7 @@ test.describe("assistant shell", () => {
         if (
           (await page.evaluate(() =>
             document.activeElement?.getAttribute("data-test"),
-          )) === "ai-entry-log-row-explain"
+          )) === "logs-search-result-ai-btn"
         )
           break;
       }
@@ -105,9 +105,6 @@ test.describe("assistant shell", () => {
       await page.keyboard.press("Escape");
       await expect(assistant.sidebar).toBeHidden();
       await expect(cell).toBeFocused();
-      await expect(
-        toolbar.locator('[data-test="ai-entry-log-row-explain"]'),
-      ).toBeVisible();
     },
   );
 
@@ -167,7 +164,7 @@ test.describe("assistant shell", () => {
       ).toBeVisible();
       await expect(assistant.sidebar).toHaveAttribute(
         "aria-label",
-        "O2 Assistant",
+        BRAND.askAutobot,
       );
       await expect(
         assistant.sidebar.locator('[data-test="assistant-shell-close"]'),
@@ -197,7 +194,7 @@ test.describe("assistant shell", () => {
       ).toBeVisible();
       await expect(page).toHaveTitle("OpenObserve - Home");
       const landmarks = page.locator(
-        'aside[aria-label="O2 Assistant"], [role="region"][aria-label="O2 Assistant"]',
+        `aside[aria-label="${BRAND.askAutobot}"], [role="region"][aria-label="${BRAND.askAutobot}"]`,
       );
       await expect(landmarks.filter({ visible: true })).toHaveCount(1);
       await expect(assistant.headerButton).toHaveAttribute(
@@ -221,8 +218,9 @@ test.describe("assistant shell", () => {
       const sheet = assistant.sheet;
       await expect(sheet).toHaveAttribute("role", "dialog");
       await expect(sheet).toHaveAttribute("aria-modal", "false");
-      await expect(sheet).toHaveAttribute("aria-label", "O2 Assistant");
-      await expect(sheet).toHaveAttribute("data-snap", "half");
+      await expect(sheet).toHaveAttribute("aria-label", BRAND.askAutobot);
+      // At 812 px a half sheet leaves the transcript under 240 px, so it opens full.
+      await expect(sheet).toHaveAttribute("data-snap", "full");
       const focusedInside = () =>
         page.evaluate(
           () => !!document.activeElement?.closest("[data-assistant-root]"),
@@ -236,6 +234,8 @@ test.describe("assistant shell", () => {
         '[data-test="assistant-shell-sheet-handle"]',
       );
       await handle.focus();
+      await page.keyboard.press("ArrowDown");
+      await expect(sheet).toHaveAttribute("data-snap", "half");
       await page.keyboard.press("ArrowDown");
       await expect(sheet).toHaveAttribute("data-snap", "peek");
       await expect(
@@ -276,6 +276,17 @@ test.describe("assistant shell", () => {
       await page.setViewportSize({ width: 375, height: 812 });
       await gotoLogs(page);
       await assistant.open("header");
+      // The sheet opens full at 812 px; the page is only reachable beside a half sheet.
+      await expect(assistant.sheet).toHaveAttribute("data-snap", "full");
+      await assistant.sheet
+        .locator('[data-test="assistant-shell-sheet-handle"]')
+        .focus();
+      await page.keyboard.press("ArrowDown");
+      await expect(assistant.sheet).toHaveAttribute("data-snap", "half");
+      // The sheet slides to its new snap, so its top is read once it reaches half.
+      await expect
+        .poll(() => assistant.sheet.evaluate((el) => el.getBoundingClientRect().top))
+        .toBeGreaterThanOrEqual(812 / 2 - 1);
       const sheetTop = await assistant.sheet.evaluate(
         (el) => el.getBoundingClientRect().top,
       );

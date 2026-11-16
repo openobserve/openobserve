@@ -63,8 +63,11 @@ test.describe("assistant security", () => {
     await expect(answer.locator('a[href*="logout"], a[href*="shared"], a[href^="javascript"], a[href^="data"]')).toHaveCount(0);
   });
 
-  test("SEC-03 a navigation frame from the agent never navigates; it is offered as one link card", { tag: ["@mock"] }, async ({ page }) => {
+  test("SEC-03 with Auto Navigation off, a navigation frame from the agent never navigates; it is offered as one link card", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
+    const toggle = assistant.container().locator('[data-test="assistant-composer-auto-navigation-btn"]');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
     // The logs page writes its own time range into the URL once it loads; only a change after that is the agent's.
     await expect.poll(() => page.url(), { timeout: 15_000 }).not.toContain("from=NaN");
     const before = page.url();
@@ -109,11 +112,8 @@ test.describe("assistant security", () => {
     expect(await page.title()).not.toContain("Checkout 5xx spike");
     await page.goto(`${harness.ENV.appUrl}/?org_identifier=${harness.ENV.org}`, { waitUntil: "domcontentloaded" });
     await expect(assistant.launcher()).toHaveAttribute("data-dd-privacy", "mask", { timeout: 30_000 });
-    // A popover is portalled to body, outside the masked launcher, so it carries the mask itself.
+    // A popover is portalled to body, outside the masked launcher, so its content carries the mask itself.
     await assistant.launcher().locator('[data-test="assistant-context-sees"]').click();
-    const popover = page.locator("[data-o-popover-content]").filter({
-      has: page.locator('[data-test="assistant-context-sees-popover"]'),
-    });
-    await expect(popover).toHaveAttribute("data-dd-privacy", "mask");
+    await expect(page.locator('[data-test="assistant-context-sees-popover"]')).toHaveAttribute("data-dd-privacy", "mask");
   });
 });

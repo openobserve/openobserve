@@ -111,7 +111,10 @@ test.describe("assistant consent card", () => {
     await expect(assistant.composer()).toHaveValue("why did checkout 5xx spike?");
   });
 
-  test("CONS-07 closing the chat moves the prompt to the global dialog; its Cancel writes nothing and keeps the draft", { tag: ["@mock"] }, async ({ page }) => {
+  test("CONS-07 closing the chat moves the prompt to the global dialog; its Cancel writes nothing and keeps the draft @edition", { tag: ["@mock", "@stack-cloud"] }, async ({ context, page }) => {
+    // The global paid-usage dialog is mounted on Cloud builds only.
+    await harness.forceCloudBuild(context);
+    await page.reload();
     await ask(page);
     await assistant.close();
     await expect(dialog(page)).toBeVisible();

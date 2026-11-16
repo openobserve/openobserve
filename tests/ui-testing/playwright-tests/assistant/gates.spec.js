@@ -150,7 +150,7 @@ test.describe("assistant gates", () => {
     await expect(sheet).toHaveCount(0);
   });
 
-  test("GATE-03 a viewer's row door is locked, focusable and opens the reason, nothing else", { tag: ["@mock", "@stack-ee", "@stack-cloud"] }, async ({
+  test("GATE-03 a viewer's row Add to chat is focusable and opens the reason, nothing else", { tag: ["@mock", "@stack-ee", "@stack-cloud"] }, async ({
     context,
     page,
   }) => {
@@ -162,22 +162,20 @@ test.describe("assistant gates", () => {
     await expect(assistant.headerButton).toHaveAttribute("data-state", "locked", { timeout: 30_000 });
     const cell = await assistant.logRowCell();
     await cell.focus();
-    const door = page.locator('.o2-table-cell-hover-actions [data-test="ai-entry-log-row-explain"]');
-    await expect(door).toHaveAttribute("aria-disabled", "true");
-    await expect(door).toHaveAttribute("aria-label", "Explain this log row, locked: ask an admin for AI access");
+    const door = page.locator('.o2-table-cell-hover-actions [data-test="logs-search-result-ai-btn"]');
+    await expect(door).toBeVisible();
     await door.focus();
     await page.keyboard.press("Enter");
-    const reason = page.locator('[data-test="assistant-gate-state"][data-size="popover"]');
-    await expect(reason).toBeVisible();
+    // A locked click opens the locked panel with the reason, as the header button does.
+    const reason = page.locator('[data-test="assistant-gate-state"]').filter({ visible: true });
+    await expect(reason).toContainText(`${BRAND.autobot} isn't available to your role`);
     // The reason must outlive the focus move into it, not flash for one frame (U2).
     await page.waitForTimeout(500);
     await expect(reason).toBeVisible();
-    await expect(page.locator("[data-assistant-root]").filter({ visible: true })).toHaveCount(0);
+    await expect(assistant.composer()).toHaveCount(0);
+    expect(await page.evaluate(() => window.__o2mock.requests.length)).toBe(0);
     const events = await harness.captureTelemetry(page);
-    expect(events.filter((e) => e.name === "ai_entry_clicked").at(-1)?.properties).toMatchObject({
-      sends: false,
-      gate: "no_permission",
-    });
+    expect(events.filter((e) => e.name === "ai_gate_blocked").at(-1)?.properties).toMatchObject({ reason: "no_permission" });
   });
 
   test("GATE-03 a viewer is locked before the first keystroke and can ask an admin", { tag: ["@mock", "@stack-ee", "@stack-cloud"] }, async ({

@@ -4,6 +4,7 @@
 import { test, expect } from "@playwright/test";
 
 import { AssistantPage } from "../../pages/assistantPage.js";
+import { BRAND } from "../../utils/brand.js";
 
 const loadHarness = () => import("./harness/setup.mjs");
 
@@ -92,7 +93,7 @@ test.describe("assistant honest turns", () => {
     await expect.poll(async () => (await events(page)).map((e) => e.name)).toContain("ai_assistant_answer_completed");
     expect((await events(page)).map((e) => e.name)).toContain("ai_assistant_message_sent");
     await ask(page, "empty_turn", "again");
-    await expect(assistant.outcome()).toContainText("The assistant didn't answer.");
+    await expect(assistant.outcome()).toContainText(`${BRAND.autobot} didn't answer.`);
     await expect.poll(async () => (await events(page)).filter((e) => e.name === "ai_assistant_answer_failed").length).toBe(1);
     expect((await events(page)).filter((e) => e.name === "ai_assistant_answer_completed")).toHaveLength(1);
   });
@@ -146,8 +147,12 @@ test.describe("assistant honest turns", () => {
     await expect(assistant.outcomeAction()).toHaveText("Continue");
     const stop = (await events(page)).find((e) => e.name === "ai_stop");
     expect(typeof stop?.properties.server_cancel_ms).toBe("number");
+    await assistant.composer().fill("draft kept");
     await assistant.outcomeAction().click();
-    await expect(assistant.composer()).toHaveValue("Continue the answer above");
+    await expect
+      .poll(() => page.evaluate(() => window.__o2mock.requests.map((r) => r.body ?? "").at(-1)))
+      .toContain("Continue the answer above");
+    await expect(assistant.composer()).toHaveValue("draft kept");
   });
 
   test("TURN-04 an unconfirmed cancel says the server may still be finishing", { tag: ["@mock"] }, async ({ page }) => {
@@ -187,7 +192,7 @@ test.describe("assistant honest turns", () => {
   test("TURN-07 an empty turn is not an answer", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await ask(page, "empty_turn");
-    await expect(assistant.outcome()).toContainText("The assistant didn't answer.");
+    await expect(assistant.outcome()).toContainText(`${BRAND.autobot} didn't answer.`);
     await expect.poll(async () => (await events(page)).find((e) => e.name === "ai_turn_ended")?.properties.error_code).toBe(
       "empty_response",
     );
