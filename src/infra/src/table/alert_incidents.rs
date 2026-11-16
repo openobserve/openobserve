@@ -210,6 +210,8 @@ impl Episode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AutomaticResolution {
     Kept,
+    /// Every firing recovered, but a person who acknowledged or was assigned it owns the close.
+    Owned,
     AlreadyResolved(Box<alert_incidents::Model>),
     Resolved {
         before: Box<alert_incidents::Model>,
@@ -960,11 +962,7 @@ pub async fn resolve_if_recovered_with(
         return Ok(AutomaticResolution::AlreadyResolved(Box::new(before)));
     }
     // A security case is an analyst's to close, whatever its detections do.
-    if before.status != "open"
-        || before.acknowledged_by.is_some()
-        || before.assigned_to.is_some()
-        || before.security_case
-    {
+    if before.security_case {
         txn.rollback().await.map_err(db_err)?;
         return Ok(AutomaticResolution::Kept);
     }
@@ -976,6 +974,10 @@ pub async fn resolve_if_recovered_with(
     if links.is_empty() || links.iter().any(|link| link.resolved_at.is_none()) {
         txn.rollback().await.map_err(db_err)?;
         return Ok(AutomaticResolution::Kept);
+    }
+    if before.status != "open" || before.acknowledged_by.is_some() || before.assigned_to.is_some() {
+        txn.rollback().await.map_err(db_err)?;
+        return Ok(AutomaticResolution::Owned);
     }
     let now = chrono::Utc::now().timestamp_micros();
     let mut active: alert_incidents::ActiveModel = before.clone().into();
@@ -4726,8 +4728,10 @@ mod tests {
                 let result = resolve_if_recovered_with(&db, "demo-org", &id)
                     .await
                     .unwrap();
-                if acknowledged || assigned || unresolved || security_case {
+                if unresolved || security_case {
                     assert_eq!(result, AutomaticResolution::Kept, "{name}/{case}");
+                } else if acknowledged || assigned {
+                    assert_eq!(result, AutomaticResolution::Owned, "{name}/{case}");
                 } else {
                     let AutomaticResolution::Resolved { before, after } = result else {
                         panic!("{name}/{case}: expected resolution");

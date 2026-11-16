@@ -6155,7 +6155,8 @@ mod tests {
     fn assistant_scope_is_exactly_these_router_routes() {
         use openobserve_api_common::auth::delegation::in_assistant_scope;
 
-        let expected = [
+        #[allow(unused_mut)]
+        let mut expected = vec![
             "GET /v2/{org_id}/alerts",
             "GET /v2/{org_id}/alerts/history",
             "GET /v2/{org_id}/alerts/incidents",
@@ -6223,6 +6224,11 @@ mod tests {
             "POST /{org_id}/prometheus/api/v1/query_range",
             "POST /{org_id}/{stream_name}/_around",
         ];
+        #[cfg(feature = "enterprise")]
+        expected.extend([
+            "GET /v2/{org_id}/autoobserve/incidents",
+            "GET /v2/{org_id}/autoobserve/suggestions",
+        ]);
         assert_eq!(scope_allows(in_assistant_scope), sorted(&expected));
     }
 

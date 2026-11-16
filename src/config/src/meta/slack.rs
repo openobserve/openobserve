@@ -91,6 +91,8 @@ pub enum ThreadKind {
     Link,
     /// An alert message's thread: every reply needs a mention, nobody owns the session.
     Alert,
+    /// An AutoObserve issue message's thread; a mention there carries the issue's context.
+    Insight,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]

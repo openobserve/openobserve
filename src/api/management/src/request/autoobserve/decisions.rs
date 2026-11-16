@@ -34,12 +34,12 @@ use infra::db::get_orm_client_ro;
 use o2_enterprise::enterprise::{
     alert_calibration_service::{applied::SuggestedChange, dismissals::Target},
     autoobserve::{
-        api::Deps,
+        api::{Deps, Page},
         contract::EntityRef,
         decisions::{
-            self, Access, BODY_INVALID, CAN_ACT_SHOWN, Caller, Ctx, DecideBody, DecisionError,
-            Family, ListQuery, Owners, OwnersScope, PreviewQuery, QUERY_INVALID, RefusalReason,
-            Source, SubjectInfo, UndoRequest,
+            self, Access, BODY_INVALID, CAN_ACT_SHOWN, Caller, Change, Ctx, DecideBody,
+            DecisionError, DecisionResult, DecisionView, Family, ListQuery, Owners, OwnersScope,
+            PreviewQuery, QUERY_INVALID, RefusalReason, Source, SubjectInfo, UndoRequest,
         },
         names::{dims, kinds},
     },
@@ -275,8 +275,20 @@ pub async fn decide(
     let ctx = context(&deps, &access, source);
     let now = now_micros();
     match body {
-        DecideBody::One(request) => respond(decisions::decide_one(&ctx, &request, now).await),
-        DecideBody::Batch(batch) => respond(decisions::decide_batch(&ctx, &batch.items, now).await),
+        DecideBody::One(request) => {
+            let done = decisions::decide_one(&ctx, &request, now).await;
+            note_on_incidents(&org_id, done.as_ref().ok());
+            respond(done)
+        }
+        DecideBody::Batch(batch) => {
+            let done = decisions::decide_batch(&ctx, &batch.items, now).await;
+            let results = done
+                .as_ref()
+                .map(|b| b.results.as_slice())
+                .unwrap_or_default();
+            note_on_incidents(&org_id, results.iter().filter_map(|i| i.result.as_ref()));
+            respond(done)
+        }
     }
 }
 
@@ -331,7 +343,9 @@ pub async fn undo_decision(
         Err(e) => return failed(&e.into()),
     };
     let ctx = context(&deps, &access, source);
-    respond(decisions::undo(&ctx, &decision_id, &request, now_micros()).await)
+    let done = decisions::undo(&ctx, &decision_id, &request, now_micros()).await;
+    note_on_incidents(&org_id, done.as_ref().ok());
+    respond(done)
 }
 
 #[utoipa::path(
@@ -396,29 +410,35 @@ pub(crate) fn decision_source(delegated: Option<&DelegatedCaller>, headers: &Hea
     }
 }
 
-/// Every active suggestion decision `user_id` can read, for the Slack insights feed's S5 updates.
+/// One page of the active `family` decisions `user_id` can read, with their total.
 pub(super) async fn feed_decisions(
     org_id: &str,
     user_id: &str,
+    family: Family,
+    page: Page,
     now: i64,
-) -> Result<Vec<o2_enterprise::enterprise::autoobserve::decisions::DecisionView>, DecisionError> {
-    use o2_enterprise::enterprise::autoobserve::decisions::{Family, ListQuery};
+) -> Result<(Vec<DecisionView>, usize), DecisionError> {
     let access = LiveAccess { org_id, user_id };
     let deps = Deps::live().map_err(DecisionError::from)?;
     let ctx = context(&deps, &access, Source::Api);
-    let mut out = Vec::new();
-    loop {
-        let query = ListQuery {
-            state: Some("active".into()),
-            family: Some(Family::Suggestion),
-            limit: None,
-            offset: Some(out.len()),
-        };
-        let page = decisions::list(&ctx, &query, now).await?;
-        let got = page.decisions.len();
-        out.extend(page.decisions);
-        if got == 0 || out.len() >= page.total {
-            return Ok(out);
+    let query = ListQuery {
+        state: Some("active".into()),
+        family: Some(family),
+        limit: Some(page.limit),
+        offset: Some(page.offset),
+    };
+    let list = decisions::list(&ctx, &query, now).await?;
+    Ok((list.decisions, list.total))
+}
+
+/// Notes each issue decision the call changed on its incident, off the response path.
+fn note_on_incidents<'a>(org_id: &str, results: impl IntoIterator<Item = &'a DecisionResult>) {
+    use openobserve_core::autoobserve::incidents::note_issue_decision;
+
+    for r in results {
+        if r.decision.family == Family::Issue && r.change != Change::Unchanged {
+            let (org, view) = (org_id.to_string(), r.decision.clone());
+            tokio::spawn(note_issue_decision(org, r.change, view));
         }
     }
 }

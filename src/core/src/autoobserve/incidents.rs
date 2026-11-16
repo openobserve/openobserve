@@ -15,12 +15,18 @@
 
 //! AutoObserve's incident path: the port opens a finding's incident; the list reads it back.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use async_trait::async_trait;
-use config::meta::alerts::{
-    incidents::AlertKind,
-    rca_runs::{AutoRunOpts, RunSummaryFields, RunTrigger},
+use config::{
+    meta::{
+        alerts::{
+            incidents::{AlertKind, IncidentEvent, IncidentEventType},
+            rca_runs::{AutoRunOpts, RunSummaryFields, RunTrigger},
+        },
+        oncall::{ResolutionCause, Response, SubjectType},
+    },
+    utils::time::now_micros,
 };
 use futures::{StreamExt, TryStreamExt};
 use infra::table::{
@@ -29,16 +35,24 @@ use infra::table::{
     oncall_ownership::Landing,
     service_streams::ServiceRecord,
 };
-use o2_enterprise::enterprise::autoobserve::{
-    INTERVAL_SECS,
-    api::Page,
-    context::{self, IssueContext, IssueRef, ViewerResolver, for_issues, issue_for},
-    contract::ActionRequest,
-    names::decision_kinds,
-    page_routing::{catalogue, cohort_dimensions, stream_service},
-    paging_enabled_for,
-    plugins::stream::{PageSubject, cohort_title, finding_id, page_subject},
-    ports::{ActionRefused, InvestigationPort, Recovery},
+use o2_enterprise::enterprise::{
+    autoobserve::{
+        INTERVAL_SECS,
+        api::{Deps, Page},
+        context::{
+            self, IssueContext, IssueIncident, IssueRef, ViewerResolver, for_issues, issue_by_id,
+            issue_for,
+        },
+        contract::ActionRequest,
+        decisions::{Action, Change, DecisionView},
+        names::decision_kinds,
+        outcomes::{self, OutcomeReport, OutcomeSource, OutcomeSubject},
+        page_routing::{catalogue, cohort_dimensions, stream_service},
+        paging_enabled_for,
+        plugins::stream::{PageSubject, cohort_title, finding_id, page_subject},
+        ports::{ActionRefused, InvestigationPort, Recovery},
+    },
+    slack::insights::copy::reason_word,
 };
 use serde::{Deserialize, Serialize};
 
@@ -58,6 +72,8 @@ pub const PAGE_PENDING_US: i64 = 2 * INTERVAL_SECS * 1_000_000;
 const UNROUTED_SCANNED: u64 = 500;
 /// Issue lookups in flight for one page of incidents.
 const ISSUE_READS: usize = 8;
+const KEPT_OPEN: &str = "This incident stays open because someone acknowledged or was assigned it; \
+                         resolve it when you are done.";
 
 /// A finding's decision kind, stream entity id and onset.
 type IssueKey = (String, String, i64);
@@ -156,6 +172,12 @@ pub struct AutoObserveIncident {
     /// What changed before the finding and what it breaks, as this caller may see it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<IssueContext>,
+    /// The incident and its page as a Slack issue thread reads them; never in the route's body.
+    #[serde(skip)]
+    pub issue_incident: Option<IssueIncident>,
+    /// Every AutoObserve firing it holds as (finding id, onset), repeats kept; never in the body.
+    #[serde(skip)]
+    pub firings: BTreeSet<(String, i64)>,
 }
 
 /// One stream of an incident; its type and name are null once the org no longer has the stream.
@@ -217,6 +239,49 @@ pub struct InvestigationView {
     pub outcome: Option<String>,
     pub summary: Option<RunSummaryFields>,
     pub not_run_reason: Option<String>,
+}
+
+/// How a responder answered an incident's page; each of its AutoObserve issues records it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RespondedAs {
+    Acknowledged {
+        by: String,
+        at: i64,
+    },
+    Resolved {
+        by: String,
+        at: i64,
+        cause: Option<ResolutionCause>,
+    },
+}
+
+impl RespondedAs {
+    /// An acknowledgement is a response, never a verdict; a resolve's cause may judge the issue.
+    pub fn report(&self, org: &str, issue: IssueRef) -> OutcomeReport {
+        let (source, by, at, (verdict, cause)) = match self {
+            Self::Acknowledged { by, at } => (OutcomeSource::IncidentAck, by, *at, (None, None)),
+            Self::Resolved { by, at, cause } => (
+                OutcomeSource::OncallResolve,
+                by,
+                *at,
+                outcomes::of_resolution_cause(cause.as_ref().map(ResolutionCause::as_str)),
+            ),
+        };
+        OutcomeReport {
+            org: org.to_string(),
+            subject: OutcomeSubject::Issue(issue),
+            source,
+            actor: Some(by.clone()),
+            at,
+            responded: true,
+            verdict,
+            cause,
+            effect: None,
+            note: None,
+            step_helpful: None,
+            step_id: None,
+        }
+    }
 }
 
 /// The pure half of `start`: the subject the incident path correlates on, scoped by `records`.
@@ -286,8 +351,10 @@ pub async fn list_with(
     let mut items: Vec<AutoObserveIncident> = rows
         .iter()
         .map(|(i, l)| {
+            let held = links.get(&i.id).map_or(&[][..], Vec::as_slice);
             let mut item = item_of(i, l);
-            item.members = members_of(links.get(&i.id).map_or(&[], Vec::as_slice), &names);
+            item.members = members_of(held, &names);
+            item.firings.extend(held.iter().map(firing_of));
             item
         })
         .collect();
@@ -298,7 +365,9 @@ pub async fn list_with(
         None
     };
     for item in &mut items {
-        item.page = Some(page_of(org, item, &unrouted, staffed_since, now).await?);
+        let (page, incident) = page_of(org, item, &unrouted, staffed_since, now).await?;
+        item.page = Some(page);
+        item.issue_incident = Some(incident);
     }
     Ok(AutoObserveIncidents {
         paging: paging_enabled_for(org).await,
@@ -424,6 +493,172 @@ pub fn item_of(
         members: Vec::new(),
         page: None,
         context: None,
+        issue_incident: None,
+        firings: BTreeSet::from([firing_of(link)]),
+    }
+}
+
+/// Records the response on each AutoObserve issue of the incident; a failure is only logged.
+pub async fn responder_outcome(org: String, incident_id: String, responded: RespondedAs) {
+    if let Err(e) = report_response(&org, &incident_id, &responded).await {
+        log::warn!("[AUTOOBSERVE] org {org}: incident {incident_id}: response not recorded: {e}");
+    }
+}
+
+/// Spawns [responder_outcome] for the incident a page record belongs to, if it has one.
+pub fn respond_to_page(record: &Response, responded: RespondedAs) {
+    let incident = record.incident_id.clone().or_else(|| {
+        (record.subject.subject_type == SubjectType::Incident)
+            .then(|| record.subject.source_id.clone())
+    });
+    if let Some(incident_id) = incident {
+        let org = record.org_id.clone();
+        tokio::spawn(responder_outcome(org, incident_id, responded));
+    }
+}
+
+/// Appends a system line to the incident's timeline, where its responders read it.
+pub async fn note_decision(org: &str, incident_id: &str, line: &str) -> anyhow::Result<()> {
+    let event = IncidentEvent::comment("system", line);
+    infra::table::incident_events::append(org, incident_id, event).await?;
+    Ok(())
+}
+
+/// Notes an issue decision on the incident its issue opened, when it opened one; only logged.
+pub async fn note_issue_decision(org: String, change: Change, view: DecisionView) {
+    let Some(line) = decision_line(change, &view) else {
+        return;
+    };
+    let noted = async {
+        match issue_incident_id(&org, &view.id).await? {
+            Some(incident_id) => note_decision(&org, &incident_id, &line).await,
+            None => Ok(()),
+        }
+    };
+    if let Err(e) = noted.await {
+        log::warn!(
+            "[AUTOOBSERVE] org {org}: decision {} not noted: {e}",
+            view.id
+        );
+    }
+}
+
+/// Z3: data came back while a person holds the incident; one note per episode of its firings.
+pub async fn note_kept_open(org: &str, incident_id: &str, back_us: i64) -> anyhow::Result<()> {
+    let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
+    let events = infra::table::incident_events::get(org, incident_id).await?;
+    if noted_since_last_firing(&links, &events) {
+        return Ok(());
+    }
+    note_decision(org, incident_id, &kept_open_line(back_us)).await
+}
+
+/// The incident holding the issue's own firing; the finding's other incidents are other episodes.
+pub fn incident_of(
+    org: &str,
+    issue: &IssueRef,
+    items: &[AutoObserveIncident],
+) -> Option<IssueIncident> {
+    let firing = (
+        finding_id(org, &issue.decision_kind, &issue.entity_id()),
+        issue.onset_us,
+    );
+    items
+        .iter()
+        .find(|item| item.firings.contains(&firing))
+        .and_then(|item| item.issue_incident.clone())
+}
+
+pub(crate) fn kept_open_line(back_us: i64) -> String {
+    match chrono::DateTime::from_timestamp_micros(back_us) {
+        Some(at) => format!("Data is back since {} UTC. {KEPT_OPEN}", at.format("%H:%M")),
+        None => format!("Data is back. {KEPT_OPEN}"),
+    }
+}
+
+/// A link's finding id and the onset it fired at, the pair its issue is read by.
+fn firing_of(link: &alert_incident_alerts::Model) -> (String, i64) {
+    let id = link.alert_id.strip_prefix(SUBJECT_PREFIX);
+    (
+        id.unwrap_or(&link.alert_id).to_string(),
+        link.alert_fired_at,
+    )
+}
+
+/// A kept-open note written after the newest firing joined already speaks for this recovery.
+fn noted_since_last_firing(
+    links: &[alert_incident_alerts::Model],
+    events: &[IncidentEvent],
+) -> bool {
+    let joined = links.iter().map(|l| l.created_at).max().unwrap_or(i64::MIN);
+    events.iter().any(|e| {
+        e.timestamp >= joined
+            && matches!(&e.event_type, IncidentEventType::Comment { user_id, comment }
+                if user_id == "system" && comment.ends_with(KEPT_OPEN))
+    })
+}
+
+/// The timeline line of an issue decision; None for one that changed nothing on the issue.
+fn decision_line(change: Change, view: &DecisionView) -> Option<String> {
+    let actor = &view.actor;
+    match change {
+        Change::Undone => Some(format!(
+            "{actor} undid the AutoObserve dismissal of this issue."
+        )),
+        Change::Created | Change::Updated if view.action == Action::Dismiss => {
+            Some(match view.reason.as_deref() {
+                Some(reason) => format!(
+                    "{actor} dismissed this issue in AutoObserve ({}).",
+                    reason_word(reason)
+                ),
+                None => format!("{actor} dismissed this issue in AutoObserve."),
+            })
+        }
+        _ => None,
+    }
+}
+
+/// Each AutoObserve firing of an incident as the issue it pages for: kind, stream and onset.
+fn member_firings(
+    org: &str,
+    links: &[alert_incident_alerts::Model],
+    names: &HashMap<String, (String, String)>,
+) -> Vec<IssueKey> {
+    let mut out = BTreeSet::new();
+    for link in links
+        .iter()
+        .filter(|l| l.alert_kind == AlertKind::AutoObserve.as_str())
+    {
+        let Some(id) = link.alert_id.strip_prefix(SUBJECT_PREFIX) else {
+            continue;
+        };
+        let Some((stream_type, name)) = names.get(id) else {
+            continue;
+        };
+        let entity = format!("{stream_type}/{name}");
+        if let Some(kind) = paged_kind(org, id, &entity) {
+            out.insert((kind.to_string(), entity, link.alert_fired_at));
+        }
+    }
+    out.into_iter().collect()
+}
+
+fn issue_incident(
+    org: &str,
+    incident: &IncidentView,
+    page: &PageView,
+    record: Option<&Response>,
+) -> IssueIncident {
+    IssueIncident {
+        incident_id: incident.id.clone(),
+        status: incident.status.clone(),
+        paged: page.outcome == PageOutcome::Paged,
+        page_failed: page.outcome == PageOutcome::Failed,
+        response_id: record.map(|r| r.id.clone()),
+        team_name: page.team_name.clone(),
+        acked_by: record.and_then(|r| r.acked_by.clone()),
+        acked_at: record.and_then(|r| r.acked_at),
+        page_url: record.map(|r| page_url(org, &r.id)),
     }
 }
 
@@ -455,10 +690,7 @@ fn member_issues(org: &str, items: &[AutoObserveIncident]) -> Vec<MemberIssue> {
                 continue;
             };
             let entity = format!("{stream_type}/{name}");
-            let kind = decision_kinds::PAGED
-                .iter()
-                .find(|kind| finding_id(org, kind, &entity) == m.id);
-            if let Some(kind) = kind {
+            if let Some(kind) = paged_kind(org, &m.id, &entity) {
                 let key = (kind.to_string(), entity, m.first_seen_at);
                 out.push((n, key, m.recovered_at));
             }
@@ -496,16 +728,65 @@ async fn first_team_at(org: &str) -> anyhow::Result<Option<i64>> {
     Ok(teams.iter().map(|t| t.created_at).min())
 }
 
+async fn report_response(
+    org: &str,
+    incident_id: &str,
+    responded: &RespondedAs,
+) -> anyhow::Result<()> {
+    let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
+    if !links
+        .iter()
+        .any(|l| l.alert_kind == AlertKind::AutoObserve.as_str())
+    {
+        return Ok(());
+    }
+    let keys = member_firings(org, &links, &stream_names(org).await);
+    let deps = Deps::live().map_err(|e| anyhow::anyhow!("AutoObserve is not running: {e:?}"))?;
+    for (kind, entity_id, onset_us) in keys {
+        if let Some(issue) = issue_for(&SearchAdapter, org, &kind, &entity_id, onset_us).await? {
+            outcomes::report(&deps, responded.report(org, issue)).await;
+        }
+    }
+    Ok(())
+}
+
+/// The incident the issue's firing joined, found by the subject and onset it opened with.
+async fn issue_incident_id(org: &str, issue_id: &str) -> anyhow::Result<Option<String>> {
+    let Some(issue) = issue_by_id(&SearchAdapter, org, issue_id, now_micros()).await? else {
+        return Ok(None);
+    };
+    let finding = finding_id(org, &issue.decision_kind, &issue.entity_id());
+    let subject = format!("{SUBJECT_PREFIX}{finding}");
+    let held =
+        infra::table::alert_incidents::find_incident_with_firing(org, &subject, issue.onset_us)
+            .await?;
+    Ok(held.map(|incident| incident.id))
+}
+
+/// The page view and, from the same record, the incident as an issue thread reads it.
 async fn page_of(
     org: &str,
     item: &AutoObserveIncident,
     unrouted: &HashSet<String>,
     staffed_since: Option<i64>,
     now: i64,
+) -> anyhow::Result<(PageView, IssueIncident)> {
+    let record = OncallPager.record(org, &item.incident.id).await?;
+    let page = page_view(org, item, record.as_ref(), unrouted, staffed_since, now).await?;
+    let incident = issue_incident(org, &item.incident, &page, record.as_ref());
+    Ok((page, incident))
+}
+
+async fn page_view(
+    org: &str,
+    item: &AutoObserveIncident,
+    record: Option<&Response>,
+    unrouted: &HashSet<String>,
+    staffed_since: Option<i64>,
+    now: i64,
 ) -> anyhow::Result<PageView> {
     let id = &item.incident.id;
-    let record = OncallPager.record(org, id).await?;
-    if let Some(team) = record.as_ref().and_then(|r| r.team_id.clone()) {
+    if let Some(team) = record.and_then(|r| r.team_id.clone()) {
         let team_name = infra::table::oncall_teams::get_cached(org, &team)
             .await?
             .map(|t| t.name);
@@ -543,6 +824,22 @@ async fn routes_nowhere(org: &str, members: &[MemberView]) -> anyhow::Result<boo
     let dimensions = cohort_dimensions(org, &streams).await;
     let routed = o2_enterprise::enterprise::oncall::routing::decide(org, None, &dimensions).await?;
     Ok(routed.team_id().is_none())
+}
+
+/// The paged decision kind whose finding on this stream has this id.
+fn paged_kind(org: &str, finding: &str, entity: &str) -> Option<&'static str> {
+    decision_kinds::PAGED
+        .iter()
+        .find(|kind| finding_id(org, kind, entity) == finding)
+        .copied()
+}
+
+/// The on-call page's own address, as on-call's chat messages link it.
+fn page_url(org: &str, response_id: &str) -> String {
+    format!(
+        "{}/web/oncall/responses/{response_id}?org_identifier={org}",
+        config::get_config().common.web_url
+    )
 }
 
 /// Each paged kind's finding id for every stream the org still has, so a member reads by name.
@@ -782,7 +1079,32 @@ mod tests {
                 ..member(silence, "deleted", 40, None)
             },
         ];
-        let older = item_of(&incident(finding_dims()), &link(&checkout));
+        cohort.issue_incident = Some(IssueIncident {
+            incident_id: "cohort".into(),
+            ..IssueIncident::default()
+        });
+        let fired = |m: &MemberView, at: i64| alert_incident_alerts::Model {
+            alert_fired_at: at,
+            ..link(&m.id)
+        };
+        let mut held: Vec<_> = cohort
+            .members
+            .iter()
+            .map(|m| fired(m, m.first_seen_at))
+            .collect();
+        held.push(fired(&cohort.members[0], 50 * MINUTE));
+        cohort.firings.extend(held.iter().map(firing_of));
+        let mut older = item_of(
+            &incident(finding_dims()),
+            &alert_incident_alerts::Model {
+                alert_fired_at: 1,
+                ..link(&checkout)
+            },
+        );
+        older.issue_incident = Some(IssueIncident {
+            incident_id: "older".into(),
+            ..IssueIncident::default()
+        });
         let items = [cohort, older];
         let members = member_issues(org, &items);
         let keys: Vec<(usize, &str, &str, i64)> = members
@@ -795,10 +1117,10 @@ mod tests {
                 (0, silence, "logs/checkout", 10),
                 (0, drop, "logs/okta_system_log", 20 * MINUTE),
                 (0, silence, "logs/okta_admin", 30 * MINUTE),
-                (1, silence, "logs/checkout", 10),
+                (1, silence, "logs/checkout", 1),
             ]
         );
-        let found = members
+        let found: Vec<Option<IssueRef>> = members
             .iter()
             .map(|(_, (kind, entity, onset), _)| {
                 Some(IssueRef {
@@ -814,8 +1136,32 @@ mod tests {
                 })
             })
             .collect();
-        let incidents = per_incident(items.len(), &members, found);
-        let read: Vec<Vec<(&str, Option<i64>)>> = incidents
+        let at = |onset_us| IssueRef {
+            onset_us,
+            ..found[0].clone().unwrap()
+        };
+        let joined: Vec<Option<String>> = found
+            .iter()
+            .flatten()
+            .cloned()
+            .chain([at(50 * MINUTE), at(5), at(60 * MINUTE)])
+            .map(|issue| incident_of(org, &issue, &items).map(|i| i.incident_id))
+            .collect();
+        let named = |s: &str| Some(s.to_string());
+        assert_eq!(
+            joined,
+            [
+                named("cohort"),
+                named("cohort"),
+                named("cohort"),
+                named("older"),
+                named("cohort"),
+                None,
+                None,
+            ],
+            "the incident holding that very firing, a re-fire included; none for an unlinked onset"
+        );
+        let read: Vec<Vec<(&str, Option<i64>)>> = per_incident(items.len(), &members, found)
             .iter()
             .map(|issues| {
                 issues
@@ -835,6 +1181,87 @@ mod tests {
                 vec![(silence, None)],
             ]
         );
+    }
+
+    #[test]
+    fn a_response_reports_on_each_autoobserve_firing_with_its_cause_as_the_verdict() {
+        use o2_enterprise::enterprise::autoobserve::{
+            context::subject_of, outcomes::CAUSE_EXPECTED, review::Verdict,
+        };
+        let (org, silence) = ("demo-org", decision_kinds::STREAM_SILENCE);
+        let checkout = finding_id(org, silence, "logs/checkout");
+        let names = HashMap::from([(checkout.clone(), ("logs".into(), "checkout".into()))]);
+        let refired = alert_incident_alerts::Model {
+            alert_fired_at: 300,
+            ..link(&checkout)
+        };
+        let alert = alert_incident_alerts::Model {
+            alert_id: "alert-1".into(),
+            alert_kind: AlertKind::Internal.as_str().into(),
+            ..link("unused")
+        };
+        let deleted = link(&finding_id(org, silence, "logs/deleted"));
+        let key = |onset| (silence.to_string(), "logs/checkout".to_string(), onset);
+        for (links, want) in [
+            (vec![alert.clone()], vec![]),
+            (
+                vec![alert, deleted, link(&checkout), refired],
+                vec![key(10), key(300)],
+            ),
+        ] {
+            assert_eq!(member_firings(org, &links, &names), want);
+        }
+        let issue = IssueRef {
+            org: org.into(),
+            decision_kind: silence.into(),
+            subject: subject_of(kinds::STREAM, "logs/checkout"),
+            decision_id: "d-1".into(),
+            onset_us: 10,
+            detected_us: 10,
+            recovered_us: None,
+            shadow: false,
+            source: None,
+        };
+        let by = || "ana@example.com".to_string();
+        let resolved = |cause| RespondedAs::Resolved {
+            by: by(),
+            at: 7,
+            cause,
+        };
+        let (ack, resolve) = (OutcomeSource::IncidentAck, OutcomeSource::OncallResolve);
+        for (responded, source, verdict, cause) in [
+            (
+                RespondedAs::Acknowledged { by: by(), at: 7 },
+                ack,
+                None,
+                None,
+            ),
+            (resolved(None), resolve, Some(Verdict::Unclear), None),
+            (
+                resolved(Some(ResolutionCause::NoisyThreshold)),
+                resolve,
+                Some(Verdict::FalseAlarm),
+                None,
+            ),
+            (
+                resolved(Some(ResolutionCause::ExpectedOrMaintenance)),
+                resolve,
+                None,
+                Some(CAUSE_EXPECTED),
+            ),
+            (
+                resolved(Some(ResolutionCause::DependencyFailure)),
+                resolve,
+                Some(Verdict::Confirmed),
+                None,
+            ),
+        ] {
+            let r = responded.report(org, issue.clone());
+            let got = (r.source, r.verdict, r.cause.as_deref(), r.responded, r.at);
+            assert_eq!(got, (source, verdict, cause, true, 7), "{responded:?}");
+            assert_eq!(r.actor.as_deref(), Some("ana@example.com"));
+            assert_eq!(r.subject, OutcomeSubject::Issue(issue.clone()));
+        }
     }
 
     #[test]

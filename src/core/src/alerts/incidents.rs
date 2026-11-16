@@ -3659,7 +3659,7 @@ impl FiringResolve {
     /// Whether this call resolved the incident, and what its follow-up steps did, failures kept.
     fn outcome(self) -> (bool, Option<Repairs>) {
         let (resolved, mut repairs) = match self.incident {
-            IncidentAfter::Kept => (false, None),
+            IncidentAfter::Kept | IncidentAfter::Owned => (false, None),
             IncidentAfter::Resolved(r) => (true, Some(r)),
             IncidentAfter::AlreadyResolved(r) => (false, r),
         };
@@ -3673,9 +3673,11 @@ impl FiringResolve {
 /// The incident after one of its firings recovered.
 #[derive(Debug, Default)]
 enum IncidentAfter {
-    /// Missing, or kept open for another firing or a human.
+    /// Missing, or kept open for another firing or a case.
     #[default]
     Kept,
+    /// Every firing recovered; a person who acknowledged or was assigned it owns the close.
+    Owned,
     /// Resolved before this call; with what its follow-up steps did when the caller repairs.
     AlreadyResolved(Option<Repairs>),
     /// Resolved by this call.
@@ -3876,6 +3878,7 @@ async fn settle_resolution(
     Ok(
         match infra::table::alert_incidents::resolve_if_recovered(org_id, incident_id).await? {
             AutomaticResolution::Kept => IncidentAfter::Kept,
+            AutomaticResolution::Owned => IncidentAfter::Owned,
             AutomaticResolution::AlreadyResolved(_) if !repair => {
                 IncidentAfter::AlreadyResolved(None)
             }
@@ -3919,7 +3922,34 @@ async fn recover_finding_firing(
     let (id, at) = (&incident.id, recovered_at);
     let onset = Some(triggered_at);
     let done = resolve_firing(org_id, id, subject_id, at, false, onset, turns).await?;
+    if matches!(done.incident, IncidentAfter::Owned) && quiet_enabled() {
+        note_kept_open(org_id, id, recovered_at, turns).await;
+    }
     Ok(done.outcome())
+}
+
+/// Z3's note, under the incident's turn so recoveries landing together write it once; only logged.
+#[cfg(feature = "enterprise")]
+async fn note_kept_open(org_id: &str, id: &str, back: i64, turns: &dyn IncidentTurns) {
+    let noted = async {
+        let turn = turns.take(org_id, id).await?;
+        let noted = crate::autoobserve::incidents::note_kept_open(org_id, id, back).await;
+        turn.end().await;
+        noted
+    };
+    if let Err(e) = noted.await {
+        log::warn!("[incidents] {org_id}/{id}: the kept-open note was not written: {e}");
+    }
+}
+
+/// The quiet switch over the kept-open note (Z3); tests set it per thread.
+#[cfg(feature = "enterprise")]
+fn quiet_enabled() -> bool {
+    #[cfg(test)]
+    if let Some(on) = tests::findings::QUIET_ON.with(std::cell::Cell::get) {
+        return on;
+    }
+    o2_enterprise::enterprise::autoobserve::holds::enabled()
 }
 
 /// Ok only when nothing is left for a retry, so the engine tells a recovery once it is whole.
@@ -6542,17 +6572,32 @@ pub async fn record_ack_change(
     status: config::meta::alerts::incidents::IncidentStatus,
     event: IncidentEvent,
 ) {
-    let muted = match infra::table::alert_incidents::get(org_id, incident_id).await {
-        Ok(m) => m.is_some_and(|m| m.muted_by_downtime_id.is_some()),
+    let row = match infra::table::alert_incidents::get(org_id, incident_id).await {
+        Ok(m) => m,
         Err(e) => {
             log::error!("[incidents] could not read {org_id}/{incident_id} after an ack: {e}");
-            false
+            None
         }
     };
+    let muted = row
+        .as_ref()
+        .is_some_and(|m| m.muted_by_downtime_id.is_some());
     if let Err(e) = append_event_unless_muted(org_id, incident_id, event, muted).await {
         log::error!("[incidents] could not record the ack of {org_id}/{incident_id}: {e}");
     }
     publish_status(org_id, incident_id, &status.to_string()).await;
+    #[cfg(feature = "enterprise")]
+    if let Some(by) = row.and_then(|m| m.acknowledged_by.zip(m.acknowledged_at))
+        && status == config::meta::alerts::incidents::IncidentStatus::Acknowledged
+    {
+        use crate::autoobserve::incidents::{RespondedAs, responder_outcome};
+        let (org, id) = (org_id.to_string(), incident_id.to_string());
+        tokio::spawn(responder_outcome(
+            org,
+            id,
+            RespondedAs::Acknowledged { by: by.0, at: by.1 },
+        ));
+    }
 }
 
 /// Update incident status
@@ -7350,7 +7395,7 @@ pub async fn notify_severity_change(
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "enterprise")]
-    mod findings {
+    pub(super) mod findings {
         use std::{
             collections::HashMap,
             sync::{
@@ -7363,6 +7408,11 @@ mod tests {
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
 
         use super::super::*;
+
+        thread_local! {
+            pub(in crate::alerts::incidents) static QUIET_ON: std::cell::Cell<Option<bool>> =
+                const { std::cell::Cell::new(None) };
+        }
 
         const TITLE: &str = "checkout (logs) stopped sending data";
         const ONSET: i64 = 1_793_784_600_000_000;
@@ -7741,7 +7791,7 @@ mod tests {
                 ids.push(open(&own, &pager).await.unwrap());
             }
             let paged = SubjectRef::new(SubjectType::Incident, ids[0].clone(), 1);
-            infra::table::oncall_responses::open(
+            let record = infra::table::oncall_responses::open(
                 &org,
                 &paged,
                 Some(&team.id),
@@ -7789,6 +7839,25 @@ mod tests {
                 serde_json::to_value(&pages[&ids[3]]).unwrap(),
                 serde_json::json!({"outcome": "failed", "team_id": null, "team_name": null})
             );
+            let threads = issue_incidents_of(&org).await;
+            let (thread, firings) = &threads[&ids[0]];
+            let own = ("stream_silence-s0".to_string(), ONSET);
+            assert_eq!(
+                *firings,
+                std::collections::BTreeSet::from([own]),
+                "its link's onset"
+            );
+            assert_eq!(
+                (thread.paged, thread.page_failed, thread.acked_by.as_deref()),
+                (true, false, None)
+            );
+            assert_eq!(thread.response_id.as_deref(), Some(record.id.as_str()));
+            assert_eq!(thread.team_name.as_deref(), Some("shop"));
+            let url = format!("/web/oncall/responses/{}?org_identifier={org}", record.id);
+            assert!(thread.page_url.as_deref().unwrap().ends_with(&url));
+            let (failed, _) = &threads[&ids[3]];
+            assert_eq!((failed.paged, failed.page_failed), (false, true));
+            assert_eq!((&failed.response_id, &failed.page_url), (&None, &None));
         }
 
         #[tokio::test]
@@ -7938,6 +8007,33 @@ mod tests {
             assert_eq!(page.outcome, PageOutcome::Paged);
             assert_eq!(page.team_id.as_deref(), Some(team.id.as_str()));
             assert_eq!(page.team_name.as_deref(), Some("shop"));
+        }
+
+        /// Each incident's thread view and the firings an issue finds it by.
+        async fn issue_incidents_of(
+            org: &str,
+        ) -> HashMap<
+            String,
+            (
+                o2_enterprise::enterprise::autoobserve::context::IssueIncident,
+                std::collections::BTreeSet<(String, i64)>,
+            ),
+        > {
+            let page = o2_enterprise::enterprise::autoobserve::api::Page {
+                limit: 50,
+                offset: 0,
+            };
+            let now = config::utils::time::now_micros();
+            crate::autoobserve::incidents::list_with(org, page, true, now)
+                .await
+                .unwrap()
+                .items
+                .into_iter()
+                .map(|i| {
+                    let thread = i.issue_incident.expect("every item reads its page");
+                    (i.incident.id, (thread, i.firings))
+                })
+                .collect()
         }
 
         async fn pages_of(
@@ -8863,6 +8959,21 @@ mod tests {
                 })
         }
 
+        async fn kept_open_notes(org_id: &str, id: &str) -> usize {
+            use config::meta::alerts::incidents::IncidentEventType;
+
+            let line = crate::autoobserve::incidents::kept_open_line(BACK);
+            infra::table::incident_events::get(org_id, id)
+                .await
+                .unwrap()
+                .iter()
+                .filter(|e| {
+                    matches!(&e.event_type, IncidentEventType::Comment { user_id, comment }
+                        if user_id == "system" && *comment == line)
+                })
+                .count()
+        }
+
         #[tokio::test]
         async fn a_recovered_finding_resolves_its_unacknowledged_incident_unmuted() {
             let _db = store().await;
@@ -9277,10 +9388,12 @@ mod tests {
         #[tokio::test]
         async fn an_acknowledged_or_assigned_incident_gets_its_link_resolved_and_stays_open() {
             let _db = store().await;
-            for column in [
-                incident_rows::Column::AcknowledgedBy,
-                incident_rows::Column::AssignedTo,
+            for (column, quiet) in [
+                (incident_rows::Column::AcknowledgedBy, true),
+                (incident_rows::Column::AssignedTo, true),
+                (incident_rows::Column::AcknowledgedBy, false),
             ] {
+                QUIET_ON.with(|on| on.set(Some(quiet)));
                 let (org, pager) = (new_org(), Pager::default());
                 let f = finding(&org, ONSET);
                 let id = open(&f, &pager).await.unwrap();
@@ -9295,7 +9408,12 @@ mod tests {
                 assert_ne!(status(&org, &id).await, "resolved", "{column:?}");
                 assert_eq!(links_resolved_at(&id).await, [Some(BACK)], "{column:?}");
                 assert!(!resolved_by_system(&org, &id).await, "{column:?}");
+                let again = resolve_finding_firing(&org, &f.subject_id, ONSET, BACK).await;
+                assert!(!again.unwrap(), "{column:?}");
+                let notes = kept_open_notes(&org, &id).await;
+                assert_eq!(notes, usize::from(quiet), "{column:?} quiet {quiet}: once");
             }
+            QUIET_ON.with(|on| on.set(None));
         }
 
         #[tokio::test]
