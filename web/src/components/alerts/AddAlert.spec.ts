@@ -1348,31 +1348,25 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find(`[data-test="add-alert-section-schedule"] ${tabs}`).exists()).toBe(false);
     });
 
-    it("steps from the footer: Back and Next name the neighbouring steps and stop at the ends", async () => {
+    it("steps from each section header: Back from the second step, Next names the following one", async () => {
       wrapper = mountAlert();
       await flushPromises();
-      const prev = () => wrapper.find('[data-test="add-alert-step-prev"]');
-      const next = () => wrapper.find('[data-test="add-alert-step-next"]');
-      expect(wrapper.find('[data-test="add-alert-section-watch-next"]').exists()).toBe(false);
-      wrapper.vm.activeSection = "watch";
-      await flushPromises();
-      expect(prev().attributes("aria-disabled")).toBe("true");
-      expect(next().attributes("aria-label")).toBe("Next: When to alert");
+      const btn = (id: string, dir: string) => `[data-test="add-alert-section-${id}-${dir}"]`;
+      expect(wrapper.find(btn("watch", "prev")).exists()).toBe(false);
+      expect(wrapper.find(btn("watch", "next")).attributes("aria-label")).toBe(
+        "Next: When to alert",
+      );
+      expect(wrapper.find(btn("notify", "next")).attributes("aria-label")).toBe(
+        "Next: How often to check",
+      );
+      expect(wrapper.find(btn("details", "next")).exists()).toBe(false);
 
-      wrapper.vm.activeSection = "notify";
-      await flushPromises();
-      expect(prev().attributes("aria-label")).toBe("Back: When to alert");
-      expect(next().attributes("aria-label")).toBe("Next: How often to check");
       const scrollToSection = vi.fn();
       wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
-      await next().trigger("click");
+      await wrapper.find(btn("notify", "next")).trigger("click");
       expect(scrollToSection).toHaveBeenCalledWith("schedule");
-      await prev().trigger("click");
+      await wrapper.find(btn("notify", "prev")).trigger("click");
       expect(scrollToSection).toHaveBeenCalledWith("condition");
-
-      wrapper.vm.activeSection = "details";
-      await flushPromises();
-      expect(next().attributes("aria-disabled")).toBe("true");
     });
 
     it("names the alert types as ways of checking, keeping their ids", async () => {
