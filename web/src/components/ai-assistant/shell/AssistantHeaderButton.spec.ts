@@ -355,24 +355,7 @@ describe("AssistantHeaderButton light", () => {
     expect(openAssistant).not.toHaveBeenCalled();
   });
 
-  it.each<[string, (store: any, sid: string) => void]>([
-    [
-      "needs you",
-      (store, sid) =>
-        (store.state.sessions[sid].turn = { state: "awaiting_approval", callId: "c1" }),
-    ],
-    [
-      "answering",
-      (store, sid) => (store.state.sessions[sid].turn = { state: "responding.writing" }),
-    ],
-    [
-      "unread",
-      (store, sid) => {
-        store.state.sessions[sid].turn = { state: "done", saved: "local" };
-        store.state.sessions[sid].unread = true;
-      },
-    ],
-  ])("looks and reads like idle while a chat is %s", async (_n, light) => {
+  it("shows working with the title, and a count for more than one", async () => {
     const { wrapper, store } = setup();
     const a = session(store, "Checkout 5xx");
     store.state.sessions[a].turn = { state: "responding.writing" };
@@ -384,9 +367,15 @@ describe("AssistantHeaderButton light", () => {
       wrapper.find('[data-test="assistant-header-status-light"]').attributes("data-shape"),
     ).toBe("ring");
     store.setActive(null);
+    const b = session(store, "Payments");
+    store.state.sessions[b].turn = { state: "queued" };
     await flushPromises();
-    const idle = button(wrapper).classes();
-    light(store, sid);
+    expect(tooltip(wrapper)).toBe("2 answers running");
+  });
+
+  it("names another tab's answer by its history row, else claims no title", async () => {
+    const remote = { state: "working" as const, sid: "0190ffff-c3d4-7e5f-8a9b-000000000001" };
+    const unknown = setup("available", {}, remote);
     await flushPromises();
     expect(button(unknown.wrapper).attributes("data-state")).toBe("working");
     expect(tooltip(unknown.wrapper)).toBe("O2 Assistant, answering");

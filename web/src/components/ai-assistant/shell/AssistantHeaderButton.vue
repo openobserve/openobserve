@@ -185,14 +185,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import type { AssistantSession, GateReason } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
 import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 
-export type HeaderButtonState = "loading" | "hidden" | "idle" | "open" | "locked" | "off";
+export type HeaderButtonState =
+  "loading" | "hidden" | "idle" | "open" | "working" | "needs_you" | "unread" | "locked" | "off";
 
 /** Hidden turns raise one quiet toast; the header region is the one speaker, so the toast is silent. */
 export const HEADER_TOAST_MS = 6_000;
+
+const AT_REST: ReadonlySet<string> = new Set(["idle", "done", "failed", "refused", "stopped"]);
 
 interface HeaderView {
   state: HeaderButtonState;
@@ -208,6 +212,10 @@ interface HeaderView {
 function needsYou(session: AssistantSession): boolean {
   const state = session.turn.state;
   return state === "awaiting_approval" || state === "awaiting_consent" || !!session.pendingApproval;
+}
+
+function isRunning(session: AssistantSession): boolean {
+  return !AT_REST.has(session.turn.state);
 }
 </script>
 
@@ -301,13 +309,16 @@ const lockedGate = computed<GateReason>(() =>
   capability.gate.value === "off_for_org" ? "off_for_org" : "no_permission",
 );
 
-// A chat another tab or device lights may be known only by its history row.
-function titleOf(sid: string | null): I18nText {
-  const session = sid ? store.state.sessions[sid] : undefined;
+// A chat another tab or device lights may be known only by its history row; else no title is claimed.
+function knownTitle(sid: string | null): I18nText | null {
+  if (!sid) return null;
+  const session = store.state.sessions[sid];
   if (session) return session.title ?? t("assistant.thread.newChatTitle");
-  return (
-    history.rows.value.find((row) => row.sid === sid)?.title ?? t("assistant.thread.newChatTitle")
-  );
+  return history.rows.value.find((row) => row.sid === sid)?.title ?? null;
+}
+
+function titleOf(sid: string | null): I18nText {
+  return knownTitle(sid) ?? t("assistant.thread.newChatTitle");
 }
 
 function plain(state: HeaderButtonState, name: I18nText, tooltip: I18nText): HeaderView {
@@ -358,76 +369,76 @@ function gateView(): HeaderView | null {
   return null;
 }
 
-// Chat activity never restyles the button; only the container and the gate do (owner decision).
 function lightView(): HeaderView {
   const light = store.headerLight.value;
+  if (light.state === "needs_you") return needsYouView(light.sid);
+  if (light.state === "working") return workingView(light.sid);
+  if (light.state === "unread") return unreadView(light.sid, light.failed);
+  if (light.state === "open" || visible.value) return openView();
+  const name = t("assistant.header.tooltip", { product });
+  return plain("idle", name, name);
+}
+
+function needsYouView(sid: string | null): HeaderView {
   const p = { product };
   const open = visible.value;
-  if (light.state === "needs_you") {
-    const waiting = runs.needsCount.value || mine.value.filter(needsYou).length;
-    const session = light.sid ? store.state.sessions[light.sid] : undefined;
-    const consent = session?.turn.state === "awaiting_consent" || !!session?.pendingConsent;
-    return {
-      ...plain(
-        "needs_you",
-        waiting > 0
-          ? t(
-              open
-                ? "assistant.header.needsYouCountNameOpen"
-                : "assistant.header.needsYouCountName",
-              { ...p, count: waiting },
-            )
-          : t(open ? "assistant.header.needsYouNameOpen" : "assistant.header.needsYouName", p),
-        consent ? t("assistant.turn.waitingConsent") : t("assistant.notice.decision"),
-      ),
-      signal: "attention",
-      ...(waiting > 0 && { count: waiting }),
-    };
-  }
-  if (light.state === "working") {
-    const running = mine.value.filter(isRunning).length;
-    const name = t(
-      open ? "assistant.header.answeringNameOpen" : "assistant.header.answeringName",
-      p,
-    );
-    const title = knownTitle(light.sid);
-    return {
-      ...plain(
-        "working",
-        name,
-        running > 1
-          ? t("assistant.header.stateRunningCount", { count: running }, running)
-          : title
-            ? t("assistant.header.stateWorking", { title })
-            : name,
-      ),
-      signal: "working",
-    };
-  }
-  if (light.state === "unread") {
-    const title = { title: titleOf(light.sid) };
-    return light.failed
-      ? {
-          ...plain(
-            "unread",
-            t("assistant.header.failedName", p),
-            t("assistant.header.stateFailed", title),
-          ),
-          signal: "failed",
-        }
-      : {
-          ...plain(
-            "unread",
-            t("assistant.header.readyName", p),
-            t("assistant.header.stateDone", title),
-          ),
-          signal: "unread",
-        };
-  }
-  const others = otherOrgView();
-  if (others) return others;
-  if (light.state === "open" || open) return openView();
-  return plain("idle", t("assistant.header.tooltip", p), t("assistant.header.tooltip", p));
+  const waiting = mine.value.filter(needsYou).length;
+  const session = sid ? store.state.sessions[sid] : undefined;
+  const consent = session?.turn.state === "awaiting_consent";
+  const name =
+    waiting > 0
+      ? t(open ? "assistant.header.needsYouCountNameOpen" : "assistant.header.needsYouCountName", {
+          ...p,
+          count: waiting,
+        })
+      : t(open ? "assistant.header.needsYouNameOpen" : "assistant.header.needsYouName", p);
+  return {
+    ...plain(
+      "needs_you",
+      name,
+      consent ? t("assistant.turn.waitingConsent") : t("assistant.notice.decision"),
+    ),
+    signal: "attention",
+    ...(waiting > 0 && { count: waiting }),
+  };
+}
+
+function workingView(sid: string | null): HeaderView {
+  const running = mine.value.filter(isRunning).length;
+  const name = t(
+    visible.value ? "assistant.header.answeringNameOpen" : "assistant.header.answeringName",
+    { product },
+  );
+  const title = knownTitle(sid);
+  const tooltip =
+    running > 1
+      ? t("assistant.header.stateRunningCount", { count: running }, running)
+      : title
+        ? t("assistant.header.stateWorking", { title })
+        : name;
+  return { ...plain("working", name, tooltip), signal: "working" };
+}
+
+function unreadView(sid: string | null, failed: boolean): HeaderView {
+  const p = { product };
+  const title = { title: titleOf(sid) };
+  return failed
+    ? {
+        ...plain(
+          "unread",
+          t("assistant.header.failedName", p),
+          t("assistant.header.stateFailed", title),
+        ),
+        signal: "failed",
+      }
+    : {
+        ...plain(
+          "unread",
+          t("assistant.header.readyName", p),
+          t("assistant.header.stateDone", title),
+        ),
+        signal: "unread",
+      };
 }
 
 // The label names what a click does: close the sidebar, or bring windows-only users to a sidebar chat.
