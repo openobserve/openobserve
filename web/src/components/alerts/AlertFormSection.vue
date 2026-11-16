@@ -18,8 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, provide } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
 import { ALERT_SECTIONS, type AlertSectionId } from "./alertFormSections";
 
@@ -30,18 +28,12 @@ const props = defineProps<{
   title: I18nText;
   /** One sentence under the title. */
   help: I18nText;
-  /** False while another section is in view: its step buttons hide so only one pair shows. */
-  current?: boolean;
 }>();
-
-const emit = defineEmits<{ go: [id: AlertSectionId] }>();
 
 const { t } = useI18nTyped();
 const total = ALERT_SECTIONS.length;
 const def = computed(() => ALERT_SECTIONS.find((section) => section.id === props.id));
 const icon = computed(() => def.value?.icon);
-const previous = computed(() => ALERT_SECTIONS[props.index - 2]);
-const next = computed(() => ALERT_SECTIONS[props.index]);
 
 provide(SETTING_ROW_BARE_KEY, true);
 </script>
@@ -53,7 +45,7 @@ provide(SETTING_ROW_BARE_KEY, true);
     class="max-lg:border-border-default flex flex-col max-lg:border-b max-lg:last:border-b-0 [&_[data-snap-stop]]:scroll-mt-24"
   >
     <header
-      class="bg-surface-base sticky top-0 z-1 flex items-start gap-3 px-5 pt-4 pb-3 max-lg:static max-lg:z-auto max-lg:pt-3 max-md:px-4"
+      class="bg-surface-base sticky top-0 z-1 flex items-start gap-3 px-4 pt-4 pb-3 max-lg:static max-lg:z-auto max-lg:pt-3"
     >
       <span
         v-if="icon"
@@ -82,38 +74,9 @@ provide(SETTING_ROW_BARE_KEY, true);
           {{ help }}
         </p>
       </div>
-      <OButton
-        v-if="previous"
-        class="shrink-0 max-md:hidden"
-        :class="current === false && 'invisible'"
-        variant="primary"
-        size="icon-circle-lg"
-        icon-left="arrow-upward"
-        :aria-label="t('alerts.sections.back', { title: t(previous.navKey) })"
-        :data-test="`add-alert-section-${id}-prev`"
-        @click="emit('go', previous.id)"
-      >
-        <OTooltip side="left" :content="t('alerts.sections.back', { title: t(previous.navKey) })" />
-      </OButton>
     </header>
-    <div class="flex flex-1 flex-col px-5 pb-4 max-md:px-4 xl:pe-16">
+    <div class="flex flex-1 flex-col px-4 pb-4">
       <slot />
-      <div
-        v-if="next"
-        class="mt-auto flex justify-end pt-4 max-md:hidden xl:sticky xl:bottom-4 xl:-me-11"
-        :class="current === false && 'invisible'"
-      >
-        <OButton
-          variant="primary"
-          size="icon-circle-lg"
-          icon-left="arrow-downward"
-          :aria-label="t('alerts.sections.next', { title: t(next.navKey) })"
-          :data-test="`add-alert-section-${id}-next`"
-          @click="emit('go', next.id)"
-        >
-          <OTooltip side="left" :content="t('alerts.sections.next', { title: t(next.navKey) })" />
-        </OButton>
-      </div>
     </div>
   </section>
 </template>

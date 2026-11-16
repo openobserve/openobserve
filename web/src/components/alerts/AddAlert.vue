@@ -293,11 +293,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <AlertFormSection
             id="watch"
-            :current="activeSection === 'watch'"
             :index="1"
             :title="t('alerts.sections.watch.title')"
             :help="t('alerts.sections.watch.help')"
-            @go="goToSection"
           >
             <OSettingRow
               :label="t('alerts.sections.howItChecks')"
@@ -358,11 +356,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <AlertFormSection
             id="condition"
-            :current="activeSection === 'condition'"
             :index="2"
             :title="t('alerts.sections.condition.title')"
             :help="t('alerts.sections.condition.help')"
-            @go="goToSection"
           >
             <div data-test="add-alert-query-card" data-snap-stop>
               <CompositeAlertForm
@@ -512,11 +508,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <AlertFormSection
             id="notify"
-            :current="activeSection === 'notify'"
             :index="3"
             :title="t('alerts.sections.notify.title')"
             :help="t('alerts.sections.notify.help')"
-            @go="goToSection"
           >
             <div class="flex flex-col" data-snap-stop>
               <div
@@ -563,11 +557,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <AlertFormSection
             id="schedule"
-            :current="activeSection === 'schedule'"
             :index="4"
             :title="t('alerts.sections.schedule.title')"
             :help="t('alerts.sections.schedule.help')"
-            @go="goToSection"
           >
             <div class="flex flex-col" data-snap-stop>
               <div
@@ -598,11 +590,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <AlertFormSection
             id="details"
-            :current="activeSection === 'details'"
             :index="5"
             :title="t('alerts.sections.details.title')"
             :help="t('alerts.sections.details.help')"
-            @go="goToSection"
           >
             <div class="flex flex-col" data-snap-stop>
               <OSettingRow
@@ -863,6 +853,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ viaIncidentLine(t, 1) }}
           </p>
+        </div>
+        <div class="flex items-center gap-1.5 max-md:hidden" data-test="add-alert-step-nav">
+          <OButton
+            variant="primary"
+            size="icon-circle"
+            icon-left="arrow-upward"
+            :disabled="!previousSection"
+            :aria-label="stepNavLabel(previousSection, 'back')"
+            data-test="add-alert-step-prev"
+            @click="previousSection && goToSection(previousSection.id)"
+          >
+            <OTooltip side="top" :content="stepNavLabel(previousSection, 'back')" />
+          </OButton>
+          <OButton
+            variant="primary"
+            size="icon-circle"
+            icon-left="arrow-downward"
+            :disabled="!nextSection"
+            :aria-label="stepNavLabel(nextSection, 'next')"
+            data-test="add-alert-step-next"
+            @click="nextSection && goToSection(nextSection.id)"
+          >
+            <OTooltip side="top" :content="stepNavLabel(nextSection, 'next')" />
+          </OButton>
         </div>
         <OButton
           data-test="add-alert-cancel-btn"
@@ -1484,6 +1498,23 @@ export default defineComponent({
       visitedSections.value = new Set([...visitedSections.value, left]);
     });
 
+    const activeIndex = computed(() =>
+      ALERT_SECTIONS.findIndex((section) => section.id === activeSection.value),
+    );
+    const previousSection = computed(() => ALERT_SECTIONS[activeIndex.value - 1]);
+    const nextSection = computed(() => ALERT_SECTIONS[activeIndex.value + 1]);
+    const stepNavLabel = (
+      section: (typeof ALERT_SECTIONS)[number] | undefined,
+      direction: "back" | "next",
+    ) => {
+      const t = alertForm.t;
+      if (!section) return t(direction === "back" ? "common.previous" : "common.next");
+      const title = t(section.navKey);
+      return direction === "back"
+        ? t("alerts.sections.back", { title })
+        : t("alerts.sections.next", { title });
+    };
+
     // Creating walks forward, so Next holds the one primary action until the last step.
     const guidesToNext = computed(
       () =>
@@ -1963,6 +1994,9 @@ export default defineComponent({
       snapScrollRef,
       activeSection,
       goToSection,
+      previousSection,
+      nextSection,
+      stepNavLabel,
       ALERT_SECTIONS,
       guidesToNext,
       sectionTargets,
