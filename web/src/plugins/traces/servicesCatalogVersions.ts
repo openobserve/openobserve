@@ -108,13 +108,18 @@ export function catalogPanelRow<
     where_key?: string;
     infer_service_name?: string;
     infer_service_type?: string;
+    infer_service_system?: string;
   },
->(rows: T[], service: string, where: string, kind = "") {
+>(rows: T[], service: string, where: string, kind = "", system?: string) {
   // A kind names a dependency row, which can share its name with an instrumented service.
   const own = rows.filter(
     (row) =>
       row.service_name === service &&
-      (kind ? row.infer_service_name && row.infer_service_type === kind : !row.infer_service_name),
+      (kind
+        ? row.infer_service_name &&
+          row.infer_service_type === kind &&
+          (system === undefined || (row.infer_service_system || "") === system)
+        : !row.infer_service_name),
   );
   return (
     own.find((row) => (row.where_key || "") === where) ??

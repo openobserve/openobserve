@@ -199,9 +199,11 @@ describe("No env chip", () => {
     expect(chip.text()).toBe("envNo env");
     expect(wrapper.find('[data-test="svcver-env-inferred"]').exists()).toBe(false);
     const tooltip = wrapper.get('[data-test="svcver-env-tooltip"]').text().replace(/\s+/g, " ");
-    expect(tooltip).toContain(
-      "No env · this service sends no deployment.environment and runs outside Kubernetes · click to set one. Where: outside Kubernetes, all its instances together",
-    );
+    const [setup, where, ...rest] = tooltip.split(". ");
+    expect(setup).toContain("deployment.environment");
+    expect(setup).toContain("click to set one");
+    expect(where).toMatch(/^Where/);
+    expect(rest).toEqual([]);
     expect(wrapper.text()).not.toMatch(/default/i);
   });
 

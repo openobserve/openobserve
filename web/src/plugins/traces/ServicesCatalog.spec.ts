@@ -3028,6 +3028,45 @@ describe("ServicesCatalog", () => {
       ).toHaveLength(3);
     });
 
+    it("reopens the clicked one of two same-named dependencies from its panel link", async () => {
+      config.isEnterprise = "true";
+      const registry = vi.spyOn(serviceVersionsService, "services").mockResolvedValue({
+        data: { services: [], envs: [], verdict_status: "ok", registry_status: "ok" },
+      } as any);
+      const orders = { service_name: "orders", _infer_service_name: "orders" };
+      mockHits([
+        {
+          ...orders,
+          _infer_service_system: "postgresql",
+          _infer_service_type: "database",
+          total_requests: 14212,
+        },
+        {
+          ...orders,
+          _infer_service_system: "mysql",
+          _infer_service_type: "database",
+          total_requests: 14078,
+        },
+      ]);
+      try {
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+        wrapper.vm.handleRowClick(
+          wrapper.vm.services.find((row: any) => row.infer_service_system === "mysql"),
+        );
+        const [{ query }] = mockRouterPush.mock.calls.at(-1)!;
+        wrapper.unmount();
+        setRouteQuery(query);
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+        expect(wrapper.vm.selectedServiceRow?.infer_service_system).toBe("mysql");
+      } finally {
+        setRouteQuery({});
+        registry.mockRestore();
+        config.isEnterprise = "false";
+      }
+    });
+
     function mockBatches(batches: any[][]) {
       mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
         for (const hits of batches) {

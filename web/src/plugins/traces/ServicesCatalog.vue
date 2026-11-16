@@ -1772,7 +1772,7 @@ watch(
       }
       return;
     }
-    const row = catalogPanelRow(rows, state.service, state.where, state.kind);
+    const row = catalogPanelRow(rows, state.service, state.where, state.kind, state.system);
     if (row) {
       selectedServiceRow.value = row;
       showSidePanel.value = true;
@@ -1787,7 +1787,13 @@ function routedRow(row: ServiceRow) {
 function handleRowClick(row: ServiceRow) {
   if (versionsEnabled && routedRow(row)) {
     void (row.infer_service_name
-      ? panelRoute.open(row.service_name, "", "operations", row.infer_service_type)
+      ? panelRoute.open(
+          row.service_name,
+          "",
+          "operations",
+          row.infer_service_type,
+          row.infer_service_system || "",
+        )
       : panelRoute.open(row.service_name, row.where_key || ""));
     return;
   }

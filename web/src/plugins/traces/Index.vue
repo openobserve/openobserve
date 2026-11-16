@@ -2514,7 +2514,13 @@ watch(
     if (stream === searchObj.data.stream.selectedStream.value) return;
     if (!searchObj.data.stream.streamLists.some((s: any) => s.value === stream)) return;
     searchObj.data.stream.selectedStream = { label: stream, value: stream };
-    void extractFields();
+    // A stream switch clears the query, so undoing it brings back the query its entry was left with.
+    const query = router.currentRoute.value.query.query;
+    searchObj.data.editorValue = typeof query === "string" ? b64DecodeUnicode(query) || "" : "";
+    void extractFields().then(() => {
+      if (searchObj.data.editorValue && searchObj.data.stream.selectedStreamFields.length)
+        restoreFilters(searchObj.data.editorValue);
+    });
   },
 );
 
