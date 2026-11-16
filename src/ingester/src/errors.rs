@@ -15,6 +15,7 @@
 
 use std::{io, path::PathBuf};
 
+use config::utils::size::bytes_to_human_readable;
 use snafu::Snafu;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -126,8 +127,19 @@ pub enum Error {
     },
     #[snafu(display("MemoryTableOverflowError"))]
     MemoryTableOverflowError {},
-    #[snafu(display("MemoryCircuitBreakerError"))]
-    MemoryCircuitBreakerError {},
+    #[snafu(display(
+        "MemoryCircuitBreakerError: memory usage {}, trips above {} ({ratio}% of total), releases below {} ({release_ratio}%)",
+        bytes_to_human_readable(*rss as f64),
+        bytes_to_human_readable(*trip as f64),
+        bytes_to_human_readable(*release as f64)
+    ))]
+    MemoryCircuitBreakerError {
+        rss: usize,
+        trip: usize,
+        release: usize,
+        ratio: usize,
+        release_ratio: usize,
+    },
     #[snafu(display("DiskCircuitBreakerError"))]
     DiskCircuitBreakerError {},
     ExternalError {
@@ -143,7 +155,7 @@ impl Error {
             Error::WalError {
                 source: wal::Error::WriteQueueFull { .. }
             } | Error::MemoryTableOverflowError {}
-                | Error::MemoryCircuitBreakerError {}
+                | Error::MemoryCircuitBreakerError { .. }
                 | Error::DiskCircuitBreakerError {}
         )
     }
@@ -177,9 +189,16 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_circuit_breaker_error_display() {
-        let e = Error::MemoryCircuitBreakerError {};
-        assert_eq!(e.to_string(), "MemoryCircuitBreakerError");
+    fn test_memory_circuit_breaker_error_is_overload() {
+        let e = Error::MemoryCircuitBreakerError {
+            rss: 0,
+            trip: 0,
+            release: 0,
+            ratio: 90,
+            release_ratio: 80,
+        };
+        assert!(e.is_overload());
+        assert!(e.to_string().starts_with("MemoryCircuitBreakerError: "));
     }
 
     #[test]

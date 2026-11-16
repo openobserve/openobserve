@@ -144,7 +144,9 @@ impl FlightService for FlightServiceImpl {
                 log::error!(
                     "[trace_id {trace_id}] flight->search: do_get physical plan generate error: {e:?}",
                 );
-                return Err(Status::internal(e.to_string()));
+                return Err(e
+                    .to_unavailable_status()
+                    .unwrap_or_else(|| Status::internal(e.to_string())));
             }
         };
 
