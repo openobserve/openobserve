@@ -838,6 +838,7 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { useListViewState } from "@/composables/useListViewState";
 import { serviceHealthFromErrorRate, type ServiceHealthStatus } from "@/utils/traces/serviceHealth";
+import { serviceKeySql } from "@/utils/serviceCount";
 
 const { t, locale } = useI18nTyped();
 const placeholderLine = (name: string) => {
@@ -1236,7 +1237,7 @@ const selectedServiceNode = computed(() => {
   const current = envServices.value.find((row) => row.id === selected.id);
   const node = {
     id: selected.id,
-    name: selected.service_name,
+    name: current?.service_name ?? selected.service_name,
     service_type: selected.infer_service_type,
   };
   // A picked place with no row here is scoped by the route, so the kept row's Health would describe another place.
@@ -1916,12 +1917,15 @@ function redAggregates(pred: string): string {
 
 function catalogSql(streamName: string, flags: StreamSchemaFlags): string {
   const requestPred = requestPredicate(flags.hasParentColumn);
+  // Spellings of one service share a registry key, so they are one row named by one of its spellings.
+  const key = serviceKeySql("service_name");
   if (!flags.hasInferColumns) {
     return `SELECT
-  service_name,
+  MIN(service_name) AS service_name,
 ${redAggregates(requestPred)}
 FROM "${streamName}"
-GROUP BY service_name
+GROUP BY
+  ${key}
 ORDER BY total_requests DESC`;
   }
   // infer_service_name is only set on CLIENT and PRODUCER spans (traces/inferred.rs).
@@ -1932,13 +1936,13 @@ ORDER BY total_requests DESC`;
   const systemExpr = flags.hasInferSystemColumn ? inferredColumn("infer_service_system") : null;
   const typeExpr = flags.hasInferTypeColumn ? inferredColumn("infer_service_type") : null;
   const groupBy = [
-    "COALESCE(NULLIF(infer_service_name, ''), service_name)",
+    `COALESCE(NULLIF(infer_service_name, ''), ${key})`,
     "NULLIF(infer_service_name, '')",
     systemExpr,
     typeExpr,
   ].filter((expr): expr is string => expr !== null);
   return `SELECT
-  COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
+  MIN(service_name) AS service_name,
   NULLIF(infer_service_name, '') AS _infer_service_name,
   ${systemExpr ?? "NULL"} AS _infer_service_system,
   ${typeExpr ?? "NULL"} AS _infer_service_type,
@@ -2202,7 +2206,6 @@ async function loadServicesCatalog() {
   if (flags.hasWhereColumn) {
     sql = sql
       .replace("SELECT\n", "SELECT\n  o2_service_where AS where_key,\n")
-      .replace("GROUP BY service_name", "GROUP BY o2_service_where, service_name")
       .replace("GROUP BY\n", "GROUP BY\n  o2_service_where,\n");
   }
 
@@ -2258,8 +2261,8 @@ async function loadServicesCatalog() {
         ) {
           const hits: any[] = response.content?.results?.hits ?? [];
           for (const hit of hits) {
-            const name = hit.service_name ?? "";
             const inferredName = hit._infer_service_name ?? undefined;
+            const name = inferredName ?? hit.service_name ?? "";
             const inferredSystem = hit._infer_service_system ?? undefined;
             const inferredType = hit._infer_service_type ?? undefined;
             const id = JSON.stringify([

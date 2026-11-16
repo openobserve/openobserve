@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { bySignalOrder, serviceNameCount, serviceValueCount } from "./serviceCount";
+import { bySignalOrder, serviceKey, serviceNameCount, serviceValueCount } from "./serviceCount";
 
 describe("serviceNameCount", () => {
   it("counts one service per display name, falling back to the key", () => {
@@ -66,6 +66,30 @@ describe("bySignalOrder", () => {
       "traces",
       "alerts",
       "rum",
+    ]);
+  });
+});
+
+describe("serviceKey", () => {
+  it("folds spellings of one service the way the backend's service_key does", () => {
+    expect(
+      [
+        " Checkout ",
+        "checkout.service",
+        "CHECKOUT.Socket",
+        "checkout .target",
+        "a.service.service",
+        ".service",
+        "checkout.services",
+      ].map(serviceKey),
+    ).toEqual([
+      "checkout",
+      "checkout",
+      "checkout",
+      "checkout",
+      "a.service",
+      ".service",
+      "checkout.services",
     ]);
   });
 });

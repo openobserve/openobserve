@@ -1,5 +1,5 @@
 <template>
-  <OContent as="section" y class="flex flex-col gap-3" data-test="svcver-versions-tab">
+  <OContent as="section" y class="flex flex-col gap-3" data-test="svcver-versions-panel">
     <p
       v-if="!enabled || denied"
       data-test="svcver-panel-denied"

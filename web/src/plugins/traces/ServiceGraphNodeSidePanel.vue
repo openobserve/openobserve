@@ -1321,9 +1321,10 @@ export default defineComponent({
         (versionsTabScope.value.service === name ? versionsTabScope.value.where : "")
       );
     });
+    // A row with no version text records unstamped spans, not a version.
     const scopedVersions = computed(() =>
       (panelVersions.data.value?.versions || []).filter(
-        (row) => row.where_key === versionsWhere.value,
+        (row) => row.version && row.where_key === versionsWhere.value,
       ),
     );
     // Before the tab picks, the count takes the place it will open on, so the badge does not wait for the tab.
@@ -1335,7 +1336,7 @@ export default defineComponent({
     const versionCount = computed(
       () =>
         (panelVersions.data.value?.versions || []).filter(
-          (row) => row.where_key === countWhere.value,
+          (row) => row.version && row.where_key === countWhere.value,
         ).length,
     );
     const headerIdentity = computed(

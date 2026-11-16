@@ -1719,6 +1719,8 @@ describe("ServiceGraphNodeSidePanel", () => {
             { version: "2.0", active: true, first_seen: 2 },
             { version: "1.0", active: false, first_seen: 1 },
             { version: "9.9", active: true, first_seen: 3, where_key: "k8s:c2/web" },
+            // Spans with no version stamp register a row that is not a version.
+            { version: "", active: true, first_seen: 4 },
           ].map((row) => ({
             version_key: row.version,
             where_key: "k8s:c1/web",

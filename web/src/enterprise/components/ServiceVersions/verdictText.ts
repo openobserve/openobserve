@@ -101,7 +101,13 @@ export function noVerdict(
 }
 /** The one no-verdict sentence for a compare, from the shared no-verdict helper. */
 export function noVerdictSentence(reason: NoVerdict, context: NoVerdictContext, t: TranslateFn) {
-  return noVerdictText(context.tracking, t, undefined, scopeFlag(reason, context));
+  return noVerdictText(
+    context.tracking,
+    t,
+    undefined,
+    scopeFlag(reason, context),
+    reason === "no_data",
+  );
 }
 /** The baseline rule a no-verdict compare names when it has no baseline, in the words of its sentence. */
 export function noVerdictBaselineRule(

@@ -417,7 +417,13 @@
           >
         </div>
         <section
-          v-if="!restricted && selectedSignal === 'traces' && result.traces && !sectionError"
+          v-if="
+            !restricted &&
+            !noEvidence &&
+            selectedSignal === 'traces' &&
+            result.traces &&
+            !sectionError
+          "
           class="rounded-surface border-border-default bg-surface-panel flex flex-col gap-1 border px-3 py-2.5"
           data-test="svcver-overlay"
         >

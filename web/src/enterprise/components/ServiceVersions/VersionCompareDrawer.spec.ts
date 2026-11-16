@@ -895,8 +895,11 @@ describe("no-verdict states", () => {
     data.arms.b = { ...data.arms.b, has_rollup: false };
     data.traces = { status: "insufficient", requests: { a: 0, b: 0, rate_a: 0, rate_b: 0 } };
     const wrapper = render(data, [row("v1", "k1"), row("v2", "k2")], [], { tracking });
-    expect(wrapper.get('[data-test="svcver-no-verdict"]').text()).toContain("warmingUp");
+    expect(wrapper.get('[data-test="svcver-no-verdict"]').text()).toContain(
+      "serviceVersions.sentence.noData",
+    );
     expect(wrapper.find('[data-test="svcver-summary-tiles"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="svcver-overlay"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("requestsPair");
   });
   it("keeps a real zero from rollup rows as a count", () => {

@@ -33921,7 +33921,8 @@
       "rollbackRecoveredBare": "Rolled back to {version} from {from} · recovered.",
       "rollbackStillWorseBare": "Rolled back to {version} from {from} · still worse.",
       "preExistingSince": "Running before deploy tracking started ({epoch}); verdicts start with the next deploy",
-      "okImproved": "OK · {n} requests"
+      "okImproved": "OK · {n} requests",
+      "noData": "Not enough data yet. Version metrics have not reached this window."
     },
     "evidence": {
       "traces": "Traces",

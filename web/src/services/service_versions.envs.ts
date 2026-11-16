@@ -20,12 +20,16 @@ export function isInferredSource(source: string | undefined) {
   return INFERRED_SOURCES.includes(source || "");
 }
 
+/** True when an inferred env names no env: the default source, or a literal the backend reads as none. */
+export function isNoEnvValue(value: string, source?: string) {
+  return source === "default" || NO_ENV_LITERALS.includes(value.trim().toLowerCase());
+}
+
 /** The memberships the backend filters and counts a scope by, null for No env (label_env_entries). */
 export function envEntries(scope: EnvSet): (string | null)[] {
   const envs = scope.envs?.length ? scope.envs : [scope.env ?? ""];
   // Only the pinned env carries its own flag; an override of a literal "default" stays a real env.
-  const absent = (env: string) =>
-    env === scope.env ? Boolean(scope.no_env) : NO_ENV_LITERALS.includes(env.trim().toLowerCase());
+  const absent = (env: string) => (env === scope.env ? Boolean(scope.no_env) : isNoEnvValue(env));
   return [...new Set(envs.map((env) => (absent(env) ? null : env)))];
 }
 

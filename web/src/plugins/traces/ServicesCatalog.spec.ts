@@ -230,6 +230,7 @@ import ServicesCatalog from "./ServicesCatalog.vue";
 import config from "@/aws-exports";
 import serviceVersionsService from "@/services/service_versions";
 import { catalogFilterEmptyText, healthWithheld } from "./servicesCatalogVersions";
+import { serviceKeySql } from "@/utils/serviceCount";
 import { gt } from "@/types/i18n";
 
 // ---------------------------------------------------------------------------
@@ -1876,7 +1877,7 @@ describe("ServicesCatalog", () => {
               results: {
                 hits: [
                   {
-                    service_name: "sso",
+                    service_name: "web",
                     _infer_service_name: "sso",
                     _infer_service_type: "database",
                     _infer_service_system: "mysql",
@@ -2322,7 +2323,7 @@ describe("ServicesCatalog", () => {
       expect(requests).toContain(ROOT_ARM);
       expect(selectItem(sql, "error_count")).toContain(INFER_ARM);
       expect(sql.split("GROUP BY")[1]).toContain(
-        "COALESCE(NULLIF(infer_service_name, ''), service_name)",
+        `COALESCE(NULLIF(infer_service_name, ''), ${serviceKeySql("service_name")})`,
       );
       expect(sql.replace(/FILTER \(WHERE/g, "")).not.toContain("WHERE");
     });
@@ -2402,7 +2403,7 @@ describe("ServicesCatalog", () => {
       expect(sql).not.toContain("NULLIF(infer_service_type");
       const groupBy = sql.split("GROUP BY")[1].split("ORDER BY")[0];
       expect(groupBy.trim().split(",\n")).toEqual([
-        "COALESCE(NULLIF(infer_service_name, ''), service_name)",
+        `COALESCE(NULLIF(infer_service_name, ''), ${serviceKeySql("service_name")})`,
         "  NULLIF(infer_service_name, '')",
       ]);
     });

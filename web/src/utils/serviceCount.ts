@@ -16,6 +16,10 @@
 import { qualifiedName } from "@/types/serviceRef";
 
 const SIGNAL_ORDER = ["logs", "metrics", "traces"];
+const SERVICE_UNITS = ["service", "socket", "target", "slice"];
+// One pattern serves TS and SQL so both fold alike; [\s\S] spans newlines in both engines without a flag.
+const SERVICE_KEY_PATTERN = `^\\s*(?:([\\s\\S]*?\\S)\\s*\\.(?:${SERVICE_UNITS.join("|")})|([\\s\\S]*?))\\s*$`;
+const SERVICE_KEY_RE = new RegExp(SERVICE_KEY_PATTERN);
 
 interface NamedRecord {
   service_name: string;
@@ -26,6 +30,16 @@ interface NamedRecord {
 /** The service a discovered record belongs to: its display name, kept apart from a same-named one by its qualifier. */
 export function serviceIdentityOf(record: NamedRecord) {
   return qualifiedName(record.display_name || record.service_name, record.display_qualifier);
+}
+
+/** The name the service registries match by (backend service_key): trimmed, lowercased, one unit suffix off. */
+export function serviceKey(name: string) {
+  return name.toLowerCase().replace(SERVICE_KEY_RE, "$1$2");
+}
+
+/** serviceKey as a SQL expression over a span column, so a search groups every spelling of a service together. */
+export function serviceKeySql(column: string) {
+  return `regexp_replace(lower(${column}), '${SERVICE_KEY_PATTERN}', '\\1\\2')`;
 }
 
 /** Services as a reader counts them in the discovered list: two detected keys of one qualified trace service count once. */
