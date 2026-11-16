@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "Схема, определённая пользователем",
     "allFieldsLabel": "Все поля",
     "nlQueryGenerationFailed": "Не удалось сгенерировать запрос. Пожалуйста, попробуйте снова.",
-    "askAIPlaceholder": "Попросите AI помочь с запросом...",
-    "askAIFunctionPlaceholder": "Попросите AI помочь с функцией...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: помощь с запросом...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: помощь с функцией...",
     "askAIPlaceholderRotation": {
       "one": "Покажи ошибки за последний час…",
       "two": "Найти медленные запросы, выполняющиеся более 5 секунд…",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "Граф сервисов",
     "services": "Каталог сервисов",
     "aiObservability": "ИИ",
-    "aiAssistant": "ИИ-ассистент",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "Выйти",
     "ingestion": "Источники данных",
     "metrics": "Метрики",
@@ -3983,7 +3983,7 @@
           "note": "Автоматизированные операции и аналитика SRE"
         },
         "ai_assistant": {
-          "name": "Ассистент O2",
+          "name": "@:{'brand.askAutobot'}",
           "note": "Интеллектуальная помощь в запросах и анализе"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "Функция VRL",
     "jsFunctionHint": "Используйте объект `row` для доступа к полям лога и их изменения. Пример: row.new_field = row.existing_field + ' processed';",
     "vrlFunctionHint": "Используйте `.` для представления текущего события. Пример: .new_field = .existing_field + ' processed'",
-    "askAIFunctionPlaceholder": "Попросите ИИ помочь с вашей функцией...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: помощь с функцией...",
     "enterFunctionPrompt": "Введите подсказку для создания функции",
     "associatedFunctionHeader": "Связанные функции",
     "enrichmentTables": "Таблицы обогащения",
@@ -6491,7 +6491,7 @@
       "rbac": "Создавайте пользовательские роли с детальными правами для вашей команды.",
       "logPatterns": "Автоматически находите повторяющиеся паттерны в логах вместо построчного чтения.",
       "correlation": "Переходите от строки лога сразу к связанным метрикам и трейсам.",
-      "aiAssistant": "Попросите ИИ написать запросы и объяснить ваши данные простым языком.",
+      "aiAssistant": "@:{'brand.askAutobot'}: напишите запросы и объясните данные простым языком.",
       "alertInsights": "Смотрите, как часто срабатывает оповещение, и сразу замечайте связанные оповещения.",
       "anomalyDetection": "Автоматически выявляйте необычное поведение метрик, прежде чем оно вызовет пороговое оповещение.",
       "agentGraph": "Смотрите, как ваши ИИ-агенты и инструменты вызывают друг друга, в виде графа.",
@@ -10359,9 +10359,9 @@
     "recentEvents": "Недавние события",
     "investigate": "Расследовать →",
     "askAi": {
-      "label": "Спросить ИИ",
-      "hint": "Спросить ИИ об этом",
-      "labelFor": "Спросить ИИ про {item}",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: спросить об этом",
+      "labelFor": "@:{'brand.askAutobot'}: спросить про {item}",
       "chip": {
         "firing": "Сработавшие оповещения",
         "failing": "Правила со сбоями",
@@ -10569,7 +10569,7 @@
     "viewInTarget": "Просмотреть в {target}",
     "viewTarget": "Просмотреть {target}",
     "welcome": {
-      "taglineHighlight": "O2 Assistant",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "Или попробуйте один из этих"
     },
     "capabilities": {
@@ -10622,7 +10622,7 @@
       "unexpectedError": "Непредвиденная ошибка",
       "toolExecutionFailed": "Ошибка выполнения инструмента",
       "errorOccurred": "Произошла ошибка",
-      "navigateConfirmQuestion": "Разрешить O2 Assistant переходить по страницам?",
+      "navigateConfirmQuestion": "Разрешить @:{'brand.autobot'} переходить по страницам?",
       "confirmToolExecution": "Подтвердить выполнение {tool}?",
       "entity": {
         "alert": "оповещение",
@@ -10727,7 +10727,7 @@
     "aiExhaustedMessage": "Оформите подписку, чтобы продолжать использовать ИИ. Дальнейшее использование будет включено в счёт этой организации.",
     "aiContractExhaustedMessage": "Свяжитесь с вашим менеджером по работе с клиентами, чтобы добавить больше AI кредитов",
     "aiPayerSubscribeMessage": "Биллингом этой организации управляет {payer}. Попросите администратора {payer} оформить подписку; дальнейшее использование будет включено в его счёт.",
-    "aiUsedByFeature": "Ассистент и генерация запросов: {chat} · Анализ инцидентов: {incident} · Повторный анализ: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} и генерация запросов: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Повторный анализ: {reanalysis}",
     "aiPaygMessage": "Бесплатные кредиты исчерпаны — использование выставляется по подписке",
     "billingGroup": {
       "tabLabel": "Группа выставления счетов",
@@ -11898,14 +11898,14 @@
       "eventsAndCommentsAppearHere": "События и комментарии появятся здесь",
       "scrollToTop": "Прокрутить вверх",
       "scrollToBottom": "Прокрутить вниз",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "ИИ-анализ",
         "analyze": "Анализировать",
-        "analyzeTooltip": "Запустить ИИ SRE-анализ этого инцидента",
-        "rcaDisabled": "RCA отключён",
-        "rcaOff": "RCA выкл.",
-        "noAiSreFor": "Нет ИИ SRE для уровня {severity}",
+        "analyzeTooltip": "Запустить анализ @:{'brand.autobotInvestigate'} для этого инцидента",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} отключён",
+        "rcaOff": "@:{'brand.autobotInvestigate'} выкл.",
+        "noAiSreFor": "Нет @:{'brand.autobotInvestigate'} для уровня {severity}",
         "investigating": "Расследование",
         "rerunElapsed": "повторный запуск · {elapsed}",
         "noUpdateFor": "нет обновлений {elapsed}",
@@ -12015,7 +12015,7 @@
       "rcaCancelFailed": "Не удалось отменить анализ",
       "rcaFailed": "Сбой AI-анализа",
       "rcaBlocked": "Анализ ИИ не выполнялся",
-      "rcaFailedGeneric": "Не удалось выполнить RCA-анализ",
+      "rcaFailedGeneric": "Не удалось выполнить анализ @:{'brand.autobotInvestigate'}",
       "rcaRetry": "Повторить анализ",
       "rcaCopy": "Копировать отчёт",
       "rcaCopied": "Отчёт скопирован в буфер обмена",
@@ -12130,7 +12130,7 @@
         "loadingReport": "Загрузка отчёта…",
         "reportAfterRun": "Отчёт появится после запуска.",
         "noAnalysisTitle": "Анализа пока нет",
-        "noAnalysisText": "ИИ-агент SRE проверяет оповещения этого инцидента, топологию, недавние изменения, трейсы, логи и метрики, а затем составляет отчёт. Пока он работает, вы можете следить за ходом в ветке расследования.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} проверяет оповещения этого инцидента, топологию, недавние изменения, трейсы, логи и метрики, а затем составляет отчёт. Пока он работает, вы можете следить за ходом в ветке расследования.",
         "stageOf": "Этап {index}/{count} · {stage}",
         "cancelRun": "Отменить запуск",
         "followInThread": "Следить в ветке",
@@ -16104,7 +16104,7 @@
         "range": "{band} · {window}",
         "filter": "Фильтровать по выделению",
         "drillDown": "Детализировать",
-        "askAi": "Спросить ИИ",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "Выделение на тепловой карте · выбран {count} спан | Выделение на тепловой карте · выбрано спанов: {count}",
         "clear": "Снять выделение"
       }
@@ -16310,8 +16310,8 @@
     "criticalPath": "Критический путь",
     "askAi": {
       "explainTrace": "Объяснить трейс",
-      "explainTraceHint": "Спросите ИИ о самых медленных спанах на критическом пути и обо всех спанах с ошибками",
-      "askAboutSpan": "Спросить ИИ об этом спане",
+      "explainTraceHint": "@:{'brand.askAutobot'}: спросить о самых медленных спанах на критическом пути и обо всех спанах с ошибками",
+      "askAboutSpan": "@:{'brand.askAutobot'}: спросить об этом спане",
       "spanChip": "Спан · {operation}",
       "traceChip": "Трейс · {operation}"
     },
@@ -25061,13 +25061,13 @@
       "subtitle": "Производительность и состояние запросов в ваших базах данных"
     },
     "ai": {
-      "suggestFix": "Спросите ИИ, как это исправить",
-      "suggestFixHint": "Открывает ИИ-ассистента с этим запросом, его движком и показателями задержки и спрашивает, что изменить. Сам он ничего не меняет.",
-      "rowSuggestFix": "Спросите ИИ, как это исправить",
+      "suggestFix": "@:{'brand.askAutobot'}: как это исправить",
+      "suggestFixHint": "Открывает @:{'brand.autobot'} с этим запросом, его движком и показателями задержки и спрашивает, что изменить. Сам он ничего не меняет.",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: как это исправить",
       "deadlockFix": "Как остановить эту взаимоблокировку?",
-      "deadlockFixHint": "Отправляет оба конфликтующих запроса и доказательства порядка строк ИИ-ассистенту.",
+      "deadlockFixHint": "Отправляет оба конфликтующих запроса и доказательства порядка строк в @:{'brand.autobot'}.",
       "blockingFix": "Почему это блокирует?",
-      "blockingFixHint": "Отправляет оператор корневой сессии, время её простоя и количество сессий, ожидающих позади неё, ИИ-ассистенту."
+      "blockingFixHint": "Отправляет оператор корневой сессии, время её простоя и количество сессий, ожидающих позади неё, в @:{'brand.autobot'}."
     },
     "filters": {
       "allEngines": "Все движки",
@@ -26773,8 +26773,8 @@
     "removeStep": "Удалить шаг",
     "channels": "Каналы",
     "policySaved": "Политика сохранена",
-    "verdictTitle": "Вердикт ИИ SRE",
-    "reportTitle": "Что обнаружил ИИ SRE",
+    "verdictTitle": "Вердикт @:{'brand.autobot'}",
+    "reportTitle": "Что обнаружил @:{'brand.autobot'}",
     "l0P1Lead": "Оповещать немедленно.",
     "l0P1Desc": "ИИ-анализ выполняется параллельно — критичные вызовы никогда не задерживаются.",
     "l0P4Lead": "Только ИИ-анализ.",
@@ -26794,7 +26794,7 @@
     "l0MaxLevelsOption": "до {count} уровня | до {count} уровней",
     "l0ParallelSentence": "вызов отправляется сразу; агент работает параллельно",
     "l0OnlySentence": "агент расследует; этот приоритет вызывает оповещение только если так задано в ваших уровнях",
-    "l0OffSentence": "ИИ SRE не запускается; вызов ведёт себя точно так же, как без ИИ-триажа",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} не запускается; вызов ведёт себя точно так же, как без ИИ-триажа",
     "l0BudgetRange": "От 30 до 600 секунд — сервер отклоняет значения вне этого диапазона, а не ограничивает их",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Подавить вызов",
@@ -26821,7 +26821,7 @@
     "eventKind_page": "Вызов",
     "eventKind_ack": "Подтверждение",
     "eventKind_note": "Заметка",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "Передача дежурства",
     "eventKind_recovery": "Восстановление",
     "eventKind_state": "Состояние",
@@ -27483,7 +27483,7 @@
     "ladderAddStep": "Добавить шаг",
     "ladderRightNow": "Прямо сейчас это",
     "ladderSameLadder": "та же лестница",
-    "ladderL0Off": "Без ИИ SRE",
+    "ladderL0Off": "Без @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "Лестница так и не узнала о ротациях",
     "ladderStaleDefaultHint": "Каждый уровень вызывает всю команду, но у этой команды есть ротации — лестница была создана ещё до их появления. Добавление или удаление участника заново применяет настройку по умолчанию, либо отредактируйте лестницу вручную один раз.",
     "reachShortNoSmtp": "только email · нет SMTP-транспорта",
@@ -27819,7 +27819,7 @@
     "consentStillRequired": "Платное использование включено не во всех требуемых организациях.",
     "updateFailed": "Не удалось обновить платное использование ИИ. Попробуйте ещё раз.",
     "declinedNotice": "Платное использование ИИ отключено, поэтому этот запрос не был отправлен.",
-    "consentScope": "Действует для всей организации: ассистент, генерация запросов и анализ инцидентов. Вы можете отключить это в любое время на странице «Планы».",
+    "consentScope": "Действует для всей организации: @:{'brand.askAutobot'}, генерация запросов и анализ инцидентов. Вы можете отключить это в любое время на странице «Планы».",
     "managePaidUsage": "Включить платное использование",
     "modePayAsYouGo": "Оплата по мере использования",
     "modeConsentRequired": "Требуется согласие",
@@ -28400,7 +28400,7 @@
         "auth_test": "Токен бота",
         "last_event": "События",
         "sockets": "Сокеты",
-        "agent": "ИИ-ассистент",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "Тестовое сообщение"
       },
       "connectedOrgs": "Подключённые организации",

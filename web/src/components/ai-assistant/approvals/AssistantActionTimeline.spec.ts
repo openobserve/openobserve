@@ -25,6 +25,10 @@ import { raw } from "@/types/i18n";
 import AssistantActionTimeline from "./AssistantActionTimeline.vue";
 import { assistantApprovalsHostKey } from "./approvals.types";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const entry = (over: Partial<ActionLedgerEntry> = {}): ActionLedgerEntry => ({
   id: "c9:0",
   approvalId: "c9",
@@ -137,7 +141,7 @@ describe("AssistantActionTimeline", () => {
     expect(wrapper.get("button").text()).toContain("1 action in this chat");
     await expand(wrapper);
     const row = wrapper.get('[data-test="assistant-action-entry-unreviewed"]');
-    expect(row.text()).toContain("The assistant changed 2 alerts without a review step.");
+    expect(row.text()).toContain(`${brandNames.autobot} changed 2 alerts without a review step.`);
     expect(row.text()).toContain("No review step");
     expect(row.find("button").exists()).toBe(false);
   });

@@ -13,11 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import i18n from "@/locales";
 import { raw, type I18nText } from "@/types/i18n";
 
-const PRODUCT_NAME = "O2 Assistant";
-
-/** The product name as the `{product}` value; the only place the literal lives in code (`95` §10.2). */
+/** The product name as the `{product}` value, the en-US brand value. */
 export function useAssistantName(): { product: I18nText } {
-  return { product: raw(PRODUCT_NAME) };
+  return { product: raw(i18n.global.t("brand.autobot")) };
 }

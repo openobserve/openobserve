@@ -222,7 +222,7 @@ html.theme-switching *::after {
   }
 }
 
-/* O2 Assistant motion, named in assistantMotion.ts; reduced motion is a 200 ms fade with no sweep, wave or spin. */
+/* Assistant motion, named in assistantMotion.ts; reduced motion is a 200 ms fade with no sweep, wave or spin. */
 @property --assistant-sweep-angle {
   syntax: "<angle>";
   inherits: false;

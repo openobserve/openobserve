@@ -23,6 +23,10 @@ import { fakeAssistant } from "../__tests__/fakeAssistant";
 import { keepForkSeed } from "../shared/forkMemory";
 import AssistantForkSource from "./AssistantForkSource.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake, api } = vi.hoisted(() => ({
   fake: { current: null as any },
   api: { getShared: vi.fn() },
@@ -149,7 +153,7 @@ describe("AssistantForkSource", () => {
     const wrapper = mountSource(session());
     await flushPromises();
     expect(at(wrapper, "assistant-fork-source-seed-lost").text()).toContain(
-      "The shared chat is no longer available, so the assistant won't have its earlier messages.",
+      `The shared chat is no longer available, so ${brandNames.autobot} won't have its earlier messages.`,
     );
     await at(wrapper, "assistant-fork-source-send-anyway").trigger("click");
     expect(at(wrapper, "assistant-fork-source-seed-lost").exists()).toBe(false);

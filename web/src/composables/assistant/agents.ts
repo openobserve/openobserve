@@ -160,12 +160,16 @@ export function agentReason(
   return t(key, { time: raw(formatOrgTime(agent.checkedAt)) });
 }
 
-/** Name prefix or id, so `@inv`, `@sre` and `@query` find their row and the purpose never does. */
+/** Prefix of the name, of any word in it, or of the id, so `@inv`, `@sre` and `@query` find their row and the purpose never does. */
 export function agentMatches(id: AgentId, name: string, query: string): boolean {
   const typed = query.trim().toLowerCase();
   if (!typed) return true;
   const label = name.toLowerCase();
-  return label.startsWith(typed) || id.startsWith(typed);
+  return (
+    label.startsWith(typed) ||
+    label.split(/\s+/).some((word) => word.startsWith(typed)) ||
+    id.startsWith(typed)
+  );
 }
 
 function lastTurnAgent(messages: ChatMessage[]): AgentId | null {

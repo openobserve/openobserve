@@ -27,6 +27,10 @@ import {
   useRcaFollow,
 } from "@/components/ai-assistant/shell/rcaFollow";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake, lg, closers, shortcuts, track, deep } = vi.hoisted(() => ({
   deep: { blocked: null as null | "no_permission" | "off_for_org" },
   fake: { current: null as any },
@@ -280,7 +284,7 @@ describe("AssistantSidebarHost", () => {
     expect(track).toHaveBeenCalledWith("ai_container_closed", { reason: "escape" });
     expect(
       document.body.querySelector('[data-test="assistant-container-status"]')?.textContent,
-    ).toContain("O2 Assistant closed.");
+    ).toContain(`${brandNames.autobot} closed.`);
     expect(document.activeElement?.getAttribute("data-test")).toBe("door");
   });
 
@@ -378,7 +382,7 @@ describe("AssistantSidebarHost", () => {
     expect(document.activeElement).toBe(sheetRoot()!.querySelector("[data-assistant-composer]"));
     expect(
       sheetRoot()!.querySelector('[data-test="assistant-status-region"]')?.textContent,
-    ).toContain("O2 Assistant opened.");
+    ).toContain(`${brandNames.autobot} opened.`);
   });
 
   it("shows the title in the peek row", async () => {
@@ -422,7 +426,7 @@ describe("AssistantSidebarHost", () => {
     await flushPromises();
     closeLockedPanel();
     await flushPromises();
-    expect(status()).toContain("O2 Assistant closed.");
+    expect(status()).toContain(`${brandNames.autobot} closed.`);
     expect(document.activeElement).toBe(outside);
   });
 });

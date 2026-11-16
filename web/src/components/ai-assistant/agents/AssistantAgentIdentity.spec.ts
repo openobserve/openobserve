@@ -20,6 +20,10 @@ import { raw } from "@/types/i18n";
 
 import AssistantAgentIdentity from "./AssistantAgentIdentity.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const mark = (w: ReturnType<typeof mount>) => w.get('[data-test="assistant-mark"]');
 
 describe("AssistantAgentIdentity", () => {
@@ -27,7 +31,9 @@ describe("AssistantAgentIdentity", () => {
     const w = mount(AssistantAgentIdentity, {
       props: { size: "meta", agent: "sre", time: raw("10:02") },
     });
-    expect(w.get('[data-test="assistant-agent-identity-name"]').text()).toBe("Investigator");
+    expect(w.get('[data-test="assistant-agent-identity-name"]').text()).toBe(
+      `${brandNames.autobotInvestigate}`,
+    );
     expect(w.get('[data-test="assistant-agent-identity-time"]').text()).toBe("10:02");
     expect(mark(w).attributes("aria-hidden")).toBe("true");
   });
@@ -48,7 +54,9 @@ describe("AssistantAgentIdentity", () => {
       "Query builder·Needs your approval",
     );
     const bare = mount(AssistantAgentIdentity, { props: { size: "header", agent: "sre" } });
-    expect(bare.get('[data-test="assistant-agent-identity-line"]').text()).toBe("Investigator");
+    expect(bare.get('[data-test="assistant-agent-identity-line"]').text()).toBe(
+      `${brandNames.autobotInvestigate}`,
+    );
   });
 
   it("keeps the agent in the compact form's accessible name", () => {
@@ -56,7 +64,7 @@ describe("AssistantAgentIdentity", () => {
       props: { size: "compact", agent: "sre", title: raw("Checkout 5xx") },
     });
     expect(w.get('[data-test="assistant-agent-identity"]').attributes("aria-label")).toBe(
-      "Checkout 5xx, Investigator",
+      `Checkout 5xx, ${brandNames.autobotInvestigate}`,
     );
     expect(mark(w).attributes("data-size")).toBe("xs");
   });

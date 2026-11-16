@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "사용자 정의 스키마",
     "allFieldsLabel": "모든 필드",
     "nlQueryGenerationFailed": "쿼리를 생성하지 못했습니다.다시 시도해 주세요.",
-    "askAIPlaceholder": "AI에게 문의에 도움을 요청하세요...",
-    "askAIFunctionPlaceholder": "함수 작성에 대해 AI에게 도움을 요청하세요...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: 쿼리 작성 도움 받기...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: 함수 작성 도움 받기...",
     "askAIPlaceholderRotation": {
       "one": "지난 한 시간 동안 발생한 오류를 보여주세요...",
       "two": "5초 이상 걸리는 느린 쿼리 찾기...",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "서비스 그래프",
     "services": "서비스 카탈로그",
     "aiObservability": "AI",
-    "aiAssistant": "AI 어시스턴트",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "로그아웃",
     "ingestion": "데이터 소스",
     "metrics": "메트릭",
@@ -3983,7 +3983,7 @@
           "note": "자동화된 SRE 운영 및 인사이트"
         },
         "ai_assistant": {
-          "name": "O2 Assistant",
+          "name": "@:{'brand.askAutobot'}",
           "note": "지능형 쿼리 및 분석 지원"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "VRL 함수",
     "jsFunctionHint": "`row` 객체를 사용하여 로그 필드에 액세스하고 수정합니다. 예: row.new_field = row.existing_field + ' processed';",
     "vrlFunctionHint": "`.`을 사용하여 현재 이벤트를 나타냅니다. 예: .new_field = .existing_field + ' processed'",
-    "askAIFunctionPlaceholder": "함수 작성에 대해 AI에게 도움을 요청하세요...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: 함수 작성 도움 받기...",
     "enterFunctionPrompt": "함수 생성 프롬프트 입력",
     "associatedFunctionHeader": "관련 함수",
     "enrichmentTables": "보강 테이블",
@@ -6491,7 +6491,7 @@
       "rbac": "팀을 위한 세분화된 권한의 사용자 정의 역할을 생성합니다.",
       "logPatterns": "한 줄씩 읽지 않고도 반복되는 로그 패턴을 자동으로 찾아냅니다.",
       "correlation": "로그 라인에서 관련 메트릭과 트레이스로 바로 이동합니다.",
-      "aiAssistant": "AI 어시스턴트에게 쿼리 작성을 요청하고 데이터를 쉬운 말로 설명받으세요.",
+      "aiAssistant": "@:{'brand.askAutobot'}: 쿼리 작성을 요청하고 데이터를 쉬운 말로 설명받으세요.",
       "alertInsights": "알림이 얼마나 자주 발생하는지 확인하고 연관된 알림을 한눈에 파악합니다.",
       "anomalyDetection": "임계값 알림이 발생하기 전에 비정상적인 메트릭 동작을 자동으로 감지합니다.",
       "agentGraph": "AI 에이전트와 도구가 서로를 호출하는 방식을 그래프로 시각화하여 확인합니다.",
@@ -10359,9 +10359,9 @@
     "recentEvents": "최근 이벤트",
     "investigate": "조사 →",
     "askAi": {
-      "label": "AI에게 질문",
-      "hint": "AI에게 이 항목 질문",
-      "labelFor": "AI에게 {item} 질문",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: 이 항목 질문",
+      "labelFor": "@:{'brand.askAutobot'}: {item} 질문",
       "chip": {
         "firing": "발생 중인 알림",
         "failing": "실패한 규칙",
@@ -10569,7 +10569,7 @@
     "viewInTarget": "{target}에서 보기",
     "viewTarget": "{target} 보기",
     "welcome": {
-      "taglineHighlight": "O2 어시스턴트",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "또는 다음 중 하나를 시도해 보십시오."
     },
     "capabilities": {
@@ -10622,7 +10622,7 @@
       "unexpectedError": "예기치 않은 오류 발생",
       "toolExecutionFailed": "도구 실행 실패",
       "errorOccurred": "오류 발생",
-      "navigateConfirmQuestion": "O2 Assistant의 탐색을 허용하시겠습니까?",
+      "navigateConfirmQuestion": "@:{'brand.autobot'}의 탐색을 허용하시겠습니까?",
       "confirmToolExecution": "{tool} 실행을 확인하시겠습니까?",
       "entity": {
         "alert": "알림",
@@ -10727,7 +10727,7 @@
     "aiExhaustedMessage": "AI를 계속 사용하려면 구독하세요. 추가 사용량은 이 조직의 청구서로 청구됩니다.",
     "aiContractExhaustedMessage": "추가 AI 크레딧을 원하시면 계정 관리자에게 문의하세요.",
     "aiPayerSubscribeMessage": "이 조직의 요금 청구는 {payer}에서 관리합니다. {payer}의 관리자에게 구독을 요청하세요. 추가 사용량은 해당 청구서로 청구됩니다.",
-    "aiUsedByFeature": "어시스턴트 및 쿼리 생성: {chat} · 인시던트 분석: {incident} · 재분석: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} 및 쿼리 생성: {chat} · @:{'brand.autobotInvestigate'}: {incident} · 재분석: {reanalysis}",
     "aiPaygMessage": "무료 크레딧 소진 — 사용량이 구독에 청구됨",
     "billingGroup": {
       "tabLabel": "결제 그룹",
@@ -11898,14 +11898,14 @@
       "eventsAndCommentsAppearHere": "이벤트와 댓글이 여기에 표시됩니다",
       "scrollToTop": "맨 위로 스크롤",
       "scrollToBottom": "맨 아래로 스크롤",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "AI 분석",
         "analyze": "분석",
-        "analyzeTooltip": "이 인시던트에 대한 AI SRE 분석을 시작합니다",
-        "rcaDisabled": "RCA 비활성화됨",
-        "rcaOff": "RCA 꺼짐",
-        "noAiSreFor": "{severity}에 대한 AI SRE가 없습니다",
+        "analyzeTooltip": "이 인시던트에 대한 @:{'brand.autobotInvestigate'} 분석을 시작합니다",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} 비활성화됨",
+        "rcaOff": "@:{'brand.autobotInvestigate'} 꺼짐",
+        "noAiSreFor": "{severity}에 대한 @:{'brand.autobotInvestigate'}이(가) 없습니다",
         "investigating": "조사 중",
         "rerunElapsed": "다시 실행 · {elapsed}",
         "noUpdateFor": "{elapsed} 동안 업데이트 없음",
@@ -12015,7 +12015,7 @@
       "rcaCancelFailed": "분석 취소에 실패했습니다",
       "rcaFailed": "AI 분석 실패",
       "rcaBlocked": "AI 분석이 실행되지 않았습니다",
-      "rcaFailedGeneric": "RCA 분석에 실패했습니다",
+      "rcaFailedGeneric": "@:{'brand.autobotInvestigate'} 분석에 실패했습니다",
       "rcaRetry": "분석 재시도",
       "rcaCopy": "보고서 복사",
       "rcaCopied": "보고서가 클립보드에 복사되었습니다",
@@ -12130,7 +12130,7 @@
         "loadingReport": "보고서 로드 중…",
         "reportAfterRun": "실행이 끝나면 보고서가 표시됩니다.",
         "noAnalysisTitle": "아직 분석이 없습니다",
-        "noAnalysisText": "AI SRE 에이전트가 이 인시던트의 알림, 토폴로지, 최근 변경 사항, 트레이스, 로그, 메트릭을 확인한 뒤 보고서를 작성합니다. 실행 중에는 조사 스레드에서 작업 내용을 따라갈 수 있습니다.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'}이(가) 이 인시던트의 알림, 토폴로지, 최근 변경 사항, 트레이스, 로그, 메트릭을 확인한 뒤 보고서를 작성합니다. 실행 중에는 조사 스레드에서 작업 내용을 따라갈 수 있습니다.",
         "stageOf": "단계 {index}/{count} · {stage}",
         "cancelRun": "실행 취소",
         "followInThread": "스레드에서 보기",
@@ -16104,7 +16104,7 @@
         "range": "{band} · {window}",
         "filter": "선택 항목으로 필터",
         "drillDown": "드릴다운",
-        "askAi": "AI에게 질문",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "히트맵 선택 · {count}개 스팬 | 히트맵 선택 · {count}개 스팬",
         "clear": "선택 지우기"
       }
@@ -16310,8 +16310,8 @@
     "criticalPath": "크리티컬 패스",
     "askAi": {
       "explainTrace": "트레이스 설명",
-      "explainTraceHint": "크리티컬 패스에서 가장 느린 스팬과 모든 오류 스팬에 대해 AI에게 질문하세요",
-      "askAboutSpan": "이 스팬에 대해 AI에게 질문",
+      "explainTraceHint": "@:{'brand.askAutobot'}: 크리티컬 패스에서 가장 느린 스팬과 모든 오류 스팬에 대해 질문하세요",
+      "askAboutSpan": "@:{'brand.askAutobot'}: 이 스팬에 대해 질문",
       "spanChip": "스팬 · {operation}",
       "traceChip": "트레이스 · {operation}"
     },
@@ -25061,13 +25061,13 @@
       "subtitle": "데이터베이스 전반의 쿼리 성능 및 상태"
     },
     "ai": {
-      "suggestFix": "AI에게 수정 방법 묻기",
-      "suggestFixHint": "AI 어시스턴트가 이 쿼리, 엔진 및 대기 시간 수치를 열어 무엇을 변경할지 묻습니다. 자체적으로는 아무것도 변경하지 않습니다.",
-      "rowSuggestFix": "AI에게 수정 방법 묻기",
+      "suggestFix": "@:{'brand.askAutobot'}: 수정 방법 묻기",
+      "suggestFixHint": "@:{'brand.autobot'}에서 이 쿼리, 엔진 및 대기 시간 수치를 열어 무엇을 변경할지 묻습니다. 자체적으로는 아무것도 변경하지 않습니다.",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: 수정 방법 묻기",
       "deadlockFix": "이 교착 상태를 어떻게 중지하나요?",
-      "deadlockFixHint": "충돌하는 두 명령문과 행 순서 증거를 AI 어시스턴트로 보냅니다.",
+      "deadlockFixHint": "충돌하는 두 명령문과 행 순서 증거를 @:{'brand.autobot'}(으)로 보냅니다.",
       "blockingFix": "이것이 왜 차단 중인가요?",
-      "blockingFixHint": "루트 세션의 명령문, 유휴 시간 및 뒤에 대기 중인 세션 수를 AI 어시스턴트로 보냅니다."
+      "blockingFixHint": "루트 세션의 명령문, 유휴 시간 및 뒤에 대기 중인 세션 수를 @:{'brand.autobot'}(으)로 보냅니다."
     },
     "filters": {
       "allEngines": "모든 엔진",
@@ -26773,8 +26773,8 @@
     "removeStep": "단계 제거",
     "channels": "채널",
     "policySaved": "정책이 저장되었습니다",
-    "verdictTitle": "AI SRE 판정",
-    "reportTitle": "AI SRE가 발견한 내용",
+    "verdictTitle": "@:{'brand.autobot'} 판정",
+    "reportTitle": "@:{'brand.autobot'}이(가) 발견한 내용",
     "l0P1Lead": "즉시 알림을 보냅니다.",
     "l0P1Desc": "AI 분석은 병렬로 실행됩니다 — 중요한 호출은 절대 지연되지 않습니다.",
     "l0P4Lead": "AI 분석만 수행합니다.",
@@ -26794,7 +26794,7 @@
     "l0MaxLevelsOption": "최대 {count}단계 | 최대 {count}단계",
     "l0ParallelSentence": "즉시 호출되며 에이전트는 동시에 조사를 진행합니다",
     "l0OnlySentence": "에이전트가 조사하며, 이 우선순위는 설정한 레벨에 따라서만 호출합니다",
-    "l0OffSentence": "AI SRE가 실행되지 않으며, 호출은 AI 트리아지 없이 이전과 동일하게 동작합니다",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'}이(가) 실행되지 않으며, 호출은 AI 트리아지 없이 이전과 동일하게 동작합니다",
     "l0BudgetRange": "30~600초 사이 — 서버는 이 범위를 벗어난 값을 조정하지 않고 거부합니다.",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "호출 억제",
@@ -26821,7 +26821,7 @@
     "eventKind_page": "호출",
     "eventKind_ack": "확인",
     "eventKind_note": "메모",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "인계",
     "eventKind_recovery": "복구",
     "eventKind_state": "상태",
@@ -27483,7 +27483,7 @@
     "ladderAddStep": "단계 추가",
     "ladderRightNow": "지금 담당은",
     "ladderSameLadder": "같은 래더",
-    "ladderL0Off": "AI SRE 없음",
+    "ladderL0Off": "@:{'brand.autobotInvestigate'} 없음",
     "ladderStaleDefaultTag": "래더가 로테이션을 한 번도 반영하지 못했습니다",
     "ladderStaleDefaultHint": "모든 단계에서 팀 전체를 호출하지만, 이 팀에는 로테이션이 있습니다. 이 래더는 로테이션이 생기기 전에 만들어진 것입니다. 멤버를 추가하거나 삭제하면 기본값이 다시 실행되고, 아니면 래더를 직접 한 번 편집하세요.",
     "reachShortNoSmtp": "이메일만 · SMTP 미구성",
@@ -27819,7 +27819,7 @@
     "consentStillRequired": "필요한 모든 조직에서 유료 사용이 활성화되지 않았습니다.",
     "updateFailed": "유료 AI 사용을 업데이트하지 못했습니다. 다시 시도하세요.",
     "declinedNotice": "유료 AI 사용이 꺼져 있어 이 요청이 전송되지 않았습니다.",
-    "consentScope": "전체 조직에 적용됩니다: 어시스턴트, 쿼리 생성, 인시던트 분석. 플랜 페이지에서 언제든 끌 수 있습니다.",
+    "consentScope": "전체 조직에 적용됩니다: @:{'brand.askAutobot'}, 쿼리 생성, 인시던트 분석. 플랜 페이지에서 언제든 끌 수 있습니다.",
     "managePaidUsage": "유료 사용 켜기",
     "modePayAsYouGo": "종량제",
     "modeConsentRequired": "승인 필요",
@@ -28400,7 +28400,7 @@
         "auth_test": "봇 토큰",
         "last_event": "이벤트",
         "sockets": "소켓",
-        "agent": "AI 어시스턴트",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "테스트 게시"
       },
       "connectedOrgs": "연결된 조직",

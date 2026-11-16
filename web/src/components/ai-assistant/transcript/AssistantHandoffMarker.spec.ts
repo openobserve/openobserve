@@ -18,13 +18,17 @@ import { describe, expect, it } from "vitest";
 
 import AssistantHandoffMarker from "./AssistantHandoffMarker.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const base = { agent: "sre", questions: 2, answers: 2 } as const;
 
 describe("AssistantHandoffMarker", () => {
   it("names the agent and the time, and keeps the disclosure closed", () => {
     const w = mount(AssistantHandoffMarker, { props: { ...base, at: 1_000 } });
     expect(w.get('[data-test="assistant-handoff-label"]').text()).toContain(
-      "Handed to Investigator by you ·",
+      `Handed to ${brandNames.autobotInvestigate} by you ·`,
     );
     expect(w.get('[data-test="assistant-handoff-given"]').attributes("aria-expanded")).toBe(
       "false",
@@ -35,7 +39,7 @@ describe("AssistantHandoffMarker", () => {
   it("drops the time it does not have", () => {
     const w = mount(AssistantHandoffMarker, { props: base });
     expect(w.get('[data-test="assistant-handoff-label"]').text()).toBe(
-      "Handed to Investigator by you",
+      `Handed to ${brandNames.autobotInvestigate} by you`,
     );
   });
 

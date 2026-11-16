@@ -27,6 +27,10 @@ import { raw } from "@/types/i18n";
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantComposer from "../composer/AssistantComposer.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake } = vi.hoisted(() => ({ fake: { current: null as any } }));
 
 vi.mock("@/composables/assistant", async (importOriginal) => ({
@@ -84,17 +88,17 @@ afterEach(() => {
 describe("@agent through the real composer (MULTI-AGENT-02)", () => {
   it("removes the token, adds no chip, sets the agent and speaks only the agent's sentence", async () => {
     const { store, sid, field, status } = setup();
-    await typeAndChoose(field, "why @inv");
+    await typeAndChoose(field, "why @sre");
     const session = store.state.sessions[sid];
     expect(session.composer.text.trim()).toBe("why");
     expect(session.composer.chips).toHaveLength(0);
     expect(session.agentId).toBe("sre");
-    expect(status()).toBe("Investigator will answer.");
+    expect(status()).toBe(`${brandNames.autobotInvestigate} will answer.`);
   });
 
   it("lets a second mention replace the first", async () => {
     const { store, sid, field } = setup();
-    await typeAndChoose(field, "@inv");
+    await typeAndChoose(field, "@sre");
     await typeAndChoose(field, "@query");
     expect(store.state.sessions[sid].agentId).toBe("generate-query");
   });
@@ -109,11 +113,11 @@ describe("@agent through the real composer (MULTI-AGENT-02)", () => {
 
   it("leaves the text and the agent alone on Escape", async () => {
     const { store, sid, field } = setup();
-    await field.setValue("@inv");
+    await field.setValue("@sre");
     await flushPromises();
     await field.trigger("keydown", { key: "Escape" });
     await flushPromises();
-    expect(store.state.sessions[sid].composer.text).toBe("@inv");
+    expect(store.state.sessions[sid].composer.text).toBe("@sre");
     expect(store.state.sessions[sid].agentId).toBeUndefined();
   });
 });

@@ -47,6 +47,7 @@ vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
   import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
 );
 import AddRegexPattern from "./AddRegexPattern.vue";
+import en from "@/locales/languages/en-US.json";
 
 const drawer = {
   name: "ODrawer",
@@ -115,7 +116,7 @@ describe("AddRegexPattern with the revamped assistant", () => {
     const { wrapper, runtime } = await setup();
     expect(wrapper.findAll('[data-test="ai-entry-regex-ask"]')).toHaveLength(1);
     expect(wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]').exists()).toBe(false);
-    expect(wrapper.text()).not.toContain("Try O2 Assistant");
+    expect(wrapper.text()).not.toContain(`Try ${en.brand.autobot}`);
     expect(runtime.hosts.get("regex")?.language).toBe("regex");
   });
 

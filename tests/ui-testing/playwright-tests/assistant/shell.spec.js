@@ -3,6 +3,7 @@
 
 import { test, expect } from "@playwright/test";
 import { AssistantPage } from "../../pages/assistantPage.js";
+import { BRAND } from "../../utils/brand.js";
 
 // Playwright compiles a static import to require(), which would load the .mjs harness as CommonJS; import() keeps it ESM.
 const loadHarness = () => import("./harness/setup.mjs");
@@ -60,7 +61,7 @@ test.describe("assistant shell", () => {
     await page.keyboard.press("Control+i");
     await expect(assistant.sidebar).toBeVisible();
     await expect(assistant.composer()).toBeFocused();
-    await expect(assistant.sidebar.locator('[data-test="assistant-status-region"]')).toHaveText("O2 Assistant opened.");
+    await expect(assistant.sidebar.locator('[data-test="assistant-status-region"]')).toHaveText(`${BRAND.autobot} opened.`);
   });
 
   test("SHELL-02 row-door variant: Escape hands focus back to the cell whose toolbar holds the door", { tag: ["@mock", "@responsive"] }, async ({
@@ -93,7 +94,7 @@ test.describe("assistant shell", () => {
     await expect(assistant.headerButton).toHaveAttribute("data-state", "open");
     await expect(assistant.headerButton).toHaveAttribute(
       "aria-label",
-      "Close O2 Assistant",
+      `Close ${BRAND.autobot}`,
     );
     // The header button's tooltip stays open under a resting pointer and covers the thread header.
     await page.mouse.move(0, 0);
@@ -110,7 +111,7 @@ test.describe("assistant shell", () => {
     await expect(assistant.headerButton).toBeFocused();
     await expect(
       page.locator('[data-test="assistant-container-status"]'),
-    ).toHaveText("O2 Assistant closed.");
+    ).toHaveText(`${BRAND.autobot} closed.`);
     await expect(assistant.headerButton).toHaveAttribute("data-state", "idle");
   });
 
@@ -120,17 +121,17 @@ test.describe("assistant shell", () => {
     await gotoLogs(page);
     await assistant.open("header");
     await expect(assistant.welcome).toHaveAttribute("data-test", "assistant-shell-empty");
-    await expect(assistant.welcome).toHaveText("O2 Assistant");
+    await expect(assistant.welcome).toHaveText(BRAND.askAutobot);
     await expect(
       assistant.sidebar.locator('[data-test="assistant-thread-logo"]'),
     ).toBeVisible();
     await expect(assistant.sidebar).toHaveAttribute(
       "aria-label",
-      "O2 Assistant",
+      BRAND.askAutobot,
     );
     await expect(
       assistant.sidebar.locator('[data-test="assistant-shell-close"]'),
-    ).toHaveAttribute("aria-label", "Close O2 Assistant");
+    ).toHaveAttribute("aria-label", `Close ${BRAND.autobot}`);
     const aiRequests = await page.evaluate(
       () => window.__o2mock.requests.length,
     );
@@ -152,7 +153,7 @@ test.describe("assistant shell", () => {
     ).toBeVisible();
     await expect(page).toHaveTitle("OpenObserve - Home");
     const landmarks = page.locator(
-      'aside[aria-label="O2 Assistant"], [role="region"][aria-label="O2 Assistant"]',
+      `aside[aria-label="${BRAND.askAutobot}"], [role="region"][aria-label="${BRAND.askAutobot}"]`,
     );
     await expect(landmarks.filter({ visible: true })).toHaveCount(1);
     await expect(assistant.headerButton).toHaveAttribute("data-state", "open");
@@ -170,13 +171,13 @@ test.describe("assistant shell", () => {
     const sheet = assistant.sheet;
     await expect(sheet).toHaveAttribute("role", "dialog");
     await expect(sheet).toHaveAttribute("aria-modal", "false");
-    await expect(sheet).toHaveAttribute("aria-label", "O2 Assistant");
+    await expect(sheet).toHaveAttribute("aria-label", BRAND.askAutobot);
     await expect(sheet).toHaveAttribute("data-snap", "half");
     const focusedInside = () =>
       page.evaluate(() => !!document.activeElement?.closest("[data-assistant-root]"));
     await expect.poll(focusedInside).toBe(true);
     await expect(assistant.composer()).toBeFocused();
-    await expect(sheet.locator('[data-test="assistant-status-region"]')).toHaveText("O2 Assistant opened.");
+    await expect(sheet.locator('[data-test="assistant-status-region"]')).toHaveText(`${BRAND.autobot} opened.`);
     const handle = sheet.locator('[data-test="assistant-shell-sheet-handle"]');
     await handle.focus();
     await page.keyboard.press("ArrowDown");
@@ -262,7 +263,7 @@ test.describe("assistant shell", () => {
     await assistant.composer().press("Escape");
     await expect(assistant.sidebar).toBeHidden();
     await expect(page.locator('[data-test="assistant-container-status"]')).toHaveText(
-      "O2 Assistant closed. Still answering in the background.",
+      `${BRAND.autobot} closed. Still answering in the background.`,
     );
     await expect(assistant.headerButton).toHaveAttribute("data-state", "working");
     expect(await page.evaluate(() => (window.__o2mock.cancels || []).length)).toBe(0);

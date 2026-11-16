@@ -21,6 +21,10 @@ import type { AgentId, CapabilityAgent } from "@/composables/assistant";
 import { fakeAssistant, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantLauncherAgent from "./AssistantLauncherAgent.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake } = vi.hoisted(() => ({ fake: { current: null as any } }));
 
 vi.mock("@/composables/assistant", async (importOriginal) => ({
@@ -85,7 +89,7 @@ describe("AssistantLauncherAgent", () => {
 
   it("is a context chip naming the default agent, with no ✕ and a hint on hover", () => {
     const wrapper = setup();
-    expect(chip(wrapper).text()).toBe("O2 Assistant");
+    expect(chip(wrapper).text()).toBe(`${brandNames.autobot}`);
     expect(chip(wrapper).attributes("data-agent")).toBe("o2-ai");
     expect(chip(wrapper).element.tagName).toBe("BUTTON");
     expect(wrapper.find('[data-test="assistant-context-chip-remove"]').exists()).toBe(false);
@@ -94,7 +98,7 @@ describe("AssistantLauncherAgent", () => {
 
   it("lists one radio row per agent, checks the current one, and says why one is locked", () => {
     const wrapper = setup(ROSTER, "sre");
-    expect(chip(wrapper).text()).toBe("Investigator");
+    expect(chip(wrapper).text()).toBe(`${brandNames.autobotInvestigate}`);
     expect(wrapper.findAll('[role="menuitemradio"]')).toHaveLength(3);
     expect(option(wrapper, "sre").attributes("aria-checked")).toBe("true");
     expect(option(wrapper, "o2-ai").attributes("aria-checked")).toBe("false");

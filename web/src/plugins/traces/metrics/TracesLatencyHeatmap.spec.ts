@@ -73,6 +73,7 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
 
 import { chartColor } from "@/utils/chartTheme";
 import TracesLatencyHeatmap from "./TracesLatencyHeatmap.vue";
+import en from "@/locales/languages/en-US.json";
 
 const search = vi.mocked(searchService.search);
 
@@ -992,7 +993,7 @@ describe("TracesLatencyHeatmap", () => {
       it("hands the selection to AI, then closes the menu and erases the box", async () => {
         wrapper = await mountAttached({ aiEnabled: true });
         await drawBox();
-        expect(el("ask-ai")!.textContent!.trim()).toBe("Ask AI");
+        expect(el("ask-ai")!.textContent!.trim()).toBe(en.brand.askAutobot);
         expect(el("ask-ai")!.querySelector("img")).not.toBeNull();
         await choose("ask-ai");
         expect(wrapper.emitted("ask-ai")).toEqual([

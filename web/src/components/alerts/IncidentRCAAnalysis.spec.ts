@@ -66,6 +66,7 @@ import {
   sec,
 } from "@/test/unit/fixtures/rcaThread";
 import type { RcaRunSummary, RcaSteering, RcaThread } from "@/services/incidents";
+import en from "@/locales/languages/en-US.json";
 
 const steerRca = vi.mocked(incidentsService.steerRca);
 
@@ -254,7 +255,7 @@ describe("IncidentRCAAnalysis", () => {
       wrapper = mountPanel({ rca: null });
 
       expect(byTest(wrapper, "trigger-rca-btn").attributes("disabled")).toBeDefined();
-      expect(reasonOf("trigger-rca-btn")).toBe("RCA disabled");
+      expect(reasonOf("trigger-rca-btn")).toBe(`${en.brand.autobotInvestigate} disabled`);
     });
 
     it("a past run stays readable while Re-analyze locks", async () => {

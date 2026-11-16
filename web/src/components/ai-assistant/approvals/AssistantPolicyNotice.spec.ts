@@ -24,6 +24,10 @@ vi.mock("@/services/assistantAnalytics", () => ({ trackAssistant: track }));
 import { fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantPolicyNotice from "./AssistantPolicyNotice.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const routes = [
   { path: "/alerts/:alert_id", name: "alertDetail", component: {} },
   { path: "/dashboards", name: "dashboards", component: {} },
@@ -50,7 +54,9 @@ describe("AssistantPolicyNotice", () => {
     });
     const notice = wrapper.get('[data-test="assistant-permission-denied"]');
     expect(notice.text()).toContain("Blocked by policy: o2_UpdateAlert. Writes are off.");
-    expect(notice.text()).toContain("An admin can allow it in Settings › Assistant › Permissions.");
+    expect(notice.text()).toContain(
+      `An admin can allow it in Settings › ${brandNames.askAutobot} › Permissions.`,
+    );
     expect(track).toHaveBeenCalledWith("ai_policy_notice", { kind: "permission_denied" });
   });
 
@@ -59,7 +65,9 @@ describe("AssistantPolicyNotice", () => {
       policy: { kind: "denied", tool: "bash", policy: "auto_reject" },
     });
     expect(wrapper.text()).toContain("Blocked by policy: bash.");
-    expect(wrapper.text()).toContain("Auto-declined by the assistant's safety settings");
+    expect(wrapper.text()).toContain(
+      `Auto-declined by the safety settings of ${brandNames.autobot}`,
+    );
   });
 
   it("surfaces a change made without a review step, with the object in a new tab", () => {
@@ -71,7 +79,7 @@ describe("AssistantPolicyNotice", () => {
       },
     });
     const notice = wrapper.get('[data-test="assistant-unreviewed-change"]');
-    expect(notice.text()).toContain("The assistant changed 1 alert without a review step.");
+    expect(notice.text()).toContain(`${brandNames.autobot} changed 1 alert without a review step.`);
     const open = wrapper.get('[data-test="assistant-unreviewed-change-open"]');
     expect(open.text()).toBe("See what changed");
     expect(open.attributes("aria-label")).toBe("See what changed (opens in a new tab)");
@@ -87,7 +95,9 @@ describe("AssistantPolicyNotice", () => {
         policy: { kind: "unreviewed", resourceType: "dashboard", count: 3 },
       },
     });
-    expect(wrapper.text()).toContain("The assistant changed 3 dashboards without a review step.");
+    expect(wrapper.text()).toContain(
+      `${brandNames.autobot} changed 3 dashboards without a review step.`,
+    );
     expect(
       wrapper.get('[data-test="assistant-unreviewed-change-open"]').attributes("href"),
     ).toContain("/dashboards");

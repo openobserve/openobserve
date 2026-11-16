@@ -22,6 +22,10 @@ import { runEscapeLadder } from "@/composables/assistant";
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantWindow from "./AssistantWindow.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake, lg, track } = vi.hoisted(() => ({
   fake: { current: null as any },
   lg: { value: true },
@@ -120,7 +124,7 @@ describe("AssistantWindow", () => {
     const el = dialog(wrapper);
     expect(el.attributes("role")).toBe("dialog");
     expect(el.attributes("aria-modal")).toBe("false");
-    expect(el.attributes("aria-label")).toContain("O2 Assistant");
+    expect(el.attributes("aria-label")).toContain(`${brandNames.autobot}`);
     expect(el.attributes("data-assistant-window")).toBe(sid);
     expect(wrapper.get('[data-test="assistant-shell-window"]').attributes("data-sid")).toBe(sid);
     expect(vars(wrapper)).toEqual([65.5, 23.5, 24, 36]);

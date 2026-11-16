@@ -26,6 +26,10 @@ import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant"
 import AssistantHeaderButton from "./AssistantHeaderButton.vue";
 import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake, openAssistant, track, toast, lg } = vi.hoisted(() => ({
   lg: { value: true },
   fake: { current: null as any },
@@ -113,8 +117,10 @@ describe("AssistantHeaderButton gates", () => {
     const { wrapper } = setup("not_entitled");
     const el = button(wrapper);
     expect(el.attributes("data-state")).toBe("locked");
-    expect(el.attributes("aria-label")).toBe("O2 Assistant, Enterprise and Cloud feature");
-    expect(tooltip(wrapper)).toBe("O2 Assistant is part of OpenObserve Enterprise and Cloud");
+    expect(el.attributes("aria-label")).toBe(`${brandNames.autobot}, Enterprise and Cloud feature`);
+    expect(tooltip(wrapper)).toBe(
+      `${brandNames.autobot} is part of OpenObserve Enterprise and Cloud`,
+    );
     expect(el.find(".rounded-default.absolute svg").exists()).toBe(true);
     expect(wrapper.find('[data-test^="assistant-"]').exists()).toBe(false);
     await el.trigger("click");
@@ -131,7 +137,7 @@ describe("AssistantHeaderButton gates", () => {
     const { wrapper } = setup("not_configured", { isAdmin: true });
     const el = button(wrapper);
     expect(el.attributes("data-state")).toBe("off");
-    expect(el.attributes("aria-label")).toBe("O2 Assistant, not set up");
+    expect(el.attributes("aria-label")).toBe(`${brandNames.autobot}, not set up`);
     expect(el.attributes("aria-disabled")).toBeUndefined();
     expect(el.attributes("disabled")).toBeUndefined();
     await el.trigger("click");
@@ -193,7 +199,7 @@ describe("AssistantHeaderButton gates", () => {
   it("is locked on G2 and opens the gate popover, never an empty container (D7 decision 2)", async () => {
     const { wrapper } = setup("no_permission");
     const el = button(wrapper);
-    expect(el.attributes("aria-label")).toBe("O2 Assistant, locked");
+    expect(el.attributes("aria-label")).toBe(`${brandNames.autobot}, locked`);
     expect(tooltip(wrapper)).toBe("Ask an admin for AI access");
     await el.trigger("click");
     await flushPromises();
@@ -230,8 +236,8 @@ describe("AssistantHeaderButton gates", () => {
 
   it("is muted with the unavailable name when the agent is down", () => {
     const { wrapper } = setup("unhealthy");
-    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, unavailable");
-    expect(tooltip(wrapper)).toBe("O2 Assistant is unavailable right now");
+    expect(button(wrapper).attributes("aria-label")).toBe(`${brandNames.autobot}, unavailable`);
+    expect(tooltip(wrapper)).toBe(`${brandNames.autobot} is unavailable right now`);
   });
 });
 
@@ -240,7 +246,7 @@ describe("AssistantHeaderButton light", () => {
     const { wrapper } = setup();
     const el = button(wrapper);
     expect(el.attributes("data-state")).toBe("idle");
-    expect(el.attributes("aria-label")).toBe("O2 Assistant");
+    expect(el.attributes("aria-label")).toBe(`${brandNames.askAutobot}`);
     expect(el.attributes("aria-expanded")).toBeUndefined();
     expect(el.attributes("aria-pressed")).toBeUndefined();
     expect(el.attributes("data-entry")).toBe("ai-entry-header-ask");
@@ -257,9 +263,9 @@ describe("AssistantHeaderButton light", () => {
     await flushPromises();
     const el = button(wrapper);
     expect(el.attributes("data-state")).toBe("open");
-    expect(el.attributes("aria-label")).toBe("Close O2 Assistant");
+    expect(el.attributes("aria-label")).toBe(`Close ${brandNames.autobot}`);
     expect(el.classes()).toContain("border-border-strong");
-    expect(tooltip(wrapper)).toBe("Close O2 Assistant");
+    expect(tooltip(wrapper)).toBe(`Close ${brandNames.autobot}`);
   });
 
   it("mutes its tooltip while a container shows, keeps the state in its name, and closes the sidebar (D1, E2)", async () => {
@@ -268,7 +274,7 @@ describe("AssistantHeaderButton light", () => {
     store.open({ kind: "sidebar" }, { focus: "none" });
     await flushPromises();
     expect(wrapper.findComponent(OTooltip).props("disabled")).toBe(true);
-    expect(button(wrapper).attributes("aria-label")).toBe("Close O2 Assistant");
+    expect(button(wrapper).attributes("aria-label")).toBe(`Close ${brandNames.autobot}`);
     openAssistant.mockClear();
     await button(wrapper).trigger("click");
     expect(store.state.shell.placement.kind).toBe("hidden");
@@ -284,8 +290,8 @@ describe("AssistantHeaderButton light", () => {
       geometry: { x: 0, y: 0, widthRem: 24, heightRem: 30 },
     } as never);
     await flushPromises();
-    expect(button(wrapper).attributes("aria-label")).toBe("Go to O2 Assistant");
-    expect(tooltip(wrapper)).toBe("Go to O2 Assistant");
+    expect(button(wrapper).attributes("aria-label")).toBe(`Go to ${brandNames.autobot}`);
+    expect(tooltip(wrapper)).toBe(`Go to ${brandNames.autobot}`);
     openAssistant.mockClear();
     await button(wrapper).trigger("click");
     expect(openAssistant).toHaveBeenCalledWith(
@@ -360,8 +366,8 @@ describe("AssistantHeaderButton light", () => {
     light(store, sid);
     await flushPromises();
     const el = button(wrapper);
-    expect(el.attributes("aria-label")).toBe("O2 Assistant");
-    expect(tooltip(wrapper)).toBe("O2 Assistant");
+    expect(el.attributes("aria-label")).toBe(`${brandNames.askAutobot}`);
+    expect(tooltip(wrapper)).toBe(`${brandNames.askAutobot}`);
     expect(el.attributes("data-state")).toBe("idle");
     expect(el.classes()).toEqual(idle);
   });
@@ -409,7 +415,7 @@ describe("AssistantHeaderButton announcements and toasts", () => {
     const a = session(store, "Hidden");
     store.state.sessions[a].turn = { state: "awaiting_approval", callId: "c" };
     await flushPromises();
-    expect(region(wrapper)).toBe("O2 Assistant needs you: Hidden.");
+    expect(region(wrapper)).toBe(`${brandNames.autobot} needs you: Hidden.`);
     document.body.innerHTML = "";
     const shown = setup();
     const b = session(shown.store, "Shown");

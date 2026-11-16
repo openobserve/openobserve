@@ -309,7 +309,7 @@ const aiInputText = ref("");
 const streamingText = ref(""); // Real-time streaming response from chat_stream
 const aiStatusText = ref("");
 
-// Session tracking & cancellation (matches O2 AI Chat patterns)
+// Session tracking & cancellation (matches AI chat patterns)
 const currentSessionId = ref<string | null>(null);
 const currentAbortController = ref<AbortController | null>(null);
 

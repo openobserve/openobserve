@@ -27,6 +27,10 @@ import AssistantAskAdminPopover, {
   type AssistantAskAdminPopoverProps,
 } from "./AssistantAskAdminPopover.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { copyToClipboard, toast, phone, orgNames } = vi.hoisted(() => ({
   orgNames: new Map<string, string>(),
   phone: { value: false },
@@ -113,15 +117,18 @@ describe("AssistantAskAdminPopover", () => {
   it.each([
     [
       "access",
-      "Hi, could you grant me O2 Assistant access in OpenObserve (IAM › Roles › Assistant, Chat) for the acme organization?",
+      `Hi, could you grant me ${brandNames.autobot} access in OpenObserve (IAM › Roles › ${brandNames.askAutobot}, Chat) for the acme organization?`,
     ],
     [
       "share_read",
-      "Could you grant me chat sharing access (IAM › Roles › Assistant, Chat sharing) in acme?",
+      `Could you grant me chat sharing access (IAM › Roles › ${brandNames.askAutobot}, Chat sharing) in acme?`,
     ],
-    ["tool_policy", "The assistant wasn't allowed to run o2_delete in acme."],
+    ["tool_policy", `${brandNames.autobot} wasn't allowed to run o2_delete in acme.`],
     ["credits", "Could you enable paid AI usage for acme? Billing › Paid usage: http"],
-    ["settings", "Could you change the O2 Assistant settings for acme in Settings › Assistant?"],
+    [
+      "settings",
+      `Could you change the ${brandNames.autobot} settings for acme in Settings › ${brandNames.askAutobot}?`,
+    ],
   ] as const)("prefills the %s request", async (kind, expected) => {
     await openPopover({ kind, tool: "o2_delete" });
     expect(message()).toContain(expected);
@@ -140,7 +147,9 @@ describe("AssistantAskAdminPopover", () => {
     expect(document.body.textContent).toContain("Admins of acme");
     const email = document.body.querySelector('[data-test="assistant-ask-admin-email"]');
     expect(email?.getAttribute("href")).toMatch(
-      /^mailto:ada%40x\.io\?subject=O2%20Assistant%20access%20for%20acme/,
+      new RegExp(
+        `^mailto:ada%40x\\.io\\?subject=${encodeURIComponent(brandNames.autobot)}%20access%20for%20acme`,
+      ),
     );
   });
 
@@ -187,7 +196,7 @@ describe("AssistantAskAdminPopover", () => {
     await wrapper.get('[data-test="trigger"]').trigger("click");
     await flushPromises();
     expect(message()).toBe(
-      `Could you turn O2 Assistant on for acme? Settings › Assistant › Access: ${window.location.origin}/settings/assistant/access?org_identifier=acme`,
+      `Could you turn ${brandNames.autobot} on for acme? Settings › ${brandNames.askAutobot} › Access: ${window.location.origin}/settings/assistant/access?org_identifier=acme`,
     );
   });
 

@@ -203,6 +203,7 @@ const mockSearchObj: any = {
 
 // ── Import component AFTER all vi.mock calls ─────────────────────────────────
 import IndexList from "@/plugins/traces/IndexList.vue";
+import en from "@/locales/languages/en-US.json";
 
 // ── Reusable mount factory ────────────────────────────────────────────────────
 function mountIndexList(props: Record<string, unknown> = {}) {
@@ -493,7 +494,7 @@ describe("IndexList Component", () => {
       wrapper = mountIndexList({ assistantSet: new Set(["stream"]) });
       await flushPromises();
       expect(tag().text()).toContain("Set by assistant");
-      expect(tag().attributes("aria-label")).toBe("Stream was set by the assistant");
+      expect(tag().attributes("aria-label")).toBe(`Stream was set by ${en.brand.autobot}`);
     });
 
     it("reports the label cleared when the user picks another stream", async () => {

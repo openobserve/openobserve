@@ -26,6 +26,7 @@ import {
   lockedLine,
   type CtaAction,
 } from "./insightCta";
+import en from "@/locales/languages/en-US.json";
 
 const LABELS: Record<CtaAction, string> = {
   openInLogs: "Open in Logs",
@@ -42,7 +43,7 @@ const LABELS: Record<CtaAction, string> = {
   openService: "Open service",
   reviewServices: "Review services",
   openInCalibration: "Open in Alert calibration",
-  askAi: "Ask AI",
+  askAi: en.brand.askAutobot,
   dismiss: "Dismiss…",
   markIntendedReport: "Mark as intended report",
   reviewAndMarkIntendedReports: "Review and mark as intended reports",

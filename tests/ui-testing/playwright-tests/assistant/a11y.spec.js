@@ -8,6 +8,7 @@ import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 
 import { AssistantPage } from "../../pages/assistantPage.js";
+import { BRAND } from "../../utils/brand.js";
 
 const loadHarness = () => import("./harness/setup.mjs");
 const loadA11y = () => import("./harness/a11y.mjs");
@@ -15,7 +16,10 @@ const loadA11y = () => import("./harness/a11y.mjs");
 const VIEWPORTS = { 1280: { width: 1280, height: 800 }, 768: { width: 768, height: 1024 }, 375: { width: 375, height: 812 } };
 const THEMES = ["light", "dark"];
 const SETTINGS_TABS = ["status", "access", "data", "history", "usage", "toolsets", "permissions", "activity"];
-const GOLDEN = JSON.parse(readFileSync(join(__dirname, "a11y", "status-announcements.json"), "utf8"));
+// The golden file holds {product}; the app's brand name fills it in.
+const GOLDEN = JSON.parse(
+  readFileSync(join(__dirname, "a11y", "status-announcements.json"), "utf8").replaceAll("{product}", BRAND.autobot),
+);
 const MIN_TARGET_PX = 44;
 const INTERACTIVE =
   'button, a[href], input:not([type="hidden"]), select, textarea, [role="button"], [role="menuitem"], [role="menuitemradio"], [role="tab"], [role="switch"], [role="checkbox"], [role="option"]';

@@ -57,7 +57,10 @@ const rustSnapshot = JSON.parse(readFileSync(join(ROOT, "rust-snapshot.json"), "
 const t = ((key: string, params?: Record<string, unknown>) => {
   const value = key.split(".").reduce<any>((node, part) => node?.[part], LOCALE);
   const text = typeof value === "string" ? value.split(" | ").at(-1)! : key;
-  return text.replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? `{${name}}`));
+  const linked = text.replace(/@:\{'([\w.]+)'\}/g, (_, link) =>
+    link.split(".").reduce<any>((node: any, part: string) => node?.[part], LOCALE),
+  );
+  return linked.replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? `{${name}}`));
 }) as unknown as TranslateFn;
 
 // Who spoke and which block kinds, in order; a turn's closing line comes from the engine live, not the reducer.
@@ -96,8 +99,14 @@ const liveFold = (turns: StoredTurn[]) => {
   });
 };
 
+// The fixtures are shared with the server tests, so they keep the old wording; the product name is swapped in here.
 const read = (name: string, file: string) =>
-  JSON.parse(readFileSync(join(ROOT, name, file), "utf8"));
+  JSON.parse(
+    readFileSync(join(ROOT, name, file), "utf8").replaceAll(
+      "summarised by the assistant at",
+      `summarised by ${LOCALE.brand.autobot} at`,
+    ),
+  );
 
 const project = (input: RecordCase, entry: (typeof AUDIENCES)[number]) =>
   JSON.parse(

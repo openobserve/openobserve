@@ -22,6 +22,7 @@ import assistantSettings from "@/services/assistant_settings";
 
 import AssistantOrgPolicyForm from "./AssistantOrgPolicyForm.vue";
 import { ORG_SETTINGS, settingsHarness } from "./assistantSettings.test-helpers";
+import en from "@/locales/languages/en-US.json";
 
 const { fake, confirm, toast } = vi.hoisted(() => ({
   fake: {
@@ -150,8 +151,7 @@ describe("AssistantOrgPolicyForm", () => {
     await settle();
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(confirm.mock.calls[0][0]).toMatchObject({
-      message:
-        "Turn off O2 Assistant for Acme? Running answers will be stopped. Members keep their chat history.",
+      message: `Turn off ${en.brand.autobot} for Acme? Running answers will be stopped. Members keep their chat history.`,
       confirmVariant: "destructive",
       focusCancel: true,
     });
@@ -167,7 +167,7 @@ describe("AssistantOrgPolicyForm", () => {
     );
     expect(toast).toHaveBeenCalledWith({
       variant: "success",
-      message: "O2 Assistant turned off for Acme",
+      message: `${en.brand.autobot} turned off for Acme`,
     });
   });
 

@@ -20,6 +20,10 @@ import { fakeAssistant, fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantSkipLink, { skipTarget } from "./AssistantSkipLink.vue";
 import { closeLockedPanel, openLockedPanel } from "./lockedPanel";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake } = vi.hoisted(() => ({ fake: { current: null as any } }));
 
 vi.mock("@/composables/assistant", async (importOriginal) => ({
@@ -68,7 +72,9 @@ describe("AssistantSkipLink", () => {
     });
     store.open({ kind: "sidebar" }, { focus: "none" });
     await flushPromises();
-    expect(wrapper.get('[data-test="assistant-skip-link"]').text()).toBe("Skip to O2 Assistant");
+    expect(wrapper.get('[data-test="assistant-skip-link"]').text()).toBe(
+      `Skip to ${brandNames.autobot}`,
+    );
     expect(
       wrapper.get('[data-test="assistant-skip-link"]').element.parentElement?.className,
     ).toContain("sr-only");

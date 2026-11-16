@@ -29,6 +29,7 @@ import { SHELL_ROUTE_CONTEXT } from "@/components/ai-assistant/shell/AssistantSh
 import { closeLockedPanel } from "@/components/ai-assistant/shell/lockedPanel";
 
 import AssistantView, { chatRef, RAIL_DEFAULT_REM, railPx, viewFor } from "./AssistantView.vue";
+import en from "@/locales/languages/en-US.json";
 
 const SID = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
 
@@ -123,7 +124,7 @@ describe("AssistantView", () => {
   it("opens a new session in the full view with the welcome and focuses its container", async () => {
     const { wrapper, store } = await setup();
     await flushPromises();
-    expect(wrapper.find('[data-test="assistant-view-title"]').text()).toBe("O2 Assistant");
+    expect(wrapper.find('[data-test="assistant-view-title"]').text()).toBe(en.brand.askAutobot);
     expect(store.state.shell.placement.kind).toBe("full");
     expect(store.state.shell.activeSid).not.toBeNull();
     expect(store.focusRequest.value?.target).toBe("composer");

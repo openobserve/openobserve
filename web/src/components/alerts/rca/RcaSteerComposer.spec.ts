@@ -21,6 +21,7 @@ import { CHIP_HIT_AREA_CLASS } from "@/components/ai-assistant/composer/composer
 import RcaSteerComposer from "./RcaSteerComposer.vue";
 import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
 import { rcaSteeringPaused } from "@/test/unit/fixtures/rcaThread";
+import en from "@/locales/languages/en-US.json";
 
 const okSend = () =>
   vi.fn<(text: string) => Promise<RcaSteerSendResult>>(async () => ({ ok: true }));
@@ -61,7 +62,7 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
     );
     expect(textarea(wrapper).attributes("aria-label")).toBe("Steer this run");
     expect(byTest(wrapper, "assistant-agent-pill").attributes("data-agent")).toBe("sre");
-    expect(byTest(wrapper, "assistant-agent-pill").text()).toBe("Investigator");
+    expect(byTest(wrapper, "assistant-agent-pill").text()).toBe(en.brand.autobotInvestigate);
     const right = byTest(wrapper, "assistant-composer-bar-right");
     expect(right.findAll("button").map((b) => b.attributes("data-test"))).toEqual([
       "rca-steer-send-btn",

@@ -991,7 +991,7 @@ describe("useManagementRoutes assistant settings", () => {
     const route = findChild();
     expect(route.path).toBe("assistant/:tab?");
     expect(route.props).toBe(true);
-    expect(enMessage(route.meta.titleKey)).toBe("Assistant");
+    expect(enMessage(route.meta.titleKey)).toBe("@:{'brand.askAutobot'}");
   });
 
   it("sends an OSS build to the enterprise-locked page", () => {

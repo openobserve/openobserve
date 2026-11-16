@@ -40,6 +40,7 @@ import { aiCreditsNotice } from "@/utils/aiCredits";
 import type { TranslateFn } from "@/types/i18n";
 import IncidentAiAnalysisCell from "./IncidentAiAnalysisCell.vue";
 import { rcaSummary } from "@/test/unit/fixtures/rcaThread";
+import en from "@/locales/languages/en-US.json";
 
 const triggerRca = vi.mocked(incidentsService.triggerRca);
 
@@ -67,7 +68,7 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
     };
   });
 
-  describe("RCA off", () => {
+  describe(`${en.brand.autobotInvestigate} off`, () => {
     const original = store.state.zoConfig;
     const mountOff = (aiAssistant: string) => {
       store.state.zoConfig = {
@@ -98,7 +99,9 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
     it("AI switched off by the operator stays RCA disabled, with no lock", () => {
       const wrapper = mountOff("hidden");
 
-      expect(wrapper.get('[data-test="incident-ai-analysis-label"]').text()).toBe("RCA disabled");
+      expect(wrapper.get('[data-test="incident-ai-analysis-label"]').text()).toBe(
+        `${en.brand.autobotInvestigate} disabled`,
+      );
       expect(wrapper.find('[data-test="incident-ai-analysis-lock"]').exists()).toBe(false);
     });
   });
@@ -119,7 +122,7 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
   it("non-Cloud 412 shows the server message and leaves the button usable", async () => {
     triggerRca.mockRejectedValue({
       isAxiosError: true,
-      response: { status: 412, data: { message: "AI SRE is not configured for this org" } },
+      response: { status: 412, data: { message: "Investigation is not configured for this org" } },
     });
     const wrapper = mountCell();
     const button = () => wrapper.get('[data-test="incident-ai-analysis-analyze-btn"]');
@@ -129,7 +132,7 @@ describe("IncidentAiAnalysisCell (RR-33)", () => {
 
     expect(toastMock).toHaveBeenCalledWith({
       variant: "error",
-      message: "AI SRE is not configured for this org",
+      message: "Investigation is not configured for this org",
     });
     expect(wrapper.emitted("started")).toBeUndefined();
     expect(button().attributes("disabled")).toBeUndefined();

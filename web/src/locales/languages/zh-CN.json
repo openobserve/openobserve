@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "用户定义的架构",
     "allFieldsLabel": "所有字段",
     "nlQueryGenerationFailed": "无法生成查询。请再试一次。",
-    "askAIPlaceholder": "让 AI 帮你完成查询...",
-    "askAIFunctionPlaceholder": "让 AI 帮你完成任务...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}：帮你完成查询...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}：帮你完成函数...",
     "askAIPlaceholderRotation": {
       "one": "让我看看过去一小时的错误...",
       "two": "查找耗时超过 5 秒的慢速查询...",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "服务图",
     "services": "服务目录",
     "aiObservability": "AI",
-    "aiAssistant": "人工智能助手",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "退出",
     "ingestion": "数据源",
     "metrics": "指标",
@@ -3983,7 +3983,7 @@
           "note": "自动化 SRE 操作和见解"
         },
         "ai_assistant": {
-          "name": "人工智能助手",
+          "name": "@:{'brand.askAutobot'}",
           "note": "智能查询和分析协助"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "VRL 函数",
     "jsFunctionHint": "使用 `row`对象访问和修改日志字段。示例：row.new_field = row.existing_field + 'processed';",
     "vrlFunctionHint": "使用 `.` 表示当前事件。示例：.new_field = .existing_field + “已处理”",
-    "askAIFunctionPlaceholder": "让 AI 帮你完成任务...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}：帮你完成函数...",
     "enterFunctionPrompt": "输入提示生成函数",
     "associatedFunctionHeader": "关联函数",
     "enrichmentTables": "富化表",
@@ -6491,7 +6491,7 @@
       "rbac": "为团队创建具有细粒度权限的自定义角色。",
       "logPatterns": "自动识别重复出现的日志模式，无需逐行阅读。",
       "correlation": "从一行日志直接跳转到其相关的指标和追踪。",
-      "aiAssistant": "让 AI 编写查询，并用通俗语言解释您的数据。",
+      "aiAssistant": "@:{'brand.askAutobot'}：编写查询，并用通俗语言解释您的数据。",
       "alertInsights": "查看告警的触发频率，并一眼发现相关联的告警。",
       "anomalyDetection": "自动捕捉异常的指标行为，在触发阈值告警之前就发现。",
       "agentGraph": "以图的形式查看 AI 智能体与工具之间的调用关系。",
@@ -10359,9 +10359,9 @@
     "recentEvents": "最近事件",
     "investigate": "调查 →",
     "askAi": {
-      "label": "询问 AI",
-      "hint": "就此询问 AI",
-      "labelFor": "就{item}询问 AI",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}：就此提问",
+      "labelFor": "@:{'brand.askAutobot'}：就{item}提问",
       "chip": {
         "firing": "触发中的告警",
         "failing": "失败的规则",
@@ -10569,7 +10569,7 @@
     "viewInTarget": "在 {target} 中查看",
     "viewTarget": "查看 {target}",
     "welcome": {
-      "taglineHighlight": "O2 助手",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "或者试试其中一个"
     },
     "capabilities": {
@@ -10622,7 +10622,7 @@
       "unexpectedError": "发生意外错误",
       "toolExecutionFailed": "工具执行失败",
       "errorOccurred": "发生错误",
-      "navigateConfirmQuestion": "允许 O2 Assistant 进行导航吗？",
+      "navigateConfirmQuestion": "允许 @:{'brand.autobot'} 进行导航吗？",
       "confirmToolExecution": "确认执行 {tool} 吗？",
       "entity": {
         "alert": "告警",
@@ -10727,7 +10727,7 @@
     "aiExhaustedMessage": "订阅后可继续使用 AI。后续用量将计入本组织的账单。",
     "aiContractExhaustedMessage": "联系您的客户经理以添加更多 AI 积分",
     "aiPayerSubscribeMessage": "本组织的账单由 {payer} 管理。请让 {payer} 的管理员进行订阅；后续用量将计入其账单。",
-    "aiUsedByFeature": "助手与查询生成：{chat} · 事件分析：{incident} · 重新分析：{reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} 与查询生成：{chat} · @:{'brand.autobotInvestigate'}：{incident} · 重新分析：{reanalysis}",
     "aiPaygMessage": "免费积分已用尽 — 使用量计入订阅账单",
     "billingGroup": {
       "tabLabel": "账单组",
@@ -11898,14 +11898,14 @@
       "eventsAndCommentsAppearHere": "事件和评论将显示在此处",
       "scrollToTop": "滚动到顶部",
       "scrollToBottom": "滚动到底部",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "AI 分析",
         "analyze": "分析",
-        "analyzeTooltip": "启动对此事件的 AI SRE 分析",
-        "rcaDisabled": "RCA 已禁用",
-        "rcaOff": "RCA 关闭",
-        "noAiSreFor": "没有适用于 {severity} 的 AI SRE",
+        "analyzeTooltip": "启动对此事件的 @:{'brand.autobotInvestigate'} 分析",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} 已禁用",
+        "rcaOff": "@:{'brand.autobotInvestigate'} 关闭",
+        "noAiSreFor": "没有适用于 {severity} 的 @:{'brand.autobotInvestigate'}",
         "investigating": "调查中",
         "rerunElapsed": "重新运行 · {elapsed}",
         "noUpdateFor": "已 {elapsed} 未更新",
@@ -12015,7 +12015,7 @@
       "rcaCancelFailed": "无法取消分析",
       "rcaFailed": "AI 分析失败",
       "rcaBlocked": "AI 分析未运行",
-      "rcaFailedGeneric": "执行 RCA 分析失败",
+      "rcaFailedGeneric": "执行 @:{'brand.autobotInvestigate'} 分析失败",
       "rcaRetry": "重试分析",
       "rcaCopy": "复制报告",
       "rcaCopied": "报告已复制到剪贴板",
@@ -12130,7 +12130,7 @@
         "loadingReport": "正在加载报告…",
         "reportAfterRun": "报告会在运行结束后显示。",
         "noAnalysisTitle": "暂无分析",
-        "noAnalysisText": "AI SRE 智能体会检查此事件的告警、拓扑、近期变更、追踪、日志和指标，然后撰写报告。运行期间，您可以在调查线程中跟进其工作。",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} 会检查此事件的告警、拓扑、近期变更、追踪、日志和指标，然后撰写报告。运行期间，您可以在调查线程中跟进其工作。",
         "stageOf": "阶段 {index}/{count} · {stage}",
         "cancelRun": "取消运行",
         "followInThread": "在线程中跟进",
@@ -16104,7 +16104,7 @@
         "range": "{band} · {window}",
         "filter": "筛选至选区",
         "drillDown": "下钻",
-        "askAi": "询问 AI",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "热力图选择 · {count} 个 Span | 热力图选择 · {count} 个 Span",
         "clear": "清除选择"
       }
@@ -16310,8 +16310,8 @@
     "criticalPath": "关键路径",
     "askAi": {
       "explainTrace": "解释追踪",
-      "explainTraceHint": "让 AI 分析关键路径上最慢的 Span 以及所有错误 Span",
-      "askAboutSpan": "让 AI 分析此 Span",
+      "explainTraceHint": "@:{'brand.askAutobot'}：分析关键路径上最慢的 Span 以及所有错误 Span",
+      "askAboutSpan": "@:{'brand.askAutobot'}：分析此 Span",
       "spanChip": "Span · {operation}",
       "traceChip": "追踪 · {operation}"
     },
@@ -25061,13 +25061,13 @@
       "subtitle": "数据库的查询性能与运行状况"
     },
     "ai": {
-      "suggestFix": "向 AI 询问如何修复",
-      "suggestFixHint": "打开 AI 助手，包含此查询、其引擎和延迟数据，并询问需要更改什么。它本身不会做任何更改。",
-      "rowSuggestFix": "向 AI 询问如何修复",
+      "suggestFix": "@:{'brand.askAutobot'}：询问如何修复",
+      "suggestFixHint": "打开 @:{'brand.autobot'}，包含此查询、其引擎和延迟数据，并询问需要更改什么。它本身不会做任何更改。",
+      "rowSuggestFix": "@:{'brand.askAutobot'}：询问如何修复",
       "deadlockFix": "如何停止此死锁？",
-      "deadlockFixHint": "将两个冲突的语句和行序证据发送给 AI 助手。",
+      "deadlockFixHint": "将两个冲突的语句和行序证据发送给 @:{'brand.autobot'}。",
       "blockingFix": "为什么这会阻塞？",
-      "blockingFixHint": "将根会话的语句、其空闲时间以及有多少会话在其后面等待发送给 AI 助手。"
+      "blockingFixHint": "将根会话的语句、其空闲时间以及有多少会话在其后面等待发送给 @:{'brand.autobot'}。"
     },
     "filters": {
       "allEngines": "所有引擎",
@@ -26773,8 +26773,8 @@
     "removeStep": "移除步骤",
     "channels": "渠道",
     "policySaved": "策略已保存",
-    "verdictTitle": "AI SRE 判定",
-    "reportTitle": "AI SRE 发现了什么",
+    "verdictTitle": "@:{'brand.autobot'} 判定",
+    "reportTitle": "@:{'brand.autobot'} 发现了什么",
     "l0P1Lead": "立即告警。",
     "l0P1Desc": "AI 分析并行运行 — 关键通知永远不会被延迟。",
     "l0P4Lead": "仅 AI 分析。",
@@ -26794,7 +26794,7 @@
     "l0MaxLevelsOption": "最多 {count} 级 | 最多 {count} 级",
     "l0ParallelSentence": "立即通知；智能体并行运行",
     "l0OnlySentence": "由代理进行调查；仅当您的级别设置如此规定时，该优先级才会发起寻呼",
-    "l0OffSentence": "不运行 AI SRE；寻呼行为与未启用 AI 分诊时完全一致",
+    "l0OffSentence": "不运行 @:{'brand.autobotInvestigate'}；寻呼行为与未启用 AI 分诊时完全一致",
     "l0BudgetRange": "介于 30 到 600 秒之间 — 服务器会拒绝此范围之外的值，而不是将其截断。",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "抑制该通知",
@@ -26821,7 +26821,7 @@
     "eventKind_page": "通知",
     "eventKind_ack": "确认",
     "eventKind_note": "备注",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "交接",
     "eventKind_recovery": "恢复",
     "eventKind_state": "状态",
@@ -27483,7 +27483,7 @@
     "ladderAddStep": "添加步骤",
     "ladderRightNow": "当前值班的是",
     "ladderSameLadder": "同一升级阶梯",
-    "ladderL0Off": "无 AI SRE",
+    "ladderL0Off": "无 @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "升级阶梯未识别到轮班",
     "ladderStaleDefaultHint": "每一级都会通知整个团队，但这个团队已有轮班——该升级阶梯是在这些轮班出现之前创建的。添加或移除成员会重新运行默认配置，也可以手动编辑一次该升级阶梯。",
     "reachShortNoSmtp": "仅电子邮件 · 未配置 SMTP 传输",
@@ -27819,7 +27819,7 @@
     "consentStillRequired": "并非所有必需的组织都已启用付费使用。",
     "updateFailed": "无法更新付费 AI 使用设置。请重试。",
     "declinedNotice": "付费 AI 使用已关闭，因此未发送此请求。",
-    "consentScope": "适用于整个组织：助手、查询生成和事件分析。您可以随时在计划页面关闭。",
+    "consentScope": "适用于整个组织：@:{'brand.askAutobot'}、查询生成和事件分析。您可以随时在计划页面关闭。",
     "managePaidUsage": "开启付费使用",
     "modePayAsYouGo": "按量付费",
     "modeConsentRequired": "需要授权",
@@ -28400,7 +28400,7 @@
         "auth_test": "机器人令牌",
         "last_event": "事件",
         "sockets": "套接字",
-        "agent": "人工智能助手",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "测试消息"
       },
       "connectedOrgs": "已连接组织",

@@ -43,6 +43,10 @@ import { queuedOf, resetComposerQueueForTests } from "./useComposerQueue";
 import { HOLD_MS, SILENCE_MS, resetVoiceForTests, setVoiceOptIn } from "./useAssistantVoice";
 import AssistantDictateButton from "./AssistantDictateButton.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake, breakpoint } = vi.hoisted(() => ({
   fake: { current: null as any, member: false },
   breakpoint: { md: true },
@@ -150,7 +154,7 @@ afterEach(() => {
 describe("names and regions (CT-08)", () => {
   it("names the textbox, masks the composer and owns one polite status region", () => {
     const { wrapper, textarea } = setup();
-    expect(textarea().attributes("aria-label")).toBe("Message O2 Assistant");
+    expect(textarea().attributes("aria-label")).toBe(`Message ${brandNames.autobot}`);
     expect(textarea().attributes("aria-multiline")).toBe("true");
     expect(textarea().attributes("aria-placeholder")).toBe(textarea().attributes("placeholder"));
     expect(textarea().attributes("data-assistant-composer")).toBe("");
@@ -183,10 +187,10 @@ describe("names and regions (CT-08)", () => {
     const { wrapper, textarea, store, sid } = setup();
     store.state.sessions[sid].nextAgentId = "sre";
     await flushPromises();
-    expect(textarea().attributes("placeholder")).toBe("Ask Investigator…");
-    expect(textarea().attributes("aria-label")).toBe("Message Investigator");
+    expect(textarea().attributes("placeholder")).toBe(`Ask ${brandNames.autobotInvestigate}…`);
+    expect(textarea().attributes("aria-label")).toBe(`Message ${brandNames.autobotInvestigate}`);
     expect(wrapper.get(NOTICE).attributes("title")).toBe(
-      "Investigator answers from now on. Earlier answers stay.",
+      `${brandNames.autobotInvestigate} answers from now on. Earlier answers stay.`,
     );
   });
 });
@@ -451,7 +455,7 @@ describe("refused sends (§1)", () => {
     refuse(store, sid, { code: "turn_limit", retryAfterMs: 2_000 });
     await vi.advanceTimersByTimeAsync(0);
     const row = () => wrapper.find(NOTICE);
-    expect(row().attributes("title")).toBe("O2 Assistant is busy. Send again in 2 s.");
+    expect(row().attributes("title")).toBe(`${brandNames.askAutobot} is busy. Send again in 2 s.`);
     expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBe("true");
     await vi.advanceTimersByTimeAsync(2_000);
     expect(row().exists()).toBe(false);
@@ -509,7 +513,7 @@ describe("refused sends (§1)", () => {
     refuse(store, sid, { code: "unreachable" });
     await flushPromises();
     expect(wrapper.get(NOTICE).attributes("title")).toBe(
-      "O2 Assistant isn't reachable right now. Your message wasn't sent.",
+      `${brandNames.autobot} isn't reachable right now. Your message wasn't sent.`,
     );
     expect(wrapper.get('[data-test="assistant-send"]').attributes("aria-disabled")).toBeUndefined();
   });
@@ -629,7 +633,7 @@ describe("states (`40` §1.3)", () => {
     for (const id of ["assistant-composer-plus", "assistant-send"])
       expect(wrapper.get(`[data-test="${id}"]`).attributes("aria-disabled")).toBe("true");
     const pill = wrapper.get('[data-test="assistant-agent-pill"]');
-    expect(pill.text()).toBe("O2 Assistant");
+    expect(pill.text()).toBe(`${brandNames.autobot}`);
     expect(wrapper.find('[data-test="assistant-composer-notice-goToRequest"]').exists()).toBe(
       false,
     );
@@ -650,7 +654,7 @@ describe("states (`40` §1.3)", () => {
     store.state.sessions[sid].pendingApproval = { id: "c1" } as PendingApproval;
     store.startReply(sid, "c1");
     await flushPromises();
-    expect(textarea().attributes("placeholder")).toBe("Reply to the assistant");
+    expect(textarea().attributes("placeholder")).toBe(`Reply to ${brandNames.autobot}`);
     expect(textarea().attributes("readonly")).toBeUndefined();
     expect(wrapper.get('[data-notice="reply"]').attributes("title")).toContain(
       "Reply declines the request",
@@ -994,7 +998,7 @@ describe("agent mention in a floating chat (MULTI-AGENT-02)", () => {
     mounted.push(wrapper);
     const field = wrapper.get<HTMLTextAreaElement>('[data-test="assistant-composer-field"]');
     field.element.focus();
-    await type(field, "why @inv");
+    await type(field, "why @sre");
     await field.trigger("keydown", { key: "Enter" });
     await flushPromises();
     expect(store.state.sessions[floating].agentId).toBe("sre");
@@ -1236,8 +1240,10 @@ describe("boards 04–06: inert field, error row, Stop and Send (S3, S4, S6, S7)
     expect(send().classes()).toEqual(expect.arrayContaining(["h-8", "rounded-full"]));
     store.state.sessions[sid].nextAgentId = "sre";
     await flushPromises();
-    expect(send().attributes("aria-label")).toBe("Send to Investigator");
-    expect(wrapper.get('[data-test="assistant-agent-picker"]').text()).toBe("Investigator");
+    expect(send().attributes("aria-label")).toBe(`Send to ${brandNames.autobotInvestigate}`);
+    expect(wrapper.get('[data-test="assistant-agent-picker"]').text()).toBe(
+      `${brandNames.autobotInvestigate}`,
+    );
     store.state.sessions[sid].nextAgentId = null as never;
     store.state.sessions[sid].pendingApproval = { id: "c1" } as PendingApproval;
     store.startReply(sid, "c1");
@@ -1333,7 +1339,7 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
   it("shows the agent as a pill, which opens the agent menu once there is a choice", async () => {
     const { wrapper } = setup();
     expect(wrapper.find('[data-test="assistant-agent-picker"]').exists()).toBe(false);
-    expect(wrapper.get('[data-test="assistant-agent-pill"]').text()).toBe("O2 Assistant");
+    expect(wrapper.get('[data-test="assistant-agent-pill"]').text()).toBe(`${brandNames.autobot}`);
     fake.current.capability.value = {
       ...fake.current.capability.value,
       agents: [

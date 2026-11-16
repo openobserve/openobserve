@@ -2421,7 +2421,7 @@ const updateDelay = (val: any) => {
   emits("update:delay", val);
 };
 
-// [START] O2 AI Context Handler
+// [START] AI Context Handler
 
 const registerAiContextHandler = () => {
   registerAiChatHandler(getContext);
@@ -2478,7 +2478,7 @@ const removeAiContextHandler = () => {
   removeAiChatHandler();
 };
 
-// [END] O2 AI Context Handler
+// [END] AI Context Handler
 
 const loadedOrg = useLoadedOrg(
   () => rows.value,

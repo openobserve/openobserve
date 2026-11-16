@@ -26,6 +26,10 @@ import AssistantGateState, {
   type AssistantGateStateProps,
 } from "./AssistantGateState.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake, track, openUpgrade } = vi.hoisted(() => ({
   fake: {
     current: null as ReturnType<typeof import("../__tests__/fakeAssistant").fakeAssistant> | null,
@@ -77,11 +81,19 @@ afterEach(() => {
 
 describe("AssistantGateState", () => {
   it.each([
-    ["not_entitled", "Meet O2 Assistant", "assistant-gate-see-plans"],
-    ["not_configured", "O2 Assistant isn't set up yet", "assistant-gate-setup"],
-    ["off_for_org", "O2 Assistant is turned off for this organization", "assistant-gate-ask-admin"],
-    ["unhealthy", "O2 Assistant is unavailable right now", "assistant-gate-try-again"],
-    ["no_permission", "O2 Assistant isn't available to your role", "assistant-gate-ask-admin"],
+    ["not_entitled", `Meet ${brandNames.autobot}`, "assistant-gate-see-plans"],
+    ["not_configured", `${brandNames.autobot} isn't set up yet`, "assistant-gate-setup"],
+    [
+      "off_for_org",
+      `${brandNames.autobot} is turned off for this organization`,
+      "assistant-gate-ask-admin",
+    ],
+    ["unhealthy", `${brandNames.autobot} is unavailable right now`, "assistant-gate-try-again"],
+    [
+      "no_permission",
+      `${brandNames.autobot} isn't available to your role`,
+      "assistant-gate-ask-admin",
+    ],
     [
       "no_share_read",
       "You don't have access to shared chats in this organization",
@@ -99,7 +111,7 @@ describe("AssistantGateState", () => {
   it.each(["hero", "inline", "popover", "tooltip"] as const)("renders the %s size", (size) => {
     const wrapper = mountGate({ size });
     expect(wrapper.get('[data-test="assistant-gate-state"]').attributes("data-size")).toBe(size);
-    expect(wrapper.text()).toContain("O2 Assistant isn't available to your role");
+    expect(wrapper.text()).toContain(`${brandNames.autobot} isn't available to your role`);
   });
 
   it("renders nothing for a member on not_configured: their doors are hidden instead", () => {
@@ -121,13 +133,15 @@ describe("AssistantGateState", () => {
 
   it("drops See plans when it only explains the assistant to an entitled org", () => {
     const wrapper = mountGate({ reason: "not_entitled", size: "hero", learnOnly: true });
-    expect(wrapper.find("h2").text()).toBe("What O2 Assistant does");
+    expect(wrapper.find("h2").text()).toBe(`What ${brandNames.autobot} does`);
     expect(wrapper.find('[data-test="assistant-gate-see-plans"]').exists()).toBe(false);
   });
 
   it("names where to grant access, as a link to IAM roles for admins only", () => {
     const member = mountGate();
-    expect(member.text()).toContain("An admin can grant access in IAM › Roles › Assistant.");
+    expect(member.text()).toContain(
+      `An admin can grant access in IAM › Roles › ${brandNames.askAutobot}.`,
+    );
     expect(member.find('[data-test="assistant-gate-where-to-grant"]').exists()).toBe(false);
     const admin = mountGate({ isAdmin: true });
     expect(admin.get('[data-test="assistant-gate-where-to-grant"]').attributes("href")).toContain(
@@ -150,7 +164,7 @@ describe("AssistantGateState", () => {
       "assistant-gate-ask-admin",
       "assistant-gate-learn-more",
     ]);
-    expect(wrapper.find("h2").text()).toBe("O2 Assistant isn't available to your role");
+    expect(wrapper.find("h2").text()).toBe(`${brandNames.autobot} isn't available to your role`);
     gateLearnOpen.value = false;
     await wrapper.get('[data-test="assistant-gate-learn-more"]').trigger("click");
     expect(gateLearnOpen.value).toBe(true);

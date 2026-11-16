@@ -22,6 +22,7 @@ import AssistantStatusCard, {
   epochMs,
   type AssistantStatusCardProps,
 } from "./AssistantStatusCard.vue";
+import en from "@/locales/languages/en-US.json";
 
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/assistantAnalytics")>()),
@@ -69,7 +70,7 @@ describe("AssistantStatusCard", () => {
     expect(w.find('[data-test="settings-assistant-setup-card"]').exists()).toBe(true);
     expect(chip(w)).toBe("Not set up");
     expect(w.text()).toContain(
-      "The assistant isn't set up for this deployment. Ask an administrator.",
+      `${en.brand.autobot} isn't set up for this deployment. Ask an administrator.`,
     );
     expect(w.find('[data-test="assistant-gate-setup"]').exists()).toBe(false);
     expect(w.find('[data-test="settings-assistant-env-O2_AGENT_URL"]').exists()).toBe(false);
@@ -123,7 +124,7 @@ describe("AssistantStatusCard", () => {
       },
     });
     expect(chip(w)).toBe("Unreachable");
-    expect(w.text()).toContain("Users see the assistant as unavailable until this is fixed.");
+    expect(w.text()).toContain(`Users see ${en.brand.autobot} as unavailable until this is fixed.`);
     expect(w.find('[data-test="settings-assistant-status-last-error"]').text()).toContain(
       "upstream connect error",
     );
@@ -255,7 +256,7 @@ describe("AssistantStatusCard", () => {
       );
       expect(chip(w)).toBe("Not in your license");
       expect(w.find('[data-test="settings-assistant-status-body"]').text()).toBe(
-        "Your license doesn't include the AI assistant, so nobody in this organization sees it. Contact your account team to add it.",
+        `Your license doesn't include ${en.brand.askAutobot}, so nobody in this organization sees it. Contact your account team to add it.`,
       );
       expect(w.find('[data-test="settings-assistant-test-btn"]').exists()).toBe(false);
       expect(w.find('[data-test="settings-assistant-open-access"]').exists()).toBe(false);

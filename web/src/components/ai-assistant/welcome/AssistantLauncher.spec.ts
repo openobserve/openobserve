@@ -36,6 +36,10 @@ import AssistantComposerPlusMenu, {
 import AssistantLauncher, { launcherState } from "./AssistantLauncher.vue";
 import AssistantLauncherAgent from "./AssistantLauncherAgent.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const ROSTER: CapabilityAgent[] = [
   { id: "o2-ai", pickable: true, available: true },
   { id: "sre", pickable: true, available: true },
@@ -194,8 +198,8 @@ describe("AssistantLauncher", () => {
     const card = wrapper.get('[data-test="assistant-launcher"]');
     expect(card.attributes("data-dd-privacy")).toBe("mask");
     const heading = wrapper.get(`#${card.attributes("aria-labelledby")}`);
-    expect(heading.text()).toBe("O2 Assistant");
-    expect(input(wrapper).attributes("aria-label")).toBe("Ask O2 Assistant");
+    expect(heading.text()).toBe(`${brandNames.askAutobot}`);
+    expect(input(wrapper).attributes("aria-label")).toBe(`Ask ${brandNames.autobot}`);
     expect(input(wrapper).attributes("maxlength")).toBe("4000");
     expect(wrapper.findAll('[data-test^="assistant-launcher-starter-"]')).toHaveLength(3);
   });
@@ -559,7 +563,7 @@ describe("AssistantLauncher", () => {
       expect(shown()).not.toBe("");
       expect("Show me errors from the last hour…".startsWith(shown())).toBe(true);
       // The field keeps its own name and nothing announces the typing.
-      expect(input(wrapper).attributes("aria-label")).toBe("Ask O2 Assistant");
+      expect(input(wrapper).attributes("aria-label")).toBe(`Ask ${brandNames.autobot}`);
       expect(input(wrapper).attributes("aria-placeholder")).toBeUndefined();
       expect(wrapper.find("[aria-live] textarea, textarea[aria-live]").exists()).toBe(false);
       await input(wrapper).trigger("focus");

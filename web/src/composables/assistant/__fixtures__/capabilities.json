@@ -18,7 +18,7 @@
     "agents": [
       {
         "id": "o2-ai",
-        "name": "O2 Assistant",
+        "name": "Test Agent",
         "purpose": "Answers questions and helps with tasks",
         "pickable": true,
         "available": true,

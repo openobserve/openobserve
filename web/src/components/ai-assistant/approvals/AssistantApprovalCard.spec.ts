@@ -32,6 +32,10 @@ import { fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantApprovalCard from "./AssistantApprovalCard.vue";
 import { assistantApprovalsHostKey, type ApprovalCardView } from "./approvals.types";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const routes = [
   { path: "/alerts/:alert_id", name: "alertDetail", component: {} },
   { path: "/alerts", name: "alertList", component: {} },
@@ -538,7 +542,7 @@ describe("AssistantApprovalCard", () => {
     await flushPromises();
     expect(approve().text()).toBe("Delete 2 alerts");
     expect(wrapper.get('[data-test="assistant-approval-narrowed"]').text()).toBe(
-      "The assistant will propose these 2 again for your approval",
+      `${brandNames.autobot} will propose these 2 again for your approval`,
     );
     await press(approve());
     expect(wrapper.emitted("decide")?.at(-1)?.[0]).toMatchObject({

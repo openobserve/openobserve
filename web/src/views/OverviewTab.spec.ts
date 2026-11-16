@@ -136,6 +136,8 @@ import { queryClient } from "@/composables/query/queryClient";
 import { streamProbeQuery } from "@/services/stream.queries";
 import { useSampleDataSession } from "@/composables/sampleData/useSampleDataSession";
 import { firstDataStorageKey } from "@/composables/firstEvent/useFirstDataNotice";
+import { b64DecodeUnicode } from "@/utils/zincutils";
+import en from "@/locales/languages/en-US.json";
 
 // OverviewTab renders only O2 `lib` components.
 
@@ -2805,6 +2807,109 @@ describe("OverviewTab", () => {
       expect(drawer().props("open")).toBe(false);
       expect(drawer().props("alertDetails")).toBeNull();
       expect(drawer().props("alertId")).toBe("");
+    });
+  });
+  describe("Ask AI hand-off", () => {
+    const aiOn = () => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        incidents_enabled: true,
+        ai_enabled: true,
+        features: { ai_assistant: "enabled" },
+      });
+    };
+    const mountWithProblems = async () => {
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: buildOverview(),
+      } as never);
+      vi.mocked(incidentsService.list).mockResolvedValue({
+        data: mockOverview.buildIncidentList(),
+      } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+    };
+    const ask = (id: string) => wrapper.find(`[data-test="overview-ask-ai-${id}"]`);
+
+    it("offers Ask AI next to Investigate on an open incident and emits its hand-off", async () => {
+      aiOn();
+      await mountWithProblems();
+
+      await ask("incident-incident-1").trigger("click");
+
+      const [payload] = wrapper.emitted("sendToAiChat")![0] as [Record<string, any>];
+      expect(payload).toMatchObject({ newChat: true, autoSend: false });
+      expect(payload.query).toContain("Checkout service degraded");
+      expect(payload.context).toMatchObject({
+        currentPage: "incidents",
+        incident_id: "incident-1",
+        title: "Checkout service degraded",
+        severity: "P1",
+        alert_count: 4,
+        group_values: { "k8s-namespace": "prod" },
+        org_id: store.state.selectedOrganization.identifier,
+        generated_at: buildOverview().generated_at,
+      });
+      expect(payload.context).not.toHaveProperty("level");
+      expect(ask("incident-incident-1").attributes("aria-label")).toBe(
+        `${en.brand.askAutobot} about Checkout service degraded`,
+      );
+      expect(typeof payload.context.start_time).toBe("number");
+      expect(payload.context.end_time).toBeGreaterThan(payload.context.start_time);
+    });
+
+    it("labels an untitled incident the same in the row, button and hand-off", async () => {
+      aiOn();
+      const list = mockOverview.buildIncidentList();
+      vi.mocked(overviewService.getOrgOverview).mockResolvedValue({
+        data: buildOverview(),
+      } as never);
+      vi.mocked(incidentsService.list).mockResolvedValue({
+        data: { ...list, incidents: list.incidents.map((i: any) => ({ ...i, title: "" })) },
+      } as never);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(ask("incident-incident-1").attributes("aria-label")).toBe(
+        `${en.brand.askAutobot} about Untitled incident`,
+      );
+      await ask("incident-incident-1").trigger("click");
+      const [payload] = wrapper.emitted("sendToAiChat")![0] as [Record<string, any>];
+      expect(payload.query).toContain("Untitled incident");
+    });
+
+    it("turns an alerts box into a hand-off with the range and snapshot time", async () => {
+      aiOn();
+      await mountWithProblems();
+
+      await ask("box-failing").trigger("click");
+
+      const [payload] = wrapper.emitted("sendToAiChat")![0] as [Record<string, any>];
+      expect(payload.query).toBe("Why did 4 alert rules fail their last evaluation?");
+      expect(payload.context).toMatchObject({
+        currentPage: "Alerts",
+        kind: "failing",
+        count: 4,
+        org_id: store.state.selectedOrganization.identifier,
+      });
+    });
+
+    it("turns a firing alert row into a hand-off", async () => {
+      aiOn();
+      await mountWithProblems();
+
+      await ask("alert-high_cpu").trigger("click");
+
+      const [payload] = wrapper.emitted("sendToAiChat")![0] as [Record<string, any>];
+      expect(payload.context).toMatchObject({ alert_name: "high_cpu", stream: "cpu_usage" });
+    });
+
+    it("shows no Ask AI button anywhere when AI is off", async () => {
+      aiOn();
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false, features: {} });
+      await mountWithProblems();
+
+      expect(wrapper.find('[data-test^="overview-ask-ai-"]').exists()).toBe(false);
     });
   });
 });

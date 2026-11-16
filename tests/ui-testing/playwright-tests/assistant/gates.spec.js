@@ -3,6 +3,7 @@
 
 import { test, expect } from "@playwright/test";
 import { AssistantPage } from "../../pages/assistantPage.js";
+import { BRAND } from "../../utils/brand.js";
 
 // Playwright compiles a static import to require(), which would load the .mjs harness as CommonJS; import() keeps it ESM.
 const loadHarness = () => import("./harness/setup.mjs");
@@ -59,7 +60,7 @@ test.describe("assistant gates", () => {
     );
     await expect(assistant.headerButton).toHaveAttribute(
       "aria-label",
-      "O2 Assistant, Enterprise and Cloud feature",
+      `${BRAND.autobot}, Enterprise and Cloud feature`,
     );
     // The window layer's live region stays mounted on every edition so later announcements are heard.
     await expect(assistant.v2Ids().and(page.locator(':not([role="status"])'))).toHaveCount(0);
@@ -70,7 +71,7 @@ test.describe("assistant gates", () => {
     await assistant.headerButton.click();
     const pitch = page.locator('[data-gate="not_entitled"][data-size="hero"]');
     await expect(pitch).toBeVisible();
-    await expect(pitch.locator("h2")).toHaveText("Meet O2 Assistant");
+    await expect(pitch.locator("h2")).toHaveText(`Meet ${BRAND.autobot}`);
     await expect(
       pitch.locator('[data-test="assistant-gate-see-plans"]'),
     ).toBeVisible();
@@ -115,7 +116,7 @@ test.describe("assistant gates", () => {
     });
     await expect(assistant.headerButton).toHaveAttribute(
       "aria-label",
-      "O2 Assistant, not set up",
+      `${BRAND.autobot}, not set up`,
     );
     await expect(assistant.headerButton).not.toHaveAttribute(
       "aria-disabled",
@@ -192,14 +193,14 @@ test.describe("assistant gates", () => {
     );
     await expect(assistant.headerButton).toHaveAttribute(
       "aria-label",
-      "O2 Assistant, locked",
+      `${BRAND.autobot}, locked`,
     );
     // A locked user gets the gate popover at the button, never an empty sidebar (D7 decision 2).
     await assistant.headerButton.click();
     const gate = page.locator('[data-gate="no_permission"][data-size="popover"]');
     await expect(gate).toBeVisible();
     await expect(gate.locator("h2")).toHaveText(
-      "O2 Assistant isn't available to your role",
+      `${BRAND.autobot} isn't available to your role`,
     );
     await expect(
       gate.locator('[data-test="assistant-gate-ask-admin"]'),
@@ -208,7 +209,7 @@ test.describe("assistant gates", () => {
     await gate.locator('[data-test="assistant-gate-ask-admin"]').click();
     await expect(assistant.askAdmin()).toBeVisible();
     await expect(assistant.askAdmin().locator("textarea")).toHaveValue(
-      /grant me O2 Assistant access/,
+      new RegExp(`grant me ${BRAND.autobot} access`),
     );
     await page.keyboard.press("Escape");
     await expect(assistant.sidebar.locator('[data-test="assistant-composer"]')).toHaveCount(0);
@@ -300,7 +301,7 @@ test.describe("assistant gates", () => {
     await assistant.open("header");
     const notice = page.locator('[data-test="assistant-gate-unknown-notice"]');
     await expect(notice).toHaveText(
-      "Your role may not include O2 Assistant. If sending fails, ask an admin.",
+      `Your role may not include ${BRAND.autobot}. If sending fails, ask an admin.`,
     );
     // The first admitted send settles the role, so the notice goes (WP-05 send half).
     await assistant.send("hello", "complete");

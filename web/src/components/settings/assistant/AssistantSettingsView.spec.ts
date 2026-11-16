@@ -25,6 +25,7 @@ import assistantSettings from "@/services/assistant_settings";
 
 import AssistantSettingsView from "./AssistantSettingsView.vue";
 import { ORG_SETTINGS, settingsHarness } from "./assistantSettings.test-helpers";
+import en from "@/locales/languages/en-US.json";
 
 const { fake, toast } = vi.hoisted(() => ({
   fake: {
@@ -100,7 +101,7 @@ describe("AssistantSettingsView", () => {
   it("titles the page with the product name and renders the tab strip", async () => {
     const { w } = await mountView("/settings/assistant/status");
     wrapper = w;
-    expect(w.find('[data-test="settings-assistant-page-title"]').text()).toBe("O2 Assistant");
+    expect(w.find('[data-test="settings-assistant-page-title"]').text()).toBe(en.brand.askAutobot);
     for (const id of [
       "status",
       "access",

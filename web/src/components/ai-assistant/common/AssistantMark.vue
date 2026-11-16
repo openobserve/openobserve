@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ],
     ]"
   >
-    <!-- The product's own mark is the O2 AI logo, as in the header and on Home; an agent keeps its glyph -->
+    <!-- The product's own mark is the AI logo, as in the header and on Home; an agent keeps its glyph -->
     <template v-if="logo">
       <img :src="aiLogo" alt="" class="size-full dark:hidden" />
       <img :src="aiLogoDark" alt="" class="hidden size-full dark:block" />

@@ -1,4 +1,4 @@
-# O2 Assistant screen-reader and keyboard walkthroughs
+# the assistant screen-reader and keyboard walkthroughs
 
 Run these once per release with the flag on, on the mocked harness: a dev server with
 `installMocks`, or the Playwright harness paused with `page.pause()`.
@@ -24,7 +24,7 @@ Mock scenarios: `confirmation`, then `consent`.
 
 | # | Keys | Expected |
 |---|---|---|
-| 1 | Open Logs. Press `Ctrl+I` (`Cmd+I` on macOS). | "O2 Assistant opened." Focus: "Message O2 Assistant, edit, multi line". |
+| 1 | Open Logs. Press `Ctrl+I` (`Cmd+I` on macOS). | "the assistant opened." Focus: "Message the assistant, edit, multi line". |
 | 2 | Type `delete stale alerts [confirmation]`, then Enter. | "Sending…" then "Writing the answer". Step lines such as "Listing streams" may be spoken, at most one every 3 seconds. |
 | 3 | Wait for the approval card. Do not move focus. | "Waiting for your approval: Delete 1 alert. Expires in 10 minutes. Press Control I to review it." Focus stays in the message box. |
 | 4 | `Ctrl+I` | Focus: "Deny, button". |
@@ -33,7 +33,7 @@ Mock scenarios: `confirmation`, then `consent`.
 | 6 | Type `why 5xx? [consent]`, then Enter. | "Sending…" then "Waiting for your decision on paid usage for default. Press Control I to review it." |
 | 7 | `Ctrl+I` | Focus: the first control of the "Turn on paid AI usage?" card, View billing. |
 | 8 | Tab to the checkbox, Space, Tab to Turn on, Enter. | The card goes away, then the turn's sentences, ending "Done". |
-| 9 | Escape, with nothing running and the message box empty. | "O2 Assistant closed." Focus returns to the control that opened it. |
+| 9 | Escape, with nothing running and the message box empty. | "the assistant closed." Focus returns to the control that opened it. |
 
 ## W2: locked role
 
@@ -41,7 +41,7 @@ Mock knobs: `role: "viewer"`, with the org-admin flag off.
 
 | # | Keys | Expected |
 |---|---|---|
-| 1 | Open Home. Use the reader's heading navigation (H in NVDA browse mode). | "O2 Assistant isn't available to your role, heading level 2". |
+| 1 | Open Home. Use the reader's heading navigation (H in NVDA browse mode). | "the assistant isn't available to your role, heading level 2". |
 | 2 | Tab | "Ask an admin, button". |
 | 3 | Enter | A dialog named "Ask an admin". Tab reaches "Copy message, button". |
 | 4 | Escape. On Logs, focus a result row and Tab into its toolbar. | The Explain door says it is locked and that you should ask an admin. It is dimmed, not hidden. |
@@ -62,7 +62,7 @@ Mock scenarios: `credits_exhausted` (Cloud build), then `offline`.
 
 | # | Keys | Expected |
 |---|---|---|
-| 1 | Open Settings, then the Assistant item. | Heading "O2 Assistant". Tab list: "Status, tab, selected". |
+| 1 | Open Settings, then the Assistant item. | Heading "the assistant". Tab list: "Status, tab, selected". |
 | 2 | Tab to Test, then Enter. | "Test passed in …" or "Test failed: …", spoken once. |
 | 3 | Open the Access tab and reach the enable switch. | "Assistant enabled for this organization, switch, on", followed by its description. |
 
@@ -85,11 +85,11 @@ Mock scenario: `confirmation`. TalkBack with Chrome on Android repeats steps 1�
 
 | # | Gestures | Expected |
 |---|---|---|
-| 1 | Open an incident. Double-tap its **Ask about this incident** door. | "O2 Assistant opened." Focus: "Message O2 Assistant, text field". |
+| 1 | Open an incident. Double-tap its **Ask about this incident** door. | "the assistant opened." Focus: "Message the assistant, text field". |
 | 2 | Type a question and send it. | "Sending…" then "Writing the answer". |
 | 3 | Wait for the approval. | "Waiting for your approval: …" ending "Review request is above the message box." (the touch variant; no keyboard shortcut is named). |
 | 4 | Swipe left from the message box to **Review request**, double-tap. Swipe right to the approve button and double-tap. | Focus: "Deny, button" after the first double-tap. Then the step line and "Done". |
-| 5 | Swipe to **Close O2 Assistant** and double-tap. There is no hardware Escape. | "O2 Assistant closed." Focus returns to the incident door. |
+| 5 | Swipe to **Close the assistant** and double-tap. There is no hardware Escape. | "the assistant closed." Focus returns to the incident door. |
 
 ## Manual keyboard check on iOS Safari (375 capture list)
 

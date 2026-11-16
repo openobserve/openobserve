@@ -38,6 +38,10 @@ import {
   useAssistantContext,
 } from "./useAssistantContext";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const capability = { gate: "available", persistence: true } as AssistantCapability;
 
 let scope: EffectScope;
@@ -261,7 +265,7 @@ describe("useAssistantContext", () => {
       "1 attachment · 7 B",
     );
     expect(view.disclosure.value).toBe(
-      "Attached data is sent to the assistant and saved with this chat.",
+      `Attached data is sent to ${brandNames.autobot} and saved with this chat.`,
     );
     store.state.sessions[sid].share = {
       id: "s",

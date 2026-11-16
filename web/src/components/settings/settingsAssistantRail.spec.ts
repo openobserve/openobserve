@@ -72,11 +72,11 @@ describe("Settings rail: Assistant", () => {
     config.isEnterprise = "true";
     const w = mountIndex();
     const labels = (w.vm as any).sectionGroups.map((g: any) => g.label);
-    expect(labels.indexOf("Assistant")).toBeGreaterThan(-1);
-    expect(labels.indexOf("Assistant")).toBeLessThan(labels.indexOf("Data"));
+    expect(labels.indexOf(enLocale.brand.askAutobot)).toBeGreaterThan(-1);
+    expect(labels.indexOf(enLocale.brand.askAutobot)).toBeLessThan(labels.indexOf("Data"));
     const item = assistantItem(w);
     expect(item).toMatchObject({
-      label: "Assistant",
+      label: enLocale.brand.askAutobot,
       description: "Status, access, data, history, usage, toolsets, permissions and activity",
       icon: "auto-awesome",
       dataTest: "settings-assistant-tab",
@@ -94,7 +94,9 @@ describe("Settings rail: Assistant", () => {
     const w = mountIndex();
     const item = assistantItem(w);
     expect(item.locked).toBe(true);
-    expect(item.lockedMessage).toBe(enLocale.enterpriseFeature.pitch.aiAssistant);
+    expect(item.lockedMessage).toBe(
+      `${enLocale.brand.askAutobot} to write queries and explain your data in plain English.`,
+    );
   });
 
   it("hides the item when the license map hides ai_assistant, and shows the license lock when locked", () => {

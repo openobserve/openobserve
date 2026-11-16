@@ -22,6 +22,7 @@ import assistantSettings from "@/services/assistant_settings";
 
 import StatusTab from "./StatusTab.vue";
 import { ORG_SETTINGS, settingsHarness } from "./assistantSettings.test-helpers";
+import en from "@/locales/languages/en-US.json";
 
 const { fake, toast } = vi.hoisted(() => ({
   fake: {
@@ -122,7 +123,7 @@ describe("StatusTab", () => {
     await w.find('[data-test="settings-assistant-test-btn"]').trigger("click");
     await settle();
     const text = w.find('[data-test="settings-assistant-test-announce"]').text();
-    expect(text).toBe("Test failed: The assistant didn't respond. Nothing was changed.");
+    expect(text).toBe(`Test failed: ${en.brand.autobot} didn't respond. Nothing was changed.`);
     expect(assistant.capabilities).toHaveBeenCalledTimes(2);
   });
 

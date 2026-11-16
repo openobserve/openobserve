@@ -282,33 +282,6 @@ describe("assistant repo guards", () => {
     expect(keys.sort()).toEqual(AI_ASSISTANT_KEYS);
   });
 
-  it("keeps the product literal only in assistant.name", () => {
-    const literal = leaves(locale.assistant, "assistant").filter(
-      ([key, value]) => value.includes("O2 Assistant") && key !== "assistant.name",
-    );
-    expect(literal).toEqual([]);
-    expect(locale.assistant.name).toBe("O2 Assistant");
-  });
-
-  it("names the product in shortcut copy only through {product}", () => {
-    const literal = leaves(locale.shortcuts, "shortcuts").filter(([, value]) =>
-      value.includes("O2 Assistant"),
-    );
-    expect(literal).toEqual([]);
-    expect(locale.shortcuts.actions.assistantOpen).toBe("Open {product}");
-  });
-
-  it("keeps the product literal in code only in useAssistantName.ts", () => {
-    expect(
-      offenders(
-        (f) =>
-          (inAssistantUi(f.path) || f.path.startsWith("composables/assistant/")) &&
-          f.text.includes("O2 Assistant") &&
-          f.path !== "composables/assistant/useAssistantName.ts",
-      ),
-    ).toEqual([]);
-  });
-
   it("reads --color-ai-accent, --color-chat-bubble-* and --color-gradient-ai* only from the assistant's files", () => {
     const found = offenders((f) => /ai-accent|chat-bubble-|gradient-ai/.test(f.text));
     const outside = found.filter((path) => !AI_TOKEN_OWNERS.some((re) => re.test(path)));

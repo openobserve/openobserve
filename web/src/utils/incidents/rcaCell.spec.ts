@@ -25,6 +25,7 @@ import {
   rcaIncidentNumber,
   type RcaCellModel,
 } from "./rcaCell";
+import en from "@/locales/languages/en-US.json";
 
 const NOW = Date.UTC(2026, 9, 16, 12, 0, 0);
 const minutesAgoMicros = (m: number) => (NOW - m * 60_000) * 1000;
@@ -71,10 +72,16 @@ type Expected = Pick<RcaCellModel, "kind" | "label" | "tone" | "detail" | "rerun
 // Basic rows, previous-result rows, and precedence.
 const cases: [string, Row, boolean, Expected][] = [
   [
-    "RCA disabled",
+    `${en.brand.autobotInvestigate} disabled`,
     { rca: null, rca_off_reason: null, severity: "P2" },
     false,
-    { kind: "state", label: "RCA disabled", tone: "muted", detail: "", rerunNote: "" },
+    {
+      kind: "state",
+      label: `${en.brand.autobotInvestigate} disabled`,
+      tone: "muted",
+      detail: "",
+      rerunNote: "",
+    },
   ],
   [
     "RR-43: disabled hides Analyze and wins over RCA off",
@@ -82,7 +89,7 @@ const cases: [string, Row, boolean, Expected][] = [
     false,
     {
       kind: "state",
-      label: "RCA disabled",
+      label: `${en.brand.autobotInvestigate} disabled`,
       tone: "muted",
       detail: "",
       rerunNote: "",
@@ -90,14 +97,14 @@ const cases: [string, Row, boolean, Expected][] = [
     },
   ],
   [
-    "RCA off · No AI SRE for P4",
+    `RCA off · No ${en.brand.autobotInvestigate} for P4`,
     { rca: null, rca_off_reason: "l0_off", severity: "P4" },
     true,
     {
       kind: "state",
-      label: "RCA off",
+      label: `${en.brand.autobotInvestigate} off`,
       tone: "muted",
-      detail: "No AI SRE for P4",
+      detail: `No ${en.brand.autobotInvestigate} for P4`,
       rerunNote: "",
       showAnalyzeOnHover: true,
     },
@@ -422,7 +429,7 @@ describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
       showAnalyzeOnHover: false,
     });
     expect(rcaCellModel(row, { rcaEnabled: false, now: NOW })).toMatchObject({
-      label: "RCA disabled",
+      label: `${en.brand.autobotInvestigate} disabled`,
       locked: false,
     });
   });

@@ -25,6 +25,10 @@ import { raw } from "@/types/i18n";
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantContextSeesPopover from "./AssistantContextSeesPopover.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake } = vi.hoisted(() => ({ fake: { current: null as any, emptyContext: false } }));
 
 vi.mock("@/composables/assistant", async (importOriginal) => {
@@ -154,7 +158,7 @@ describe("AssistantContextSeesPopover", () => {
       group("page")!
         .querySelector('[data-test="assistant-context-sees-not-read-hint"]')
         ?.getAttribute("aria-label"),
-    ).toBe("The assistant does not read this yet");
+    ).toBe(`${brandNames.autobot} does not read this yet`);
     expect(trackAssistant).toHaveBeenCalledWith("ai_context_inspected", { target: "sees" });
   });
 
@@ -214,9 +218,9 @@ describe("AssistantContextSeesPopover", () => {
     const { panel } = await openPopover();
     const heading = panel()!.querySelector("h2")!;
     expect(document.activeElement).toBe(heading);
-    expect(heading.textContent?.trim()).toBe("What O2 Assistant Will See");
+    expect(heading.textContent?.trim()).toBe(`What ${brandNames.autobot} Will See`);
     expect(panel()!.closest("[role='dialog']")?.getAttribute("aria-label")).toBe(
-      "What O2 Assistant Will See",
+      `What ${brandNames.autobot} Will See`,
     );
   });
 
@@ -235,7 +239,7 @@ describe("AssistantContextSeesPopover", () => {
   it("opens from a small named icon that fits the box's corner, taking no text width (PO A34)", async () => {
     const { trigger, wrapper } = await openPopover();
     expect(trigger.text()).toBe("");
-    expect(trigger.attributes("aria-label")).toBe("What O2 Assistant Will See");
+    expect(trigger.attributes("aria-label")).toBe(`What ${brandNames.autobot} Will See`);
     expect(trigger.attributes("data-size")).toBe("sm");
     expect(trigger.classes()).toContain("max-md:min-h-11");
     expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);

@@ -392,7 +392,8 @@ describe("the error ledger", () => {
       for (const [field, text] of Object.entries(entry)) {
         // The provider reasons are fragments inside `{reason}`, so they start lower case.
         if (field === "reason") continue;
-        expect(text).not.toMatch(/Please|!$|O2 Assistant|AI Assistant/);
+        expect(text).not.toMatch(/Please|!$/);
+        expect(text.replace(/@:\{'[^']*'\}/g, "")).not.toContain(locale.brand.autobot);
         expect(text[0]).toBe(text[0].toUpperCase());
       }
   });

@@ -99,7 +99,10 @@ describe("locale registry stays in sync", () => {
     expect(entryMessages).not.toHaveProperty("serviceVersions");
     await loadLazyLocaleBlocks();
     // setupTests merges the Security namespace into en-us as well.
-    expect(i18n.global.getLocaleMessage("en-us")).toEqual({ ...enMessages, ...enSecurityMessages });
+    expect(i18n.global.getLocaleMessage("en-us")).toEqual({
+      ...enMessages,
+      ...enSecurityMessages,
+    });
   });
 });
 
@@ -262,6 +265,21 @@ describe("untranslated keys fall back to en-US", () => {
     expect(t("filterBar.addFilter")).toBe("Add filter");
     expect(t("filterBar.validation.regexLength", { max: 5 })).toBe(
       "Verwenden Sie für das Muster höchstens 5 Zeichen.",
+    );
+  });
+});
+
+describe("brand names", () => {
+  it("resolve as links in a lazily loaded locale, inside params and plurals", async () => {
+    await loadLocaleMessages("de");
+    const global = i18n.global as any;
+    expect(global.getLocaleMessage("de")).not.toHaveProperty("brand");
+    global.mergeLocaleMessage("de", {
+      brandProbe:
+        "@:{'brand.autobot'} hat {count} Zeile. | @:{'brand.autobot'} hat {count} Zeilen.",
+    });
+    expect(global.t("brandProbe", { count: 3 }, { locale: "de", plural: 3 })).toBe(
+      `${enMessages.brand.autobot} hat 3 Zeilen.`,
     );
   });
 });

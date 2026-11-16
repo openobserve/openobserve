@@ -2,6 +2,7 @@
 // Covers the header edition button (data-test="upgrade-to-enterprise-btn") and the
 // EnterpriseUpgradeDialog feature list with o2.ws documentation short links.
 import { expect } from '@playwright/test';
+import { BRAND } from '../../utils/brand.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 // Enterprise features rendered in the dialog for OSS and ENT builds (non-cloud layout).
@@ -23,7 +24,7 @@ export const ENTERPRISE_FEATURES = [
   // but that page issues a client-side redirect to /docs/enterprise-setup/sre-agent/ — assert
   // the final user-visible URL.
   { name: 'SRE Agent', slug: 'sre_agent', beta: true, ha: true, expectedPath: '/docs/enterprise-setup/sre-agent/' },
-  { name: 'O2 Assistant', slug: 'ai_assistant', beta: true, ha: true, expectedPath: '/docs/' },
+  { name: BRAND.askAutobot, slug: 'ai_assistant', beta: true, ha: true, expectedPath: '/docs/' },
   { name: 'Anomaly Detection', slug: 'anomaly_detect', beta: true, ha: false, expectedPath: '/docs/user-guide/analytics/alerts/anomaly-detection/' },
   { name: 'Metrics Auto Downsampling', slug: 'metrics_downsample', beta: false, ha: false, expectedPath: '/docs/user-guide/data-exploration/metrics/downsampling-metrics/' },
   { name: 'Log Patterns', slug: 'log_patterns', beta: false, ha: false, expectedPath: '/blog/log-patterns-automatic-pattern-extraction-faster-analysis/' },

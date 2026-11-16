@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "Benutzerdefiniertes Schema",
     "allFieldsLabel": "Alle Felder",
     "nlQueryGenerationFailed": "Die Abfrage konnte nicht generiert werden. Bitte versuchen Sie es erneut.",
-    "askAIPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Anfrage...",
-    "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: Hilfe bei Ihrer Abfrage...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: Hilfe bei Ihrer Funktion...",
     "askAIPlaceholderRotation": {
       "one": "Zeige mir Fehler der letzten Stunde...",
       "two": "Finden Sie langsame Abfragen, die länger als 5 Sekunden dauern...",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "Service-Graph",
     "services": "Service-Katalog",
     "aiObservability": "KI-Beobachtbarkeit",
-    "aiAssistant": "KI-Assistent",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "Abmelden",
     "ingestion": "Datenquellen",
     "metrics": "Metriken",
@@ -3983,7 +3983,7 @@
           "note": "Automatisierte SRE-Operationen und Einblicke"
         },
         "ai_assistant": {
-          "name": "KI-Assistent",
+          "name": "@:{'brand.askAutobot'}",
           "note": "Intelligente Abfrage- und Analyseunterstützung"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "VRL-Funktion",
     "jsFunctionHint": "Verwenden Sie das Objekt `row`, um auf Log-Felder zuzugreifen und diese zu ändern. Beispiel: row.new_field = row.existing_field + 'verarbeitet';",
     "vrlFunctionHint": "Verwenden Sie das `.`, um das aktuelle Ereignis darzustellen. Beispiel: .new_field = .existing_field + 'verarbeitet'",
-    "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: Hilfe bei Ihrer Funktion...",
     "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren",
     "associatedFunctionHeader": "Assoziierte Funktionen",
     "enrichmentTables": "Anreicherungstabellen",
@@ -6491,7 +6491,7 @@
       "rbac": "Erstellen Sie benutzerdefinierte Rollen mit feingranularen Berechtigungen für Ihr Team.",
       "logPatterns": "Erkennen Sie wiederkehrende Log-Muster automatisch, statt Zeile für Zeile zu lesen.",
       "correlation": "Springen Sie von einer Logzeile direkt zu den zugehörigen Metriken und Traces.",
-      "aiAssistant": "Lassen Sie KI Abfragen schreiben und Ihre Daten in einfacher Sprache erklären.",
+      "aiAssistant": "@:{'brand.askAutobot'}: Abfragen schreiben und Ihre Daten in einfacher Sprache erklären lassen.",
       "alertInsights": "Sehen Sie, wie oft ein Alarm ausgelöst wird, und erkennen Sie korrelierte Alarme auf einen Blick.",
       "anomalyDetection": "Erkennen Sie ungewöhnliches Metrikverhalten automatisch, bevor ein Schwellenwert-Alarm ausgelöst wird.",
       "agentGraph": "Sehen Sie, wie Ihre KI-Agenten und -Tools sich gegenseitig aufrufen – visualisiert als Graph.",
@@ -10359,9 +10359,9 @@
     "recentEvents": "Letzte Ereignisse",
     "investigate": "Untersuchen →",
     "askAi": {
-      "label": "KI fragen",
-      "hint": "KI dazu fragen",
-      "labelFor": "KI nach {item} fragen",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: dazu fragen",
+      "labelFor": "@:{'brand.askAutobot'}: nach {item} fragen",
       "chip": {
         "firing": "Ausgelöste Alarme",
         "failing": "Fehlgeschlagene Regeln",
@@ -10569,7 +10569,7 @@
     "viewInTarget": "In {target} ansehen",
     "viewTarget": "{target} anzeigen",
     "welcome": {
-      "taglineHighlight": "O2 Assistent",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "Oder probieren Sie eines davon aus"
     },
     "capabilities": {
@@ -10622,7 +10622,7 @@
       "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten",
       "toolExecutionFailed": "Tool-Ausführung fehlgeschlagen",
       "errorOccurred": "Ein Fehler ist aufgetreten",
-      "navigateConfirmQuestion": "Soll O2 Assistant navigieren?",
+      "navigateConfirmQuestion": "Soll @:{'brand.autobot'} navigieren?",
       "confirmToolExecution": "Ausführung von {tool} bestätigen?",
       "entity": {
         "alert": "Alarm",
@@ -10727,7 +10727,7 @@
     "aiExhaustedMessage": "Abonnieren Sie, um KI weiter zu nutzen. Die weitere Nutzung wird über die Rechnung dieser Organisation abgerechnet.",
     "aiContractExhaustedMessage": "Kontaktieren Sie Ihren Account-Manager, um weitere AI-Guthaben hinzuzufügen",
     "aiPayerSubscribeMessage": "Die Abrechnung für diese Organisation wird von {payer} verwaltet. Bitten Sie einen Administrator von {payer} zu abonnieren; die weitere Nutzung wird über dessen Rechnung abgerechnet.",
-    "aiUsedByFeature": "Assistent und Abfragegenerierung: {chat} · Vorfallanalyse: {incident} · Neuanalyse: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} und Abfragegenerierung: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Neuanalyse: {reanalysis}",
     "aiPaygMessage": "Kostenlose Credits sind aufgebraucht — Nutzung wird dem Abonnement in Rechnung gestellt",
     "billingGroup": {
       "tabLabel": "Abrechnungsgruppe",
@@ -11898,14 +11898,14 @@
       "eventsAndCommentsAppearHere": "Ereignisse und Kommentare erscheinen hier",
       "scrollToTop": "Nach oben scrollen",
       "scrollToBottom": "Nach unten scrollen",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "KI-Analyse",
         "analyze": "Analysieren",
-        "analyzeTooltip": "Starten Sie eine KI-SRE-Analyse dieses Vorfalls",
-        "rcaDisabled": "RCA deaktiviert",
-        "rcaOff": "RCA aus",
-        "noAiSreFor": "Kein KI-SRE für {severity}",
+        "analyzeTooltip": "Starten Sie eine @:{'brand.autobotInvestigate'}-Analyse dieses Vorfalls",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} deaktiviert",
+        "rcaOff": "@:{'brand.autobotInvestigate'} aus",
+        "noAiSreFor": "Kein @:{'brand.autobotInvestigate'} für {severity}",
         "investigating": "Untersuchung läuft",
         "rerunElapsed": "erneut ausgeführt · {elapsed}",
         "noUpdateFor": "keine Aktualisierung seit {elapsed}",
@@ -12015,7 +12015,7 @@
       "rcaCancelFailed": "Fehler beim Abbrechen der Analyse",
       "rcaFailed": "AI-Analyse fehlgeschlagen",
       "rcaBlocked": "KI-Analyse wurde nicht ausgeführt",
-      "rcaFailedGeneric": "Fehler beim Durchführen der RCA-Analyse",
+      "rcaFailedGeneric": "Fehler beim Durchführen der @:{'brand.autobotInvestigate'}-Analyse",
       "rcaRetry": "Analyse wiederholen",
       "rcaCopy": "Bericht kopieren",
       "rcaCopied": "Bericht in die Zwischenablage kopiert",
@@ -12130,7 +12130,7 @@
         "loadingReport": "Bericht wird geladen …",
         "reportAfterRun": "Der Bericht erscheint nach dem Lauf.",
         "noAnalysisTitle": "Noch keine Analyse",
-        "noAnalysisText": "Der KI-SRE-Agent prüft die Alarme, die Topologie, die letzten Änderungen, Traces, Logs und Metriken dieses Vorfalls und schreibt dann einen Bericht. Sie können seine Arbeit während des Laufs im Untersuchungs-Thread verfolgen.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} prüft die Alarme, die Topologie, die letzten Änderungen, Traces, Logs und Metriken dieses Vorfalls und schreibt dann einen Bericht. Sie können die Arbeit während des Laufs im Untersuchungs-Thread verfolgen.",
         "stageOf": "Phase {index}/{count} · {stage}",
         "cancelRun": "Lauf abbrechen",
         "followInThread": "Im Thread verfolgen",
@@ -16104,7 +16104,7 @@
         "range": "{band} · {window}",
         "filter": "Auf Auswahl filtern",
         "drillDown": "Drill-down",
-        "askAi": "KI fragen",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "Heatmap-Auswahl · {count} Span | Heatmap-Auswahl · {count} Spans",
         "clear": "Auswahl aufheben"
       }
@@ -16310,8 +16310,8 @@
     "criticalPath": "Kritischer Pfad",
     "askAi": {
       "explainTrace": "Trace erklären",
-      "explainTraceHint": "KI nach den langsamsten Spans auf dem kritischen Pfad und jedem fehlerhaften Span fragen",
-      "askAboutSpan": "KI zu diesem Span fragen",
+      "explainTraceHint": "@:{'brand.askAutobot'}: nach den langsamsten Spans auf dem kritischen Pfad und jedem fehlerhaften Span fragen",
+      "askAboutSpan": "@:{'brand.askAutobot'}: zu diesem Span fragen",
       "spanChip": "Span · {operation}",
       "traceChip": "Trace · {operation}"
     },
@@ -25061,13 +25061,13 @@
       "subtitle": "Abfrageleistung und -zustand in Ihren Datenbanken"
     },
     "ai": {
-      "suggestFix": "KI fragen, wie das zu beheben ist",
-      "suggestFixHint": "Öffnet den KI-Assistenten mit dieser Abfrage, ihrer Engine und ihren Latenzwerten und fragt, was geändert werden soll. Er selbst ändert nichts.",
-      "rowSuggestFix": "KI fragen, wie das zu beheben ist",
+      "suggestFix": "@:{'brand.askAutobot'}: fragen, wie das zu beheben ist",
+      "suggestFixHint": "Öffnet @:{'brand.autobot'} mit dieser Abfrage, ihrer Engine und ihren Latenzwerten und fragt, was geändert werden soll. Selbst ändert es nichts.",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: fragen, wie das zu beheben ist",
       "deadlockFix": "Wie stoppe ich diesen Deadlock?",
-      "deadlockFixHint": "Sendet beide widersprüchlichen Anweisungen und die Beweise für die Zeilenreihenfolge an den KI-Assistenten.",
+      "deadlockFixHint": "Sendet beide widersprüchlichen Anweisungen und die Beweise für die Zeilenreihenfolge an @:{'brand.autobot'}.",
       "blockingFix": "Warum blockiert das?",
-      "blockingFixHint": "Sendet die Anweisung der Root-Sitzung, ihre Leerlaufzeit und die Anzahl der dahinter blockierten Sitzungen an den KI-Assistenten."
+      "blockingFixHint": "Sendet die Anweisung der Root-Sitzung, ihre Leerlaufzeit und die Anzahl der dahinter blockierten Sitzungen an @:{'brand.autobot'}."
     },
     "filters": {
       "allEngines": "Alle Engines",
@@ -26773,8 +26773,8 @@
     "removeStep": "Schritt entfernen",
     "channels": "Kanäle",
     "policySaved": "Richtlinie gespeichert",
-    "verdictTitle": "KI-SRE-Urteil",
-    "reportTitle": "Was der KI-SRE gefunden hat",
+    "verdictTitle": "Urteil von @:{'brand.autobot'}",
+    "reportTitle": "Was @:{'brand.autobot'} gefunden hat",
     "l0P1Lead": "Sofort alarmieren.",
     "l0P1Desc": "KI-Analyse läuft parallel – kritische Alarmierungen werden nie verzögert.",
     "l0P4Lead": "Nur KI-Analyse.",
@@ -26794,7 +26794,7 @@
     "l0MaxLevelsOption": "bis zu {count} Stufe | bis zu {count} Stufen",
     "l0ParallelSentence": "sofort alarmiert; der Agent läuft parallel",
     "l0OnlySentence": "der Agent untersucht; diese Priorität alarmiert nur, wenn Ihre Stufen dies vorsehen",
-    "l0OffSentence": "kein KI-SRE läuft; die Alarmierung verhält sich genau wie ohne KI-Triage",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} läuft nicht; die Alarmierung verhält sich genau wie ohne KI-Triage",
     "l0BudgetRange": "Zwischen 30 und 600 Sekunden – der Server lehnt Werte außerhalb dieses Bereichs ab, anstatt sie zu begrenzen.",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Alarmierung unterdrücken",
@@ -26821,7 +26821,7 @@
     "eventKind_page": "Alarmierung",
     "eventKind_ack": "Bestätigung",
     "eventKind_note": "Notiz",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "Übergabe",
     "eventKind_recovery": "Wiederherstellung",
     "eventKind_state": "Zustand",
@@ -27483,7 +27483,7 @@
     "ladderAddStep": "Schritt hinzufügen",
     "ladderRightNow": "Aktuell ist das",
     "ladderSameLadder": "gleiche Eskalationsleiter",
-    "ladderL0Off": "Kein KI-SRE",
+    "ladderL0Off": "Kein @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "Die Eskalationsleiter hat die Rotationen nie berücksichtigt",
     "ladderStaleDefaultHint": "Jede Stufe alarmiert das gesamte Team, aber dieses Team hat Rotationen – die Eskalationsleiter wurde erstellt, bevor es sie gab. Das Hinzufügen oder Entfernen eines Mitglieds generiert die Standard-Eskalationsleiter neu, oder bearbeiten Sie die Eskalationsleiter einmal manuell.",
     "reachShortNoSmtp": "nur E-Mail · kein SMTP-Transport",
@@ -27819,7 +27819,7 @@
     "consentStillRequired": "Die kostenpflichtige Nutzung ist nicht für alle erforderlichen Organisationen aktiviert.",
     "updateFailed": "Kostenpflichtige KI-Nutzung konnte nicht aktualisiert werden. Versuchen Sie es erneut.",
     "declinedNotice": "Die kostenpflichtige KI-Nutzung ist deaktiviert, daher wurde diese Anfrage nicht gesendet.",
-    "consentScope": "Gilt für die gesamte Organisation: Assistent, Abfragegenerierung und Vorfallanalyse. Sie können sie jederzeit auf der Seite „Pläne“ deaktivieren.",
+    "consentScope": "Gilt für die gesamte Organisation: @:{'brand.askAutobot'}, Abfragegenerierung und Vorfallanalyse. Sie können sie jederzeit auf der Seite „Pläne“ deaktivieren.",
     "managePaidUsage": "Kostenpflichtige Nutzung aktivieren",
     "modePayAsYouGo": "Nutzungsbasiert",
     "modeConsentRequired": "Zustimmung erforderlich",
@@ -28400,7 +28400,7 @@
         "auth_test": "Bot-Token",
         "last_event": "Ereignisse",
         "sockets": "Sockets",
-        "agent": "KI-Assistent",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "Testnachricht"
       },
       "connectedOrgs": "Verbundene Organisationen",

@@ -23,6 +23,7 @@ import assistantSettings from "@/services/assistant_settings";
 
 import ToolsetsTab from "./ToolsetsTab.vue";
 import { settingsHarness } from "./assistantSettings.test-helpers";
+import en from "@/locales/languages/en-US.json";
 
 const { fake, toast, confirm, viewport } = vi.hoisted(() => ({
   viewport: { mdUp: true },
@@ -128,7 +129,7 @@ describe("ToolsetsTab", () => {
     expect(w.find('[data-test="ai-toolset-pagerduty-enabled"]').exists()).toBe(false);
     expect(w.find('[data-test="ai-toolset-pagerduty-test"]').exists()).toBe(false);
     expect(w.find('[data-test="ai-toolsets-footer-note"]').text()).toContain(
-      "Enabled toolsets are available to O2 Assistant and to incident analysis",
+      `Enabled toolsets are available to ${en.brand.autobot} and to incident analysis`,
     );
     expect(w.find('[data-test="settings-assistant-mcp-link"]').exists()).toBe(true);
   });

@@ -21,6 +21,7 @@ import aiToolsets from "@/services/ai_toolsets";
 
 import AssistantToolsetForm from "./AssistantToolsetForm.vue";
 import { settingsHarness } from "./assistantSettings.test-helpers";
+import en from "@/locales/languages/en-US.json";
 
 const { fake, toast, confirm } = vi.hoisted(() => ({
   fake: {
@@ -163,7 +164,7 @@ describe("AssistantToolsetForm", () => {
     );
     await save(w);
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Let the assistant run kubectl without asking?" }),
+      expect.objectContaining({ title: `Let ${en.brand.autobot} run kubectl without asking?` }),
     );
     expect(aiToolsets.update).not.toHaveBeenCalled();
   });
@@ -312,7 +313,7 @@ describe("AssistantToolsetForm", () => {
     await w.find('[data-test="ai-toolset-name-input"] input').setValue("My_Tool");
     await settle();
     expect(w.find('[data-test="ai-toolset-agent-name"]').text()).toBe(
-      "The assistant calls this my-tool",
+      `${en.brand.autobot} calls this my-tool`,
     );
     await w.find('[data-test="ai-toolset-mcp-url"] input').setValue("https://x.example/mcp");
     await save(w);
@@ -322,8 +323,7 @@ describe("AssistantToolsetForm", () => {
     );
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({
-        message:
-          "Toolset added. O2 Assistant and incident analysis in Acme can use it from the next answer.",
+        message: `Toolset added. ${en.brand.autobot} and incident analysis in Acme can use it from the next answer.`,
       }),
     );
   });

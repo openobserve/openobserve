@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "Door de gebruiker gedefinieerd schema",
     "allFieldsLabel": "Alle velden",
     "nlQueryGenerationFailed": "Het genereren van een query is mislukt. Probeer het opnieuw.",
-    "askAIPlaceholder": "Vraag AI om hulp bij je vraag...",
-    "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: hulp bij je query...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: hulp bij je functie...",
     "askAIPlaceholderRotation": {
       "one": "Laat me fouten zien van het afgelopen uur...",
       "two": "Vind langzame zoekopdrachten die meer dan 5 seconden duren...",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "Servicegrafiek",
     "services": "Servicecatalogus",
     "aiObservability": "AI",
-    "aiAssistant": "AI-assistent",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "Uitloggen",
     "ingestion": "Gegevensbronnen",
     "metrics": "Metrieken",
@@ -3983,7 +3983,7 @@
           "note": "Geautomatiseerde SRE-activiteiten en -inzichten"
         },
         "ai_assistant": {
-          "name": "AI-assistent",
+          "name": "@:{'brand.askAutobot'}",
           "note": "Intelligente hulp bij het opvragen en analyseren"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "VRL-functie",
     "jsFunctionHint": "Gebruik het object `row` om logvelden te openen en te wijzigen. Voorbeeld: row.new_field = row.existing_field + 'processed';",
     "vrlFunctionHint": "Gebruik de `.` om de huidige gebeurtenis weer te geven. Voorbeeld: .new_field = .existing_field + 'verwerkt'",
-    "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: hulp bij je functie...",
     "enterFunctionPrompt": "Voer een prompt in om een functie te genereren",
     "associatedFunctionHeader": "Bijbehorende functies",
     "enrichmentTables": "Verrijkingstabellen",
@@ -6491,7 +6491,7 @@
       "rbac": "Maak aangepaste rollen met fijnmazige machtigingen voor je team.",
       "logPatterns": "Herken terugkerende logpatronen automatisch in plaats van regel voor regel te lezen.",
       "correlation": "Spring van een logregel direct naar de bijbehorende metrieken en traces.",
-      "aiAssistant": "Vraag AI om query's te schrijven en je gegevens in gewone taal uit te leggen.",
+      "aiAssistant": "@:{'brand.askAutobot'}: laat query's schrijven en je gegevens in gewone taal uitleggen.",
       "alertInsights": "Zie hoe vaak een alarm afgaat en herken gecorreleerde alarmen in één oogopslag.",
       "anomalyDetection": "Detecteer automatisch ongebruikelijk metriekgedrag, voordat er een drempelalarm afgaat.",
       "agentGraph": "Zie hoe je AI-agents en tools elkaar aanroepen, weergegeven als een graaf.",
@@ -10359,9 +10359,9 @@
     "recentEvents": "Recente gebeurtenissen",
     "investigate": "Onderzoeken →",
     "askAi": {
-      "label": "Vraag AI",
-      "hint": "Vraag AI hierover",
-      "labelFor": "Vraag AI over {item}",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: vraag hierover",
+      "labelFor": "@:{'brand.askAutobot'}: vraag over {item}",
       "chip": {
         "firing": "Alarmerende meldingen",
         "failing": "Mislukte regels",
@@ -10569,7 +10569,7 @@
     "viewInTarget": "Bekijk in {target}",
     "viewTarget": "Bekijk {target}",
     "welcome": {
-      "taglineHighlight": "O2-assistent",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "Of probeer een van deze"
     },
     "capabilities": {
@@ -10622,7 +10622,7 @@
       "unexpectedError": "Er is een onverwachte fout opgetreden",
       "toolExecutionFailed": "Tooluitvoering mislukt",
       "errorOccurred": "Er is een fout opgetreden",
-      "navigateConfirmQuestion": "O2 Assistant toestaan om te navigeren?",
+      "navigateConfirmQuestion": "@:{'brand.autobot'} toestaan om te navigeren?",
       "confirmToolExecution": "Bevestig uitvoering van {tool}?",
       "entity": {
         "alert": "alarm",
@@ -10727,7 +10727,7 @@
     "aiExhaustedMessage": "Neem een abonnement om AI te blijven gebruiken. Verder gebruik wordt gefactureerd op de factuur van deze organisatie.",
     "aiContractExhaustedMessage": "Neem contact op met uw accountmanager om meer AI-tegoed toe te voegen",
     "aiPayerSubscribeMessage": "De facturatie voor deze organisatie wordt beheerd door {payer}. Vraag een beheerder van {payer} om een abonnement te nemen; verder gebruik wordt gefactureerd op de factuur ervan.",
-    "aiUsedByFeature": "Assistent en querygeneratie: {chat} · Incidentanalyse: {incident} · Heranalyse: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} en querygeneratie: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Heranalyse: {reanalysis}",
     "aiPaygMessage": "Gratis credits uitgeput — gebruik wordt gefactureerd op het abonnement",
     "billingGroup": {
       "tabLabel": "Factureringsgroep",
@@ -11898,14 +11898,14 @@
       "eventsAndCommentsAppearHere": "Gebeurtenissen en opmerkingen verschijnen hier",
       "scrollToTop": "Naar boven scrollen",
       "scrollToBottom": "Naar beneden scrollen",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "AI-analyse",
         "analyze": "Analyseren",
-        "analyzeTooltip": "Start een AI SRE-analyse van dit incident",
-        "rcaDisabled": "RCA uitgeschakeld",
-        "rcaOff": "RCA uit",
-        "noAiSreFor": "Geen AI SRE voor {severity}",
+        "analyzeTooltip": "Start een @:{'brand.autobotInvestigate'}-analyse van dit incident",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} uitgeschakeld",
+        "rcaOff": "@:{'brand.autobotInvestigate'} uit",
+        "noAiSreFor": "Geen @:{'brand.autobotInvestigate'} voor {severity}",
         "investigating": "Wordt onderzocht",
         "rerunElapsed": "herstart · {elapsed}",
         "noUpdateFor": "geen update gedurende {elapsed}",
@@ -12015,7 +12015,7 @@
       "rcaCancelFailed": "Kan analyse niet annuleren",
       "rcaFailed": "AI-analyse mislukt",
       "rcaBlocked": "AI-analyse is niet uitgevoerd",
-      "rcaFailedGeneric": "Kan RCA-analyse niet uitvoeren",
+      "rcaFailedGeneric": "Kan @:{'brand.autobotInvestigate'}-analyse niet uitvoeren",
       "rcaRetry": "Analyse opnieuw proberen",
       "rcaCopy": "Rapport kopiëren",
       "rcaCopied": "Rapport gekopieerd naar klembord",
@@ -12130,7 +12130,7 @@
         "loadingReport": "Rapport laden…",
         "reportAfterRun": "Het rapport verschijnt na de run.",
         "noAnalysisTitle": "Nog geen analyse",
-        "noAnalysisText": "De AI SRE Agent controleert de alarmen, topologie, recente wijzigingen, traces, logs en metrieken van dit incident en schrijft vervolgens een rapport. Je kunt het werk volgen in de thread Onderzoek terwijl het loopt.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} controleert de alarmen, topologie, recente wijzigingen, traces, logs en metrieken van dit incident en schrijft vervolgens een rapport. Je kunt het werk volgen in de thread Onderzoek terwijl het loopt.",
         "stageOf": "Fase {index}/{count} · {stage}",
         "cancelRun": "Run annuleren",
         "followInThread": "Volgen in thread",
@@ -16104,7 +16104,7 @@
         "range": "{band} · {window}",
         "filter": "Filteren op selectie",
         "drillDown": "Drill-down",
-        "askAi": "Vraag AI",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "Heatmapselectie · {count} span | Heatmapselectie · {count} spans",
         "clear": "Selectie wissen"
       }
@@ -16310,8 +16310,8 @@
     "criticalPath": "Kritieke pad",
     "askAi": {
       "explainTrace": "Trace uitleggen",
-      "explainTraceHint": "Vraag AI naar de traagste spans op het kritieke pad en elke foutieve span",
-      "askAboutSpan": "Vraag AI naar deze span",
+      "explainTraceHint": "@:{'brand.askAutobot'}: vraag naar de traagste spans op het kritieke pad en elke foutieve span",
+      "askAboutSpan": "@:{'brand.askAutobot'}: vraag naar deze span",
       "spanChip": "Span · {operation}",
       "traceChip": "Trace · {operation}"
     },
@@ -25061,13 +25061,13 @@
       "subtitle": "Queryprestaties en status van uw databases"
     },
     "ai": {
-      "suggestFix": "Vraag AI hoe dit op te lossen",
-      "suggestFixHint": "Opent de AI-assistent met deze query, de engine en de latentiewaarden, en vraagt wat er moet veranderen. Het verandert zelf niets.",
-      "rowSuggestFix": "Vraag AI hoe dit op te lossen",
+      "suggestFix": "@:{'brand.askAutobot'}: hoe los ik dit op",
+      "suggestFixHint": "Opent @:{'brand.autobot'} met deze query, de engine en de latentiewaarden, en vraagt wat er moet veranderen. Het verandert zelf niets.",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: hoe los ik dit op",
       "deadlockFix": "Hoe stop ik deze deadlock?",
-      "deadlockFixHint": "Verstuurt zowel de conflicterende statements als het rijvolgorde-bewijs naar de AI-assistent.",
+      "deadlockFixHint": "Verstuurt zowel de conflicterende statements als het rijvolgorde-bewijs naar @:{'brand.autobot'}.",
       "blockingFix": "Waarom blokkeert dit?",
-      "blockingFixHint": "Verstuurt de statement van de rootsessie, de inactieve tijd en het aantal sessies dat erachter vastzit naar de AI-assistent."
+      "blockingFixHint": "Verstuurt de statement van de rootsessie, de inactieve tijd en het aantal sessies dat erachter vastzit naar @:{'brand.autobot'}."
     },
     "filters": {
       "allEngines": "Alle engines",
@@ -26773,8 +26773,8 @@
     "removeStep": "Verwijder stap",
     "channels": "Kanalen",
     "policySaved": "Beleid opgeslagen",
-    "verdictTitle": "AI-SRE-oordeel",
-    "reportTitle": "Wat de AI SRE heeft gevonden",
+    "verdictTitle": "Oordeel van @:{'brand.autobot'}",
+    "reportTitle": "Wat @:{'brand.autobot'} heeft gevonden",
     "l0P1Lead": "Direct alarmeren.",
     "l0P1Desc": "AI-analyse draait parallel — kritieke oproepen worden nooit vertraagd.",
     "l0P4Lead": "Alleen AI-analyse.",
@@ -26794,7 +26794,7 @@
     "l0MaxLevelsOption": "tot {count} niveau | tot {count} niveaus",
     "l0ParallelSentence": "onmiddellijk opgeroepen; de agent draait tegelijkertijd mee",
     "l0OnlySentence": "de agent onderzoekt; deze prioriteit leidt alleen tot een piketoproep als je niveaus dat aangeven",
-    "l0OffSentence": "er draait geen AI SRE; de piketoproep gedraagt zich precies zoals zonder AI-triage",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} draait niet; de piketoproep gedraagt zich precies zoals zonder AI-triage",
     "l0BudgetRange": "Tussen 30 en 600 seconden — de server weigert waarden buiten dit bereik in plaats van ze af te kappen.",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "De oproep onderdrukken",
@@ -26821,7 +26821,7 @@
     "eventKind_page": "Oproep",
     "eventKind_ack": "Ack",
     "eventKind_note": "Notitie",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "Overdracht",
     "eventKind_recovery": "Herstel",
     "eventKind_state": "Status",
@@ -27483,7 +27483,7 @@
     "ladderAddStep": "Een stap toevoegen",
     "ladderRightNow": "Op dit moment is dat",
     "ladderSameLadder": "dezelfde ladder",
-    "ladderL0Off": "Geen AI SRE",
+    "ladderL0Off": "Geen @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "Ladder heeft de rotaties niet overgenomen",
     "ladderStaleDefaultHint": "Elk niveau roept het hele team op, maar dit team heeft rotaties — de ladder is gemaakt vóórdat ze bestonden. Het toevoegen of verwijderen van een lid voert de standaard opnieuw uit, of bewerk de ladder een keer met de hand.",
     "reachShortNoSmtp": "alleen e-mail · geen SMTP-transport",
@@ -27819,7 +27819,7 @@
     "consentStillRequired": "Betaald gebruik is niet ingeschakeld voor alle vereiste organisaties.",
     "updateFailed": "Betaald AI-gebruik kon niet worden bijgewerkt. Probeer het opnieuw.",
     "declinedNotice": "Betaald AI-gebruik staat uit, dus dit verzoek is niet verzonden.",
-    "consentScope": "Geldt voor de hele organisatie: AI-assistent, querygeneratie en incidentanalyse. Je kunt het altijd uitschakelen op de pagina Abonnementen.",
+    "consentScope": "Geldt voor de hele organisatie: @:{'brand.askAutobot'}, querygeneratie en incidentanalyse. Je kunt het altijd uitschakelen op de pagina Abonnementen.",
     "managePaidUsage": "Betaald gebruik inschakelen",
     "modePayAsYouGo": "Betalen per gebruik",
     "modeConsentRequired": "Toestemming vereist",
@@ -28400,7 +28400,7 @@
         "auth_test": "Bottoken",
         "last_event": "Gebeurtenissen",
         "sockets": "Sockets",
-        "agent": "AI-assistent",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "Testbericht"
       },
       "connectedOrgs": "Verbonden organisaties",

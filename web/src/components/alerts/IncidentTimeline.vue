@@ -343,13 +343,7 @@ const AI_TYPES = [
 ];
 const SEVERITY_TYPES = ["SeverityUpgrade", "SeverityOverride"];
 
-// P1 is the most urgent; a SeverityUpgrade to a less urgent level is a put-back.
-const severityLowered = (data: any): boolean => {
-  const rank = (s: unknown) => Number(String(s ?? "").replace(/^P/, ""));
-  return rank(data?.to) > rank(data?.from);
-};
-
-// True only for the fixed "AI SRE" badge treatment: a system-authored AI
+// True only for the fixed investigation badge treatment: a system-authored AI
 // event. A user-cancelled AI event goes through the normal badge instead.
 const isAiLabelled = (event: any): boolean => {
   return getUserId(event) === "System" && AI_TYPES.includes(event.type);

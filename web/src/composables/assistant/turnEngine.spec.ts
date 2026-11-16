@@ -51,6 +51,10 @@ import type {
   SendResult,
 } from "./useAssistantClient";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 vi.mock("@/services/assistantAnalytics", () => ({
   trackAssistant: vi.fn(),
   trackAssistantAdmitted: vi.fn(),
@@ -1764,7 +1768,7 @@ describe("turnEngine: round 3 follow-ups", () => {
     expect(announce).toHaveBeenCalledWith(
       h.current.sid,
       "assistant.error.credits_exhausted.title",
-      expect.objectContaining({ org: "org1", product: "O2 Assistant" }),
+      expect.objectContaining({ org: "org1", product: `${brandNames.autobot}` }),
     );
     const second = await begin(h);
     clock += 12_000;

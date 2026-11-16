@@ -30,6 +30,7 @@ import { ASK_AI_KEY, type InsightAskPayload } from "../insight/insightCta";
 import { analysisLink, incidentLink } from "./incidentsCopy";
 import LivePaged from "./LivePaged.vue";
 import oncall from "@/services/oncall";
+import en from "@/locales/languages/en-US.json";
 
 const routeQuery: Record<string, string> = { live: "1" };
 const push = vi.fn();
@@ -517,7 +518,7 @@ describe("LivePaged", () => {
     await flushPromises();
     expect(rows(rest)).toHaveLength(3);
     expect(rest.text()).not.toMatch(RAW);
-    expect(rest.text()).toContain("RCA off");
+    expect(rest.text()).toContain(`${en.brand.autobotInvestigate} off`);
     expect(rest.text()).toContain("Not analyzed");
 
     queryClient.clear();

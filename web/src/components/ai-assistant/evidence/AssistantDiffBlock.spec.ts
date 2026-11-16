@@ -22,6 +22,10 @@ import { resetAssistantShortcutsForTests } from "@/composables/assistant/shortcu
 
 import AssistantDiffBlock from "./AssistantDiffBlock.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 vi.mock("monaco-editor/esm/vs/editor/editor.api", () => {
   throw new Error("Monaco is not loaded in unit specs");
 });
@@ -82,7 +86,7 @@ describe("AssistantDiffBlock", () => {
   it("states the language, that nothing checked it, and the source on the bar", () => {
     const { wrapper } = setup({ language: "js", hostId: "function" });
     expect(wrapper.get('[data-test="assistant-diff-status"]').text()).toBe(
-      "Proposed JavaScript · not checked · from O2 Assistant",
+      `Proposed JavaScript · not checked · from ${brandNames.autobot}`,
     );
     expect(wrapper.get('[data-test="assistant-diff-block"]').attributes("aria-label")).toBe(
       "Proposed change to the function",

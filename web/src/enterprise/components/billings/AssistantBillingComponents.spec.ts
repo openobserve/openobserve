@@ -26,6 +26,7 @@ import { createTestQueryClient, withQueryClient } from "@/test/unit/helpers/quer
 
 import AssistantCreditsCard from "./AssistantCreditsCard.vue";
 import AssistantPaidUsageSettings from "./AssistantPaidUsageSettings.vue";
+import en from "@/locales/languages/en-US.json";
 
 const { confirm, promptForConsent, capabilityAdmin } = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -352,7 +353,7 @@ describe("AssistantCreditsCard", () => {
       used_by_feature: { chat: 700, incident: 400, incident_reanalysis: 100 },
     });
     expect(w.find('[data-test="billing-ai-used-by-feature"]').text()).toBe(
-      "Assistant and query generation: 700 · Incident analysis: 400 · Reanalysis: 100",
+      `${en.brand.askAutobot} and query generation: 700 · ${en.brand.autobotInvestigate}: 400 · Reanalysis: 100`,
     );
   });
 

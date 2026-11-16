@@ -18,17 +18,21 @@ import { describe, expect, it } from "vitest";
 
 import AssistantHandoffSuggestion from "./AssistantHandoffSuggestion.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const card = (w: ReturnType<typeof mount>) => w.get('[data-test="assistant-handoff-suggestion"]');
 
 describe("AssistantHandoffSuggestion", () => {
   it("shows the title, the body and both actions in tab order", () => {
     const w = mount(AssistantHandoffSuggestion, { props: { agent: "sre" } });
-    expect(card(w).text()).toContain("Investigator can look for the cause");
+    expect(card(w).text()).toContain(`${brandNames.autobotInvestigate} can look for the cause`);
     expect(w.get('[data-test="assistant-handoff-suggestion-body"]').text()).toBe(
       "It gets this chat and its context. It can take a few minutes.",
     );
     const buttons = w.findAll("button").map((button) => button.text());
-    expect(buttons).toEqual(["Hand off to Investigator", "Not now"]);
+    expect(buttons).toEqual([`Hand off to ${brandNames.autobotInvestigate}`, "Not now"]);
   });
 
   it("mentions credits only on a metered org", () => {
@@ -49,7 +53,7 @@ describe("AssistantHandoffSuggestion", () => {
 
   it("collapses to one line that can still hand off", async () => {
     const w = mount(AssistantHandoffSuggestion, { props: { agent: "sre", collapsed: true } });
-    expect(w.text()).toContain("Investigator was suggested");
+    expect(w.text()).toContain(`${brandNames.autobotInvestigate} was suggested`);
     expect(w.find('[data-test="assistant-handoff-suggestion"]').exists()).toBe(false);
     await w.get('[data-test="assistant-handoff-suggestion-reopen"]').trigger("click");
     expect(w.emitted("accept")).toHaveLength(1);

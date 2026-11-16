@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "ユーザー定義スキーマ",
     "allFieldsLabel": "すべてのフィールド",
     "nlQueryGenerationFailed": "クエリを生成できませんでした。もう一度試してください。",
-    "askAIPlaceholder": "AIに問い合わせて...",
-    "askAIFunctionPlaceholder": "関数について AI に質問してください...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}：クエリの作成を手伝ってもらう...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}：関数の作成を手伝ってもらう...",
     "askAIPlaceholderRotation": {
       "one": "過去 1 時間のエラーを表示...",
       "two": "5 秒以上かかる遅いクエリを検索...",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "サービスグラフ",
     "services": "サービスカタログ",
     "aiObservability": "AI オブザーバビリティ",
-    "aiAssistant": "AI アシスタント",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "サインアウト",
     "ingestion": "データソース",
     "metrics": "メトリクス",
@@ -3983,7 +3983,7 @@
           "note": "自動化されたSRE運用と洞察"
         },
         "ai_assistant": {
-          "name": "AI アシスタント",
+          "name": "@:{'brand.askAutobot'}",
           "note": "インテリジェントなクエリと分析の支援"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "VRL 関数",
     "jsFunctionHint": "`row` オブジェクトを使用して、ログフィールドにアクセスして変更します。例:row.new_field = row.existing_field + 'processed';",
     "vrlFunctionHint": "現在のイベントを表すには `.` を使用してください。例: .new_field = .existing_field + ' processed'",
-    "askAIFunctionPlaceholder": "関数について AI に質問してください...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}：関数の作成を手伝ってもらう...",
     "enterFunctionPrompt": "関数を生成するプロンプトを入力してください",
     "associatedFunctionHeader": "関連関数",
     "enrichmentTables": "エンリッチメントテーブル",
@@ -6491,7 +6491,7 @@
       "rbac": "チーム向けにきめ細かい権限を持つカスタムロールを作成できます。",
       "logPatterns": "1行ずつ読む代わりに、繰り返し発生するログパターンを自動的に検出します。",
       "correlation": "ログ行から関連するメトリクスとトレースに直接移動できます。",
-      "aiAssistant": "AI にクエリの作成を依頼し、データをわかりやすい言葉で説明してもらえます。",
+      "aiAssistant": "@:{'brand.askAutobot'}：クエリの作成を依頼し、データをわかりやすい言葉で説明してもらえます。",
       "alertInsights": "アラートがどのくらいの頻度で発火するかを把握し、相関するアラートを一目で確認できます。",
       "anomalyDetection": "しきい値アラートが発火する前に、異常なメトリクスの挙動を自動的に検知します。",
       "agentGraph": "AI エージェントとツールが互いにどのように呼び出し合っているかを、グラフで可視化して確認できます。",
@@ -10359,9 +10359,9 @@
     "recentEvents": "最近のイベント",
     "investigate": "調査する →",
     "askAi": {
-      "label": "AI に質問",
-      "hint": "AI にこれについて質問",
-      "labelFor": "AI に{item}について質問",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}：これについて質問",
+      "labelFor": "@:{'brand.askAutobot'}：{item}について質問",
       "chip": {
         "firing": "発火中のアラート",
         "failing": "失敗しているルール",
@@ -10569,7 +10569,7 @@
     "viewInTarget": "{target} で表示",
     "viewTarget": "{target} を表示",
     "welcome": {
-      "taglineHighlight": "O2 アシスタント",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "または、次のいずれかを試してください"
     },
     "capabilities": {
@@ -10622,7 +10622,7 @@
       "unexpectedError": "予期しないエラーが発生しました",
       "toolExecutionFailed": "ツールの実行に失敗しました",
       "errorOccurred": "エラーが発生しました",
-      "navigateConfirmQuestion": "O2 Assistant がナビゲートすることを許可しますか？",
+      "navigateConfirmQuestion": "@:{'brand.autobot'} がナビゲートすることを許可しますか？",
       "confirmToolExecution": "{tool} の実行を確認しますか？",
       "entity": {
         "alert": "アラート",
@@ -10727,7 +10727,7 @@
     "aiExhaustedMessage": "AI を使い続けるにはサブスクライブしてください。以降の使用量はこの組織の請求書に請求されます。",
     "aiContractExhaustedMessage": "AIクレジットを追加するには、アカウントマネージャーにお問い合わせください",
     "aiPayerSubscribeMessage": "この組織の請求は {payer} が管理しています。サブスクライブするには {payer} の管理者に依頼してください。以降の使用量はその請求書に請求されます。",
-    "aiUsedByFeature": "アシスタントとクエリ生成: {chat} · インシデント分析: {incident} · 再分析: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} とクエリ生成: {chat} · @:{'brand.autobotInvestigate'}: {incident} · 再分析: {reanalysis}",
     "aiPaygMessage": "無料クレジットを使い切りました — 使用量はサブスクリプションに請求されます",
     "billingGroup": {
       "tabLabel": "請求グループ",
@@ -11898,14 +11898,14 @@
       "eventsAndCommentsAppearHere": "イベントとコメントがここに表示されます",
       "scrollToTop": "先頭にスクロール",
       "scrollToBottom": "末尾にスクロール",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "AI 分析",
         "analyze": "分析",
-        "analyzeTooltip": "このインシデントの AI SRE 分析を開始",
-        "rcaDisabled": "RCA 無効",
-        "rcaOff": "RCA オフ",
-        "noAiSreFor": "{severity} の AI SRE はありません",
+        "analyzeTooltip": "このインシデントの @:{'brand.autobotInvestigate'} 分析を開始",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} 無効",
+        "rcaOff": "@:{'brand.autobotInvestigate'} オフ",
+        "noAiSreFor": "{severity} の @:{'brand.autobotInvestigate'} はありません",
         "investigating": "調査中",
         "rerunElapsed": "再実行 · {elapsed}",
         "noUpdateFor": "{elapsed} 更新なし",
@@ -12015,7 +12015,7 @@
       "rcaCancelFailed": "分析のキャンセルに失敗しました",
       "rcaFailed": "AI 分析に失敗しました",
       "rcaBlocked": "AI 分析は実行されませんでした",
-      "rcaFailedGeneric": "RCA 分析を実行できませんでした",
+      "rcaFailedGeneric": "@:{'brand.autobotInvestigate'} 分析を実行できませんでした",
       "rcaRetry": "分析を再試行",
       "rcaCopy": "レポートをコピー",
       "rcaCopied": "レポートをクリップボードにコピーしました",
@@ -12130,7 +12130,7 @@
         "loadingReport": "レポートを読み込み中…",
         "reportAfterRun": "レポートは実行後に表示されます。",
         "noAnalysisTitle": "分析はまだありません",
-        "noAnalysisText": "AI SREエージェントはこのインシデントのアラート、トポロジー、最近の変更、トレース、ログ、メトリクスをチェックし、レポートを作成します。実行中は調査スレッドで作業を追跡できます。",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} はこのインシデントのアラート、トポロジー、最近の変更、トレース、ログ、メトリクスをチェックし、レポートを作成します。実行中は調査スレッドで作業を追跡できます。",
         "stageOf": "ステージ {index}/{count} · {stage}",
         "cancelRun": "実行をキャンセル",
         "followInThread": "スレッドでフォロー",
@@ -16104,7 +16104,7 @@
         "range": "{band} · {window}",
         "filter": "選択範囲でフィルター",
         "drillDown": "ドリルダウン",
-        "askAi": "AI に質問",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "ヒートマップ選択 · {count} スパン | ヒートマップ選択 · {count} スパン",
         "clear": "選択をクリア"
       }
@@ -16310,8 +16310,8 @@
     "criticalPath": "クリティカルパス",
     "askAi": {
       "explainTrace": "トレースを説明",
-      "explainTraceHint": "クリティカルパス上の最も遅いスパンとすべてのエラースパンについてAIに質問します",
-      "askAboutSpan": "このスパンについてAIに質問",
+      "explainTraceHint": "@:{'brand.askAutobot'}：クリティカルパス上の最も遅いスパンとすべてのエラースパンについて質問します",
+      "askAboutSpan": "@:{'brand.askAutobot'}：このスパンについて質問",
       "spanChip": "スパン · {operation}",
       "traceChip": "トレース · {operation}"
     },
@@ -25061,13 +25061,13 @@
       "subtitle": "データベース全体のクエリパフォーマンスと健全性"
     },
     "ai": {
-      "suggestFix": "AIに修正方法を尋ねる",
-      "suggestFixHint": "このクエリ、そのエンジン、レイテンシー数値をAIアシスタントで開き、何を変更すべきかを尋ねます。それ自体は何も変更しません。",
-      "rowSuggestFix": "AIに修正方法を尋ねる",
+      "suggestFix": "@:{'brand.askAutobot'}：修正方法を尋ねる",
+      "suggestFixHint": "このクエリ、そのエンジン、レイテンシー数値を @:{'brand.autobot'} で開き、何を変更すべきかを尋ねます。それ自体は何も変更しません。",
+      "rowSuggestFix": "@:{'brand.askAutobot'}：修正方法を尋ねる",
       "deadlockFix": "このデッドロックを止めるにはどうすればよいですか？",
-      "deadlockFixHint": "競合する両方のステートメントと行順序の証拠をAIアシスタントに送信します。",
+      "deadlockFixHint": "競合する両方のステートメントと行順序の証拠を @:{'brand.autobot'} に送信します。",
       "blockingFix": "なぜブロックしているのですか？",
-      "blockingFixHint": "ルートセッションのステートメント、そのアイドル時間、そしてその背後で詰まっているセッション数をAIアシスタントに送信します。"
+      "blockingFixHint": "ルートセッションのステートメント、そのアイドル時間、そしてその背後で詰まっているセッション数を @:{'brand.autobot'} に送信します。"
     },
     "filters": {
       "allEngines": "すべてのエンジン",
@@ -26773,8 +26773,8 @@
     "removeStep": "ステップを削除",
     "channels": "チャネル",
     "policySaved": "ポリシーが保存されました",
-    "verdictTitle": "AI SREの判定",
-    "reportTitle": "AI SRE が見つけた内容",
+    "verdictTitle": "@:{'brand.autobot'} の判定",
+    "reportTitle": "@:{'brand.autobot'} が見つけた内容",
     "l0P1Lead": "アラートを即時送信。",
     "l0P1Desc": "AI分析は並行して実行され、重要な呼び出しが遅延することはありません。",
     "l0P4Lead": "AI分析のみ。",
@@ -26794,7 +26794,7 @@
     "l0MaxLevelsOption": "最大 {count} レベル | 最大 {count} レベル",
     "l0ParallelSentence": "直ちに呼び出され、エージェントが並行して調査します",
     "l0OnlySentence": "エージェントが調査します。この優先度で呼び出しが行われるのは、レベル設定で指定されている場合のみです",
-    "l0OffSentence": "AI SRE は実行されません。呼び出しは AI トリアージなしの場合とまったく同じように動作します",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} は実行されません。呼び出しは AI トリアージなしの場合とまったく同じように動作します",
     "l0BudgetRange": "30〜600秒の範囲です。この範囲外の値は、クランプせずサーバーが拒否します。",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "呼び出しを抑制する",
@@ -26821,7 +26821,7 @@
     "eventKind_page": "呼び出し",
     "eventKind_ack": "確認",
     "eventKind_note": "メモ",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "引き継ぎ",
     "eventKind_recovery": "復旧",
     "eventKind_state": "状態",
@@ -27483,7 +27483,7 @@
     "ladderAddStep": "ステップを追加",
     "ladderRightNow": "現在の担当は",
     "ladderSameLadder": "同じラダー",
-    "ladderL0Off": "AI SRE なし",
+    "ladderL0Off": "@:{'brand.autobotInvestigate'} なし",
     "ladderStaleDefaultTag": "ローテーション未反映",
     "ladderStaleDefaultHint": "すべてのレベルがチーム全体を呼び出しますが、このチームにはローテーションがあります。このラダーはローテーションが存在する前に作成されました。メンバーを追加/削除するとデフォルトが再実行されるか、ラダーを一度手動で編集してください。",
     "reachShortNoSmtp": "メールのみ・SMTPトランスポートなし",
@@ -27819,7 +27819,7 @@
     "consentStillRequired": "必要なすべての組織で有料利用が有効になっていません。",
     "updateFailed": "有料のAI使用を更新できませんでした。もう一度お試しください。",
     "declinedNotice": "有料のAI使用がオフのため、このリクエストは送信されませんでした。",
-    "consentScope": "組織全体に適用されます：アシスタント、クエリ生成、インシデント分析。プランページでいつでもオフにできます。",
+    "consentScope": "組織全体に適用されます：@:{'brand.askAutobot'}、クエリ生成、インシデント分析。プランページでいつでもオフにできます。",
     "managePaidUsage": "有料使用を有効にする",
     "modePayAsYouGo": "従量課金",
     "modeConsentRequired": "承認が必要",
@@ -28400,7 +28400,7 @@
         "auth_test": "ボットトークン",
         "last_event": "イベント",
         "sockets": "ソケット",
-        "agent": "AI アシスタント",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "テスト投稿"
       },
       "connectedOrgs": "接続済みの組織",

@@ -2,6 +2,7 @@
 // Settings › Assistant with the flag on: rail, tabs, status card, Test, org policy and the member view.
 import { test, expect } from "@playwright/test";
 import { AssistantPage } from "../../pages/assistantPage.js";
+import { BRAND } from "../../utils/brand.js";
 
 // Playwright compiles a static import to require(), which would load the .mjs harness as CommonJS; import() keeps it ESM.
 const loadHarness = () => import("./harness/setup.mjs");
@@ -41,7 +42,7 @@ test.describe("assistant settings", () => {
     await expect(item).toBeVisible({ timeout: 30_000 });
     await item.click();
     await expect(page).toHaveURL(/\/settings\/assistant\/status/);
-    await expect(page.locator('[data-test="settings-assistant-page-title"]')).toHaveText("O2 Assistant");
+    await expect(page.locator('[data-test="settings-assistant-page-title"]')).toHaveText(BRAND.askAutobot);
     await expect(item).toHaveAttribute("aria-selected", "true");
     for (const tab of TABS) {
       await openTab(page, tab);
@@ -101,7 +102,7 @@ test.describe("assistant settings", () => {
     await expect(dialog).toContainText("Running answers will be stopped. Members keep their chat history.");
     await expect(dialog.locator('[data-test="o-dialog-secondary-btn"]')).toBeFocused();
     await dialog.locator('[data-test="o-dialog-primary-btn"]').click();
-    await expect(page.locator('[data-test="o-toast-message"]')).toHaveText("O2 Assistant turned off for default");
+    await expect(page.locator('[data-test="o-toast-message"]')).toHaveText(`${BRAND.autobot} turned off for default`);
     expect(state.settingsPuts).toEqual([
       { enabled: false, permission_tier: "act_with_approval", org_sharing: true, public_sharing: true, data_sharing_level: "raw" },
     ]);

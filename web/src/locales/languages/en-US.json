@@ -1597,8 +1597,8 @@
     "userDefinedSchemaLabel": "User-Defined Schema",
     "allFieldsLabel": "All Fields",
     "nlQueryGenerationFailed": "Failed to generate query. Please try again.",
-    "askAIPlaceholder": "Ask AI to help with your query...",
-    "askAIFunctionPlaceholder": "Ask AI to help with your function...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'} to help with your query...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'} to help with your function...",
     "askAIPlaceholderRotation": {
       "one": "Show me errors from the last hour…",
       "two": "Find slow queries taking more than 5s…",
@@ -2071,7 +2071,7 @@
     "serviceGraph": "Service Graph",
     "services": "Service Catalog",
     "aiObservability": "AI Observability",
-    "aiAssistant": "AI Assistant",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "Sign Out",
     "ingestion": "Data sources",
     "metrics": "Metrics",
@@ -4122,7 +4122,7 @@
           "note": "Automated SRE operations and insights"
         },
         "ai_assistant": {
-          "name": "O2 Assistant",
+          "name": "@:{'brand.askAutobot'}",
           "note": "Intelligent query and analysis assistance"
         },
         "anomaly_detection": {
@@ -4975,18 +4975,18 @@
     "roleAdmin": "Admin",
     "modules": {
       "descriptions": {
-        "ai": "Chat with the assistant, use AI query help and run incident analysis.",
+        "ai": "Chat with @:{'brand.autobot'}, use AI query help and run incident analysis.",
         "ai_chat_share": "Share chats inside the organization and open chats others shared. Admin-only until granted.",
-        "ai_toolsets": "Add and change the tools the assistant can use.",
+        "ai_toolsets": "Add and change the tools @:{'brand.autobot'} can use.",
         "llmObservability": "Tracing, evaluation and prompts for your own LLM applications. Not {product}.",
         "mcp": "Connect external AI clients ({clients}) to this organization through MCP."
       },
       "groups": {
-        "assistant": "Assistant",
+        "assistant": "@:{'brand.askAutobot'}",
         "llmObservability": "LLM observability"
       },
       "labels": {
-        "ai": "{product}",
+        "ai": "@:{'brand.askAutobot'}",
         "ai_chat_share": "Chat sharing",
         "ai_toolsets": "Toolsets",
         "mcp": "MCP access"
@@ -6549,7 +6549,7 @@
     "vrlfunction": "VRL Function",
     "jsFunctionHint": "Use the `row` object to access and modify log fields. Example: row.new_field = row.existing_field + ' processed';",
     "vrlFunctionHint": "Use the `.` to represent the current event. Example: .new_field = .existing_field + ' processed'",
-    "askAIFunctionPlaceholder": "Ask AI to help with your function...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'} to help with your function...",
     "enterFunctionPrompt": "Enter a prompt to generate function",
     "associatedFunctionHeader": "Associated Functions",
     "enrichmentTables": "Enrichment Tables",
@@ -6664,7 +6664,7 @@
       "rbac": "Create custom roles with fine-grained permissions for your team.",
       "logPatterns": "Spot recurring log patterns automatically instead of reading line by line.",
       "correlation": "Jump from a log line straight to its related metrics and traces.",
-      "aiAssistant": "Ask AI to write queries and explain your data in plain English.",
+      "aiAssistant": "@:{'brand.askAutobot'} to write queries and explain your data in plain English.",
       "alertInsights": "See how often an alert fires and spot correlated alerts at a glance.",
       "anomalyDetection": "Catch unusual metric behavior automatically, before it fires a threshold alert.",
       "agentGraph": "See how your AI agents and tools call each other, visualized as a graph.",
@@ -10531,7 +10531,7 @@
     "agent": {
       "askOff": {
         "budget": "AI credits for this month are used up, so {product} cannot answer",
-        "oss": "{product}, the AI assistant, is part of OpenObserve Enterprise. This Open Source build has no assistant and no incidents.",
+        "oss": "@:{'brand.askAutobot'} is part of OpenObserve Enterprise. This Open Source build has no @:{'brand.autobot'} and no incidents.",
         "not_entitled": "{product} is not part of this plan",
         "not_configured": "{product} is not set up for this organization yet",
         "off_for_org": "{product} is off for this organization",
@@ -10547,7 +10547,7 @@
         "title": "No data yet · send your first logs, metrics or traces",
         "note": "Home fills in by itself once a service sends data: Now and Problems with no alert. Building it uses no AI."
       },
-      "tabLabel": "AI Assistant"
+      "tabLabel": "@:{'brand.askAutobot'}"
     },
     "answersReady": "{count} answer ready | {count} answers ready"
   },
@@ -10561,9 +10561,9 @@
     "recentEvents": "Recent events",
     "investigate": "Investigate →",
     "askAi": {
-      "label": "Ask AI",
-      "hint": "Ask AI about this",
-      "labelFor": "Ask AI about {item}",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'} about this",
+      "labelFor": "@:{'brand.askAutobot'} about {item}",
       "chip": {
         "firing": "Firing alerts",
         "failing": "Failing rules",
@@ -10803,7 +10803,7 @@
     "viewInTarget": "View in {target}",
     "viewTarget": "View {target}",
     "welcome": {
-      "taglineHighlight": "O2 Assistant",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "Or try one of these"
     },
     "capabilities": {
@@ -10856,7 +10856,7 @@
       "unexpectedError": "An unexpected error occurred",
       "toolExecutionFailed": "Tool execution failed",
       "errorOccurred": "An error occurred",
-      "navigateConfirmQuestion": "Allow O2 Assistant to navigate?",
+      "navigateConfirmQuestion": "Allow @:{'brand.autobot'} to navigate?",
       "confirmToolExecution": "Confirm execution of {tool}?",
       "entity": {
         "alert": "alert",
@@ -11042,7 +11042,7 @@
         "failedForbidden": "You don't have permission to make this change.",
         "failedItem": "{name} failed: {reason}",
         "itemsName": "Result of each item",
-        "narrowed": "The assistant will propose these {count} again for your approval",
+        "narrowed": "@:{'brand.autobot'} will propose these {count} again for your approval",
         "open": "Open {name} (opens in a new tab)",
         "sending": "Sending your decision…",
         "stop": "Stop",
@@ -11088,8 +11088,8 @@
       "retry": "Retry",
       "record": {
         "denied": "Denied: {name}",
-        "deniedUnnamed": "Denied a change the assistant proposed",
-        "deniedUnnamedReason": "Denied a change the assistant proposed · {reason}",
+        "deniedUnnamed": "Denied a change @:{'brand.autobot'} proposed",
+        "deniedUnnamedReason": "Denied a change @:{'brand.autobot'} proposed · {reason}",
         "expired": "Request expired. Nothing was changed.",
         "moved": "Moved to {editor}",
         "paused": "Paused {entity} {name}",
@@ -11109,7 +11109,7 @@
       "recheckFailed": "Couldn't check for changes, so nothing was written",
       "more": "More actions",
       "revokeFailed": "Couldn't revoke. Try again from Settings.",
-      "grantNotStored": "Approved this once. It wasn't saved for later, so the assistant will ask next time.",
+      "grantNotStored": "Approved this once. It wasn't saved for later, so @:{'brand.autobot'} will ask next time.",
       "actionPhrase": {
         "create": "creating {entity}",
         "pause": "pausing {entity}",
@@ -11130,11 +11130,11 @@
         "access": "Hi, could you grant me {product} access in OpenObserve ({whereToGrant}, Chat) for the {org} organization?",
         "consent": "Could you enable paid AI usage for {org}? Billing › Paid usage: {link}",
         "credits": "Could you enable paid AI usage for {org}? Billing › Paid usage: {link}",
-        "enable": "Could you turn {product} on for {org}? Settings › Assistant › Access: {link}",
-        "settings": "Could you change the {product} settings for {org} in Settings › Assistant?",
+        "enable": "Could you turn {product} on for {org}? Settings › @:{'brand.askAutobot'} › Access: {link}",
+        "settings": "Could you change the {product} settings for {org} in Settings › @:{'brand.askAutobot'}?",
         "share_read": "Could you grant me chat sharing access ({whereToGrant}, Chat sharing) in {org}?",
-        "tool_policy": "The assistant wasn't allowed to run {tool} in {org}. Could you review the assistant's permissions in Settings › Assistant › Permissions?",
-        "agent_access": "Could you let me use {agent} in {product} for {org}? Settings › Assistant › Agents: {link}"
+        "tool_policy": "@:{'brand.autobot'} wasn't allowed to run {tool} in {org}. Could you review the permissions of @:{'brand.autobot'} in Settings › @:{'brand.askAutobot'} › Permissions?",
+        "agent_access": "Could you let me use {agent} in {product} for {org}? Settings › @:{'brand.askAutobot'} › Agents: {link}"
       },
       "messageLabel": "Message",
       "subject": {
@@ -11171,7 +11171,7 @@
       },
       "managePaidUsage": "Manage paid usage",
       "mode": {
-        "consentRequired": "Included credits are used up. Allow paid usage to keep using the assistant.",
+        "consentRequired": "Included credits are used up. Allow paid usage to keep using @:{'brand.autobot'}.",
         "exhaustedContract": "AI credits are used up. Contact your account manager.",
         "exhaustedContractMember": "AI credits are used up. Ask an organization admin to contact your account manager.",
         "exhaustedSubscribe": "AI credits are used up. Subscribe to continue.",
@@ -11278,7 +11278,7 @@
       "removeImage": "Remove {name}",
       "noAccess": "You can read your chats. Starting or continuing one needs AI access.",
       "replyHelper": "Reply declines the request",
-      "replyPlaceholder": "Reply to the assistant",
+      "replyPlaceholder": "Reply to @:{'brand.autobot'}",
       "running": "Wait for this answer to finish, or stop it.",
       "sendEmpty": "Type a message or add context to send",
       "undo": "Undo",
@@ -11353,7 +11353,7 @@
       },
       "chipName": "{label}, {secondary}",
       "dataSharing": "Data sharing · {level}",
-      "disclosure": "Attached data is sent to the assistant and saved with this chat.",
+      "disclosure": "Attached data is sent to @:{'brand.autobot'} and saved with this chat.",
       "seesDisclosure": "Saved with this chat.",
       "seesEmpty": "Only your message is sent.",
       "seesGroup": {
@@ -11366,7 +11366,7 @@
       "seesIntro": "These go with your next message.",
       "seesIntroRemove": "These go with your next message. To leave out something you added, remove its chip.",
       "seesTitle": "What {product} Will See",
-      "disclosureShared": "Attached data is sent to the assistant, saved with this chat and included in any share.",
+      "disclosureShared": "Attached data is sent to @:{'brand.autobot'}, saved with this chat and included in any share.",
       "field": {
         "alert": "Alert",
         "attachments": "Attachments",
@@ -11401,7 +11401,7 @@
       "moreName": "Show {count} more context chip | Show {count} more context chips",
       "notSent": "Not Sent",
       "orgLine": "{org} organization",
-      "notReadHint": "The assistant does not read this yet",
+      "notReadHint": "@:{'brand.autobot'} does not read this yet",
       "notReadYet": "not read yet",
       "openSource": "Open in {page}",
       "remove": "Remove {label} from context",
@@ -11427,10 +11427,10 @@
         "fromPage": "page",
         "page": "Time · {range}",
         "swap": "Change time range",
-        "hint": "The assistant looks at data from this time range.",
+        "hint": "@:{'brand.autobot'} looks at data from this time range.",
         "customRange": "Custom Range…"
       },
-      "title": "What the assistant sees",
+      "title": "What @:{'brand.autobot'} sees",
       "trayLabel": "Context for your next message",
       "trimInternal": "Hide internal fields",
       "truncated": "truncated to {size}",
@@ -11560,7 +11560,7 @@
       "addedToDraft": "Added to your message. Press Send when ready.",
       "addedToast": "Added to chat",
       "ask": "Ask {product}",
-      "assistant": "Assistant",
+      "assistant": "@:{'brand.askAutobot'}",
       "buildFailed": "Couldn't prepare this request",
       "capReached": "Not added: the message is at its limit of 20 rows or 32 KB. Remove a chip and try again.",
       "chip": {
@@ -11589,7 +11589,7 @@
       "explainSeries": "Explain this series",
       "explainService": "Explain this service",
       "explainSpan": "Explain this span",
-      "fix": "Ask AI how to fix this",
+      "fix": "@:{'brand.askAutobot'} how to fix this",
       "inChat": "In chat",
       "inChatRemove": "In chat. Remove it with its × in the context tray.",
       "lockedName": "{label}, locked: ask an admin for AI access",
@@ -11608,10 +11608,10 @@
       },
       "tooltip": {
         "add": "Attaches this to the chat without sending",
-        "createRegex": "Opens a new regex pattern with the assistant beside it, ready to write one for this field",
-        "dockedAsk": "Opens the assistant for this editor",
+        "createRegex": "Opens a new regex pattern with @:{'brand.autobot'} beside it, ready to write one for this field",
+        "dockedAsk": "Opens @:{'brand.autobot'} for this editor",
         "emptyResult": "Sends the query, streams and time range and asks why nothing matched",
-        "explain": "Sends this and asks the assistant to explain it",
+        "explain": "Sends this and asks @:{'brand.autobot'} to explain it",
         "explainAlert": "Sends the alert, its query and threshold and asks what it watches",
         "explainEdge": "Sends this dependency's request, error and latency numbers and asks if it is healthy",
         "explainField": "Sends this field and its value and asks what it means",
@@ -11622,7 +11622,7 @@
         "fix": "Sends this finding and asks how to fix it",
         "ingestion": "Sends this guide's check result and asks how to get the first data in",
         "noStream": "Asks how to send the first data to this organization",
-        "sidebarAsk": "Opens the assistant in the sidebar with this function",
+        "sidebarAsk": "Opens @:{'brand.autobot'} in the sidebar with this function",
         "troubleshootAlert": "Sends the alert, its query, threshold and last firing and asks why it fired",
         "troubleshootQuery": "Sends the query, the error and the time range and asks what to change",
         "troubleshootSpan": "Sends this failing span and asks why it failed"
@@ -11640,8 +11640,8 @@
       "agent_unavailable": {
         "action": "Retry",
         "body": "Findings so far are kept above.",
-        "title": "The assistant didn't respond. Nothing was changed.",
-        "titleAfterChange": "The assistant didn't respond."
+        "title": "@:{'brand.autobot'} didn't respond. Nothing was changed.",
+        "titleAfterChange": "@:{'brand.autobot'} didn't respond."
       },
       "already_submitted": {
         "action": "Reload chat",
@@ -11652,14 +11652,14 @@
       },
       "approval_delivery_failed": {
         "action": "Send again",
-        "title": "Your decision didn't reach the assistant. Nothing was changed."
+        "title": "Your decision didn't reach @:{'brand.autobot'}. Nothing was changed."
       },
       "approval_elsewhere": {
         "title": "Another tab is waiting for your approval on this chat. Your message wasn't sent."
       },
       "approval_expired": {
         "action": "Ask again",
-        "title": "No answer in time, so the assistant didn't run this action."
+        "title": "No answer in time, so @:{'brand.autobot'} didn't run this action."
       },
       "authorization_unavailable": {
         "action": "Retry",
@@ -11700,7 +11700,7 @@
       },
       "empty_response": {
         "action": "Retry",
-        "title": "The assistant didn't answer."
+        "title": "@:{'brand.autobot'} didn't answer."
       },
       "history_unavailable": {
         "action": "Retry",
@@ -11729,7 +11729,7 @@
         "action": "Open IAM roles",
         "actionAdmin": "Open IAM roles",
         "actionMember": "Ask an admin",
-        "body": "This chat stays readable. An admin can grant access in IAM › Roles › Assistant.",
+        "body": "This chat stays readable. An admin can grant access in IAM › Roles › @:{'brand.askAutobot'}.",
         "title": "Your role can no longer use {product}. Your message wasn't sent."
       },
       "permission_denied_tool": {
@@ -11737,7 +11737,7 @@
         "actionAdmin": "Open assistant permissions",
         "actionMember": "Ask an admin",
         "body": "Your organization's assistant policy blocks it.",
-        "title": "The assistant wasn't allowed to run {tool}."
+        "title": "@:{'brand.autobot'} wasn't allowed to run {tool}."
       },
       "persistence_failed": {
         "action": "Retry save",
@@ -11817,7 +11817,7 @@
         "action": "View plans",
         "actionAdmin": "View plans",
         "actionMember": "Ask an admin",
-        "body": "Subscribe to keep using the assistant.",
+        "body": "Subscribe to keep using @:{'brand.autobot'}.",
         "title": "Included AI credits are used up for {org}."
       },
       "turn_busy": {
@@ -11845,7 +11845,7 @@
       },
       "agent_not_permitted": {
         "title": "Your role can't use {agent}. Your message wasn't sent.",
-        "body": "An admin can grant it in Settings › Assistant › Agents.",
+        "body": "An admin can grant it in Settings › @:{'brand.askAutobot'} › Agents.",
         "action": "Ask an admin"
       },
       "agent_unreachable": {
@@ -11891,8 +11891,8 @@
       "rowsWindow": "{count} row · {took} · {window} | {count} rows · {took} · {window}",
       "runNow": "Run now",
       "runNowHint": "Opens {explorer} with this query loaded; you run it there.",
-      "sawRows": "The assistant got {count} row | The assistant got {count} rows",
-      "sawRowsIn": "The assistant got {count} row in {range} | The assistant got {count} rows in {range}",
+      "sawRows": "@:{'brand.autobot'} got {count} row | @:{'brand.autobot'} got {count} rows",
+      "sawRowsIn": "@:{'brand.autobot'} got {count} row in {range} | @:{'brand.autobot'} got {count} rows in {range}",
       "stopped": "Stopped",
       "windowCapped": "{window} (cut to the last 7 days)",
       "askAdmin": "Ask an admin",
@@ -11957,7 +11957,7 @@
       "divider": "Your chat starts here",
       "failed": "Couldn't continue this chat",
       "regionName": "Continued from {title}",
-      "seedLost": "The shared chat is no longer available, so the assistant won't have its earlier messages.",
+      "seedLost": "The shared chat is no longer available, so @:{'brand.autobot'} won't have its earlier messages.",
       "seedMissing": "Shared transcript not available on this device",
       "sendAnyway": "Send anyway",
       "showTurns": "Show {count} shared turn | Show {count} shared turns",
@@ -11992,8 +11992,8 @@
         "title": "You don't have access to shared chats in this organization"
       },
       "notConfigured": {
-        "body": "No agent target is configured for this deployment, so the assistant is off for everyone.",
-        "setup": "Set up the assistant",
+        "body": "No agent target is configured for this deployment, so @:{'brand.autobot'} is off for everyone.",
+        "setup": "Set up @:{'brand.autobot'}",
         "title": "{product} isn't set up yet"
       },
       "notEntitled": {
@@ -12006,13 +12006,13 @@
         "tooltip": "{product} is part of OpenObserve Enterprise and Cloud"
       },
       "offForOrg": {
-        "body": "Past chats stay readable. An admin can turn it on in Settings › Assistant.",
+        "body": "Past chats stay readable. An admin can turn it on in Settings › @:{'brand.askAutobot'}.",
         "title": "{product} is turned off for this organization"
       },
       "openAccessSettings": "Open access settings",
       "tryAgain": "Retry",
       "unhealthy": {
-        "body": "The assistant service isn't responding. Try again in a few minutes.",
+        "body": "The @:{'brand.autobot'} service isn't responding. Try again in a few minutes.",
         "notice": "{product} isn't responding. Your last message wasn't answered.",
         "title": "{product} is unavailable right now",
         "tooltip": "{product} is unavailable right now"
@@ -12035,7 +12035,7 @@
       "openChat": "Open chat",
       "revoke": "Revoke",
       "revokeNamed": "Revoke always-allow for {tool}",
-      "revoked": "Approval revoked. The assistant will ask next time.",
+      "revoked": "Approval revoked. @:{'brand.autobot'} will ask next time.",
       "thisChat": "This chat",
       "title": "Standing approvals",
       "unsupported": "Organization-wide approvals need a newer server version.",
@@ -12066,7 +12066,7 @@
       "stateRunningCount": "{count} answer running | {count} answers running",
       "stateWorking": "Answering: {title}",
       "toastReady": "Answer ready · {title}",
-      "tooltip": "{product}",
+      "tooltip": "@:{'brand.askAutobot'}",
       "unavailableName": "{product}, unavailable",
       "toastFailed": "{title} failed",
       "goTo": "Go to {product}"
@@ -12179,10 +12179,10 @@
       "loadOlder": "Load older",
       "loadedOlder": "Loaded {count} older chat | Loaded {count} older chats",
       "localOnly": {
-        "adminHelp": "To turn it on, set O2_AI_CHAT_PERSISTENCE_ENABLED. Settings › Assistant explains the options.",
+        "adminHelp": "To turn it on, set O2_AI_CHAT_PERSISTENCE_ENABLED. Settings › @:{'brand.askAutobot'} explains the options.",
         "adminLink": "Read the docs",
         "description": "Chats, saved in this browser only, {count} of {cap}",
-        "help": "Chats stay in this browser. Signing out keeps them unless you choose otherwise below; clearing site data removes them. An admin can turn on account history in Settings › Assistant.",
+        "help": "Chats stay in this browser. Signing out keeps them unless you choose otherwise below; clearing site data removes them. An admin can turn on account history in Settings › @:{'brand.askAutobot'}.",
         "info": "About browser history",
         "keptOnSignOut": "Your browser chats were kept when you signed out.",
         "title": "Saved in this browser only"
@@ -12253,10 +12253,10 @@
       "askAgain": "Ask again",
       "edited": "Edited after {product}",
       "provenance": "About this change",
-      "restoredAssistant": "Restored the assistant's version.",
+      "restoredAssistant": "Restored the version from @:{'brand.autobot'}.",
       "restoredOriginal": "Restored your original.",
       "revert": "Revert",
-      "revertAi": "Revert to the assistant's version",
+      "revertAi": "Revert to the version from @:{'brand.autobot'}",
       "revertMine": "Revert to my original",
       "revertName": "Revert assistant's change",
       "short": "AI",
@@ -12300,7 +12300,7 @@
       "parityLine": "Your agent gets the same tools and permissions as {product}. Tools {product} itself can use are set up in {link}.",
       "replaceToken": "Replace {token} with the token you generate above, or with the Base64 of a service account's email:token.",
       "skillsHint": "Teaches your agent how to query, alert and build dashboards in {brand}.",
-      "toolsetsPath": "Settings › {product} › Toolsets"
+      "toolsetsPath": "Settings › @:{'brand.askAutobot'} › Toolsets"
     },
     "message": {
       "actionsName": "Message actions",
@@ -12340,7 +12340,7 @@
       "branchFailed": "Couldn't branch this chat",
       "newTag": "New"
     },
-    "name": "O2 Assistant",
+    "name": "@:{'brand.askAutobot'}",
     "limit": {
       "slotFree": "A chat finished. You can send now."
     },
@@ -12389,11 +12389,11 @@
       "unlisted": "{count} more item has no name and is included | {count} more items have no name and are included"
     },
     "policy": {
-      "autoDeclined": "Auto-declined by the assistant's safety settings",
+      "autoDeclined": "Auto-declined by the safety settings of @:{'brand.autobot'}",
       "denied": "Blocked by policy: {tool}. {detail}",
-      "deniedAdmin": "An admin can allow it in Settings › Assistant › Permissions.",
+      "deniedAdmin": "An admin can allow it in Settings › @:{'brand.askAutobot'} › Permissions.",
       "deniedPlain": "Blocked by policy: {tool}.",
-      "unreviewed": "The assistant changed {count} {entity} without a review step.",
+      "unreviewed": "@:{'brand.autobot'} changed {count} {entity} without a review step.",
       "unreviewedAction": "See what changed",
       "unreviewedActionName": "See what changed (opens in a new tab)"
     },
@@ -12414,7 +12414,7 @@
       "openAll": "Open in {explorer} for all {count}"
     },
     "record": {
-      "compacted": "Earlier context was summarised by the assistant at {time}",
+      "compacted": "Earlier context was summarised by @:{'brand.autobot'} at {time}",
       "theModel": "the model"
     },
     "scroll": {
@@ -12442,7 +12442,7 @@
         "publicSharing": "Allow public links",
         "publicSharingDeploymentOff": "Public links are off for this deployment (ZO_PUBLIC_AI_CHAT_ENABLED).",
         "publicSharingLine": "Public link options disappear from the share dialog.",
-        "rbacOff": "Role-based access is off in this deployment, so every user is an admin and can use the assistant.",
+        "rbacOff": "Role-based access is off in this deployment, so every user is an admin and can use @:{'brand.autobot'}.",
         "roles": {
           "allRoles": "IAM › Roles",
           "capped": "Showing {shown} of {total} roles. See all roles in {link}.",
@@ -12462,9 +12462,9 @@
         "tierActLine": "Members can grant per-tool approvals for this chat or always; deletes always ask.",
         "tierNeedsAgent": "Needs a newer agent version to enforce",
         "tierPropose": "Propose changes",
-        "tierProposeLine": "The assistant drafts changes as approval cards; nothing is applied without a member's approval.",
+        "tierProposeLine": "@:{'brand.autobot'} drafts changes as approval cards; nothing is applied without a member's approval.",
         "tierRead": "Read and query",
-        "tierReadLine": "The assistant runs queries only and never changes anything.",
+        "tierReadLine": "@:{'brand.autobot'} runs queries only and never changes anything.",
         "tierStored": "Saved tier: {tier}. It applies once the agent can enforce it.",
         "offInOrg": "Off in this organization",
         "onInOrg": "On in this organization",
@@ -12520,16 +12520,16 @@
         "retentionForever": "until deleted",
         "serverTitle": "Saved to the server"
       },
-      "leaveName": "the assistant settings of {org}",
-      "offInDeployment": "The assistant is off in this deployment, so these settings have no effect yet.",
-      "pageTitle": "{product}",
+      "leaveName": "the @:{'brand.askAutobot'} settings of {org}",
+      "offInDeployment": "@:{'brand.autobot'} is off in this deployment, so these settings have no effect yet.",
+      "pageTitle": "@:{'brand.askAutobot'}",
       "railDesc": "Status, access, data, history, usage, toolsets, permissions and activity",
       "status": {
         "agentEnabled": "Assistant enabled",
         "agentHa": "High availability",
         "agentUrl": "Agent address",
         "agentVersion": "Agent version",
-        "approvals": "Changes by the assistant",
+        "approvals": "Changes by @:{'brand.autobot'}",
         "approvalsNotEnforced": "Refused: O2_AI_INTERNAL_SECRET isn't set, so no approved change can be applied.",
         "checked": "Checked",
         "clientError": "The agent didn't respond · last seen in this browser",
@@ -12541,16 +12541,16 @@
         "model": "Model",
         "modelHidden": "Hidden from members",
         "notSetUp": "Not set up",
-        "notSetUpMember": "The assistant isn't set up for this deployment. Ask an administrator.",
+        "notSetUpMember": "@:{'brand.autobot'} isn't set up for this deployment. Ask an administrator.",
         "offBody": "Turned off by {actor} on {date}. Members can still open their past chats.",
         "offBodyUnknown": "Turned off for this organization. Members can still open their past chats.",
         "offForOrg": "Off for this organization",
         "openAccess": "Open access settings",
         "reachable": "Reachable",
         "unreachable": "Unreachable",
-        "unreachableBody": "Users see the assistant as unavailable until this is fixed.",
+        "unreachableBody": "Users see @:{'brand.autobot'} as unavailable until this is fixed.",
         "notEntitled": "Not in your license",
-        "notEntitledBody": "Your license doesn't include the AI assistant, so nobody in this organization sees it. Contact your account team to add it."
+        "notEntitledBody": "Your license doesn't include @:{'brand.askAutobot'}, so nobody in this organization sees it. Contact your account team to add it."
       },
       "tabs": {
         "access": "Access",
@@ -12572,7 +12572,7 @@
         "running": "Testing…",
         "unknownCause": "no reason given"
       },
-      "title": "Assistant",
+      "title": "@:{'brand.askAutobot'}",
       "usage": {
         "allowance": "Credit allowance",
         "answered": "Answered",
@@ -12605,7 +12605,7 @@
     "runs": {
       "agent": {
         "general": "{product}",
-        "investigator": "Investigator",
+        "investigator": "@:{'brand.autobotInvestigate'}",
         "queryBuilder": "Query builder"
       },
       "chatInOrg": "A chat in {org}",
@@ -12969,7 +12969,7 @@
     "toolsets": {
       "add": "New toolset",
       "clash": "Name clash",
-      "clashTip": "Both reach the assistant as {agent}; one hides the other.",
+      "clashTip": "Both reach @:{'brand.autobot'} as {agent}; one hides the other.",
       "columns": {
         "actions": "Actions",
         "enabled": "Enabled",
@@ -12984,7 +12984,7 @@
       "deleteTitle": "Delete {name}?",
       "deleted": "{name} deleted",
       "editNamed": "Edit {name}",
-      "empty": "No toolsets yet. Add an MCP server, a CLI tool or a skill the assistant can use.",
+      "empty": "No toolsets yet. Add an MCP server, a CLI tool or a skill @:{'brand.autobot'} can use.",
       "emptyTitle": "No toolsets yet",
       "enableFailed": "{name} could not be updated.",
       "enabledFor": "Enabled, {name}",
@@ -12992,18 +12992,18 @@
         "aboutCli": "Each run stops after {timeout} seconds and keeps at most {bytes} bytes of output.",
         "aboutCliLabel": "About CLI tools",
         "added": "Toolset added. {product} and incident analysis in {org} can use it from the next answer.",
-        "agentName": "The assistant calls this {agent}",
+        "agentName": "@:{'brand.autobot'} calls this {agent}",
         "allowHelp": "Only these subcommands can run. Separate with commas.",
         "allowRequired": "Enter at least one subcommand",
-        "approvalOff": "The assistant runs this command without asking. Only turn this off for read-only commands.",
+        "approvalOff": "@:{'brand.autobot'} runs this command without asking. Only turn this off for read-only commands.",
         "approvalOffConfirm": "Turn off approval",
         "approvalOffMessage": "Allowed subcommands: {allow}",
-        "approvalOffTitle": "Let the assistant run {command} without asking?",
+        "approvalOffTitle": "Let @:{'brand.autobot'} run {command} without asking?",
         "approvalOn": "Members see an approval card with the exact command before it runs.",
         "back": "Back to toolsets",
         "cliSection": "CLI tool",
-        "descriptionHelp": "The assistant reads this to decide when to call the tool. Say what it does and when to use it, e.g. 'Look up who is on call and page them for PagerDuty services.'",
-        "descriptionLabel": "What the assistant should use this tool for",
+        "descriptionHelp": "@:{'brand.autobot'} reads this to decide when to call the tool. Say what it does and when to use it, e.g. 'Look up who is on call and page them for PagerDuty services.'",
+        "descriptionLabel": "What @:{'brand.autobot'} should use this tool for",
         "editTitle": "Edit toolset",
         "enterAgain": "Enter the value again",
         "wholeNumber": "Enter a whole number greater than 0",
@@ -13013,7 +13013,7 @@
         "loadFailed": "This toolset could not be loaded.",
         "maskValue": "*** is how a kept secret is sent. Enter the real value.",
         "mcpSection": "MCP server",
-        "nameClash": "Another toolset already reaches the assistant as {agent}",
+        "nameClash": "Another toolset already reaches @:{'brand.autobot'} as {agent}",
         "newTitle": "New toolset",
         "presets": "Quick fill",
         "reenterDestination": "The stored secrets can't be kept when the URL, command, allowed subcommands or approval change. Enter every secret again before saving.",
@@ -13037,7 +13037,7 @@
       "mcpLine": "To use OpenObserve from your own agent, see {link}.",
       "mcpLink": "MCP server",
       "moreFor": "More actions for {name}",
-      "notSetUp": "Toolsets take effect once the assistant is set up.",
+      "notSetUp": "Toolsets take effect once @:{'brand.autobot'} is set up.",
       "runtimeRule": "Enabled toolsets are available to {product} and to incident analysis in this organization.",
       "search": "Search toolsets",
       "secret": {
@@ -13280,7 +13280,7 @@
       }
     },
     "oncall": {
-      "continue": "Continue in the assistant"
+      "continue": "Continue in @:{'brand.autobot'}"
     },
     "autoobserve": {
       "askChip": "AutoObserve ask · {name}",
@@ -13292,7 +13292,7 @@
         "purpose": "Answers questions and helps with tasks"
       },
       "investigator": {
-        "name": "Investigator",
+        "name": "@:{'brand.autobotInvestigate'}",
         "purpose": "Finds causes"
       },
       "queryBuilder": {
@@ -13356,7 +13356,7 @@
     "threadsBar": {
       "label": "Threads",
       "title": "Threads",
-      "incidents": "Incidents with a live RCA run · {count}",
+      "incidents": "Incidents with a live @:{'brand.autobotInvestigate'} run · {count}",
       "moreIncidents": "{count} more, newest first",
       "pageFull": "{count}+ open",
       "openIncidents": "Open incidents",
@@ -13468,7 +13468,7 @@
     "aiExhaustedMessage": "Subscribe to keep using AI. Further usage is billed on this organization's invoice.",
     "aiContractExhaustedMessage": "Contact your account manager to add more AI credits",
     "aiPayerSubscribeMessage": "Billing for this organization is managed by {payer}. Ask an admin of {payer} to subscribe; further usage is billed on its invoice.",
-    "aiUsedByFeature": "Assistant and query generation: {chat} · Incident analysis: {incident} · Reanalysis: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} and query generation: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Reanalysis: {reanalysis}",
     "aiPaygMessage": "Free credits exhausted — usage billed to subscription",
     "billingGroup": {
       "tabLabel": "Billing Group",
@@ -15038,14 +15038,14 @@
       "eventsAndCommentsAppearHere": "Events and comments will appear here",
       "scrollToTop": "Scroll to top",
       "scrollToBottom": "Scroll to bottom",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "AI analysis",
         "analyze": "Analyze",
-        "analyzeTooltip": "Start an AI SRE analysis of this incident",
-        "rcaDisabled": "RCA disabled",
-        "rcaOff": "RCA off",
-        "noAiSreFor": "No AI SRE for {severity}",
+        "analyzeTooltip": "Start an @:{'brand.autobotInvestigate'} analysis of this incident",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} disabled",
+        "rcaOff": "@:{'brand.autobotInvestigate'} off",
+        "noAiSreFor": "No @:{'brand.autobotInvestigate'} for {severity}",
         "investigating": "Investigating",
         "rerunElapsed": "re-run · {elapsed}",
         "noUpdateFor": "no update for {elapsed}",
@@ -15165,7 +15165,7 @@
       "rcaCancelFailed": "Failed to cancel analysis",
       "rcaFailed": "AI analysis failed",
       "rcaBlocked": "AI analysis didn't run",
-      "rcaFailedGeneric": "Failed to perform RCA analysis",
+      "rcaFailedGeneric": "Failed to perform @:{'brand.autobotInvestigate'} analysis",
       "rcaRetry": "Retry analysis",
       "rcaCopy": "Copy report",
       "rcaCopied": "Report copied to clipboard",
@@ -15286,7 +15286,7 @@
         "openAnalysisTab": "Open Incident Analysis",
         "reportAfterRun": "The report shows after the run.",
         "noAnalysisTitle": "No analysis yet",
-        "noAnalysisText": "The AI SRE Agent checks this incident's alerts, topology, recent changes, traces, logs and metrics, then writes a report. You can follow its work in the Investigation thread while it runs.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} checks this incident's alerts, topology, recent changes, traces, logs and metrics, then writes a report. You can follow its work in the Investigation thread while it runs.",
         "stageOf": "Stage {index}/{count} · {stage}",
         "cancelRun": "Cancel run",
         "followInThread": "Follow in thread",
@@ -18447,7 +18447,7 @@
     "generalLabel": "General Settings",
     "groupGeneral": "General",
     "groupAccessSecurity": "Access & Security",
-    "groupAssistant": "Assistant",
+    "groupAssistant": "@:{'brand.askAutobot'}",
     "groupDestinations": "Destinations",
     "groupData": "Data",
     "groupOperations": "Operations",
@@ -18462,7 +18462,7 @@
     "orgSubtitle": "Field names, data retention and automatic features for {org}.",
     "passwordPolicySubtitle": "Rules for native email and password accounts.",
     "cipherKeysDesc": "Encryption keys for sensitive fields",
-    "aiToolsetsDesc": "MCP servers and CLI tools the AI assistant can use",
+    "aiToolsetsDesc": "MCP servers and CLI tools @:{'brand.autobot'} can use",
     "regexPatternsDesc": "Reusable regex patterns for redaction",
     "domainManagementDesc": "SSO claim parsing and sign-in restrictions by domain",
     "passwordPolicy": "Password Policy",
@@ -19505,7 +19505,7 @@
         "range": "{band} · {window}",
         "filter": "Filter to selection",
         "drillDown": "Drill down",
-        "askAi": "Ask AI",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "Heatmap selection · {count} span | Heatmap selection · {count} spans",
         "clear": "Clear selection"
       }
@@ -19714,8 +19714,8 @@
     "criticalPath": "Critical path",
     "askAi": {
       "explainTrace": "Explain trace",
-      "explainTraceHint": "Ask AI about the slowest spans on the critical path and every error span",
-      "askAboutSpan": "Ask AI about this span",
+      "explainTraceHint": "@:{'brand.askAutobot'} about the slowest spans on the critical path and every error span",
+      "askAboutSpan": "@:{'brand.askAutobot'} about this span",
       "spanChip": "Span · {operation}",
       "traceChip": "Trace · {operation}"
     },
@@ -20320,7 +20320,7 @@
     },
     "assistantSet": {
       "label": "Set by assistant",
-      "name": "{field} was set by the assistant",
+      "name": "{field} was set by @:{'brand.autobot'}",
       "field": {
         "query": "Query",
         "stream": "Stream",
@@ -22211,8 +22211,8 @@
         "loopExplain": "A high repeat rate usually means the agent isn't caching results or is retrying. Open the worst traces below to see the repeated calls.",
         "failExplain": "These are all of this agent's error messages, from every failure class, not only this one. Read them to find the fix, or open a trace to see where it happened.",
         "costExplain": "These traces drove this agent's spend. Open the most expensive ones to see what ran.",
-        "explain": "Explain with O2 AI",
-        "explainHelp": "O2 AI investigates this signal from its error messages and worst traces, reaches past the AI spans into logs, metrics, Kubernetes and deploys, and cites its evidence."
+        "explain": "Explain with @:{'brand.autobot'}",
+        "explainHelp": "@:{'brand.autobot'} investigates this signal from its error messages and worst traces, reaches past the AI spans into logs, metrics, Kubernetes and deploys, and cites its evidence."
       }
     },
     "versionCompare": {
@@ -26009,7 +26009,7 @@
       "synthetics": "Synthetics",
       "fleet": "Fleet",
       "kubernetes": "Kubernetes",
-      "assistant": "{product}"
+      "assistant": "@:{'brand.askAutobot'}"
     },
     "pages": {
       "global": "Global",
@@ -26070,7 +26070,7 @@
       "fleetConfigEditor": "Configuration editor",
       "fleetOverview": "Fleet pipelines",
       "securityRecord": "Security — open record",
-      "assistant": "{product}",
+      "assistant": "@:{'brand.askAutobot'}",
       "assistantComposer": "{product} composer",
       "queryEditor": "Query editor"
     },
@@ -28768,13 +28768,13 @@
       "subtitle": "Query performance and health across your databases"
     },
     "ai": {
-      "suggestFix": "Ask AI how to fix this",
-      "suggestFixHint": "Opens the AI assistant with this query, its engine and its latency numbers, and asks what to change. It does not change anything itself.",
-      "rowSuggestFix": "Ask AI how to fix this",
+      "suggestFix": "@:{'brand.askAutobot'} how to fix this",
+      "suggestFixHint": "Opens @:{'brand.autobot'} with this query, its engine and its latency numbers, and asks what to change. It does not change anything itself.",
+      "rowSuggestFix": "@:{'brand.askAutobot'} how to fix this",
       "deadlockFix": "How do I stop this deadlock?",
-      "deadlockFixHint": "Sends both conflicting statements and the row-order evidence to the AI assistant.",
+      "deadlockFixHint": "Sends both conflicting statements and the row-order evidence to @:{'brand.autobot'}.",
       "blockingFix": "Why is this blocking?",
-      "blockingFixHint": "Sends the root session's statement, its idle time and how many sessions are stuck behind it to the AI assistant."
+      "blockingFixHint": "Sends the root session's statement, its idle time and how many sessions are stuck behind it to @:{'brand.autobot'}."
     },
     "filters": {
       "allEngines": "All engines",
@@ -30480,8 +30480,8 @@
     "removeStep": "Remove step",
     "channels": "Channels",
     "policySaved": "Policy saved",
-    "verdictTitle": "AI SRE verdict",
-    "reportTitle": "What the AI SRE found",
+    "verdictTitle": "@:{'brand.autobot'} verdict",
+    "reportTitle": "What @:{'brand.autobot'} found",
     "l0P1Lead": "Alert immediately.",
     "l0P1Desc": "AI analysis runs in parallel — critical pages are never delayed.",
     "l0P4Lead": "AI analysis only.",
@@ -30501,7 +30501,7 @@
     "l0MaxLevelsOption": "up to {count} level | up to {count} levels",
     "l0ParallelSentence": "paged at once; the agent runs alongside",
     "l0OnlySentence": "the agent investigates; this priority pages only if your levels say so",
-    "l0OffSentence": "no AI SRE runs; the page behaves exactly as it did without AI triage",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} does not run; the page behaves exactly as it did without AI triage",
     "l0BudgetRange": "Between 30 and 600 seconds — the server refuses values outside this range rather than clamping",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Suppress the page",
@@ -30528,7 +30528,7 @@
     "eventKind_page": "Page",
     "eventKind_ack": "Ack",
     "eventKind_note": "Note",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "Handoff",
     "eventKind_recovery": "Recovery",
     "eventKind_state": "State",
@@ -31190,7 +31190,7 @@
     "ladderAddStep": "Add a step",
     "ladderRightNow": "Right now that is",
     "ladderSameLadder": "same ladder",
-    "ladderL0Off": "No AI SRE",
+    "ladderL0Off": "No @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "Ladder never learned the rotations",
     "ladderStaleDefaultHint": "Every level pages the whole team, but this team has rotations — the ladder was created before they existed. Adding or removing a member re-runs the default, or edit the ladder once by hand.",
     "reachShortNoSmtp": "email only · no SMTP transport",
@@ -31527,7 +31527,7 @@
     "consentStillRequired": "Paid usage is not enabled for every required organization.",
     "updateFailed": "Couldn't update paid AI usage. Try again.",
     "declinedNotice": "Paid AI usage is off, so this request wasn't sent.",
-    "consentScope": "Applies to the whole organization: Assistant, query generation and incident analysis. You can turn it off anytime on the Plans page.",
+    "consentScope": "Applies to the whole organization: @:{'brand.askAutobot'}, query generation and incident analysis. You can turn it off anytime on the Plans page.",
     "managePaidUsage": "Turn on paid usage",
     "modePayAsYouGo": "Pay as you go",
     "modeConsentRequired": "Consent required",
@@ -32936,7 +32936,7 @@
         "auth_test": "Bot token",
         "last_event": "Events",
         "sockets": "Sockets",
-        "agent": "AI assistant",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "Test post"
       },
       "connectedOrgs": "Connected orgs",
@@ -35585,7 +35585,7 @@
       "openService": "Open service",
       "reviewServices": "Review services",
       "openInCalibration": "Open in Alert calibration",
-      "askAi": "Ask AI",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "Ask admins",
       "dismiss": "Dismiss…",
       "markIntendedReport": "Mark as intended report",
@@ -36620,5 +36620,10 @@
       },
       "noHighConfidence": "No high-confidence names"
     }
+  },
+  "brand": {
+    "askAutobot": "Ask Autobot",
+    "autobot": "Autobot",
+    "autobotInvestigate": "Autobot Investigate"
   }
 }

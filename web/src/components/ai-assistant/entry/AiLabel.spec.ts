@@ -20,6 +20,10 @@ import type { AiLabelState } from "@/composables/assistant";
 
 import AiLabel from "./AiLabel.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { md } = vi.hoisted(() => ({ md: { value: true } }));
 
 vi.mock("@/composables/useBreakpoint", async () => {
@@ -52,7 +56,9 @@ afterEach(() => {
 describe("AiLabel", () => {
   it("says the assistant wrote it and offers one Revert to my original", async () => {
     const wrapper = mount(AiLabel, { props: { state: state() }, attachTo: document.body });
-    expect(wrapper.get('[data-test="ai-label-tag"]').text()).toContain("Written by O2 Assistant");
+    expect(wrapper.get('[data-test="ai-label-tag"]').text()).toContain(
+      `Written by ${brandNames.autobot}`,
+    );
     const revert = wrapper.get('[data-test="ai-label-revert"]');
     expect(revert.attributes("aria-label")).toBe("Revert assistant's change");
     await revert.trigger("click");
@@ -60,16 +66,18 @@ describe("AiLabel", () => {
     wrapper.unmount();
   });
 
-  it("after an edit, reverts to the assistant's version or to my original from a menu", async () => {
+  it(`after an edit, reverts to the assistant's version or to my original from a menu`, async () => {
     const wrapper = mount(AiLabel, {
       props: { state: state({ status: "edited" }) },
       attachTo: document.body,
     });
-    expect(wrapper.get('[data-test="ai-label-tag"]').text()).toContain("Edited after O2 Assistant");
+    expect(wrapper.get('[data-test="ai-label-tag"]').text()).toContain(
+      `Edited after ${brandNames.autobot}`,
+    );
     await wrapper.get('[data-test="ai-label-revert"]').trigger("click");
     await flushPromises();
     expect(document.body.querySelector('[data-test="ai-label-revert-ai"]')?.textContent).toContain(
-      "Revert to the assistant's version",
+      `Revert to the version from ${brandNames.autobot}`,
     );
     expect(
       document.body.querySelector('[data-test="ai-label-revert-mine"]')?.textContent,
@@ -106,7 +114,7 @@ describe("AiLabel", () => {
     const tag = wrapper.get('[data-test="ai-label-tag"]');
     expect(tag.text()).toContain("AI");
     expect(tag.text()).not.toContain("Written by");
-    expect(tag.attributes("aria-label")).toBe("AI, Written by O2 Assistant");
+    expect(tag.attributes("aria-label")).toBe(`AI, Written by ${brandNames.autobot}`);
     (breakpoint as unknown as { __state: { value: boolean } }).__state.value = true;
   });
 });

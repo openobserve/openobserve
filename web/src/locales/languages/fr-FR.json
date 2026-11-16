@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "Schéma défini par l'utilisateur",
     "allFieldsLabel": "Tous les domaines",
     "nlQueryGenerationFailed": "Impossible de générer la requête. Veuillez réessayer.",
-    "askAIPlaceholder": "Demandez à AI de l'aide pour répondre à votre requête...",
-    "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'} : aide pour votre requête...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'} : aide pour votre fonction...",
     "askAIPlaceholderRotation": {
       "one": "Montrez-moi les erreurs de la dernière heure...",
       "two": "Trouvez des requêtes lentes qui prennent plus de 5 secondes...",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "Graphe des services",
     "services": "Catalogue des services",
     "aiObservability": "Observabilité de l'IA",
-    "aiAssistant": "Assistante IA",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "Déconnectez-vous",
     "ingestion": "Sources de données",
     "metrics": "Métriques",
@@ -3983,7 +3983,7 @@
           "note": "Opérations et informations SRE automatisées"
         },
         "ai_assistant": {
-          "name": "Assistante IA",
+          "name": "@:{'brand.askAutobot'}",
           "note": "Assistance intelligente aux requêtes et à l'analyse"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "Fonction VRL",
     "jsFunctionHint": "Utilisez l'objet row pour accéder aux champs du journal et les modifier. Exemple : row.new_field = row.existing_field + « traité » ;",
     "vrlFunctionHint": "Utilisez le «. » pour représenter l'événement en cours. Exemple : .new_field = .existing_field + « traité »",
-    "askAIFunctionPlaceholder": "Demandez à l'IA de vous aider dans votre fonction...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'} : aide pour votre fonction...",
     "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
     "associatedFunctionHeader": "Fonctions associées",
     "enrichmentTables": "Tableaux d'enrichissement",
@@ -6491,7 +6491,7 @@
       "rbac": "Créez des rôles personnalisés avec des permissions fines pour votre équipe.",
       "logPatterns": "Repérez automatiquement les motifs récurrents dans les logs au lieu de lire ligne par ligne.",
       "correlation": "Passez d'une ligne de log directement à ses métriques et traces associées.",
-      "aiAssistant": "Demandez à l'IA d'écrire des requêtes et d'expliquer vos données en langage clair.",
+      "aiAssistant": "@:{'brand.askAutobot'} : écrire des requêtes et expliquer vos données en langage clair.",
       "alertInsights": "Voyez à quelle fréquence une alerte se déclenche et repérez d'un coup d'œil les alertes corrélées.",
       "anomalyDetection": "Détectez automatiquement les comportements inhabituels des métriques, avant qu'ils ne déclenchent une alerte de seuil.",
       "agentGraph": "Visualisez les appels entre vos agents et outils d'IA sous forme de graphe.",
@@ -10359,9 +10359,9 @@
     "recentEvents": "Événements récents",
     "investigate": "Enquêter →",
     "askAi": {
-      "label": "Demander à l'IA",
-      "hint": "Demander à l'IA à ce sujet",
-      "labelFor": "Demander à l'IA à propos de {item}",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'} à ce sujet",
+      "labelFor": "@:{'brand.askAutobot'} à propos de {item}",
       "chip": {
         "firing": "Alertes déclenchées",
         "failing": "Règles en échec",
@@ -10569,7 +10569,7 @@
     "viewInTarget": "Voir dans {target}",
     "viewTarget": "Voir {target}",
     "welcome": {
-      "taglineHighlight": "Assistant O2",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "Ou essayez l'un d'entre eux"
     },
     "capabilities": {
@@ -10622,7 +10622,7 @@
       "unexpectedError": "Une erreur inattendue est survenue",
       "toolExecutionFailed": "Échec de l'exécution de l'outil",
       "errorOccurred": "Une erreur est survenue",
-      "navigateConfirmQuestion": "Autoriser l'assistant O2 à naviguer ?",
+      "navigateConfirmQuestion": "Autoriser @:{'brand.autobot'} à naviguer ?",
       "confirmToolExecution": "Confirmer l'exécution de {tool} ?",
       "entity": {
         "alert": "alerte",
@@ -10727,7 +10727,7 @@
     "aiExhaustedMessage": "Abonnez-vous pour continuer à utiliser l'IA. L'utilisation supplémentaire est facturée sur la facture de cette organisation.",
     "aiContractExhaustedMessage": "Contactez votre gestionnaire de compte pour ajouter plus de crédits IA",
     "aiPayerSubscribeMessage": "La facturation de cette organisation est gérée par {payer}. Demandez à un administrateur de {payer} de s'abonner ; l'utilisation supplémentaire est facturée sur sa facture.",
-    "aiUsedByFeature": "Assistante IA et génération de requêtes : {chat} · Analyse d'incident : {incident} · Réanalyse : {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} et génération de requêtes : {chat} · @:{'brand.autobotInvestigate'} : {incident} · Réanalyse : {reanalysis}",
     "aiPaygMessage": "Crédits gratuits épuisés — utilisation facturée à l'abonnement",
     "billingGroup": {
       "tabLabel": "Groupe de facturation",
@@ -11898,14 +11898,14 @@
       "eventsAndCommentsAppearHere": "Les événements et commentaires apparaîtront ici",
       "scrollToTop": "Revenir en haut",
       "scrollToBottom": "Aller en bas",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "Analyse IA",
         "analyze": "Analyser",
-        "analyzeTooltip": "Lancer une analyse SRE IA de cet incident",
-        "rcaDisabled": "RCA désactivée",
-        "rcaOff": "RCA désactivée",
-        "noAiSreFor": "Pas de SRE IA pour {severity}",
+        "analyzeTooltip": "Lancer une analyse @:{'brand.autobotInvestigate'} de cet incident",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} désactivé",
+        "rcaOff": "@:{'brand.autobotInvestigate'} arrêté",
+        "noAiSreFor": "Pas de @:{'brand.autobotInvestigate'} pour {severity}",
         "investigating": "Investigation en cours",
         "rerunElapsed": "relance · {elapsed}",
         "noUpdateFor": "aucune mise à jour depuis {elapsed}",
@@ -12015,7 +12015,7 @@
       "rcaCancelFailed": "Échec de l'annulation de l'analyse",
       "rcaFailed": "L'analyse IA a échoué",
       "rcaBlocked": "L'analyse IA n'a pas été exécutée",
-      "rcaFailedGeneric": "Échec de l'analyse RCA",
+      "rcaFailedGeneric": "Échec de l'analyse @:{'brand.autobotInvestigate'}",
       "rcaRetry": "Réessayer l'analyse",
       "rcaCopy": "Copier le rapport",
       "rcaCopied": "Rapport copié dans le presse-papiers",
@@ -12130,7 +12130,7 @@
         "loadingReport": "Chargement du rapport…",
         "reportAfterRun": "Le rapport s'affiche à la fin de l'exécution.",
         "noAnalysisTitle": "Aucune analyse pour l'instant",
-        "noAnalysisText": "L'agent SRE IA examine les alertes, la topologie, les changements récents, les traces, les logs et les métriques de cet incident, puis rédige un rapport. Vous pouvez suivre son travail dans le fil d'investigation pendant l'exécution.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} examine les alertes, la topologie, les changements récents, les traces, les logs et les métriques de cet incident, puis rédige un rapport. Vous pouvez suivre son travail dans le fil d'investigation pendant l'exécution.",
         "stageOf": "Étape {index}/{count} · {stage}",
         "cancelRun": "Annuler l'exécution",
         "followInThread": "Suivre dans le fil",
@@ -16104,7 +16104,7 @@
         "range": "{band} · {window}",
         "filter": "Filtrer sur la sélection",
         "drillDown": "Explorer",
-        "askAi": "Demander à l'IA",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "Sélection de la carte de chaleur · {count} span | Sélection de la carte de chaleur · {count} spans",
         "clear": "Effacer la sélection"
       }
@@ -16310,8 +16310,8 @@
     "criticalPath": "Chemin critique",
     "askAi": {
       "explainTrace": "Expliquer la trace",
-      "explainTraceHint": "Interrogez l'IA sur les spans les plus lents du chemin critique et sur chaque span en erreur",
-      "askAboutSpan": "Interroger l'IA à propos de ce span",
+      "explainTraceHint": "@:{'brand.askAutobot'} sur les spans les plus lents du chemin critique et sur chaque span en erreur",
+      "askAboutSpan": "@:{'brand.askAutobot'} à propos de ce span",
       "spanChip": "Span · {operation}",
       "traceChip": "Trace · {operation}"
     },
@@ -25061,13 +25061,13 @@
       "subtitle": "Performances et santé des requêtes sur vos bases de données"
     },
     "ai": {
-      "suggestFix": "Demander à l'IA comment corriger ceci",
-      "suggestFixHint": "Ouvre l'assistant IA avec cette requête, son moteur et ses chiffres de latence, et demande quoi modifier. Il ne change rien lui-même.",
-      "rowSuggestFix": "Demander à l'IA comment corriger ceci",
+      "suggestFix": "@:{'brand.askAutobot'} : comment corriger ceci",
+      "suggestFixHint": "Ouvre @:{'brand.autobot'} avec cette requête, son moteur et ses chiffres de latence, et demande quoi modifier. Il ne change rien lui-même.",
+      "rowSuggestFix": "@:{'brand.askAutobot'} : comment corriger ceci",
       "deadlockFix": "Comment puis-je arrêter ce blocage ?",
-      "deadlockFixHint": "Envoie les deux instructions conflictuelles et la preuve de l'ordre des lignes à l'assistant IA.",
+      "deadlockFixHint": "Envoie les deux instructions conflictuelles et la preuve de l'ordre des lignes à @:{'brand.autobot'}.",
       "blockingFix": "Pourquoi cela bloque-t-il ?",
-      "blockingFixHint": "Envoie à l'assistant IA l'instruction de la session racine, son temps d'inactivité et le nombre de sessions bloquées derrière elle."
+      "blockingFixHint": "Envoie à @:{'brand.autobot'} l'instruction de la session racine, son temps d'inactivité et le nombre de sessions bloquées derrière elle."
     },
     "filters": {
       "allEngines": "Tous les moteurs",
@@ -26773,8 +26773,8 @@
     "removeStep": "Supprimer l'étape",
     "channels": "Canaux",
     "policySaved": "Politique enregistrée",
-    "verdictTitle": "Verdict de l'IA SRE",
-    "reportTitle": "Ce que le SRE IA a trouvé",
+    "verdictTitle": "Verdict de @:{'brand.autobot'}",
+    "reportTitle": "Ce que @:{'brand.autobot'} a trouvé",
     "l0P1Lead": "Alerter immédiatement.",
     "l0P1Desc": "L'analyse IA s'exécute en parallèle — les notifications critiques ne sont jamais retardées.",
     "l0P4Lead": "Analyse IA uniquement.",
@@ -26794,7 +26794,7 @@
     "l0MaxLevelsOption": "jusqu’à {count} niveau | jusqu’à {count} niveaux",
     "l0ParallelSentence": "envoyée immédiatement ; l'agent agit en parallèle",
     "l0OnlySentence": "l'agent enquête ; cette priorité n'envoie de notification que si vos niveaux le prévoient",
-    "l0OffSentence": "aucun SRE IA n'intervient ; la notification se comporte exactement comme sans triage IA",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} n'intervient pas ; la notification se comporte exactement comme sans triage IA",
     "l0BudgetRange": "Entre 30 et 600 secondes — le serveur refuse les valeurs en dehors de cet intervalle plutôt que de les borner",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Bloquer la notification",
@@ -26821,7 +26821,7 @@
     "eventKind_page": "Notification",
     "eventKind_ack": "Acquittement",
     "eventKind_note": "Note",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "Passation",
     "eventKind_recovery": "Rétablissement",
     "eventKind_state": "État",
@@ -27483,7 +27483,7 @@
     "ladderAddStep": "Ajouter une étape",
     "ladderRightNow": "Actuellement, c'est",
     "ladderSameLadder": "même échelle",
-    "ladderL0Off": "Aucun SRE IA",
+    "ladderL0Off": "Pas de @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "L'échelle n'a jamais pris en compte les rotations",
     "ladderStaleDefaultHint": "Chaque niveau prévient toute l'équipe, mais cette équipe a des rotations — l'échelle a été créée avant leur apparition. Ajouter ou supprimer un membre relance la configuration par défaut, ou modifiez l'échelle manuellement une fois.",
     "reachShortNoSmtp": "e-mail uniquement · pas de transport SMTP",
@@ -27819,7 +27819,7 @@
     "consentStillRequired": "L’utilisation payante n’est pas activée pour toutes les organisations requises.",
     "updateFailed": "Impossible de mettre à jour l'utilisation payante de l'IA. Réessayez.",
     "declinedNotice": "L'utilisation payante de l'IA est désactivée, cette requête n'a donc pas été envoyée.",
-    "consentScope": "S'applique à toute l'organisation : Assistante IA, génération de requêtes et analyse des incidents. Vous pouvez la désactiver à tout moment sur la page Plans.",
+    "consentScope": "S'applique à toute l'organisation : @:{'brand.askAutobot'}, génération de requêtes et analyse des incidents. Vous pouvez la désactiver à tout moment sur la page Plans.",
     "managePaidUsage": "Activer l'utilisation payante",
     "modePayAsYouGo": "Paiement à l’usage",
     "modeConsentRequired": "Consentement requis",
@@ -28400,7 +28400,7 @@
         "auth_test": "Jeton du bot",
         "last_event": "Événements",
         "sockets": "Sockets",
-        "agent": "Assistante IA",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "Message de test"
       },
       "connectedOrgs": "Organisations connectées",

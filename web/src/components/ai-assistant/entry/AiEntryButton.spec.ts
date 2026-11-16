@@ -38,6 +38,10 @@ import AiEntryButton, {
   type AiEntryButtonProps,
 } from "./AiEntryButton.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake, openAssistant, track, toast, locale } = vi.hoisted(() => ({
   fake: { current: null as any },
   openAssistant: vi.fn(),
@@ -244,7 +248,7 @@ describe("AiEntryButton gate table (`60` §3.7)", () => {
   it("names the locked reason in the tooltip", () => {
     expect(tooltipText(setup({}, "no_permission").wrapper)).toBe("Ask an admin for AI access");
     expect(tooltipText(setup({}, "off_for_org").wrapper)).toBe(
-      "O2 Assistant is turned off for this organization",
+      `${brandNames.autobot} is turned off for this organization`,
     );
   });
 });

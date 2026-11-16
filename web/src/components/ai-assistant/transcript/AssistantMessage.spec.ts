@@ -40,6 +40,10 @@ import {
   syncMarkdownParserForTests,
 } from "./markdown";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { track } = vi.hoisted(() => ({ track: vi.fn() }));
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/assistantAnalytics")>()),
@@ -131,7 +135,7 @@ describe("AssistantMessage", () => {
       props: { message: { ...prompt, agentId: "sre", handoffFrom: "o2-ai" }, turnId: "t1" },
     });
     expect(handed.get('[data-test="assistant-message-meta"]').text()).toContain(
-      "· to Investigator",
+      `· to ${brandNames.autobotInvestigate}`,
     );
     const later = mount(AssistantMessage, {
       props: { message: { ...prompt, agentId: "sre" }, turnId: "t1" },
@@ -524,7 +528,9 @@ describe("AssistantMessage", () => {
     expect(notice.text()).toContain(
       "Blocked by policy: o2_UpdateAlert. Writes are off for this organization.",
     );
-    expect(notice.text()).toContain("An admin can allow it in Settings › Assistant › Permissions.");
+    expect(notice.text()).toContain(
+      `An admin can allow it in Settings › ${brandNames.askAutobot} › Permissions.`,
+    );
   });
 
   it("renders a registered kind through its renderer, and counts an unregistered kind once", () => {

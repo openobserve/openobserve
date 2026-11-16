@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "User-Defined Schema",
     "allFieldsLabel": "All Fields",
     "nlQueryGenerationFailed": "Failed to generate query. Please try again.",
-    "askAIPlaceholder": "Ask AI to help with your query...",
-    "askAIFunctionPlaceholder": "Ask AI to help with your function...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: ขอความช่วยเหลือเกี่ยวกับคิวรีของคุณ...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: ขอความช่วยเหลือเกี่ยวกับฟังก์ชันของคุณ...",
     "askAIPlaceholderRotation": {
       "one": "Show me errors from the last hour…",
       "two": "Find slow queries taking more than 5s…",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "กราฟบริการ (Service Graph)",
     "services": "แคตตาล็อกบริการ (Service Catalog)",
     "aiObservability": "AI Observability",
-    "aiAssistant": "ผู้ช่วย AI",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "ออกจากระบบ",
     "ingestion": "แหล่งข้อมูล (Data Sources)",
     "metrics": "เมทริกซ์ (Metrics)",
@@ -3982,7 +3982,7 @@
           "note": "Automated SRE operations and insights"
         },
         "ai_assistant": {
-          "name": "O2 Assistant",
+          "name": "@:{'brand.askAutobot'}",
           "note": "Intelligent query and analysis assistance"
         },
         "anomaly_detection": {
@@ -6375,7 +6375,7 @@
     "vrlfunction": "VRL Function",
     "jsFunctionHint": "Use the `row` object to access and modify log fields. Example: row.new_field = row.existing_field + ' processed';",
     "vrlFunctionHint": "Use the `.` to represent the current event. Example: .new_field = .existing_field + ' processed'",
-    "askAIFunctionPlaceholder": "Ask AI to help with your function...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: ขอความช่วยเหลือเกี่ยวกับฟังก์ชันของคุณ...",
     "enterFunctionPrompt": "Enter a prompt to generate function",
     "associatedFunctionHeader": "Associated Functions",
     "enrichmentTables": "Enrichment Tables",
@@ -6490,7 +6490,7 @@
       "rbac": "Create custom roles with fine-grained permissions for your team.",
       "logPatterns": "Spot recurring log patterns automatically instead of reading line by line.",
       "correlation": "Jump from a log line straight to its related metrics and traces.",
-      "aiAssistant": "Ask AI to write queries and explain your data in plain English.",
+      "aiAssistant": "@:{'brand.askAutobot'}: ให้เขียนคิวรีและอธิบายข้อมูลของคุณด้วยภาษาที่เข้าใจง่าย",
       "alertInsights": "See how often an alert fires and spot correlated alerts at a glance.",
       "anomalyDetection": "Catch unusual metric behavior automatically, before it fires a threshold alert.",
       "agentGraph": "See how your AI agents and tools call each other, visualized as a graph.",
@@ -10356,9 +10356,9 @@
     "recentEvents": "เหตุการณ์ล่าสุด",
     "investigate": "Investigate →",
     "askAi": {
-      "label": "ถาม AI",
-      "hint": "ถาม AI เกี่ยวกับเรื่องนี้",
-      "labelFor": "ถาม AI เกี่ยวกับ {item}",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: ถามเกี่ยวกับเรื่องนี้",
+      "labelFor": "@:{'brand.askAutobot'}: ถามเกี่ยวกับ {item}",
       "chip": {
         "firing": "การแจ้งเตือนที่ Firing",
         "failing": "กฎที่ล้มเหลว",
@@ -10566,7 +10566,7 @@
     "viewInTarget": "View in {target}",
     "viewTarget": "View {target}",
     "welcome": {
-      "taglineHighlight": "O2 Assistant",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "Or try one of these"
     },
     "capabilities": {
@@ -10619,7 +10619,7 @@
       "unexpectedError": "An unexpected error occurred",
       "toolExecutionFailed": "Tool execution failed",
       "errorOccurred": "An error occurred",
-      "navigateConfirmQuestion": "Allow O2 Assistant to navigate?",
+      "navigateConfirmQuestion": "อนุญาตให้ @:{'brand.autobot'} นำทางหรือไม่?",
       "confirmToolExecution": "Confirm execution of {tool}?",
       "entity": {
         "alert": "alert",
@@ -10698,7 +10698,7 @@
     "aiExhaustedMessage": "Subscribe to keep using AI. Further usage is billed on this organization's invoice.",
     "aiContractExhaustedMessage": "Contact your account manager to add more AI credits",
     "aiPayerSubscribeMessage": "Billing for this organization is managed by {payer}. Ask an admin of {payer} to subscribe; further usage is billed on its invoice.",
-    "aiUsedByFeature": "Assistant and query generation: {chat} · Incident analysis: {incident} · Reanalysis: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} และการสร้างคิวรี: {chat} · @:{'brand.autobotInvestigate'}: {incident} · การวิเคราะห์ซ้ำ: {reanalysis}",
     "aiPaygMessage": "Free credits exhausted — usage billed to subscription",
     "billingGroup": {
       "tabLabel": "Billing Group",
@@ -11869,14 +11869,14 @@
       "eventsAndCommentsAppearHere": "Events and comments will appear here",
       "scrollToTop": "Scroll to top",
       "scrollToBottom": "Scroll to bottom",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "AI analysis",
         "analyze": "Analyze",
-        "analyzeTooltip": "Start an AI SRE analysis of this incident",
-        "rcaDisabled": "RCA disabled",
-        "rcaOff": "RCA off",
-        "noAiSreFor": "No AI SRE for {severity}",
+        "analyzeTooltip": "เริ่มการวิเคราะห์ด้วย @:{'brand.autobotInvestigate'} สำหรับเหตุการณ์นี้",
+        "rcaDisabled": "ปิดใช้งาน @:{'brand.autobotInvestigate'} แล้ว",
+        "rcaOff": "@:{'brand.autobotInvestigate'} ปิดอยู่",
+        "noAiSreFor": "ไม่มี @:{'brand.autobotInvestigate'} สำหรับ {severity}",
         "investigating": "Investigating",
         "rerunElapsed": "re-run · {elapsed}",
         "noUpdateFor": "no update for {elapsed}",
@@ -11986,7 +11986,7 @@
       "rcaCancelFailed": "Failed to cancel analysis",
       "rcaFailed": "AI analysis failed",
       "rcaBlocked": "AI analysis didn't run",
-      "rcaFailedGeneric": "Failed to perform RCA analysis",
+      "rcaFailedGeneric": "ไม่สามารถดำเนินการวิเคราะห์ @:{'brand.autobotInvestigate'} ได้",
       "rcaRetry": "Retry analysis",
       "rcaCopy": "Copy report",
       "rcaCopied": "Report copied to clipboard",
@@ -12101,7 +12101,7 @@
         "loadingReport": "Loading report…",
         "reportAfterRun": "The report shows after the run.",
         "noAnalysisTitle": "No analysis yet",
-        "noAnalysisText": "The AI SRE Agent checks this incident's alerts, topology, recent changes, traces, logs and metrics, then writes a report. You can follow its work in the Investigation thread while it runs.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} ตรวจสอบการแจ้งเตือน โทโพโลยี การเปลี่ยนแปลงล่าสุด เทรซ ล็อก และเมตริกของเหตุการณ์นี้ แล้วเขียนรายงาน คุณติดตามการทำงานได้ในเธรดการสืบสวนขณะที่ทำงานอยู่",
         "stageOf": "Stage {index}/{count} · {stage}",
         "cancelRun": "Cancel run",
         "followInThread": "Follow in thread",
@@ -16075,7 +16075,7 @@
         "range": "{band} · {window}",
         "filter": "กรองตามการเลือก",
         "drillDown": "เจาะลึก",
-        "askAi": "ถาม AI",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "การเลือกในฮีตแมป · {count} สแปน | การเลือกในฮีตแมป · {count} สแปน",
         "clear": "ล้างการเลือก"
       }
@@ -16281,8 +16281,8 @@
     "criticalPath": "Critical path",
     "askAi": {
       "explainTrace": "อธิบายเทรซ",
-      "explainTraceHint": "สอบถาม AI เกี่ยวกับสแปนที่ช้าที่สุดบนเส้นทางวิกฤตและสแปนที่เกิดข้อผิดพลาดทั้งหมด",
-      "askAboutSpan": "สอบถาม AI เกี่ยวกับสแปนนี้",
+      "explainTraceHint": "@:{'brand.askAutobot'}: สอบถามเกี่ยวกับสแปนที่ช้าที่สุดบนเส้นทางวิกฤตและสแปนที่เกิดข้อผิดพลาดทั้งหมด",
+      "askAboutSpan": "@:{'brand.askAutobot'}: สอบถามเกี่ยวกับสแปนนี้",
       "spanChip": "สแปน · {operation}",
       "traceChip": "เทรซ · {operation}"
     },
@@ -25029,13 +25029,13 @@
       "subtitle": "Query performance and health across your databases"
     },
     "ai": {
-      "suggestFix": "Ask AI how to fix this",
-      "suggestFixHint": "Opens the AI assistant with this query, its engine and its latency numbers, and asks what to change. It does not change anything itself.",
-      "rowSuggestFix": "Ask AI how to fix this",
+      "suggestFix": "@:{'brand.askAutobot'}: ถามวิธีแก้ไขปัญหานี้",
+      "suggestFixHint": "เปิด @:{'brand.autobot'} พร้อมคิวรีนี้ เอนจินของคิวรี และตัวเลขเวลาแฝง แล้วถามว่าควรเปลี่ยนอะไร โดยจะไม่เปลี่ยนแปลงสิ่งใดเอง",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: ถามวิธีแก้ไขปัญหานี้",
       "deadlockFix": "How do I stop this deadlock?",
-      "deadlockFixHint": "Sends both conflicting statements and the row-order evidence to the AI assistant.",
+      "deadlockFixHint": "ส่งคำสั่งที่ขัดแย้งกันทั้งสองรายการและหลักฐานลำดับแถวไปยัง @:{'brand.autobot'}",
       "blockingFix": "Why is this blocking?",
-      "blockingFixHint": "Sends the root session's statement, its idle time and how many sessions are stuck behind it to the AI assistant."
+      "blockingFixHint": "ส่งคำสั่งของเซสชันต้นทาง เวลาที่ไม่ได้ใช้งาน และจำนวนเซสชันที่ค้างอยู่ด้านหลังไปยัง @:{'brand.autobot'}"
     },
     "filters": {
       "allEngines": "All engines",
@@ -26741,8 +26741,8 @@
     "removeStep": "Remove step",
     "channels": "Channels",
     "policySaved": "Policy saved",
-    "verdictTitle": "AI SRE verdict",
-    "reportTitle": "What the AI SRE found",
+    "verdictTitle": "คำตัดสินของ @:{'brand.autobot'}",
+    "reportTitle": "สิ่งที่ @:{'brand.autobot'} พบ",
     "l0P1Lead": "Alert immediately.",
     "l0P1Desc": "AI analysis runs in parallel — critical pages are never delayed.",
     "l0P4Lead": "AI analysis only.",
@@ -26762,7 +26762,7 @@
     "l0MaxLevelsOption": "สูงสุด {count} ระดับ | สูงสุด {count} ระดับ",
     "l0ParallelSentence": "paged at once; the agent runs alongside",
     "l0OnlySentence": "the agent investigates; this priority pages only if your levels say so",
-    "l0OffSentence": "no AI SRE runs; the page behaves exactly as it did without AI triage",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} ไม่ทำงาน การแจ้งเตือนจะทำงานเหมือนเดิมทุกประการเมื่อไม่มีการคัดแยกด้วย AI",
     "l0BudgetRange": "Between 30 and 600 seconds — the server refuses values outside this range rather than clamping",
     "l0BudgetInvalidNotSaved": "ระยะเวลาหน่วงต้องอยู่ระหว่าง 30 ถึง 600 วินาที",
     "l0AllowSuppress": "Suppress the page",
@@ -26789,7 +26789,7 @@
     "eventKind_page": "Page",
     "eventKind_ack": "Ack",
     "eventKind_note": "Note",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "Handoff",
     "eventKind_recovery": "Recovery",
     "eventKind_state": "State",
@@ -27451,7 +27451,7 @@
     "ladderAddStep": "เพิ่มขั้นตอน",
     "ladderRightNow": "Right now that is",
     "ladderSameLadder": "same ladder",
-    "ladderL0Off": "No AI SRE",
+    "ladderL0Off": "ไม่มี @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "Ladder never learned the rotations",
     "ladderStaleDefaultHint": "Every level pages the whole team, but this team has rotations — the ladder was created before they existed. Adding or removing a member re-runs the default, or edit the ladder once by hand.",
     "reachShortNoSmtp": "email only · no SMTP transport",
@@ -27787,7 +27787,7 @@
     "consentStillRequired": "Paid usage is not enabled for every required organization.",
     "updateFailed": "Couldn't update paid AI usage. Try again.",
     "declinedNotice": "Paid AI usage is off, so this request wasn't sent.",
-    "consentScope": "Applies to the whole organization: Assistant, query generation and incident analysis. You can turn it off anytime on the Plans page.",
+    "consentScope": "มีผลกับทั้งองค์กร: @:{'brand.askAutobot'} การสร้างคิวรี และการวิเคราะห์เหตุการณ์ คุณปิดได้ทุกเมื่อในหน้าแพ็กเกจ",
     "managePaidUsage": "Turn on paid usage",
     "modePayAsYouGo": "Pay as you go",
     "modeConsentRequired": "Consent required",
@@ -28368,7 +28368,7 @@
         "auth_test": "Bot token",
         "last_event": "Events",
         "sockets": "Sockets",
-        "agent": "AI assistant",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "Test post"
       },
       "connectedOrgs": "Connected orgs",

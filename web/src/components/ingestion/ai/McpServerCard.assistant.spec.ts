@@ -33,6 +33,7 @@ vi.mock("@/composables/useMcpCredential", async (importOriginal) => ({
 }));
 
 import McpServerCard from "./McpServerCard.vue";
+import en from "@/locales/languages/en-US.json";
 
 const blank = { template: "<div />" };
 
@@ -71,7 +72,7 @@ describe("McpServerCard with the assistant", () => {
   it("names the assistant and links to its toolsets", async () => {
     const w = await mountCard(false);
     expect(w.find('[data-test="mcp-server-assistant-parity"]').text()).toBe(
-      "Your agent gets the same tools and permissions as O2 Assistant. Tools O2 Assistant itself can use are set up in Settings › O2 Assistant › Toolsets.",
+      `Your agent gets the same tools and permissions as ${en.brand.autobot}. Tools ${en.brand.autobot} itself can use are set up in Settings › ${en.brand.askAutobot} › Toolsets.`,
     );
     expect(w.find('[data-test="mcp-server-assistant-toolsets-link"]').attributes("href")).toBe(
       "/settings/assistant/toolsets?org_identifier=default",

@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "使用者定義結構描述",
     "allFieldsLabel": "所有欄位",
     "nlQueryGenerationFailed": "查詢產生失敗，請重試。",
-    "askAIPlaceholder": "請 AI 協助查詢...",
-    "askAIFunctionPlaceholder": "請 AI 協助函式...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}：協助查詢...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}：協助函式...",
     "askAIPlaceholderRotation": {
       "one": "顯示過去一小時的錯誤…",
       "two": "找出耗時超過 5 秒的慢速查詢…",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "服務圖表",
     "services": "服務目錄",
     "aiObservability": "AI",
-    "aiAssistant": "AI 助手",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "登出",
     "ingestion": "資料來源",
     "metrics": "指標",
@@ -3983,7 +3983,7 @@
           "note": "自動化 SRE 作業與洞察"
         },
         "ai_assistant": {
-          "name": "O2 助理",
+          "name": "@:{'brand.askAutobot'}",
           "note": "智慧查詢與分析協助"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "VRL 函式",
     "jsFunctionHint": "使用 `row` 物件來存取和修改日誌欄位。範例：row.new_field = row.existing_field + ' processed';",
     "vrlFunctionHint": "使用 `.` 代表目前事件。範例：.new_field = .existing_field + ' processed'",
-    "askAIFunctionPlaceholder": "請 AI 協助函式...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}：協助函式...",
     "enterFunctionPrompt": "輸入提示以產生函式",
     "associatedFunctionHeader": "已關聯的函式",
     "enrichmentTables": "擴充表",
@@ -6491,7 +6491,7 @@
       "rbac": "為您的團隊建立具備精細權限的自訂角色。",
       "logPatterns": "自動找出重複出現的日誌模式，無須逐行閱讀。",
       "correlation": "從單一日誌行直接跳至相關的指標與追蹤。",
-      "aiAssistant": "請 AI 撰寫查詢，並以淺顯英文說明您的資料。",
+      "aiAssistant": "@:{'brand.askAutobot'}：撰寫查詢，並以淺顯的語言說明您的資料。",
       "alertInsights": "查看警示觸發的頻率，並一眼找出相關聯的警示。",
       "anomalyDetection": "自動捕捉異常的指標行為，在觸發閾值警示之前。",
       "agentGraph": "以圖形呈現您的 AI 代理與工具彼此如何呼叫。",
@@ -10354,9 +10354,9 @@
     "recentEvents": "最近事件",
     "investigate": "調查 →",
     "askAi": {
-      "label": "詢問 AI",
-      "hint": "就此詢問 AI",
-      "labelFor": "就{item}詢問 AI",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}：就此提問",
+      "labelFor": "@:{'brand.askAutobot'}：就{item}提問",
       "chip": {
         "firing": "觸發中的警示",
         "failing": "失敗的規則",
@@ -10564,7 +10564,7 @@
     "viewInTarget": "在 {target} 中檢視",
     "viewTarget": "檢視 {target}",
     "welcome": {
-      "taglineHighlight": "O2 助理",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "或試試以下其中一項"
     },
     "capabilities": {
@@ -10617,7 +10617,7 @@
       "unexpectedError": "發生未預期的錯誤",
       "toolExecutionFailed": "工具執行失敗",
       "errorOccurred": "發生錯誤",
-      "navigateConfirmQuestion": "允許 O2 Assistant 導覽嗎？",
+      "navigateConfirmQuestion": "允許 @:{'brand.autobot'} 導覽嗎？",
       "confirmToolExecution": "確認執行 {tool} 嗎？",
       "entity": {
         "alert": "警示",
@@ -10722,7 +10722,7 @@
     "aiExhaustedMessage": "訂閱即可繼續使用 AI。後續用量將計入此組織的帳單。",
     "aiContractExhaustedMessage": "聯絡您的帳戶管理員以新增更多 AI 額度",
     "aiPayerSubscribeMessage": "此組織的帳務由 {payer} 管理。請要求 {payer} 的管理員訂閱；後續用量將計入其帳單。",
-    "aiUsedByFeature": "助手與查詢生成：{chat} · 事件分析：{incident} · 重新分析：{reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} 與查詢生成：{chat} · @:{'brand.autobotInvestigate'}：{incident} · 重新分析：{reanalysis}",
     "aiPaygMessage": "免費額度已用完 — 使用量計入訂閱費用",
     "billingGroup": {
       "tabLabel": "計費群組",
@@ -11893,14 +11893,14 @@
       "eventsAndCommentsAppearHere": "事件和留言會顯示在這裡",
       "scrollToTop": "捲動至頂端",
       "scrollToBottom": "捲動至底部",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "AI 分析",
         "analyze": "分析",
-        "analyzeTooltip": "開始對此事件進行 AI SRE 分析",
-        "rcaDisabled": "RCA 已停用",
-        "rcaOff": "RCA 關閉",
-        "noAiSreFor": "沒有適用於 {severity} 的 AI SRE",
+        "analyzeTooltip": "開始對此事件進行 @:{'brand.autobotInvestigate'} 分析",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} 已停用",
+        "rcaOff": "@:{'brand.autobotInvestigate'} 關閉",
+        "noAiSreFor": "沒有適用於 {severity} 的 @:{'brand.autobotInvestigate'}",
         "investigating": "調查中",
         "rerunElapsed": "重新執行 · {elapsed}",
         "noUpdateFor": "已 {elapsed} 沒有更新",
@@ -12010,7 +12010,7 @@
       "rcaCancelFailed": "無法取消分析",
       "rcaFailed": "AI 分析失敗",
       "rcaBlocked": "AI 分析未執行",
-      "rcaFailedGeneric": "無法執行 RCA 分析",
+      "rcaFailedGeneric": "無法執行 @:{'brand.autobotInvestigate'} 分析",
       "rcaRetry": "重試分析",
       "rcaCopy": "複製報告",
       "rcaCopied": "報告已複製到剪貼簿",
@@ -12125,7 +12125,7 @@
         "loadingReport": "正在載入報表…",
         "reportAfterRun": "報表會在執行結束後顯示。",
         "noAnalysisTitle": "尚無分析",
-        "noAnalysisText": "AI SRE Agent 會檢查此事件的警示、拓撲、近期變更、追蹤、日誌與指標，然後撰寫報表。執行期間，您可以在調查討論串中追蹤其工作。",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} 會檢查此事件的警示、拓撲、近期變更、追蹤、日誌與指標，然後撰寫報表。執行期間，您可以在調查討論串中追蹤其工作。",
         "stageOf": "階段 {index}/{count} · {stage}",
         "cancelRun": "取消執行",
         "followInThread": "在討論串中追蹤",
@@ -16099,7 +16099,7 @@
         "range": "{band} · {window}",
         "filter": "篩選至選取範圍",
         "drillDown": "向下鑽取",
-        "askAi": "詢問 AI",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "熱區圖選取 · {count} 個 Span | 熱區圖選取 · {count} 個 Span",
         "clear": "清除選取"
       }
@@ -16305,8 +16305,8 @@
     "criticalPath": "關鍵路徑",
     "askAi": {
       "explainTrace": "說明追蹤",
-      "explainTraceHint": "向 AI 詢問關鍵路徑上最慢的 Span 以及每個錯誤 Span",
-      "askAboutSpan": "向 AI 詢問此 Span",
+      "explainTraceHint": "@:{'brand.askAutobot'}：詢問關鍵路徑上最慢的 Span 以及每個錯誤 Span",
+      "askAboutSpan": "@:{'brand.askAutobot'}：詢問此 Span",
       "spanChip": "Span · {operation}",
       "traceChip": "追蹤 · {operation}"
     },
@@ -25056,13 +25056,13 @@
       "subtitle": "跨資料庫的查詢效能與健康狀態"
     },
     "ai": {
-      "suggestFix": "詢問 AI 如何修正",
-      "suggestFixHint": "使用此查詢、其引擎和延遲資料開啟 AI 助手，並詢問應更改什麼。它本身不會更改任何內容。",
-      "rowSuggestFix": "詢問 AI 如何修正",
+      "suggestFix": "@:{'brand.askAutobot'}：詢問如何修正",
+      "suggestFixHint": "使用此查詢、其引擎和延遲資料開啟 @:{'brand.autobot'}，並詢問應更改什麼。它本身不會更改任何內容。",
+      "rowSuggestFix": "@:{'brand.askAutobot'}：詢問如何修正",
       "deadlockFix": "如何停止這個死結？",
-      "deadlockFixHint": "將兩個衝突的陳述和列順序證據傳送給 AI 助手。",
+      "deadlockFixHint": "將兩個衝突的陳述和列順序證據傳送給 @:{'brand.autobot'}。",
       "blockingFix": "為什麼這會阻塞？",
-      "blockingFixHint": "將根工作階段的陳述、其閒置時間以及卡在其後面的工作階段數量傳送給 AI 助手。"
+      "blockingFixHint": "將根工作階段的陳述、其閒置時間以及卡在其後面的工作階段數量傳送給 @:{'brand.autobot'}。"
     },
     "filters": {
       "allEngines": "所有引擎",
@@ -26768,8 +26768,8 @@
     "removeStep": "移除步驟",
     "channels": "通知管道",
     "policySaved": "原則已儲存",
-    "verdictTitle": "AI SRE 判定",
-    "reportTitle": "AI SRE 發現了什麼",
+    "verdictTitle": "@:{'brand.autobot'} 判定",
+    "reportTitle": "@:{'brand.autobot'} 發現了什麼",
     "l0P1Lead": "立即警示。",
     "l0P1Desc": "AI 分析會平行執行 — 關鍵呼叫絕不會延遲。",
     "l0P4Lead": "僅 AI 分析。",
@@ -26789,7 +26789,7 @@
     "l0MaxLevelsOption": "最多 {count} 級 | 最多 {count} 級",
     "l0ParallelSentence": "立即呼叫；AI 代理同時執行",
     "l0OnlySentence": "代理程式會進行調查；此優先等級僅在您的等級設定允許時才會發出呼叫",
-    "l0OffSentence": "不會執行 AI SRE；呼叫的行為與未啟用 AI 分診時完全相同",
+    "l0OffSentence": "不會執行 @:{'brand.autobotInvestigate'}；呼叫的行為與未啟用 AI 分診時完全相同",
     "l0BudgetRange": "介於 30 至 600 秒 — 伺服器會拒絕此範圍外的數值，而非自動取邊界值。",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "抑制此呼叫",
@@ -26816,7 +26816,7 @@
     "eventKind_page": "呼叫",
     "eventKind_ack": "確認",
     "eventKind_note": "附註",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "交接",
     "eventKind_recovery": "恢復",
     "eventKind_state": "狀態",
@@ -27478,7 +27478,7 @@
     "ladderAddStep": "新增步驟",
     "ladderRightNow": "目前是",
     "ladderSameLadder": "相同階梯",
-    "ladderL0Off": "無 AI SRE",
+    "ladderL0Off": "無 @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "階梯從未納入輪值",
     "ladderStaleDefaultHint": "每一級都會傳呼整個團隊，但此團隊有輪值制度——階梯是在輪值制度建立之前建立的。新增或移除成員會重新執行預設，或手動編輯一次階梯。",
     "reachShortNoSmtp": "僅電子郵件 · 無 SMTP 傳輸",
@@ -27814,7 +27814,7 @@
     "consentStillRequired": "並非所有必要的組織都已啟用付費使用。",
     "updateFailed": "無法更新付費 AI 使用設定。請再試一次。",
     "declinedNotice": "付費 AI 使用已關閉，因此未送出此請求。",
-    "consentScope": "適用於整個組織：助手、查詢產生與事件分析。您可隨時在方案頁面將其關閉。",
+    "consentScope": "適用於整個組織：@:{'brand.askAutobot'}、查詢產生與事件分析。您可隨時在方案頁面將其關閉。",
     "managePaidUsage": "開啟付費使用",
     "modePayAsYouGo": "按量付費",
     "modeConsentRequired": "需要授權",
@@ -28395,7 +28395,7 @@
         "auth_test": "Bot 權杖",
         "last_event": "事件",
         "sockets": "Socket",
-        "agent": "AI 助手",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "測試訊息"
       },
       "connectedOrgs": "已連線組織",

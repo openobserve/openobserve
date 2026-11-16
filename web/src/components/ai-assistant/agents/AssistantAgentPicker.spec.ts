@@ -25,6 +25,10 @@ import { computed } from "vue";
 import { fakeAssistant, fakeVuex } from "../__tests__/fakeAssistant";
 import AssistantAgentPicker from "./AssistantAgentPicker.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { fake, breakpoint } = vi.hoisted(() => ({
   fake: { current: null as any },
   breakpoint: { mobile: false },
@@ -108,26 +112,30 @@ afterEach(() => {
 describe("AssistantAgentPicker", () => {
   it("keeps only the icon in a narrow composer, naming the agent in its label and tooltip", () => {
     const wide = trigger(setup().wrapper);
-    expect(wide.text()).toContain("O2 Assistant");
+    expect(wide.text()).toContain(`${brandNames.autobot}`);
     expect(wide.attributes("aria-label")).toBeUndefined();
     document.body.innerHTML = "";
     const { wrapper } = setup(ROSTER, false, true);
-    expect(trigger(wrapper).text()).not.toContain("O2 Assistant");
-    expect(trigger(wrapper).attributes("aria-label")).toBe("O2 Assistant");
-    expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe("O2 Assistant");
+    expect(trigger(wrapper).text()).not.toContain(`${brandNames.autobot}`);
+    expect(trigger(wrapper).attributes("aria-label")).toBe(`${brandNames.autobot}`);
+    expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe(
+      `${brandNames.autobot}`,
+    );
   });
 
   it("shows a plain pill with no menu without a choice to offer", () => {
     for (const roster of [[], [ROSTER[0]]]) {
       const { wrapper } = setup(roster);
       expect(wrapper.find('[data-test="assistant-agent-picker"]').exists()).toBe(false);
-      expect(wrapper.get('[data-test="assistant-agent-pill"]').text()).toBe("O2 Assistant");
+      expect(wrapper.get('[data-test="assistant-agent-pill"]').text()).toBe(
+        `${brandNames.autobot}`,
+      );
     }
   });
 
   it("is a pill naming the agent, lists one radio row per agent by name only, and checks the current one", () => {
     const { wrapper } = setup();
-    expect(trigger(wrapper).text()).toBe("O2 Assistant");
+    expect(trigger(wrapper).text()).toBe(`${brandNames.autobot}`);
     expect(trigger(wrapper).classes()).not.toContain("opacity-60");
     expect(wrapper.text()).toContain("Agent");
     expect(wrapper.find('[data-test="assistant-agent-option-clause"]').exists()).toBe(false);
@@ -160,7 +168,7 @@ describe("AssistantAgentPicker", () => {
     expect(send).not.toHaveBeenCalled();
     expect(option(wrapper, "sre").attributes("aria-checked")).toBe("true");
     expect(trigger(wrapper).attributes("data-pending")).toBeUndefined();
-    expect(composerUi(sid).status?.text).toBe("Investigator will answer.");
+    expect(composerUi(sid).status?.text).toBe(`${brandNames.autobotInvestigate} will answer.`);
   });
 
   it("marks a pending switch on a chat with turns, and the current agent takes it away", async () => {

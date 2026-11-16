@@ -31,6 +31,10 @@ import AssistantTurnOutcome, {
   type AssistantTurnOutcomeProps,
 } from "./AssistantTurnOutcome.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 vi.mock("@/components/ai-assistant/gate/AssistantAskAdminPopover.vue", () => ({
   __esModule: true,
   default: {
@@ -83,14 +87,14 @@ const LEDGER: [AssistantErrorCode, "failed" | "refused", string, string | null, 
   [
     "permission_denied",
     "refused",
-    "Your role can no longer use O2 Assistant. Your message wasn't sent.",
+    `Your role can no longer use ${brandNames.autobot}. Your message wasn't sent.`,
     "Open IAM roles",
     "Ask an admin",
   ],
   [
     "not_enabled",
     "refused",
-    "O2 Assistant is turned off for acme. Your message wasn't sent.",
+    `${brandNames.autobot} is turned off for acme. Your message wasn't sent.`,
     "Open access settings",
     "Ask an admin",
   ],
@@ -153,7 +157,7 @@ const LEDGER: [AssistantErrorCode, "failed" | "refused", string, string | null, 
   [
     "agent_unavailable",
     "failed",
-    "The assistant didn't respond. Nothing was changed.",
+    `${brandNames.autobot} didn't respond. Nothing was changed.`,
     "Retry",
     "Retry",
   ],
@@ -179,7 +183,7 @@ const LEDGER: [AssistantErrorCode, "failed" | "refused", string, string | null, 
     "Reload chat",
     "Reload chat",
   ],
-  ["empty_response", "failed", "The assistant didn't answer.", "Retry", "Retry"],
+  ["empty_response", "failed", `${brandNames.autobot} didn't answer.`, "Retry", "Retry"],
   [
     "signed_out",
     "failed",
@@ -332,7 +336,7 @@ describe("AssistantTurnOutcome", () => {
     expect(title(provider)).toBe("The AI provider failed, so the answer stopped.");
     expect(bodies(provider)).toEqual(["Retrying won't undo anything already changed."]);
     expect(label(provider)).toBe("Ask again");
-    expect(title(afterChange("agent_unavailable"))).toBe("The assistant didn't respond.");
+    expect(title(afterChange("agent_unavailable"))).toBe(`${brandNames.autobot} didn't respond.`);
     expect(title(afterChange("stream_dropped"))).toBe("Connection lost after 40 s.");
     for (const code of [
       "provider_error",
@@ -587,7 +591,9 @@ describe("AssistantTurnOutcome", () => {
 
   it("is one line with no button and no Details when readonly (HT-02 AC 11)", () => {
     const wrapper = mountOutcome({ error: error("agent_unavailable"), readonly: true });
-    expect(wrapper.text()).toBe("Failed: The assistant didn't respond. Nothing was changed.");
+    expect(wrapper.text()).toBe(
+      `Failed: ${brandNames.autobot} didn't respond. Nothing was changed.`,
+    );
     expect(wrapper.find("button").exists()).toBe(false);
   });
 
@@ -635,7 +641,9 @@ describe("AssistantTurnOutcome: agent refusals (MULTI-AGENT-12)", () => {
       error: error("agent_not_permitted", { agent: "sre" }),
     });
     await flushPromises();
-    expect(title(w)).toBe("Your role can't use Investigator. Your message wasn't sent.");
+    expect(title(w)).toBe(
+      `Your role can't use ${brandNames.autobotInvestigate}. Your message wasn't sent.`,
+    );
     expect(w.get('[data-test="ask-admin-stub"]').exists()).toBe(true);
     expect(w.get(fallback).text()).toMatch(/^Use .* instead$/);
   });
@@ -718,7 +726,9 @@ describe("AssistantTurnOutcome: agent refusals (MULTI-AGENT-12)", () => {
       sid: "s1",
       error: error("handoff_failed", { agent: "sre", handoffFrom: "generate-query" }),
     });
-    expect(title(w)).toBe("Couldn't hand this chat to Investigator. Query builder kept it.");
+    expect(title(w)).toBe(
+      `Couldn't hand this chat to ${brandNames.autobotInvestigate}. Query builder kept it.`,
+    );
     expect(label(w)).toBe("Try again");
     expect(w.get(fallback).text()).toBe("Keep going with Query builder");
   });

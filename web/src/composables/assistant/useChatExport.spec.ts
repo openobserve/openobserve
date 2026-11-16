@@ -32,13 +32,17 @@ import {
   type ExportSource,
 } from "./useChatExport";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const NOW = Date.UTC(2026, 9, 21, 9, 5);
 
 const ctx: ExportContext = {
   org: "default",
   timezone: "UTC",
   now: NOW,
-  product: "O2 Assistant",
+  product: `${brandNames.autobot}`,
   t: gt,
 };
 
@@ -58,7 +62,7 @@ describe("chatMarkdown", () => {
     expect(lines[0]).toBe("# Checkout 5xx spike");
     expect(lines[1]).toBe("Exported 09:05 UTC · default");
     expect(md).toContain("**You**\n\nDelete the stale alert");
-    expect(md).toContain("**O2 Assistant**");
+    expect(md).toContain(`**${brandNames.autobot}**`);
     expect(md).toMatch(/Worked through 2 steps \(SearchAlerts, o2_delete\)/);
     expect(md).toMatch(/Approved by you at \d\d:\d\d · Deleted 1 of 1/);
     expect(md.endsWith("\n")).toBe(true);

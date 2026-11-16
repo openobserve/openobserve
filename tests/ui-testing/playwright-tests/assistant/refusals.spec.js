@@ -4,6 +4,7 @@
 import { test, expect } from "@playwright/test";
 
 import { AssistantPage } from "../../pages/assistantPage.js";
+import { BRAND } from "../../utils/brand.js";
 
 const loadHarness = () => import("./harness/setup.mjs");
 
@@ -99,7 +100,7 @@ test.describe("assistant refusals and recovery", () => {
     // The chat stays readable: the refusal names the role, and the strip locks the composer to access.
     await expect(assistant.outcome()).toHaveAttribute("data-code", "permission_denied");
     await expect(assistant.outcome().locator('[data-test="assistant-turn-outcome-title"]')).toHaveText(
-      "Your role can no longer use O2 Assistant. Your message wasn't sent.",
+      `Your role can no longer use ${BRAND.autobot}. Your message wasn't sent.`,
     );
     await expect(notice("access")).toContainText("Needs AI access");
   });
@@ -107,7 +108,7 @@ test.describe("assistant refusals and recovery", () => {
   test("ERR-04 an org with the assistant off says so with the admin action", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await refuse(page, "not_enabled_400");
-    await expect(assistant.outcome()).toContainText("O2 Assistant is turned off for");
+    await expect(assistant.outcome()).toContainText(`${BRAND.autobot} is turned off for`);
     // The admin action opens Settings › Assistant › Access in a new tab, so the chat stays open.
     await expect(assistant.outcomeAction()).toHaveText("Open access settings (opens in a new tab)");
     await expect(assistant.outcomeAction()).toHaveAttribute("target", "_blank");

@@ -545,12 +545,12 @@ describe("turnReducer: every transition", () => {
   });
 
   it("announces a failure with the values its title names (round 3 #4)", () => {
-    const copy = { t, org: "acme", product: "O2 Assistant", elapsedMs: 42_000 };
+    const copy = { t, org: "acme", product: `${locale.brand.autobot}`, elapsedMs: 42_000 };
     const dropped = run(S.writing, { type: "eof", hasTail: false }, { copy });
     expect(dropped.effects).toContainEqual({
       kind: "announce",
       key: "assistant.error.stream_dropped.title",
-      params: { org: "acme", product: "O2 Assistant", elapsed: "42 s" },
+      params: { org: "acme", product: `${locale.brand.autobot}`, elapsed: "42 s" },
     });
     const overloaded = run(
       S.writing,

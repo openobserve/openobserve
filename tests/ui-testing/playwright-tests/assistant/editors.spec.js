@@ -3,6 +3,7 @@
 
 import { test, expect } from "@playwright/test";
 import { AssistantPage } from "../../pages/assistantPage.js";
+import { BRAND } from "../../utils/brand.js";
 
 // Playwright compiles a static import to require(), which would load the .mjs harness as CommonJS; import() keeps it ESM.
 const loadHarness = () => import("./harness/setup.mjs");
@@ -110,13 +111,13 @@ test.describe("assistant editors and width", () => {
     await expect(diff).toHaveAttribute("aria-label", "Proposed change to the alert query");
     await expect(diff.locator('[data-test="assistant-diff-reject"]')).toBeFocused();
     await expect(diff.locator('[data-test="assistant-diff-status"]')).toContainText(
-      "Proposed SQL · not checked · from O2 Assistant",
+      `Proposed SQL · not checked · from ${BRAND.autobot}`,
     );
     expect(await sqlInEditor(page)).toBe(original);
     await diff.locator('[data-test="assistant-diff-accept"]').click();
     await expect(diff).toBeHidden();
     await expect.poll(() => sqlInEditor(page)).toContain("SELECT service_name, count(*) AS errors");
-    await expect(assistant.aiLabel()).toContainText("Written by O2 Assistant");
+    await expect(assistant.aiLabel()).toContainText(`Written by ${BRAND.autobot}`);
     await expect(dock.locator('[data-test="assistant-composer-field"]')).toBeFocused();
     await assistant.aiLabel().locator('[data-test="ai-label-revert"]').click();
     await expect(assistant.aiLabel()).toBeHidden();

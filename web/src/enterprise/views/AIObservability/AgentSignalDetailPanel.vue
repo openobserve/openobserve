@@ -53,7 +53,7 @@
             {{ explanation }}
           </p>
         </div>
-        <!-- Waits for the evidence so the question to O2 AI carries it. -->
+        <!-- Waits for the evidence so the question to the chat carries it. -->
         <OButton
           v-if="explainable"
           variant="outline"
@@ -240,7 +240,7 @@ const props = defineProps<{
   /** The variant the drill-down narrows to: null = any, UNSET = not set. */
   agentEnv?: string | null;
   agentVersion?: string | null;
-  /** Offer "Explain with O2 AI"; only where the host page forwards `sendToAiChat`. */
+  /** Offer the "Explain" action; only where the host page forwards `sendToAiChat`. */
   explainable?: boolean;
 }>();
 

@@ -1,4 +1,4 @@
-# O2 Assistant mock harness
+# Assistant mock harness
 
 Runs the real OpenObserve frontend against a real (open-source) backend and fakes every
 AI endpoint with Playwright, so every assistant surface can be tested end to end without

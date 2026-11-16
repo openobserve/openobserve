@@ -41,6 +41,10 @@ import AssistantShell, {
 import { closeLockedPanel, lockedPanelMoved, openLockedPanel, useLockedPanel } from "./lockedPanel";
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const STARTER: Starter = {
   id: "s1",
   kind: "page",
@@ -134,10 +138,10 @@ afterEach(() => {
 });
 
 describe("AssistantShell landmark", () => {
-  it("is an aside named O2 Assistant in the sidebar, masked for session replay", () => {
+  it(`is an aside named ${brandNames.autobot} in the sidebar, masked for session replay`, () => {
     const el = root(setup().wrapper);
     expect(el.element.tagName).toBe("ASIDE");
-    expect(el.attributes("aria-label")).toBe("O2 Assistant");
+    expect(el.attributes("aria-label")).toBe(`${brandNames.askAutobot}`);
     expect(el.attributes("data-dd-privacy")).toBe("mask");
     expect(el.attributes("data-test")).toBe("assistant-shell-sidebar");
     expect(el.attributes("data-placement")).toBe("sidebar");
@@ -147,7 +151,7 @@ describe("AssistantShell landmark", () => {
     const full = root(setup({ placement: "full", density: "roomy" }).wrapper);
     expect(full.element.tagName).toBe("SECTION");
     expect(full.attributes("role")).toBe("region");
-    expect(full.attributes("aria-label")).toBe("O2 Assistant");
+    expect(full.attributes("aria-label")).toBe(`${brandNames.askAutobot}`);
     document.body.innerHTML = "";
     const sheet = root(setup({ sheet: true }).wrapper);
     expect(sheet.element.tagName).toBe("DIV");
@@ -220,7 +224,7 @@ describe("AssistantShell states", () => {
     openLockedPanel(null);
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
-      "O2 Assistant isn't available to your role.",
+      `${brandNames.autobot} isn't available to your role.`,
     );
   });
 
@@ -259,7 +263,7 @@ describe("AssistantShell states", () => {
       expect(root(wrapper).attributes("data-state")).toBe("empty");
       const empty = wrapper.get('[data-test="assistant-shell-empty"]');
       expect(empty.findAll("img")).toHaveLength(2);
-      expect(empty.text()).toBe("O2 Assistant");
+      expect(empty.text()).toBe(`${brandNames.askAutobot}`);
       expect(empty.text()).not.toMatch(/beta/i);
       expect(wrapper.find('[data-test="assistant-welcome"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="assistant-composer"]').exists()).toBe(true);
@@ -295,7 +299,7 @@ describe("AssistantShell states", () => {
   it("keeps a live composer with the unknown-role notice", () => {
     const { wrapper } = setup({}, "available", { canChat: "unknown" });
     expect(wrapper.get('[data-test="assistant-gate-unknown-notice"]').text()).toBe(
-      "Your role may not include O2 Assistant. If sending fails, ask an admin.",
+      `Your role may not include ${brandNames.autobot}. If sending fails, ask an admin.`,
     );
     expect(wrapper.find('[data-test="assistant-composer"]').exists()).toBe(true);
   });
@@ -308,7 +312,7 @@ describe("AssistantShell states", () => {
     const retry = vi.spyOn(store, "retry").mockResolvedValue({ state: "done", saved: "local" });
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-shell-unhealthy-notice"]').text()).toContain(
-      "O2 Assistant isn't responding. Your last message wasn't answered.",
+      `${brandNames.autobot} isn't responding. Your last message wasn't answered.`,
     );
     expect(wrapper.find('[data-test="assistant-composer"]').exists()).toBe(true);
     await wrapper.get('[data-test="assistant-shell-unhealthy-notice-retry"]').trigger("click");
@@ -356,7 +360,7 @@ describe("AssistantShell chrome and focus", () => {
     expect(wrapper.find('[data-test="assistant-density-switch"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-layout-button"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="assistant-shell-close"]').attributes("aria-label")).toBe(
-      "Close O2 Assistant",
+      `Close ${brandNames.autobot}`,
     );
     expect(wrapper.get('[data-test="assistant-shell-chrome"]').classes()).toContain("h-10");
     document.body.innerHTML = "";
@@ -432,7 +436,7 @@ describe("AssistantShell chrome and focus", () => {
     await flushPromises();
     expect(document.activeElement).toBe(root(wrapper).element);
     expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
-      "O2 Assistant opened.",
+      `${brandNames.autobot} opened.`,
     );
   });
 
@@ -490,7 +494,7 @@ describe("AssistantShell mounted after the open", () => {
       wrapper.get('[data-test="assistant-composer-field"]').element,
     );
     expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
-      "O2 Assistant opened.",
+      `${brandNames.autobot} opened.`,
     );
   });
 
@@ -756,7 +760,7 @@ describe("WP-06 conversation wiring", () => {
     store.announce(sid, "assistant.error.agent_unavailable.title");
     await flushPromises();
     expect(wrapper.get('[data-test="assistant-status-region"]').text()).toBe(
-      "Failed. The assistant didn't respond. Nothing was changed. Retry available.",
+      `Failed. ${brandNames.autobot} didn't respond. Nothing was changed. Retry available.`,
     );
   });
 

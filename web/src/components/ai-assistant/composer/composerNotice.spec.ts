@@ -30,6 +30,10 @@ import {
   type ComposerNotice,
 } from "./composerNotice";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 // The shipped short titles of K5, each with its link, as the strip shows them.
 const KIT_NOTICES: ComposerNotice[] = [
   {
@@ -81,7 +85,9 @@ describe("composerNotice: the strip's one line (K5)", () => {
   });
 
   it("shortens a long title by whole words, keeps the link, and leaves the sentence for title=", () => {
-    const sentence = raw("Your role can no longer use O2 Assistant. Your message wasn't sent.");
+    const sentence = raw(
+      `Your role can no longer use ${brandNames.autobot}. Your message wasn't sent.`,
+    );
     const fitted = fitNotice(
       sentenceNotice("access", sentence, "warning", [
         { action: "askAdmin", label: raw("Ask an admin") },

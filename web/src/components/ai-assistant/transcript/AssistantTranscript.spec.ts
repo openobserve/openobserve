@@ -36,6 +36,10 @@ import { composerUi } from "@/components/ai-assistant/composer/composerUi";
 
 import AssistantTranscript from "./AssistantTranscript.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 vi.mock("./AssistantMessageActions.vue", () => ({
   __esModule: true,
   default: {
@@ -158,7 +162,7 @@ describe("AssistantTranscript", () => {
     expect(el.attributes()).toMatchObject({
       role: "log",
       "aria-live": "off",
-      "aria-label": "Conversation with O2 Assistant",
+      "aria-label": `Conversation with ${brandNames.autobot}`,
       tabindex: "0",
       "data-dd-privacy": "mask",
     });
@@ -181,7 +185,7 @@ describe("AssistantTranscript", () => {
     expect(turns[0].attributes("aria-label")).toBe("Turn 1: why 5xx?");
     const answer = wrapper.get('[data-test="assistant-answer-t1"]');
     expect(answer.attributes("tabindex")).toBe("-1");
-    expect(answer.attributes("aria-label")).toBe("O2 Assistant, answer to why 5xx?");
+    expect(answer.attributes("aria-label")).toBe(`${brandNames.autobot}, answer to why 5xx?`);
     expect((wrapper.vm as unknown as { focusLatestAnswer(): boolean }).focusLatestAnswer()).toBe(
       true,
     );
@@ -382,7 +386,9 @@ describe("AssistantTranscript", () => {
     const { wrapper } = mountLive(liveSession(messages));
     const dividers = wrapper.findAll('[data-test="assistant-compaction-divider"]');
     expect(dividers).toHaveLength(1);
-    expect(dividers[0].text()).toMatch(/^Earlier context was summarised by the assistant at /);
+    expect(dividers[0].text()).toMatch(
+      new RegExp(`^Earlier context was summarised by ${brandNames.autobot} at `),
+    );
     const turn = wrapper.get('[data-test="assistant-turn-t-cmp-2"]');
     expect(turn.find('[data-test="assistant-compaction-divider"]').exists()).toBe(true);
   });
@@ -514,7 +520,7 @@ describe("AssistantTranscript", () => {
     expect(log(wrapper as never).attributes("data-readonly")).toBe("");
     expect(wrapper.find('[data-test^="actions-stub"]').exists()).toBe(false);
     expect(wrapper.get('[data-test="assistant-turn-outcome"]').text()).toBe(
-      "Failed: The assistant didn't respond. Nothing was changed.",
+      `Failed: ${brandNames.autobot} didn't respond. Nothing was changed.`,
     );
   });
 
@@ -596,7 +602,7 @@ describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
       /, answer to first$/,
     );
     expect(wrapper.get('[data-test="assistant-answer-t2"]').attributes("aria-label")).toBe(
-      "Investigator, answer to look deeper",
+      `${brandNames.autobotInvestigate}, answer to look deeper`,
     );
   });
 
@@ -616,7 +622,9 @@ describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
     expect(turn.get('[data-test="assistant-handoff-given-panel"]').text()).toContain(
       "1 questions, 1 answers",
     );
-    expect(turn.get('[data-test="assistant-message-meta"]').text()).toContain("· to Investigator");
+    expect(turn.get('[data-test="assistant-message-meta"]').text()).toContain(
+      `· to ${brandNames.autobotInvestigate}`,
+    );
   });
 
   it("renders no marker without the echo", () => {
@@ -636,7 +644,7 @@ describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
     const { wrapper } = mountLive(session);
     expect(wrapper.find('[data-test="assistant-handoff-marker"]').exists()).toBe(false);
     const row = wrapper.get('[data-code="handoff_failed"]');
-    expect(row.text()).toContain("Couldn't hand this chat to Investigator.");
+    expect(row.text()).toContain(`Couldn't hand this chat to ${brandNames.autobotInvestigate}.`);
     expect(row.get('[data-test="assistant-turn-outcome-action"]').attributes("aria-label")).toBe(
       "Try again",
     );

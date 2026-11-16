@@ -30,6 +30,10 @@ import AssistantMentionMenu, {
   type MentionOption,
 } from "./AssistantMentionMenu.vue";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const { breakpoint, fake, dashboardsApi } = vi.hoisted(() => ({
   breakpoint: { md: true },
   fake: { current: null as any },
@@ -144,7 +148,7 @@ describe("AssistantMentionMenu: Agents group (MULTI-AGENT-02)", () => {
       "assistant-mention-group-agents",
     );
     expect(agentRows(wrapper)).toEqual(["o2-ai", "sre", "generate-query"]);
-    for (const query of ["inv", "sre", "Investigator"]) {
+    for (const query of ["sre", `${brandNames.autobotInvestigate}`]) {
       await wrapper.setProps({ query });
       expect(agentRows(wrapper)).toEqual(["sre"]);
       expect(wrapper.vm.current()?.agent).toBe("sre");
@@ -193,7 +197,7 @@ describe("AssistantMentionMenu: Agents group (MULTI-AGENT-02)", () => {
 
   it("lists no agents with hideAgents, so Home's menu holds context only", async () => {
     withAgents();
-    const { wrapper } = await open("inv");
+    const { wrapper } = await open("sre");
     await wrapper.setProps({ hideAgents: true });
     expect(wrapper.find('[data-test="assistant-mention-group-agents"]').exists()).toBe(false);
     expect(agentRows(wrapper)).toEqual([]);
@@ -206,12 +210,12 @@ describe("AssistantMentionMenu: Agents group (MULTI-AGENT-02)", () => {
 
   it("hands a pick to the composer, sets the agent and speaks once, with no chip", async () => {
     const { store, sid } = withAgents();
-    const { wrapper } = await open("inv");
+    const { wrapper } = await open("sre");
     wrapper.vm.choose(wrapper.vm.current()!);
     const [picked] = wrapper.emitted("select")![0] as [MentionOption];
     expect(picked.chip).toBeUndefined();
     expect(store.state.sessions[sid].agentId).toBe("sre");
-    expect(composerUi(sid).status?.text).toBe("Investigator will answer.");
+    expect(composerUi(sid).status?.text).toBe(`${brandNames.autobotInvestigate} will answer.`);
   });
 
   it("sets the agent of the chat it was typed in, not the active sidebar chat", async () => {
@@ -221,11 +225,11 @@ describe("AssistantMentionMenu: Agents group (MULTI-AGENT-02)", () => {
       detached: true,
     });
     expect(store.state.shell.activeSid).toBe(sidebar);
-    const { wrapper } = await open("inv", false, floating);
+    const { wrapper } = await open("sre", false, floating);
     wrapper.vm.choose(wrapper.vm.current()!);
     expect(store.state.sessions[floating].agentId).toBe("sre");
     expect(store.state.sessions[sidebar].agentId).toBeUndefined();
-    expect(composerUi(floating).status?.text).toBe("Investigator will answer.");
+    expect(composerUi(floating).status?.text).toBe(`${brandNames.autobotInvestigate} will answer.`);
     const disabled = await open("query", false, floating);
     disabled.wrapper.vm.choose(disabled.wrapper.vm.current()!);
     expect(composerUi(floating).status?.text).toBe("Not available · Ask an admin");

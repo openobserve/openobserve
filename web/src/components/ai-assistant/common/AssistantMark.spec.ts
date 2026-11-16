@@ -23,7 +23,7 @@ import { agentGlyph } from "./glyphs";
 const agent = { glyph: agentGlyph.sre };
 
 describe("AssistantMark", () => {
-  it("draws the product as the O2 AI logo, light and dark, with no tile", () => {
+  it("draws the product as the logo, light and dark, with no tile", () => {
     for (const props of [{}, { glyph: agentGlyph["o2-ai"] }]) {
       const mark = mount(AssistantMark, { props }).get('[data-test="assistant-mark"]');
       expect(mark.attributes("data-logo")).toBe("");

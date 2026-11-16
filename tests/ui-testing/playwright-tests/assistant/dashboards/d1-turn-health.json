@@ -1,7 +1,7 @@
 {
   "version": 5,
   "dashboardId": "",
-  "title": "D1 Turn health (O2 Assistant)",
+  "title": "D1 Turn health (assistant)",
   "description": "HT-11 AC 6, gap-2 \u00a74.1 D1 over ai_* RUM actions. Cloud and dogfood only; self-hosted sends nothing.",
   "role": "",
   "owner": "",

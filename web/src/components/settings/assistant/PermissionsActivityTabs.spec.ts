@@ -22,6 +22,7 @@ import assistantSettings from "@/services/assistant_settings";
 import ActivityTab from "./ActivityTab.vue";
 import PermissionsTab from "./PermissionsTab.vue";
 import { settingsHarness } from "./assistantSettings.test-helpers";
+import en from "@/locales/languages/en-US.json";
 
 const { fake, toast, confirm } = vi.hoisted(() => ({
   fake: {
@@ -125,7 +126,9 @@ describe("PermissionsTab", () => {
     expect(confirm).not.toHaveBeenCalled();
     expect(assistantSettings.revokeGrant).toHaveBeenCalledWith("acme", "g1");
     expect(toast).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Approval revoked. The assistant will ask next time." }),
+      expect.objectContaining({
+        message: `Approval revoked. ${en.brand.autobot} will ask next time.`,
+      }),
     );
   });
 });

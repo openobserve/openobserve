@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChatMessage } from "@/ts/interfaces/chat";
+import enUS from "@/locales/languages/en-US.json";
 import { raw } from "@/types/i18n";
 
 import {
@@ -110,13 +111,16 @@ describe("agents: the roster", () => {
     );
   });
 
-  it("matches a name prefix or the id, never a word inside the name", () => {
-    expect(agentMatches("sre", "Investigator", "inv")).toBe(true);
-    expect(agentMatches("sre", "Investigator", "sre")).toBe(true);
-    expect(agentMatches("sre", "Investigator", "Investigator")).toBe(true);
+  it("matches the start of the name, of any word in it, or of the id, never the middle of a word", () => {
+    const investigate = enUS.brand.autobotInvestigate;
+    expect(agentMatches("sre", investigate, "inv")).toBe(true);
+    expect(agentMatches("sre", investigate, "auto")).toBe(true);
+    expect(agentMatches("sre", investigate, "sre")).toBe(true);
+    expect(agentMatches("sre", investigate, investigate)).toBe(true);
+    expect(agentMatches("sre", investigate, "vest")).toBe(false);
     expect(agentMatches("generate-query", "Query builder", "query")).toBe(true);
-    expect(agentMatches("generate-query", "Query builder", "builder")).toBe(false);
-    expect(agentMatches("sre", "Investigator", "")).toBe(true);
+    expect(agentMatches("generate-query", "Query builder", "builder")).toBe(true);
+    expect(agentMatches("sre", investigate, "")).toBe(true);
   });
 });
 

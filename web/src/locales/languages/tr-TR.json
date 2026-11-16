@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "Kullanıcı Tanımlı Şema",
     "allFieldsLabel": "Tüm Alanlar",
     "nlQueryGenerationFailed": "Sorgu oluşturulamadı. Lütfen tekrar deneyin.",
-    "askAIPlaceholder": "Yapay zekadan sorgunuzla ilgili yardım isteyin...",
-    "askAIFunctionPlaceholder": "Yapay zekadan fonksiyonunuza yardım etmesini isteyin...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: sorgunuzla ilgili yardım alın...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: fonksiyonunuzla ilgili yardım alın...",
     "askAIPlaceholderRotation": {
       "one": "Bana son saatteki hataları göster...",
       "two": "5 saniyeden fazla süren yavaş sorguları bulun...",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "Hizmet Grafiği",
     "services": "Hizmet Kataloğu",
     "aiObservability": "Yapay Zeka",
-    "aiAssistant": "Yapay Zeka Asistanı",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "Oturumu Kapat",
     "ingestion": "Veri kaynakları",
     "metrics": "Metrikler",
@@ -3983,7 +3983,7 @@
           "note": "Otomatik SRE işlemleri ve içgörüleri"
         },
         "ai_assistant": {
-          "name": "Yapay Zeka Asistanı",
+          "name": "@:{'brand.askAutobot'}",
           "note": "Akıllı sorgu ve analiz yardımı"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "VRL Fonksiyonu",
     "jsFunctionHint": "Günlük alanlarına erişmek ve değiştirmek için `row` nesnesini kullanın. Örnek: Row.new_field = Row.existing_field + 'processed';",
     "vrlFunctionHint": "Geçerli olayı temsil etmek için `.` tuşunu kullanın. Örnek: .new_field = .existing_field + 'işlenmiş'",
-    "askAIFunctionPlaceholder": "Yapay zekadan fonksiyonunuza yardım etmesini isteyin...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: fonksiyonunuzla ilgili yardım alın...",
     "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin",
     "associatedFunctionHeader": "İlişkili Fonksiyonlar",
     "enrichmentTables": "Zenginleştirme Tabloları",
@@ -6491,7 +6491,7 @@
       "rbac": "Ekibiniz için ince ayarlı izinlere sahip özel roller oluşturun.",
       "logPatterns": "Satır satır okumak yerine yinelenen günlük desenlerini otomatik olarak tespit edin.",
       "correlation": "Bir günlük satırından doğrudan ilgili metriklerine ve izlerine atlayın.",
-      "aiAssistant": "Yapay zekadan sorgu yazmasını ve verilerinizi sade bir dille açıklamasını isteyin.",
+      "aiAssistant": "@:{'brand.askAutobot'}: sorgu yazdırın ve verilerinizi sade bir dille açıklatın.",
       "alertInsights": "Bir uyarının ne sıklıkla tetiklendiğini görün ve ilişkili uyarıları bir bakışta tespit edin.",
       "anomalyDetection": "Sıra dışı metrik davranışını, bir eşik uyarısı tetiklemeden önce otomatik olarak yakalayın.",
       "agentGraph": "Yapay zeka ajanlarınızın ve araçlarınızın birbirini nasıl çağırdığını grafik olarak görselleştirilmiş halde görün.",
@@ -10359,9 +10359,9 @@
     "recentEvents": "Son olaylar",
     "investigate": "Araştırın→",
     "askAi": {
-      "label": "Yapay Zeka'ya Sor",
-      "hint": "Yapay Zeka'ya bunu sor",
-      "labelFor": "Yapay Zeka'ya {item} hakkında sor",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: bunu sor",
+      "labelFor": "@:{'brand.askAutobot'}: {item} hakkında sor",
       "chip": {
         "firing": "Tetiklenmiş uyarılar",
         "failing": "Başarısız kurallar",
@@ -10569,7 +10569,7 @@
     "viewInTarget": "{target} içinde görüntüle",
     "viewTarget": "{target} görüntüle",
     "welcome": {
-      "taglineHighlight": "O2 Asistanı",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "Veya bunlardan birini deneyin"
     },
     "capabilities": {
@@ -10622,7 +10622,7 @@
       "unexpectedError": "Beklenmeyen bir hata oluştu",
       "toolExecutionFailed": "Araç yürütmesi başarısız oldu",
       "errorOccurred": "Bir hata oluştu",
-      "navigateConfirmQuestion": "O2 Assistant'ın gezinmesine izin verilsin mi?",
+      "navigateConfirmQuestion": "@:{'brand.autobot'} gezinebilsin mi?",
       "confirmToolExecution": "{tool} çalıştırılmasını onaylıyor musunuz?",
       "entity": {
         "alert": "Uyarı",
@@ -10727,7 +10727,7 @@
     "aiExhaustedMessage": "Yapay zekayı kullanmaya devam etmek için abone olun. Daha fazla kullanım bu kuruluşun faturasına yansıtılır.",
     "aiContractExhaustedMessage": "Daha fazla AI kredisi eklemek için hesap yöneticinizle iletişime geçin",
     "aiPayerSubscribeMessage": "Bu kuruluşun faturalandırması {payer} tarafından yönetilir. Abone olmak için {payer} yöneticisinden isteyin; daha fazla kullanım onun faturasına yansıtılır.",
-    "aiUsedByFeature": "Asistan ve sorgu oluşturma: {chat} · Vaka analizi: {incident} · Yeniden analiz: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} ve sorgu oluşturma: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Yeniden analiz: {reanalysis}",
     "aiPaygMessage": "Ücretsiz krediler tükendi — kullanım aboneliğe faturalandırılır",
     "billingGroup": {
       "tabLabel": "Faturalandırma Grubu",
@@ -11898,14 +11898,14 @@
       "eventsAndCommentsAppearHere": "Olaylar ve yorumlar burada görünecek",
       "scrollToTop": "En üste kaydır",
       "scrollToBottom": "En alta kaydır",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "Yapay Zeka analizi",
         "analyze": "Analiz Et",
-        "analyzeTooltip": "Bu vaka için Yapay Zeka SRE analizi başlat",
-        "rcaDisabled": "RCA devre dışı",
-        "rcaOff": "RCA kapalı",
-        "noAiSreFor": "{severity} için Yapay Zeka SRE yok",
+        "analyzeTooltip": "Bu vaka için @:{'brand.autobotInvestigate'} analizi başlat",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} devre dışı",
+        "rcaOff": "@:{'brand.autobotInvestigate'} kapalı",
+        "noAiSreFor": "{severity} için @:{'brand.autobotInvestigate'} yok",
         "investigating": "İnceleniyor",
         "rerunElapsed": "yeniden çalıştırma · {elapsed}",
         "noUpdateFor": "{elapsed} boyunca güncelleme yok",
@@ -12015,7 +12015,7 @@
       "rcaCancelFailed": "Analiz iptal edilemedi",
       "rcaFailed": "AI analizi başarısız oldu",
       "rcaBlocked": "Yapay Zeka analizi çalışmadı",
-      "rcaFailedGeneric": "RCA analizi gerçekleştirilemedi",
+      "rcaFailedGeneric": "@:{'brand.autobotInvestigate'} analizi gerçekleştirilemedi",
       "rcaRetry": "Analizi yeniden dene",
       "rcaCopy": "Raporu kopyala",
       "rcaCopied": "Rapor panoya kopyalandı",
@@ -12130,7 +12130,7 @@
         "loadingReport": "Rapor yükleniyor…",
         "reportAfterRun": "Rapor, çalıştırmadan sonra görünür.",
         "noAnalysisTitle": "Henüz analiz yok",
-        "noAnalysisText": "Yapay Zeka SRE Ajanı bu vakanın uyarılarını, topolojisini, son değişikliklerini, izlerini, günlüklerini ve metriklerini kontrol eder, ardından bir rapor yazar. Çalışırken yaptıklarını İnceleme ileti dizisinde takip edebilirsiniz.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} bu vakanın uyarılarını, topolojisini, son değişikliklerini, izlerini, günlüklerini ve metriklerini kontrol eder, ardından bir rapor yazar. Çalışırken yaptıklarını İnceleme ileti dizisinde takip edebilirsiniz.",
         "stageOf": "Aşama {index}/{count} · {stage}",
         "cancelRun": "Çalıştırmayı iptal et",
         "followInThread": "İleti dizisinde takip et",
@@ -16104,7 +16104,7 @@
         "range": "{band} · {window}",
         "filter": "Seçime göre filtrele",
         "drillDown": "Ayrıntıya in",
-        "askAi": "Yapay Zeka'ya Sor",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "Isı haritası seçimi · {count} span | Isı haritası seçimi · {count} span",
         "clear": "Seçimi temizle"
       }
@@ -16310,8 +16310,8 @@
     "criticalPath": "Kritik yol",
     "askAi": {
       "explainTrace": "İzi açıkla",
-      "explainTraceHint": "Kritik yoldaki en yavaş span'ler ve tüm hatalı span'ler hakkında yapay zekaya sor",
-      "askAboutSpan": "Bu span hakkında yapay zekaya sor",
+      "explainTraceHint": "@:{'brand.askAutobot'}: kritik yoldaki en yavaş span'ler ve tüm hatalı span'ler hakkında sor",
+      "askAboutSpan": "@:{'brand.askAutobot'}: bu span hakkında sor",
       "spanChip": "Span · {operation}",
       "traceChip": "İz · {operation}"
     },
@@ -25061,13 +25061,13 @@
       "subtitle": "Veritabanlarınızdaki sorgu performansı ve sağlığı"
     },
     "ai": {
-      "suggestFix": "Bunu nasıl düzelteceğini AI'ya sor",
-      "suggestFixHint": "Bu sorgu, motoru ve gecikme değerleriyle AI asistanını açar ve neyin değiştirileceğini sorar. Kendisi hiçbir şeyi değiştirmez.",
-      "rowSuggestFix": "Bunu nasıl düzelteceğini AI'ya sor",
+      "suggestFix": "@:{'brand.askAutobot'}: bunu nasıl düzelteceğini sor",
+      "suggestFixHint": "@:{'brand.autobot'} bu sorgu, motoru ve gecikme değerleriyle açılır ve neyin değiştirileceğini sorar. Kendisi hiçbir şeyi değiştirmez.",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: bunu nasıl düzelteceğini sor",
       "deadlockFix": "Bu kilitlenmeyi nasıl durdurabilirim?",
-      "deadlockFixHint": "Hem çakışan ifadeleri hem de satır sırası kanıtını AI asistanına gönderir.",
+      "deadlockFixHint": "Hem çakışan ifadeleri hem de satır sırası kanıtını @:{'brand.autobot'} hizmetine gönderir.",
       "blockingFix": "Bu neden engelliyor?",
-      "blockingFixHint": "Kök oturumun ifadesini, boşta kalma süresini ve arkasında bekleyen oturum sayısını AI asistanına gönderir."
+      "blockingFixHint": "Kök oturumun ifadesini, boşta kalma süresini ve arkasında bekleyen oturum sayısını @:{'brand.autobot'} hizmetine gönderir."
     },
     "filters": {
       "allEngines": "Tüm motorlar",
@@ -26773,8 +26773,8 @@
     "removeStep": "Adımı kaldır",
     "channels": "Kanallar",
     "policySaved": "Politika kaydedildi",
-    "verdictTitle": "Yapay Zeka SRE kararı",
-    "reportTitle": "Yapay Zeka SRE'nin buldukları",
+    "verdictTitle": "@:{'brand.autobot'} kararı",
+    "reportTitle": "@:{'brand.autobot'} bulguları",
     "l0P1Lead": "Hemen uyar.",
     "l0P1Desc": "Yapay zeka analizi paralel çalışır — kritik çağrılar asla geciktirilmez.",
     "l0P4Lead": "Yalnızca yapay zeka analizi.",
@@ -26794,7 +26794,7 @@
     "l0MaxLevelsOption": "en fazla {count} seviye | en fazla {count} seviye",
     "l0ParallelSentence": "hemen çağrı yapılır; ajan da paralel çalışır",
     "l0OnlySentence": "ajan araştırır; bu öncelik yalnızca seviyeleriniz öyle diyorsa çağrı gönderir",
-    "l0OffSentence": "Yapay Zeka SRE çalışmaz; çağrı, Yapay Zeka triyajı olmadan olduğu gibi tam olarak davranır",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} çalışmaz; çağrı, Yapay Zeka triyajı olmadan olduğu gibi tam olarak davranır",
     "l0BudgetRange": "30 ile 600 saniye arasında — sunucu, bu aralığın dışındaki değerleri sınır değerlerine sabitlemek yerine reddeder",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Çağrıyı bastır",
@@ -26821,7 +26821,7 @@
     "eventKind_page": "Çağrı",
     "eventKind_ack": "Onay",
     "eventKind_note": "Not",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "Devir",
     "eventKind_recovery": "Düzelme",
     "eventKind_state": "Durum",
@@ -27483,7 +27483,7 @@
     "ladderAddStep": "Adım ekle",
     "ladderRightNow": "Şu anda bu",
     "ladderSameLadder": "aynı merdiven",
-    "ladderL0Off": "Yapay Zeka SRE yok",
+    "ladderL0Off": "@:{'brand.autobotInvestigate'} yok",
     "ladderStaleDefaultTag": "Merdiven rotasyonları hiç öğrenmedi",
     "ladderStaleDefaultHint": "Her seviye tüm ekibi çağırır, ancak bu ekibin rotasyonları var — merdiven, rotasyonlar oluşturulmadan önce oluşturulmuş. Üye eklemek veya çıkarmak varsayılanı yeniden çalıştırır, ya da merdiveni elle bir kez düzenleyin.",
     "reachShortNoSmtp": "yalnızca e-posta · SMTP aktarımı yok",
@@ -27819,7 +27819,7 @@
     "consentStillRequired": "Ücretli kullanım gerekli tüm kuruluşlar için etkinleştirilmedi.",
     "updateFailed": "Ücretli Yapay Zeka kullanımı güncellenemedi. Tekrar deneyin.",
     "declinedNotice": "Ücretli Yapay Zeka kullanımı kapalı olduğundan bu istek gönderilmedi.",
-    "consentScope": "Tüm kuruluş için geçerlidir: Asistan, sorgu oluşturma ve vaka analizi. Planlar sayfasından istediğiniz zaman kapatabilirsiniz.",
+    "consentScope": "Tüm kuruluş için geçerlidir: @:{'brand.askAutobot'}, sorgu oluşturma ve vaka analizi. Planlar sayfasından istediğiniz zaman kapatabilirsiniz.",
     "managePaidUsage": "Ücretli kullanımı aç",
     "modePayAsYouGo": "Kullandıkça öde",
     "modeConsentRequired": "Onay gerekli",
@@ -28400,7 +28400,7 @@
         "auth_test": "Bot token",
         "last_event": "Olaylar",
         "sockets": "Socket'ler",
-        "agent": "Yapay Zeka Asistanı",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "Test gönderisi"
       },
       "connectedOrgs": "Bağlı kuruluşlar",

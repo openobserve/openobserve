@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "Schemat zdefiniowany przez użytkownika",
     "allFieldsLabel": "Wszystkie pola",
     "nlQueryGenerationFailed": "Nie udało się wygenerować zapytania. Spróbuj ponownie.",
-    "askAIPlaceholder": "Zapytaj AI o pomoc w zapytaniu...",
-    "askAIFunctionPlaceholder": "Zapytaj AI o pomoc w funkcji...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: pomoc w zapytaniu...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: pomoc w funkcji...",
     "askAIPlaceholderRotation": {
       "one": "Pokaż błędy z ostatniej godziny…",
       "two": "Znajdź wolne zapytania trwające dłużej niż 5s…",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "Graf usług",
     "services": "Katalog usług",
     "aiObservability": "AI",
-    "aiAssistant": "Asystent AI",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "Wyloguj się",
     "ingestion": "Źródła danych",
     "metrics": "Metryki",
@@ -3983,7 +3983,7 @@
           "note": "Automatyczne operacje SRE i spostrzeżenia"
         },
         "ai_assistant": {
-          "name": "Asystent O2",
+          "name": "@:{'brand.askAutobot'}",
           "note": "Inteligentna pomoc w zapytaniach i analizie"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "Funkcja VRL",
     "jsFunctionHint": "Użyj obiektu `row`, aby uzyskać dostęp do pól logów i modyfikować je. Przykład: row.new_field = row.existing_field + ' processed';",
     "vrlFunctionHint": "Użyj `.`, aby reprezentować bieżące zdarzenie. Przykład: .new_field = .existing_field + ' processed'",
-    "askAIFunctionPlaceholder": "Poproś AI o pomoc w tworzeniu funkcji...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: pomoc w funkcji...",
     "enterFunctionPrompt": "Wprowadź prompt do wygenerowania funkcji",
     "associatedFunctionHeader": "Powiązane funkcje",
     "enrichmentTables": "Tabele wzbogacania",
@@ -6491,7 +6491,7 @@
       "rbac": "Twórz niestandardowe role ze szczegółowymi uprawnieniami dla swojego zespołu.",
       "logPatterns": "Automatycznie wykrywaj powtarzające się wzorce logów, zamiast czytać je linia po linii.",
       "correlation": "Przechodź z wiersza logu bezpośrednio do powiązanych metryk i trace.",
-      "aiAssistant": "Poproś AI o napisanie zapytań i wyjaśnienie Twoich danych prostym językiem.",
+      "aiAssistant": "@:{'brand.askAutobot'}: napisz zapytania i wyjaśnij dane prostym językiem.",
       "alertInsights": "Zobacz, jak często alert się wyzwala, i jednym spojrzeniem wykryj skorelowane alerty.",
       "anomalyDetection": "Automatycznie wykrywaj nietypowe zachowanie metryk, zanim wywoła alert progowy.",
       "agentGraph": "Zobacz, jak Twoi agenci AI i narzędzia wywołują się nawzajem, w formie grafu.",
@@ -10359,9 +10359,9 @@
     "recentEvents": "Ostatnie zdarzenia",
     "investigate": "Zbadaj →",
     "askAi": {
-      "label": "Zapytaj AI",
-      "hint": "Zapytaj AI o to",
-      "labelFor": "Zapytaj AI o {item}",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: zapytaj o to",
+      "labelFor": "@:{'brand.askAutobot'}: zapytaj o {item}",
       "chip": {
         "firing": "Wyzwolone alerty",
         "failing": "Reguły z błędami",
@@ -10569,7 +10569,7 @@
     "viewInTarget": "Zobacz w {target}",
     "viewTarget": "Zobacz {target}",
     "welcome": {
-      "taglineHighlight": "O2 Assistant",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "Lub wypróbuj jedną z tych opcji"
     },
     "capabilities": {
@@ -10622,7 +10622,7 @@
       "unexpectedError": "Wystąpił nieoczekiwany błąd",
       "toolExecutionFailed": "Wykonanie narzędzia nie powiodło się",
       "errorOccurred": "Wystąpił błąd",
-      "navigateConfirmQuestion": "Czy zezwolić asystentowi O2 na nawigację?",
+      "navigateConfirmQuestion": "Czy zezwolić @:{'brand.autobot'} na nawigację?",
       "confirmToolExecution": "Potwierdzić wykonanie {tool}?",
       "entity": {
         "alert": "alert",
@@ -10727,7 +10727,7 @@
     "aiExhaustedMessage": "Subskrybuj, aby dalej korzystać z AI. Dalsze użycie zostanie rozliczone na fakturze tej organizacji.",
     "aiContractExhaustedMessage": "Skontaktuj się z menedżerem konta, aby dodać więcej kredytów AI",
     "aiPayerSubscribeMessage": "Rozliczeniami tej organizacji zarządza {payer}. Poproś administratora {payer} o subskrypcję; dalsze użycie zostanie rozliczone na jej fakturze.",
-    "aiUsedByFeature": "Asystent i generowanie zapytań: {chat} · Analiza incydentów: {incident} · Ponowna analiza: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} i generowanie zapytań: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Ponowna analiza: {reanalysis}",
     "aiPaygMessage": "Bezpłatne kredyty wyczerpane — użycie fakturowane na subskrypcję",
     "billingGroup": {
       "tabLabel": "Grupa rozliczeniowa",
@@ -11898,14 +11898,14 @@
       "eventsAndCommentsAppearHere": "Tutaj pojawią się zdarzenia i komentarze",
       "scrollToTop": "Przewiń do góry",
       "scrollToBottom": "Przewiń do dołu",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "Analiza AI",
         "analyze": "Analizuj",
-        "analyzeTooltip": "Rozpocznij analizę AI SRE tego incydentu",
-        "rcaDisabled": "RCA wyłączone",
-        "rcaOff": "RCA wyłączone",
-        "noAiSreFor": "Brak AI SRE dla {severity}",
+        "analyzeTooltip": "Rozpocznij analizę @:{'brand.autobotInvestigate'} tego incydentu",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} wyłączone",
+        "rcaOff": "@:{'brand.autobotInvestigate'} wyłączone",
+        "noAiSreFor": "Brak @:{'brand.autobotInvestigate'} dla {severity}",
         "investigating": "Analizowanie",
         "rerunElapsed": "ponowne uruchomienie · {elapsed}",
         "noUpdateFor": "brak aktualizacji przez {elapsed}",
@@ -12015,7 +12015,7 @@
       "rcaCancelFailed": "Nie udało się anulować analizy",
       "rcaFailed": "Analiza AI nie powiodła się",
       "rcaBlocked": "Analiza AI nie została uruchomiona",
-      "rcaFailedGeneric": "Nie udało się przeprowadzić analizy RCA",
+      "rcaFailedGeneric": "Nie udało się przeprowadzić analizy @:{'brand.autobotInvestigate'}",
       "rcaRetry": "Ponów analizę",
       "rcaCopy": "Kopiuj raport",
       "rcaCopied": "Raport skopiowano do schowka",
@@ -12130,7 +12130,7 @@
         "loadingReport": "Ładowanie raportu…",
         "reportAfterRun": "Raport pojawia się po zakończeniu przebiegu.",
         "noAnalysisTitle": "Brak analizy",
-        "noAnalysisText": "Agent AI SRE sprawdza alerty tego incydentu, topologię, ostatnie zmiany, trace, logi i metryki, a następnie pisze raport. Możesz śledzić jego pracę w wątku dochodzenia w trakcie działania.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} sprawdza alerty tego incydentu, topologię, ostatnie zmiany, trace, logi i metryki, a następnie pisze raport. Możesz śledzić jego pracę w wątku dochodzenia w trakcie działania.",
         "stageOf": "Etap {index}/{count} · {stage}",
         "cancelRun": "Anuluj przebieg",
         "followInThread": "Śledź w wątku",
@@ -16104,7 +16104,7 @@
         "range": "{band} · {window}",
         "filter": "Filtruj według zaznaczenia",
         "drillDown": "Przejdź w głąb",
-        "askAi": "Zapytaj AI",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "Zaznaczenie na mapie cieplnej · {count} span | Zaznaczenie na mapie cieplnej · {count} span",
         "clear": "Wyczyść zaznaczenie"
       }
@@ -16310,8 +16310,8 @@
     "criticalPath": "Ścieżka krytyczna",
     "askAi": {
       "explainTrace": "Wyjaśnij trace",
-      "explainTraceHint": "Zapytaj AI o najwolniejsze spany na ścieżce krytycznej i każdy span z błędem",
-      "askAboutSpan": "Zapytaj AI o ten span",
+      "explainTraceHint": "@:{'brand.askAutobot'}: zapytaj o najwolniejsze spany na ścieżce krytycznej i każdy span z błędem",
+      "askAboutSpan": "@:{'brand.askAutobot'}: zapytaj o ten span",
       "spanChip": "Span · {operation}",
       "traceChip": "Trace · {operation}"
     },
@@ -25061,13 +25061,13 @@
       "subtitle": "Wydajność i kondycja zapytań w Twoich bazach danych"
     },
     "ai": {
-      "suggestFix": "Zapytaj AI, jak to naprawić",
-      "suggestFixHint": "Otwiera asystenta AI z tym zapytaniem, jego silnikiem i liczbami opóźnień i pyta, co zmienić. Sam niczego nie zmienia.",
-      "rowSuggestFix": "Zapytaj AI, jak to naprawić",
+      "suggestFix": "@:{'brand.askAutobot'}: jak to naprawić",
+      "suggestFixHint": "Otwiera @:{'brand.autobot'} z tym zapytaniem, jego silnikiem i liczbami opóźnień i pyta, co zmienić. Sam niczego nie zmienia.",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: jak to naprawić",
       "deadlockFix": "Jak zatrzymać to zakleszczenie?",
-      "deadlockFixHint": "Wysyła do asystenta AI obie sprzeczne instrukcje oraz dowody kolejności wierszy.",
+      "deadlockFixHint": "Wysyła do @:{'brand.autobot'} obie sprzeczne instrukcje oraz dowody kolejności wierszy.",
       "blockingFix": "Dlaczego to blokuje?",
-      "blockingFixHint": "Wysyła do asystenta AI instrukcję sesji głównej, jej czas bezczynności oraz liczbę sesji zablokowanych za nią."
+      "blockingFixHint": "Wysyła do @:{'brand.autobot'} instrukcję sesji głównej, jej czas bezczynności oraz liczbę sesji zablokowanych za nią."
     },
     "filters": {
       "allEngines": "Wszystkie silniki",
@@ -26773,8 +26773,8 @@
     "removeStep": "Usuń krok",
     "channels": "Kanały",
     "policySaved": "Polityka zapisana",
-    "verdictTitle": "Werdykt AI SRE",
-    "reportTitle": "Co znalazł AI SRE",
+    "verdictTitle": "Werdykt @:{'brand.autobot'}",
+    "reportTitle": "Co znalazł @:{'brand.autobot'}",
     "l0P1Lead": "Alert natychmiast.",
     "l0P1Desc": "Analiza AI działa równolegle — krytyczne wezwania nigdy nie są opóźniane.",
     "l0P4Lead": "Tylko analiza AI.",
@@ -26794,7 +26794,7 @@
     "l0MaxLevelsOption": "do {count} poziomu | do {count} poziomów",
     "l0ParallelSentence": "wezwanie wysyłane od razu; agent działa równolegle",
     "l0OnlySentence": "agent prowadzi dochodzenie; ten priorytet wzywa tylko wtedy, gdy Twoje poziomy na to wskazują",
-    "l0OffSentence": "AI SRE nie działa; wezwanie zachowuje się dokładnie tak, jak bez triage'u AI",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} nie działa; wezwanie zachowuje się dokładnie tak, jak bez triage'u AI",
     "l0BudgetRange": "Między 30 a 600 sekund — serwer odrzuca wartości spoza tego zakresu, zamiast je przycinać",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Wycisz wezwanie",
@@ -26821,7 +26821,7 @@
     "eventKind_page": "Wezwanie",
     "eventKind_ack": "Potwierdzenie",
     "eventKind_note": "Notatka",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "Przekazanie",
     "eventKind_recovery": "Odzyskanie",
     "eventKind_state": "Stan",
@@ -27483,7 +27483,7 @@
     "ladderAddStep": "Dodaj krok",
     "ladderRightNow": "Teraz to jest",
     "ladderSameLadder": "ta sama drabina",
-    "ladderL0Off": "Brak AI SRE",
+    "ladderL0Off": "Brak @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "Drabina nigdy nie poznała rotacji",
     "ladderStaleDefaultHint": "Każdy poziom wzywa cały zespół, ale ten zespół ma rotacje — drabinka została utworzona, zanim one istniały. Dodanie lub usunięcie członka ponownie uruchamia domyślną konfigurację, albo edytuj drabinkę raz ręcznie.",
     "reachShortNoSmtp": "tylko e-mail · brak transportu SMTP",
@@ -27819,7 +27819,7 @@
     "consentStillRequired": "Płatne użycie nie jest włączone dla wszystkich wymaganych organizacji.",
     "updateFailed": "Nie udało się zaktualizować płatnego korzystania z AI. Spróbuj ponownie.",
     "declinedNotice": "Płatne korzystanie z AI jest wyłączone, więc to żądanie nie zostało wysłane.",
-    "consentScope": "Dotyczy całej organizacji: Asystenta AI, generowania zapytań i analizy incydentów. Możesz to wyłączyć w dowolnym momencie na stronie Planów.",
+    "consentScope": "Dotyczy całej organizacji: @:{'brand.askAutobot'}, generowania zapytań i analizy incydentów. Możesz to wyłączyć w dowolnym momencie na stronie Planów.",
     "managePaidUsage": "Włącz płatne korzystanie",
     "modePayAsYouGo": "Płatność za użycie",
     "modeConsentRequired": "Wymagana zgoda",
@@ -28400,7 +28400,7 @@
         "auth_test": "Token bota",
         "last_event": "Zdarzenia",
         "sockets": "Gniazda",
-        "agent": "Asystent AI",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "Wiadomość testowa"
       },
       "connectedOrgs": "Połączone organizacje",

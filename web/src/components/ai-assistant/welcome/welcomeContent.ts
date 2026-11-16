@@ -1,5 +1,5 @@
 /**
- * Static content for the O2 Assistant home-tab welcome screen.
+ * Static content for the assistant home-tab welcome screen.
  */
 
 import type { I18nKey } from "@/types/i18n";

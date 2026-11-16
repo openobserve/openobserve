@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "Lược đồ do người dùng xác định",
     "allFieldsLabel": "Tất cả trường",
     "nlQueryGenerationFailed": "Không thể tạo truy vấn. Vui lòng thử lại.",
-    "askAIPlaceholder": "Hỏi AI để giúp đỡ với truy vấn của bạn...",
-    "askAIFunctionPlaceholder": "Hỏi AI để giúp đỡ với hàm của bạn...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: giúp đỡ với truy vấn của bạn...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: giúp đỡ với hàm của bạn...",
     "askAIPlaceholderRotation": {
       "one": "Hiển thị lỗi từ giờ trước…",
       "two": "Tìm truy vấn chậm mất hơn 5s…",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "Biểu đồ dịch vụ",
     "services": "Danh mục dịch vụ",
     "aiObservability": "AI",
-    "aiAssistant": "Trợ lý AI",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "Đăng xuất",
     "ingestion": "Nguồn dữ liệu",
     "metrics": "Chỉ số",
@@ -3983,7 +3983,7 @@
           "note": "Vận hành và phân tích SRE tự động"
         },
         "ai_assistant": {
-          "name": "Trợ lý O2",
+          "name": "@:{'brand.askAutobot'}",
           "note": "Hỗ trợ truy vấn và phân tích thông minh"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "Hàm VRL",
     "jsFunctionHint": "Sử dụng đối tượng `row` để truy cập và sửa đổi các trường nhật ký. Ví dụ: row.new_field = row.existing_field + ' processed';",
     "vrlFunctionHint": "Sử dụng `.` để đại diện cho sự kiện hiện tại. Ví dụ: .new_field = .existing_field + ' processed'",
-    "askAIFunctionPlaceholder": "Nhờ AI hỗ trợ cho hàm của bạn...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: giúp đỡ với hàm của bạn...",
     "enterFunctionPrompt": "Nhập lời nhắc để tạo hàm",
     "associatedFunctionHeader": "Các Hàm Liên kết",
     "enrichmentTables": "Bảng làm giàu dữ liệu",
@@ -6491,7 +6491,7 @@
       "rbac": "Tạo vai trò tùy chỉnh với quyền chi tiết cho nhóm của bạn.",
       "logPatterns": "Tự động phát hiện các mẫu nhật ký lặp lại thay vì đọc từng dòng.",
       "correlation": "Chuyển từ một dòng nhật ký thẳng đến các chỉ số và trace liên quan.",
-      "aiAssistant": "Yêu cầu AI viết truy vấn và giải thích dữ liệu của bạn bằng ngôn ngữ dễ hiểu.",
+      "aiAssistant": "@:{'brand.askAutobot'}: viết truy vấn và giải thích dữ liệu của bạn bằng ngôn ngữ dễ hiểu.",
       "alertInsights": "Xem tần suất cảnh báo kích hoạt và phát hiện các cảnh báo tương quan trong nháy mắt.",
       "anomalyDetection": "Tự động phát hiện hành vi chỉ số bất thường trước khi nó kích hoạt cảnh báo ngưỡng.",
       "agentGraph": "Xem cách các agent AI và công cụ gọi nhau, được trực quan hóa dưới dạng biểu đồ.",
@@ -10359,9 +10359,9 @@
     "recentEvents": "Sự kiện gần đây",
     "investigate": "Điều tra →",
     "askAi": {
-      "label": "Hỏi AI",
-      "hint": "Hỏi AI về nội dung này",
-      "labelFor": "Hỏi AI về {item}",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: hỏi về nội dung này",
+      "labelFor": "@:{'brand.askAutobot'}: hỏi về {item}",
       "chip": {
         "firing": "Cảnh báo đang kích hoạt",
         "failing": "Quy tắc thất bại",
@@ -10569,7 +10569,7 @@
     "viewInTarget": "Xem trong {target}",
     "viewTarget": "Xem {target}",
     "welcome": {
-      "taglineHighlight": "O2 Assistant",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "Hoặc thử một trong những"
     },
     "capabilities": {
@@ -10622,7 +10622,7 @@
       "unexpectedError": "Đã xảy ra lỗi không mong muốn",
       "toolExecutionFailed": "Thực thi công cụ thất bại",
       "errorOccurred": "Đã xảy ra lỗi",
-      "navigateConfirmQuestion": "Cho phép O2 Assistant điều hướng?",
+      "navigateConfirmQuestion": "Cho phép @:{'brand.autobot'} điều hướng?",
       "confirmToolExecution": "Xác nhận thực thi {tool}?",
       "entity": {
         "alert": "cảnh báo",
@@ -10727,7 +10727,7 @@
     "aiExhaustedMessage": "Đăng ký để tiếp tục sử dụng AI. Phần sử dụng thêm sẽ được tính vào hóa đơn của tổ chức này.",
     "aiContractExhaustedMessage": "Liên hệ với quản lý tài khoản của bạn để thêm tín dụng AI",
     "aiPayerSubscribeMessage": "Việc thanh toán cho tổ chức này do {payer} quản lý. Hãy yêu cầu quản trị viên của {payer} đăng ký; phần sử dụng thêm sẽ được tính vào hóa đơn của tổ chức đó.",
-    "aiUsedByFeature": "Trợ lý và tạo truy vấn: {chat} · Phân tích sự cố: {incident} · Phân tích lại: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} và tạo truy vấn: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Phân tích lại: {reanalysis}",
     "aiPaygMessage": "Tín dụng miễn phí đã hết — mức sử dụng được tính vào đăng ký",
     "billingGroup": {
       "tabLabel": "Nhóm thanh toán",
@@ -11898,14 +11898,14 @@
       "eventsAndCommentsAppearHere": "Sự kiện và bình luận sẽ xuất hiện tại đây",
       "scrollToTop": "Cuộn lên đầu",
       "scrollToBottom": "Cuộn xuống cuối",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "Phân tích AI",
         "analyze": "Phân tích",
-        "analyzeTooltip": "Bắt đầu phân tích SRE bằng AI cho sự cố này",
-        "rcaDisabled": "RCA đã tắt",
-        "rcaOff": "RCA tắt",
-        "noAiSreFor": "Không có AI SRE cho {severity}",
+        "analyzeTooltip": "Bắt đầu phân tích @:{'brand.autobotInvestigate'} cho sự cố này",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} đã tắt",
+        "rcaOff": "@:{'brand.autobotInvestigate'} tắt",
+        "noAiSreFor": "Không có @:{'brand.autobotInvestigate'} cho {severity}",
         "investigating": "Đang điều tra",
         "rerunElapsed": "chạy lại · {elapsed}",
         "noUpdateFor": "không có cập nhật trong {elapsed}",
@@ -12015,7 +12015,7 @@
       "rcaCancelFailed": "Không thể hủy phân tích",
       "rcaFailed": "Phân tích AI thất bại",
       "rcaBlocked": "Phân tích AI không chạy",
-      "rcaFailedGeneric": "Không thể thực hiện phân tích RCA",
+      "rcaFailedGeneric": "Không thể thực hiện phân tích @:{'brand.autobotInvestigate'}",
       "rcaRetry": "Thử lại phân tích",
       "rcaCopy": "Sao chép báo cáo",
       "rcaCopied": "Đã sao chép báo cáo vào bảng tạm",
@@ -12130,7 +12130,7 @@
         "loadingReport": "Đang tải báo cáo…",
         "reportAfterRun": "Báo cáo sẽ hiển thị sau khi lần chạy kết thúc.",
         "noAnalysisTitle": "Chưa có phân tích",
-        "noAnalysisText": "AI SRE Agent kiểm tra cảnh báo, cấu trúc liên kết, các thay đổi gần đây, trace, nhật ký và chỉ số của sự cố này, rồi viết báo cáo. Bạn có thể theo dõi quá trình làm việc trong luồng Điều tra khi nó đang chạy.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} kiểm tra cảnh báo, cấu trúc liên kết, các thay đổi gần đây, trace, nhật ký và chỉ số của sự cố này, rồi viết báo cáo. Bạn có thể theo dõi quá trình làm việc trong luồng Điều tra khi nó đang chạy.",
         "stageOf": "Giai đoạn {index}/{count} · {stage}",
         "cancelRun": "Hủy lần chạy",
         "followInThread": "Theo dõi trong luồng",
@@ -16104,7 +16104,7 @@
         "range": "{band} · {window}",
         "filter": "Lọc theo vùng chọn",
         "drillDown": "Xem chi tiết",
-        "askAi": "Hỏi AI",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "Vùng chọn heatmap · {count} span | Vùng chọn heatmap · {count} span",
         "clear": "Xóa vùng chọn"
       }
@@ -16310,8 +16310,8 @@
     "criticalPath": "Đường tới hạn",
     "askAi": {
       "explainTrace": "Giải thích trace",
-      "explainTraceHint": "Hỏi AI về các span chậm nhất trên đường dẫn tới hạn và mọi span lỗi",
-      "askAboutSpan": "Hỏi AI về span này",
+      "explainTraceHint": "@:{'brand.askAutobot'}: hỏi về các span chậm nhất trên đường dẫn tới hạn và mọi span lỗi",
+      "askAboutSpan": "@:{'brand.askAutobot'}: hỏi về span này",
       "spanChip": "Span · {operation}",
       "traceChip": "Trace · {operation}"
     },
@@ -25061,13 +25061,13 @@
       "subtitle": "Hiệu suất và tình trạng truy vấn trên các cơ sở dữ liệu của bạn"
     },
     "ai": {
-      "suggestFix": "Hỏi AI cách khắc phục điều này",
-      "suggestFixHint": "Mở trợ lý AI với truy vấn này, engine của nó và các số liệu độ trễ, đồng thời hỏi cần thay đổi gì. Nó không tự thay đổi bất cứ điều gì.",
-      "rowSuggestFix": "Hỏi AI cách khắc phục điều này",
+      "suggestFix": "@:{'brand.askAutobot'}: cách khắc phục điều này",
+      "suggestFixHint": "Mở @:{'brand.autobot'} với truy vấn này, engine của nó và các số liệu độ trễ, đồng thời hỏi cần thay đổi gì. Nó không tự thay đổi bất cứ điều gì.",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: cách khắc phục điều này",
       "deadlockFix": "Làm cách nào để dừng deadlock này?",
-      "deadlockFixHint": "Gửi cả hai câu lệnh xung đột và bằng chứng thứ tự hàng cho trợ lý AI.",
+      "deadlockFixHint": "Gửi cả hai câu lệnh xung đột và bằng chứng thứ tự hàng cho @:{'brand.autobot'}.",
       "blockingFix": "Tại sao cái này đang chặn?",
-      "blockingFixHint": "Gửi câu lệnh của phiên gốc, thời gian rảnh và số phiên bị kẹt phía sau nó đến trợ lý AI."
+      "blockingFixHint": "Gửi câu lệnh của phiên gốc, thời gian rảnh và số phiên bị kẹt phía sau nó đến @:{'brand.autobot'}."
     },
     "filters": {
       "allEngines": "Tất cả engine",
@@ -26773,8 +26773,8 @@
     "removeStep": "Xóa bước",
     "channels": "Kênh",
     "policySaved": "Đã lưu chính sách",
-    "verdictTitle": "Phán quyết AI SRE",
-    "reportTitle": "Những gì AI SRE phát hiện",
+    "verdictTitle": "Phán quyết của @:{'brand.autobot'}",
+    "reportTitle": "Những gì @:{'brand.autobot'} phát hiện",
     "l0P1Lead": "Cảnh báo ngay lập tức.",
     "l0P1Desc": "Phân tích AI chạy song song — các thông báo trực nghiêm trọng không bao giờ bị trễ.",
     "l0P4Lead": "Chỉ phân tích AI.",
@@ -26794,7 +26794,7 @@
     "l0MaxLevelsOption": "tối đa {count} cấp | tối đa {count} cấp",
     "l0ParallelSentence": "được gọi trực ngay lập tức; agent chạy song song",
     "l0OnlySentence": "agent sẽ điều tra; mức ưu tiên này chỉ gọi trực nếu các cấp độ của bạn cho phép như vậy",
-    "l0OffSentence": "không có AI SRE chạy; thông báo trực hoạt động đúng như khi không có phân loại AI",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} không chạy; thông báo trực hoạt động đúng như khi không có phân loại AI",
     "l0BudgetRange": "Từ 30 đến 600 giây — máy chủ từ chối các giá trị ngoài khoảng này thay vì tự điều chỉnh",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Chặn thông báo trực",
@@ -26821,7 +26821,7 @@
     "eventKind_page": "Thông báo trực",
     "eventKind_ack": "Xác nhận",
     "eventKind_note": "Ghi chú",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "Bàn giao",
     "eventKind_recovery": "Khôi phục",
     "eventKind_state": "Trạng thái",
@@ -27483,7 +27483,7 @@
     "ladderAddStep": "Thêm bước",
     "ladderRightNow": "Hiện tại là",
     "ladderSameLadder": "cùng thang leo thang",
-    "ladderL0Off": "Không có AI SRE",
+    "ladderL0Off": "Không có @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "Thang leo thang chưa từng biết các ca trực",
     "ladderStaleDefaultHint": "Mọi cấp đều gọi toàn bộ nhóm, nhưng nhóm này có ca trực — thang leo thang được tạo trước khi chúng ra đời. Thêm hoặc xóa thành viên sẽ chạy lại mặc định, hoặc chỉnh sửa thang leo thang một lần bằng tay.",
     "reachShortNoSmtp": "chỉ email · không có kênh SMTP",
@@ -27819,7 +27819,7 @@
     "consentStillRequired": "Sử dụng có phí chưa được bật cho mọi tổ chức bắt buộc.",
     "updateFailed": "Không thể cập nhật sử dụng AI trả phí. Vui lòng thử lại.",
     "declinedNotice": "Sử dụng AI trả phí đang tắt, nên yêu cầu này chưa được gửi.",
-    "consentScope": "Áp dụng cho toàn bộ tổ chức: Trợ lý AI, tạo truy vấn và phân tích sự cố. Bạn có thể tắt bất cứ lúc nào trên trang Gói dịch vụ.",
+    "consentScope": "Áp dụng cho toàn bộ tổ chức: @:{'brand.askAutobot'}, tạo truy vấn và phân tích sự cố. Bạn có thể tắt bất cứ lúc nào trên trang Gói dịch vụ.",
     "managePaidUsage": "Bật sử dụng trả phí",
     "modePayAsYouGo": "Trả theo mức dùng",
     "modeConsentRequired": "Cần ủy quyền",
@@ -28400,7 +28400,7 @@
         "auth_test": "Token bot",
         "last_event": "Sự kiện",
         "sockets": "Socket",
-        "agent": "Trợ lý AI",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "Tin nhắn thử"
       },
       "connectedOrgs": "Tổ chức đã kết nối",

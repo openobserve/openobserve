@@ -1460,8 +1460,8 @@
     "userDefinedSchemaLabel": "مخطط معرف من قبل المستخدم",
     "allFieldsLabel": "جميع الحقول",
     "nlQueryGenerationFailed": "فشل في توليد استعلام. يرجى المحاولة مرة أخرى.",
-    "askAIPlaceholder": "اطلب من الذكاء الاصطناعي مساعدتك في استعلامك...",
-    "askAIFunctionPlaceholder": "اطلب من الذكاء الاصطناعي مساعدتك في دالتك...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: مساعدة في استعلامك...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: مساعدة في دالتك...",
     "askAIPlaceholderRotation": {
       "one": "أرني أخطاء من الساعة الماضية...",
       "two": "ابحث عن استعلامات بطيئة تستغرق أكثر من 5 ثوان...",
@@ -1934,7 +1934,7 @@
     "serviceGraph": "رسم الخدمة",
     "services": "كتالوج الخدمة",
     "aiObservability": "الذكاء الاصطناعي",
-    "aiAssistant": "مساعد الذكاء الاصطناعي",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "تسجيل الخروج",
     "ingestion": "مصادر البيانات",
     "metrics": "المقاييس",
@@ -3983,7 +3983,7 @@
           "note": "عمليات SRE الآلية والرؤى"
         },
         "ai_assistant": {
-          "name": "مساعد O2",
+          "name": "@:{'brand.askAutobot'}",
           "note": "المساعدة الذكية في الاستعلام والتحليل"
         },
         "anomaly_detection": {
@@ -6376,7 +6376,7 @@
     "vrlfunction": "دالة VRL",
     "jsFunctionHint": "استخدم كائن `row` للوصول إلى حقول السجل وتعديلها. مثال: row.new_field = row.existing_field + 'تمت معالجته';",
     "vrlFunctionHint": "استخدم `.` لتمثيل الحدث الحالي. مثال: .new_field = .existing_field + 'تمت معالجته'",
-    "askAIFunctionPlaceholder": "اطلب من الذكاء الاصطناعي مساعدتك في دالتك...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: مساعدة في دالتك...",
     "enterFunctionPrompt": "أدخل رسالة لتوليد الدالة",
     "associatedFunctionHeader": "الدوال المرتبطة",
     "enrichmentTables": "جداول الإثراء",
@@ -6491,7 +6491,7 @@
       "rbac": "أنشئ أدوارًا مخصصة بأذونات دقيقة لفريقك.",
       "logPatterns": "اكتشف أنماط السجلات المتكررة تلقائيًا بدلًا من قراءتها سطرًا بسطر.",
       "correlation": "انتقل من سطر سجل مباشرةً إلى المقاييس والتتبعات المرتبطة به.",
-      "aiAssistant": "اطلب من الذكاء الاصطناعي كتابة الاستعلامات وشرح بياناتك بلغة بسيطة.",
+      "aiAssistant": "@:{'brand.askAutobot'}: كتابة الاستعلامات وشرح بياناتك بلغة بسيطة.",
       "alertInsights": "اطّلع على عدد مرات تفعيل التنبيه واكتشف التنبيهات المترابطة بلمحة.",
       "anomalyDetection": "اكتشف سلوك المقاييس غير المعتاد تلقائيًا قبل أن يُفعّل تنبيه عتبة.",
       "agentGraph": "اطّلع على كيفية استدعاء وكلاء الذكاء الاصطناعي وأدواتك لبعضها، مع تمثيلها في رسم بياني.",
@@ -10359,9 +10359,9 @@
     "recentEvents": "الأحداث الأخيرة",
     "investigate": "تحقيق →",
     "askAi": {
-      "label": "اسأل الذكاء الاصطناعي",
-      "hint": "اسأل الذكاء الاصطناعي عن هذا",
-      "labelFor": "اسأل الذكاء الاصطناعي عن {item}",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: اسأل عن هذا",
+      "labelFor": "@:{'brand.askAutobot'}: اسأل عن {item}",
       "chip": {
         "firing": "تنبيهات قيد التنبيه",
         "failing": "قواعد فاشلة",
@@ -10569,7 +10569,7 @@
     "viewInTarget": "عرض في {target}",
     "viewTarget": "عرض {target}",
     "welcome": {
-      "taglineHighlight": "مساعد O2",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "أو جرب واحدة من هذه"
     },
     "capabilities": {
@@ -10622,7 +10622,7 @@
       "unexpectedError": "حدث خطأ غير متوقع",
       "toolExecutionFailed": "فشل تنفيذ الأداة",
       "errorOccurred": "حدث خطأ",
-      "navigateConfirmQuestion": "هل يمكن السماح لمساعد O2 بالتنقل؟",
+      "navigateConfirmQuestion": "هل يمكن السماح لـ @:{'brand.autobot'} بالتنقل؟",
       "confirmToolExecution": "هل تؤكد تنفيذ {tool}؟",
       "entity": {
         "alert": "تنبيه",
@@ -10727,7 +10727,7 @@
     "aiExhaustedMessage": "اشترك لمواصلة استخدام الذكاء الاصطناعي. يُفاتر الاستخدام الإضافي على فاتورة هذه المؤسسة.",
     "aiContractExhaustedMessage": "اتصل بمدير حسابك لإضافة المزيد من اعتمادات الذكاء الاصطناعي",
     "aiPayerSubscribeMessage": "تتولى {payer} إدارة الفوترة لهذه المؤسسة. اطلب من أحد مسؤولي {payer} الاشتراك؛ ويُفوتَر الاستخدام الإضافي على فاتورتها.",
-    "aiUsedByFeature": "المساعد وتوليد الاستعلامات: {chat} · تحليل الحوادث: {incident} · إعادة التحليل: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.askAutobot'} وتوليد الاستعلامات: {chat} · @:{'brand.autobotInvestigate'}: {incident} · إعادة التحليل: {reanalysis}",
     "aiPaygMessage": "تم نفاد الاعتمادات المجانية — الاستخدام سيتم فوترة الاشتراك",
     "billingGroup": {
       "tabLabel": "مجموعة الفوترة",
@@ -11898,14 +11898,14 @@
       "eventsAndCommentsAppearHere": "ستظهر الأحداث والتعليقات هنا",
       "scrollToTop": "التمرير إلى الأعلى",
       "scrollToBottom": "التمرير إلى الأسفل",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "تحليل الذكاء الاصطناعي",
         "analyze": "تحليل",
-        "analyzeTooltip": "بدء تحليل بواسطة SRE الذكاء الاصطناعي لهذا الحادث",
-        "rcaDisabled": "تحليل السبب الجذري معطّل",
-        "rcaOff": "تحليل السبب الجذري متوقف",
-        "noAiSreFor": "لا يوجد SRE ذكاء اصطناعي لـ {severity}",
+        "analyzeTooltip": "بدء تحليل @:{'brand.autobotInvestigate'} لهذا الحادث",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} معطّل",
+        "rcaOff": "@:{'brand.autobotInvestigate'} متوقف",
+        "noAiSreFor": "لا يوجد @:{'brand.autobotInvestigate'} لـ {severity}",
         "investigating": "جارٍ التحقيق",
         "rerunElapsed": "إعادة تشغيل · {elapsed}",
         "noUpdateFor": "لا تحديث منذ {elapsed}",
@@ -12015,7 +12015,7 @@
       "rcaCancelFailed": "فشل في إلغاء التحليل",
       "rcaFailed": "فشل تحليل الذكاء الاصطناعي",
       "rcaBlocked": "لم يتم تشغيل تحليل الذكاء الاصطناعي",
-      "rcaFailedGeneric": "فشل في إجراء تحليل RCA",
+      "rcaFailedGeneric": "فشل في إجراء تحليل @:{'brand.autobotInvestigate'}",
       "rcaRetry": "إعادة محاولة التحليل",
       "rcaCopy": "نسخ التقرير",
       "rcaCopied": "تم نسخ التقرير إلى الحافظة",
@@ -12130,7 +12130,7 @@
         "loadingReport": "جارٍ تحميل التقرير…",
         "reportAfterRun": "يظهر التقرير بعد التشغيل.",
         "noAnalysisTitle": "لا يوجد تحليل بعد",
-        "noAnalysisText": "يفحص وكيل SRE للذكاء الاصطناعي تنبيهات هذا الحادث والبنية الطوبولوجية والتغييرات الأخيرة والتتبعات والسجلات والمقاييس، ثم يكتب تقريرًا. يمكنك متابعة عمله في سلسلة التحقيق أثناء التشغيل.",
+        "noAnalysisText": "يفحص @:{'brand.autobotInvestigate'} تنبيهات هذا الحادث والبنية الطوبولوجية والتغييرات الأخيرة والتتبعات والسجلات والمقاييس، ثم يكتب تقريرًا. يمكنك متابعة عمله في سلسلة التحقيق أثناء التشغيل.",
         "stageOf": "المرحلة {index}/{count} · {stage}",
         "cancelRun": "إلغاء التشغيل",
         "followInThread": "المتابعة في السلسلة",
@@ -16104,7 +16104,7 @@
         "range": "{band} · {window}",
         "filter": "تصفية حسب التحديد",
         "drillDown": "التعمق",
-        "askAi": "اسأل الذكاء الاصطناعي",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "تحديد الخريطة الحرارية · {count} امتداد | تحديد الخريطة الحرارية · {count} من الامتدادات",
         "clear": "مسح التحديد"
       }
@@ -16310,8 +16310,8 @@
     "criticalPath": "المسار الحرج",
     "askAi": {
       "explainTrace": "اشرح التتبع",
-      "explainTraceHint": "اسأل الذكاء الاصطناعي عن أبطأ الامتدادات على المسار الحرج وكل امتداد به خطأ",
-      "askAboutSpan": "اسأل الذكاء الاصطناعي عن هذا الامتداد",
+      "explainTraceHint": "@:{'brand.askAutobot'}: اسأل عن أبطأ الامتدادات على المسار الحرج وكل امتداد به خطأ",
+      "askAboutSpan": "@:{'brand.askAutobot'}: اسأل عن هذا الامتداد",
       "spanChip": "الامتداد · {operation}",
       "traceChip": "التتبع · {operation}"
     },
@@ -25061,13 +25061,13 @@
       "subtitle": "استعلام الأداء والصحة عبر قواعد بياناتك"
     },
     "ai": {
-      "suggestFix": "اسأل الذكاء الاصطناعي كيف يصلح هذا",
-      "suggestFixHint": "يفتح مساعد الذكاء الاصطناعي بهذا الاستعلام، ومحركه، وأرقام التأخير، ويسأل عما يجب تغييره. لا يغير أي شيء بنفسه.",
-      "rowSuggestFix": "اسأل الذكاء الاصطناعي كيف يصلح هذا",
+      "suggestFix": "@:{'brand.askAutobot'}: كيف يُصلح هذا",
+      "suggestFixHint": "يفتح @:{'brand.autobot'} بهذا الاستعلام، ومحركه، وأرقام التأخير، ويسأل عما يجب تغييره. لا يغير أي شيء بنفسه.",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: كيف يُصلح هذا",
       "deadlockFix": "كيف أوقف هذا الجمود؟",
-      "deadlockFixHint": "يرسل البيانات المتضاربة وأدلة ترتيب الصف إلى مساعد الذكاء الاصطناعي.",
+      "deadlockFixHint": "يرسل البيانات المتضاربة وأدلة ترتيب الصف إلى @:{'brand.autobot'}.",
       "blockingFix": "لماذا يتم الحظر هذا؟",
-      "blockingFixHint": "يرسل بيان الجلسة الجذرية، ووقت الخمول وعدد الجلسات العالقة خلفه إلى مساعد الذكاء الاصطناعي."
+      "blockingFixHint": "يرسل بيان الجلسة الجذرية، ووقت الخمول وعدد الجلسات العالقة خلفه إلى @:{'brand.autobot'}."
     },
     "filters": {
       "allEngines": "جميع المحركات",
@@ -26773,8 +26773,8 @@
     "removeStep": "إزالة الخطوة",
     "channels": "القنوات",
     "policySaved": "تم حفظ السياسة",
-    "verdictTitle": "حكم SRE بالذكاء الاصطناعي",
-    "reportTitle": "ما وجده SRE الذكاء الاصطناعي",
+    "verdictTitle": "حكم @:{'brand.autobot'}",
+    "reportTitle": "ما وجده @:{'brand.autobot'}",
     "l0P1Lead": "أرسل تنبيهًا فورًا.",
     "l0P1Desc": "يعمل تحليل الذكاء الاصطناعي بالتوازي — لا يتم تأخير الاستدعاءات الحرجة أبدًا.",
     "l0P4Lead": "تحليل الذكاء الاصطناعي فقط.",
@@ -26794,7 +26794,7 @@
     "l0MaxLevelsOption": "حتى {count} مستوى | حتى {count} مستويات",
     "l0ParallelSentence": "يتم الاستدعاء فورًا؛ ويعمل الوكيل بالتوازي",
     "l0OnlySentence": "يقوم الوكيل بالتحقيق؛ لا تُرسل تنبيهات هذه الأولوية إلا إذا نصّت مستوياتك على ذلك",
-    "l0OffSentence": "لا يعمل SRE الذكاء الاصطناعي؛ يتصرف التنبيه تمامًا كما كان بدون فرز الذكاء الاصطناعي",
+    "l0OffSentence": "لا يعمل @:{'brand.autobotInvestigate'}؛ يتصرف التنبيه تمامًا كما كان بدون فرز الذكاء الاصطناعي",
     "l0BudgetRange": "بين 30 و600 ثانية — يرفض الخادم القيم خارج هذا النطاق بدلاً من تقييدها.",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "كتم الاستدعاء",
@@ -26821,7 +26821,7 @@
     "eventKind_page": "استدعاء",
     "eventKind_ack": "إقرار",
     "eventKind_note": "ملاحظة",
-    "eventKind_rca": "تحليل السبب الجذري",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "تسليم",
     "eventKind_recovery": "تعافٍ",
     "eventKind_state": "الحالة",
@@ -27483,7 +27483,7 @@
     "ladderAddStep": "إضافة خطوة",
     "ladderRightNow": "حاليًا هذا هو",
     "ladderSameLadder": "نفس السلم",
-    "ladderL0Off": "بدون SRE الذكاء الاصطناعي",
+    "ladderL0Off": "بدون @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "لم يتعرف السلم على النوبات",
     "ladderStaleDefaultHint": "كل مستوى يستدعي الفريق بأكمله، لكن هذا الفريق لديه تناوبات — تم إنشاء السلم قبل وجودها. إضافة أو إزالة عضو تعيد تشغيل الوضع الافتراضي، أو عدّل السلم يدويًا مرة واحدة.",
     "reachShortNoSmtp": "بريد إلكتروني فقط · لا يوجد SMTP",
@@ -27819,7 +27819,7 @@
     "consentStillRequired": "الاستخدام المدفوع غير مفعّل لكل المؤسسات المطلوبة.",
     "updateFailed": "تعذّر تحديث استخدام الذكاء الاصطناعي المدفوع. حاول مرة أخرى.",
     "declinedNotice": "استخدام الذكاء الاصطناعي المدفوع معطّل، لذلك لم يُرسل هذا الطلب.",
-    "consentScope": "يسري على المؤسسة بأكملها: المساعد وإنشاء الاستعلامات وتحليل الحوادث. يمكنك إيقافه في أي وقت من صفحة الخطط.",
+    "consentScope": "يسري على المؤسسة بأكملها: @:{'brand.askAutobot'} وإنشاء الاستعلامات وتحليل الحوادث. يمكنك إيقافه في أي وقت من صفحة الخطط.",
     "managePaidUsage": "تشغيل الاستخدام المدفوع",
     "modePayAsYouGo": "الدفع حسب الاستخدام",
     "modeConsentRequired": "التفويض مطلوب",
@@ -28400,7 +28400,7 @@
         "auth_test": "رمز البوت",
         "last_event": "الأحداث",
         "sockets": "اتصالات Socket",
-        "agent": "مساعد الذكاء الاصطناعي",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "رسالة اختبار"
       },
       "connectedOrgs": "المؤسسات المتصلة",

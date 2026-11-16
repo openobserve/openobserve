@@ -34,6 +34,10 @@ import { fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantApprovalResult from "./AssistantApprovalResult.vue";
 import { assistantApprovalsHostKey, type AssistantApprovalsHost } from "./approvals.types";
 
+import brandLocale from "@/locales/languages/en-US.json";
+
+const brandNames = brandLocale.brand;
+
 const BATCH = approvalOf({
   type: "confirmation_required",
   tool: "o2_delete",
@@ -464,9 +468,11 @@ describe("AssistantApprovalResult", () => {
           { type: "approval_result", resolved: { id: "gone", recorded: true, ...resolved } },
         ],
       }).wrapper;
-    expect(line(orphan({ approved: false, at: 1 }))).toBe("Denied a change the assistant proposed");
+    expect(line(orphan({ approved: false, at: 1 }))).toBe(
+      `Denied a change ${brandNames.autobot} proposed`,
+    );
     expect(line(orphan({ approved: false, at: 1, detail: "User declined the request" }))).toBe(
-      "Denied a change the assistant proposed · User declined the request",
+      `Denied a change ${brandNames.autobot} proposed · User declined the request`,
     );
   });
 
@@ -894,7 +900,7 @@ describe("AssistantApprovalResult", () => {
 
       expect(grants).toHaveBeenCalled();
       expect(revoke).toHaveBeenCalledWith(expect.any(String), "g1");
-      expect(always.text()).toBe("Approval revoked. The assistant will ask next time.");
+      expect(always.text()).toBe(`Approval revoked. ${brandNames.autobot} will ask next time.`);
     });
 
     const adaGrant = (over: Record<string, unknown> = {}) => ({
@@ -1312,7 +1318,9 @@ describe("AssistantApprovalResult", () => {
       await live.wrapper.get('[data-test="assistant-approval-result-revoke"]').trigger("click");
       await flushPromises();
       expect(revoke).toHaveBeenCalledWith("default", "g-chat");
-      expect(allowedLine(live.wrapper)).toBe("Approval revoked. The assistant will ask next time.");
+      expect(allowedLine(live.wrapper)).toBe(
+        `Approval revoked. ${brandNames.autobot} will ask next time.`,
+      );
 
       queryClient.clear();
       const again = mountRecord(null, { blocks: [gatheredBlock, reopened("chat")] });
@@ -1330,7 +1338,9 @@ describe("AssistantApprovalResult", () => {
       ]);
       const { wrapper } = mountRecord(null, { blocks: [gatheredBlock, reopened("chat")] });
       await flushPromises();
-      expect(allowedLine(wrapper)).toBe("Approval revoked. The assistant will ask next time.");
+      expect(allowedLine(wrapper)).toBe(
+        `Approval revoked. ${brandNames.autobot} will ask next time.`,
+      );
       expect(wrapper.find('[data-test="assistant-approval-result-revoke"]').exists()).toBe(false);
     });
 
@@ -1340,7 +1350,9 @@ describe("AssistantApprovalResult", () => {
       const { wrapper } = mountRecord(null, { blocks: [gatheredBlock, reopened("always")] });
       await flushPromises();
       expect(grants).toHaveBeenCalled();
-      expect(allowedLine(wrapper)).toBe("Approval revoked. The assistant will ask next time.");
+      expect(allowedLine(wrapper)).toBe(
+        `Approval revoked. ${brandNames.autobot} will ask next time.`,
+      );
       expect(wrapper.find('[data-test="assistant-approval-result-revoke"]').exists()).toBe(false);
       expect(revoke).not.toHaveBeenCalled();
     });
@@ -1364,7 +1376,7 @@ describe("AssistantApprovalResult", () => {
       const always = wrapper.get('[data-test="assistant-approval-result-always"]');
       expect(always.attributes("data-grant")).toBe("not_stored");
       expect(always.text()).toBe(
-        "Approved this once. It wasn't saved for later, so the assistant will ask next time.",
+        `Approved this once. It wasn't saved for later, so ${brandNames.autobot} will ask next time.`,
       );
       expect(wrapper.find('[data-test="assistant-approval-result-revoke"]').exists()).toBe(false);
     });
@@ -1380,7 +1392,7 @@ describe("AssistantApprovalResult", () => {
       await first.wrapper.get('[data-test="assistant-approval-result-revoke"]').trigger("click");
       await flushPromises();
       expect(allowedLine(second.wrapper)).toBe(
-        "Approval revoked. The assistant will ask next time.",
+        `Approval revoked. ${brandNames.autobot} will ask next time.`,
       );
     });
 
