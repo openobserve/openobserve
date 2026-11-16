@@ -20,10 +20,13 @@ use axum::{
     extract::{Path, Query, rejection::JsonRejection},
     response::Response,
 };
-use config::meta::{
-    search::{Query as SearchQuery, Request as SearchRequest},
-    self_reporting::usage::TRIGGERS_STREAM,
-    stream::StreamType,
+use config::{
+    meta::{
+        search::{Query as SearchQuery, Request as SearchRequest},
+        self_reporting::usage::TRIGGERS_STREAM,
+        stream::StreamType,
+    },
+    utils::sql::quote_like_pattern,
 };
 use o2_enterprise::enterprise::security::sigma::{
     self, ApplicableRule, CatalogRule, MitreCoverage,
@@ -516,9 +519,9 @@ async fn stored_groups(
         .await
         .ok()?;
     schema.field_with_name("siem_groups").ok()?;
-    let id = alert_id.replace('\'', "''").replace('%', "");
+    let pattern = quote_like_pattern("%", alert_id, "%");
     let sql = format!(
-        "SELECT siem_groups FROM \"{TRIGGERS_STREAM}\" WHERE key LIKE '%{id}%' AND siem_groups IS NOT NULL AND siem_groups <> ''"
+        "SELECT siem_groups FROM \"{TRIGGERS_STREAM}\" WHERE key LIKE {pattern} AND siem_groups IS NOT NULL AND siem_groups <> ''"
     );
     let rows = search_rows(
         org_id,
