@@ -67,13 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </template>
         <template #actions>
-          <StarterPackRepairChip
-            v-if="starterPacksEnabled && dashboardId && !isFullscreen && !store.state.printMode"
-            :key="String(dashboardId)"
-            :org="store.state.selectedOrganization?.identifier"
-            :scope="{ dashboardId: String(dashboardId) }"
-            @repaired="reloadAfterRepair"
-          />
           <!-- Add panel is the most-used action, so it leads the toolbar. -->
           <OButton
             v-if="!isFullscreen && !isEditingLayout"
@@ -746,12 +739,7 @@ import {
   useRouter,
   type RouteLocationNormalized,
 } from "vue-router";
-import {
-  fetchLatestDashboard,
-  getDashboard,
-  movePanelToAnotherTab,
-  getFoldersList,
-} from "../../utils/commons.ts";
+import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
 import { generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { useRoute } from "vue-router";
@@ -765,7 +753,6 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import PublicLinksPanel from "@/components/dashboards/PublicLinksPanel.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import StarterPackLandingRow from "@/components/starterPacks/StarterPackLandingRow.vue";
-import StarterPackRepairChip from "@/components/starterPacks/StarterPackRepairChip.vue";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import useNotifications from "@/composables/useNotifications";
 import {
@@ -895,7 +882,6 @@ export default defineComponent({
     RenderDashboardCharts,
     DeployMarkersUnavailable,
     StarterPackLandingRow,
-    StarterPackRepairChip,
     ScheduledDashboards,
     PanelLayoutSettings,
     DashboardJsonEditor,
@@ -1012,12 +998,6 @@ export default defineComponent({
           label: currentDashboardData.data?.title ?? t("dashboard.viewDashboard.dashboard"),
         });
       }
-    };
-
-    // A repair saves outside this page, so the cached copy and its hash are replaced before reloading.
-    const reloadAfterRepair = async () => {
-      await fetchLatestDashboard(store, dashboardId.value, folderId.value ?? "default");
-      await loadDashboard();
     };
 
     const tabId = computed(() => route.query.tab);
@@ -3007,8 +2987,6 @@ export default defineComponent({
     return {
       packLanding,
       packLandingId,
-      starterPacksEnabled: STARTER_PACKS_ENABLED,
-      reloadAfterRepair,
       isMobile,
       currentDashboardData,
       dashboardRemountKey,

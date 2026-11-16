@@ -26,7 +26,6 @@ import { useHomePacks, type HomePacks } from "@/composables/starterPacks/useHome
 import { raw, useI18nTyped } from "@/types/i18n";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
 import StarterPackFindMore from "./StarterPackFindMore.vue";
-import StarterPackHealthLine from "./StarterPackHealthLine.vue";
 import StarterPackHomeRow from "./StarterPackHomeRow.vue";
 import StarterPackUndoDialog from "./StarterPackUndoDialog.vue";
 import TurnOnAlertsDrawer from "./TurnOnAlertsDrawer.vue";
@@ -150,10 +149,6 @@ const compact = computed(() =>
           </OButton>
         </template>
       </OBanner>
-    </template>
-
-    <template v-for="item in home.setUp.value" :key="`health-${item.pack.id}`">
-      <StarterPackHealthLine :org="org" :pack="item.pack" />
     </template>
 
     <OBanner
