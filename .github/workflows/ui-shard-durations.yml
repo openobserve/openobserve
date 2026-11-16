@@ -1,0 +1,177 @@
+name: Refresh UI shard durations
+
+on:
+  schedule:
+    - cron: '0 3 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-shard-durations
+  cancel-in-progress: false
+
+jobs:
+  # No privileged token here: this job runs npm ci and the script.
+  regenerate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+      run_id: ${{ steps.src.outputs.run_id }}
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Find the newest main run with live blobs
+        id: src
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Blobs exist only for main pushes that changed UI code and live 1 day, so a week without such a push skips.
+          ids=$(gh api "repos/${{ github.repository }}/actions/workflows/unit-tests.yml/runs?branch=main&event=push&status=success&per_page=30" --jq '.workflow_runs[].id')
+          for id in $ids; do
+            n=$(gh api "repos/${{ github.repository }}/actions/runs/$id/artifacts?per_page=100" \
+              --jq '[.artifacts[] | select((.name | startswith("ui-unit-blob-")) and (.expired | not))] | length')
+            if [ "$n" = "4" ]; then echo "run_id=$id" >> "$GITHUB_OUTPUT"; exit 0; fi
+          done
+          echo "No successful main run has all 4 unexpired ui-unit-blob artifacts; nothing to refresh." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node.js
+        if: steps.src.outputs.run_id
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Restore node_modules
+        if: steps.src.outputs.run_id
+        id: nm
+        uses: actions/cache/restore@v6
+        with:
+          path: web/node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
+
+      - name: Install dependencies
+        if: steps.src.outputs.run_id && steps.nm.outputs.cache-hit != 'true'
+        working-directory: web
+        run: npm ci --ignore-scripts
+
+      - name: Regenerate durations
+        if: steps.src.outputs.run_id
+        working-directory: web
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ steps.src.outputs.run_id }}" -p 'ui-unit-blob-*' -D "$RUNNER_TEMP/blobs"
+          node scripts/ui-shard-durations.mjs "$RUNNER_TEMP/blobs"
+
+      - name: Detect a change
+        id: diff
+        run: |
+          if [ -n "${{ steps.src.outputs.run_id }}" ] && ! git diff --quiet -- web/scripts/ui-shard-durations.json; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Durations unchanged or no source run; no PR." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: steps.diff.outputs.changed == 'true'
+        with:
+          name: ui-shard-durations
+          path: web/scripts/ui-shard-durations.json
+          retention-days: 1
+
+  # Holds the PAT but runs no npm or node code.
+  open-pr:
+    needs: regenerate
+    if: needs.regenerate.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      BRANCH: chore/ui-shard-durations-refresh
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          # A PAT, not GITHUB_TOKEN: a PR pushed with GITHUB_TOKEN starts no workflows, so it would get no CI.
+          token: ${{ secrets.ORG_ADMIN_TOKEN }}
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: ui-shard-durations
+          path: ${{ runner.temp }}/new
+
+      - name: Open or update the PR
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          RUN_ID: ${{ needs.regenerate.outputs.run_id }}
+        run: |
+          F=web/scripts/ui-shard-durations.json
+          read -r LOGIN ID < <(gh api user --jq '"\(.login) \(.id)"')
+          if [ -z "$LOGIN" ] || [ -z "$ID" ]; then
+            echo "::error::gh api user returned no identity; check that ORG_ADMIN_TOKEN is valid"
+            exit 1
+          fi
+          EMAIL="${ID}+${LOGIN}@users.noreply.github.com"
+          git config user.name "$LOGIN"
+          git config user.email "$EMAIL"
+
+          git show HEAD:$F | jq -S . > "$RUNNER_TEMP/old.json"
+          cp "$RUNNER_TEMP/new/ui-shard-durations.json" $F
+          jq -S . $F > "$RUNNER_TEMP/new.json"
+          ADDED=$(jq -n --slurpfile o "$RUNNER_TEMP/old.json" --slurpfile n "$RUNNER_TEMP/new.json" '[$n[0]|keys[]] - [$o[0]|keys[]] | length')
+          REMOVED=$(jq -n --slurpfile o "$RUNNER_TEMP/old.json" --slurpfile n "$RUNNER_TEMP/new.json" '[$o[0]|keys[]] - [$n[0]|keys[]] | length')
+          CHANGED=$(jq -n --slurpfile o "$RUNNER_TEMP/old.json" --slurpfile n "$RUNNER_TEMP/new.json" '$o[0] as $o | $n[0] | to_entries | map(select($o[.key] != null and $o[.key] != .value)) | length')
+
+          PR=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')
+          PUSH=1
+          if git fetch origin "$BRANCH" 2>/dev/null; then
+            SHA=$(git rev-parse FETCH_HEAD)
+            # Never overwrite a human's commits on the shared branch.
+            if git log --format=%ae "origin/main..$SHA" | grep -qvxF -- "$EMAIL"; then
+              echo "::warning::$BRANCH has commits from someone else; leaving it alone."
+              echo "Skipped: $BRANCH has commits from someone else." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            LEASE="--force-with-lease=$BRANCH:$SHA"
+            # Identical content on the branch: keep the SHA stable instead of pushing a new one weekly.
+            if git show "$SHA:$F" | cmp -s - $F; then
+              PUSH=0
+              if [ -n "$PR" ]; then echo "PR already has these durations; nothing to do." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0; fi
+            fi
+          fi
+          if [ "$PUSH" = 1 ]; then
+            git checkout -b "$BRANCH"
+            git add $F
+            git commit -m "chore(ci): refresh UI shard durations"
+            # One machine-owned branch rebuilt from main every run; the lease keeps it from clobbering a newer push.
+            git push ${LEASE:+"$LEASE"} origin "$BRANCH"
+          fi
+
+          cat > "$RUNNER_TEMP/body.md" <<EOF
+          Refreshes \`web/scripts/ui-shard-durations.json\`, the per-spec times that balance the 4 UI test shards.
+
+          - Source run: https://github.com/${{ github.repository }}/actions/runs/$RUN_ID
+          - Specs added: $ADDED
+          - Specs removed: $REMOVED
+          - Specs with a changed time: $CHANGED
+
+          Opened by the weekly Refresh UI shard durations workflow.
+          EOF
+          PR=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')
+          if [ -n "$PR" ]; then
+            gh pr edit "$PR" --body-file "$RUNNER_TEMP/body.md"
+          else
+            PR=$(gh pr create --title "chore(ci): refresh UI shard durations" --body-file "$RUNNER_TEMP/body.md" --base main --head "$BRANCH")
+          fi
+          gh pr edit "$PR" --add-label auto-generated || echo "::warning::Could not label $PR"
+          echo "$PR" >> "$GITHUB_STEP_SUMMARY"
