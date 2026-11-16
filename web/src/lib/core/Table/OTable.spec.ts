@@ -1177,6 +1177,23 @@ describe("OTable", () => {
       });
       expect(wrapper.find('[data-test="o2-table-expand-cell"]').exists()).toBe(false);
     });
+
+    it("drops the chevron column on expandButton false but still shows the expanded row", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          expansion: "single",
+          expandButton: false,
+          expandedIds: ["1"],
+          rowKey: "id",
+        },
+        slots: { expansion: '<p data-test="detail">detail</p>' },
+      });
+      await nextTick();
+      expect(wrapper.find('[data-test="o2-table-expand-cell"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="detail"]').exists()).toBe(true);
+    });
   });
 
   // ── Empty State ────────────────────────────────────────────

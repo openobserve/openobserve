@@ -14,6 +14,7 @@ import {
 const props = withDefaults(defineProps<DescriptionListProps>(), {
   columns: 1,
   dense: false,
+  divided: false,
   labelWidth: "default",
 });
 
@@ -29,7 +30,11 @@ defineSlots<DescriptionListSlots>();
 const classes = computed(() => [
   "m-0 grid grid-cols-1",
   props.columns === 2 ? "md:grid-cols-2" : "",
-  props.dense ? "gap-x-6 gap-y-1.5" : "gap-x-8 gap-y-3",
+  props.divided
+    ? "divide-border-default border-border-default divide-y border-b gap-x-8 *:py-3"
+    : props.dense
+      ? "gap-x-6 gap-y-1.5"
+      : "gap-x-8 gap-y-3",
 ]);
 </script>
 

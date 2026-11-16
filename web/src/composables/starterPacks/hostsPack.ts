@@ -66,12 +66,10 @@ export const HOSTS_PACK: StarterPack = {
   savedViews: [],
   collectorRoute: "ingestFromLinux",
   logo: "images/common/linux.svg",
+  pausedImpactKey: "starterPacks.hosts.pausedImpact",
   signals: [
-    "system_cpu_time",
-    "system_memory_usage",
-    "system_filesystem_usage",
-    "node_cpu_seconds_total",
-    "node_memory_MemAvailable_bytes",
-    "node_filesystem_avail_bytes",
+    ["system_cpu_time", "node_cpu_seconds_total"],
+    ["system_memory_usage", "node_memory_MemAvailable_bytes"],
+    ["system_filesystem_usage", "node_filesystem_avail_bytes"],
   ],
 };

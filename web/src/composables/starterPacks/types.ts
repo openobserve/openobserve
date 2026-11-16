@@ -136,10 +136,12 @@ export interface StarterPack {
   clusterScoped?: boolean;
   /** The ingestion guide a stale pack points at. */
   collectorRoute?: string;
-  /** Metric streams that show this source is reporting; without one the pack is never matched. */
-  signals?: string[];
+  /** Metric streams that show this source is reporting, each list the spellings of one signal; without one the pack is never matched. */
+  signals?: string[][];
   /** Image path under assets, shown beside the pack title on Home. */
   logo?: string;
+  /** What goes unnoticed while the pack's alerts are paused, as the end of a sentence. */
+  pausedImpactKey?: I18nKey;
 }
 
 export interface PackRecordItem {

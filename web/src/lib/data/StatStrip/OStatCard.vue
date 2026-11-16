@@ -48,6 +48,10 @@ const props = withDefaults(
     subIcon?: IconName;
     /** The glyph's tooltip when it should say more than `sub`. */
     subTooltip?: I18nText;
+    /** Puts `sub` on its own line under the value, for a qualifier too long to share the label's line. */
+    subBelow?: boolean;
+    /** Drops the proportion bar, for a plain count that is no share of anything. */
+    hideBar?: boolean;
     icon?: IconName;
     tone?: StatTone;
     trend?: StatTrend;
@@ -373,7 +377,7 @@ const trendClass = computed(() =>
                generic heading cannot be read as the wrong quantity. Truncates
                before the value does — the value never shrinks. -->
           <OIcon
-            v-if="sub && subIcon"
+            v-if="sub && subIcon && !subBelow"
             :name="subIcon"
             size="xs"
             :label="sub"
@@ -382,9 +386,11 @@ const trendClass = computed(() =>
           >
             <OTooltip :content="subTooltip || sub" />
           </OIcon>
-          <OTruncatedText v-else-if="sub" class="text-text-label text-2xs max-lg:hidden">{{
-            sub
-          }}</OTruncatedText>
+          <OTruncatedText
+            v-else-if="sub && !subBelow"
+            class="text-text-label text-2xs max-lg:hidden"
+            >{{ sub }}</OTruncatedText
+          >
         </div>
         <span
           v-if="icon || slots.icon"
@@ -398,9 +404,15 @@ const trendClass = computed(() =>
           </slot>
         </span>
       </div>
-      <!-- Track is always rendered so the card height never shifts as data loads;
-           only the fill width changes. -->
-      <div class="bg-surface-subtle h-1 overflow-hidden rounded-full">
+      <OTruncatedText
+        v-if="sub && subBelow"
+        class="text-text-label text-2xs"
+        data-test="o-stat-card-sub-below"
+        >{{ sub }}</OTruncatedText
+      >
+      <!-- Unless hidden, the track always renders so the card height never shifts
+           as data loads; only the fill width changes. -->
+      <div v-if="!hideBar" class="bg-surface-subtle h-1 overflow-hidden rounded-full">
         <div
           class="h-full rounded-full transition-all duration-300"
           :class="tc.bar"

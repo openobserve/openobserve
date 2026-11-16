@@ -385,6 +385,68 @@ describe("LibraryDrawer", () => {
     );
   });
 
+  describe("installed mode", () => {
+    const mountInstalled = async (props: Record<string, unknown> = {}) => {
+      const wrapper = mount(LibraryDrawer, {
+        props: { open: true, entry: promqlEntry, ready: true, installed: true, ...props },
+        slots: {
+          "in-org": '<p data-test="in-org">In this org</p>',
+          "installed-footer": '<button data-test="open-alert">Open alert</button>',
+        },
+        global: { plugins: [i18n], stubs },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    it("swaps Customize and Add for the page's own footer", async () => {
+      const wrapper = await mountInstalled();
+      expect(wrapper.find('[data-test="open-alert"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-library-drawer-install"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-library-drawer-customize"]').exists()).toBe(false);
+    });
+
+    it("shows the In this org section after the query", async () => {
+      const wrapper = await mountInstalled();
+      const html = wrapper.html();
+      expect(wrapper.find('[data-test="in-org"]').exists()).toBe(true);
+      expect(html.indexOf('data-test="in-org"')).toBeGreaterThan(
+        html.indexOf('data-test="alert-library-drawer-query"'),
+      );
+    });
+
+    it("drops the install-only warning, since the alert already exists", async () => {
+      const wrapper = await mountInstalled({ dataState: "never" });
+      expect(wrapper.find('[data-test="alert-library-drawer-needs-data"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-library-drawer-availability"]').exists()).toBe(true);
+    });
+
+    it("says the data is unchecked, never available, when the health read failed", async () => {
+      const wrapper = await mountInstalled({ dataState: "unknown" });
+      expect(wrapper.get('[data-test="alert-library-drawer-availability"]').text()).toBe(
+        "Data not checked",
+      );
+    });
+
+    it("takes the page's subtitle over the Library's", async () => {
+      const wrapper = await mountInstalled({ subtitle: "k8s/a · Kubernetes · Kubernetes pack" });
+      expect(wrapper.findComponent({ name: "ODrawer" }).props("subTitle")).toBe(
+        "k8s/a · Kubernetes · Kubernetes pack",
+      );
+    });
+
+    it("keeps the install footer and no org section outside installed mode", async () => {
+      const wrapper = mount(LibraryDrawer, {
+        props: { open: true, entry: promqlEntry, ready: true },
+        slots: { "in-org": '<p data-test="in-org">In this org</p>' },
+        global: { plugins: [i18n], stubs },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="in-org"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-library-drawer-install"]').exists()).toBe(true);
+    });
+  });
+
   describe("anomaly alerts", () => {
     const anomalyEntry: AlertLibraryEntry = {
       ...sqlEntry,

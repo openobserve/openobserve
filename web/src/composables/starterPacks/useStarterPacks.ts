@@ -963,6 +963,19 @@ export function useStarterPacks(org: string) {
     }
   };
 
+  /** The body an item's source hash covers, as Remove reads it; null once the item is gone. */
+  const readSnapshot = async (pack: StarterPack, item: PackRecordItem): Promise<unknown> => {
+    try {
+      return await adapterFor(pack, item, [], new Map()).snapshot({
+        id: item.id!,
+        folderId: item.folderId,
+      });
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw error;
+    }
+  };
+
   /** Runs a pack's own edit of these alerts so Undo still sees them as unchanged; user edits stay detected. */
   const trackAlertEdit = async <T>(
     pack: StarterPack,
@@ -1126,6 +1139,7 @@ export function useStarterPacks(org: string) {
     appendToInstall,
     undoItems,
     previewPack,
+    readSnapshot,
     undoPack,
     removePack,
     trackAlertEdit,

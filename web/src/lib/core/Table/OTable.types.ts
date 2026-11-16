@@ -412,6 +412,8 @@ export interface OTableProps<TData = any> {
   expandedIds?: string[];
   /** Per-row predicate: return false to hide the expand button for that row */
   getRowExpansionEnabled?: (row: TData) => boolean;
+  /** `false` drops the chevron column, for a table whose own cell control opens the row. */
+  expandButton?: boolean;
   /** When true or a per-row predicate, clicking a row also toggles expansion */
   expandOnRowClick?: boolean | ((row: TData) => boolean);
   /** For tree/grouping: returns sub-rows of a given row */

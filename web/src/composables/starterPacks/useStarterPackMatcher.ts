@@ -119,7 +119,7 @@ export function useStarterPackMatcher(
     const metrics = streams
       ? [...(streams.metrics?.keys() ?? [])]
       : await readNames(org, "metrics");
-    const present = (pack.signals ?? []).filter((name) => metrics.includes(name));
+    const present = (pack.signals ?? []).flat().filter((name) => metrics.includes(name));
     // Without a signal stream the pack cannot fit, so the Library match is not paid for.
     if (!present.length) return { next: "none", seen: [], found: [] };
     const matched =

@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, ref, shallowRef } from "vue";
 
 import { fakeFlow } from "@/components/starterPacks/starterPackTestFlow";
+import { staleSinceText } from "@/composables/starterPacks/usePackHealth";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -26,16 +27,16 @@ import StarterPackPage from "./StarterPackPage.vue";
 const fake = vi.hoisted(() => ({
   flow: null as any,
   turn: null as any,
-  isEnterprise: "false",
-  isCloud: "false",
+  updates: null as any,
+  repair: null as any,
   packsOn: false,
-  packs: null as any,
+  packId: "kubernetes",
   query: {} as Record<string, string>,
   push: null as any,
   replace: null as any,
-  stale: null as number | null,
-  staleStreams: new Set<string>(),
+  streams: [] as unknown[],
   replies: {} as Record<string, unknown>,
+  snapshots: {} as Record<string, unknown>,
   toast: vi.fn(),
 }));
 
@@ -44,22 +45,24 @@ vi.mock("@/constants/starterPacks", () => ({
     return fake.packsOn;
   },
 }));
-vi.mock("@/composables/starterPacks/useStarterPacks", () => ({
-  useStarterPacks: () => fake.packs,
-}));
-vi.mock("@/aws-exports", () => ({
-  default: {
-    get isEnterprise() {
-      return fake.isEnterprise;
-    },
-    get isCloud() {
-      return fake.isCloud;
-    },
-  },
+vi.mock("@/composables/starterPacks/useStarterPacks", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/starterPacks/useStarterPacks")>()),
+  useStarterPacks: () => ({
+    readSnapshot: vi.fn(async (_pack: unknown, item: { itemId: string }) => {
+      const found = fake.snapshots[item.itemId];
+      if (found instanceof Error) throw found;
+      return found ?? null;
+    }),
+    appendToInstall: vi.fn(async () => ({})),
+  }),
 }));
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ query: fake.query, params: { pack: "kubernetes" } }),
-  useRouter: () => ({ push: fake.push, replace: fake.replace }),
+  useRoute: () => ({ query: fake.query, params: { pack: fake.packId } }),
+  useRouter: () => ({
+    push: fake.push,
+    replace: fake.replace,
+    resolve: () => ({ href: "/web/x" }),
+  }),
 }));
 vi.mock("@/composables/starterPacks/useStarterPackFlow", () => ({
   useStarterPackFlow: () => fake.flow,
@@ -67,20 +70,37 @@ vi.mock("@/composables/starterPacks/useStarterPackFlow", () => ({
 vi.mock("@/composables/starterPacks/useTurnOnAlerts", () => ({
   useTurnOnAlerts: () => fake.turn,
 }));
+vi.mock("@/composables/starterPacks/usePackUpdates", () => ({
+  usePackUpdates: () => fake.updates,
+}));
+vi.mock("@/composables/starterPacks/useRepairLater", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/starterPacks/useRepairLater")>()),
+  useRepairLater: () => fake.repair,
+}));
 vi.mock("@/composables/starterPacks/useStarterPackMatcher", () => ({
-  useStarterPackMatcher: () => ({ clusters: ref(["eu"]), check: vi.fn() }),
+  useStarterPackMatcher: () => ({ clusters: ref([]), check: vi.fn() }),
 }));
 vi.mock("@/composables/starterPacks/usePackHealth", async (importOriginal) => {
-  const { ref: vueRef } = await import("vue");
+  const { shallowRef: vueShallowRef, ref: vueRef } = await import("vue");
   return {
     ...(await importOriginal<typeof import("@/composables/starterPacks/usePackHealth")>()),
-    usePackHealth: () => ({
-      staleStreams: vueRef(fake.staleStreams),
-      staleSince: vueRef(fake.stale),
-      check: vi.fn(),
-    }),
+    usePackHealth: () => {
+      const streams = vueShallowRef<unknown[]>([]);
+      return {
+        staleStreams: vueRef(new Set()),
+        staleSince: vueRef(null),
+        streams,
+        check: vi.fn(),
+        checkStreams: vi.fn(async () => {
+          streams.value = fake.streams;
+        }),
+      };
+    },
   };
 });
+vi.mock("@/composables/alerts/useAlertLibrary", () => ({
+  useAlertLibrary: () => ({ loadManifest: vi.fn(async () => ({ alerts: [] })) }),
+}));
 vi.mock("@/services/alerts.queries", () => ({
   alertHistoryQuery: () => ({ kind: "history" }),
   firingAlertsQuery: () => ({ kind: "firing" }),
@@ -94,47 +114,87 @@ vi.mock("@/composables/query/readQuery", () => ({
 
 const t = i18n.global.t as (...args: unknown[]) => string;
 
-const row = (enabled: boolean, over: Record<string, unknown> = {}) => ({
-  id: "a",
-  name: "Alert a",
+const row = (id: string, enabled: boolean, over: Record<string, unknown> = {}) => ({
+  id,
+  folderId: "f1",
+  name: `alert_${id}`,
   severity: "warning",
   enabled,
-  alert: {
-    stream_name: "s",
-    stream_type: "metrics",
-    destinations: ["chat"],
-    trigger_condition: { frequency: 5, period: 5, operator: ">=", threshold: 85 },
-  },
+  alert: { stream_name: "kube_pod_info", stream_type: "metrics", destinations: ["chat"] },
+  ...over,
+});
+const recordItem = (kind: string, itemId: string, over: Record<string, unknown> = {}) => ({
+  kind,
+  itemId,
+  status: "created",
+  id: `${itemId}-id`,
+  folderId: "f1",
+  ...over,
+});
+const installedRecord = (items: unknown[] = [], over: Record<string, unknown> = {}) => ({
+  packId: "kubernetes",
+  installId: "i1",
+  status: "complete",
+  installedBy: "a@example.com",
+  installedAt: 1,
+  version: "1.0.0",
+  items: [
+    { kind: "folder", itemId: "alerts", status: "created", id: "alerts-folder" },
+    recordItem("alert", "k8s/a", { id: "a" }),
+    recordItem("dashboard", "overview"),
+    recordItem("savedView", "v1"),
+    ...items,
+  ],
   ...over,
 });
 
-const CELLS = ["name", "state", "threshold", "fired", "actions"];
+const PASS = { template: "<div><slot /></div>" };
+const OTableStub = {
+  props: ["data", "columns", "rowSection"],
+  emits: ["row-click"],
+  template: `<div>
+    <slot name="toolbar" /><slot name="toolbar-trailing" />
+    <template v-for="(row, index) in data" :key="index">
+      <slot v-if="rowSection && (index === 0 || rowSection(data[index - 1]) !== rowSection(row))" name="group-header" :section-key="rowSection(row)" />
+      <div data-test="table-row" @click="$emit('row-click', row)">
+        <div v-for="col in columns" :key="col.id"><slot :name="'cell-' + col.id" :row="row" /></div>
+      </div>
+    </template>
+    <slot v-if="!data.length" name="empty" />
+  </div>`,
+};
+
 const render = async () => {
   const wrapper = mount(StarterPackPage, {
     global: {
       plugins: [i18n, store],
       stubs: {
         OPageLayout: {
+          props: ["title", "back"],
           template:
-            "<div><slot name='title-prefix' /><slot name='subtitle' /><slot name='title-trail' /><slot name='actions' /><slot /></div>",
+            "<div><span data-test='layout-title'>{{ title }}</span><a data-test='layout-back' :data-to='back?.to?.name' :data-org='back?.to?.query?.org_identifier' /><slot name='title' /><slot name='subtitle' /><slot name='title-trail' /><slot name='actions' /><slot /></div>",
         },
-        OTable: {
-          props: ["data"],
-          data: () => ({ cells: CELLS }),
-          template: `<div><div v-for="row in data" :key="row.id" data-test="row"><div v-for="cell in cells" :key="cell" :data-test="'cell-' + cell"><slot :name="'cell-' + cell" :row="row" /></div></div><slot v-if="!data.length" name="empty" /></div>`,
+        OTable: OTableStub,
+        OTabPanels: PASS,
+        OTabPanel: PASS,
+        ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+        ODropdownItem: {
+          emits: ["select"],
+          template: "<button @click=\"$emit('select')\"><slot /></button>",
+        },
+        ShareButton: { template: "<button data-test='starter-pack-page-share-btn' />" },
+        FitItems: {
+          props: ["items"],
+          template: "<span><span v-for='item in items' :key='item'>{{ item }}</span></span>",
         },
         StarterPackDrawer: true,
-        StarterPackDetailsDrawer: true,
         StarterPackUndoDialog: true,
-        StarterPackFindMore: true,
-        StarterPackRepairChip: true,
+        StarterPackUpdateDrawer: true,
+        StarterPackRepairPanel: true,
         TurnOnAlertsDrawer: true,
-        QuickMuteDialog: true,
+        LibraryDrawer: true,
+        ODrawer: true,
         OIcon: true,
-        ODrawer: {
-          props: ["open"],
-          template: "<div v-if='open'><slot /><slot name='footer' /></div>",
-        },
       },
     },
   });
@@ -143,565 +203,497 @@ const render = async () => {
 };
 const has = (wrapper: any, id: string) => wrapper.find(`[data-test="${id}"]`).exists();
 const text = (wrapper: any, id: string) => wrapper.get(`[data-test="${id}"]`).text();
-const turnOnDrawer = (wrapper: any) => wrapper.findComponent({ name: "TurnOnAlertsDrawer" });
 
 describe("StarterPackPage", () => {
-  const zoConfig = store.state.zoConfig;
-
   beforeEach(() => {
-    fake.isEnterprise = "false";
-    fake.isCloud = "false";
     fake.packsOn = false;
+    fake.packId = "kubernetes";
     fake.query = { org_identifier: "org" };
     fake.push = vi.fn(async () => undefined);
     fake.replace = vi.fn(async () => undefined);
-    fake.stale = null;
-    fake.staleStreams = new Set();
+    fake.streams = [{ name: "kube_pod_info", type: "metrics", state: "receiving", lastUs: 1 }];
     fake.replies = {};
-    fake.toast.mockClear();
-    fake.packs = {
-      checkUpdates: vi.fn(async () => []),
-      applyUpdates: vi.fn(async () => undefined),
-      revertUpdates: vi.fn(async () => undefined),
-      appendToInstall: vi.fn(async () => undefined),
+    fake.snapshots = {
+      overview: {
+        title: "Kubernetes Overview",
+        description: "Cluster use",
+        tabs: [{ panels: [{}, {}] }],
+      },
+      v1: { view_name: "Kubernetes events" },
     };
-    fake.flow = fakeFlow({ record: shallowRef({ items: [], installedBy: "a@example.com" }) });
+    fake.toast.mockClear();
+    fake.flow = fakeFlow({
+      record: shallowRef(installedRecord()),
+      items: computed(() => fake.flow.record.value.items.filter((i: any) => i.kind !== "folder")),
+      failed: computed(() =>
+        fake.flow.record.value.items.filter((i: any) => i.status === "failed"),
+      ),
+      canUndo: ref(false),
+    });
     fake.turn = {
-      rows: shallowRef([row(true)]),
+      rows: shallowRef([row("a", false), row("b", true)]),
       loadState: ref("ready"),
       load: vi.fn(),
       forbidden: ref(false),
-      setThreshold: vi.fn(),
-      turnOff: vi.fn(),
-      chosenRows: computed(() => []),
     };
-  });
-  afterEach(() => {
-    store.state.zoConfig = zoConfig;
+    fake.updates = {
+      available: ref(false),
+      canRevert: ref(false),
+      needsDashboard: ref(false),
+      state: ref("idle"),
+      check: vi.fn(),
+      revert: vi.fn(),
+      addDashboard: vi.fn(),
+    };
+    fake.repair = {
+      issue: shallowRef(null),
+      undoable: shallowRef(null),
+      busy: ref(false),
+      failed: ref(false),
+      check: vi.fn(),
+      apply: vi.fn(),
+      undo: vi.fn(),
+    };
   });
 
   describe("header", () => {
-    it("goes back to Starter Packs from the breadcrumb", async () => {
+    it("shows the pack name with a back link to Starter Packs", async () => {
       const wrapper = await render();
-      await wrapper.get('[data-test="starter-pack-page-back"]').trigger("click");
+      expect(text(wrapper, "layout-title")).toBe("Kubernetes");
+      const back = wrapper.get('[data-test="layout-back"]');
+      expect(back.attributes("data-to")).toBe("starterPacks");
+      expect(back.attributes("data-org")).toBe("org");
+    });
+
+    it("offers Remove, Turn on, Share and More while alerts are paused", async () => {
+      const wrapper = await render();
+      expect(text(wrapper, "starter-pack-page-turn-on-btn")).toBe(
+        t("starterPacks.turnOn.submit", { count: 1 }, 1),
+      );
+      for (const id of ["remove-btn", "share-btn", "more-btn"])
+        expect(has(wrapper, `starter-pack-page-${id}`)).toBe(true);
+      expect(has(wrapper, "starter-pack-page-update-btn")).toBe(false);
+      expect(has(wrapper, "starter-pack-page-pack-details-btn")).toBe(false);
+    });
+
+    it("drops Turn on once every alert is active", async () => {
+      fake.turn.rows.value = [row("a", true)];
+      expect(has(await render(), "starter-pack-page-turn-on-btn")).toBe(false);
+    });
+
+    it("leaves a view-only user with Share alone", async () => {
+      fake.flow.canManage.value = false;
+      const wrapper = await render();
+      expect(has(wrapper, "starter-pack-page-share-btn")).toBe(true);
+      for (const id of ["remove-btn", "turn-on-btn", "more-btn"])
+        expect(has(wrapper, `starter-pack-page-${id}`)).toBe(false);
+      expect(text(wrapper, "starter-pack-page-status")).toBe(
+        t("starterPacks.page.status.viewOnly"),
+      );
+    });
+
+    it("shows Review update and the Update available tag beside the status", async () => {
+      fake.packsOn = true;
+      fake.updates.available.value = true;
+      const wrapper = await render();
+      expect(has(wrapper, "starter-pack-page-update-btn")).toBe(true);
+      expect(has(wrapper, "starter-pack-page-update-tag")).toBe(true);
+      expect(text(wrapper, "starter-pack-page-status")).toBe(t("starterPacks.page.status.ready"));
+    });
+
+    it("hides the Update available tag from a view-only user, who cannot review it", async () => {
+      fake.packsOn = true;
+      fake.updates.available.value = true;
+      fake.flow.canManage.value = false;
+      const wrapper = await render();
+      expect(has(wrapper, "starter-pack-page-update-tag")).toBe(false);
+      expect(fake.updates.check).not.toHaveBeenCalled();
+    });
+
+    it("keeps Undo setup and Revert update in the More menu", async () => {
+      fake.packsOn = true;
+      fake.flow.canUndo.value = true;
+      fake.updates.canRevert.value = true;
+      const wrapper = await render();
+      expect(has(wrapper, "starter-pack-page-more-undo")).toBe(true);
+      await wrapper.get('[data-test="starter-pack-page-revert-btn"]').trigger("click");
+      expect(fake.updates.revert).toHaveBeenCalled();
+    });
+  });
+
+  describe("status tag", () => {
+    it("reads Ready while alerts are only paused", async () => {
+      expect(text(await render(), "starter-pack-page-status")).toBe(
+        t("starterPacks.page.status.ready"),
+      );
+    });
+
+    it("reads Firing when a pack alert fires now", async () => {
+      fake.replies.firing = { list: [{ alert_id: "b", enabled: true, last_outcome: "firing" }] };
+      expect(text(await render(), "starter-pack-page-status")).toBe(
+        t("starterPacks.page.status.firing"),
+      );
+    });
+
+    it("reads Needs attention when a stream never received data", async () => {
+      fake.streams = [{ name: "kube_pod_info", type: "metrics", state: "never", lastUs: null }];
+      expect(text(await render(), "starter-pack-page-status")).toBe(
+        t("starterPacks.page.status.attention"),
+      );
+    });
+  });
+
+  describe("notices", () => {
+    it("puts the partly failed error ahead of the paused warning", async () => {
+      fake.flow.record.value = installedRecord([
+        recordItem("alert", "k8s/c", { status: "failed", id: undefined }),
+      ]);
+      const wrapper = await render();
+      expect(has(wrapper, "starter-pack-page-notice-failed")).toBe(true);
+      expect(has(wrapper, "starter-pack-page-notice-paused")).toBe(false);
+      expect(text(wrapper, "starter-pack-page-notice-failed")).toContain("1 of 4 items");
+      expect(text(wrapper, "starter-pack-page-status")).toBe(
+        t("starterPacks.page.status.attention"),
+      );
+    });
+
+    it("explains paused alerts with no button of its own", async () => {
+      const wrapper = await render();
+      const notice = wrapper.get('[data-test="starter-pack-page-notice-paused"]');
+      expect(notice.text()).toContain("1 alert is paused");
+      expect(notice.text()).toContain("CPU, memory or pods");
+      expect(has(wrapper, "starter-pack-page-notice-paused-action")).toBe(false);
+    });
+
+    it("says a stream stopped and points at the collector", async () => {
+      fake.turn.rows.value = [row("a", true)];
+      fake.streams = [{ name: "kube_pod_info", type: "metrics", state: "stopped", lastUs: 5 }];
+      const wrapper = await render();
+      expect(text(wrapper, "starter-pack-page-notice-stopped")).toContain("kube_pod_info");
+      await wrapper.get('[data-test="starter-pack-page-notice-stopped-action"]').trigger("click");
       expect(fake.push).toHaveBeenCalledWith({
-        name: "starterPacks",
+        name: "ingestFromKubernetes",
         query: { org_identifier: "org" },
       });
     });
 
-    it("shows how many alerts are off in the chip and offers Turn on", async () => {
-      fake.turn.rows.value = [row(false), row(false, { id: "b" })];
-      const wrapper = await render();
-      expect(text(wrapper, "starter-pack-page-chip")).toBe(
-        t("starterPacks.page.chipOff", { count: 2 }, 2),
+    it("names the longest-stopped stream, counts the rest and dates it from the oldest", async () => {
+      fake.turn.rows.value = [row("a", true)];
+      const oldest = Date.UTC(2026, 10, 9, 8, 0) * 1000;
+      const recent = Date.UTC(2026, 10, 14, 10, 59) * 1000;
+      fake.streams = [
+        { name: "kube_pod_info", type: "metrics", state: "stopped", lastUs: recent },
+        { name: "k8s_events", type: "logs", state: "stopped", lastUs: oldest },
+        { name: "kube_node_info", type: "metrics", state: "stopped", lastUs: recent },
+      ];
+      const notice = text(await render(), "starter-pack-page-notice-stopped");
+      expect(notice).toContain(
+        t(
+          "starterPacks.page.notice.stoppedMore",
+          { stream: "k8s_events", count: 2, since: staleSinceText(oldest) },
+          2,
+        ),
       );
-      expect(has(wrapper, "starter-pack-page-turn-on-btn")).toBe(true);
-    });
-
-    it("says the alerts are off before saying the data stopped", async () => {
-      fake.stale = Date.UTC(2026, 10, 12, 9, 40) * 1000;
-      fake.turn.rows.value = [row(false)];
-      expect(text(await render(), "starter-pack-page-chip")).toBe(
-        t("starterPacks.page.chipOff", { count: 1 }, 1),
-      );
-    });
-
-    it("puts a stale pack's last data time in the chip, never a banner", async () => {
-      fake.stale = Date.UTC(2026, 10, 12, 9, 40) * 1000;
-      const wrapper = await render();
-      expect(text(wrapper, "starter-pack-page-chip")).toContain(
-        t("starterPacks.page.chipNoData", { since: "" }).trim(),
-      );
-      expect(wrapper.findComponent({ name: "OBanner" }).exists()).toBe(false);
-    });
-
-    it("has no Turn off all action; each row switch covers it", async () => {
-      expect(has(await render(), "starter-pack-page-turn-off-all-btn")).toBe(false);
-    });
-
-    it("lists a stream without a known type with no type", async () => {
-      fake.turn.rows.value = [{ ...row(true), alert: { stream_name: "s", destinations: [] } }];
-      const wrapper = await render();
-      await wrapper.get('[data-test="starter-pack-page-pack-details-btn"]').trigger("click");
-      const drawer = wrapper.findComponent({ name: "StarterPackDetailsDrawer" });
-      expect(drawer.props("streams")).toEqual([{ name: "s", type: "" }]);
-    });
-
-    it("closes Pack details when another drawer or dialog opens", async () => {
-      fake.turn.rows.value = [row(false)];
-      const wrapper = await render();
-      const drawer = () => wrapper.findComponent({ name: "StarterPackDetailsDrawer" });
-      const open = async () => {
-        await wrapper.get('[data-test="starter-pack-page-pack-details-btn"]').trigger("click");
-        expect(drawer().props("open")).toBe(true);
-      };
-      await open();
-      await wrapper.get('[data-test="starter-pack-page-edit-threshold-btn"]').trigger("click");
-      expect(drawer().props("open")).toBe(false);
-      (wrapper.vm as any).editRow = null;
-      await open();
-      await wrapper.get('[data-test="starter-pack-page-remove-btn"]').trigger("click");
-      expect(drawer().props("open")).toBe(false);
-      wrapper.findComponent({ name: "StarterPackUndoDialog" }).vm.$emit("update:open", false);
-      await open();
-      await wrapper.get('[data-test="starter-pack-page-turn-on-btn"]').trigger("click");
-      expect(drawer().props("open")).toBe(false);
-    });
-
-    it("closes Pack details when the update, Find more or repair drawer opens", async () => {
-      fake.packsOn = true;
-      const wrapper = await render();
-      const drawer = () => wrapper.findComponent({ name: "StarterPackDetailsDrawer" });
-      const open = async () => {
-        await wrapper.get('[data-test="starter-pack-page-pack-details-btn"]').trigger("click");
-        expect(drawer().props("open")).toBe(true);
-      };
-      await open();
-      (wrapper.vm as any).updateOpen = true;
-      await flushPromises();
-      expect(drawer().props("open")).toBe(false);
-      (wrapper.vm as any).updateOpen = false;
-      await open();
-      wrapper.findComponent({ name: "StarterPackFindMore" }).vm.$emit("opened");
-      await flushPromises();
-      expect(drawer().props("open")).toBe(false);
-      await open();
-      wrapper.findComponent({ name: "StarterPackRepairChip" }).vm.$emit("opened");
-      await flushPromises();
-      expect(drawer().props("open")).toBe(false);
-    });
-
-    it("opens the Pack details drawer with the pack's streams", async () => {
-      const wrapper = await render();
-      await wrapper.get('[data-test="starter-pack-page-pack-details-btn"]').trigger("click");
-      const drawer = wrapper.findComponent({ name: "StarterPackDetailsDrawer" });
-      expect(drawer.props("open")).toBe(true);
-      expect(drawer.props("streams")).toEqual([{ name: "s", type: "metrics" }]);
-    });
-
-    it("links a newer catalog version from the chip", async () => {
-      fake.packsOn = true;
-      fake.flow = fakeFlow({
-        record: shallowRef({
-          installId: "i1",
-          version: "1",
-          installedBy: "a@example.com",
-          items: [],
-        }),
-      });
-      fake.packs.checkUpdates.mockResolvedValue([{ itemId: "a", rows: [] }]);
-      const wrapper = await render();
-      expect(text(wrapper, "starter-pack-page-chip")).toBe(t("starterPacks.page.chipUpdate"));
-      expect(has(wrapper, "starter-pack-page-update-btn")).toBe(true);
     });
   });
 
-  describe("view only", () => {
-    beforeEach(() => {
-      fake.flow = fakeFlow({
-        canManage: ref(false),
-        record: shallowRef({ items: [], installedBy: "a@example.com" }),
-      });
+  describe("summary strip", () => {
+    it("counts active alerts out of all, with the paused ones as the sub", async () => {
+      const tile = text(await render(), "starter-pack-page-tile-alerts");
+      expect(tile).toContain("1 / 2");
+      expect(tile).toContain(t("starterPacks.page.strip.paused", { count: 1 }));
     });
 
-    it("moves Copy link for an admin into the header and marks the pack View only", async () => {
-      const wrapper = await render();
-      expect(has(wrapper, "starter-pack-page-copy-link-btn")).toBe(true);
-      expect(has(wrapper, "starter-pack-page-pack-details-btn")).toBe(true);
-      expect(has(wrapper, "starter-pack-page-remove-btn")).toBe(false);
-      expect(text(wrapper, "starter-pack-page-chip")).toBe(t("starterPacks.page.chipViewOnly"));
+    it("says None in this pack when the install made no alerts", async () => {
+      fake.turn.rows.value = [];
+      const tile = text(await render(), "starter-pack-page-tile-alerts");
+      expect(tile).toContain(t("starterPacks.page.strip.none"));
     });
 
-    it("leaves only Open on each row", async () => {
-      const wrapper = await render();
-      expect(has(wrapper, "starter-pack-page-row-switch")).toBe(false);
-      expect(has(wrapper, "starter-pack-page-edit-threshold-btn")).toBe(false);
-      expect(has(wrapper, "starter-pack-page-open-alert-btn")).toBe(true);
-    });
-
-    it("treats a refused write as view only", async () => {
-      fake.flow = fakeFlow({ record: shallowRef({ items: [] }) });
-      fake.turn.forbidden.value = true;
-      expect(has(await render(), "starter-pack-page-copy-link-btn")).toBe(true);
-    });
-  });
-
-  describe("alert rows", () => {
-    it("reads the title row as N of M on and who it notifies", async () => {
-      fake.turn.rows.value = [row(true), row(false, { id: "b" })];
-      expect(text(await render(), "starter-pack-page-alerts-meta")).toBe(
-        t("starterPacks.page.alertsNotifies", { on: 1, total: 2, destinations: "chat" }),
-      );
-    });
-
-    it("names each alert by its library title and keeps the saved name on hover", async () => {
-      fake.flow = fakeFlow({
-        record: shallowRef({ items: [] }),
-        alertTitle: (id: string) => `Title ${id}`,
-      });
-      const title = (await render()).get('[data-test="starter-pack-page-alert-title"]');
-      expect(title.text()).toBe("Title a");
-      expect(title.attributes("title")).toBe("Alert a");
-    });
-
-    it("shows the threshold in words", async () => {
-      expect(text(await render(), "cell-threshold")).toBe(
-        t("starterPacks.page.thresholdFor", {
-          op: t("starterPacks.page.opAbove"),
-          value: 85,
-          period: 5,
+    it("names the longest-stopped stream in the Streams tile", async () => {
+      const oldest = Date.UTC(2026, 10, 9, 8, 0) * 1000;
+      fake.streams = [
+        { name: "kube_pod_info", type: "metrics", state: "receiving", lastUs: Date.now() * 1000 },
+        { name: "k8s_events", type: "logs", state: "stopped", lastUs: oldest },
+      ];
+      expect(text(await render(), "starter-pack-page-tile-streams")).toContain(
+        t("starterPacks.page.strip.stoppedSince", {
+          stream: "k8s_events",
+          since: staleSinceText(oldest),
         }),
       );
     });
 
-    it("marks a firing alert Firing, a stale one No data and an off one Off", async () => {
-      fake.turn.rows.value = [row(true), row(true, { id: "b" }), row(false, { id: "c" })];
-      fake.replies.firing = { list: [{ alert_id: "a", last_outcome: "firing" }] };
-      fake.staleStreams = new Set(["s"]);
+    it("counts the streams receiving data", async () => {
+      fake.streams = [
+        { name: "kube_pod_info", type: "metrics", state: "receiving", lastUs: 1 },
+        { name: "k8s_events", type: "logs", state: "unknown", lastUs: null },
+      ];
+      expect(text(await render(), "starter-pack-page-tile-streams")).toContain("1 / 2");
+    });
+  });
+
+  describe("contents", () => {
+    it("groups the items by type with links to the real lists", async () => {
       const wrapper = await render();
+      for (const kind of ["alert", "dashboard", "savedView"])
+        expect(has(wrapper, `starter-pack-page-group-${kind}`)).toBe(true);
+      expect(has(wrapper, "starter-pack-page-open-in-alerts")).toBe(true);
+      expect(has(wrapper, "starter-pack-page-open-in-dashboards")).toBe(true);
+      const names = wrapper
+        .findAll('[data-test="starter-pack-page-row-name"]')
+        .map((n) => n.text());
+      expect(names).toEqual(["alert_a", "alert_b", "Kubernetes Overview", "Kubernetes events"]);
+    });
+
+    it("sorts a firing alert first in its group", async () => {
+      fake.turn.rows.value = [row("a", true), row("b", true)];
+      fake.replies.firing = { list: [{ alert_id: "b", enabled: true, last_outcome: "firing" }] };
+      const wrapper = await render();
+      const first = wrapper.findAll('[data-test="starter-pack-page-row-name"]')[0];
+      expect(first.text()).toBe("alert_b");
       expect(has(wrapper, "starter-pack-page-state-firing")).toBe(true);
-      expect(has(wrapper, "starter-pack-page-state-noData")).toBe(true);
-      expect(has(wrapper, "starter-pack-page-state-off")).toBe(true);
     });
 
-    it("turns an alert off straight from its switch", async () => {
+    it("filters by search and offers to clear an empty result", async () => {
       const wrapper = await render();
-      wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", false);
+      await wrapper.get('[data-test="starter-pack-page-search"] input').setValue("nothing-matches");
       await flushPromises();
-      expect(fake.turn.turnOff).toHaveBeenCalledWith([expect.objectContaining({ id: "a" })]);
-      expect(turnOnDrawer(wrapper).props("open")).toBe(false);
+      expect(wrapper.findAll('[data-test="starter-pack-page-row-name"]')).toHaveLength(0);
+      expect(text(wrapper, "starter-pack-page-contents-empty")).toContain("nothing-matches");
     });
 
-    it("opens the Turn on drawer preselected to the alert switched on", async () => {
-      fake.turn.rows.value = [row(false)];
+    it("shows only one type when the toggle picks it", async () => {
       const wrapper = await render();
-      wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", true);
+      const toggle = wrapper.findComponent({ name: "OToggleGroup" });
+      toggle.vm.$emit("update:modelValue", "dashboard");
       await flushPromises();
-      expect(turnOnDrawer(wrapper).props("open")).toBe(true);
-      expect(turnOnDrawer(wrapper).props("preselectIds")).toEqual(["a"]);
-      expect(fake.turn.turnOff).not.toHaveBeenCalled();
+      const names = wrapper
+        .findAll('[data-test="starter-pack-page-row-name"]')
+        .map((n) => n.text());
+      expect(names).toEqual(["Kubernetes Overview"]);
     });
 
-    it("keeps an Off alert's switch off after its Turn on drawer closes without turning it on", async () => {
-      fake.turn.rows.value = [row(false)];
+    it("marks an item edited since setup and one still as installed", async () => {
+      fake.flow.record.value = installedRecord();
+      fake.flow.record.value.items[2].sourceHash = "not-the-current-hash";
       const wrapper = await render();
-      const button = () => wrapper.get('[data-test="starter-pack-page-row-switch-btn"]');
-      await button().trigger("click");
-      await flushPromises();
-      expect(turnOnDrawer(wrapper).props("open")).toBe(true);
-      expect(button().attributes("aria-checked")).toBe("false");
-      turnOnDrawer(wrapper).vm.$emit("update:open", false);
-      await flushPromises();
-      expect(button().attributes("aria-checked")).toBe("false");
+      expect(has(wrapper, "starter-pack-page-row-edited")).toBe(true);
     });
 
-    it("keeps the switch on and says so when turning off fails", async () => {
-      fake.turn.turnOff.mockResolvedValue(false);
+    it("says Couldn't check when a body read fails, unlike a deleted item", async () => {
+      fake.snapshots.overview = new Error("boom");
+      fake.snapshots.v1 = null;
       const wrapper = await render();
-      await wrapper.get('[data-test="starter-pack-page-row-switch-btn"]').trigger("click");
+      expect(wrapper.findAll('[data-test="starter-pack-page-row-read-failed"]')).toHaveLength(1);
+    });
+
+    it("opens the item drawer on a row click", async () => {
+      const wrapper = await render();
+      await wrapper.findAll('[data-test="table-row"]')[2].trigger("click");
       await flushPromises();
-      expect(fake.turn.turnOff).toHaveBeenCalled();
+      const drawer = wrapper.findComponent({ name: "StarterPackItemDrawer" });
+      expect(drawer.props("open")).toBe(true);
+      expect(drawer.props("row")).toMatchObject({ kind: "dashboard", panels: 2 });
+    });
+
+    it("opens an alert row in the Library drawer in installed mode", async () => {
+      const wrapper = await render();
+      await wrapper.findAll('[data-test="table-row"]')[0].trigger("click");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "LibraryDrawer" }).attributes("installed")).toBe("true");
+    });
+
+    it("says the alert's data is unchecked when its stream read failed or has no health yet", async () => {
+      fake.streams = [{ name: "kube_pod_info", type: "metrics", state: "unknown", lastUs: null }];
+      let wrapper = await render();
+      await wrapper.findAll('[data-test="table-row"]')[0].trigger("click");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "LibraryDrawer" }).props("dataState")).toBe("unknown");
+      fake.streams = [];
+      wrapper = await render();
+      await wrapper.findAll('[data-test="table-row"]')[0].trigger("click");
+      await flushPromises();
+      const drawer = wrapper.findComponent({ name: "LibraryDrawer" });
+      expect(drawer.props("dataState")).toBe("unknown");
+      expect(drawer.props("subtitle")).toBe("k8s/a · Kubernetes · Kubernetes pack");
+    });
+  });
+
+  describe("streams and fields", () => {
+    it("lists never received and couldn't check streams in their own words", async () => {
+      fake.streams = [
+        { name: "kube_pod_info", type: "metrics", state: "never", lastUs: null },
+        { name: "k8s_events", type: "logs", state: "unknown", lastUs: null },
+      ];
+      const wrapper = await render();
+      expect(text(wrapper, "starter-pack-page-stream-state-never")).toBe(
+        t("starterPacks.page.streams.never"),
+      );
+      expect(text(wrapper, "starter-pack-page-stream-state-unknown")).toBe(
+        t("starterPacks.page.streams.unknown"),
+      );
+    });
+
+    it("maps each renamed field once with every stream it holds in", async () => {
+      fake.flow.record.value = installedRecord([], {
+        bindings: [
+          { stream: "s1", from: "k8s_node_name", to: "node", tier: "alias" },
+          { stream: "s2", from: "k8s_node_name", to: "node", tier: "alias" },
+          { stream: "s1", from: "message", to: "body_note", tier: "chosen" },
+        ],
+      });
+      const wrapper = await render();
+      expect(wrapper.findAll('[data-test^="starter-pack-page-field-tier-"]')).toHaveLength(2);
+      expect(has(wrapper, "starter-pack-page-field-tier-chosen")).toBe(true);
+    });
+
+    it("shows Change disabled with the reason once the pack is set up", async () => {
+      fake.flow.record.value = installedRecord([], {
+        bindings: [{ stream: "s1", from: "k8s_node_name", to: "node", tier: "alias" }],
+      });
+      const wrapper = await render();
       expect(
-        wrapper.get('[data-test="starter-pack-page-row-switch-btn"]').attributes("aria-checked"),
-      ).toBe("true");
-      expect(fake.toast).toHaveBeenCalledWith({
-        variant: "error",
-        message: t("starterPacks.page.turnOffFailed"),
-      });
-    });
-
-    it("asks for a number instead of saving a blank threshold", async () => {
-      const wrapper = await render();
-      await wrapper.get('[data-test="starter-pack-page-edit-threshold-btn"]').trigger("click");
-      (wrapper.vm as any).thresholdDraft = "";
-      await flushPromises();
-      wrapper.findComponent({ name: "ODialog" }).vm.$emit("click:primary");
-      await flushPromises();
-      expect(fake.turn.setThreshold).not.toHaveBeenCalled();
-      expect(wrapper.findComponent({ name: "OInput" }).props("errorMessage")).toBe(
-        t("starterPacks.page.thresholdNotNumber"),
+        wrapper.get('[data-test="starter-pack-page-field-change"]').attributes(),
+      ).toHaveProperty("aria-disabled");
+      expect(text(wrapper, "starter-pack-page-field-locked")).toBe(
+        t("starterPacks.page.fields.lockedHelp"),
       );
     });
 
-    it("says so when saving a threshold fails", async () => {
-      fake.turn.setThreshold.mockResolvedValue(false);
-      const wrapper = await render();
-      await wrapper.get('[data-test="starter-pack-page-edit-threshold-btn"]').trigger("click");
-      wrapper.findComponent({ name: "ODialog" }).vm.$emit("click:primary");
-      await flushPromises();
-      expect(fake.turn.setThreshold).toHaveBeenCalledWith("a", 85, { count: false });
-      expect(fake.toast).toHaveBeenCalledWith({
-        variant: "error",
-        message: t("starterPacks.page.thresholdFailed"),
+    it("shows no Change to a view-only user", async () => {
+      fake.flow.canManage.value = false;
+      fake.flow.record.value = installedRecord([], {
+        bindings: [{ stream: "s1", from: "k8s_node_name", to: "node", tier: "alias" }],
       });
+      const wrapper = await render();
+      expect(has(wrapper, "starter-pack-page-field-change")).toBe(false);
+      expect(has(wrapper, "starter-pack-page-field-locked")).toBe(false);
     });
 
-    it("marks an alert that fired and notified nobody on its row", async () => {
-      fake.turn.rows.value = [{ ...row(true), alert: { stream_name: "s", destinations: [] } }];
-      fake.replies.history = { total: 4 };
-      const wrapper = await render();
-      expect(text(wrapper, "cell-fired")).toContain("4");
-      expect(has(wrapper, "starter-pack-page-silent-fired")).toBe(true);
+    it("says nothing was renamed when the data uses the pack's names", async () => {
+      expect(text(await render(), "starter-pack-page-field-empty")).toBe(
+        t("starterPacks.page.fields.empty"),
+      );
     });
+  });
 
-    it("opens the alert in All Alerts", async () => {
-      const wrapper = await render();
-      await wrapper.get('[data-test="starter-pack-page-open-alert-btn"]').trigger("click");
-      expect(fake.push).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "alertDetail", params: { alert_id: "a" } }),
+  describe("about", () => {
+    it("counts what the install made, not what setup would still make", async () => {
+      expect(text(await render(), "starter-pack-page-about-adds")).toContain(
+        "1 dashboard, 2 alerts, 1 saved view",
       );
     });
 
-    it("offers no Mute where downtimes are off", async () => {
-      expect(has(await render(), "starter-pack-page-mute-btn")).toBe(false);
-    });
-
-    it("offers Mute on Cloud when downtimes are on", async () => {
-      fake.isCloud = "true";
-      store.state.zoConfig = { ...zoConfig, downtimes_enabled: true };
-      expect(has(await render(), "starter-pack-page-mute-btn")).toBe(true);
-    });
-  });
-
-  it("opens the Turn on drawer from the Library card link", async () => {
-    fake.query = { org_identifier: "org", turnOn: "1" };
-    fake.turn.rows.value = [row(false)];
-    const wrapper = await render();
-    expect(turnOnDrawer(wrapper).props("open")).toBe(true);
-    expect(fake.replace).toHaveBeenCalled();
-  });
-
-  it("keeps the Turn on link when there is nothing to turn on", async () => {
-    fake.query = { org_identifier: "org", turnOn: "1" };
-    const wrapper = await render();
-    expect(turnOnDrawer(wrapper).props("open")).toBe(false);
-    expect(fake.replace).not.toHaveBeenCalled();
-  });
-
-  it("gives an admin Set up in… when the pack is not installed", async () => {
-    fake.flow = fakeFlow({ isAdmin: ref(true) });
-    const wrapper = await render();
-    expect(has(wrapper, "starter-pack-page-folder-select")).toBe(true);
-    expect(has(wrapper, "starter-pack-page-setup-btn")).toBe(true);
-    expect(text(wrapper, "starter-pack-page-chip")).toBe(t("starterPacks.page.chipNotSetUp"));
-  });
-
-  it("opens the setup popup from Set up without installing, and offers no What gets created", async () => {
-    fake.flow = fakeFlow({ isAdmin: ref(true) });
-    const wrapper = await render();
-    expect(has(wrapper, "starter-pack-page-details-btn")).toBe(false);
-    const drawer = wrapper.findComponent({ name: "StarterPackDrawer" });
-    expect(drawer.props("open")).toBe(false);
-    await wrapper.get('[data-test="starter-pack-page-setup-btn"]').trigger("click");
-    expect(drawer.props("open")).toBe(true);
-    expect(fake.flow.install).not.toHaveBeenCalled();
-  });
-
-  it("hands the popup the folder picked on the page", async () => {
-    fake.flow = fakeFlow({ isAdmin: ref(true) });
-    const wrapper = await render();
-    const drawer = wrapper.findComponent({ name: "StarterPackDrawer" });
-    expect(drawer.props("flow")).toBe(fake.flow);
-    expect(drawer.props("folderName")).toBeUndefined();
-    wrapper
-      .findComponent('[data-test="starter-pack-page-folder-select"]')
-      .vm.$emit("update:modelValue", "Team folder");
-    await flushPromises();
-    expect(drawer.props("folderName")).toBe("Team folder");
-  });
-
-  it("re-reads the page when the popup closes after it installed the pack", async () => {
-    fake.flow = fakeFlow({ isAdmin: ref(true) });
-    const wrapper = await render();
-    await wrapper.get('[data-test="starter-pack-page-setup-btn"]').trigger("click");
-    vi.mocked(fake.flow.load).mockClear();
-    fake.flow.installed.value = true;
-    wrapper.findComponent({ name: "StarterPackDrawer" }).vm.$emit("update:open", false);
-    await flushPromises();
-    expect(fake.flow.load).toHaveBeenCalledTimes(1);
-  });
-
-  it("hides the folder picker from anyone else", async () => {
-    fake.flow = fakeFlow();
-    expect(has(await render(), "starter-pack-page-folder-select")).toBe(false);
-  });
-
-  it("shows a load failure as an empty state with Retry", async () => {
-    fake.flow = fakeFlow({ loadFailed: ref(true) });
-    const wrapper = await render();
-    expect(has(wrapper, "starter-pack-page-error")).toBe(true);
-    expect(has(wrapper, "starter-pack-page-section-alerts")).toBe(false);
-    expect(text(wrapper, "starter-pack-page-chip")).toBe(t("starterPacks.page.loadFailed"));
-  });
-
-  describe("dashboards and views", () => {
-    const withItems = (items: unknown[]) =>
-      fakeFlow({ record: shallowRef({ items, installedBy: "a@example.com" }) });
-
-    it("lists the dashboards and saved views the install made and opens each", async () => {
-      fake.flow = withItems([
-        { kind: "alert", itemId: "a", status: "created", id: "x" },
-        { kind: "dashboard", itemId: "overview", status: "created", id: "d1", folderId: "f1" },
-        { kind: "savedView", itemId: "events", status: "existing", id: "v1" },
-        { kind: "dashboard", itemId: "nodes", status: "skipped" },
-      ]);
+    it("counts every pack alert in the cost, paused ones too", async () => {
+      fake.turn.rows.value = [row("a", false)];
       const wrapper = await render();
-      const rows = wrapper.findAll('[data-test="starter-pack-page-view-row"]');
-      expect(rows.map((item) => item.text())).toEqual([
-        expect.stringContaining("name-overview"),
-        expect.stringContaining("name-events"),
-      ]);
-      const open = wrapper.findAll('[data-test="starter-pack-page-view-open-btn"]');
-      await open[0].trigger("click");
-      expect(fake.push).toHaveBeenCalledWith({
-        name: "viewDashboard",
-        query: { org_identifier: "org", dashboard: "d1", folder: "f1", pack: "kubernetes" },
-      });
-      await open[1].trigger("click");
-      expect(fake.push).toHaveBeenCalledWith({
-        name: "logs",
-        query: { org_identifier: "org", stream_type: "logs", stream: "k8s_events" },
-      });
-    });
-
-    it("hides the section when the install made no dashboard or view", async () => {
-      fake.flow = withItems([
-        { kind: "alert", itemId: "a", status: "created", id: "x" },
-        { kind: "dashboard", itemId: "overview", status: "failed" },
-      ]);
-      const wrapper = await render();
-      expect(has(wrapper, "starter-pack-page-section-views")).toBe(false);
-    });
-  });
-
-  describe("with every alert skipped", () => {
-    it("says how many alerts setup skipped for missing data", async () => {
-      fake.flow = fakeFlow({
-        record: shallowRef({
-          items: [
-            { kind: "alert", itemId: "a", status: "skipped" },
-            { kind: "alert", itemId: "b", status: "skipped" },
-            { kind: "dashboard", itemId: "overview", status: "skipped" },
-          ],
-        }),
-      });
-      fake.turn.rows.value = [];
-      const wrapper = await render();
-      expect(text(wrapper, "starter-pack-page-alerts-skipped")).toContain(
-        t("starterPacks.page.alertsSkipped", { count: 2 }, 2),
+      expect(text(wrapper, "starter-pack-page-about")).toMatch(
+        /About [\d,]+ background queries a day/,
       );
-    });
-
-    it("counts alerts setup left out for missing data", async () => {
-      fake.flow = fakeFlow({
-        record: shallowRef({
-          items: [{ kind: "dashboard", itemId: "overview", status: "created" }],
-        }),
-        preview: shallowRef({
-          notIncluded: [
-            { kind: "alert", itemId: "a", name: "A", reason: "no_data" },
-            { kind: "alert", itemId: "b", name: "B", reason: "no_data" },
-            { kind: "alert", itemId: "c", name: "C", reason: "already_have" },
-            { kind: "dashboard", itemId: "d", name: "D", reason: "no_data" },
-          ],
-        }),
-      });
-      fake.turn.rows.value = [];
-      const wrapper = await render();
-      expect(text(wrapper, "starter-pack-page-alerts-skipped")).toContain(
-        t("starterPacks.page.alertsSkipped", { count: 2 }, 2),
-      );
-    });
-
-    it("counts an alert once when the record skipped it and the preview leaves it out", async () => {
-      fake.flow = fakeFlow({
-        record: shallowRef({ items: [{ kind: "alert", itemId: "a", status: "skipped" }] }),
-        preview: shallowRef({
-          notIncluded: [{ kind: "alert", itemId: "a", name: "A", reason: "no_data" }],
-        }),
-      });
-      fake.turn.rows.value = [];
-      const wrapper = await render();
-      expect(text(wrapper, "starter-pack-page-alerts-skipped")).toContain(
-        t("starterPacks.page.alertsSkipped", { count: 1 }, 1),
-      );
-    });
-
-    it("says the alerts failed to load, with Retry, instead of the skipped count", async () => {
-      fake.flow = fakeFlow({
-        record: shallowRef({ items: [{ kind: "alert", itemId: "a", status: "skipped" }] }),
-      });
-      fake.turn.rows.value = [];
-      fake.turn.loadState.value = "error";
-      const wrapper = await render();
-      expect(has(wrapper, "starter-pack-page-alerts-skipped")).toBe(false);
-      expect(text(wrapper, "starter-pack-page-alerts-load-failed")).toContain(
-        t("starterPacks.turnOn.loadFailed"),
-      );
-      fake.turn.load.mockClear();
-      await wrapper
-        .get(
-          '[data-test="starter-pack-page-alerts-load-failed"] [data-test="o2-empty-state-action-primary"]',
-        )
-        .trigger("click");
-      expect(fake.turn.load).toHaveBeenCalledWith({ count: false });
-    });
-
-    it("keeps the plain empty table when nothing was skipped", async () => {
-      fake.turn.rows.value = [];
-      const wrapper = await render();
-      expect(has(wrapper, "starter-pack-page-alerts-skipped")).toBe(false);
+      expect(text(wrapper, "starter-pack-page-about")).not.toContain("About 0 ");
     });
   });
 
-  describe("with a newer catalog version", () => {
-    const update = {
-      itemId: "a",
-      name: "Alert a",
-      fromHash: "v1",
-      hash: "v2",
-      rows: [{ field: "description", yours: "old", library: "new", outcome: "updated" }],
-      base: { description: "old" },
-      next: { description: "new" },
-    };
-    const installed = (items: unknown[]) =>
-      fakeFlow({
-        record: shallowRef({ installId: "i1", version: "1", installedBy: "a@example.com", items }),
-      });
-
+  describe("not set up", () => {
+    const realFetch = globalThis.fetch;
     beforeEach(() => {
-      fake.packsOn = true;
+      globalThis.fetch = vi.fn(async () => ({ ok: false, status: 404 })) as never;
+      fake.flow.record.value = null;
+      fake.flow.preview.value = {
+        items: [{ kind: "alert", itemId: "k8s/a", status: "pending" }],
+        names: { "k8s/a": "Alert A" },
+        notIncluded: [],
+        bindings: [],
+        questions: [],
+        flavours: {},
+        repairs: [],
+      };
+    });
+    // unstubAllGlobals would also drop the setup file's ResizeObserver stub.
+    afterEach(() => {
+      globalThis.fetch = realFetch;
     });
 
-    it("offers the update and shows each changed field in the drawer", async () => {
-      fake.flow = installed([{ kind: "alert", itemId: "a", status: "created", id: "x" }]);
-      fake.packs.checkUpdates.mockResolvedValue([update]);
+    // The pack's dashboard JSON loads by dynamic import, which takes more than a microtask flush.
+    const renderSettled = async () => {
       const wrapper = await render();
-      expect(fake.packs.checkUpdates).toHaveBeenCalledWith(fake.flow.pack, "i1");
-      await wrapper.get('[data-test="starter-pack-page-update-btn"]').trigger("click");
-      await flushPromises();
-      const changed = wrapper.get('[data-test="starter-pack-update-row-description"]').text();
-      expect(changed).toContain("old");
-      expect(changed).toContain("new");
-      await wrapper.get('[data-test="starter-pack-update-apply-btn"]').trigger("click");
-      await flushPromises();
-      expect(fake.packs.applyUpdates).toHaveBeenCalledWith(fake.flow.pack, "i1", [update]);
-      expect(has(wrapper, "starter-pack-update-drawer")).toBe(false);
+      await vi.waitFor(() => expect(has(wrapper, "starter-pack-page-loading")).toBe(false));
+      return wrapper;
+    };
+
+    it("offers Set up next to the folder choice, with an info notice", async () => {
+      fake.flow.isAdmin.value = true;
+      const wrapper = await renderSettled();
+      expect(has(wrapper, "starter-pack-page-setup-btn")).toBe(true);
+      expect(
+        wrapper.findComponent('[data-test="starter-pack-page-setup-btn"]').props("iconLeft"),
+      ).toBe("add");
+      expect(has(wrapper, "starter-pack-page-folder-select")).toBe(true);
+      expect(has(wrapper, "starter-pack-page-remove-btn")).toBe(false);
+      expect(has(wrapper, "starter-pack-page-notice-not-set-up")).toBe(true);
+      expect(text(wrapper, "starter-pack-page-status")).toBe(
+        t("starterPacks.page.status.notSetUp"),
+      );
+      expect(has(wrapper, "starter-pack-page-state-willBeCreated")).toBe(true);
     });
 
-    it("reverts an applied update and checks again", async () => {
-      const applied = { fromHash: "v1", rows: update.rows };
-      fake.flow = installed([
-        { kind: "alert", itemId: "a", status: "created", id: "x", update: applied },
-      ]);
-      const wrapper = await render();
-      fake.packs.checkUpdates.mockClear();
-      await wrapper.get('[data-test="starter-pack-page-revert-btn"]').trigger("click");
-      await flushPromises();
-      expect(fake.packs.revertUpdates).toHaveBeenCalledWith(fake.flow.pack, "i1");
-      expect(fake.flow.load).toHaveBeenCalled();
-      expect(fake.packs.checkUpdates).toHaveBeenCalledTimes(1);
+    it("lets an admin change a field before setup", async () => {
+      fake.flow.isAdmin.value = true;
+      fake.flow.preview.value = {
+        ...fake.flow.preview.value,
+        bindings: [{ stream: "s1", from: "k8s_node_name", to: "node", tier: "alias" }],
+      };
+      const wrapper = await renderSettled();
+      expect(
+        wrapper.get('[data-test="starter-pack-page-field-change"]').attributes(),
+      ).not.toHaveProperty("aria-disabled");
+      expect(has(wrapper, "starter-pack-page-field-locked")).toBe(false);
     });
+
+    it("disables Set up for someone who cannot manage packs", async () => {
+      fake.flow.isAdmin.value = false;
+      const wrapper = await renderSettled();
+      expect(wrapper.get('[data-test="starter-pack-page-setup-btn"]').attributes()).toHaveProperty(
+        "aria-disabled",
+      );
+    });
+  });
+
+  it("holds the status, notices and rows as skeletons until the first load ends", async () => {
+    let finish = () => {};
+    fake.turn.load = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    const wrapper = await render();
+    expect(has(wrapper, "starter-pack-page-loading")).toBe(true);
+    expect(has(wrapper, "starter-pack-page-status")).toBe(false);
+    expect(has(wrapper, "starter-pack-page-notice-paused")).toBe(false);
+    finish();
+    await flushPromises();
+    expect(has(wrapper, "starter-pack-page-loading")).toBe(false);
+    expect(has(wrapper, "starter-pack-page-status")).toBe(true);
+  });
+
+  it("names a mistyped pack instead of showing another one", async () => {
+    fake.packId = "kubernetez";
+    const wrapper = await render();
+    expect(text(wrapper, "starter-pack-page-not-found")).toContain("kubernetez");
+    expect(has(wrapper, "starter-pack-page-not-found-icon")).toBe(true);
+    expect(has(wrapper, "starter-pack-page-tabs")).toBe(false);
+  });
+
+  it("shows the load error with a retry", async () => {
+    fake.flow.loadFailed.value = true;
+    expect(has(await render(), "starter-pack-page-error")).toBe(true);
+  });
+
+  it("says so when a change is refused mid-action, then goes view only", async () => {
+    const wrapper = await render();
+    fake.turn.forbidden.value = true;
+    await flushPromises();
+    expect(fake.toast).toHaveBeenCalledWith({
+      variant: "error",
+      message: t("starterPacks.page.forbidden"),
+    });
+    expect(text(wrapper, "starter-pack-page-status")).toBe(t("starterPacks.page.status.viewOnly"));
   });
 });

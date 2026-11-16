@@ -19,6 +19,8 @@ export interface DescriptionListProps {
   columns?: 1 | 2;
   /** Tighter row rhythm, for a list inside a card rather than a page column. */
   dense?: boolean;
+  /** A rule between rows, for a one-column list that is the whole content of a page tab. */
+  divided?: boolean;
   /** Width of every item's label column; `narrow` gives the value the room in a side-column card. */
   labelWidth?: DescriptionLabelWidth;
 }
