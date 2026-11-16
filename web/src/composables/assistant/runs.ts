@@ -525,7 +525,7 @@ function sessionRow(session: AssistantSession, input: RunsInput): RunRow | null 
     startedAt: started,
     turnId: meta.turnId,
   };
-  if (session.pendingConsent)
+  if (session.turn.state === "awaiting_consent")
     return {
       ...base,
       group: "needs_you",
@@ -533,8 +533,6 @@ function sessionRow(session: AssistantSession, input: RunsInput): RunRow | null 
       request: "consent",
       consent: true,
     };
-  // A chat waiting on someone else's paid-usage card was never admitted, so that card's chat speaks for it.
-  if (session.turn.state === "awaiting_consent") return null;
   const pending = session.pendingApproval;
   if (pending)
     return {

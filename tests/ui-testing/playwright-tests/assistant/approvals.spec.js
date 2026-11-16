@@ -310,16 +310,13 @@ test.describe("assistant approval cards", () => {
     await expect(consent).toBeVisible({ timeout: 15_000 });
     await expect(assistant.composer()).toBeFocused();
     await page.keyboard.press("Control+i");
-    await expect(consent.locator('[data-test="assistant-consent-card-org"]')).toBeFocused();
-    await tabTo(page, consent.locator('[data-test="assistant-consent-card-checkbox"] [role="checkbox"]'));
+    await expect(consent.locator('[data-test="paid-overage-view-billing"]')).toBeFocused();
+    await tabTo(page, consent.locator('[data-test="paid-overage-authorization-checkbox"] [role="checkbox"]'));
     await page.keyboard.press("Space");
-    await tabTo(page, consent.locator('[data-test="assistant-consent-card-enable"]'));
+    await tabTo(page, consent.locator('[data-test="o2-ai-paid-usage-consent-enable"]'));
     await page.keyboard.press("Enter");
-    await expect(assistant.container().locator('[data-test="assistant-consent-note"]')).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(consent).toBeHidden({ timeout: 15_000 });
     expect(await focusInAssistant()).toBe(true);
-    await expect.poll(() => spokenTimes("Paid AI usage enabled. Sending your message.")).toBe(1);
   });
 
   test("SHELL-13 a card never takes focus from the composer; Ctrl+I and Review request reach Deny, with no trap", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {

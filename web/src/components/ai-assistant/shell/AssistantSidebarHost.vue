@@ -262,7 +262,7 @@ const peekTitle = computed(() => activeSession.value?.title ?? t("assistant.thre
 const peekSignal = computed<AssistantSignal | null>(() => {
   const session = activeSession.value;
   if (!session) return null;
-  if (session.pendingApproval || session.pendingConsent) return "attention";
+  if (session.pendingApproval) return "attention";
   if (["awaiting_approval", "awaiting_consent"].includes(session.turn.state)) return "attention";
   return AT_REST.has(session.turn.state) ? null : "working";
 });

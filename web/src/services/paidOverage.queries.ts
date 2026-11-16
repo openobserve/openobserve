@@ -20,7 +20,7 @@ import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 import paidOverage, { type PaidOverageFeature, type PaidOverageStatus } from "./paidOverage";
 import { paidOverageKeys } from "./paidOverage.querykeys";
 
-/** `GET paid_overage`; a consent card and the meter re-read it on focus and on the `consent_granted` hint. */
+/** `GET paid_overage`; the meter and Billing read it. */
 export const paidOverageQuery = (org: string, feature: PaidOverageFeature) =>
   queryOptions({
     queryKey: paidOverageKeys.status(org, feature),

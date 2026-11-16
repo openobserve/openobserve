@@ -31,8 +31,8 @@ Mock scenarios: `confirmation`, then `consent`.
 | 5 | Tab to Approve, then Enter. | The step line for the delete, then "Done". |
 | 5b | Shift+Tab to **Go to answer**, then Enter. | Focus moves to the latest answer article, named after the prompt. Read it with the virtual cursor. Then `Ctrl+I`: focus returns to the message box. |
 | 6 | Type `why 5xx? [consent]`, then Enter. | "Sending…" then "Waiting for your decision on paid usage for default. Press Control I to review it." |
-| 7 | `Ctrl+I` | Focus: the consent card heading, "Enable paid AI usage for default?". |
-| 8 | Tab to the checkbox, Space, Tab to Enable, Enter. | "Paid AI usage enabled. Sending your message." Then the turn's sentences, ending "Done". |
+| 7 | `Ctrl+I` | Focus: the first control of the "Turn on paid AI usage?" card, View billing. |
+| 8 | Tab to the checkbox, Space, Tab to Turn on, Enter. | The card goes away, then the turn's sentences, ending "Done". |
 | 9 | Escape, with nothing running and the message box empty. | "O2 Assistant closed." Focus returns to the control that opened it. |
 
 ## W2: locked role

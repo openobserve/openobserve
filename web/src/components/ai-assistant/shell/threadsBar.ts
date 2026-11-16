@@ -21,7 +21,7 @@ export type TrayState = "needsYou" | "working" | "failed" | "idle";
 /** The chat's state: waiting for the person, answering, failed, or quiet. */
 export function trayState(session: AssistantSession | undefined): TrayState {
   if (!session) return "idle";
-  if (session.pendingApproval || session.pendingConsent) return "needsYou";
+  if (session.pendingApproval || session.turn.state === "awaiting_consent") return "needsYou";
   const state = session.turn.state;
   if (state === "failed" || state === "refused") return "failed";
   if (state === "done" || state === "stopped") return "idle";

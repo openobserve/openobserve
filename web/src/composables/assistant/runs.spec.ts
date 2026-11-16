@@ -51,7 +51,6 @@ function session(sid: string, over: Record<string, unknown> = {}): AssistantSess
     turnMeta: { turnId: "t-" + sid, startedAt: NOW - 5_000, ownedByThisTab: true },
     unread: false,
     pendingApproval: null,
-    pendingConsent: null,
     record: { ephemeral: false },
     ...over,
   } as unknown as AssistantSession;
@@ -118,8 +117,8 @@ describe("runsList", () => {
     const rows = runsList(
       input({
         sessions: [
-          session("a", { pendingConsent: { id: "x" } }),
-          session("b", { pendingConsent: { id: "x" } }),
+          session("a", { turn: { state: "awaiting_consent" } }),
+          session("b", { turn: { state: "awaiting_consent" } }),
           session("c", { turn: { state: "awaiting_consent" } }),
         ],
       }),
@@ -385,7 +384,7 @@ describe("createRuns", () => {
 
   it("leaves out of the count a chat waiting on paid usage, which was never admitted", async () => {
     const { store, runs, sid } = setup();
-    store.state.sessions[sid].pendingConsent = { id: "x" } as never;
+    store.state.sessions[sid].turn = { state: "awaiting_consent" };
     await nextTick();
     expect(runs.active.value).toBe(0);
     expect(runs.needsCount.value).toBe(1);

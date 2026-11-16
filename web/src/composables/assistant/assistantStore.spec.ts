@@ -598,21 +598,6 @@ describe("composer", () => {
     expect(store.state.sessions[sid].composer.replyStash).toBeUndefined();
   });
 
-  it("answers an Enable on its way before a Stop: the stop waits on the consent runtime", async () => {
-    const consent = {
-      onConsentRequired: vi.fn(),
-      resolve: vi.fn(),
-      cancel: vi.fn(),
-      busy: vi.fn(() => true),
-    };
-    const engine = { ...inertAssistantDeps().engine, stop: vi.fn(async () => undefined) };
-    const { store } = makeStore({ consent, engine });
-    const sid = newSession(store);
-    await store.stop(sid);
-    expect(consent.cancel).toHaveBeenCalledWith(sid, "stopped");
-    expect(engine.stop).not.toHaveBeenCalled();
-  });
-
   it("stops the stream at once on Stop while the card's decline is still on its way", () => {
     const approvals = {
       ...inertAssistantDeps().approvals,
@@ -759,9 +744,8 @@ describe("turn actions", () => {
       retrySave: vi.fn(),
     };
     const approvals = { ...deps.approvals, decide: vi.fn().mockResolvedValue({ status: "done" }) };
-    const consent = { ...deps.consent, resolve: vi.fn() };
     const actions = { apply: vi.fn().mockResolvedValue({ ok: true }) };
-    const { store } = makeStore({ engine, approvals, consent, actions });
+    const { store } = makeStore({ engine, approvals, actions });
     const sid = newSession(store);
     await expect(store.send(sid, { mode: "chat" })).resolves.toEqual(DONE);
     expect(engine.send).toHaveBeenCalledWith(sid, { mode: "chat" });
@@ -770,7 +754,6 @@ describe("turn actions", () => {
     await store.continueTurn(sid);
     await store.retrySave(sid, "t1");
     await store.decideApproval(sid, { approved: true, scope: "once" });
-    await store.resolveConsent(sid, true, true);
     await store.dispatch(sid, { kind: "retry" });
     expect(engine.stop).toHaveBeenCalledWith(sid);
     expect(engine.retry).toHaveBeenCalledWith(sid);
@@ -781,7 +764,6 @@ describe("turn actions", () => {
       { approved: true, scope: "once" },
       undefined,
     );
-    expect(consent.resolve).toHaveBeenCalledWith(sid, true, true);
     expect(actions.apply).toHaveBeenCalledWith(sid, { kind: "retry" });
   });
 

@@ -451,11 +451,6 @@ export function inertAssistantDeps(
       withdraw: async () => undefined,
       onResolved: () => undefined,
     },
-    consent: {
-      onConsentRequired: () => undefined,
-      resolve: async () => undefined,
-      cancel: () => undefined,
-    },
     actions: { apply: async () => ({ ok: false, reason: "failed" }) },
     ...overrides,
   };
@@ -868,15 +863,6 @@ function createPlacementSlice(core: StoreCore) {
       if (placement.kind === "hidden") return;
       const restore =
         placement.kind === "docked" || (placement.kind === "full" && reason === "route");
-      // A docked chat closes with its editor, so its consent card goes too even when the chat lands in the sidebar.
-      const sid = state.shell.activeSid;
-      if (
-        placement.kind === "docked" &&
-        previousPlacement &&
-        sid &&
-        core.session(sid)?.pendingConsent
-      )
-        core.deps.consent.cancel(sid, "container_closed");
       state.shell.placement =
         restore && previousPlacement ? { ...previousPlacement } : { kind: "hidden" };
       state.shell.previousPlacement = null;
@@ -910,7 +896,7 @@ function createPlacementSlice(core: StoreCore) {
 }
 
 function createWindowSlice(core: StoreCore) {
-  const { state, deps } = core;
+  const { state } = core;
   const windowAnnouncement = shallowRef<WindowAnnouncement | null>(null);
   const announce = (key: I18nKey, sid: Sid, other?: Sid) => {
     windowAnnouncement.value = {
@@ -1012,7 +998,6 @@ function createWindowSlice(core: StoreCore) {
     closeWindow(sid) {
       const session = core.session(sid);
       if (!windowOf(state.shell, sid)) return;
-      if (session?.pendingConsent) deps.consent.cancel(sid, "container_closed");
       const running = !!session && isRunning(session.turn);
       announce(
         running ? "assistant.announce.windowClosedRunning" : "assistant.announce.windowClosed",
@@ -1357,7 +1342,6 @@ function createTurnSlice(core: StoreCore) {
     | "continueTurn"
     | "retrySave"
     | "decideApproval"
-    | "resolveConsent"
     | "dispatch"
     | "markNotSaved"
     | "regenerate"
@@ -1386,8 +1370,6 @@ function createTurnSlice(core: StoreCore) {
     },
     // A waiting card's decline goes out before the cancel, so no stale batch runs later; the stream never waits for its answer.
     async stop(sid) {
-      // An Enable on its way is answered first: a stop now could leave paid usage on behind a "not sent".
-      if (deps.consent.busy?.(sid)) return deps.consent.cancel(sid, "stopped");
       if (core.session(sid)?.pendingApproval) void deps.approvals.withdraw(sid, "stopped");
       return deps.engine.stop(sid);
     },
@@ -1443,8 +1425,6 @@ function createTurnSlice(core: StoreCore) {
     canRetry: (sid) => deps.engine.canRetry?.(sid) ?? false,
     cancelTurn: (sid, turnId) => deps.engine.cancelTurn?.(sid, turnId) ?? Promise.resolve(false),
     decideApproval: (sid, decision, approvalId) => deps.approvals.decide(sid, decision, approvalId),
-    resolveConsent: (sid, accepted, acknowledged) =>
-      deps.consent.resolve(sid, accepted, acknowledged),
     dispatch: (sid, action) => deps.actions.apply(sid, action),
     markNotSaved(sid) {
       const session = core.session(sid);
@@ -1697,7 +1677,6 @@ function blankSession(
       contextUsed: null,
     },
     pendingApproval: null,
-    pendingConsent: null,
     // Votes, "Opened" lines, asked windows and approval records survive a reload in this browser.
     annotations,
     share: null,
@@ -2030,7 +2009,6 @@ function isIdle(core: StoreCore, session: AssistantSession): boolean {
     composer.chips.length === 0 &&
     composer.images.length === 0 &&
     !session.pendingApproval &&
-    !session.pendingConsent &&
     !(turn.state === "done" && turn.saved === "not_saved") &&
     !core.savesPending.has(session.sid)
   );
@@ -2084,12 +2062,7 @@ function isEmptySession(session: AssistantSession): boolean {
 
 function needsYou(session: AssistantSession): boolean {
   const state = session.turn.state;
-  return (
-    state === "awaiting_approval" ||
-    state === "awaiting_consent" ||
-    !!session.pendingApproval ||
-    !!session.pendingConsent
-  );
+  return state === "awaiting_approval" || state === "awaiting_consent" || !!session.pendingApproval;
 }
 
 function previousFor(from: Placement, to: Placement, previous: Placement | null): Placement | null {

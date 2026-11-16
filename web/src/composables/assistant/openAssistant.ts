@@ -277,7 +277,8 @@ function planOf(
 ): DoorPlan {
   const composerEmpty = !session || session.composer.text.trim() === "";
   const running = !!session && isRunning(session.turn);
-  const carded = !!session && (!!session.pendingApproval || !!session.pendingConsent);
+  const carded =
+    !!session && (!!session.pendingApproval || session.turn.state === "awaiting_consent");
   const wantsSend = args.intent === "send";
   const free = wantsSend && composerEmpty && !running && !carded;
   // A door never starts a turn this tab may not start; its prompt stays staged and the door says why.
@@ -319,11 +320,7 @@ function homeDoor(env: OpenAssistantEnv, args: OpenAssistantCall): "full" | "foc
   if (args.intent !== "open" || args.payload || args.seed?.length) return "full";
   const session = resolveThread(env, args, target);
   const live =
-    !!session &&
-    (isRunning(session.turn) ||
-      session.unread ||
-      !!session.pendingApproval ||
-      !!session.pendingConsent);
+    !!session && (isRunning(session.turn) || session.unread || !!session.pendingApproval);
   return live ? "full" : "focus";
 }
 

@@ -15,7 +15,7 @@
 
 import type { ComputedRef, Ref } from "vue";
 
-import type { PaidOverageFeature, PaidOverageStatus } from "@/services/paidOverage";
+import type { PaidOverageStatus } from "@/services/paidOverage";
 import type { ChatMessage, ImageAttachment, TurnSpan } from "@/ts/interfaces/chat";
 import type { I18nKey, I18nText } from "@/types/i18n";
 
@@ -504,13 +504,11 @@ export interface ActionLedgerEntry {
   undoUnconfirmed?: boolean;
 }
 
-/** A 412 consent prompt held on its session (`00` §11). */
-export interface PendingConsent {
+/** What a turn's 412 asks for: the shared paid-usage prompt, then a resend under `turnId`. */
+export interface TurnConsentRequest {
   org: string;
-  feature: PaidOverageFeature;
   status: PaidOverageStatus;
   turnId: string;
-  snapshot: ComposerSnapshot;
 }
 
 export interface ShareSummary {
@@ -736,7 +734,6 @@ export interface AssistantSession {
   pendingApproval: PendingApproval | null;
   /** Writes asked after `pendingApproval` in the same chat, shown one at a time in the order they were asked. */
   queuedApprovals?: PendingApproval[];
-  pendingConsent: PendingConsent | null;
   annotations: Record<BlockId, BlockAnnotation>;
   share: ShareSummary | null;
   ledger: ActionLedgerEntry[];
@@ -803,7 +800,6 @@ export type AssistantHint =
   | { v: 1; type: "approval_resolved"; sid: string; callId?: string; approved: boolean; at: number }
   /** Stop from a tab waiting on another tab's card: the holder declines it and stops the turn. */
   | { v: 1; type: "approval_stop"; sid: string; at: number }
-  | { v: 1; type: "consent_granted"; org: string; feature: "ai_credits"; at: number }
   | { v: 1; type: "signed_out"; at: number }
   | {
       v: 1;
@@ -909,7 +905,6 @@ export interface AssistantStoreApi {
     decision: ApprovalDecision,
     approvalId?: string,
   ): Promise<ApprovalResult>;
-  resolveConsent(sid: Sid, accepted: boolean, acknowledged?: boolean): Promise<void>;
 
   dispatch(sid: Sid, action: AssistantAction): Promise<ActionResult>;
 
@@ -1110,10 +1105,8 @@ export interface TurnEngine {
   approvalExtended?(sid: Sid, until?: number): void;
   /** A decision on the card is on its way, so its expiry does not end the turn meanwhile. */
   approvalSending?(sid: Sid): void;
-  /** A turn waiting on consent ends unsent with its prompt back, as a Stop before sending does. */
-  consentWithdrawn?(sid: Sid): void;
-  /** WP-10 installs `consent.ts`. */
-  setConsentHandler(handler: (sid: Sid, err: AssistantError) => void): void;
+  /** `consent.ts` installs the shared paid-usage prompt. */
+  setConsentHandler(handler: (sid: Sid, request: TurnConsentRequest) => void): void;
 }
 
 export type MutationResult = { ok: true } | { ok: false; error: AssistantError };
@@ -1156,15 +1149,6 @@ export interface ApprovalsService {
   onResolved(sid: Sid, frame: ConfirmationResolvedFrame): void;
 }
 
-export interface ConsentService {
-  onConsentRequired(sid: Sid, err: AssistantError): void;
-  /** An accept turns paid usage on only with the card's acknowledgement ticked. */
-  resolve(sid: Sid, accepted: boolean, acknowledged?: boolean): Promise<void>;
-  cancel(sid: Sid, reason: "container_closed" | "org_switch" | "sign_out" | "stopped"): void;
-  /** True while an Enable is on its way; a cancel then waits for its answer. */
-  busy?(sid: Sid): boolean;
-}
-
 export interface ActionDispatcher {
   apply(sid: Sid, action: AssistantAction): Promise<ActionResult>;
 }
@@ -1187,6 +1171,5 @@ export interface AssistantStoreDeps {
   history: HistoryService;
   hints: HintChannel;
   approvals: ApprovalsService;
-  consent: ConsentService;
   actions: ActionDispatcher;
 }

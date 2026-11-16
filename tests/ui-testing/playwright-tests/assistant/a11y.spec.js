@@ -168,7 +168,7 @@ test.describe("assistant accessibility", () => {
         await assistant.send("why 5xx?", "consent");
         await expect(assistant.consentCard()).toBeVisible({ timeout: 15_000 });
         await expectClean(page, name("consent"));
-        await assistant.consentCard().locator('[data-test="assistant-consent-card-cancel"]').click();
+        await assistant.consentCard().locator('[data-test="o2-ai-paid-usage-consent-cancel"]').click();
 
         await assistant.openHistory();
         await expectClean(page, name("history"));
@@ -251,7 +251,7 @@ test.describe("assistant accessibility", () => {
     await step("consent", () => assistant.send("why 5xx?", "consent"), () => expect(assistant.consentCard()).toBeVisible({ timeout: 15_000 }));
     await step(
       "consent-cancelled",
-      () => assistant.consentCard().locator('[data-test="assistant-consent-card-cancel"]').click(),
+      () => assistant.consentCard().locator('[data-test="o2-ai-paid-usage-consent-cancel"]').click(),
       () => expect(assistant.consentCard()).toBeHidden({ timeout: 15_000 }),
     );
     await step("closed", () => assistant.composer().press("Escape"), () => expect(assistant.sidebar).toBeHidden());

@@ -767,7 +767,13 @@ function threadFor(): "new" | "current" | "auto" {
   if (props.thread) return props.thread;
   if (!sends.value) return "current";
   const shown = visibleTarget.value;
-  if (shown && (queued.value || drafted.value || shown.pendingApproval || shown.pendingConsent))
+  if (
+    shown &&
+    (queued.value ||
+      drafted.value ||
+      shown.pendingApproval ||
+      shown.turn.state === "awaiting_consent")
+  )
     return "current";
   if (props.entryKind !== "empty_state") return "new";
   const last = emptyStateThreads.get(routeKey());

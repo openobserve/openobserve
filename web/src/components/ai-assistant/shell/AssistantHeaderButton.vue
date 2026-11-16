@@ -182,12 +182,7 @@ interface HeaderView {
 
 function needsYou(session: AssistantSession): boolean {
   const state = session.turn.state;
-  return (
-    state === "awaiting_approval" ||
-    state === "awaiting_consent" ||
-    !!session.pendingApproval ||
-    !!session.pendingConsent
-  );
+  return state === "awaiting_approval" || state === "awaiting_consent" || !!session.pendingApproval;
 }
 </script>
 

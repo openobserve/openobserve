@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-// Paid-usage consent with the flag on: a card in the requesting container, the same turn id once, honest cancels and other tabs.
+// Paid-usage consent with the flag on: the shared org-wide prompt inline in the chat, the same turn id once, honest cancels.
 
 import { test, expect } from "@playwright/test";
 
@@ -29,11 +29,12 @@ test.describe("assistant consent card", () => {
   }
 
   const card = (target = assistant) => target.consentCard();
-  const field = (id, target = assistant) => card(target).locator(`[data-test="assistant-consent-card-${id}"]`);
+  const button = (id, target = assistant) => card(target).locator(`[data-test="o2-ai-paid-usage-consent-${id}"]`);
+  const po = (id, target = assistant) => card(target).locator(`[data-test="paid-overage-${id}"]`);
+  const dialog = (page) => page.locator('[data-test="paid-overage-consent-dialog"]');
   const requests = (page) =>
     page.evaluate(() => window.__o2mock.requests.map((r) => ({ headers: r.headers, scenario: r.scenario })));
   const puts = () => state.log.filter((line) => line.startsWith("PUT paid_overage"));
-  const region = () => assistant.container().locator('[data-test="assistant-status-region"]');
 
   test.beforeEach(async ({ context, page }) => {
     harness = await loadHarness();
@@ -43,33 +44,26 @@ test.describe("assistant consent card", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("CONS-01 an admin enables once the box is ticked, and the same turn id is resent once", { tag: ["@mock", "@stack-cloud"] }, async ({ page }) => {
+  test("CONS-01 an admin turns it on once the box is ticked, and the same turn id is resent once", { tag: ["@mock", "@stack-cloud"] }, async ({ page }) => {
     await ask(page);
-    await expect(field("org")).toHaveText("Enable paid AI usage for default?");
-    await expect(field("consequence")).toContainText("every AI request from anyone in default is billed");
-    await expect(region()).toContainText("Waiting for your decision on paid usage for default.");
+    await expect(card()).toContainText("Turn on paid AI usage?");
+    await expect(po("billing-cycle-copy")).toContainText("AI usage is billed at your plan's rate");
     await expect(assistant.composerState()).toHaveAttribute("data-state", "inert");
-    await expect(field("enable")).toBeDisabled();
-    await field("checkbox").click();
-    await expect(field("enable")).toBeEnabled();
-    await field("enable").click();
-    await expect(assistant.container().locator('[data-test="assistant-consent-note"]')).toContainText(
-      /Paid AI usage enabled for default by you · /,
-      { timeout: 15_000 },
-    );
+    await expect(dialog(page)).toHaveCount(0);
+    await expect(button("enable")).toBeDisabled();
+    await po("authorization-checkbox").click();
+    await expect(button("enable")).toBeEnabled();
+    await button("enable").click();
+    await expect(card()).toHaveCount(0, { timeout: 15_000 });
     expect(puts()).toHaveLength(1);
+    await expect.poll(async () => (await requests(page)).length).toBe(2);
     const sent = await requests(page);
-    expect(sent).toHaveLength(2);
     expect(sent[1].headers["x-o2-assistant-turn-id"]).toBe(sent[0].headers["x-o2-assistant-turn-id"]);
-    await expect(card()).toHaveCount(0);
-    const telemetry = await harness.captureTelemetry(page);
-    const steps = telemetry.filter((e) => e.name === "ai_consent").map((e) => e.properties.step);
-    expect(steps).toEqual(expect.arrayContaining(["shown", "enabled"]));
   });
 
   test("CONS-02 Cancel writes nothing and gives the prompt back, the note clearing on the next keystroke", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page);
-    await field("cancel").click();
+    await button("cancel").click();
     await expect(card()).toHaveCount(0);
     expect(puts()).toHaveLength(0);
     await expect(assistant.composer()).toHaveValue("why did checkout 5xx spike?");
@@ -81,41 +75,34 @@ test.describe("assistant consent card", () => {
     await expect(assistant.outcome()).toHaveCount(0);
   });
 
-  test("CONS-03 Manage in Billing opens a new tab and is never a decline", { tag: ["@mock"] }, async ({ context, page }) => {
+  test("CONS-03 View billing declines, writes nothing and opens Billing", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page);
-    const opened = context.waitForEvent("page");
-    await field("view-billing").click();
-    const tab = await opened;
-    await tab.close();
-    await expect(card()).toBeVisible();
+    await po("view-billing").click();
+    await expect(page).toHaveURL(/\/billings\/plans/);
     expect(puts()).toHaveLength(0);
   });
 
-  test("CONS-04 a member gets Ask an admin instead of Enable", { tag: ["@mock", "@stack-cloud"] }, async ({ page }) => {
+  test("CONS-04 a member is told to ask an admin and gets no Turn on", { tag: ["@mock", "@stack-cloud"] }, async ({ page }) => {
     await ask(page, "consent_member");
-    await expect(field("checkbox")).toHaveCount(0);
-    await expect(field("enable")).toHaveCount(0);
-    await expect(field("member")).toContainText("An admin of default can enable paid usage.");
-    await field("ask-admin").click();
-    await expect(assistant.askAdmin().locator("textarea")).toHaveValue(
-      /^Could you enable paid AI usage for default\? Billing › Paid usage: /,
-    );
+    await expect(po("authorization-checkbox")).toHaveCount(0);
+    await expect(button("enable")).toHaveCount(0);
+    await expect(po("contact-admin")).toContainText("Ask an organization admin to turn on paid AI usage.");
   });
 
   test("CONS-05 a failed PUT says so inline and keeps the card", { tag: ["@mock"] }, async ({ page }) => {
     state.consentPutStatus = 500;
     await ask(page);
-    await field("checkbox").click();
-    await field("enable").click();
-    await expect(field("error")).toHaveText("Paid usage couldn't be updated. Try again.");
-    await expect(field("enable")).toBeEnabled();
+    await po("authorization-checkbox").click();
+    await button("enable").click();
+    await expect(card().locator('[role="alert"]')).toHaveText("Couldn't update paid AI usage. Try again.");
+    await expect(button("enable")).toBeEnabled();
     await expect(card()).toBeVisible();
   });
 
   test("CONS-06 a second 412 on the resend is a refusal with the prompt back, never a second card", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page, "consent_twice");
-    await field("checkbox").click();
-    await field("enable").click();
+    await po("authorization-checkbox").click();
+    await button("enable").click();
     await expect(assistant.outcome()).toContainText(
       "Paid usage isn't enabled for every organization this needs.",
       { timeout: 15_000 },
@@ -124,91 +111,15 @@ test.describe("assistant consent card", () => {
     await expect(assistant.composer()).toHaveValue("why did checkout 5xx spike?");
   });
 
-  test("CONS-07 closing the container cancels the card: nothing written, no dialog, the draft kept", { tag: ["@mock"] }, async ({ page }) => {
+  test("CONS-07 closing the chat moves the prompt to the global dialog; its Cancel writes nothing and keeps the draft", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page);
     await assistant.close();
-    await expect(page.locator('[data-test="paid-overage-consent-dialog"]')).toHaveCount(0);
+    await expect(dialog(page)).toBeVisible();
+    await dialog(page).getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog(page)).toHaveCount(0);
     expect(puts()).toHaveLength(0);
     await assistant.open("header");
     await expect(card()).toHaveCount(0);
-    await expect(assistant.composer()).toHaveValue("why did checkout 5xx spike?");
-  });
-
-  async function switchOrg(page, identifier) {
-    await page.locator('[data-test="navbar-organizations-select-trigger"]').click();
-    await page
-      .locator(`[data-test="organization-menu-item-label-item-label"][data-test-org-identifier="${identifier}"]`)
-      .click();
-    const keep = page.locator('[data-test="assistant-shell-org-switch-keep"]');
-    await keep.click({ timeout: 5_000 }).catch(() => {});
-    await expect(page).toHaveURL(new RegExp(`org_identifier=${identifier}`));
-  }
-
-  async function backToDefault(page) {
-    await switchOrg(page, harness.ENV.org);
-    await expect(assistant.headerButton).toHaveAttribute("data-state", /idle|unread|working/, { timeout: 30_000 });
-    await assistant.open("header");
-  }
-
-  test("CONS-08 an org switch cancels the card before the switch, and no PUT reaches the old org", { tag: ["@mock"] }, async ({ page }) => {
-    const second = await harness.ensureOrg("e2e_assistant_lifecycle");
-    await ask(page);
-    await assistant.close();
-    await switchOrg(page, second);
-    expect(puts()).toHaveLength(0);
-    await backToDefault(page);
-    await expect(card()).toHaveCount(0);
-    await expect(assistant.composer()).toHaveValue("why did checkout 5xx spike?");
-    expect(puts()).toHaveLength(0);
-  });
-
-  test("CONS-08 an org switch while Enable is on its way waits for its answer: paid usage stays on, nothing is sent, the prompt comes back", { tag: ["@mock"] }, async ({ page }) => {
-    const second = await harness.ensureOrg("e2e_assistant_lifecycle");
-    state.consentPutDelayMs = 2_500;
-    await ask(page);
-    await field("checkbox").click();
-    await field("enable").click();
-    await expect(card()).toHaveAttribute("aria-busy", "true");
-    await page.keyboard.press("Escape");
-    await expect(card()).toBeVisible();
-    await assistant.close();
-    await switchOrg(page, second);
-    await expect.poll(() => puts(), { timeout: 10_000 }).toEqual([`PUT paid_overage ${harness.ENV.org}`]);
-    await backToDefault(page);
-    await expect(assistant.container().locator('[data-test="assistant-consent-note"]')).toContainText(
-      /Paid AI usage enabled for default by you · /,
-      { timeout: 15_000 },
-    );
-    await expect(assistant.container()).not.toContainText("Paid usage wasn't enabled");
-    await expect(assistant.composer()).toHaveValue("why did checkout 5xx spike?");
-    expect(await requests(page)).toHaveLength(1);
-  });
-
-  test("CONS-09 a grant in another tab resolves this card and resends its own turn", { tag: ["@mock"] }, async ({ context, page }) => {
-    await ask(page);
-    const other = await context.newPage();
-    const second = new AssistantPage(other);
-    await ask(other, "consent", second);
-    await field("checkbox", second).click();
-    await field("enable", second).click();
-    await expect(other.locator('[data-test="assistant-consent-note"]')).toBeVisible({ timeout: 15_000 });
-    await expect(assistant.container().locator('[data-test="assistant-consent-note"]')).toBeVisible({
-      timeout: 15_000,
-    });
-    const sent = await requests(page);
-    expect(sent).toHaveLength(2);
-    expect(sent[1].headers["x-o2-assistant-turn-id"]).toBe(sent[0].headers["x-o2-assistant-turn-id"]);
-    expect(puts()).toHaveLength(1);
-    await other.close();
-  });
-
-  test("CONS-10 Escape inside the card cancels it and the panel stays open", { tag: ["@mock"] }, async ({ page }) => {
-    await ask(page);
-    await field("checkbox").focus();
-    await page.keyboard.press("Escape");
-    await expect(card()).toHaveCount(0);
-    await expect(assistant.container()).toBeVisible();
-    expect(puts()).toHaveLength(0);
     await expect(assistant.composer()).toHaveValue("why did checkout 5xx spike?");
   });
 });

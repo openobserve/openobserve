@@ -367,7 +367,7 @@ describe("rows (§1, S1)", () => {
     expect(wrapper.find('[data-test="assistant-composer-corner"]').exists()).toBe(false);
     expect(textarea().classes()).not.toContain("pe-7!");
     await wrapper.setProps({ accessLost: false });
-    store.state.sessions[sid].pendingConsent = { id: "c1" } as never;
+    store.state.sessions[sid].turn = { state: "awaiting_consent" };
     await flushPromises();
     expect(sees().exists()).toBe(false);
   });
@@ -1154,10 +1154,10 @@ describe("boards 04–06: inert field, error row, Stop and Send (S3, S4, S6, S7)
     expect(inert().findComponent(OIcon).props("name")).toBe("pause");
     expect(inert().attributes("title")).toBe("Decide above to continue");
     store.state.sessions[sid].pendingApproval = null;
-    store.state.sessions[sid].pendingConsent = { id: "p1" } as never;
+    store.state.sessions[sid].turn = { state: "awaiting_consent" };
     await flushPromises();
     expect(inert().exists()).toBe(true);
-    store.state.sessions[sid].pendingConsent = null;
+    store.state.sessions[sid].turn = { state: "idle" };
     await flushPromises();
     expect(inert().exists()).toBe(false);
   });
@@ -2047,7 +2047,7 @@ describe("dictation (WP-48)", () => {
   it("stops when a card arrives; the inert frame keeps the mic, crossed and off", async () => {
     const ctx = voiceSetup();
     await listen(ctx);
-    ctx.store.state.sessions[ctx.sid].pendingConsent = { id: "c1" } as never;
+    ctx.store.state.sessions[ctx.sid].turn = { state: "awaiting_consent" };
     await flushPromises();
     expect(ctx.wrapper.get('[data-test="assistant-composer"]').attributes("data-state")).toBe(
       "inert",
@@ -2175,7 +2175,7 @@ describe("dictation (WP-48)", () => {
 
   it("does not dictate on a hold while a card holds the composer", async () => {
     const ctx = voiceSetup();
-    ctx.store.state.sessions[ctx.sid].pendingConsent = { id: "c1" } as never;
+    ctx.store.state.sessions[ctx.sid].turn = { state: "awaiting_consent" };
     await flushPromises();
     vi.useFakeTimers();
     ctx.textarea().element.focus();

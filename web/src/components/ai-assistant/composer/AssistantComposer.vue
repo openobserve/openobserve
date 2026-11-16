@@ -202,7 +202,8 @@ const THREAD_WINDOW_MS = 30 * 60_000;
 const REPLY_SELECTOR =
   '[data-test="assistant-approval-reply"], [data-test="assistant-question-other"]';
 
-const CARD_SELECTOR = '[data-test="assistant-approval-card"], [data-test="assistant-consent-card"]';
+const CARD_SELECTOR =
+  '[data-test="assistant-approval-card"], [data-test="o2-ai-paid-usage-consent"]';
 </script>
 
 <script setup lang="ts">
@@ -399,7 +400,7 @@ const asking = computed(() => session.value?.pendingApproval?.kind === "question
 const inertKind = computed<"approval" | "asking" | "consent" | null>(() => {
   if (session.value?.pendingApproval && !replying.value)
     return asking.value ? "asking" : "approval";
-  return session.value?.pendingConsent ? "consent" : null;
+  return session.value?.turn.state === "awaiting_consent" ? "consent" : null;
 });
 
 // The mic and the recall sheet follow the pointer, not the width, so a narrow desktop window keeps its keyboard.
@@ -602,7 +603,7 @@ const clearedText = computed<I18nText | null>(() => {
 // Go to request is offered only while the card is out of view, as the card itself is the way back otherwise.
 const cardAway = ref(false);
 watch(
-  [inertKind, root, () => session.value?.pendingApproval?.id, () => session.value?.pendingConsent],
+  [inertKind, root, () => session.value?.pendingApproval?.id, () => session.value?.turn.state],
   ([kind], _, onCleanup) => {
     cardAway.value = false;
     const cards = kind ? Array.from(shellRoot()?.querySelectorAll(CARD_SELECTOR) ?? []) : [];

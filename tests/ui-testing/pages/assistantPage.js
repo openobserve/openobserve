@@ -120,7 +120,7 @@ export class AssistantPage {
   }
 
   consentCard() {
-    return this.container().locator('[data-test="assistant-consent-card"]');
+    return this.container().locator('[data-test="o2-ai-paid-usage-consent"]');
   }
 
   meter() {

@@ -304,8 +304,8 @@ export function createLifecycle(deps: LifecycleDeps): AssistantLifecycleRuntime 
       mirror.beat();
       void store.stop(hint.sid);
     }),
-    ...(["prefs_changed", "history_changed", "share_changed", "consent_granted"] as const).map(
-      (type) => hints.on(type, (hint) => store.applyHint(hint)),
+    ...(["prefs_changed", "history_changed", "share_changed"] as const).map((type) =>
+      hints.on(type, (hint) => store.applyHint(hint)),
     ),
   );
   // A login by another account must not hand this tab's chats to it; that one needs a reload.
@@ -459,9 +459,7 @@ async function settleOnSwitch(
       // The deny goes out with keepalive and records its own answer; the switch never waits on it.
       if (session.pendingApproval)
         return void store.decideApproval(session.sid, { approved: false, reason: "withdrawn" });
-      return session.pendingConsent || session.turn.state === "awaiting_consent"
-        ? store.stop(session.sid)
-        : undefined;
+      return session.turn.state === "awaiting_consent" ? store.stop(session.sid) : undefined;
     }),
   );
 }
@@ -472,7 +470,7 @@ function liveCount(store: AssistantStoreInternal): number {
 }
 
 function waiting(session: AssistantSession): boolean {
-  return NEEDS_YOU.has(session.turn.state) || !!session.pendingApproval || !!session.pendingConsent;
+  return NEEDS_YOU.has(session.turn.state) || !!session.pendingApproval;
 }
 
 function otherTabTurns(deps: LifecycleDeps): LiveTurn[] {
