@@ -16,14 +16,26 @@
 use axum::{
     Json,
     extract::Request,
-    http::StatusCode,
+    http::{StatusCode, header::CONTENT_TYPE},
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use common::meta::ingestion_routes::{is_ingestion_write, is_opamp};
+use common::meta::{
+    http::{CONTENT_TYPE_JSON, HttpResponse as MetaHttpResponse},
+    ingestion_routes::{is_ingestion_write, is_opamp},
+    otlp::otlp_rejection_response,
+};
+use config::meta::otlp::OtlpRequestType;
 use openobserve_core::ingestion::check_memory_circuit_breaker;
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+/// Path endings of the OTLP/HTTP export routes; `/traces` also covers `/otel/v1/traces`.
+const OTLP_ROUTE_SUFFIXES: &[&str] = &[
+    "/v1/logs",
+    "/v1/metrics",
+    "/traces",
+    "/v1/profiles",
+    "/v1development/profiles",
+];
 
 /// Refuses an ingest write on a tripped memory circuit breaker before its body is read or decoded.
 pub async fn memory_breaker_middleware(request: Request, next: Next) -> Response {
@@ -39,13 +51,29 @@ async fn refuse_writes_when(
     if let Err(e) = check()
         && is_data_write(&request)
     {
-        return (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(MetaHttpResponse::error(StatusCode::SERVICE_UNAVAILABLE, e)),
-        )
-            .into_response();
+        return refusal(&request, e);
     }
     next.run(request).await
+}
+
+/// OTLP/HTTP clients only parse a `google.rpc.Status` in the encoding the export was sent in.
+fn refusal(request: &Request, e: infra::errors::Error) -> Response {
+    let status = StatusCode::SERVICE_UNAVAILABLE;
+    let path = request.uri().path();
+    if !OTLP_ROUTE_SUFFIXES.iter().any(|s| path.ends_with(s)) {
+        return (status, Json(MetaHttpResponse::error(status, e))).into_response();
+    }
+    let content_type = request
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    let req_type = if content_type.starts_with(CONTENT_TYPE_JSON) {
+        OtlpRequestType::HttpJson
+    } else {
+        OtlpRequestType::HttpProtobuf
+    };
+    otlp_rejection_response(req_type, status, e.to_string())
 }
 
 /// OpAMP manages agents and writes no data, so it stays up while the breaker is tripped.
@@ -91,6 +119,8 @@ mod tests {
         let routes = Router::new()
             .route("/{org_id}/{stream_name}/_json", post(read_body))
             .route("/{org_id}/v1/opamp", post(read_body))
+            .route("/{org_id}/v1/logs", post(read_body))
+            .route("/{org_id}/otel/v1/traces", post(read_body))
             .route("/{org_id}/streams", get(read_body))
             .layer(middleware::from_fn(move |req, next| {
                 refuse_writes_when(req, next, check)
@@ -160,5 +190,41 @@ mod tests {
             assert_eq!(status, StatusCode::OK, "{uri}");
             assert!(read, "{uri}");
         }
+    }
+
+    async fn refuse_otlp(uri: &str, content_type: &str) -> axum::http::Response<Body> {
+        let req = axum::http::Request::builder()
+            .method(Method::POST)
+            .uri(uri)
+            .header(CONTENT_TYPE, content_type)
+            .body(Body::empty())
+            .unwrap();
+        app(tripped).oneshot(req).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_otlp_refusal_keeps_the_export_encoding() {
+        use common::meta::{http::CONTENT_TYPE_PROTO, otlp::GoogleRpcStatus};
+        use prost::Message;
+
+        for uri in ["/api/default/v1/logs", "/api/default/otel/v1/traces"] {
+            let resp = refuse_otlp(uri, CONTENT_TYPE_PROTO).await;
+            assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE, "{uri}");
+            assert_eq!(resp.headers()[CONTENT_TYPE], CONTENT_TYPE_PROTO, "{uri}");
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let status = GoogleRpcStatus::decode(body).unwrap();
+            assert_eq!(status.code, 14, "{uri}");
+            assert_eq!(status.message, "Error# MemoryCircuitBreakerError", "{uri}");
+        }
+
+        let resp = refuse_otlp("/api/default/v1/logs", "application/json; charset=utf-8").await;
+        assert_eq!(resp.headers()[CONTENT_TYPE], CONTENT_TYPE_JSON);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], 14);
     }
 }

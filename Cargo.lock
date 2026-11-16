@@ -8082,6 +8082,7 @@ dependencies = [
  "openobserve-synthetics",
  "openobserve-tls",
  "opentelemetry-proto",
+ "prost 0.14.4",
  "rand 0.10.2",
  "regex",
  "reqwest 0.13.4",
