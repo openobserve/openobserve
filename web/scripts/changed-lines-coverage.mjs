@@ -22,34 +22,27 @@ export function parseDiff(text) {
   return files;
 }
 
-// line -> covered, for lines where a statement starts.
+// line -> covered, for lines inside any statement; covered only if every statement spanning it ran.
 export function lineCoverage(fileCov) {
   const lines = new Map();
-  for (const [id, loc] of Object.entries(fileCov.statementMap)) {
-    const l = loc.start.line;
-    lines.set(l, lines.get(l) || fileCov.s[id] > 0);
-  }
+  for (const [id, loc] of Object.entries(fileCov.statementMap))
+    for (let l = loc.start.line; l <= loc.end.line; l++)
+      lines.set(l, (lines.get(l) ?? true) && fileCov.s[id] > 0);
   return lines;
 }
 
-// Without coverage data every non-blank, non-comment changed line counts as executable and uncovered.
+// Blank and comment lines never count. Without coverage data every other changed line is uncovered.
 export function fileStats(changed, lines, source) {
   const src = (source ?? "").split("\n");
   let exec = 0;
   let covered = 0;
   const uncovered = [];
   for (const n of [...changed].sort((a, b) => a - b)) {
-    if (lines) {
-      if (!lines.has(n)) continue;
-      exec++;
-      if (lines.get(n)) covered++;
-      else uncovered.push(n);
-    } else {
-      const t = (src[n - 1] ?? "").trim();
-      if (!t || /^(\/\/|\/\*|\*)/.test(t)) continue;
-      exec++;
-      uncovered.push(n);
-    }
+    const t = (src[n - 1] ?? "").trim();
+    if (!t || /^(\/\/|\/\*|\*)/.test(t) || (lines && !lines.has(n))) continue;
+    exec++;
+    if (lines?.get(n)) covered++;
+    else uncovered.push(n);
   }
   return { exec, covered, uncovered };
 }
@@ -77,7 +70,7 @@ export function gate({ diff, coverage, inScope, readSource, min }) {
   for (const [f, changed] of parseDiff(diff)) {
     if (/\.spec\.(ts|js|vue)$/.test(f) || !inScope(f)) continue;
     const cov = byFile.get(f);
-    const s = fileStats(changed, cov ? lineCoverage(cov) : null, cov ? null : readSource(f));
+    const s = fileStats(changed, cov ? lineCoverage(cov) : null, readSource(f));
     if (s.exec) rows.push({ file: f, noData: !cov, ...s });
   }
   const exec = rows.reduce((a, r) => a + r.exec, 0);

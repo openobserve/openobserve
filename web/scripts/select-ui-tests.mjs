@@ -28,8 +28,9 @@ const EXTS = [
 ];
 const SRC_TYPES =
   /\.(ts|tsx|js|jsx|mjs|cjs|vue|json|css|scss|svg|png|jpe?g|gif|webp|ico|woff2?|ttf|txt|md|snap)$/;
-// Specs that read source through fs or ?raw, so the import graph cannot see what they cover.
-const READS_SOURCE = /readFileSync|readdirSync|readFile\(|fs\.promises|\?raw\b/;
+// Code that reads source through fs or ?raw, so the import graph cannot see what it covers.
+const READS_FS = /readFileSync|readdirSync|readFile\(|fs\.promises/;
+const READS_SOURCE = new RegExp(`${READS_FS.source}|\\?raw\\b`);
 const LOCALE = /(?:^|\/)([a-z]{2}-[A-Z]{2})\.json$/;
 const FULL = [
   /^web\/(package\.json|package-lock\.json|vite\.config\.ts|vitest[^/]*\.config\.ts|tsconfig[^/]*\.json|postcss\.config\.js|coverage\.sh)$/,
@@ -177,24 +178,35 @@ export function buildGraph(texts, nodes, aliases) {
     }
   }
   const nodeList = [...nodes];
+  const globRes = [];
   for (const [f, pat] of globs) {
     if (pat.startsWith("!")) continue;
     const abs = specBase(pat, f, aliases);
     if (abs == null) continue;
     const re = globToRe(abs);
     const prefix = abs.slice(0, abs.search(/[*?{]|$/));
+    globRes.push([f, prefix, re]);
     for (const n of nodeList) if (n !== f && n.startsWith(prefix) && re.test(n)) deps.get(f).add(n);
   }
   const rev = new Map();
   for (const [f, ds] of deps) for (const d of ds) (rev.get(d) ?? rev.set(d, []).get(d)).push(f);
-  return { deps, rev, missing };
+  // Files whose glob would match p, so a deleted match still reaches the glob's consumers.
+  const globOwners = (p) =>
+    globRes
+      .filter(([f, prefix, re]) => f !== p && p.startsWith(prefix) && re.test(p))
+      .map(([f]) => f);
+  return { deps, rev, missing, globOwners };
 }
 
-const reach = (edges, start) => {
+// From a node where stop(node) holds, only edges to nodes in keep are followed.
+const reach = (edges, start, stop, keep) => {
   const seen = new Set(start);
   const q = [...start];
-  while (q.length)
-    for (const n of edges.get(q.pop()) ?? []) if (!seen.has(n)) seen.add(n) && q.push(n);
+  while (q.length) {
+    const cur = q.pop();
+    for (const n of edges.get(cur) ?? [])
+      if (!seen.has(n) && (!stop?.(cur) || keep.has(n))) seen.add(n) && q.push(n);
+  }
   return seen;
 };
 
@@ -309,7 +321,7 @@ export function select({ repo, base, head }) {
   const cfg = ["vite.config.ts", "vitest.config.ts"].map(
     (f) => showFile(repo, head, "web/" + f) ?? "",
   );
-  const { deps, rev, missing } = buildGraph(texts, nodes, parseAliases(cfg));
+  const { deps, rev, missing, globOwners } = buildGraph(texts, nodes, parseAliases(cfg));
   const specs = [...nodes].filter((f) => SPEC.test(f));
   const specSet = new Set(specs);
   const setupFiles = [
@@ -318,8 +330,9 @@ export function select({ repo, base, head }) {
   if (!setupFiles.length) throw new Error("no setupFiles in vitest.config.ts");
   // Locale JSON keeps the key-level rule; anything else setup loads reaches every spec.
   const setup = reach(deps, setupFiles);
+  const inSetup = (f) => setup.has(f) || (!nodes.has(f) && globOwners(f).some((o) => setup.has(o)));
   const setupHits = changed.filter(
-    (p) => p.startsWith("web/") && setup.has(p.slice(4)) && !LOCALE.test(p),
+    (p) => p.startsWith("web/") && inSetup(p.slice(4)) && !LOCALE.test(p),
   );
   if (setupHits.length) {
     const more = setupHits.length > 1 ? ` (+${setupHits.length - 1} more)` : "";
@@ -333,9 +346,9 @@ export function select({ repo, base, head }) {
 
   const reasons = [];
   const picked = new Set();
-  const take = (file, starts, direct = []) => {
+  const take = (file, starts, direct = [], stop) => {
     const got = new Set(direct);
-    for (const n of reach(rev, starts)) if (specSet.has(n)) got.add(n);
+    for (const n of reach(rev, starts, stop, specSet)) if (specSet.has(n)) got.add(n);
     for (const s of got) picked.add(s);
     reasons.push({ file, specs: got.size });
   };
@@ -343,6 +356,7 @@ export function select({ repo, base, head }) {
     if (!repoPath.startsWith("web/")) continue;
     const f = repoPath.slice(4);
     const exists = nodes.has(f);
+    const owners = exists ? [] : globOwners(f);
     if (SPEC.test(f)) {
       take(repoPath, [], exists ? [f] : []);
       continue;
@@ -351,9 +365,10 @@ export function select({ repo, base, head }) {
     if (loc && f.startsWith("src/")) {
       const direct = (rev.get(f) ?? []).filter((x) => specSet.has(x));
       if (loc[1] !== "en-US") {
+        // Specs load these by app code ("ko"); past setup-loaded loaders, keep only direct spec importers.
         const out = new Set(direct);
         idx.specsContaining(loc[1], out);
-        take(repoPath, [], out);
+        take(repoPath, [f, ...owners], out, (n) => setup.has(n) && !LOCALE.test(n));
         continue;
       }
       let keys;
@@ -390,7 +405,7 @@ export function select({ repo, base, head }) {
         missing.get(f.replace(/\.[^./]+$/, "")) ??
         missing.get(f) ??
         missing.get(f.replace(/\/index\.[^./]+$/, ""));
-      take(repoPath, [...(importers ?? [])]);
+      take(repoPath, [...(importers ?? []), ...owners]);
       continue;
     }
     if (f.startsWith("src/") ? SRC_TYPES.test(f) : NO_EFFECT.test(f)) {
@@ -401,7 +416,12 @@ export function select({ repo, base, head }) {
   }
   if (changed.some((p) => p.startsWith("web/src/"))) {
     const fsSpecs = specs.filter((s) => READS_SOURCE.test(texts.get(s) ?? ""));
-    take("specs that read source files directly (always run)", [], fsSpecs);
+    const fsHelpers = [...texts].filter(([f, t]) => !specSet.has(f) && READS_FS.test(t));
+    take(
+      "specs that read source files directly or through a helper (always run)",
+      fsHelpers.map(([f]) => f),
+      fsSpecs,
+    );
   }
   return {
     mode: "picked",

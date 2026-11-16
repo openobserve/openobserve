@@ -16,7 +16,8 @@ const git = (...a) =>
 const write = (files) => {
   for (const [f, t] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(repo, f)), { recursive: true });
-    fs.writeFileSync(path.join(repo, f), t);
+    if (t == null) fs.rmSync(path.join(repo, f));
+    else fs.writeFileSync(path.join(repo, f), t);
   }
 };
 const commit = () => {
@@ -31,15 +32,25 @@ const EN = {
   y: { attr: "Edit item", dollar: "Delete item", glob: "Save item", tpl: "Close item" },
 };
 const FS_SPEC = "src/locales/keys.spec.ts";
-// Specs other than the fs-reading one, which every web/src change picks.
-const graphSpecs = (r) => r.specs.filter((s) => s !== FS_SPEC);
+const FS_HELPER_SPEC = "src/data.spec.ts";
+// Specs other than the fs-reading ones, which every web/src change picks.
+const graphSpecs = (r) => r.specs.filter((s) => s !== FS_SPEC && s !== FS_HELPER_SPEC);
 git("init", "-q");
 write({
   "README.md": "x",
   "web/vite.config.ts": alias,
   "web/vitest.config.ts": `${alias}\nsetupFiles: ['src/test/setup.ts'],`,
   "web/package.json": "{}",
-  "web/src/test/setup.ts": `import { q } from "@/utils/q";`,
+  "web/src/test/setup.ts": `import { q } from "@/utils/q";\nimport i18n from "@/locales";`,
+  "web/src/locales/index.ts": `const sec = import.meta.glob("./languages/security/*.json");`,
+  "web/src/locales/languages/security/ko-KR.json": JSON.stringify({ siem: { nav: "Alerts" } }),
+  "web/src/router.spec.ts": `import i18n from "@/locales";\nsetLocale("ko");`,
+  "web/src/catalog.ts": `export const all = import.meta.glob("./catalog/*.json");`,
+  "web/src/catalog/one.json": "{}",
+  "web/src/catalog.spec.ts": `import { all } from "./catalog";`,
+  "web/src/test/readData.ts": `import fs from "node:fs";\nexport const d = () => fs.readFileSync("src/data/a.json");`,
+  "web/src/data/a.json": `{"value":1}`,
+  "web/src/data.spec.ts": `import { d } from "./test/readData";`,
   "web/src/utils/q.ts": "export const q = 1;",
   "web/src/test/helper.ts": "export const h = 1;",
   "web/src/utils/a.ts": "export const a = 1;",
@@ -101,12 +112,28 @@ test("an added locale key selects only the specs that read locale files", () => 
     "web/src/locales/languages/en-US.json": JSON.stringify({ ...EN, z: { new: "New" } }),
   });
   assert.equal(r.mode, "picked");
-  assert.deepEqual(r.specs, [FS_SPEC]);
+  assert.ok(r.specs.includes(FS_SPEC));
+  assert.deepEqual(graphSpecs(r), []);
 });
 
 test("a non-English locale change selects the specs that read locale files", () => {
   const r = run({ "web/src/locales/languages/de-DE.json": JSON.stringify({ x: { hello: "Hi" } }) });
-  assert.deepEqual(r.specs, [FS_SPEC]);
+  assert.ok(r.specs.includes(FS_SPEC));
+  assert.deepEqual(graphSpecs(r), []);
+});
+
+test("a non-English locale change follows its loader to specs using the app locale code", () => {
+  const r = run({ "web/src/locales/languages/security/ko-KR.json": JSON.stringify({ siem: {} }) });
+  assert.equal(r.mode, "picked");
+  assert.deepEqual(graphSpecs(r), ["src/router.spec.ts"]);
+});
+
+test("deleting a file matched by import.meta.glob selects the glob's consumers", () => {
+  assert.deepEqual(graphSpecs(run({ "web/src/catalog/one.json": null })), ["src/catalog.spec.ts"]);
+});
+
+test("specs importing a helper that reads files run for any web/src change", () => {
+  assert.ok(run({ "web/src/data/a.json": `{"value":2}` }).specs.includes(FS_HELPER_SPEC));
 });
 
 test("specs that read source through fs run for any web/src change", () => {
@@ -161,7 +188,8 @@ test("the gate counts statement lines only and treats a file without coverage as
     diff,
     coverage,
     inScope: () => true,
-    readSource: () => "\n\n\n\nx();\n",
+    readSource: (f) =>
+      f === "src/a.ts" ? "covered();\n// comment\nmissed();\n" : "\n\n\n\nx();\n",
     min: 70,
   });
   assert.equal(r.exec, 3);
@@ -171,5 +199,22 @@ test("the gate counts statement lines only and treats a file without coverage as
     gate({ diff: "", coverage, inScope: () => true, readSource: () => "", min: 70 }).pass,
     true,
   );
+});
+test("the gate counts changed lines inside a multiline statement that never ran", () => {
+  const diff = ["+++ b/web/src/m.ts", "@@ -3 +3 @@", "+  b,"].join("\n");
+  const span = (a, b) => ({ start: { line: a }, end: { line: b } });
+  const gateWith = (statementMap, s) =>
+    gate({
+      diff,
+      coverage: { "/w/web/src/m.ts": { statementMap, s } },
+      inScope: () => true,
+      readSource: () => "f();\nreturn Math.max(\n  b,\n  c,\n);\n",
+      min: 70,
+    });
+  const r = gateWith({ 0: span(2, 5) }, { 0: 0 });
+  assert.deepEqual([r.exec, r.pass], [1, false]);
+  // Stricter rule: an inner statement that never ran leaves the line uncovered even if the outer one ran.
+  assert.equal(gateWith({ 0: span(1, 6), 1: span(3, 3) }, { 0: 1, 1: 0 }).covered, 0);
+  assert.equal(gateWith({ 0: span(1, 6), 1: span(2, 5) }, { 0: 1, 1: 2 }).covered, 1);
 });
 process.on("exit", () => fs.rmSync(repo, { recursive: true, force: true }));
