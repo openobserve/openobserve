@@ -63,11 +63,7 @@ export class DateTimePickerPage {
         this.previewNote = page.locator('[data-test="date-time-preview-note"]');
         this.tooltipContent = page.locator('[data-test="o-tooltip-content"]');
 
-        // ==================== Expected toast messages ====================
-        // Values of common.dateRangePasted / dateRangePasteError / dateRangePasteEmpty
-        // in web/src/locales/languages/en-US.json.
-        this.pastedToastMessage = 'Date range pasted';
-        this.pasteErrorToastMessage = 'Could not parse date range';
+        // common.dateRangePasteEmpty in web/src/locales/languages/en-US.json; the only paste toast left.
         this.pasteEmptyToastMessage = 'Clipboard is empty. Copy a date range first.';
     }
 
@@ -198,55 +194,56 @@ export class DateTimePickerPage {
     }
 
     /**
-     * Reads the clipboard and parses the {"start_date":micros,"end_date":micros}
-     * payload that Copy writes. Fails loudly if the payload is not that shape.
+     * Reads the text Copy writes, `[name (]YYYY-MM-DD HH:MM[:SS[.mmm]] – [YYYY-MM-DD ]HH:MM… UTC±hh:mm[)]`,
+     * into epoch micros. Each stamp carries its zone offset, so this is exact in any runner timezone.
      */
     async readCopiedRange() {
-        const raw = await this.readClipboard();
-        let payload;
-        try {
-            payload = JSON.parse(raw);
-        } catch {
-            throw new Error(`Clipboard did not contain JSON. Got: ${raw}`);
-        }
-        expect(typeof payload.start_date, `start_date in ${raw}`).toBe('number');
-        expect(typeof payload.end_date, `end_date in ${raw}`).toBe('number');
-        return payload;
+        const text = await this.readClipboard();
+        const parsed = parseCopyText(text);
+        expect(parsed, `Clipboard did not hold a copied range. Got: ${text}`).not.toBeNull();
+        return parsed;
     }
 
-    /**
-     * Pastes `text` and returns the range the picker resolved it to, read back
-     * through Copy. Copy resolves the selection through the picker's own timezone,
-     * so this round-trip is exact for second-aligned epoch input and free of any
-     * dependence on the runner's timezone.
-     */
+    /** Pastes `text`, applies it with Enter, and returns the applied range read back through Copy. */
     async pasteAndReadBackRange(text) {
         await this.seedClipboard(text);
         await this.clickPaste();
-        await this.expectPasteSuccessToast();
+        await this.applyPaste();
         await this.expectAbsolutePanelActive();
         await this.clickCopy();
         return await this.readCopiedRange();
     }
 
-    // ==================== Toast assertions ====================
+    // ==================== Paste and copy states ====================
 
     /** Copy confirms in place: the button shows a check under date-time-copy-btn-done. */
     async expectCopyConfirmed() {
         await expect(this.copyDoneBtn).toBeVisible();
     }
 
-    async expectPasteSuccessToast() {
-        await expect(this.toastByMessage(this.pastedToastMessage)).toBeVisible();
+    /** A paste only fills the bar and previews it; Enter applies, and a panel that closes is reopened. */
+    async applyPaste() {
+        await expect(this.resolvedLine).toHaveAttribute('data-preview', 'true');
+        await this.textInput.press('Enter');
+        const closed = await this.panel.waitFor({ state: 'hidden', timeout: 1500 }).then(() => true, () => false);
+        if (closed) await this.openPicker();
     }
 
-    async expectPasteErrorToast() {
-        await expect(this.toastByMessage(this.pasteErrorToastMessage)).toBeVisible();
+    /** Pasted text that reads as no range shows the bar's error and applies nothing. */
+    async expectPasteUnreadable() {
+        await expect(this.inputError).toBeVisible();
     }
 
     async expectPasteEmptyToast() {
         await expect(this.toastByMessage(this.pasteEmptyToastMessage)).toBeVisible();
-        await expect(this.toastByMessage(this.pasteErrorToastMessage)).toHaveCount(0);
+    }
+
+    /** Escape backs out of typed text one step at a time before it closes the panel. */
+    async closePickerDiscardingInput() {
+        for (let i = 0; i < 4 && await this.panel.isVisible(); i++) {
+            await this.page.keyboard.press('Escape');
+        }
+        await expect(this.panel).toBeHidden();
     }
 
     // ==================== Value readers ====================
@@ -333,6 +330,32 @@ export class DateTimePickerPage {
 function clockTail(time) {
     const shown = String(time).replace(/^(\d{1,2}:\d{2}):00$/, '$1');
     return new RegExp(`(^|\\s)${shown.replace(/[.]/g, '\\.')}$`);
+}
+
+const STAMP = '(\\d{4}-\\d{2}-\\d{2})';
+const CLOCK = '(\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{3})?)?)';
+const OFFSET = '(UTC(?:[+-]\\d{2}:\\d{2})?)';
+const COPY_TEXT = new RegExp(
+    `^(?:(.+) \\()?${STAMP} ${CLOCK}(?: ${OFFSET})? – (?:${STAMP} )?${CLOCK} ${OFFSET}\\)?$`,
+);
+
+const stampMicros = (date, clock, offset) => {
+    const time = clock.length === 5 ? `${clock}:00` : clock;
+    const zone = offset === 'UTC' ? 'Z' : offset.slice(3);
+    return Date.parse(`${date}T${time}${zone}`) * 1000;
+};
+
+/** The copied text as `{ name, start_date, end_date, text }` in epoch micros, or null when it is not one. */
+export function parseCopyText(text) {
+    const m = COPY_TEXT.exec(String(text).trim());
+    if (!m) return null;
+    const [, name, startDate, startClock, startOffset, endDate, endClock, endOffset] = m;
+    return {
+        name: name ?? null,
+        start_date: stampMicros(startDate, startClock, startOffset ?? endOffset),
+        end_date: stampMicros(endDate ?? startDate, endClock, endOffset),
+        text,
+    };
 }
 
 export default DateTimePickerPage;

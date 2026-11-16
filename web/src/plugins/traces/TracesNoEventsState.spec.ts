@@ -191,6 +191,31 @@ describe("TracesNoEventsState", () => {
       }
     });
 
+    it("offers no longer range when it is over the stream's query-range limit", () => {
+      wrapper.unmount();
+      const dt = mockSearchObj.data.datetime as Record<string, unknown>;
+      const saved = { ...dt };
+      Object.assign(dt, {
+        startTime: (Date.now() - 24 * 3600000) * 1000,
+        endTime: Date.now() * 1000,
+        relativeTimePeriod: "24h",
+        queryRangeRestrictionInHour: 24,
+      });
+      try {
+        wrapper = mount(TracesNoEventsState, {
+          global: {
+            plugins: [i18n, store],
+            provide: { [TRACES_APPLY_RANGE as symbol]: vi.fn() },
+            stubs: { OEmptyState: OEmptyStateStub, EmptyStateActionCard: EmptyStateActionCardStub },
+          },
+        });
+        expect(wrapper.find('[data-test="traces-no-events-try-range-btn"]').exists()).toBe(false);
+      } finally {
+        Object.keys(dt).forEach((k) => delete dt[k]);
+        Object.assign(dt, saved);
+      }
+    });
+
     it("should NOT render any expand range card (feature removed)", () => {
       expect(wrapper.find('[data-test="traces-no-events-expand-range-card"]').exists()).toBe(false);
     });

@@ -105,6 +105,7 @@ import DOMPurify from "dompurify";
 import { formatRangeLabel } from "@/utils/timeRangeLabel";
 import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import { nextLongerChip, TIME_RANGE_CHIP_SETS } from "@/utils/timeRangeList";
+import { chipsWithinLimit } from "@/utils/logs/rangeLimitRefusal";
 import { TRACES_APPLY_RANGE } from "./tracesSearchBar.utils";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
@@ -244,7 +245,11 @@ const currentPeriodLabel = computed(() => {
 
 const tryChip = computed(() => {
   const w = queryWindowUs.value;
-  return w ? nextLongerChip(w.end - w.start, TIME_RANGE_CHIP_SETS.ops) : null;
+  if (!w) return null;
+  // Index sets the limit on the shared datetime once the stream loads; the declared shape omits it.
+  const datetime = searchObj.data?.datetime as { queryRangeRestrictionInHour?: number } | undefined;
+  const limitHours = Number(datetime?.queryRangeRestrictionInHour ?? 0);
+  return nextLongerChip(w.end - w.start, chipsWithinLimit(TIME_RANGE_CHIP_SETS.ops, limitHours));
 });
 const tryChipLabel = computed(() =>
   tryChip.value ? formatPeriodLabel(tryChip.value.value, store?.state?.timezone, t) : "",

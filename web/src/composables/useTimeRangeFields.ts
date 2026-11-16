@@ -19,6 +19,7 @@ import { convertToUtcTimestamp } from "@/utils/zincutils";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import { parseTimeInput } from "@/utils/dateTimeRangeParse";
 import { readingAnchorMicros } from "@/utils/timeRangeAnchor";
+import { formatCivilDayPrefix } from "@/utils/timeRangeRail";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { MICROS_PER_SECOND, type TimeRangeZone } from "@/composables/useTimeRangeZone";
 import type { TimeRangeLimits } from "@/composables/useTimeRangeLimits";
@@ -27,6 +28,8 @@ type TimeField = "start" | "end";
 
 // A clock time alone, with an optional fraction: it keeps the day the field already shows.
 const CLOCK_ONLY_RE = /^([\d:]+?)(?:\.(\d{1,6}))?$/;
+// The fields are read back by the parser, which knows English month names only.
+const FIELD_LOCALE = "en-US";
 
 interface ShownEnd {
   date: string;
@@ -63,9 +66,9 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
   const { t } = useI18nTyped();
   const { clock, limits, selectedType, calendarToken, pendingDay, calendarPreviewDay, menuOpen } =
     deps;
-  const { zone, convertUnixTime, absoluteToMicros, endFieldToMicros, isZoneMidnight, dayLabel } =
+  const { zone, tooltipNow, convertUnixTime, absoluteToMicros, endFieldToMicros, isZoneMidnight } =
     clock;
-  const { selectionCeilingMicros, startBoundError, trustedRange } = limits;
+  const { selectionCeilingMicros, startBoundError, endBoundError, trustedRange } = limits;
 
   const selectedTime = ref({
     startTime: "00:00:00",
@@ -340,10 +343,11 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
     return pending ? (calendarPreviewDay.value ?? pending) : selectedDate.value.to;
   };
 
-  // The instants the fields hold, on the pending day when one is clicked.
+  // The instants the fields hold, on the pending day when one is clicked; an edit there writes exact instants.
   const fieldInstants = (): { start: number; end: number } => {
     const pending = pendingShown();
-    if (pending === null) {
+    const { from, to } = selectedDate.value;
+    if (pending === null || (from === pending && to === pending)) {
       const { startUTC, endUTC } = getUTCTimeStamp();
       return { start: startUTC, end: endUTC };
     }
@@ -360,16 +364,17 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
       : time.endsWith(":00")
         ? time.slice(0, 5)
         : time;
-    return `${dayLabel(date)} ${clockText}`;
+    return `${formatCivilDayPrefix(date, zone.value, tooltipNow.value, FIELD_LOCALE)} ${clockText}`;
   };
 
   const fieldText = (field: TimeField): string => {
     const time = field === "start" ? selectedTime.value.startTime : selectedTime.value.endTime;
-    if (pendingShown() !== null) return formatFieldStamp(fieldDate(field), time, 0);
     const { start, end } = fieldInstants();
     const at = field === "start" ? start : shownEndMicros(start, end);
     const civil = convertUnixTime(at);
-    return formatFieldStamp(civil.date, civil.time, msOf(at));
+    if (pendingShown() === null) return formatFieldStamp(civil.date, civil.time, msOf(at));
+    const day = fieldDate(field);
+    return formatFieldStamp(day, time, civil.date === day && civil.time === time ? msOf(at) : 0);
   };
 
   const startFieldText = computed(() => fieldDrafts.value.start ?? fieldText("start"));
@@ -438,7 +443,7 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
       return;
     }
     unreadableFields.value[field] = false;
-    const bound = field === "start" ? startBoundError(at) : null;
+    const bound = field === "start" ? startBoundError(at) : endBoundError(at);
     if (bound !== null) return refuseField(field, bound);
     const range = rangeAfterEdit(field, at);
     if (!range) return refuseField(field, t("common.timeRangeEndBeforeStart"));

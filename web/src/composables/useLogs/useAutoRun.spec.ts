@@ -337,15 +337,18 @@ describe("AC4.6 kind table", () => {
     const meta = { liveMode: setting === "on" };
     const reasons = kind === "refinement" ? refinements : kind === "entry" ? entries : explicit;
     reasons
-      .filter((r) => r !== "narrow")
+      .filter((r) => r !== "narrow" && r !== "range")
       .forEach((r) => expect(reasonEligibility(r, config, meta, "logs")).toBe(expected));
   });
 
-  it("Narrow to runs whatever the Auto Run setting but re-checks the guard", () => {
-    expect(
-      reasonEligibility("narrow", { auto_query_enabled: true }, { liveMode: false }, "logs"),
-    ).toBe("guarded");
-  });
+  it.each(["narrow", "range"] as RunReason[])(
+    "%s runs whatever the Auto Run setting but re-checks the guard",
+    (reason) => {
+      expect(
+        reasonEligibility(reason, { auto_query_enabled: true }, { liveMode: false }, "logs"),
+      ).toBe("guarded");
+    },
+  );
 
   it("refinements never auto-run on Visualize or Build", () => {
     expect(
@@ -908,11 +911,30 @@ describe("explicit zoom", () => {
 
 describe("explicit range change", () => {
   it("runs once with Auto Run off and the editor clean", () => {
-    const h = makeHarness({ liveMode: false, estimateMb: 1e9 });
+    const h = makeHarness({ liveMode: false, estimateMb: 50 });
     expect(h.engine.requestRun("range")).toBe("dispatched");
     vi.runAllTimers();
     expect(h.hits()).toHaveLength(1);
     expect(h.hits()[0].ctx.reasons).toEqual(["range"]);
+  });
+
+  it("is held by the scan-budget guard when the new range is over budget", () => {
+    const h = makeHarness({ liveMode: false, estimateMb: 1e9 });
+    expect(h.engine.requestRun("range")).toBe("blocked");
+    vi.runAllTimers();
+    expect(h.hits()).toHaveLength(0);
+    expect(h.store.meta.autoRunBlocked).not.toBeNull();
+  });
+
+  it("a range already covered by consent runs without a new estimate", () => {
+    const h = makeHarness({ liveMode: false, estimateMb: 1e9 });
+    h.engine.requestRun("url");
+    vi.runAllTimers();
+    h.engine.requestRun("run-anyway");
+    vi.runAllTimers();
+    const calls = h.estimate.mock.calls.length;
+    expect(h.engine.requestRun("range")).toBe("dispatched");
+    expect(h.estimate.mock.calls.length).toBe(calls);
   });
 
   it("waits behind unrun editor edits and keeps them unrun", () => {

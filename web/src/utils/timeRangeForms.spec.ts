@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import { rollingShortName, triggerLabelForms } from "./timeRangeForms";
-import { formatRangeDates } from "./timeRangeLabel";
+import { formatRangeDates, formatRangeDuration, formatRangeStart } from "./timeRangeLabel";
 
 describe("triggerLabelForms (ui-spec §6, r2)", () => {
   it("steps a live dashboard range from name to short name to dates, never dropping the dates", () => {
@@ -160,6 +160,35 @@ describe("triggerLabelForms on dashboards [V1]", () => {
       zoneDot: true,
     });
     expect(forms.some((form) => form.zoneDot)).toBe(true);
+  });
+});
+
+describe("narrow start · duration form keeps the year (ui-spec §6 Year rule)", () => {
+  const opts = {
+    timezone: "Asia/Calcutta",
+    nowMs: Date.parse("2026-11-16T10:00:00Z"),
+    locale: "en-US",
+  };
+  const ist = (civil: string) => Date.parse(`${civil}+05:30`) * 1000;
+  const narrowest = (startCivil: string, endCivil: string) => {
+    const range = { startUs: ist(startCivil), endUs: ist(endCivil) };
+    return triggerLabelForms({
+      kind: "fixed",
+      dashboard: false,
+      name: "",
+      dates: formatRangeDates(range, opts),
+      start: formatRangeStart(range, opts),
+      duration: formatRangeDuration(range.startUs, range.endUs),
+    }).at(-1)?.dates;
+  };
+
+  it.each([
+    ["2025-11-04T00:00:00", "2025-11-07T00:00:00", "Nov 4, 2025 · 3d"],
+    ["2025-11-04T10:00:00", "2025-11-06T12:00:00", "Nov 4, 2025, 10:00 · 2d 2h"],
+    ["2025-12-30T00:00:00", "2026-01-03T00:00:00", "Dec 30, 2025 · 4d"],
+    ["2026-11-04T10:00:00", "2026-11-06T12:00:00", "Nov 4, 10:00 · 2d 2h"],
+  ])("%s – %s → %s", (start, end, expected) => {
+    expect(narrowest(start, end)).toBe(expected);
   });
 });
 

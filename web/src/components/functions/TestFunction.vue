@@ -593,7 +593,11 @@ const timeHost = usePageTimeRange({
   },
 });
 
+// A range applied while a query is pending starts another; only the newest may write the events.
+let eventsRequest = 0;
 const getResults = async () => {
+  const request = ++eventsRequest;
+  const isLatest = () => request === eventsRequest;
   loading.value.events = true;
 
   const timestamps: any =
@@ -625,6 +629,7 @@ const getResults = async () => {
       page_type: selectedStream.value.type,
     })
     .then((res: any) => {
+      if (!isLatest()) return;
       expandState.value.stream = false;
       expandState.value.query = false;
       expandState.value.events = true;
@@ -633,6 +638,7 @@ const getResults = async () => {
       sqlErrorRanges.value = [];
     })
     .catch((err: any) => {
+      if (!isLatest()) return;
       sqlQueryErrorMsg.value = err.response?.data?.message
         ? err.response?.data?.message
         : t("functions.invalidSqlQuery");
@@ -659,7 +665,7 @@ const getResults = async () => {
       });
     })
     .finally(() => {
-      loading.value.events = false;
+      if (isLatest()) loading.value.events = false;
     });
 };
 const isInputValid = () => {

@@ -873,6 +873,7 @@ import {
   formatRangeDuration,
   formatRangeLabel,
   formatRangeStamps,
+  formatRangeStart,
   formatZoneOffset,
   type RangeLabelInput,
 } from "@/utils/timeRangeLabel";
@@ -2211,6 +2212,7 @@ export default defineComponent({
         name: full.name,
         shortName: kind === "live" && period ? rollingShortName(period) : null,
         dates: full.dates,
+        start: formatRangeStart(range, { ...labelOptions(), surface: labelSurface.value }),
         duration: formatRangeDuration(range.startUs, range.endUs),
       });
     });

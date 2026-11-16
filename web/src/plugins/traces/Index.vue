@@ -197,6 +197,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @pick-stream="onPickTracesStream"
                       />
                     </div>
+                    <RangeLimitStrip
+                      v-else-if="tracesRangeLink.refusal"
+                      :refusal="tracesRangeLink.refusal"
+                      :timezone="store.state.timezone"
+                      data-test="traces-range-limit-strip"
+                      nothing-run-test="traces-nothing-run"
+                      @show="(period: string) => searchBarRef?.dateTimeRef?.pickChip?.(period)"
+                      @pick="() => searchBarRef?.dateTimeRef?.openMenu?.()"
+                    />
                     <div
                       v-else-if="
                         !searchObj.loadingStream &&
@@ -220,15 +229,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @action="() => searchData()"
                       />
                     </div>
-                    <RangeLimitStrip
-                      v-else-if="tracesRangeLink.refusal"
-                      :refusal="tracesRangeLink.refusal"
-                      :timezone="store.state.timezone"
-                      data-test="traces-range-limit-strip"
-                      nothing-run-test="traces-nothing-run"
-                      @show="(period: string) => searchBarRef?.dateTimeRef?.pickChip?.(period)"
-                      @pick="() => searchBarRef?.dateTimeRef?.openMenu?.()"
-                    />
                     <div v-else data-test="logs-search-search-result" class="flex h-full! flex-col">
                       <StaleRangeStrip
                         v-if="staleRangeText"
@@ -957,6 +957,7 @@ function resultsViewKey() {
 
 // The whole editor value is the where clause; a "|" split is quote-unaware and would cut match_all('a | b').
 function buildEditorFilter() {
+  if (tracesContextOn.value) return "";
   return resolveTracesFilter(
     searchObj.data.editorValue,
     tracesParser.value,
@@ -1681,6 +1682,16 @@ const sortNeedsSchema = () => {
   return !!sortBy && sortBy !== "start_time" && sortBy !== "duration";
 };
 
+// The fields load sets the link refusal, so a link that may hit a range limit must not run before it.
+const linkMayBeRefused = () => {
+  if (!tracesRangeLink.fromLink) return false;
+  if (Number(store.state.zoConfig.max_query_range) > 0) return true;
+  const entry = searchObj.data.streamResults?.list?.find(
+    (s: any) => s.name === searchObj.data.stream.selectedStream.value,
+  );
+  return !entry?.settings || Number(entry.settings.max_query_range) > 0;
+};
+
 /** `leftOrg`: the org an org switch left; a URL still on that org is the page's own sync, not a shared link. */
 async function loadPageData({ leftOrg = "" } = {}) {
   const generation = pageGeneration;
@@ -1709,7 +1720,7 @@ async function loadPageData({ leftOrg = "" } = {}) {
   if (generation !== pageGeneration) return;
   await parserReady;
   if (generation !== pageGeneration) return;
-  if (fields && sortNeedsSchema()) await fields.fieldsReady;
+  if (fields && (sortNeedsSchema() || linkMayBeRefused())) await fields.fieldsReady;
   if (generation !== pageGeneration) return;
   pageLoaded = true;
   pendingLanding = null;
@@ -2124,6 +2135,7 @@ type ContextBar = {
   dateTimeRef?: {
     setRelativeTime: (period: string) => void;
     setAbsoluteTime: (startUs: number, endUs: number) => void;
+    setDateType: (type: string) => void;
   };
   enterContextWindow?: (range: { start: number; end: number }) => boolean;
   undoToResults?: (run: () => void) => boolean;
@@ -2165,9 +2177,11 @@ const backFromTracesContext = async () => {
   const bar = searchBarRef.value as ContextBar | null;
   if (bar?.undoToResults?.(() => searchData())) return;
   if (previous && bar?.dateTimeRef) {
-    if (previous.type === "relative" && previous.relativeTimePeriod)
+    if (previous.type === "relative" && previous.relativeTimePeriod) {
+      // setRelativeTime leaves the picker on the context window's dates, so the type is switched too.
       bar.dateTimeRef.setRelativeTime(previous.relativeTimePeriod);
-    else bar.dateTimeRef.setAbsoluteTime(previous.startTime, previous.endTime);
+      bar.dateTimeRef.setDateType("relative");
+    } else bar.dateTimeRef.setAbsoluteTime(previous.startTime, previous.endTime);
     await nextTick();
   }
   searchData();

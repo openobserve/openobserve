@@ -4985,4 +4985,122 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(appRouter.currentRoute.value.fullPath).toBe("/logs");
     });
   });
+
+  describe("context view and linked range (Codex pass 1)", () => {
+    const fakeBar = {
+      setEditorValue: vi.fn(),
+      enterContextWindow: vi.fn(),
+      undoToResults: vi.fn(),
+      dateTimeRef: {
+        setRelativeTime: vi.fn(),
+        setAbsoluteTime: vi.fn(),
+        setDateType: vi.fn(),
+      },
+    };
+    beforeEach(() => {
+      fakeBar.enterContextWindow.mockReturnValue(true);
+      fakeBar.undoToResults.mockReturnValue(false);
+    });
+    const mountWithBar = () =>
+      mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": { template: "<div />", setup: () => fakeBar },
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    const ownRequests = () => {
+      const { calls, contexts } = mockFetchQueryDataWithHttpStream.mock;
+      return calls.filter((_c, i) => contexts[i] === wrapper.vm.$).map((c: any) => c[0].queryReq);
+    };
+    const linkRoute = {
+      value: { query: { stream: "default", period: "7d" }, name: "traces", path: "/traces" },
+    };
+
+    afterEach(() => {
+      tracesRangeLink.refusal = null;
+      tracesRangeLink.fromLink = false;
+    });
+
+    it("Search around with filters off sends no editor filter", async () => {
+      wrapper = mountWithBar();
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.data.editorValue = "service_name = 'api'";
+      wrapper.vm.onTracesSearchAround({
+        row: { trace_start_time: 1_700_000_000_000_000 },
+        seconds: 300,
+        keepFilters: false,
+      });
+      expect(wrapper.vm.tracesContextOn).toBe(true);
+      mockFetchQueryDataWithHttpStream.mockClear();
+      wrapper.vm.searchData();
+      await flushPromises();
+      expect(ownRequests().at(-1)?.filter).toBe("");
+    });
+
+    it("Back from a moved context window restores the earlier relative range in the picker", async () => {
+      wrapper = mountWithBar();
+      await flushPromises();
+      mockSearchObj.meta.searchMode = "traces";
+      mockSearchObj.data.editorValue = "service_name = 'api'";
+      Object.assign(mockSearchObj.data.datetime, { type: "relative", relativeTimePeriod: "15m" });
+      wrapper.vm.onTracesSearchAround({
+        row: { trace_start_time: 1_700_000_000_000_000 },
+        seconds: 300,
+        keepFilters: false,
+      });
+      await wrapper.vm.backFromTracesContext();
+      expect(fakeBar.dateTimeRef.setRelativeTime).toHaveBeenCalledWith("15m");
+      expect(fakeBar.dateTimeRef.setDateType).toHaveBeenCalledWith("relative");
+    });
+
+    it("a linked range over the limit runs nothing even when the stream's settings load late", async () => {
+      routerCurrentRouteSpy.mockReturnValue(linkRoute as any);
+      Object.assign(mockSearchObj.data.datetime, { type: "relative", relativeTimePeriod: "7d" });
+      let settle: (value: unknown) => void = () => {};
+      const limited = {
+        ...mockStreamList.list[0],
+        settings: { ...mockStreamList.list[0].settings, max_query_range: 24 },
+      };
+      mockGetStreams.mockResolvedValue({ ...mockStreamList, list: [limited] });
+      mockGetStream.mockImplementation(() => new Promise((resolve) => (settle = resolve)));
+      wrapper = mountWithBar();
+      await flushPromises();
+      expect(ownRequests()).toHaveLength(0);
+      settle(limited);
+      await flushPromises();
+      expect(tracesRangeLink.refusal).not.toBeNull();
+      expect(ownRequests()).toHaveLength(0);
+    });
+
+    it("a cold refused link shows the range-limit strip, not the no-query state", async () => {
+      routerCurrentRouteSpy.mockReturnValue(linkRoute as any);
+      Object.assign(mockSearchObj.data.datetime, { type: "relative", relativeTimePeriod: "7d" });
+      const limited = mockStreamList.list[0];
+      mockGetStream.mockResolvedValue({
+        ...limited,
+        settings: { ...limited.settings, max_query_range: 24 },
+      });
+      mockSearchObj.searchApplied = false;
+      wrapper = mountWithBar();
+      await flushPromises();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false), { timeout: 2000 });
+      expect(tracesRangeLink.refusal).not.toBeNull();
+      expect(mockSearchObj.data.queryResults?.hits?.length ?? 0).toBe(0);
+      for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
+      await nextTick();
+      expect(wrapper.find('[data-test="traces-range-limit-strip"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-search-not-started-text"]').exists()).toBe(false);
+    });
+  });
 });

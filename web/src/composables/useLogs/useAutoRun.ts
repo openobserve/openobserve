@@ -376,6 +376,9 @@ const OP_RANK: Record<RunOperation, number> = {
 
 const CONSENT_IGNORING_REASONS = new Set<RunReason>(["url", "activation", "visualize-restore"]);
 
+// A picked range can widen the scan, so it re-checks the budget like Narrow to.
+const GUARDED_EXPLICIT_REASONS = new Set<RunReason>(["narrow", "range"]);
+
 const DIRTY_CLEARING_REASONS = new Set<RunReason>(["run", "saved-view", "explicit"]);
 
 const SCAN_GATED_ACTIONS = new Set<PersistAction>([
@@ -452,7 +455,7 @@ export function reasonEligibility(
   mode: SearchMode,
 ): Eligibility {
   const kind = REASON_KIND[reason];
-  if (kind === "explicit") return reason === "narrow" ? "guarded" : "unguarded";
+  if (kind === "explicit") return GUARDED_EXPLICIT_REASONS.has(reason) ? "guarded" : "unguarded";
   if (kind === "entry") return config.auto_query_enabled ? "guarded" : "unguarded";
   if (mode === "visualize" || mode === "build") return "skip";
   return isAutoRunActive(config, meta) ? "guarded" : "skip";
@@ -1064,7 +1067,7 @@ export function createAutoRun(deps: AutoRunDeps) {
       origin: options.origin,
       signature: deps.readSignature(),
       target: "live",
-      guarded: reason === "narrow",
+      guarded: GUARDED_EXPLICIT_REASONS.has(reason),
       useConsent: reason !== "narrow",
     });
   }

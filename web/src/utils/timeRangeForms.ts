@@ -30,6 +30,8 @@ export interface TriggerLabelFormsInput {
   name: string;
   shortName?: string | null;
   dates?: string;
+  /** The start bound alone, carrying the year the dates carry. */
+  start?: string;
   duration?: string;
 }
 
@@ -47,7 +49,7 @@ export const triggerLabelForms = (input: TriggerLabelFormsInput): TriggerLabelFo
   const short = shortName && shortName !== name ? shortName : null;
   if (kind === "fixed" || !name) {
     if (dashboard || !dates) return [{ name: "", dates }];
-    const start = dates.split(DASH)[0];
+    const start = input.start || dates.split(DASH)[0];
     const forms: TriggerLabelForm[] = [
       { name: "", dates },
       { name: "", dates, zoneDot: true },

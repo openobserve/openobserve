@@ -278,7 +278,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         icon="timer"
                         clickable
-                        :aria-label="t('dashboard.panelTimeEnabled')"
+                        :aria-label="
+                          t('dashboard.panelTimeChipLabel', {
+                            range: String(panelTimeChipText(item.id)),
+                          })
+                        "
                         :data-test="`dashboard-panel-${item.id}-time-chip`"
                         :ref="(chip) => setPanelTimeChip(item.id, chip)"
                         @click="openPanelTimePicker(item.id)"
@@ -298,6 +302,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`panel-time-picker-${item.id}`"
                         :ref="(picker) => setPanelTimePicker(item.id, picker)"
                       />
+                      <OButton
+                        v-if="panelTimePickers.get(item.id)?.canUndo"
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        icon-left="undo"
+                        :aria-label="panelTimePickers.get(item.id)?.undoLabel"
+                        :data-test="`dashboard-panel-${item.id}-time-undo`"
+                        @click="panelTimePickers.get(item.id)?.undo()"
+                        ><OTooltip
+                          :content="panelTimePickers.get(item.id)?.undoLabel"
+                          side="bottom"
+                      /></OButton>
                     </span>
                   </template>
                   <!-- Panel-Level Variables (shown below drag-allow section) -->
@@ -383,6 +399,7 @@ import {
   watch,
   nextTick,
   reactive,
+  shallowReactive,
   inject,
   type PropType,
   type Ref,
@@ -394,6 +411,8 @@ import { useRouter } from "vue-router";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { getIntlLocale } from "@/locales";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { panelTimeChipLabel } from "@/utils/dashboard/dashboardTimeLabels";
 import { useRoute } from "vue-router";
@@ -559,6 +578,7 @@ export default defineComponent({
     ODialog,
     OTruncatedText,
     OTag,
+    OButton,
     OTooltip,
   },
   setup(props: any, { emit }) {
@@ -1793,7 +1813,8 @@ export default defineComponent({
     const panelTimeGateScope = effectScope(true);
     onBeforeUnmount(() => panelTimeGateScope.stop());
 
-    const panelTimePickers = new Map<string, any>();
+    // Reactive so the chip's undo appears once its picker mounts and gains a step.
+    const panelTimePickers = shallowReactive(new Map<string, any>());
     const setPanelTimePicker = (panelId: string, picker: any) => {
       if (picker) panelTimePickers.set(panelId, picker);
       else panelTimePickers.delete(panelId);
@@ -1829,6 +1850,7 @@ export default defineComponent({
         getPanelPickedTime(panelId) ?? panelTimeValues.value[panelId],
         store.state.timezone,
         t,
+        getIntlLocale(),
       );
     const openPanelTimePicker = (panelId: string) => {
       panelTimePickers.get(panelId)?.dateTimePicker?.openMenu?.();
@@ -2088,6 +2110,7 @@ export default defineComponent({
       setPanelTimePicker,
       setPanelTimeChip,
       panelTimeChipText,
+      panelTimePickers,
       openPanelTimePicker,
       onPanelTimePickerHide,
       viewPanelSelectedDate,

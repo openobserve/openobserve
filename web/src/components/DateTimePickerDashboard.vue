@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, onUnmounted, type PropType } from "vue";
+import { ref, computed, defineComponent, onUnmounted, type PropType } from "vue";
 import DateTime from "@/components/DateTime.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import type {
@@ -129,6 +129,9 @@ export default defineComponent({
   setup(props, { emit }) {
     const dateTimePicker: any = ref(null);
 
+    // DateTime emits `apply` just before its `on:date-change`; the gate needs that apply's source.
+    let applySource: TimeRangeApplyMeta["source"] | undefined;
+
     const updateDateTime = (date: any) => {
       const newValue = {
         startTime: date.startTime,
@@ -140,10 +143,16 @@ export default defineComponent({
       };
 
       // The second argument tells a page the picker's own corrections apart from a user's pick.
-      emit("update:modelValue", newValue, { userChanged: date.userChangedValue !== false });
+      const source = applySource;
+      applySource = undefined;
+      emit("update:modelValue", newValue, {
+        userChanged: date.userChangedValue !== false,
+        ...(source ? { source } : {}),
+      });
     };
 
     const onApply = (range: TimeRange, meta: TimeRangeApplyMeta) => {
+      applySource = meta?.source;
       emit("apply", range, meta);
     };
 
@@ -167,6 +176,8 @@ export default defineComponent({
 
     // The picker's own undo, for a page control that goes back a step; false before mount or with nothing to undo.
     const undo = (): boolean => dateTimePicker.value?.undo() ?? false;
+    const canUndo = computed(() => dateTimePicker.value?.undoAvailable === true);
+    const undoLabel = computed((): string => dateTimePicker.value?.undoTooltip ?? "");
 
     const onHide = () => {
       emit("hide");
@@ -195,6 +206,8 @@ export default defineComponent({
       getConsumableDateTime,
       setSavedDate,
       undo,
+      canUndo,
+      undoLabel,
       onShow,
       onHide,
       onTimezoneChange,

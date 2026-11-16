@@ -177,6 +177,17 @@ describe("DateTimePickerDashboard", () => {
       expect(wrapper.emitted("apply")).toEqual([[range, meta]]);
     });
 
+    it("tags the range change that follows an undo with its source, and only that one", async () => {
+      wrapper = createWrapper();
+      const picker = wrapper.findComponent('[data-test="datetime-component"]');
+      const date = { startTime: 1, endTime: 2, relativeTimePeriod: "30d", valueType: "relative" };
+      await picker.vm.$emit("apply", { kind: "rolling", span: "30d" }, { source: "undo" });
+      await picker.vm.$emit("on:date-change", date);
+      await picker.vm.$emit("on:date-change", date);
+      const metas = wrapper.emitted("update:modelValue").map((e: any[]) => e[1]);
+      expect(metas).toEqual([{ userChanged: true, source: "undo" }, { userChanged: true }]);
+    });
+
     it("should handle null initialTimezone", () => {
       wrapper = createWrapper({
         initialTimezone: null,

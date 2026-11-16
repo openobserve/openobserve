@@ -1233,6 +1233,7 @@ export default defineComponent({
               Number(range.end),
               this.plotChart,
               Number(this.searchObj.data.histogramInterval),
+              this.searchObj.data.histogram?.chartParams?.timezone,
             )
           : null;
       const start = snapped?.start ?? range.start;

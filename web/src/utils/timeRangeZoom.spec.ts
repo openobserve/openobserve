@@ -61,15 +61,20 @@ describe("drag-zoom values from a zone-shifted chart", () => {
 
 const HOUR_MS = 3_600_000;
 const MINUTE_MS = 60_000;
+const DAY_MS = 86_400_000;
 const SPIKE = 6;
 
 // The Logs histogram as built in the app: bucket keys → useHistogram's xData → convertLogData → ECharts.
-const renderHistogram = (zone: string, intervalMs: number) => {
-  const first = Date.UTC(2026, 10, 15, 18, 0);
+const renderHistogram = (
+  zone: string,
+  intervalMs: number,
+  first = Date.UTC(2026, 10, 15, 18, 0),
+  spike = SPIKE,
+) => {
   const keys = Array.from({ length: 12 }, (_, i) =>
     new Date(first + i * intervalMs).toISOString().slice(0, 19),
   );
-  const counts = keys.map((_, i) => (i === SPIKE ? 122 : 3));
+  const counts = keys.map((_, i) => (i === spike ? 122 : 3));
   const xData = keys.map((key) => histogramDateTimezone(key, zone));
   const { options } = convertLogData(xData, counts, {
     title: "",
@@ -83,13 +88,13 @@ const renderHistogram = (zone: string, intervalMs: number) => {
     height: 120,
   });
   chart.setOption(options);
-  const bar = (chart as any).getModel().getSeriesByIndex(0).getData().getItemLayout(SPIKE);
+  const bar = (chart as any).getModel().getSeriesByIndex(0).getData().getItemLayout(spike);
   const valueAt = (px: number) => chart.convertFromPixel({ xAxisIndex: 0 }, px) as number;
   // A drag from the bar's left edge to its right edge, as ECharts hands it to the page.
   const brush = { start: valueAt(bar.x), end: valueAt(bar.x + bar.width) };
   const originMs = Number(options.series[0].data[0][0]);
   chart.dispose();
-  return { brush, originMs, bucketStartMs: first + SPIKE * intervalMs };
+  return { brush, originMs, bucketStartMs: first + spike * intervalMs };
 };
 
 describe("drag-zoom over a Logs histogram bar [Bug 1, Bug 2]", () => {
@@ -120,6 +125,27 @@ describe("drag-zoom over a Logs histogram bar [Bug 1, Bug 2]", () => {
       const snapped = snapZoomToBuckets(brush.start, brush.end, interval, originMs);
       expect(asInstant(snapped.start)).toBe(bucketStartMs);
       expect(asInstant(snapped.end)).toBe(bucketStartMs + interval);
+    },
+  );
+
+  it.each(["UTC", "America/New_York", "Asia/Kolkata"])(
+    "lands on a daily bar past a DST change in the chart zone (browser %s)",
+    (browser) => {
+      process.env.TZ = browser;
+      const zone = "America/New_York";
+      // Mar 1–12, 2026 UTC days; New York springs forward on Mar 8, before the Mar 9 bar.
+      const { brush, originMs, bucketStartMs } = renderHistogram(
+        zone,
+        DAY_MS,
+        Date.UTC(2026, 2, 1),
+        8,
+      );
+      const asInstant = (shiftedMs: number) => instantFromShiftedMs(shiftedMs, zone) / 1000;
+
+      const snapped = snapZoomToBuckets(brush.start, brush.end, DAY_MS, originMs, zone);
+      expect(new Date(asInstant(snapped.start)).toISOString()).toBe("2026-03-09T00:00:00.000Z");
+      expect(asInstant(snapped.start)).toBe(bucketStartMs);
+      expect(asInstant(snapped.end)).toBe(bucketStartMs + DAY_MS);
     },
   );
 });

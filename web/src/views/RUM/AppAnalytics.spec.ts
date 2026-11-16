@@ -128,7 +128,7 @@ describe("AppAnalytics shell", () => {
         stubs: {
           DateTime: {
             template: "<div data-test='date-picker-stub' />",
-            props: ["modelValue"],
+            props: ["modelValue", "range"],
             methods: { setSavedDate: (d: unknown) => setSavedDateSpy(d) },
           },
           ShareButton: { template: "<button data-test='share-stub' />", props: ["url"] },
@@ -1002,6 +1002,17 @@ describe("AppAnalytics shell", () => {
     await flushPromises();
     expect(router.currentRoute.value.query.period).toBe("30d");
     expect(setSavedDateSpy).toHaveBeenCalledWith({ type: "relative", relativeTimePeriod: "30d" });
+  });
+
+  it("widening the range to 30d moves the page's own range too, so picking 15m again applies", async () => {
+    await mountAt("/product-analytics/overview?app=web&period=15m");
+    await new Promise((r) => setTimeout(r, 30));
+    await flushPromises();
+    useProductAnalytics().widenRange(router);
+    await new Promise((r) => setTimeout(r, 30));
+    await flushPromises();
+    const picker = wrapper!.findComponent('[data-test="rum-analytics-date-picker"]');
+    expect(picker.props("range")).toEqual({ kind: "rolling", span: "30d" });
   });
 
   it("mounting inside keep-alive enters once, as a plain mount does (F6)", async () => {

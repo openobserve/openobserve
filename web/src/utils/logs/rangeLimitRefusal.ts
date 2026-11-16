@@ -15,6 +15,7 @@
 
 import { linkOverLimit } from "@/composables/useTimeRangeLimits";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { periodToMicros } from "@/utils/logs/estimateScanMb";
 
 /** A linked range the page refused to run because the stream limits it; the page shows the guard strip instead. */
 export interface RangeLimitRefusal {
@@ -48,4 +49,17 @@ export const linkRangeRefusal = (
   const over = linkOverLimit({ startUs, endUs }, limitHours);
   if (!over) return null;
   return { asked: over.asked, period, allowed: over.allowed, allowedPeriod: over.period, stream };
+};
+
+/** The quick ranges a stream's query-range limit allows; a limit of 0 or below is none. */
+export const chipsWithinLimit = <T extends { value: string }>(
+  chips: readonly T[],
+  limitHours: number,
+): T[] => {
+  if (!(limitHours > 0)) return [...chips];
+  const limitUs = limitHours * 3600 * 1_000_000;
+  return chips.filter((chip) => {
+    const spanUs = periodToMicros(chip.value);
+    return spanUs !== null && spanUs <= limitUs;
+  });
 };

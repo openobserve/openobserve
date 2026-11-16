@@ -447,6 +447,8 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     if (!reading) return false;
     const plan = planInput(reading, false);
     if (plan.kind === "refused") return false;
+    // Fixed dates hide the rows matched by name (listRows), so they always get their own row.
+    if (plan.kind === "absolute") return true;
     const period =
       plan.kind === "calendar"
         ? plan.token

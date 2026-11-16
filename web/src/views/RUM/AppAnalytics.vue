@@ -670,10 +670,8 @@ const timeHost = usePageTimeRange({
     }),
 });
 
-// The picker only reads its v-model on mount, so a programmatic scope change that
-// doesn't come from the picker itself (widenRange's "show the past 30 days" fallback,
-// initFromRoute's URL restore, a sub-tab switch that carries a new range) never reaches
-// its displayed label unless pushed in here.
+// A scope change made outside the picker (widen, URL restore) reaches neither its label nor the host,
+// and a stale host range drops a re-pick of the old range as unchanged.
 watch(
   () => [
     state.datetime.valueType,
@@ -681,7 +679,10 @@ watch(
     state.datetime.startTime,
     state.datetime.endTime,
   ],
-  () => dateTimePickerRef.value?.setSavedDate?.(toPickerSavedDate(state.datetime)),
+  () => {
+    timeHost.range.value = pageRange(state.datetime);
+    dateTimePickerRef.value?.setSavedDate?.(toPickerSavedDate(state.datetime));
+  },
 );
 
 const toggleIncludeAll = () => {

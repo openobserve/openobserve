@@ -162,6 +162,7 @@ import { computed, ref } from "vue";
 import DateTime from "@/components/DateTime.vue";
 import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import usePageTimeRange from "@/composables/usePageTimeRange";
+import type { TimeRange } from "@/utils/timeRangeModel";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef, OTablePaginationParams } from "@/lib/core/Table/OTable.types";
@@ -268,8 +269,17 @@ function onRangeChange(range: AuditRange) {
   // Custom opens on the period it replaces, so switching to it keeps showing the same span.
   if (range === "custom" && filters.value.range !== "custom") {
     customRange.value = { from: period.value.from ?? anchor.value, to: anchor.value };
+    timeHost.range.value = customAsRange();
   }
   setFilters({ range });
+}
+
+function customAsRange(): TimeRange {
+  return {
+    kind: "fixed",
+    startUs: customRange.value.from * 1000,
+    endUs: customRange.value.to * 1000,
+  };
 }
 
 function onCustomRange(value: { startTime: number; endTime: number }) {
@@ -284,11 +294,7 @@ const timeHost = usePageTimeRange({
   preset: "explorer-auto",
   source: t("fleet.tabs.audit"),
   url: false,
-  initial: () => ({
-    kind: "fixed",
-    startUs: customRange.value.from * 1000,
-    endUs: customRange.value.to * 1000,
-  }),
+  initial: () => customAsRange(),
   capabilities: { kinds: ["rolling", "fixed"] },
   onRange: (value) => onCustomRange(value as { startTime: number; endTime: number }),
 });

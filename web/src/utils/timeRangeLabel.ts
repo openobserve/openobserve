@@ -83,6 +83,14 @@ interface Shape {
 export const formatRangeDates = (range: RangeLabelInput, opts: RangeLabelOptions = {}): string =>
   datesOf(shapeOf(range, opts));
 
+/** The start bound alone, with the year whenever the range's dates carry one (ui-spec §6). */
+export const formatRangeStart = (range: RangeLabelInput, opts: RangeLabelOptions = {}): string => {
+  const { locale, start, wholeDays, withYear, precision } = shapeOf(range, opts);
+  const clock = wholeDays ? {} : clockOptions(precision);
+  const format = new Intl.DateTimeFormat(locale, { ...dayOptions(withYear), ...clock });
+  return clean(format.format(utcDateOf(start, !wholeDays)));
+};
+
 /** Live: the name, or "name · dates" when `showDates`. Fixed: the dates, after a given name only. */
 export const formatRangeLabel = (
   range: RangeLabelInput,

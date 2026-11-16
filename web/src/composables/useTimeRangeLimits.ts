@@ -118,6 +118,13 @@ export default function useTimeRangeLimits(props: TimeRangeLimitProps, clock: Ti
       : t("common.timeRangeStartInFuture");
   };
 
+  // An End typed past maxDate is refused like a Start; without one a fixed range may run on (§2).
+  const endBoundError = (endMicros: number): I18nText | null => {
+    if (!props.maxDate || !(endMicros > forwardCeilingMicros())) return null;
+    const date = formatCivilDay(props.maxDate, zone.value, tooltipNow.value, intlLocale.value);
+    return t("common.timeRangeAfterMax", { date });
+  };
+
   // A stored Recent range the calendar can show, with an end past the ceiling cut to it; null when it cannot.
   const boundedRange = (startUs: number, endUs: number): { start: number; end: number } | null => {
     if (!Number.isFinite(startUs) || !Number.isFinite(endUs) || endUs <= startUs) return null;
@@ -199,6 +206,7 @@ export default function useTimeRangeLimits(props: TimeRangeLimitProps, clock: Ti
     selectionCeilingMicros,
     floorMicros,
     startBoundError,
+    endBoundError,
     boundedRange,
     trustedRange,
     restrictionMessage,

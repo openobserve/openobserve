@@ -56,6 +56,19 @@ describe("panelTimeChipLabel", () => {
     expect(label).toMatch(/^Nov 16, (2026, )?01:30 – 01:45$/);
   });
 
+  it("writes a fixed panel range's dates in the user's locale", () => {
+    const start = Date.UTC(2026, 10, 15, 20, 0) * MICROS;
+    const value = convertPanelTimeRangeToPicker(
+      buildPanelTimeRange({
+        type: "absolute",
+        valueType: "absolute",
+        startTime: start,
+        endTime: start + 15 * 60e6,
+      }),
+    );
+    expect(String(panelTimeChipLabel(value, "UTC", gt, "fr-FR"))).toMatch(/^15 nov\./);
+  });
+
   it("is empty with no panel range", () => {
     expect(String(panelTimeChipLabel(null, "UTC", gt))).toBe("");
   });

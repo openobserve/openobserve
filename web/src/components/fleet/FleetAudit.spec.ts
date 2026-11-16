@@ -189,6 +189,18 @@ describe("FleetAudit", () => {
     expect(lastParams().offset).toBe(0);
   });
 
+  it("hands the picker the period custom replaces", async () => {
+    await mountAudit();
+    await pick("fleet-audit-range", "7d");
+    await pick("fleet-audit-range", "custom");
+    const { from, to } = lastParams();
+    expect(wrapper.findComponent('[data-test="fleet-audit-date-picker"]').props("range")).toEqual({
+      kind: "fixed",
+      startUs: from * 1000,
+      endUs: to * 1000,
+    });
+  });
+
   it("keeps a picked custom period when custom is chosen again", async () => {
     await mountAudit();
     await pick("fleet-audit-range", "custom");

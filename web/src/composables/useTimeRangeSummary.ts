@@ -189,8 +189,13 @@ export default function useTimeRangeSummary(
     if (!token || token.offset === 0) return null;
     const ctx = rangeContext();
     const tag = String(timeRangeKindTag({ kind: "calendar", ...token }, ctx, t));
-    const running = `calendar:${token.unit}:0`;
-    const next = resolveCalendarPeriodBounds(running, zone.value, tooltipNow.value);
+    const running = resolveCalendarPeriodBounds(
+      `calendar:${token.unit}:0`,
+      zone.value,
+      tooltipNow.value,
+    );
+    // The change comes when the running period ends; the token then resolves one period later.
+    const next = running && resolveCalendarPeriodBounds(period, zone.value, running.endTime / 1000);
     const when = timeRangeChangeText({ kind: "calendar", ...token }, ctx);
     if (!next || !when) return { tag, hint: tag };
     const dates = formatRangeDates(

@@ -5,6 +5,8 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
 import enLocale from "@/locales/languages/en-US.json";
+import searchService from "@/services/search";
+import { flushPromises } from "@vue/test-utils";
 
 // Mock dependencies
 vi.mock("@/composables/useStreams", () => ({
@@ -880,6 +882,37 @@ describe("TestFunction.vue Branch Coverage", () => {
       // updateStreams resets name when resetStream=true before checking type
       await vm.updateStreams(true);
       expect(vm.selectedStream.name).toBe("");
+    });
+  });
+
+  describe("overlapping event queries", () => {
+    it("keeps the newest query's events when an older one answers last", async () => {
+      const replies: Array<(value: unknown) => void> = [];
+      vi.mocked(searchService.search).mockImplementation(
+        () => new Promise((resolve) => replies.push(resolve)) as any,
+      );
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            "query-editor": true,
+            DateTime: true,
+            FullViewContainer: true,
+            O2AIContextAddBtn: true,
+          },
+        },
+      });
+      const vm = wrapper.vm as any;
+      vm.getResults();
+      vm.getResults();
+      replies[1]({ data: { hits: [{ run: "newer" }] } });
+      await flushPromises();
+      replies[0]({ data: { hits: [{ run: "older" }] } });
+      await flushPromises();
+      expect(JSON.parse(vm.inputEvents)).toEqual([{ run: "newer" }]);
+      expect(vm.loading.events).toBe(false);
     });
   });
 });

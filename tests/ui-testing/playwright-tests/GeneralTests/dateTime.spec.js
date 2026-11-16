@@ -66,7 +66,7 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
 
     await pm.dateTimePickerPage.seedClipboard(`${ANCHOR_START_MICROS} - ${ANCHOR_END_MICROS}`);
     await pm.dateTimePickerPage.clickPaste();
-    await pm.dateTimePickerPage.expectPasteSuccessToast();
+    await pm.dateTimePickerPage.applyPaste();
     await pm.dateTimePickerPage.expectAbsolutePanelActive();
     await pm.dateTimePickerPage.expectNextEnabled();
 
@@ -127,7 +127,7 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
 
     await pm.dateTimePickerPage.seedClipboard(`${ANCHOR_START_MICROS} - ${ANCHOR_END_MICROS}`);
     await pm.dateTimePickerPage.clickPaste();
-    await pm.dateTimePickerPage.expectPasteSuccessToast();
+    await pm.dateTimePickerPage.applyPaste();
     await pm.dateTimePickerPage.expectAbsolutePanelActive();
 
     await pm.dateTimePickerPage.clickPrev();
@@ -156,7 +156,7 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
 
     await pm.dateTimePickerPage.seedClipboard(`${startMicros} - ${endMicros}`);
     await pm.dateTimePickerPage.clickPaste();
-    await pm.dateTimePickerPage.expectPasteSuccessToast();
+    await pm.dateTimePickerPage.applyPaste();
     await pm.dateTimePickerPage.expectAbsolutePanelActive();
 
     await pm.dateTimePickerPage.clickCopy();

@@ -1028,6 +1028,32 @@ describe("histogramZoomWindow (Bugs 1, 2)", () => {
     },
   );
 
+  it("lands on the dragged daily bar past a DST change in the chart zone", () => {
+    const DAY_MS = 24 * HOUR_MS;
+    const timezone = "America/New_York";
+    // New York springs forward on Mar 8, so the Mar 9 bar sits an hour off a uniform zoned grid.
+    const days = Array.from({ length: 12 }, (_, i) => Date.UTC(2026, 2, 1) + i * DAY_MS);
+    const chart = convertLogData(
+      days,
+      days.map(() => 1),
+      {
+        title: "",
+        unparsed_x_data: [],
+        timezone,
+      },
+    );
+    const bar = Number(chart.options.series[0].data[8][0]);
+    const next = Number(chart.options.series[0].data[9][0]);
+    const win = histogramZoomWindow(
+      bar - DAY_MS / 3,
+      bar + DAY_MS / 3,
+      chart,
+      DAY_MS * 1000,
+      timezone,
+    );
+    expect(win).toEqual({ start: bar, end: next });
+  });
+
   it("drag edges never carry pixel milliseconds", () => {
     const chart = convertLogData(xData, yData, { title: "", unparsed_x_data: [], timezone: "UTC" });
     const win = histogramZoomWindow(xData[1] + 1234.5, xData[3] - 99.7, chart, HOUR_MS * 1000);

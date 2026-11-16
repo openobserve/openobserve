@@ -19,6 +19,7 @@ import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
 import usePageTimeRange from "@/composables/usePageTimeRange";
 import useTimeRangeContext from "@/composables/useTimeRangeContext";
 import { formatTimeRange } from "@/utils/timeRangeFormat";
+import { rangeToLegacy, type TimeRange } from "@/utils/timeRangeModel";
 import QueryEditor from "@/components/QueryEditor.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -64,35 +65,39 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 const SQL_IDENT = /^[A-Za-z_][A-Za-z0-9_.]*$/;
 const paramsValid = computed(() => SQL_IDENT.test(props.field) && SQL_IDENT.test(props.stream));
 
-// Editable time range (µs); searches read these refs, not the fixed props.
+// The queried range (µs): searches and paging read it; a picked range lands here only on Run.
 const rangeStart = ref(props.startTime);
 const rangeEnd = ref(props.endTime);
+const timeRangeContext = useTimeRangeContext();
+const fixedProps = (): TimeRange => ({
+  kind: "fixed",
+  startUs: props.startTime,
+  endUs: props.endTime,
+});
+const timeHost = usePageTimeRange({
+  preset: "explorer-manual",
+  source: t("panel.logExplorer.title"),
+  url: false,
+  initial: fixedProps,
+  capabilities: { kinds: ["rolling", "fixed"] },
+  hasResults: () => events.value.length > 0,
+  onRange: () => {},
+  run: () => {
+    const bounds = rangeToLegacy(timeHost.range.value, timeRangeContext.now());
+    rangeStart.value = bounds.startTime;
+    rangeEnd.value = bounds.endTime;
+    void runQuery();
+  },
+});
 watch(
   () => [props.startTime, props.endTime],
   () => {
     rangeStart.value = props.startTime;
     rangeEnd.value = props.endTime;
+    timeHost.range.value = fixedProps();
+    timeHost.markQueried();
   },
 );
-let dateReady = false;
-const timeRangeContext = useTimeRangeContext();
-const storeRange = (d: { startTime?: number; endTime?: number }) => {
-  if (!dateReady) return;
-  const s = Number.isFinite(d.startTime) ? Math.trunc(Number(d.startTime)) : rangeStart.value;
-  const e = Number.isFinite(d.endTime) ? Math.trunc(Number(d.endTime)) : rangeEnd.value;
-  rangeStart.value = s;
-  rangeEnd.value = e;
-};
-const timeHost = usePageTimeRange({
-  preset: "explorer-manual",
-  source: t("panel.logExplorer.title"),
-  url: false,
-  initial: () => ({ kind: "fixed", startUs: rangeStart.value, endUs: rangeEnd.value }),
-  capabilities: { kinds: ["rolling", "fixed"] },
-  hasResults: () => events.value.length > 0,
-  onRange: storeRange,
-  run: () => void runQuery(),
-});
 const staleText = computed(() => {
   const queried = timeHost.stale.value ? timeHost.queried.value : null;
   if (!queried) return null;
@@ -729,7 +734,6 @@ async function restoreEventDetail() {
 
 watch(pageSize, () => goToPage(0));
 onMounted(async () => {
-  dateReady = true;
   timeHost.markQueried();
   await loadEvents();
   await restoreEventDetail();

@@ -367,6 +367,32 @@ describe("useStreamFields Composable", () => {
       }
     });
 
+    it.each([
+      ["winter rows", [Date.UTC(2026, 0, 10), Date.UTC(2026, 0, 12)], "UTC-05:00"],
+      ["summer rows", [Date.UTC(2026, 6, 10), Date.UTC(2026, 6, 12)], "UTC-04:00"],
+      [
+        "rows across a DST change",
+        [Date.UTC(2026, 2, 7), Date.UTC(2026, 2, 9)],
+        "America/New_York",
+      ],
+    ])("labels %s with the zone in force on their dates", (_name, rowsMs, label) => {
+      const zone = store.state.timezone;
+      store.state.timezone = "America/New_York";
+      searchObj.data.queryResults = {
+        hits: (rowsMs as number[]).map((ms) => ({ _timestamp: ms * 1000, message: "m" })),
+      } as any;
+      vi.useFakeTimers();
+      vi.setSystemTime(Date.UTC(2026, 6, 1));
+      try {
+        wrapper.vm.updateGridColumns();
+        const ts = searchObj.data.resultGrid.columns.find((c: any) => c.id === "_timestamp");
+        expect(ts.header).toBe(`timestamp (${label})`);
+      } finally {
+        vi.useRealTimers();
+        store.state.timezone = zone;
+      }
+    });
+
     it("leaves a single-stream result unchanged", () => {
       searchObj.data.stream.selectedStream = ["app"];
 

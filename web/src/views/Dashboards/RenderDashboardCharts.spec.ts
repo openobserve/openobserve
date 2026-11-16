@@ -984,7 +984,7 @@ describe("RenderDashboardCharts", () => {
       const bar = wrapper.get('[data-test="panel-bar-stub"]');
       const chip = bar.get('[data-test="dashboard-panel-P1-time-chip"]');
       expect(chip.text()).toBe("1h");
-      expect(chip.attributes("aria-label")).toBe("Panel-Specific Time Range");
+      expect(chip.attributes("aria-label")).toBe("Panel-Specific Time Range: 1h");
       expect(chip.findComponent({ name: "OIcon" }).props("name")).toBe("timer");
       expect(bar.find('[data-test="dashboard-panel-P1-time-picker"]').exists()).toBe(true);
       expect(
@@ -1009,6 +1009,20 @@ describe("RenderDashboardCharts", () => {
       await mountWithPanelPicker();
       await pickPreset("h", 6);
       expect(wrapper.get('[data-test="dashboard-panel-P1-time-chip"]').text()).toBe("6h");
+    });
+
+    it("offers the panel's undo beside its chip once a pick can be undone", async () => {
+      await mountWithPanelPicker();
+      const undo = () => wrapper.find('[data-test="dashboard-panel-P1-time-undo"]');
+      expect(undo().exists()).toBe(false);
+
+      await pickPreset("h", 6);
+      expect(undo().exists()).toBe(true);
+      await undo().trigger("click");
+      await flushPromises();
+
+      expect(wrapper.get('[data-test="dashboard-panel-P1-time-chip"]').text()).toBe("1h");
+      expect(undo().exists()).toBe(false);
     });
 
     it("does not reload the panel when its picker reports its starting range", async () => {

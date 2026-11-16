@@ -30,7 +30,7 @@ const OEmptyStateStub = defineComponent({
 });
 
 // The window Index passes, resolved from the period the way Index.vue's queryWindowUs does.
-const mountWithWindow = (relativeTimePeriod: string) => {
+const mountWithWindow = (relativeTimePeriod: string, rangeLimitHours?: number) => {
   const r = getConsumableRelativeTime(relativeTimePeriod, "UTC")!;
   return mount(LogsNoEventsState, {
     props: {
@@ -42,6 +42,7 @@ const mountWithWindow = (relativeTimePeriod: string) => {
       aiEnabled: false,
       queryWindowUs: { start: r.startTime, end: r.endTime },
       timezone: "UTC",
+      rangeLimitHours,
     },
     global: { plugins: [i18n, store], stubs: { OEmptyState: OEmptyStateStub } },
   });
@@ -93,6 +94,16 @@ describe("LogsNoEventsState", () => {
     expect(btn.text()).toBe("Try Last 1 hour");
     await btn.trigger("click");
     expect(wrapper.emitted("apply-range")).toEqual([["1h"]]);
+  });
+
+  it("offers no longer range when it is over the stream's query-range limit", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T03:19:00Z"));
+    expect(
+      mountWithWindow("4h", 24).find('[data-test="logs-no-events-try-range-btn"]').text(),
+    ).toBe("Try Last 24 hours");
+    const wrapper = mountWithWindow("24h", 24);
+    expect(wrapper.find('[data-test="logs-no-events-try-range-btn"]').exists()).toBe(false);
   });
 
   it("offers no longer range when no quick range is longer than the window (O4)", () => {

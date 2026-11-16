@@ -114,6 +114,7 @@ import DOMPurify from "dompurify";
 import { formatRangeLabel } from "@/utils/timeRangeLabel";
 import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import { nextLongerChip, TIME_RANGE_CHIP_SETS } from "@/utils/timeRangeList";
+import { chipsWithinLimit } from "@/utils/logs/rangeLimitRefusal";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 // Backend uses exclusive end boundary, so nudge end by 1s to include the record at doc_time_max.
@@ -132,6 +133,8 @@ const props = defineProps<{
   queryWindowUs?: { start: number; end: number };
   /** User-selected timezone string, e.g. "America/New_York" or "UTC". */
   timezone?: string;
+  /** The stream's query-range limit in hours; 0 or below is none. */
+  rangeLimitHours?: number;
 }>();
 
 const emit = defineEmits<{
@@ -203,7 +206,6 @@ const jumpTargetSublabel = computed(() => {
 
 // --- time-range helpers ------------------------------------------------------
 
-// A widen action was once removed as unhelpful; the approved polish design brings "Try {range}" back.
 const isRelative = computed(() => props.dateType === "relative" && !!props.relativeTimePeriod);
 const currentPeriodLabel = computed(() => {
   const w = props.queryWindowUs;
@@ -219,7 +221,9 @@ const currentPeriodLabel = computed(() => {
 
 const tryChip = computed(() => {
   const w = props.queryWindowUs;
-  return w ? nextLongerChip(w.end - w.start, TIME_RANGE_CHIP_SETS.ops) : null;
+  if (!w) return null;
+  const chips = chipsWithinLimit(TIME_RANGE_CHIP_SETS.ops, props.rangeLimitHours ?? 0);
+  return nextLongerChip(w.end - w.start, chips);
 });
 const tryChipLabel = computed(() =>
   tryChip.value ? formatPeriodLabel(tryChip.value.value, props.timezone, t) : "",

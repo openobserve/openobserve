@@ -26,18 +26,19 @@ export const panelTimeChipLabel = (
   value: PanelTimePickerValue | null | undefined,
   timezone: string,
   t: TranslateFn,
+  locale = "en-US",
 ): I18nText => {
   if (!value) return raw("");
   const period = value.relativeTimePeriod;
   if ((value.valueType ?? value.type) === "relative") {
     if (!period) return raw("");
     const short = rollingShortName(period);
-    return short ? raw(short) : formatPeriodLabel(period, timezone, t);
+    return short ? raw(short) : formatPeriodLabel(period, timezone, t, locale);
   }
   const startUs = Number(value.startTime);
   const endUs = Number(value.endTime);
   if (!(startUs > 0 && endUs > startUs)) return raw("");
-  return raw(formatRangeDates({ startUs, endUs }, { timezone }));
+  return raw(formatRangeDates({ startUs, endUs }, { timezone, locale }));
 };
 
 /** What a plain Share copies: a finished calendar period as fixed dates (owner (b)), any other period live. */

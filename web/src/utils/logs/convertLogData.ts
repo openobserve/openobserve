@@ -122,6 +122,7 @@ export const histogramZoomWindow = (
   endMs: number,
   chart: { options?: { series?: { data?: unknown[][] }[] } } | null | undefined,
   intervalUs: number,
+  timezone?: string,
 ): { start: number; end: number } => {
   const first = chart?.options?.series?.[0]?.data?.[0]?.[0];
   const origin = Number(first instanceof Date ? first.getTime() : first);
@@ -130,6 +131,7 @@ export const histogramZoomWindow = (
     endMs,
     Number(intervalUs) / 1000,
     Number.isFinite(origin) ? origin : 0,
+    timezone && timezone != "UTC" ? timezone : undefined,
   );
 };
 

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { linkRangeRefusal } from "./rangeLimitRefusal";
+import { chipsWithinLimit, linkRangeRefusal } from "./rangeLimitRefusal";
 import { getConsumableRelativeTime } from "@/utils/date";
 
 const HOUR_US = 3_600_000_000;
@@ -69,5 +69,19 @@ describe("linkRangeRefusal (R2, O1)", () => {
     };
     expect(linkRangeRefusal(wide, 0, "s")).toBeNull();
     expect(linkRangeRefusal(wide, -1, "s")).toBeNull();
+  });
+});
+
+describe("chipsWithinLimit", () => {
+  const chips = ["15m", "1h", "4h", "24h", "7d"].map((value) => ({ value, label: value }));
+
+  it("keeps every chip when the stream has no limit", () => {
+    expect(chipsWithinLimit(chips, -1)).toEqual(chips);
+    expect(chipsWithinLimit(chips, 0)).toEqual(chips);
+  });
+
+  it("drops chips longer than the limit and keeps one equal to it", () => {
+    expect(chipsWithinLimit(chips, 24).map((c) => c.value)).toEqual(["15m", "1h", "4h", "24h"]);
+    expect(chipsWithinLimit(chips, 2).map((c) => c.value)).toEqual(["15m", "1h"]);
   });
 });

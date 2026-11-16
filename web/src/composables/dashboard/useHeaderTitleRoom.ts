@@ -16,7 +16,7 @@
 import { computed, getCurrentScope, onScopeDispose, ref, watch, type Ref } from "vue";
 
 export const TITLE_MIN_PX = 160;
-/** Tailwind's `xl` screen: from here the dashboard trigger sits in the header row, below it on its own row. */
+/** Must equal Tailwind's `xl` screen, the breakpoint the header template switches rows at. */
 export const HEADER_TIME_ROW_QUERY = "(min-width: 80rem)";
 /** The header actions that take their icon-only form, one at a time, in this order. */
 export const HEADER_COLLAPSE_ORDER = ["share", "edit", "auto"] as const;

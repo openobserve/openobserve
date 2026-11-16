@@ -64,6 +64,9 @@ import { sqlSources } from "@/utils/logs/sqlSources";
 /** How long a cold load keeps the field list loading for the semantic groups before showing it ungrouped. */
 export const FIELD_GROUPS_WAIT_MS = 1000;
 
+// Two DST changes fit in a longer span, so its end offsets can match while the middle differs.
+const ONE_OFFSET_SPAN_MS = 120 * 24 * 60 * 60 * 1000;
+
 let correlationWatcherUsers = 0;
 let correlationWatcherScope: EffectScope | null = null;
 let fieldGroupsHoldId = 0;
@@ -1265,6 +1268,11 @@ export const useStreamFields = () => {
           searchObj.meta.sqlMode == false ||
           selectedFields.includes(store.state.zoConfig.timestamp_column)
         ) {
+          const zoneLabel = rowsZoneLabel(
+            store.state.timezone,
+            searchObj.data.queryResults?.hits ?? [],
+            store.state.zoConfig.timestamp_column,
+          );
           searchObj.data.resultGrid.columns.push({
             name: store.state.zoConfig.timestamp_column,
             id: store.state.zoConfig.timestamp_column,
@@ -1281,10 +1289,10 @@ export const useStreamFields = () => {
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
             label: t("search.timestampWithTimezone", {
-              timezone: formatZoneOffset(store.state.timezone),
+              timezone: zoneLabel,
             }),
             header: t("search.timestampWithTimezone", {
-              timezone: formatZoneOffset(store.state.timezone),
+              timezone: zoneLabel,
             }),
             align: "left",
             sortable: true,
@@ -1519,6 +1527,23 @@ function retainCorrelationQueryWatcher(watchQuery: () => void): void {
     correlationWatcherScope?.stop();
     correlationWatcherScope = null;
   });
+}
+
+// One offset reads only when every row shares it; rows across a DST change get the zone name instead.
+function rowsZoneLabel(timezone: string, hits: unknown[], column: string): string {
+  let minMs = Infinity;
+  let maxMs = -Infinity;
+  for (const hit of hits) {
+    const ms = Number((hit as Record<string, unknown>)?.[column]) / 1000;
+    if (!Number.isFinite(ms)) continue;
+    minMs = Math.min(minMs, ms);
+    maxMs = Math.max(maxMs, ms);
+  }
+  if (minMs > maxMs) return formatZoneOffset(timezone);
+  const offset = formatZoneOffset(timezone, minMs);
+  const oneOffset =
+    maxMs - minMs <= ONE_OFFSET_SPAN_MS && offset === formatZoneOffset(timezone, maxMs);
+  return oneOffset || !timezone ? offset : timezone;
 }
 
 export default useStreamFields;

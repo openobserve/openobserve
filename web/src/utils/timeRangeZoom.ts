@@ -32,18 +32,27 @@ export const instantFromShiftedMs = (shiftedMs: number, shiftZone: string): numb
 };
 
 /** A drag-zoom window widened to whole buckets: the bucket of the bar under each edge (`originMs` is any bucket start). */
+// `shiftZone` is the zone `toZonedTime` shifted the chart values to; values in and out stay shifted.
 export const snapZoomToBuckets = (
   startMs: number,
   endMs: number,
   intervalMs: number,
   originMs = 0,
+  shiftZone?: string,
 ): { start: number; end: number } => {
   if (!(intervalMs >= SECOND_MS)) {
     const start = Math.floor(startMs / SECOND_MS) * SECOND_MS;
     return { start, end: Math.max(Math.ceil(endMs / SECOND_MS) * SECOND_MS, start + SECOND_MS) };
   }
+  // Buckets are uniform in true instants; shifted values gain or lose an hour at a DST change.
+  const toTrue = (ms: number) => (shiftZone ? instantFromShiftedMs(ms, shiftZone) / 1000 : ms);
+  const toShifted = (ms: number) => (shiftZone ? toZonedTime(ms, shiftZone).getTime() : ms);
+  const origin = toTrue(originMs);
   // ECharts centres a time-axis bar on its bucket start, so the bar under a point is the nearest start.
-  const first = Math.round((startMs - originMs) / intervalMs);
-  const last = Math.max(Math.round((endMs - originMs) / intervalMs), first);
-  return { start: originMs + first * intervalMs, end: originMs + (last + 1) * intervalMs };
+  const first = Math.round((toTrue(startMs) - origin) / intervalMs);
+  const last = Math.max(Math.round((toTrue(endMs) - origin) / intervalMs), first);
+  return {
+    start: toShifted(origin + first * intervalMs),
+    end: toShifted(origin + (last + 1) * intervalMs),
+  };
 };
