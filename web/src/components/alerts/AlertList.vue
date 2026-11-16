@@ -3125,6 +3125,22 @@ export default defineComponent({
           loading.value = false;
           return;
         }
+        // Push before anything clears: the debounced URL write would otherwise land on the previous entry and strip its search.
+        const {
+          "v.search": _s,
+          "v.all": _a,
+          "v.q": _q,
+          "v.page": _p,
+          ...carried
+        } = router.currentRoute.value.query;
+        router.push({
+          name: "alertList",
+          query: {
+            ...carried,
+            org_identifier: store.state.selectedOrganization.identifier,
+            folder: newVal,
+          },
+        });
         // A folder switch starts a new list; the page persisted for the previous folder must not be restored onto it.
         currentPage.value = 1;
         if (searchAcrossFolders.value) {
@@ -3133,16 +3149,6 @@ export default defineComponent({
           filteredResults.value = [];
         }
         await getAlertsByFolderId(store, newVal);
-        if (router.currentRoute.value.query.folder != newVal) {
-          router.push({
-            name: "alertList",
-            query: {
-              ...router.currentRoute.value.query,
-              org_identifier: store.state.selectedOrganization.identifier,
-              folder: activeFolderId.value,
-            },
-          });
-        }
         filterAlertsByTab();
       },
     );
@@ -4153,6 +4159,8 @@ export default defineComponent({
         await getAlertsByFolderId(store, newVal);
         filterAlertsByTab();
       }
+      // A folder the URL already names came from Back or Forward, and the URL restores its search too.
+      if (newVal == router.currentRoute.value.query.folder) isRestoringState.value = true;
       // When restoring state from a prior navigation, skip clearing search filters
       if (isRestoringState.value) {
         isRestoringState.value = false;
@@ -4314,10 +4322,8 @@ export default defineComponent({
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
       if (newVal) {
-        //here we are setting the searchQuery to null and then setting the filterQuery to the searchQuery
-        //this is done because we want to clear the searchQuery and then set the filterQuery to the searchQuery
-        searchQuery.value = null;
-        searchQuery.value = filterQuery.value;
+        // Back restores both fields at once; an empty filter must not wipe the restored search.
+        if (filterQuery.value) searchQuery.value = filterQuery.value;
         filterQuery.value = null;
       }
       if (!newVal) {

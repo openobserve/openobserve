@@ -1183,7 +1183,6 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
         <template #selection-actions>
           <OButton
             variant="primary"
-            icon="add"
             :disabled="!bulkRules.length"
             data-test="security-content-install-selected"
             @click="bulkOpen = true"
@@ -1547,7 +1546,6 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
               v-if="check.compiled?.runnable && canAuthor"
               variant="secondary"
               size="sm"
-              icon="add"
               :data-test="`security-content-rule-stream-install-${check.stream}`"
               @click="install(openRule.id, check.stream, check.source.id)"
               >{{ t("siem.content.installHere") }}</OButton
@@ -1572,7 +1570,6 @@ const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
         </OButton>
         <OButton
           variant="primary"
-          icon="add"
           :disabled="!canAuthor"
           data-test="security-content-rule-install"
           @click="installDefault(openRule)"

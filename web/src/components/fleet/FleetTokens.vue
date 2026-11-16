@@ -81,12 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="fleet-tokens-refresh"
             @click="refresh"
           />
-          <OButton
-            variant="secondary"
-            icon="add"
-            data-test="fleet-tokens-create"
-            @click="mode = 'create'"
-          >
+          <OButton variant="secondary" data-test="fleet-tokens-create" @click="mode = 'create'">
             {{ t("fleet.enrollment.newToken") }}
           </OButton>
         </template>

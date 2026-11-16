@@ -106,7 +106,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 variant="accent-ghost"
                 size="sm"
-                icon="add"
                 class="shrink-0"
                 :disabled="full"
                 :data-test="`dashboard-playlist-add-${hit.dashboardId}`"

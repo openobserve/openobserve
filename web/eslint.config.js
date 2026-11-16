@@ -655,6 +655,10 @@ const o2ButtonApi = {
         const sourceCode = context.sourceCode ?? context.getSourceCode();
         const services = sourceCode.parserServices ?? context.parserServices;
         if (!services?.defineTemplateBodyVisitor) return {};
+        // RUM pages are owned by another team; their B4 cleanup lands there.
+        const rumOwned = /[\\/](views[\\/]RUM|components[\\/]rum)[\\/]/.test(
+          context.filename ?? "",
+        );
         const check = (node, tag, prop, value, shown = `<${tag}> ${prop}`) => {
           const allowed = BUTTON_API[tag]?.values?.[prop];
           if (!allowed || allowed.includes(value)) return;
@@ -704,6 +708,19 @@ const o2ButtonApi = {
               return;
             }
             if (api.values?.[prop]) for (const value of values) check(node, tag, prop, value);
+            if (!rumOwned && tag === "OButton" && (prop === "icon" || prop === "icon-end")) {
+              const attrs = element?.startTag?.attributes ?? [];
+              const iconOnly = attrs.some((attr) => {
+                const attrKey = attr.directive ? attr.key?.argument : attr.key;
+                return kebab(attrKey?.rawName ?? attrKey?.name ?? "") === "icon-only";
+              });
+              if (!iconOnly && values.includes("add")) {
+                context.report({
+                  node,
+                  message: `A text <OButton> carries no "+" icon; drop ${prop}="add" and keep the label (guidelines B4, H6).`,
+                });
+              }
+            }
           },
         });
       },

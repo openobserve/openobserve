@@ -179,7 +179,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     v-if="values.links.length < MAX_LINKS"
                     variant="ghost"
-                    icon="add"
                     class="self-start"
                     data-test="announcement-editor-add-link"
                     @click="addLink"

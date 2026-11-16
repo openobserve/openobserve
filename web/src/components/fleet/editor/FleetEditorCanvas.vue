@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="pointer-events-auto flex flex-1 items-center justify-end gap-1">
         <OButton
           variant="secondary"
-          icon="add"
           data-test="fleet-editor-canvas-add-pipeline"
           @click="emit('add-pipeline')"
         >

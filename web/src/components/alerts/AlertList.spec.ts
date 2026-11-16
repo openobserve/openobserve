@@ -2504,6 +2504,8 @@ describe("AlertList - search behaviors", () => {
   it("clearSearchHistory resets searchQuery and filteredResults", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
+    // The URL write for "abc" would otherwise hang on the guards and land in a later spec's route.
+    vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
 
     wrapper.vm.searchAcrossFolders = true;
     wrapper.vm.searchQuery = "abc";

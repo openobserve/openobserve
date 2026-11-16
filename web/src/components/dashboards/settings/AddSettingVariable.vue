@@ -314,7 +314,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mt-3 w-fit"
                 @click="addField()"
                 data-test="dashboard-add-option-btn"
-                icon="add"
               >
                 {{ t("dashboard.addOption") }}
               </OButton>
@@ -394,7 +393,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="mt-3"
                   @click="addCustomValue"
                   data-test="dashboard-add-custom-value-btn"
-                  icon="add"
                 >
                 </OButton>
               </div>

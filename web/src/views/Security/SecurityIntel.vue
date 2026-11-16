@@ -912,7 +912,6 @@ async function onSaved() {
         />
         <OButton
           variant="primary"
-          icon="add"
           :disabled="!canAuthor"
           data-test="security-intel-add"
           @click="showAdd = true"

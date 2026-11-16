@@ -48,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           "
           data-test="dashboard-tab-move-add-tab-btn"
-          icon="add"
         >
           <template #icon><OIcon name="add" size="sm" /></template>
           <OTooltip :content="t('dashboard.singlePanelMove.addTab')" />

@@ -325,7 +325,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         data-test="add-destination-add-header-btn"
                         variant="secondary"
-                        icon="add"
                         @click="addApiHeader()"
                       >
                         {{ t("alert_destinations.addHeader") }}

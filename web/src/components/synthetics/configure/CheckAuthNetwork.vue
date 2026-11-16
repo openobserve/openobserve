@@ -204,7 +204,6 @@ function removeCookie(index: number) {
           </ul>
           <OButton
             variant="ghost"
-            icon="add"
             class="self-start"
             data-test="synthetics-check-auth-network-add-header-btn"
             @click="addHeader"
@@ -259,7 +258,6 @@ function removeCookie(index: number) {
           </ul>
           <OButton
             variant="ghost"
-            icon="add"
             class="self-start"
             data-test="synthetics-check-auth-network-add-cookie-btn"
             @click="addCookie"

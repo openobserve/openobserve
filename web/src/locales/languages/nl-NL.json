@@ -56,6 +56,7 @@
         "ariaLabel": "Wachten op gegevens"
       }
     },
+    "requestId": "Verzoek {id}",
     "createFirstItem": "Maak je eerste item",
     "newBrowserCheck": "Nieuwe browsercheck",
     "allCaughtUp": "Je bent weer helemaal bij",
@@ -451,7 +452,9 @@
       "description": "Er komt geen {noun} overeen met je huidige filters of zoekopdracht. Probeer ze aan te passen of te wissen.",
       "action": "Filters wissen",
       "actionDesc": "Alle filters opnieuw instellen en zoeken",
-      "fallbackNoun": "uitslagen"
+      "fallbackNoun": "uitslagen",
+      "noMatches": "Geen resultaten",
+      "noMatchesText": "Niets komt overeen met de huidige zoekopdracht of filters."
     },
     "nouns": {
       "logs": "logs",
@@ -490,6 +493,7 @@
       "evalTemplates": "evaluatiesjablonen",
       "enrichmentTables": "verrijkingstabellen",
       "cipherKeys": "cipher keys",
+      "announcementBanners": "aankondigingsbanners",
       "aiToolsets": "AI-toolsets",
       "llmProviders": "LLM-providers",
       "sourceMaps": "source maps",
@@ -633,6 +637,26 @@
     "noOncallUnrouted": {
       "title": "Niets heeft een eigenaar nodig",
       "description": "Elk alarm dat afging, bereikte een team."
+    },
+    "noSlackChannelDefaults": {
+      "title": "Nog geen enkel kanaal heeft een standaardorganisatie",
+      "description": "Vragen in een kanaal zonder standaard gaan naar de standaardorganisatie van elke persoon (die kan dit wijzigen met /o2 org)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "Niemand in deze organisatie heeft Slack al gekoppeld"
+    },
+    "slackNotConnected": {
+      "title": "Verbind een Slack-workspace"
+    },
+    "noAnnouncementBanners": {
+      "title": "Nog geen banners",
+      "description": "Banners tonen een melding bovenaan de app aan de organisaties die je kiest.",
+      "action": "Banner toevoegen",
+      "actionDesc": "Schrijf een melding en plan die in"
+    },
+    "pageError": {
+      "title": "Deze pagina kon niet worden geladen",
+      "description": "Geen van de gegevens van deze pagina is geladen. Probeer het nu opnieuw of over een minuut."
     }
   },
   "accessBoundary": {
@@ -660,6 +684,7 @@
       "groups": "Groepen",
       "serviceAccounts": "Serviceaccounts",
       "cipherKeys": "Cipher keys",
+      "announcementBanners": "Aankondigingsbanners",
       "regexPatterns": "Regex-patronen",
       "evalJobs": "Online evaluatietaken",
       "billingGroup": "Factureringsgroep",
@@ -716,6 +741,7 @@
       "groups": "groepen",
       "serviceAccounts": "serviceaccounts",
       "cipherKeys": "cipher keys",
+      "announcementBanners": "aankondigingsbanners",
       "regexPatterns": "regex-patronen",
       "unnamed": "deze resource",
       "onCall": "piket",
@@ -773,9 +799,14 @@
   },
   "common": {
     "saveBar": {
-      "noChanges": "Geen wijzigingen om op te slaan"
+      "noChanges": "Geen wijzigingen om op te slaan",
+      "unsavedChanges": "{n} niet-opgeslagen wijziging | {n} niet-opgeslagen wijzigingen",
+      "changesShort": "{n} wijziging | {n} wijzigingen",
+      "fixFields": "{n} veld herstellen | {n} velden herstellen",
+      "discard": "Negeren"
     },
     "dismiss": "Sluiten",
+    "undo": "Ongedaan maken",
     "exitFullscreen": "Volledig scherm sluiten",
     "moreActions": "Meer acties",
     "moreOptions": "Meer opties",
@@ -1014,6 +1045,8 @@
     "back": "Terug",
     "save": "Opslaan",
     "discardChanges": "Wijzigingen negeren",
+    "switchOn": "Aan",
+    "switchOff": "Uit",
     "unsavedChanges": "Niet opgeslagen wijzigingen",
     "update": "Bijwerken",
     "favourite": "Favoriet",
@@ -1128,6 +1161,8 @@
     "field": "Veld",
     "enterValueOrVariable": "Voer waarde of $variable in",
     "all": "Alles",
+    "allStates": "Alle statussen",
+    "allStatuses": "Alle statussen",
     "jsonFilesOnlyHint": "Alleen .json-bestanden",
     "fileUploadJsonTab": "Bestandsupload / JSON",
     "urlImportTab": "URL-import",
@@ -1234,7 +1269,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "collectorconfiguratie"
+        "fleet_config": "collectorconfiguratie",
+        "workflow": "workflow"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1244,6 +1280,11 @@
       "leaveMessageInBrowser": "Sla de {entity} op, bewaar je wijzigingen in deze browser, of verwerp ze.",
       "retentionInBrowser": "Wijzigingen worden {days} dagen in deze browser bewaard, of totdat je uitlogt. Alleen de {max} nieuwste van elke soort worden bewaard.",
       "dotUndated": "Unsaved draft"
+    },
+    "leaveGuard": {
+      "title": "Verlaten met niet-opgeslagen wijzigingen?",
+      "message": "Je hebt {n} niet-opgeslagen wijziging op deze pagina. Die gaat verloren als je vertrekt. | Je hebt {n} niet-opgeslagen wijzigingen op deze pagina. Die gaan verloren als je vertrekt.",
+      "keepEditing": "Blijven bewerken"
     }
   },
   "flow": {
@@ -1942,8 +1983,8 @@
     "histogramTitleRows": "{total} rij in {took} ms. | {total} rijen in {took} ms.",
     "histogramTitleRowsWithScan": "{total} rij in {took} ms. ({scanLabel}: {scanSize}) | {total} rijen in {took} ms. ({scanLabel}: {scanSize})",
     "pickStreamFirst": "Kies eerst een stream",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "Automatisch vernieuwen werkt zoekresultaten bij. Het pauzeert terwijl je visualiseert.",
+    "histogramNoTimeAxis": "Gegroepeerde resultaten hebben geen tijdas"
   },
   "menu": {
     "alertCalibration": "Alarmkalibratie",
@@ -3858,6 +3899,8 @@
     "your_complete_license_key": "Uw volledige licentiesleutel:",
     "copy_key": "Sleutel kopiëren",
     "usage_information": "Informatie over het gebruik",
+    "usage_chart_title": "Dagelijkse ingestie deze maand",
+    "no_license_ingestion_limit": "Zonder licentie is ingestie beperkt tot <strong>{limit} GB</strong> per dag.",
     "license_allows_ingestion": "De huidige licentie staat <strong>{limit} GB</strong> aan data-ingestie per dag toe.",
     "license_allows_unlimited_ingestion": "De huidige licentie staat onbeperkte gegevensinvoer toe.",
     "limit_exceeded_days": "De limiet werd overschreden op <strong class=\"{colorClass}\">{days} dag</strong> deze maand | De limiet werd overschreden op <strong class=\"{colorClass}\">{days} dagen</strong> deze maand",
@@ -4714,6 +4757,8 @@
     },
     "listOrganizations": {
       "subtitle": "Organisaties waartoe u toegang hebt",
+      "switch": "Overschakelen naar deze organisatie",
+      "current": "Huidig",
       "cannotEditWhileDeleting": "Kan niet bewerken terwijl verwijdering bezig is",
       "edit": "Bewerken",
       "deleteOrganization": "Organisatie verwijderen",
@@ -5373,7 +5418,7 @@
         "intro": "Wanneer een alarm dat is afgegaan herstelt, ontvangt elke volgende stap deze payload."
       },
       "incidentEvent": {
-        "label": "Incident event",
+        "label": "Incidentgebeurtenis",
         "tab": "Incidenten",
         "node": "Incidenttrigger",
         "desc": "Uitvoeren bij een incident lifecycle-gebeurtenis",
@@ -7041,7 +7086,7 @@
       "aiCategoryFrameworks": "AI-frameworks & agents",
       "aiCategoryGateways": "AI-gateways & proxies",
       "aiCategoryModelProviders": "Modelproviders",
-      "aiCategoryNoCode": "No-code platforms",
+      "aiCategoryNoCode": "No-codeplatforms",
       "aiCategoryTools": "Tools & integraties",
       "anyLinuxHostNote": "Elke Linux-server of VM.",
       "anyWindowsHostNote": "Elke Windows-server of VM.",
@@ -10169,6 +10214,12 @@
       "noPanels": "Geen panelen",
       "panelsDeletedHint": "De panelen zijn verwijderd, dus er wordt momenteel op geen enkel paneel getekend. Selecteer panelen, of kies Alles selecteren, om dit op te lossen.",
       "blankFiltersHint": "Voorwaarden zonder waarde worden genegeerd."
+    },
+    "inlineCreate": {
+      "folderName": "Naam van nieuwe map",
+      "createFolder": "Map maken",
+      "tabName": "Naam van nieuw tabblad",
+      "createTab": "Tabblad maken"
     }
   },
   "panel": {
@@ -14256,7 +14307,8 @@
         "mute": "Je kunt dit niet dempen.",
         "onCall": "Piket: {people}",
         "canAct": "Kan ook actie ondernemen: {people}",
-        "people": "Piket: {onCall}. Kan ook actie ondernemen: {canAct}"
+        "people": "Piket: {onCall}. Kan ook actie ondernemen: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "Dit alarm gaat niet af, dus er is niets te bevestigen.",
@@ -14315,7 +14367,11 @@
       "open": "Bewerken in Security"
     },
     "newAlertTitle": "Nieuwe waarschuwing",
-    "newAnomalyTitle": "Nieuwe anomaliedetectie"
+    "newAnomalyTitle": "Nieuwe anomaliedetectie",
+    "rowAction": {
+      "paused": "{name} gepauzeerd | {count} alerts gepauzeerd",
+      "resumed": "{name} hervat | {count} alerts hervat"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Openen",
@@ -14774,6 +14830,7 @@
     "destination_type": "Bestemmingstype",
     "template": "Sjabloon",
     "actions": "Acties",
+    "addHeader": "Header toevoegen",
     "addTitle": "Nieuwe bestemming",
     "updateTitle": "Bestemming bijwerken",
     "delete": "Verwijderen",
@@ -14919,7 +14976,9 @@
   },
   "pipeline_destinations": {
     "header": "Pipelinebestemmingen",
-    "search": "Bestemming zoeken"
+    "search": "Bestemming zoeken",
+    "destinationType": "Bestemmingstype",
+    "outputFormat": "Uitvoerformaat"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15359,7 +15418,7 @@
       "legend": "Legenda - ",
       "stepValuePlaceholder": "bijv. 30s, 1m",
       "step": "Stap - ",
-      "queryType": "Query type - ",
+      "queryType": "Querytype -",
       "rangeDescription": "Bereik: Retourneert tijdreeksgegevens over een tijdsbereik.",
       "instantDescription": "Direct: Retourneert enkele waarde op een specifiek tijdstip.",
       "range": "Bereik",
@@ -15430,8 +15489,12 @@
     "groupIntegrations": "Integraties",
     "groupAccount": "Account",
     "slackApp": "Slack",
+    "slackAppDesc": "Workspaces, kanaalstandaarden en accountkoppeling voor de Slack-app",
     "generalDesc": "Thema, standaardwaarden voor query's en kernvoorkeuren",
     "orgDesc": "Organisatieparameters en -identificaties",
+    "generalSubtitle": "Hoe {org} eruitziet en de standaardinstellingen voor query's.",
+    "orgSubtitle": "Veldnamen, gegevensretentie en automatische functies voor {org}.",
+    "passwordPolicySubtitle": "Regels voor native e-mail- en wachtwoordaccounts.",
     "cipherKeysDesc": "Versleutelingssleutels voor gevoelige velden",
     "regexPatternsDesc": "Herbruikbare regex-patronen voor redactie",
     "domainManagementDesc": "Aanmelden beperken tot toegestane SSO-domeinen",
@@ -15718,10 +15781,59 @@
       "failedToLoadServices": "Services laden mislukt"
     },
     "domainManagement": {
-      "unknownTime": "Onbekende tijd"
+      "unknownTime": "Onbekende tijd",
+      "claimParserTitle": "Claimparser",
+      "claimParserSectionDesc": "Zet SSO- en LDAP-claims om in toewijzingen van organisaties en rollen.",
+      "claimParserLabel": "Claimparserfunctie",
+      "claimParserHelp": "Een {product1}- of {product2}-functie die de gemapte claims ontvangt en de toe te wijzen organisaties en rollen teruggeeft, of een weigering.",
+      "claimParserFormatLink": "Invoer- en uitvoerformaat",
+      "claimParserPlaceholder": "Geen functie",
+      "noFunctions": "Nog geen functies",
+      "restrictionsTitle": "Domeinbeperkingen",
+      "restrictionsDesc": "Welke e-maildomeinen en gebruikers zich via SSO kunnen aanmelden.",
+      "domainLabel": "Domein",
+      "addDomain": "Domein toevoegen",
+      "noDomains": "Nog geen domeinen. Voeg een domein toe om te beperken wie zich kan aanmelden.",
+      "accessFor": "Toegang voor {domain}",
+      "policyAllowAll": "Alle gebruikers toestaan",
+      "policyAllowSpecific": "Alleen vermelde gebruikers toestaan",
+      "policyBlockSpecific": "Vermelde gebruikers blokkeren",
+      "policyBlockAll": "Alle gebruikers blokkeren",
+      "effectAllowSpecific": "Alleen de vermelde gebruikers met e-mailadressen die eindigen op {domain} mogen inloggen.",
+      "effectBlockSpecific": "De vermelde externe SSO-gebruikers met e-mailadressen die eindigen op {domain} worden geblokkeerd voor het systeem (UI, API en ingestie).",
+      "emailLabel": "E-mailadres",
+      "noEmails": "Nog geen e-mailadressen vermeld.",
+      "removeDomain": "{domain} verwijderen",
+      "removeEmail": "{email} verwijderen",
+      "saved": "SSO-instellingen opgeslagen"
     },
     "general": {
       "close": "Sluiten",
+      "themeTitle": "Thema",
+      "themeDescription": "De accentkleur voor {org} in lichte en donkere modus.",
+      "accentColorLabel": "Accentkleur",
+      "lightColorLabel": "Wijzig de kleur van de lichte modus, nu {color}",
+      "darkColorLabel": "Wijzig de kleur van de donkere modus, nu {color}",
+      "queryDefaultsTitle": "Querystandaarden",
+      "queryDefaultsDescription": "Standaardwaarden voor het verzamelen van metrics en PromQL-query's.",
+      "scrapeIntervalLabel": "Scrape-interval",
+      "scrapeIntervalHelp": "Hoe vaak metrics worden verzameld.",
+      "unitSeconds": "seconden",
+      "maxSeriesLabel": "Max. reeksen per query",
+      "maxSeriesHelp": "Het maximale aantal reeksen dat één PromQL-query mag teruggeven. Leeg gebruikt de standaardwaarde, {n}.",
+      "unitSeries": "reeksen",
+      "maxSeriesError": "Voer 1.000 tot 1.000.000 in, of laat leeg om de standaardwaarde te gebruiken.",
+      "brandingTitle": "Branding",
+      "brandingDescription": "De naam en logo's die aan elke organisatie op deze instantie worden getoond.",
+      "logoTextHelp": "Vervangt de standaardnaam die in de app wordt getoond. Maximaal 100 tekens.",
+      "logoTextTooLong": "Gebruik maximaal 100 tekens.",
+      "logoTextSaveFailed": "Aangepaste logotekst is niet opgeslagen. {reason}",
+      "logoSaveFailed": "Het {mode}-logo is niet geüpload. {reason}",
+      "brandingUpdated": "Branding bijgewerkt",
+      "logoLightLabel": "Aangepast logo (lichte modus)",
+      "logoLightHelp": "Getoond in lichte modus. PNG, JPG, GIF of BMP, maximaal 150 × 30 px.",
+      "logoDarkLabel": "Aangepast logo (donkere modus)",
+      "logoDarkHelp": "Getoond in donkere modus. PNG, JPG, GIF of BMP, maximaal 150 × 30 px.",
       "fileCounterLabel": "{constraint} {filesNumber} bestand {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
@@ -15743,18 +15855,30 @@
       "title": "Standaardwaarden voor gegevensretentie",
       "about": "Voor streams zonder eigen retentie. Leeg of 0 gebruikt de globale waarde; anders ten minste 3 dagen.",
       "defaultDays": "Standaard (dagen)",
+      "defaultLabel": "Standaard",
+      "unitDays": "dagen",
+      "daysFor": "{type}-retentie (dagen)",
       "streamType": "Streamtype",
       "days": "Dagen",
       "addType": "Streamtype toevoegen",
+      "allTypesAdded": "Elk streamtype heeft al een rij.",
+      "removeTypeNamed": "De standaard voor {type} verwijderen",
       "removeType": "Dit streamtype verwijderen",
       "globalDefault": "Globaal: {value}",
       "globalType": "Globaal {type}: {value}",
       "daysValue": "{days} dagen",
       "forever": "voor altijd bewaren",
-      "invalid": "Gebruik 0 of minimaal 3 dagen"
+      "invalid": "Gebruik 0 of minimaal 3 dagen",
+      "invalidType": "Gebruik minstens 3 dagen of verwijder dit type"
     },
     "organizationSettings": {
       "fieldNameHelp": "Gebruik alleen alfanumerieke tekens en '+=,.{'@'}-_' tekens, zonder spaties.",
+      "sectionTitle": "Gegevensverwerking",
+      "sectionDescription": "Hoe logs aan traces koppelen en welke automatische functies aan staan.",
+      "traceIdHelp": "Het logveld dat een logregel aan zijn trace koppelt. Alleen letters, cijfers en + = , . {'@'} - _.",
+      "spanIdHelp": "Het logveld dat een logregel aan zijn span koppelt. Dezelfde tekens als hierboven.",
+      "ingestionLogsHelp": "Houdt een log bij van de records waarvan de ingestie mislukt.",
+      "usageStreamHelp": "Schrijft het gebruik van {org} naar een eigen stream, die je kunt bevragen.",
       "settingsUpdated": "Organisatie-instellingen succesvol bijgewerkt",
       "settingsSaveError": "Fout bij opslaan organisatie-instellingen"
     },
@@ -16409,6 +16533,7 @@
     "queryRange": "Vraagbereik",
     "userSummary": "Gebruikerssamenvatting",
     "allQueries": "Alle query's",
+    "allFields": "Alle velden",
     "queryType": "Soort zoekopdracht",
     "numOfQueries": "Aantal zoekopdrachten",
     "totalDuration": "Total Exec. Duur",
@@ -17145,12 +17270,12 @@
       "truncated": "Toont de eerste span van deze trace, in starttijdvolgorde. Latere spans zijn nog niet geladen. | Toont de eerste {count} spans van deze trace, in starttijdvolgorde. Latere spans zijn nog niet geladen.",
       "loadMore": "Laad de volgende span | Laad de volgende {size} spans",
       "loadMoreFailed": "Kon niet meer spans van deze trace laden",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "Geen trace met dit ID tussen {from} en {to}",
+      "notFoundText": "Trace {traceId} heeft geen spans in de stream {stream} in dit bereik. Hij kan ouder of nieuwer zijn, in een andere stream staan of niet zijn verzameld.",
+      "searchWiderRange": "Zoek in een breder bereik",
+      "searchSpansInRange": "Zoek spans in dit bereik",
+      "loadFailedTitle": "Deze trace kon niet worden geladen",
+      "loadFailedText": "Trace {traceId} kon niet worden gelezen. Probeer het zo opnieuw."
     },
     "traceTree": {
       "clickToExpand": "Klik om uit te vouwen",
@@ -17345,6 +17470,8 @@
     "type": "Typ",
     "step1WithType": "Keystore-details (Type: {type})",
     "step2": "Encryptiemechanisme",
+    "sectionKey": "Sleutel",
+    "sectionSetup": "Sleutelopslag en versleuteling",
     "secret": "Geheim",
     "baseURL": "Basis-URL",
     "accessId": "Toegangs-ID",
@@ -17583,6 +17710,8 @@
     "noTracesDescription": "Geen traces gevonden voor deze correlatie in het geselecteerde tijdsbereik.",
     "viewInTraces": "Bekijken in Traces",
     "filters": "Filters",
+    "fieldGroupsTitle": "Veldgroepen",
+    "fieldNamesColumn": "Veldnamen",
     "semanticFieldGroupsCaption": "Definieer veldnaamtoewijzingen voor correlatie en deduplicatie (bijv. host, hostnaam, knooppunt → 'host'-groep)",
     "exportToJson": "Exporteren naar JSON",
     "importFromJson": "Importeren vanuit JSON",
@@ -20725,8 +20854,8 @@
       "searchAroundTip": "Laad de gebeurtenissen die vlak voor en na deze zijn gelogd.",
       "noOfEventsTip": "Hoeveel gebeurtenissen rond deze worden geladen.",
       "severityTip": "Gedetecteerd logniveau. Selecteer om te zien hoe het is bepaald.",
-      "traceId": "Trace ID",
-      "spanId": "Span ID"
+      "traceId": "Trace-ID",
+      "spanId": "Span-ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select *-query wordt niet ondersteund voor visualisatie.",
@@ -21011,6 +21140,7 @@
     "showDetail": "Details weergeven",
     "hideDetail": "Details verbergen",
     "runAs": "Uitvoeren als",
+    "runSuggestion": "{query} uitvoeren",
     "searchTextFor": "Zoek naar tekst \"{text}\"",
     "searchTextDesc": "Doorzoek de hele invoer als één frase",
     "explain": {
@@ -21042,7 +21172,19 @@
     "dataStale": "Gegevens zijn verouderd",
     "lastRefreshed": "Laatst ververst: {time}",
     "refresh": "Vernieuwen",
-    "refreshWithAge": "Vernieuwen, laatst vernieuwd {age}"
+    "refreshWithAge": "Vernieuwen, laatst vernieuwd {age}",
+    "refreshing": "Vernieuwen",
+    "failed": "Mislukt",
+    "autoRefresh": "Automatisch vernieuwen",
+    "autoOn": "Auto · {interval}",
+    "every": "Elke {interval}",
+    "interval": {
+      "10s": "10 s",
+      "30s": "30 s",
+      "1m": "1 min",
+      "5m": "5 min",
+      "15m": "15 min"
+    }
   },
   "synthetics": {
     "variables": {
@@ -21900,7 +22042,12 @@
       "noPrivateMatches": "Geen privélocaties gevonden voor uw zoekopdracht",
       "newPrivateLocation": "Nieuwe privélocatie",
       "publicSubtitle": "Cloudregio's, altijd beschikbaar",
-      "privateSubtitle": "De locatie is klaar wanneer ten minste een van de agents actief is"
+      "privateSubtitle": "De locatie is klaar wanneer ten minste een van de agents actief is",
+      "emptyState": {
+        "title": "Nog geen locaties",
+        "description": "Een locatie is een plek van waaruit je synthetische monitors hun controles uitvoeren, zoals een cloudregio.",
+        "actionDesc": "Voeg een plek toe om controles vanuit uit te voeren"
+      }
     },
     "newCheck": {
       "comingSoon": "Binnenkort",
@@ -22981,7 +23128,10 @@
       "tokenLinkTooltip": "Kies welk ingestietoken de snippets gebruiken",
       "copiedWithToken": "Gekopieerd met org-token {name}",
       "tokenIncludedHint": "Kopiëren bevat het ingestietoken van de organisatie, dat hier verborgen blijft.",
-      "maskedSelectionWarning": "Het verborgen token is als punten gekopieerd. Gebruik Kopiëren of maak het eerst zichtbaar."
+      "maskedSelectionWarning": "Het verborgen token is als punten gekopieerd. Gebruik Kopiëren of maak het eerst zichtbaar.",
+      "wrapLines": "Regels afbreken",
+      "showAll": "Alle {count} regel tonen | Alle {count} regels tonen",
+      "showLess": "Minder tonen"
     },
     "spinner": {
       "loading": "Laden"
@@ -23026,7 +23176,10 @@
       "moreInfo": "Meer informatie"
     },
     "dialog": {
-      "closeDialog": "Dialoogvenster sluiten"
+      "closeDialog": "Dialoogvenster sluiten",
+      "discardChanges": "Wijzigingen negeren?",
+      "keepEditing": "Blijven bewerken",
+      "discard": "Negeren"
     },
     "drawer": {
       "closeDrawer": "Paneel sluiten"
@@ -23049,6 +23202,32 @@
       "clear": "Wissen"
     },
     "file": {
+      "removeNamed": "{name} verwijderen",
+      "sourceLabel": "Importeren uit",
+      "sourceFile": "Bestand",
+      "sourceUrl": "URL",
+      "sourcePaste": "Plakken",
+      "dropPrompt": "Sleep een bestand hierheen of {choose}",
+      "dropPromptMultiple": "Sleep bestanden hierheen of {choose}",
+      "chooseAFile": "kies een bestand",
+      "chooseFiles": "kies bestanden",
+      "chooseFileButton": "Bestand kiezen",
+      "chooseFilesButton": "Bestanden kiezen",
+      "noFileChosen": "Geen bestand gekozen",
+      "dropToUpload": "Laat los om te uploaden",
+      "upToSize": "tot {size}",
+      "upToSizeEach": "tot {size} per bestand",
+      "oneFile": "één bestand",
+      "upToFiles": "tot {count} bestanden",
+      "typeRejected": "Alleen {allowed}-bestanden worden geaccepteerd",
+      "sizeRejected": "{size} overschrijdt de limiet van {max}",
+      "countRejected": "Slechts {count} bestand tegelijk | Slechts {count} bestanden tegelijk",
+      "uploadFailed": "Upload mislukt",
+      "uploaded": "Geüpload",
+      "urlPlaceholder": "Bestands-URL",
+      "urlHelp": "We halen het één keer op wanneer je importeert.",
+      "textPlaceholder": "Plak de inhoud hier",
+      "invalidJson": "Geen geldige JSON: {detail}",
       "removeFile": "Bestand verwijderen",
       "clearAll": "Alles wissen"
     },
@@ -23063,7 +23242,14 @@
     "pagination": {
       "pagination": "Paginering",
       "previousPage": "Vorige pagina",
-      "nextPage": "Volgende pagina"
+      "nextPage": "Volgende pagina",
+      "onFirstPage": "Je bent al op de eerste pagina",
+      "onLastPage": "Je bent al op de laatste pagina",
+      "range": "{from}–{to} van {total}",
+      "rangeOfMany": "{from}–{to} van veel",
+      "pageOf": "Pagina {page} van {pages}",
+      "perPage": "{size} per pagina",
+      "pageSize": "Rijen per pagina"
     },
     "select": {
       "more": "meer",
@@ -23073,6 +23259,10 @@
       "noOptionsFound": "Geen opties gevonden",
       "multiSelect": "Meervoudige selectie",
       "singleSelect": "Enkele selectie",
+      "any": "Alle",
+      "noMatches": "Geen resultaten voor \"{term}\"",
+      "clearSearch": "Zoekopdracht wissen",
+      "addOption": "\"{value}\" toevoegen",
       "moreInfoAbout": "Meer informatie over {field}",
       "moreInfo": "Meer informatie"
     },
@@ -23114,7 +23304,10 @@
       "removeColumnAria": "Kolom verwijderen",
       "formatColumnAria": "Kolom opmaken",
       "selectedOfTotal": "{selected} van {total} geselecteerd",
-      "selectedCount": "{selected} geselecteerd"
+      "selectedCount": "{selected} geselecteerd",
+      "clearSelection": "Wissen",
+      "rowActions": "Rijacties",
+      "moreRowActions": "Meer acties"
     },
     "predefinedThemes": {
       "title": "Thema",
@@ -23482,6 +23675,26 @@
         "past": "Afgelopen dagen",
         "ended": "Beëindigd"
       }
+    },
+    "jsonViewer": {
+      "include": "Filteren op deze waarde",
+      "exclude": "Deze waarde uitsluiten",
+      "copyValue": "Waarde kopiëren",
+      "fieldCount": "{count} veld | {count} velden",
+      "itemCount": "{count} item | {count} items"
+    },
+    "tabs": {
+      "more": "Meer",
+      "unsaved": "Niet-opgeslagen wijzigingen",
+      "locked": "Vergrendeld"
+    },
+    "statStrip": {
+      "filters": "Filters",
+      "showOnly": "Alleen {label} tonen",
+      "alsoShow": "Ook {label} tonen",
+      "stopShowing": "Stoppen met tonen van {label}",
+      "scrollBack": "Vorige filters tonen",
+      "scrollForward": "Meer filters tonen"
     }
   },
   "functions": {
@@ -24352,6 +24565,12 @@
   },
   "passwordPolicy": {
     "complexity": "Complexiteit",
+    "complexityDesc": "Wat elk nieuw wachtwoord moet bevatten.",
+    "unitCharacters": "tekens",
+    "unitDays": "dagen",
+    "unitPasswords": "wachtwoorden",
+    "unitAttempts": "pogingen",
+    "unitSeconds": "seconden",
     "minLength": "Minimumlengte",
     "minLengthDesc": "Kortste geaccepteerde wachtwoord",
     "maxLength": "Maximumlengte",
@@ -24367,6 +24586,7 @@
     "specialCharSet": "Toegestane speciale tekens",
     "specialCharSetDesc": "Laat leeg om elk niet-alfanumeriek teken te accepteren",
     "maxLengthTooSmall": "Maximumlengte moet tussen de minimumlengte en 128 liggen.",
+    "maxLengthBelowMin": "Moet {min} of meer zijn, passend bij de minimale lengte.",
     "confirmTitle": "Wachtwoordbeleid opslaan?",
     "confirmMessage": "Opslaan kan ertoe leiden dat elke native gebruiker een nieuw wachtwoord moet instellen voordat deze verder kan. Root, externe gebruikers en serviceaccounts zijn uitgezonderd — dit geldt ook voor u, tenzij u het rootaccount bent. Dit kan niet ongedaan worden gemaakt.",
     "saved": "Wachtwoordbeleid opgeslagen. | Wachtwoordbeleid opgeslagen. {count} gebruiker moet zijn wachtwoord opnieuw instellen. | Wachtwoordbeleid opgeslagen. {count} gebruikers moeten hun wachtwoord opnieuw instellen.",
@@ -24377,14 +24597,17 @@
     "loadFailed": "Er is iets misgegaan bij het lezen van het huidige beleid.",
     "rotation": "Rotatie",
     "rotationDays": "Rotatieperiode",
+    "rotationDesc": "Wanneer een wachtwoord verloopt en hoeveel waarschuwing mensen krijgen.",
     "rotationDaysDesc": "Dagen voordat een wachtwoord verloopt. 0 = verloopt nooit",
     "rotationWarningDays": "Waarschuwen voor afloop",
     "rotationWarningDaysDesc": "Dagen van kennisgeving bij aanmelding. 0 = geen waarschuwing",
+    "rotationWarningDaysOffDesc": "Dagen waarschuwing bij het aanmelden. Gebruikt zodra wachtwoorden verlopen.",
     "warningDaysTooLong": "Het waarschuwingsvenster kan niet langer zijn dan de rotatieperiode.",
     "rotationPreview": "Een vandaag ingesteld wachtwoord verloopt op {expires}. De aanmeldwaarschuwing begint op {warns}.",
     "rotationPreviewNoWarning": "Een vandaag ingesteld wachtwoord verloopt op {expires}. Er wordt voor die tijd geen waarschuwing getoond.",
     "reuse": "Hergebruikpreventie",
     "historyCount": "Onthouden wachtwoorden",
+    "reuseDesc": "Voorkomt dat mensen terugkeren naar een oud wachtwoord.",
     "historyCountDesc": "Een nieuw wachtwoord mag niet overeenkomen met dit aantal eerdere wachtwoorden. 0 = geen controle",
     "historyMaxRetained": "Bewaarde geschiedenis",
     "historyMaxRetainedDesc": "Hoeveel eerdere wachtwoorden per gebruiker worden bewaard",
@@ -24392,6 +24615,7 @@
     "reuseExplainer": "Het huidige wachtwoord telt als een van de onthouden wachtwoorden — hergebruik ervan wordt door deze regel geweigerd, niet door een aparte controle.",
     "lockout": "Accountvergrendeling",
     "lockoutThreshold": "Mislukte pogingen voor vergrendeling",
+    "lockoutDesc": "Wat er gebeurt na herhaaldelijk mislukte aanmeldpogingen.",
     "lockoutThresholdDesc": "0 = vergrendeling uitgeschakeld",
     "lockoutBucketSize": "Pogingen voor elke volgende vergrendeling",
     "lockoutBucketSizeDesc": "0 = hergebruik de waarde hierboven",
@@ -24406,6 +24630,7 @@
     "backoffLinear": "Lineair",
     "lockoutPreview": "{threshold} fouten → {first} · elke {bucket} meer → {rest} · gemaximeerd op {max}. Een succesvolle aanmelding reset alles.",
     "sessionEnforcement": "Sessie en handhaving",
+    "sessionEnforcementDesc": "Hoe lang een aanmelding duurt en of root deze regels volgt.",
     "cookieMaxAge": "Sessielevensduur",
     "cookieMaxAgeDesc": "Seconden dat een aangemelde sessie geldig blijft. 0 = gebruik de standaardwaarde van de instantie uit {envVar}",
     "applyToRoot": "Toepassen op het rootaccount",
@@ -24782,6 +25007,7 @@
       "packUnavailableHint": "Samengestelde content voor deze workload is nog niet uitgebracht. Bouw ondertussen een dashboard om dit in kaart te brengen.",
       "partialTelemetryKubernetes": "We hebben Kubernetes-streams gevonden, maar niet de metrieken die deze pagina nodig heeft (kubeletstats of cluster-receiver). Controleer de receivers van je collector.",
       "partialTelemetryHosts": "We hebben host-streams gevonden, maar niet de metrieken die deze pagina nodig heeft. Controleer de hostmetrics-receiver van je collector.",
+      "hostMetricsMissingTitle": "Geen hostmetrics gevonden",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}, en nog {count} meer",
       "hiddenFootnote": "Gegevensbronnen waarvoor je geen toegang hebt, verschijnen hier ook.",
@@ -27232,6 +27458,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "De oproep onderdrukken",
     "savePolicyFailed": "Het beleid kon niet worden opgeslagen",
+    "savePolicyFailedReason": "Beleid niet opgeslagen. {reason}",
     "state_triggered": "Geactiveerd",
     "state_triaged": "Getrieerd",
     "state_acknowledged": "Erkend",
@@ -28849,6 +29076,11 @@
       "otherOrgs": "Geen andere organisatie | {count} andere organisatie | {count} andere organisaties",
       "connectedOn": "{date} door {user}",
       "helpContact": "Hulpcontact",
+      "helpContactHelp": "Mensen die hun account niet kunnen koppelen, krijgen te horen dat ze dit contact moeten vragen.",
+      "eventsLabel": "Slack-gebeurtenissen",
+      "connectionLabel": "Verbinding",
+      "outboundLabel": "Uitgaande wachtrij",
+      "collaboratorsLabel": "App-medewerkers",
       "helpContactPlaceholder": "#o2-help, of een persoon bij wie je terechtkunt",
       "helpContactSaved": "Hulpcontact opgeslagen",
       "disconnectSection": "Verbreken",
@@ -30502,9 +30734,9 @@
     },
     "queryTooltip": "Filter als tekst bewerken",
     "builderTooltip": "Filter bewerken met de builder",
-    "editorModeLabel": "Filter editor",
+    "editorModeLabel": "Filtereditor",
     "modeBuilder": "Builder",
-    "modeText": "Text"
+    "modeText": "Tekst"
   },
   "autoobserveLive": {
     "paging": {
@@ -30597,5 +30829,23 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "pageHeader": {
+    "about": "Over deze pagina"
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· in {percent}% van de traces, afgelopen 24 uur",
+    "fallbacksNote": "Voer fallbackvelden in, gescheiden door komma's, in de volgorde waarin ze gecontroleerd worden.",
+    "fallbackInvalid": "Gebruik veldnamen gescheiden door komma's. Alleen letters, cijfers en . _ - : / {'@'}.",
+    "sessions": {
+      "title": "Sessieweergave",
+      "help": "Hoe sessies een titel krijgen en welke wrappertekst erin wordt verborgen.",
+      "noAgents": "Nog geen agents. Voeg een agent toe om de wrappertekst te verbergen."
+    }
+  },
+  "copyButton": {
+    "copy": "Kopiëren",
+    "copied": "Gekopieerd",
+    "failed": "Kopiëren geblokkeerd · druk op Ctrl C"
   }
 }

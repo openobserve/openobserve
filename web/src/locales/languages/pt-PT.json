@@ -18,6 +18,7 @@
     "rbacOff": "O RBAC está desativado para esta organização. Um administrador ativa-o definindo {env} como true na configuração do servidor."
   },
   "emptyState": {
+    "requestId": "Pedido {id}",
     "illustrations": {
       "noHistoryYet": "Sem histórico ainda",
       "noLogsFound": "Nenhum log encontrado",
@@ -451,7 +452,9 @@
       "description": "Nenhum {noun} corresponde aos seus filtros ou pesquisas atuais. Tente ajustá-los ou limpá-los.",
       "action": "Limpar filtros",
       "actionDesc": "Repor todos os filtros e a pesquisa",
-      "fallbackNoun": "resultados"
+      "fallbackNoun": "resultados",
+      "noMatches": "Sem correspondências",
+      "noMatchesText": "Nada corresponde à pesquisa ou aos filtros atuais."
     },
     "nouns": {
       "logs": "logs",
@@ -490,6 +493,7 @@
       "evalTemplates": "modelos de avaliação",
       "enrichmentTables": "tabelas de enriquecimento",
       "cipherKeys": "chaves de cifra",
+      "announcementBanners": "faixas de anúncio",
       "aiToolsets": "conjuntos de ferramentas de IA",
       "llmProviders": "fornecedores de LLM",
       "sourceMaps": "mapas de origem",
@@ -633,6 +637,26 @@
     "noOncallUnrouted": {
       "title": "Nada precisa de um responsável",
       "description": "Todos os alertas que dispararam chegaram a uma equipa."
+    },
+    "noSlackChannelDefaults": {
+      "title": "Nenhum canal tem ainda uma organização predefinida",
+      "description": "As perguntas num canal sem organização predefinida vão para a organização predefinida de cada pessoa (que a pode alterar com /o2 org)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "Ninguém nesta organização ligou ainda o Slack"
+    },
+    "slackNotConnected": {
+      "title": "Ligar um espaço de trabalho do Slack"
+    },
+    "noAnnouncementBanners": {
+      "title": "Ainda sem faixas",
+      "description": "As faixas mostram um aviso no topo da aplicação às organizações que escolher.",
+      "action": "Adicionar faixa",
+      "actionDesc": "Escreva um aviso e agende-o"
+    },
+    "pageError": {
+      "title": "Não foi possível carregar esta página",
+      "description": "Nenhum dos dados desta página foi carregado. Tente de novo agora ou dentro de um minuto."
     }
   },
   "accessBoundary": {
@@ -660,6 +684,7 @@
       "groups": "Grupos",
       "serviceAccounts": "Contas de serviço",
       "cipherKeys": "Chaves de cifra",
+      "announcementBanners": "Faixas de anúncio",
       "regexPatterns": "Padrões regex",
       "evalJobs": "Trabalhos de avaliação online",
       "billingGroup": "Grupo de faturação",
@@ -716,6 +741,7 @@
       "groups": "grupos",
       "serviceAccounts": "contas de serviço",
       "cipherKeys": "chaves de cifra",
+      "announcementBanners": "faixas de anúncio",
       "regexPatterns": "padrões regex",
       "unnamed": "este recurso",
       "onCall": "piquete",
@@ -773,9 +799,14 @@
   },
   "common": {
     "saveBar": {
-      "noChanges": "Sem alterações para guardar"
+      "noChanges": "Sem alterações para guardar",
+      "unsavedChanges": "{n} alteração não guardada | {n} alterações não guardadas",
+      "changesShort": "{n} alteração | {n} alterações",
+      "fixFields": "Corrigir {n} campo | Corrigir {n} campos",
+      "discard": "Descartar"
     },
     "dismiss": "Dispensar",
+    "undo": "Anular",
     "exitFullscreen": "Sair do ecrã inteiro",
     "moreActions": "Mais ações",
     "moreOptions": "Mais opções",
@@ -1014,6 +1045,8 @@
     "back": "Voltar",
     "save": "Guardar",
     "discardChanges": "Descartar alterações",
+    "switchOn": "Ligado",
+    "switchOff": "Desligado",
     "unsavedChanges": "Alterações não guardadas",
     "update": "Atualizar",
     "favourite": "Favorito",
@@ -1128,6 +1161,8 @@
     "field": "Campo",
     "enterValueOrVariable": "Introduza um valor ou $variable",
     "all": "Todos",
+    "allStates": "Todos os estados",
+    "allStatuses": "Todos os estados",
     "jsonFilesOnlyHint": "Apenas ficheiros .json",
     "fileUploadJsonTab": "Carregamento de ficheiro / JSON",
     "urlImportTab": "Importação por URL",
@@ -1234,7 +1269,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "configuração do coletor"
+        "fleet_config": "configuração do coletor",
+        "workflow": "fluxo de trabalho"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1244,6 +1280,11 @@
       "leaveMessageInBrowser": "Guarde o {entity}, mantenha as suas alterações neste navegador ou descarte-as.",
       "retentionInBrowser": "As alterações são mantidas neste navegador durante {days} dias, ou até terminar sessão. Apenas as {max} mais recentes de cada tipo são mantidas.",
       "dotUndated": "Unsaved draft"
+    },
+    "leaveGuard": {
+      "title": "Sair com alterações não guardadas?",
+      "message": "Tem {n} alteração não guardada nesta página. Será perdida se sair. | Tem {n} alterações não guardadas nesta página. Serão perdidas se sair.",
+      "keepEditing": "Continuar a editar"
     }
   },
   "flow": {
@@ -1942,8 +1983,8 @@
     "histogramTitleRows": "A mostrar {total} linha em {took} ms. | A mostrar {total} linhas em {took} ms.",
     "histogramTitleRowsWithScan": "A mostrar {total} linha em {took} ms. ({scanLabel}: {scanSize}) | A mostrar {total} linhas em {took} ms. ({scanLabel}: {scanSize})",
     "pickStreamFirst": "Escolha primeiro um fluxo",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "A atualização automática atualiza os resultados da pesquisa. Fica em pausa enquanto visualiza.",
+    "histogramNoTimeAxis": "Os resultados agrupados não têm eixo temporal"
   },
   "menu": {
     "alertCalibration": "Calibração de alertas",
@@ -3858,6 +3899,8 @@
     "your_complete_license_key": "A sua chave de licença completa:",
     "copy_key": "Copiar chave",
     "usage_information": "Informações de utilização",
+    "usage_chart_title": "Ingestão diária este mês",
+    "no_license_ingestion_limit": "Sem licença, a ingestão está limitada a <strong>{limit} GB</strong> por dia.",
     "license_allows_ingestion": "A licença atual permite <strong>{limit} GB</strong> de ingestão de dados por dia.",
     "license_allows_unlimited_ingestion": "A licença atual permite a ingestão ilimitada de dados.",
     "limit_exceeded_days": "O limite foi excedido em <strong class=\"{colorClass}\">{days} dia</strong> neste mês | O limite foi excedido em <strong class=\"{colorClass}\">{days} dias</strong> neste mês",
@@ -4714,6 +4757,8 @@
     },
     "listOrganizations": {
       "subtitle": "Organizações a que pode aceder",
+      "switch": "Mudar para esta organização",
+      "current": "Atual",
       "cannotEditWhileDeleting": "Não é possível editar enquanto a eliminação está em curso",
       "edit": "Editar",
       "deleteOrganization": "Eliminar organização",
@@ -10169,6 +10214,12 @@
       "noPanels": "Nenhum painel",
       "panelsDeletedHint": "Os seus painéis foram eliminados, por isso atualmente não é desenhada em nenhum painel. Selecione painéis, ou escolha Selecionar tudo, para corrigir isto.",
       "blankFiltersHint": "As condições sem valor são ignoradas."
+    },
+    "inlineCreate": {
+      "folderName": "Nome da nova pasta",
+      "createFolder": "Criar pasta",
+      "tabName": "Nome do novo separador",
+      "createTab": "Criar separador"
     }
   },
   "panel": {
@@ -14256,7 +14307,8 @@
         "mute": "Não pode silenciar isto.",
         "onCall": "De piquete: {people}",
         "canAct": "Também podem agir: {people}",
-        "people": "De piquete: {onCall}. Também podem agir: {canAct}"
+        "people": "De piquete: {onCall}. Também podem agir: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "Este alerta não está disparado, pelo que não há nada para reconhecer.",
@@ -14315,7 +14367,11 @@
       "open": "Editar em Segurança"
     },
     "newAlertTitle": "Novo alerta",
-    "newAnomalyTitle": "Nova deteção de anomalias"
+    "newAnomalyTitle": "Nova deteção de anomalias",
+    "rowAction": {
+      "paused": "{name} em pausa | {count} alertas em pausa",
+      "resumed": "{name} retomado | {count} alertas retomados"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Abrir",
@@ -14774,6 +14830,7 @@
     "destination_type": "Tipo de Destino",
     "template": "Modelo",
     "actions": "Ações",
+    "addHeader": "Adicionar cabeçalho",
     "addTitle": "Novo Destino",
     "updateTitle": "Atualizar Destino",
     "delete": "Eliminar",
@@ -14919,7 +14976,9 @@
   },
   "pipeline_destinations": {
     "header": "Destinos de Pipelines",
-    "search": "Pesquisar destino"
+    "search": "Pesquisar destino",
+    "destinationType": "Tipo de destino",
+    "outputFormat": "Formato de saída"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15430,8 +15489,12 @@
     "groupIntegrations": "Integrações",
     "groupAccount": "Conta",
     "slackApp": "Slack",
+    "slackAppDesc": "Espaços de trabalho, predefinições de canais e ligação de contas para a aplicação Slack",
     "generalDesc": "Tema, padrões de consulta e preferências essenciais",
     "orgDesc": "Parâmetros e identificadores da organização",
+    "generalSubtitle": "Aspeto de {org} e as respetivas predefinições de consulta.",
+    "orgSubtitle": "Nomes de campos, retenção de dados e funcionalidades automáticas de {org}.",
+    "passwordPolicySubtitle": "Regras para contas nativas com e-mail e palavra-passe.",
     "cipherKeysDesc": "Chaves de encriptação para campos sensíveis",
     "regexPatternsDesc": "Padrões regex reutilizáveis para ocultação de dados",
     "domainManagementDesc": "Restringir o início de sessão a domínios SSO permitidos",
@@ -15718,10 +15781,59 @@
       "failedToLoadServices": "Falha ao carregar serviços"
     },
     "domainManagement": {
-      "unknownTime": "Hora desconhecida"
+      "unknownTime": "Hora desconhecida",
+      "claimParserTitle": "Analisador de claims",
+      "claimParserSectionDesc": "Converte claims de SSO e LDAP em atribuições de organização e função.",
+      "claimParserLabel": "Função do analisador de claims",
+      "claimParserHelp": "Uma função {product1} ou {product2} que recebe os claims mapeados e devolve as organizações e funções a atribuir, ou uma recusa.",
+      "claimParserFormatLink": "Formato de entrada e saída",
+      "claimParserPlaceholder": "Nenhuma função",
+      "noFunctions": "Ainda sem funções",
+      "restrictionsTitle": "Restrições de domínio",
+      "restrictionsDesc": "Que domínios de e-mail e utilizadores podem iniciar sessão através de SSO.",
+      "domainLabel": "Domínio",
+      "addDomain": "Adicionar domínio",
+      "noDomains": "Ainda sem domínios. Adicione um domínio para restringir quem pode iniciar sessão.",
+      "accessFor": "Acesso para {domain}",
+      "policyAllowAll": "Permitir todos os utilizadores",
+      "policyAllowSpecific": "Permitir apenas os utilizadores indicados",
+      "policyBlockSpecific": "Bloquear os utilizadores indicados",
+      "policyBlockAll": "Bloquear todos os utilizadores",
+      "effectAllowSpecific": "Apenas os utilizadores indicados com endereços de e-mail terminados em {domain} poderão iniciar sessão.",
+      "effectBlockSpecific": "Os utilizadores SSO externos indicados com endereços de e-mail terminados em {domain} serão bloqueados no sistema (IU, API e ingestão).",
+      "emailLabel": "Endereço de e-mail",
+      "noEmails": "Ainda sem endereços de e-mail indicados.",
+      "removeDomain": "Remover {domain}",
+      "removeEmail": "Remover {email}",
+      "saved": "Definições de SSO guardadas"
     },
     "general": {
       "close": "Fechar",
+      "themeTitle": "Tema",
+      "themeDescription": "A cor de destaque de {org} nos modos claro e escuro.",
+      "accentColorLabel": "Cor de destaque",
+      "lightColorLabel": "Alterar a cor do modo claro, atualmente {color}",
+      "darkColorLabel": "Alterar a cor do modo escuro, atualmente {color}",
+      "queryDefaultsTitle": "Predefinições de consulta",
+      "queryDefaultsDescription": "Predefinições para recolha de métricas e consultas PromQL.",
+      "scrapeIntervalLabel": "Intervalo de recolha",
+      "scrapeIntervalHelp": "Com que frequência as métricas são recolhidas.",
+      "unitSeconds": "segundos",
+      "maxSeriesLabel": "Máx. de séries por consulta",
+      "maxSeriesHelp": "O maior número de séries que uma consulta PromQL pode devolver. Vazio usa a predefinição, {n}.",
+      "unitSeries": "séries",
+      "maxSeriesError": "Introduza um valor entre 1 000 e 1 000 000, ou deixe vazio para usar a predefinição.",
+      "brandingTitle": "Identidade visual",
+      "brandingDescription": "O nome e os logótipos apresentados a todas as organizações nesta instância.",
+      "logoTextHelp": "Substitui o nome predefinido apresentado na aplicação. Até 100 carateres.",
+      "logoTextTooLong": "Use 100 carateres ou menos.",
+      "logoTextSaveFailed": "O texto de logótipo personalizado não foi guardado. {reason}",
+      "logoSaveFailed": "O logótipo ({mode}) não foi carregado. {reason}",
+      "brandingUpdated": "Identidade visual atualizada",
+      "logoLightLabel": "Logótipo personalizado (modo claro)",
+      "logoLightHelp": "Apresentado no modo claro. PNG, JPG, GIF ou BMP, até 150 × 30 px.",
+      "logoDarkLabel": "Logótipo personalizado (modo escuro)",
+      "logoDarkHelp": "Apresentado no modo escuro. PNG, JPG, GIF ou BMP, até 150 × 30 px.",
       "fileCounterLabel": "{constraint} {filesNumber} ficheiro {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
@@ -15743,18 +15855,30 @@
       "title": "Predefinições de retenção de dados",
       "about": "Para streams sem retenção própria. Vazio ou 0 utiliza o valor global; caso contrário, pelo menos 3 dias.",
       "defaultDays": "Predefinição (dias)",
+      "defaultLabel": "Predefinição",
+      "unitDays": "dias",
+      "daysFor": "Retenção de {type} (dias)",
       "streamType": "Tipo de stream",
       "days": "Dias",
       "addType": "Adicionar tipo de stream",
+      "allTypesAdded": "Todos os tipos de stream já têm uma linha.",
+      "removeTypeNamed": "Remover a predefinição de {type}",
       "removeType": "Remover este tipo de stream",
       "globalDefault": "Global: {value}",
       "globalType": "Global {type}: {value}",
       "daysValue": "{days} dias",
       "forever": "manter para sempre",
-      "invalid": "Utilize 0 ou pelo menos 3 dias"
+      "invalid": "Utilize 0 ou pelo menos 3 dias",
+      "invalidType": "Use pelo menos 3 dias ou remova este tipo"
     },
     "organizationSettings": {
       "fieldNameHelp": "Use apenas caracteres alfanuméricos e '+=,.{'@'}-_', sem espaços.",
+      "sectionTitle": "Tratamento de dados",
+      "sectionDescription": "Como os registos se ligam aos rastreios e que funcionalidades automáticas estão ativas.",
+      "traceIdHelp": "O campo de registo que liga uma linha de registo ao respetivo rastreio. Apenas letras, números e + = , . {'@'} - _.",
+      "spanIdHelp": "O campo de registo que liga uma linha de registo ao respetivo span. Os mesmos carateres que acima.",
+      "ingestionLogsHelp": "Mantém um registo dos registos cuja ingestão falha.",
+      "usageStreamHelp": "Escreve a utilização de {org} num stream próprio, que pode consultar.",
       "settingsUpdated": "Definições da organização atualizadas com sucesso",
       "settingsSaveError": "Erro ao guardar definições da organização"
     },
@@ -16409,6 +16533,7 @@
     "queryRange": "Intervalo de consulta",
     "userSummary": "Resumo do utilizador",
     "allQueries": "Todas as consultas",
+    "allFields": "Todos os campos",
     "queryType": "Tipo de consulta",
     "numOfQueries": "Número de consultas",
     "totalDuration": "Duração total de exec.",
@@ -17145,12 +17270,12 @@
       "truncated": "A mostrar o primeiro span deste trace, por ordem de hora de início. Spans posteriores ainda não foram carregados. | A mostrar os primeiros {count} spans deste trace, por ordem de hora de início. Spans posteriores ainda não foram carregados.",
       "loadMore": "Carregar o próximo span | Carregar os próximos {size} spans",
       "loadMoreFailed": "Não foi possível carregar mais spans deste trace",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "Nenhum rastreio com este ID entre {from} e {to}",
+      "notFoundText": "O rastreio {traceId} não tem spans no stream {stream} neste intervalo. Pode ser mais antigo ou mais recente, estar noutro stream ou não ter sido recolhido.",
+      "searchWiderRange": "Pesquisar num intervalo mais amplo",
+      "searchSpansInRange": "Pesquisar spans neste intervalo",
+      "loadFailedTitle": "Não foi possível carregar este rastreio",
+      "loadFailedText": "Não foi possível ler o rastreio {traceId}. Tente de novo dentro de momentos."
     },
     "traceTree": {
       "clickToExpand": "Clique para expandir",
@@ -17345,6 +17470,8 @@
     "type": "Tipo",
     "step1WithType": "Detalhes do Key Store (Tipo: {type})",
     "step2": "Mecanismo de encriptação",
+    "sectionKey": "Chave",
+    "sectionSetup": "Armazenamento de chaves e encriptação",
     "secret": "Segredo",
     "baseURL": "URL base",
     "accessId": "ID de acesso",
@@ -17583,6 +17710,8 @@
     "noTracesDescription": "Nenhum trace encontrado para esta correlação no intervalo de tempo selecionado.",
     "viewInTraces": "Ver em Traces",
     "filters": "Filtros",
+    "fieldGroupsTitle": "Grupos de campos",
+    "fieldNamesColumn": "Nomes dos campos",
     "semanticFieldGroupsCaption": "Mapeie os nomes dos campos da sua telemetria para grupos comuns, para que o OpenObserve os possa correlacionar entre streams.",
     "exportToJson": "Exportar para JSON",
     "importFromJson": "Importar do JSON",
@@ -20725,8 +20854,8 @@
       "searchAroundTip": "Carrega os eventos registados imediatamente antes e depois deste.",
       "noOfEventsTip": "Quantos eventos carregar em torno deste.",
       "severityTip": "Nível de registo detetado. Selecione para ver como foi detetado.",
-      "traceId": "Trace ID",
-      "spanId": "Span ID"
+      "traceId": "ID do rastreio",
+      "spanId": "ID do span"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Consulta Select * não é suportada para visualização.",
@@ -21011,6 +21140,7 @@
     "showDetail": "Mostrar detalhes",
     "hideDetail": "Ocultar detalhes",
     "runAs": "Executar como",
+    "runSuggestion": "Executar {query}",
     "searchTextFor": "Pesquisar o texto de \"{text}\"",
     "searchTextDesc": "Pesquisar toda a entrada como uma única frase",
     "explain": {
@@ -21042,7 +21172,19 @@
     "dataStale": "Os dados estão obsoletos",
     "lastRefreshed": "Última atualização: {time}",
     "refresh": "Atualizar",
-    "refreshWithAge": "Atualizar, última atualização {age}"
+    "refreshWithAge": "Atualizar, última atualização {age}",
+    "refreshing": "A atualizar",
+    "failed": "Falhou",
+    "autoRefresh": "Atualização automática",
+    "autoOn": "Auto · {interval}",
+    "every": "A cada {interval}",
+    "interval": {
+      "10s": "10 s",
+      "30s": "30 s",
+      "1m": "1 min",
+      "5m": "5 min",
+      "15m": "15 min"
+    }
   },
   "synthetics": {
     "variables": {
@@ -21900,7 +22042,12 @@
       "noPrivateMatches": "Nenhum local privado corresponde à sua pesquisa",
       "newPrivateLocation": "Novo local privado",
       "publicSubtitle": "Regiões de nuvem, sempre disponíveis",
-      "privateSubtitle": "O local está pronto quando pelo menos um dos seus agentes está ativo"
+      "privateSubtitle": "O local está pronto quando pelo menos um dos seus agentes está ativo",
+      "emptyState": {
+        "title": "Ainda sem localizações",
+        "description": "Uma localização é o sítio a partir do qual os seus monitores sintéticos executam as verificações, como uma região de cloud.",
+        "actionDesc": "Adicione um sítio a partir do qual executar verificações"
+      }
     },
     "newCheck": {
       "comingSoon": "Em breve",
@@ -22981,7 +23128,10 @@
       "tokenLinkTooltip": "Escolha o token de ingestão que os trechos de código usam",
       "copiedWithToken": "Copiado com o token da organização {name}",
       "tokenIncludedHint": "A cópia inclui o token de ingestão da organização, que permanece oculto aqui.",
-      "maskedSelectionWarning": "O token oculto foi copiado como pontos. Use Copiar ou revele-o primeiro."
+      "maskedSelectionWarning": "O token oculto foi copiado como pontos. Use Copiar ou revele-o primeiro.",
+      "wrapLines": "Quebrar linhas",
+      "showAll": "Mostrar {count} linha | Mostrar todas as {count} linhas",
+      "showLess": "Mostrar menos"
     },
     "spinner": {
       "loading": "A carregar"
@@ -23026,7 +23176,10 @@
       "moreInfo": "Mais informações"
     },
     "dialog": {
-      "closeDialog": "Fechar diálogo"
+      "closeDialog": "Fechar diálogo",
+      "discardChanges": "Descartar alterações?",
+      "keepEditing": "Continuar a editar",
+      "discard": "Descartar"
     },
     "drawer": {
       "closeDrawer": "Fechar gaveta"
@@ -23049,6 +23202,32 @@
       "clear": "Limpar"
     },
     "file": {
+      "removeNamed": "Remover {name}",
+      "sourceLabel": "Importar de",
+      "sourceFile": "Ficheiro",
+      "sourceUrl": "URL",
+      "sourcePaste": "Colar",
+      "dropPrompt": "Largue um ficheiro aqui ou {choose}",
+      "dropPromptMultiple": "Largue ficheiros aqui ou {choose}",
+      "chooseAFile": "escolha um ficheiro",
+      "chooseFiles": "escolha ficheiros",
+      "chooseFileButton": "Escolher ficheiro",
+      "chooseFilesButton": "Escolher ficheiros",
+      "noFileChosen": "Nenhum ficheiro escolhido",
+      "dropToUpload": "Largue para carregar",
+      "upToSize": "até {size}",
+      "upToSizeEach": "até {size} cada",
+      "oneFile": "um ficheiro",
+      "upToFiles": "até {count} ficheiros",
+      "typeRejected": "Só são aceites ficheiros {allowed}",
+      "sizeRejected": "{size} excede o limite de {max}",
+      "countRejected": "Só {count} ficheiro de cada vez | Só {count} ficheiros de cada vez",
+      "uploadFailed": "Falha no carregamento",
+      "uploaded": "Carregado",
+      "urlPlaceholder": "URL do ficheiro",
+      "urlHelp": "Obtemos o ficheiro uma vez, ao importar.",
+      "textPlaceholder": "Cole o conteúdo aqui",
+      "invalidJson": "JSON inválido: {detail}",
       "removeFile": "Remover ficheiro",
       "clearAll": "Limpar tudo"
     },
@@ -23063,7 +23242,14 @@
     "pagination": {
       "pagination": "Paginação",
       "previousPage": "Página anterior",
-      "nextPage": "Próxima página"
+      "nextPage": "Próxima página",
+      "onFirstPage": "Já está na primeira página",
+      "onLastPage": "Já está na última página",
+      "range": "{from}–{to} de {total}",
+      "rangeOfMany": "{from}–{to} de muitos",
+      "pageOf": "Página {page} de {pages}",
+      "perPage": "{size} por página",
+      "pageSize": "Linhas por página"
     },
     "select": {
       "more": "mais",
@@ -23073,6 +23259,10 @@
       "noOptionsFound": "Nenhuma opção encontrada",
       "multiSelect": "Seleção múltipla",
       "singleSelect": "Seleção única",
+      "any": "Qualquer",
+      "noMatches": "Sem resultados para «{term}»",
+      "clearSearch": "Limpar pesquisa",
+      "addOption": "Adicionar «{value}»",
       "moreInfoAbout": "Mais informações sobre {field}",
       "moreInfo": "Mais informações"
     },
@@ -23114,7 +23304,10 @@
       "removeColumnAria": "Remover coluna",
       "formatColumnAria": "Formatar coluna",
       "selectedOfTotal": "{selected} de {total} selecionados",
-      "selectedCount": "{selected} selecionados"
+      "selectedCount": "{selected} selecionados",
+      "clearSelection": "Limpar",
+      "rowActions": "Ações da linha",
+      "moreRowActions": "Mais ações"
     },
     "predefinedThemes": {
       "title": "Tema",
@@ -23482,6 +23675,26 @@
         "past": "Dias anteriores",
         "ended": "Terminada"
       }
+    },
+    "jsonViewer": {
+      "include": "Filtrar por este valor",
+      "exclude": "Excluir este valor",
+      "copyValue": "Copiar valor",
+      "fieldCount": "{count} campo | {count} campos",
+      "itemCount": "{count} item | {count} itens"
+    },
+    "tabs": {
+      "more": "Mais",
+      "unsaved": "Alterações não guardadas",
+      "locked": "Bloqueado"
+    },
+    "statStrip": {
+      "filters": "Filtros",
+      "showOnly": "Mostrar apenas {label}",
+      "alsoShow": "Mostrar também {label}",
+      "stopShowing": "Deixar de mostrar {label}",
+      "scrollBack": "Mostrar filtros anteriores",
+      "scrollForward": "Mostrar mais filtros"
     }
   },
   "functions": {
@@ -24352,6 +24565,12 @@
   },
   "passwordPolicy": {
     "complexity": "Complexidade",
+    "complexityDesc": "O que cada nova palavra-passe tem de conter.",
+    "unitCharacters": "carateres",
+    "unitDays": "dias",
+    "unitPasswords": "palavras-passe",
+    "unitAttempts": "tentativas",
+    "unitSeconds": "segundos",
     "minLength": "Comprimento mínimo",
     "minLengthDesc": "Palavra-passe mais curta aceite",
     "maxLength": "Comprimento máximo",
@@ -24367,6 +24586,7 @@
     "specialCharSet": "Caracteres especiais permitidos",
     "specialCharSetDesc": "Deixe vazio para aceitar qualquer carácter não alfanumérico",
     "maxLengthTooSmall": "O comprimento máximo deve estar entre o comprimento mínimo e 128.",
+    "maxLengthBelowMin": "Tem de ser {min} ou mais, para corresponder ao comprimento mínimo.",
     "confirmTitle": "Guardar política de palavras-passe?",
     "confirmMessage": "Guardar pode forçar todos os utilizadores nativos a definir uma nova palavra-passe antes de continuar. Utilizadores root, externos e contas de serviço estão isentos — isto inclui-o a si, a menos que seja a conta root. Não pode ser desfeito.",
     "saved": "Política de palavras-passe guardada. | Política de palavras-passe guardada. {count} utilizador deve repor a palavra-passe. | Política de palavras-passe guardada. {count} utilizadores devem repor a palavra-passe.",
@@ -24377,14 +24597,17 @@
     "loadFailed": "Algo correu mal ao ler a política atual.",
     "rotation": "Rotação",
     "rotationDays": "Período de rotação",
+    "rotationDesc": "Quando uma palavra-passe expira e com que antecedência as pessoas são avisadas.",
     "rotationDaysDesc": "Dias antes de a palavra-passe expirar. 0 = nunca expira",
     "rotationWarningDays": "Avisar antes da expiração",
     "rotationWarningDaysDesc": "Dias de antecedência no início de sessão. 0 = sem aviso",
+    "rotationWarningDaysOffDesc": "Dias de aviso prévio no início de sessão. Usado quando as palavras-passe expiram.",
     "warningDaysTooLong": "O período de aviso não pode ser maior que o período de rotação.",
     "rotationPreview": "Uma palavra-passe definida hoje expira {expires}. O aviso no início de sessão começa {warns}.",
     "rotationPreviewNoWarning": "Uma palavra-passe definida hoje expira {expires}. Nenhum aviso é mostrado antes disso.",
     "reuse": "Prevenção de reutilização",
     "historyCount": "Palavras-passe memorizadas",
+    "reuseDesc": "Impede que se volte a uma palavra-passe antiga.",
     "historyCountDesc": "Uma nova palavra-passe não pode ser igual a esta quantidade de palavras-passe anteriores. 0 = sem verificação",
     "historyMaxRetained": "Histórico retido",
     "historyMaxRetainedDesc": "Quantas palavras-passe anteriores são mantidas por utilizador",
@@ -24392,6 +24615,7 @@
     "reuseExplainer": "A palavra-passe atual conta como uma das palavras-passe do conjunto memorizado — reutilizá-la é recusado por esta regra, não por uma verificação separada.",
     "lockout": "Bloqueio de conta",
     "lockoutThreshold": "Tentativas falhadas antes do bloqueio",
+    "lockoutDesc": "O que acontece após repetidas falhas de início de sessão.",
     "lockoutThresholdDesc": "0 = bloqueio desativado",
     "lockoutBucketSize": "Tentativas antes de cada bloqueio adicional",
     "lockoutBucketSizeDesc": "0 = reutilizar o valor acima",
@@ -24406,6 +24630,7 @@
     "backoffLinear": "Linear",
     "lockoutPreview": "{threshold} falhas → {first} · a cada {bucket} adicionais → {rest} · limitado a {max}. Um início de sessão bem-sucedido redefine tudo.",
     "sessionEnforcement": "Sessão e aplicação",
+    "sessionEnforcementDesc": "Quanto tempo dura um início de sessão e se o root segue estas regras.",
     "cookieMaxAge": "Duração da sessão",
     "cookieMaxAgeDesc": "Segundos durante os quais uma sessão autenticada permanece válida. 0 = usar o padrão da instância de {envVar}",
     "applyToRoot": "Aplicar à conta root",
@@ -24782,6 +25007,7 @@
       "packUnavailableHint": "O conteúdo curado para esta carga de trabalho ainda não foi lançado. Crie um dashboard para o representar em gráficos entretanto.",
       "partialTelemetryKubernetes": "Encontrámos streams do Kubernetes, mas não as métricas de que esta página precisa (kubeletstats ou receiver de cluster). Verifique os receivers do seu coletor.",
       "partialTelemetryHosts": "Encontrámos streams de host, mas não as métricas de que esta página precisa. Verifique o receiver hostmetrics do seu coletor.",
+      "hostMetricsMissingTitle": "Não foram encontradas métricas do host",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}, e mais {count}",
       "hiddenFootnote": "Fontes de dados às quais não tem acesso também aparecem aqui.",
@@ -27232,6 +27458,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Suprimir o acionamento",
     "savePolicyFailed": "Não foi possível guardar a política",
+    "savePolicyFailedReason": "Política não guardada. {reason}",
     "state_triggered": "Acionado",
     "state_triaged": "Triado",
     "state_acknowledged": "Reconhecido",
@@ -28849,6 +29076,11 @@
       "otherOrgs": "Nenhuma outra organização | {count} outra organização | {count} outras organizações",
       "connectedOn": "{date} por {user}",
       "helpContact": "Contacto de ajuda",
+      "helpContactHelp": "As pessoas que não conseguem ligar a conta são encaminhadas para este contacto.",
+      "eventsLabel": "Eventos do Slack",
+      "connectionLabel": "Ligação",
+      "outboundLabel": "Fila de saída",
+      "collaboratorsLabel": "Colaboradores da aplicação",
       "helpContactPlaceholder": "#o2-help, ou uma pessoa a quem perguntar",
       "helpContactSaved": "Contacto de ajuda guardado",
       "disconnectSection": "Desconectar",
@@ -30502,9 +30734,9 @@
     },
     "queryTooltip": "Editar o filtro como texto",
     "builderTooltip": "Editar o filtro com o construtor",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
+    "editorModeLabel": "Editor de filtros",
+    "modeBuilder": "Construtor",
+    "modeText": "Texto"
   },
   "autoobserveLive": {
     "paging": {
@@ -30597,5 +30829,23 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "pageHeader": {
+    "about": "Acerca desta página"
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· em {percent}% dos rastreios, últimas 24 horas",
+    "fallbacksNote": "Introduza os campos alternativos separados por vírgulas, pela ordem de verificação.",
+    "fallbackInvalid": "Use nomes de campos separados por vírgulas. Apenas letras, números e . _ - : / {'@'}.",
+    "sessions": {
+      "title": "Apresentação de sessões",
+      "help": "Como as sessões são intituladas e que texto envolvente é ocultado.",
+      "noAgents": "Ainda sem agentes. Adicione um agente para ocultar o respetivo texto envolvente."
+    }
+  },
+  "copyButton": {
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "failed": "Cópia bloqueada · prima Ctrl C"
   }
 }

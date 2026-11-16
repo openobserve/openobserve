@@ -11,7 +11,6 @@
       <OButton
         v-if="!readonly"
         variant="secondary"
-        icon="add"
         @click="onAddClick"
         data-test="add-cross-link-btn"
       >

@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
-            <OButton variant="secondary" class="mb-4" @click="addHeader" icon="add">
+            <OButton variant="secondary" class="mb-4" @click="addHeader">
               {{ t("aiToolset.addHeader") }}
             </OButton>
           </template>
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
-            <OButton variant="secondary" class="mb-4" @click="addEnvVar" icon="add">
+            <OButton variant="secondary" class="mb-4" @click="addEnvVar">
               {{ t("aiToolset.addEnvVar") }}
             </OButton>
 
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("common.editorDraft.reenterField") }}
               </div>
             </div>
-            <OButton variant="secondary" class="mb-4" @click="addCredFile" icon="add">
+            <OButton variant="secondary" class="mb-4" @click="addCredFile">
               {{ t("aiToolset.addCredFile") }}
             </OButton>
           </template>

@@ -1571,7 +1571,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OButton
           variant="secondary"
           size="sm"
-          icon="add"
           :disabled="addDisabled"
           class="max-md:hidden"
           data-test="synthetics-journey-add-step-btn"

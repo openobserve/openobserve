@@ -18,6 +18,7 @@
     "rbacOff": "RBAC jest wyłączone dla tej organizacji. Administrator włącza je, ustawiając {env} na true w konfiguracji serwera."
   },
   "emptyState": {
+    "requestId": "Żądanie {id}",
     "illustrations": {
       "noHistoryYet": "Brak historii",
       "noLogsFound": "Nie znaleziono logów",
@@ -451,7 +452,9 @@
       "description": "Brak {noun} pasujących do bieżących filtrów lub wyszukiwania. Spróbuj je zmienić lub wyczyścić.",
       "action": "Wyczyść filtry",
       "actionDesc": "Zresetuj wszystkie filtry i wyszukiwanie",
-      "fallbackNoun": "wyniki"
+      "fallbackNoun": "wyniki",
+      "noMatches": "Brak wyników",
+      "noMatchesText": "Nic nie pasuje do bieżącego wyszukiwania ani filtrów."
     },
     "nouns": {
       "logs": "logi",
@@ -490,6 +493,7 @@
       "evalTemplates": "szablony ewaluacji",
       "enrichmentTables": "tabele wzbogacania",
       "cipherKeys": "klucze szyfrujące",
+      "announcementBanners": "banery z ogłoszeniami",
       "aiToolsets": "zestawy narzędzi AI",
       "llmProviders": "dostawcy LLM",
       "sourceMaps": "mapy źródłowe",
@@ -633,6 +637,26 @@
     "noOncallUnrouted": {
       "title": "Nic nie wymaga właściciela",
       "description": "Każdy alert, który został wyzwolony, dotarł do zespołu."
+    },
+    "noSlackChannelDefaults": {
+      "title": "Żaden kanał nie ma jeszcze domyślnej organizacji",
+      "description": "Pytania w kanale bez organizacji domyślnej trafiają do domyślnej organizacji każdej osoby (można ją zmienić poleceniem /o2 org)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "Nikt w tej organizacji nie połączył jeszcze Slacka"
+    },
+    "slackNotConnected": {
+      "title": "Połącz przestrzeń roboczą Slack"
+    },
+    "noAnnouncementBanners": {
+      "title": "Brak jeszcze banerów",
+      "description": "Banery wyświetlają komunikat u góry aplikacji wybranym organizacjom.",
+      "action": "Dodaj baner",
+      "actionDesc": "Napisz komunikat i zaplanuj jego wyświetlanie"
+    },
+    "pageError": {
+      "title": "Nie udało się wczytać tej strony",
+      "description": "Żadne dane tej strony nie zostały wczytane. Spróbuj ponownie teraz lub za minutę."
     }
   },
   "accessBoundary": {
@@ -660,6 +684,7 @@
       "groups": "Grupy",
       "serviceAccounts": "Konta usługi",
       "cipherKeys": "Klucze szyfrujące",
+      "announcementBanners": "Banery z ogłoszeniami",
       "regexPatterns": "Wzorce regex",
       "evalJobs": "Zadania ewaluacji online",
       "billingGroup": "Grupa rozliczeniowa",
@@ -716,6 +741,7 @@
       "groups": "grupy",
       "serviceAccounts": "konta usługi",
       "cipherKeys": "klucze szyfrujące",
+      "announcementBanners": "banery z ogłoszeniami",
       "regexPatterns": "wzorce regex",
       "unnamed": "ten zasób",
       "onCall": "dyżury",
@@ -773,9 +799,14 @@
   },
   "common": {
     "saveBar": {
-      "noChanges": "Brak zmian do zapisania"
+      "noChanges": "Brak zmian do zapisania",
+      "unsavedChanges": "{n} niezapisana zmiana | {n} niezapisane zmiany",
+      "changesShort": "{n} zmiana | {n} zmiany",
+      "fixFields": "Popraw {n} pole | Popraw pola: {n}",
+      "discard": "Odrzuć"
     },
     "dismiss": "Odrzuć",
+    "undo": "Cofnij",
     "exitFullscreen": "Wyjdź z pełnego ekranu",
     "moreActions": "Więcej akcji",
     "moreOptions": "Więcej opcji",
@@ -1014,6 +1045,8 @@
     "back": "Wstecz",
     "save": "Zapisz",
     "discardChanges": "Odrzuć zmiany",
+    "switchOn": "Wł.",
+    "switchOff": "Wył.",
     "unsavedChanges": "Niezapisane zmiany",
     "update": "Aktualizuj",
     "favourite": "Ulubione",
@@ -1128,6 +1161,8 @@
     "field": "Pole",
     "enterValueOrVariable": "Wprowadź wartość lub $variable",
     "all": "Wszystkie",
+    "allStates": "Wszystkie stany",
+    "allStatuses": "Wszystkie statusy",
     "jsonFilesOnlyHint": "Tylko pliki .json",
     "fileUploadJsonTab": "Przesyłanie plików / JSON",
     "urlImportTab": "Import URL",
@@ -1234,7 +1269,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "konfiguracja kolektora"
+        "fleet_config": "konfiguracja kolektora",
+        "workflow": "przepływ pracy"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1244,6 +1280,11 @@
       "leaveMessageInBrowser": "Zapisz {entity}, zachowaj zmiany w tej przeglądarce lub je odrzuć.",
       "retentionInBrowser": "Zmiany są przechowywane w tej przeglądarce przez {days} dni lub do wylogowania. Zachowywanych jest tylko {max} najnowszych każdego rodzaju.",
       "dotUndated": "Unsaved draft"
+    },
+    "leaveGuard": {
+      "title": "Wyjść z niezapisanymi zmianami?",
+      "message": "Na tej stronie jest {n} niezapisana zmiana. Zostanie utracona po wyjściu. | Na tej stronie są niezapisane zmiany: {n}. Zostaną utracone po wyjściu.",
+      "keepEditing": "Kontynuuj edycję"
     }
   },
   "flow": {
@@ -1942,8 +1983,8 @@
     "histogramTitleRows": "{total} wiersz w {took} ms. | {total} wierszy w {took} ms.",
     "histogramTitleRowsWithScan": "{total} wiersz w {took} ms. ({scanLabel}: {scanSize}) | {total} wierszy w {took} ms. ({scanLabel}: {scanSize})",
     "pickStreamFirst": "Najpierw wybierz strumień",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "Automatyczne odświeżanie aktualizuje wyniki wyszukiwania. Jest wstrzymane podczas wizualizacji.",
+    "histogramNoTimeAxis": "Wyniki pogrupowane nie mają osi czasu"
   },
   "menu": {
     "alertCalibration": "Kalibracja alertów",
@@ -3858,6 +3899,8 @@
     "your_complete_license_key": "Twój pełny klucz licencyjny:",
     "copy_key": "Kopiuj klucz",
     "usage_information": "Informacje o użyciu",
+    "usage_chart_title": "Dzienny wolumen danych w tym miesiącu",
+    "no_license_ingestion_limit": "Bez licencji ingestia jest ograniczona do <strong>{limit} GB</strong> dziennie.",
     "license_allows_ingestion": "Aktualna licencja pozwala na przesyłanie <strong>{limit} GB</strong> danych dziennie.",
     "license_allows_unlimited_ingestion": "Obecna licencja pozwala na nieograniczone przesyłanie danych.",
     "limit_exceeded_days": "Limit został przekroczony przez <strong class=\"{colorClass}\">{days} dzień</strong> w tym miesiącu | Limit został przekroczony przez <strong class=\"{colorClass}\">{days} dni</strong> w tym miesiącu",
@@ -4714,6 +4757,8 @@
     },
     "listOrganizations": {
       "subtitle": "Organizacje, do których masz dostęp",
+      "switch": "Przełącz na tę organizację",
+      "current": "Bieżąca",
       "cannotEditWhileDeleting": "Nie można edytować podczas trwania usuwania",
       "edit": "Edytuj",
       "deleteOrganization": "Usuń organizację",
@@ -10169,6 +10214,12 @@
       "noPanels": "Brak paneli",
       "panelsDeletedHint": "Jego panele zostały usunięte, więc obecnie nie jest rysowany na żadnym panelu. Wybierz panele lub wybierz Zaznacz wszystko, aby to naprawić.",
       "blankFiltersHint": "Warunki bez wartości są pomijane."
+    },
+    "inlineCreate": {
+      "folderName": "Nazwa nowego folderu",
+      "createFolder": "Utwórz folder",
+      "tabName": "Nazwa nowej karty",
+      "createTab": "Utwórz kartę"
     }
   },
   "panel": {
@@ -14256,7 +14307,8 @@
         "mute": "Nie możesz tego wyciszyć.",
         "onCall": "Na dyżurze: {people}",
         "canAct": "Mogą również działać: {people}",
-        "people": "Na dyżurze: {onCall}. Mogą również działać: {canAct}"
+        "people": "Na dyżurze: {onCall}. Mogą również działać: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "Ten alert nie jest wyzwolony, więc nie ma czego potwierdzać.",
@@ -14315,7 +14367,11 @@
       "open": "Edytuj w Bezpieczeństwie"
     },
     "newAlertTitle": "Nowy alert",
-    "newAnomalyTitle": "Nowe wykrywanie anomalii"
+    "newAnomalyTitle": "Nowe wykrywanie anomalii",
+    "rowAction": {
+      "paused": "Wstrzymano: {name} | Wstrzymane alerty: {count}",
+      "resumed": "Wznowiono: {name} | Wznowione alerty: {count}"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Otwórz",
@@ -14774,6 +14830,7 @@
     "destination_type": "Typ miejsca docelowego",
     "template": "Szablon",
     "actions": "Akcje",
+    "addHeader": "Dodaj nagłówek",
     "addTitle": "Nowe miejsce docelowe",
     "updateTitle": "Aktualizuj miejsce docelowe",
     "delete": "Usuń",
@@ -14919,7 +14976,9 @@
   },
   "pipeline_destinations": {
     "header": "Miejsca docelowe potoków",
-    "search": "Szukaj miejsc docelowych"
+    "search": "Szukaj miejsc docelowych",
+    "destinationType": "Typ miejsca docelowego",
+    "outputFormat": "Format wyjściowy"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15430,8 +15489,12 @@
     "groupIntegrations": "Integracje",
     "groupAccount": "Konto",
     "slackApp": "Slack",
+    "slackAppDesc": "Przestrzenie robocze, ustawienia domyślne kanałów i łączenie kont dla aplikacji Slack",
     "generalDesc": "Motyw, domyślne zapytania i podstawowe preferencje",
     "orgDesc": "Parametry organizacji i identyfikatory",
+    "generalSubtitle": "Wygląd organizacji {org} i jej domyślne ustawienia zapytań.",
+    "orgSubtitle": "Nazwy pól, retencja danych i funkcje automatyczne dla {org}.",
+    "passwordPolicySubtitle": "Zasady dla kont natywnych z adresem e-mail i hasłem.",
     "cipherKeysDesc": "Klucze szyfrowania dla poufnych pól",
     "regexPatternsDesc": "Wielokrotnego użytku wzorce regex do maskowania",
     "domainManagementDesc": "Ogranicz logowanie do dozwolonych domen SSO",
@@ -15718,10 +15781,59 @@
       "failedToLoadServices": "Nie udało się załadować usług"
     },
     "domainManagement": {
-      "unknownTime": "Nieznany czas"
+      "unknownTime": "Nieznany czas",
+      "claimParserTitle": "Parser claimów",
+      "claimParserSectionDesc": "Zamienia claimy SSO i LDAP na przypisania do organizacji i ról.",
+      "claimParserLabel": "Funkcja parsera claimów",
+      "claimParserHelp": "Funkcja {product1} lub {product2}, która otrzymuje zmapowane claimy i zwraca organizacje oraz role do przypisania albo odmowę.",
+      "claimParserFormatLink": "Format wejścia i wyjścia",
+      "claimParserPlaceholder": "Brak funkcji",
+      "noFunctions": "Brak funkcji",
+      "restrictionsTitle": "Ograniczenia domen",
+      "restrictionsDesc": "Które domeny e-mail i którzy użytkownicy mogą logować się przez SSO.",
+      "domainLabel": "Domena",
+      "addDomain": "Dodaj domenę",
+      "noDomains": "Brak domen. Dodaj domenę, aby ograniczyć, kto może się logować.",
+      "accessFor": "Dostęp dla {domain}",
+      "policyAllowAll": "Zezwól wszystkim użytkownikom",
+      "policyAllowSpecific": "Zezwól tylko wymienionym użytkownikom",
+      "policyBlockSpecific": "Zablokuj wymienionych użytkowników",
+      "policyBlockAll": "Zablokuj wszystkich użytkowników",
+      "effectAllowSpecific": "Logować się będą mogli tylko wymienieni użytkownicy z adresami e-mail kończącymi się na {domain}.",
+      "effectBlockSpecific": "Wymienieni zewnętrzni użytkownicy SSO z adresami e-mail kończącymi się na {domain} zostaną zablokowani w systemie (UI, API i ingestia).",
+      "emailLabel": "Adres e-mail",
+      "noEmails": "Brak wymienionych adresów e-mail.",
+      "removeDomain": "Usuń {domain}",
+      "removeEmail": "Usuń {email}",
+      "saved": "Zapisano ustawienia SSO"
     },
     "general": {
       "close": "Zamknij",
+      "themeTitle": "Motyw",
+      "themeDescription": "Kolor akcentu dla {org} w trybie jasnym i ciemnym.",
+      "accentColorLabel": "Kolor akcentu",
+      "lightColorLabel": "Zmień kolor trybu jasnego, obecnie {color}",
+      "darkColorLabel": "Zmień kolor trybu ciemnego, obecnie {color}",
+      "queryDefaultsTitle": "Domyślne ustawienia zapytań",
+      "queryDefaultsDescription": "Wartości domyślne zbierania metryk i zapytań PromQL.",
+      "scrapeIntervalLabel": "Interwał scrapowania",
+      "scrapeIntervalHelp": "Jak często zbierane są metryki.",
+      "unitSeconds": "sekund",
+      "maxSeriesLabel": "Maks. liczba serii na zapytanie",
+      "maxSeriesHelp": "Największa liczba serii, jaką może zwrócić jedno zapytanie PromQL. Puste pole oznacza wartość domyślną: {n}.",
+      "unitSeries": "serii",
+      "maxSeriesError": "Wpisz wartość od 1 000 do 1 000 000 lub zostaw puste, aby użyć domyślnej.",
+      "brandingTitle": "Branding",
+      "brandingDescription": "Nazwa i logo widoczne dla każdej organizacji w tej instancji.",
+      "logoTextHelp": "Zastępuje domyślną nazwę wyświetlaną w aplikacji. Do 100 znaków.",
+      "logoTextTooLong": "Użyj najwyżej 100 znaków.",
+      "logoTextSaveFailed": "Nie zapisano własnego tekstu logo. {reason}",
+      "logoSaveFailed": "Nie przesłano logo ({mode}). {reason}",
+      "brandingUpdated": "Zaktualizowano branding",
+      "logoLightLabel": "Własne logo (tryb jasny)",
+      "logoLightHelp": "Wyświetlane w trybie jasnym. PNG, JPG, GIF lub BMP, do 150 × 30 px.",
+      "logoDarkLabel": "Własne logo (tryb ciemny)",
+      "logoDarkHelp": "Wyświetlane w trybie ciemnym. PNG, JPG, GIF lub BMP, do 150 × 30 px.",
       "fileCounterLabel": "{constraint} pliki: {filesNumber} {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
@@ -15743,18 +15855,30 @@
       "title": "Domyślne ustawienia retencji danych",
       "about": "Dla strumieni bez własnego okresu przechowywania. Pusta wartość lub 0 oznacza użycie wartości globalnej; w przeciwnym razie co najmniej 3 dni.",
       "defaultDays": "Domyślne (dni)",
+      "defaultLabel": "Domyślnie",
+      "unitDays": "dni",
+      "daysFor": "Retencja: {type} (dni)",
       "streamType": "Typ strumienia",
       "days": "Dni",
       "addType": "Dodaj typ strumienia",
+      "allTypesAdded": "Każdy typ strumienia ma już wiersz.",
+      "removeTypeNamed": "Usuń wartość domyślną dla: {type}",
       "removeType": "Usuń ten typ strumienia",
       "globalDefault": "Globalnie: {value}",
       "globalType": "Globalny {type}: {value}",
       "daysValue": "{days} dni",
       "forever": "przechowuj bezterminowo",
-      "invalid": "Użyj 0 lub co najmniej 3 dni"
+      "invalid": "Użyj 0 lub co najmniej 3 dni",
+      "invalidType": "Użyj co najmniej 3 dni lub usuń ten typ"
     },
     "organizationSettings": {
       "fieldNameHelp": "Używaj tylko znaków alfanumerycznych oraz '+=,.{'@'}-_', bez spacji.",
+      "sectionTitle": "Obsługa danych",
+      "sectionDescription": "Jak logi łączą się ze śladami i które funkcje automatyczne są włączone.",
+      "traceIdHelp": "Pole logu łączące wiersz logu z jego śladem. Tylko litery, cyfry i + = , . {'@'} - _.",
+      "spanIdHelp": "Pole logu łączące wiersz logu z jego spanem. Te same znaki co wyżej.",
+      "ingestionLogsHelp": "Zapisuje log rekordów, których ingestia się nie powiodła.",
+      "usageStreamHelp": "Zapisuje użycie {org} we własnym strumieniu, który można odpytywać.",
       "settingsUpdated": "Ustawienia organizacji zaktualizowane pomyślnie",
       "settingsSaveError": "Błąd podczas zapisywania ustawień organizacji"
     },
@@ -16409,6 +16533,7 @@
     "queryRange": "Zakres zapytania",
     "userSummary": "Podsumowanie użytkownika",
     "allQueries": "Wszystkie zapytania",
+    "allFields": "Wszystkie pola",
     "queryType": "Typ zapytania",
     "numOfQueries": "Liczba zapytań",
     "totalDuration": "Łączny czas wykonania",
@@ -17145,12 +17270,12 @@
       "truncated": "Wyświetlany jest pierwszy span tego trace, w kolejności czasu rozpoczęcia. Późniejsze spany nie zostały jeszcze wczytane. | Wyświetlane są pierwsze spany tego trace ({count}), w kolejności czasu rozpoczęcia. Późniejsze spany nie zostały jeszcze wczytane.",
       "loadMore": "Wczytaj następny span | Wczytaj następne spany ({size})",
       "loadMoreFailed": "Nie udało się wczytać kolejnych spanów tego trace'a",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "Brak śladu o tym ID między {from} a {to}",
+      "notFoundText": "Ślad {traceId} nie ma spanów w strumieniu {stream} w tym zakresie. Może być starszy lub nowszy, w innym strumieniu albo niezebrany.",
+      "searchWiderRange": "Szukaj w szerszym zakresie",
+      "searchSpansInRange": "Szukaj spanów w tym zakresie",
+      "loadFailedTitle": "Nie udało się wczytać tego śladu",
+      "loadFailedText": "Nie można odczytać śladu {traceId}. Spróbuj ponownie za chwilę."
     },
     "traceTree": {
       "clickToExpand": "Kliknij, aby rozwinąć",
@@ -17345,6 +17470,8 @@
     "type": "Typ",
     "step1WithType": "Szczegóły magazynu kluczy (Typ: {type})",
     "step2": "Mechanizm szyfrowania",
+    "sectionKey": "Klucz",
+    "sectionSetup": "Magazyn kluczy i szyfrowanie",
     "secret": "Sekret",
     "baseURL": "Podstawowy URL",
     "accessId": "Identyfikator dostępu",
@@ -17583,6 +17710,8 @@
     "noTracesDescription": "Nie znaleziono trace dla tej korelacji w wybranym zakresie czasu.",
     "viewInTraces": "Zobacz w trace",
     "filters": "Filtry",
+    "fieldGroupsTitle": "Grupy pól",
+    "fieldNamesColumn": "Nazwy pól",
     "semanticFieldGroupsCaption": "Mapuj nazwy pól telemetrii na wspólne grupy, aby OpenObserve mógł je korelować w różnych strumieniach.",
     "exportToJson": "Eksportuj do JSON",
     "importFromJson": "Importuj z JSON",
@@ -20725,8 +20854,8 @@
       "searchAroundTip": "Wczytaj zdarzenia zapisane tuż przed tym zdarzeniem i tuż po nim.",
       "noOfEventsTip": "Ile zdarzeń wczytać wokół tego zdarzenia.",
       "severityTip": "Wykryty poziom logu. Wybierz, aby zobaczyć, jak go wykryto.",
-      "traceId": "Trace ID",
-      "spanId": "Span ID"
+      "traceId": "ID śladu",
+      "spanId": "ID spanu"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Zapytanie SELECT * nie jest obsługiwane dla wizualizacji.",
@@ -21011,6 +21140,7 @@
     "showDetail": "Pokaż szczegóły",
     "hideDetail": "Ukryj szczegóły",
     "runAs": "Uruchom jako",
+    "runSuggestion": "Uruchom {query}",
     "searchTextFor": "Szukaj tekstu dla \"{text}\"",
     "searchTextDesc": "Przeszukaj całe dane wejściowe jako jedną frazę",
     "explain": {
@@ -21042,7 +21172,19 @@
     "dataStale": "Dane są nieaktualne",
     "lastRefreshed": "Ostatnie odświeżenie: {time}",
     "refresh": "Odśwież",
-    "refreshWithAge": "Odśwież, ostatnio odświeżono {age}"
+    "refreshWithAge": "Odśwież, ostatnio odświeżono {age}",
+    "refreshing": "Odświeżanie",
+    "failed": "Niepowodzenie",
+    "autoRefresh": "Automatyczne odświeżanie",
+    "autoOn": "Auto · {interval}",
+    "every": "Co {interval}",
+    "interval": {
+      "10s": "10 s",
+      "30s": "30 s",
+      "1m": "1 min",
+      "5m": "5 min",
+      "15m": "15 min"
+    }
   },
   "synthetics": {
     "variables": {
@@ -21900,7 +22042,12 @@
       "noPrivateMatches": "Żadne lokalizacje prywatne nie odpowiadają Twojemu wyszukiwaniu",
       "newPrivateLocation": "Nowa lokalizacja prywatna",
       "publicSubtitle": "Regiony w chmurze, zawsze dostępne",
-      "privateSubtitle": "Lokalizacja jest gotowa, gdy co najmniej jeden z jej agentów jest aktywny"
+      "privateSubtitle": "Lokalizacja jest gotowa, gdy co najmniej jeden z jej agentów jest aktywny",
+      "emptyState": {
+        "title": "Brak lokalizacji",
+        "description": "Lokalizacja to miejsce, z którego Twoje monitory syntetyczne wykonują testy, np. region chmury.",
+        "actionDesc": "Dodaj miejsce, z którego mają być wykonywane testy"
+      }
     },
     "newCheck": {
       "comingSoon": "Wkrótce",
@@ -22981,7 +23128,10 @@
       "tokenLinkTooltip": "Wybierz, którego tokenu pozyskiwania danych używają fragmenty kodu",
       "copiedWithToken": "Skopiowano z tokenem organizacji {name}",
       "tokenIncludedHint": "Kopiowanie obejmuje token pozyskiwania danych organizacji, który pozostaje tutaj ukryty.",
-      "maskedSelectionWarning": "Ukryty token został skopiowany jako kropki. Użyj opcji Kopiuj lub najpierw go pokaż."
+      "maskedSelectionWarning": "Ukryty token został skopiowany jako kropki. Użyj opcji Kopiuj lub najpierw go pokaż.",
+      "wrapLines": "Zawijaj wiersze",
+      "showAll": "Pokaż {count} wiersz | Pokaż wszystkie wiersze: {count}",
+      "showLess": "Pokaż mniej"
     },
     "spinner": {
       "loading": "Ładowanie"
@@ -23026,7 +23176,10 @@
       "moreInfo": "Więcej informacji"
     },
     "dialog": {
-      "closeDialog": "Zamknij okno dialogowe"
+      "closeDialog": "Zamknij okno dialogowe",
+      "discardChanges": "Odrzucić zmiany?",
+      "keepEditing": "Kontynuuj edycję",
+      "discard": "Odrzuć"
     },
     "drawer": {
       "closeDrawer": "Zamknij szufladę"
@@ -23049,6 +23202,32 @@
       "clear": "Wyczyść"
     },
     "file": {
+      "removeNamed": "Usuń {name}",
+      "sourceLabel": "Importuj z",
+      "sourceFile": "Plik",
+      "sourceUrl": "URL",
+      "sourcePaste": "Wklej",
+      "dropPrompt": "Upuść plik tutaj lub {choose}",
+      "dropPromptMultiple": "Upuść pliki tutaj lub {choose}",
+      "chooseAFile": "wybierz plik",
+      "chooseFiles": "wybierz pliki",
+      "chooseFileButton": "Wybierz plik",
+      "chooseFilesButton": "Wybierz pliki",
+      "noFileChosen": "Nie wybrano pliku",
+      "dropToUpload": "Upuść, aby przesłać",
+      "upToSize": "do {size}",
+      "upToSizeEach": "do {size} każdy",
+      "oneFile": "jeden plik",
+      "upToFiles": "do {count} plików",
+      "typeRejected": "Akceptowane są tylko pliki: {allowed}",
+      "sizeRejected": "{size} przekracza limit {max}",
+      "countRejected": "Tylko {count} plik naraz | Tylko {count} pliki naraz",
+      "uploadFailed": "Przesyłanie nie powiodło się",
+      "uploaded": "Przesłano",
+      "urlPlaceholder": "URL pliku",
+      "urlHelp": "Pobieramy go raz, podczas importu.",
+      "textPlaceholder": "Wklej treść tutaj",
+      "invalidJson": "Nieprawidłowy JSON: {detail}",
       "removeFile": "Usuń plik",
       "clearAll": "Wyczyść wszystko"
     },
@@ -23063,7 +23242,14 @@
     "pagination": {
       "pagination": "Paginacja",
       "previousPage": "Poprzednia strona",
-      "nextPage": "Następna strona"
+      "nextPage": "Następna strona",
+      "onFirstPage": "Jesteś już na pierwszej stronie",
+      "onLastPage": "Jesteś już na ostatniej stronie",
+      "range": "{from}–{to} z {total}",
+      "rangeOfMany": "{from}–{to} z wielu",
+      "pageOf": "Strona {page} z {pages}",
+      "perPage": "{size} na stronę",
+      "pageSize": "Wierszy na stronę"
     },
     "select": {
       "more": "więcej",
@@ -23073,6 +23259,10 @@
       "noOptionsFound": "Nie znaleziono opcji",
       "multiSelect": "Wielokrotny wybór",
       "singleSelect": "Pojedynczy wybór",
+      "any": "Dowolne",
+      "noMatches": "Brak wyników dla „{term}”",
+      "clearSearch": "Wyczyść wyszukiwanie",
+      "addOption": "Dodaj „{value}”",
       "moreInfoAbout": "Więcej informacji o polu {field}",
       "moreInfo": "Więcej informacji"
     },
@@ -23114,7 +23304,10 @@
       "removeColumnAria": "Usuń kolumnę",
       "formatColumnAria": "Formatuj kolumnę",
       "selectedOfTotal": "Wybrano {selected} z {total}",
-      "selectedCount": "Wybrano {selected}"
+      "selectedCount": "Wybrano {selected}",
+      "clearSelection": "Wyczyść",
+      "rowActions": "Akcje wiersza",
+      "moreRowActions": "Więcej akcji"
     },
     "predefinedThemes": {
       "title": "Motyw",
@@ -23482,6 +23675,26 @@
         "past": "Minione dni",
         "ended": "Zakończone"
       }
+    },
+    "jsonViewer": {
+      "include": "Filtruj po tej wartości",
+      "exclude": "Odfiltruj tę wartość",
+      "copyValue": "Kopiuj wartość",
+      "fieldCount": "{count} pole | Pola: {count}",
+      "itemCount": "{count} element | Elementy: {count}"
+    },
+    "tabs": {
+      "more": "Więcej",
+      "unsaved": "Niezapisane zmiany",
+      "locked": "Zablokowane"
+    },
+    "statStrip": {
+      "filters": "Filtry",
+      "showOnly": "Pokaż tylko: {label}",
+      "alsoShow": "Pokaż także: {label}",
+      "stopShowing": "Przestań pokazywać: {label}",
+      "scrollBack": "Pokaż poprzednie filtry",
+      "scrollForward": "Pokaż więcej filtrów"
     }
   },
   "functions": {
@@ -24352,6 +24565,12 @@
   },
   "passwordPolicy": {
     "complexity": "Złożoność",
+    "complexityDesc": "Co musi zawierać każde nowe hasło.",
+    "unitCharacters": "znaków",
+    "unitDays": "dni",
+    "unitPasswords": "haseł",
+    "unitAttempts": "prób",
+    "unitSeconds": "sekund",
     "minLength": "Minimalna długość",
     "minLengthDesc": "Najkrótsze akceptowane hasło",
     "maxLength": "Maksymalna długość",
@@ -24367,6 +24586,7 @@
     "specialCharSet": "Dozwolone znaki specjalne",
     "specialCharSetDesc": "Pozostaw puste, aby akceptować dowolny znak niealfanumeryczny",
     "maxLengthTooSmall": "Maksymalna długość musi mieścić się między minimalną długością a 128.",
+    "maxLengthBelowMin": "Musi wynosić co najmniej {min}, zgodnie z minimalną długością.",
     "confirmTitle": "Zapisać zasady haseł?",
     "confirmMessage": "Zapisanie może wymusić na każdym natywnym użytkowniku ustawienie nowego hasła przed dalszym korzystaniem. Konto root, użytkownicy zewnętrzni i konta usługi są zwolnione — dotyczy to również Ciebie, chyba że jesteś kontem root. Tej operacji nie można cofnąć.",
     "saved": "Zasady haseł zostały zapisane. | Zasady haseł zostały zapisane. {count} użytkownik musi zresetować swoje hasło. | Zasady haseł zostały zapisane. {count} użytkowników musi zresetować swoje hasła.",
@@ -24377,14 +24597,17 @@
     "loadFailed": "Wystąpił problem podczas odczytywania bieżących zasad.",
     "rotation": "Rotacja",
     "rotationDays": "Okres rotacji",
+    "rotationDesc": "Kiedy hasło wygasa i z jakim wyprzedzeniem użytkownicy są o tym informowani.",
     "rotationDaysDesc": "Liczba dni do wygaśnięcia hasła. 0 = nigdy nie wygasa",
     "rotationWarningDays": "Ostrzegaj przed wygaśnięciem",
     "rotationWarningDaysDesc": "Liczba dni powiadomienia przy logowaniu. 0 = brak ostrzeżenia",
+    "rotationWarningDaysOffDesc": "Liczba dni wyprzedzenia przy logowaniu. Obowiązuje po wygaśnięciu haseł.",
     "warningDaysTooLong": "Okno ostrzeżenia nie może być dłuższe niż okres rotacji.",
     "rotationPreview": "Hasło ustawione dzisiaj wygasa {expires}. Ostrzeżenie przy logowaniu rozpoczyna się {warns}.",
     "rotationPreviewNoWarning": "Hasło ustawione dzisiaj wygasa {expires}. Do tego czasu nie jest wyświetlane żadne ostrzeżenie.",
     "reuse": "Zapobieganie ponownemu użyciu",
     "historyCount": "Zapamiętane hasła",
+    "reuseDesc": "Uniemożliwia powrót do starego hasła.",
     "historyCountDesc": "Nowe hasło nie może być takie samo jak ta liczba poprzednich. 0 = brak sprawdzania",
     "historyMaxRetained": "Zachowana historia",
     "historyMaxRetainedDesc": "Ile poprzednich haseł jest zachowywanych na użytkownika",
@@ -24392,6 +24615,7 @@
     "reuseExplainer": "Bieżące hasło liczy się jako jedno z zapamiętanego zestawu — jego ponowne użycie jest odrzucane przez tę regułę, a nie przez osobne sprawdzenie.",
     "lockout": "Blokada konta",
     "lockoutThreshold": "Nieudane próby przed blokadą",
+    "lockoutDesc": "Co się dzieje po wielokrotnych nieudanych logowaniach.",
     "lockoutThresholdDesc": "0 = blokada wyłączona",
     "lockoutBucketSize": "Próby przed każdą kolejną blokadą",
     "lockoutBucketSizeDesc": "0 = użyj wartości powyżej",
@@ -24406,6 +24630,7 @@
     "backoffLinear": "Liniowa",
     "lockoutPreview": "Nieudane próby: {threshold} → {first} · co kolejne {bucket} → {rest} · ograniczone do {max}. Udane logowanie resetuje wszystko.",
     "sessionEnforcement": "Sesja i egzekwowanie",
+    "sessionEnforcementDesc": "Jak długo trwa logowanie i czy użytkownik root podlega tym zasadom.",
     "cookieMaxAge": "Czas życia sesji",
     "cookieMaxAgeDesc": "Liczba sekund, przez jaką zalogowana sesja pozostaje ważna. 0 = użyj domyślnej wartości instancji z {envVar}",
     "applyToRoot": "Zastosuj do konta root",
@@ -24782,6 +25007,7 @@
       "packUnavailableHint": "Wyselekcjonowana zawartość dla tego obciążenia nie została jeszcze udostępniona. W międzyczasie zbuduj pulpit, aby przedstawić ją na wykresie.",
       "partialTelemetryKubernetes": "Znaleźliśmy strumienie Kubernetes, ale nie metryki potrzebne tej stronie (kubeletstats lub odbiornik klastra). Sprawdź odbiorniki w swoim kolektorze.",
       "partialTelemetryHosts": "Znaleźliśmy strumienie hostów, ale nie metryki potrzebne tej stronie. Sprawdź odbiornik hostmetrics w swoim kolektorze.",
+      "hostMetricsMissingTitle": "Nie znaleziono metryk hosta",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first} i {count} więcej",
       "hiddenFootnote": "Źródła danych, do których nie masz dostępu, również pojawiają się tutaj.",
@@ -27232,6 +27458,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Wycisz wezwanie",
     "savePolicyFailed": "Nie udało się zapisać polityki",
+    "savePolicyFailedReason": "Nie zapisano zasady. {reason}",
     "state_triggered": "Wyzwolony",
     "state_triaged": "Po triage'u",
     "state_acknowledged": "Potwierdzony",
@@ -28849,6 +29076,11 @@
       "otherOrgs": "Brak innych organizacji | {count} inna organizacja | {count} innych organizacji",
       "connectedOn": "{date} przez {user}",
       "helpContact": "Kontakt ds. pomocy",
+      "helpContactHelp": "Osoby, które nie mogą połączyć konta, są kierowane do tego kontaktu.",
+      "eventsLabel": "Zdarzenia Slack",
+      "connectionLabel": "Połączenie",
+      "outboundLabel": "Kolejka wychodząca",
+      "collaboratorsLabel": "Współpracownicy aplikacji",
       "helpContactPlaceholder": "#o2-help lub osoba do kontaktu",
       "helpContactSaved": "Zapisano kontakt ds. pomocy",
       "disconnectSection": "Odłącz",
@@ -30502,9 +30734,9 @@
     },
     "queryTooltip": "Edytuj filtr jako tekst",
     "builderTooltip": "Edytuj filtr w kreatorze",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
+    "editorModeLabel": "Edytor filtra",
+    "modeBuilder": "Kreator",
+    "modeText": "Tekst"
   },
   "autoobserveLive": {
     "paging": {
@@ -30597,5 +30829,23 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "pageHeader": {
+    "about": "O tej stronie"
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· w {percent}% śladów, ostatnie 24 godziny",
+    "fallbacksNote": "Wpisz pola zapasowe oddzielone przecinkami, w kolejności sprawdzania.",
+    "fallbackInvalid": "Użyj nazw pól oddzielonych przecinkami. Tylko litery, cyfry i . _ - : / {'@'}.",
+    "sessions": {
+      "title": "Wyświetlanie sesji",
+      "help": "Jak nazywane są sesje i jaki tekst opakowujący jest w nich ukrywany.",
+      "noAgents": "Brak agentów. Dodaj agenta, aby ukryć jego tekst opakowujący."
+    }
+  },
+  "copyButton": {
+    "copy": "Kopiuj",
+    "copied": "Skopiowano",
+    "failed": "Kopiowanie zablokowane · naciśnij Ctrl C"
   }
 }

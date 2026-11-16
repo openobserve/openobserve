@@ -174,7 +174,6 @@
       <OButton
         variant="secondary"
         size="sm"
-        icon="add"
         class="rounded-s-default! rounded-e-none!"
         :title="t('aiObservability.playground.addMessageAs', { role: roleLabel(nextRole) })"
         data-test="ai-playground-add-message"

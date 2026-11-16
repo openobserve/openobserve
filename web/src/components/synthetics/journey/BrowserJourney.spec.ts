@@ -1265,7 +1265,6 @@ describe("BrowserJourney add menu and step filter", () => {
     const add = wrapper.find(ADD_STEP);
     expect(add.attributes("variant")).toBe("secondary");
     expect(add.attributes("size")).toBe("sm");
-    expect(add.attributes("icon")).toBe("add");
     expect(add.text()).toBe("synthetics.journey.addMenu.addStep");
 
     await add.trigger("click");

@@ -95,7 +95,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="ms-auto flex flex-wrap items-center gap-2">
               <OButton
                 variant="ghost"
-                icon="add"
                 data-test="fleet-fleets-add-collector"
                 @click="installOpen = true"
               >

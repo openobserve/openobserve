@@ -21,7 +21,6 @@
           <OButton
             v-if="!editing && !readOnly"
             variant="secondary"
-            icon="add"
             class="shrink-0"
             data-test="prompt-label-add"
             @click="openForm(null)"

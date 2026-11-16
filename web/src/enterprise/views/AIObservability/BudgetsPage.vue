@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-2xs text-text-secondary flex-1">{{ t("aiBudgets.signalNote") }}</span>
         <OButton
           variant="primary"
-          icon="add"
           :disabled="noStream || !!forbidden"
           data-test="ai-budgets-new"
           @click="openNew"

@@ -164,7 +164,6 @@
             >
               <OButton
                 variant="secondary"
-                icon="add"
                 data-test="gen-ai-harness-add-agent"
                 @click="addHarnessRule"
               >

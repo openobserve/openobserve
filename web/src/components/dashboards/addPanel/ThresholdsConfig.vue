@@ -129,7 +129,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="self-start">
         <OButton
           variant="secondary"
-          icon="add"
           data-test="dashboard-config-thresholds-add-step"
           @click="addStep"
           >{{ t("dashboard.thresholdAddStep") }}</OButton

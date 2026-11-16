@@ -56,6 +56,7 @@
         "ariaLabel": "等待資料中"
       }
     },
+    "requestId": "要求 {id}",
     "createFirstItem": "建立您的第一個項目",
     "newBrowserCheck": "新增瀏覽器檢查",
     "allCaughtUp": "您已掌握最新資訊",
@@ -451,7 +452,9 @@
       "description": "沒有 {noun} 符合您目前的篩選條件或搜尋。請嘗試調整或清除它們。",
       "action": "清除篩選條件",
       "actionDesc": "重設所有篩選條件與搜尋",
-      "fallbackNoun": "結果"
+      "fallbackNoun": "結果",
+      "noMatches": "沒有相符項目",
+      "noMatchesText": "沒有內容符合目前的搜尋或篩選條件。"
     },
     "nouns": {
       "logs": "日誌",
@@ -490,6 +493,7 @@
       "evalTemplates": "評估範本",
       "enrichmentTables": "擴充資料表",
       "cipherKeys": "加密金鑰",
+      "announcementBanners": "公告橫幅",
       "aiToolsets": "AI 工具集",
       "llmProviders": "LLM 供應商",
       "sourceMaps": "原始碼對應檔",
@@ -633,6 +637,26 @@
     "noOncallUnrouted": {
       "title": "沒有需要負責人的項目",
       "description": "每個已觸發的警示都已送達團隊。"
+    },
+    "noSlackChannelDefaults": {
+      "title": "還沒有頻道設定預設組織",
+      "description": "未設定預設組織的頻道中的提問會送到每個人的預設組織(使用者可用 /o2 org 變更)。"
+    },
+    "noSlackLinkedPeople": {
+      "title": "此組織中還沒有人連結 Slack"
+    },
+    "slackNotConnected": {
+      "title": "連接 Slack 工作區"
+    },
+    "noAnnouncementBanners": {
+      "title": "還沒有橫幅",
+      "description": "橫幅會在應用程式頂端向你選擇的組織顯示一則通知。",
+      "action": "新增橫幅",
+      "actionDesc": "撰寫通知並排定發布時間"
+    },
+    "pageError": {
+      "title": "無法載入此頁面",
+      "description": "此頁面的資料均未載入。請立即重試,或一分鐘後再試。"
     }
   },
   "accessBoundary": {
@@ -660,6 +684,7 @@
       "groups": "群組",
       "serviceAccounts": "服務帳戶",
       "cipherKeys": "加密金鑰",
+      "announcementBanners": "公告橫幅",
       "regexPatterns": "正規表示式模式",
       "evalJobs": "線上評估作業",
       "billingGroup": "計費群組",
@@ -716,6 +741,7 @@
       "groups": "群組",
       "serviceAccounts": "服務帳戶",
       "cipherKeys": "加密金鑰",
+      "announcementBanners": "公告橫幅",
       "regexPatterns": "正規表示式模式",
       "unnamed": "此資源",
       "onCall": "值班",
@@ -773,9 +799,14 @@
   },
   "common": {
     "saveBar": {
-      "noChanges": "沒有要儲存的變更"
+      "noChanges": "沒有要儲存的變更",
+      "unsavedChanges": "{n} 項未儲存的變更",
+      "changesShort": "{n} 項變更",
+      "fixFields": "修正 {n} 個欄位",
+      "discard": "捨棄"
     },
     "dismiss": "關閉",
+    "undo": "復原",
     "exitFullscreen": "退出全螢幕",
     "moreActions": "更多操作",
     "moreOptions": "更多選項",
@@ -1014,6 +1045,8 @@
     "back": "返回",
     "save": "儲存",
     "discardChanges": "捨棄變更",
+    "switchOn": "開",
+    "switchOff": "關",
     "unsavedChanges": "未儲存的變更",
     "update": "更新",
     "favourite": "收藏",
@@ -1128,6 +1161,8 @@
     "field": "欄位",
     "enterValueOrVariable": "輸入值或 $variable",
     "all": "全部",
+    "allStates": "所有狀態",
+    "allStatuses": "所有狀態",
     "jsonFilesOnlyHint": "僅限 .json 檔案",
     "fileUploadJsonTab": "檔案上傳 / JSON",
     "urlImportTab": "URL 匯入",
@@ -1234,7 +1269,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "收集器設定"
+        "fleet_config": "收集器設定",
+        "workflow": "工作流程"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1244,6 +1280,11 @@
       "leaveMessageInBrowser": "儲存{entity}、將您的變更保留在此瀏覽器中，或捨棄變更。",
       "retentionInBrowser": "變更會保留在此瀏覽器中 {days} 天，或直到您登出為止。每種類型僅保留最新的 {max} 個。",
       "dotUndated": "Unsaved draft"
+    },
+    "leaveGuard": {
+      "title": "有未儲存的變更,要離開嗎?",
+      "message": "此頁面有 {n} 項未儲存的變更,離開後將會遺失。",
+      "keepEditing": "繼續編輯"
     }
   },
   "flow": {
@@ -1942,8 +1983,8 @@
     "histogramTitleRows": "在 {took} 毫秒內顯示 {total} 列。 | 在 {took} 毫秒內顯示 {total} 列。",
     "histogramTitleRowsWithScan": "在 {took} 毫秒內顯示 {total} 列。（{scanLabel}：{scanSize}） | 在 {took} 毫秒內顯示 {total} 列。（{scanLabel}：{scanSize}）",
     "pickStreamFirst": "請先選擇一個串流",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "自動重新整理會更新搜尋結果。視覺化期間會暫停。",
+    "histogramNoTimeAxis": "分組結果沒有時間軸"
   },
   "menu": {
     "alertCalibration": "警示校準",
@@ -3858,6 +3899,8 @@
     "your_complete_license_key": "完整授權金鑰：",
     "copy_key": "複製金鑰",
     "usage_information": "使用量資訊",
+    "usage_chart_title": "本月每日擷取量",
+    "no_license_ingestion_limit": "沒有授權時,每日擷取量上限為 <strong>{limit} GB</strong>。",
     "license_allows_ingestion": "目前授權允許每天 <strong>{limit} GB</strong> 的資料攝取量。",
     "license_allows_unlimited_ingestion": "目前授權允許無限制的資料攝取。",
     "limit_exceeded_days": "本月超出限制的天數為 <strong class=\"{colorClass}\">{days} 天</strong> | 本月超出限制的天數為 <strong class=\"{colorClass}\">{days} 天</strong>",
@@ -4714,6 +4757,8 @@
     },
     "listOrganizations": {
       "subtitle": "您可以存取的組織",
+      "switch": "切換到此組織",
+      "current": "目前",
       "cannotEditWhileDeleting": "刪除進行中無法編輯",
       "edit": "編輯",
       "deleteOrganization": "刪除組織",
@@ -10164,6 +10209,12 @@
       "noPanels": "沒有面板",
       "panelsDeletedHint": "其面板已被刪除，因此目前不會繪製在任何面板上。請選擇面板，或選擇「全選」以修正此問題。",
       "blankFiltersHint": "沒有值的條件會被忽略。"
+    },
+    "inlineCreate": {
+      "folderName": "新資料夾名稱",
+      "createFolder": "建立資料夾",
+      "tabName": "新分頁名稱",
+      "createTab": "建立分頁"
     }
   },
   "panel": {
@@ -14253,7 +14304,8 @@
         "mute": "您無法將此項目靜音。",
         "onCall": "值班：{people}",
         "canAct": "也可操作：{people}",
-        "people": "值班：{onCall}。也可操作：{canAct}"
+        "people": "值班：{onCall}。也可操作：{canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "此警示目前未觸發，因此沒有需要確認的項目。",
@@ -14310,6 +14362,10 @@
     "siemDetection": {
       "notice": "此警示是安全偵測。其查詢由 Sigma 規則編譯而成，因此規則、串流與排程需在安全模組中編輯，以確保規則與查詢保持一致。",
       "open": "在安全模組中編輯"
+    },
+    "rowAction": {
+      "paused": "{name} 已暫停",
+      "resumed": "{name} 已恢復"
     }
   },
   "alert_dependencies": {
@@ -14769,6 +14825,7 @@
     "destination_type": "目標類型",
     "template": "範本",
     "actions": "操作",
+    "addHeader": "新增標頭",
     "addTitle": "新目標",
     "updateTitle": "更新目標",
     "delete": "刪除",
@@ -14914,7 +14971,9 @@
   },
   "pipeline_destinations": {
     "header": "管線目標",
-    "search": "搜尋目標"
+    "search": "搜尋目標",
+    "destinationType": "目的地類型",
+    "outputFormat": "輸出格式"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15425,8 +15484,12 @@
     "groupIntegrations": "整合",
     "groupAccount": "帳戶",
     "slackApp": "Slack",
+    "slackAppDesc": "Slack 應用程式的工作區、頻道預設值與帳戶連結",
     "generalDesc": "主題、查詢預設值與核心偏好設定",
     "orgDesc": "組織參數與識別碼",
+    "generalSubtitle": "{org} 的外觀與查詢預設值。",
+    "orgSubtitle": "{org} 的欄位名稱、資料保留與自動功能。",
+    "passwordPolicySubtitle": "原生電子郵件與密碼帳戶的規則。",
     "cipherKeysDesc": "用於敏感欄位的加密金鑰",
     "regexPatternsDesc": "用於遮蔽的可重複使用 regex 模式",
     "domainManagementDesc": "限制僅允許的 SSO 網域登入",
@@ -15713,10 +15776,59 @@
       "failedToLoadServices": "無法載入服務"
     },
     "domainManagement": {
-      "unknownTime": "未知時間"
+      "unknownTime": "未知時間",
+      "claimParserTitle": "宣告解析器",
+      "claimParserSectionDesc": "將 SSO 與 LDAP 宣告轉換為組織與角色指派。",
+      "claimParserLabel": "宣告解析器函式",
+      "claimParserHelp": "接收對應後的宣告並傳回要指派的組織與角色(或拒絕)的 {product1} 或 {product2} 函式。",
+      "claimParserFormatLink": "輸入與輸出格式",
+      "claimParserPlaceholder": "無函式",
+      "noFunctions": "還沒有函式",
+      "restrictionsTitle": "網域限制",
+      "restrictionsDesc": "哪些電子郵件網域與使用者可以透過 SSO 登入。",
+      "domainLabel": "網域",
+      "addDomain": "新增網域",
+      "noDomains": "還沒有網域。新增網域以限制可登入的使用者。",
+      "accessFor": "{domain} 的存取權限",
+      "policyAllowAll": "允許所有使用者",
+      "policyAllowSpecific": "僅允許列出的使用者",
+      "policyBlockSpecific": "封鎖列出的使用者",
+      "policyBlockAll": "封鎖所有使用者",
+      "effectAllowSpecific": "只有電子郵件地址以 {domain} 結尾且在清單中的使用者才被允許登入。",
+      "effectBlockSpecific": "電子郵件地址以 {domain} 結尾且在清單中的外部 SSO 使用者將被系統封鎖(介面、API 與資料擷取)。",
+      "emailLabel": "電子郵件地址",
+      "noEmails": "還沒有列出電子郵件地址。",
+      "removeDomain": "移除 {domain}",
+      "removeEmail": "移除 {email}",
+      "saved": "SSO 設定已儲存"
     },
     "general": {
       "close": "關閉",
+      "themeTitle": "主題",
+      "themeDescription": "{org} 在淺色與深色模式下的強調色。",
+      "accentColorLabel": "強調色",
+      "lightColorLabel": "變更淺色模式顏色,目前為 {color}",
+      "darkColorLabel": "變更深色模式顏色,目前為 {color}",
+      "queryDefaultsTitle": "查詢預設值",
+      "queryDefaultsDescription": "指標收集與 PromQL 查詢的預設值。",
+      "scrapeIntervalLabel": "抓取間隔",
+      "scrapeIntervalHelp": "指標的收集頻率。",
+      "unitSeconds": "秒",
+      "maxSeriesLabel": "每次查詢的序列上限",
+      "maxSeriesHelp": "單一 PromQL 查詢最多可傳回的序列數。留空則使用預設值 {n}。",
+      "unitSeries": "個序列",
+      "maxSeriesError": "請輸入 1,000 到 1,000,000,或留空以使用預設值。",
+      "brandingTitle": "品牌",
+      "brandingDescription": "向此執行個體中每個組織顯示的名稱與標誌。",
+      "logoTextHelp": "取代應用程式中顯示的預設名稱。最多 100 個字元。",
+      "logoTextTooLong": "請使用不超過 100 個字元。",
+      "logoTextSaveFailed": "自訂標誌文字未能儲存。{reason}",
+      "logoSaveFailed": "{mode}標誌未能上傳。{reason}",
+      "brandingUpdated": "品牌已更新",
+      "logoLightLabel": "自訂標誌(淺色模式)",
+      "logoLightHelp": "於淺色模式下顯示。PNG、JPG、GIF 或 BMP,最大 150 × 30 px。",
+      "logoDarkLabel": "自訂標誌(深色模式)",
+      "logoDarkHelp": "於深色模式下顯示。PNG、JPG、GIF 或 BMP,最大 150 × 30 px。",
       "fileCounterLabel": "{constraint} {filesNumber} 個檔案 {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
@@ -15738,18 +15850,30 @@
       "title": "資料保留預設值",
       "about": "適用於沒有自身保留設定的串流。留空或 0 會使用全域值；否則至少 3 天。",
       "defaultDays": "預設（天）",
+      "defaultLabel": "預設",
+      "unitDays": "天",
+      "daysFor": "{type}保留期(天)",
       "streamType": "串流類型",
       "days": "天",
       "addType": "新增串流類型",
+      "allTypesAdded": "每種串流類型都已有一列。",
+      "removeTypeNamed": "移除{type}預設值",
       "removeType": "移除此串流類型",
       "globalDefault": "全域：{value}",
       "globalType": "全域 {type}：{value}",
       "daysValue": "{days} 天",
       "forever": "永久保留",
-      "invalid": "使用 0 或至少 3 天"
+      "invalid": "使用 0 或至少 3 天",
+      "invalidType": "請至少使用 3 天,或移除此類型"
     },
     "organizationSettings": {
       "fieldNameHelp": "僅使用字母數字和 '+=,.{'@'}-_' 字元，不要包含空格。",
+      "sectionTitle": "資料處理",
+      "sectionDescription": "日誌如何連結到追蹤,以及啟用了哪些自動功能。",
+      "traceIdHelp": "將日誌列連結到其追蹤的日誌欄位。僅限字母、數字與 + = , . {'@'} - _",
+      "spanIdHelp": "將日誌列連結到其 span 的日誌欄位。字元限制同上。",
+      "ingestionLogsHelp": "保留擷取失敗記錄的日誌。",
+      "usageStreamHelp": "將 {org} 的使用情況寫入其專屬串流,你可以對其進行查詢。",
       "settingsUpdated": "組織設定已成功更新",
       "settingsSaveError": "儲存組織設定時發生錯誤"
     },
@@ -16404,6 +16528,7 @@
     "queryRange": "查詢範圍",
     "userSummary": "使用者摘要",
     "allQueries": "所有查詢",
+    "allFields": "所有欄位",
     "queryType": "查詢類型",
     "numOfQueries": "查詢數量",
     "totalDuration": "總執行時間",
@@ -17140,12 +17265,12 @@
       "truncated": "顯示此追蹤的第一個 Span，依開始時間排序。後續 Span 尚未載入。 | 顯示此追蹤的前 {count} 個 Span，依開始時間排序。後續 Span 尚未載入。",
       "loadMore": "載入下一個 Span | 載入接下來 {size} 個 Span",
       "loadMoreFailed": "無法載入此追蹤的更多 Span",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "在 {from} 到 {to} 之間沒有此 ID 的追蹤",
+      "notFoundText": "追蹤 {traceId} 在此範圍內的 {stream} 串流中沒有 span。它可能更早或更晚、位於其他串流中,或未被收集。",
+      "searchWiderRange": "搜尋更大的範圍",
+      "searchSpansInRange": "在此範圍內搜尋 span",
+      "loadFailedTitle": "無法載入此追蹤",
+      "loadFailedText": "無法讀取追蹤 {traceId}。請稍後重試。"
     },
     "traceTree": {
       "clickToExpand": "點擊展開",
@@ -17340,6 +17465,8 @@
     "type": "類型",
     "step1WithType": "金鑰儲存庫詳細資料（類型：{type}）",
     "step2": "加密機制",
+    "sectionKey": "金鑰",
+    "sectionSetup": "金鑰儲存庫與加密",
     "secret": "密碼",
     "baseURL": "基底 URL",
     "accessId": "存取 ID",
@@ -17578,6 +17705,8 @@
     "noTracesDescription": "在選取的時間範圍內找不到此關聯的追蹤。",
     "viewInTraces": "在追蹤中檢視",
     "filters": "篩選條件",
+    "fieldGroupsTitle": "欄位群組",
+    "fieldNamesColumn": "欄位名稱",
     "semanticFieldGroupsCaption": "將遙測欄位名稱對應至共用群組，讓 OpenObserve 能夠跨串流進行關聯。",
     "exportToJson": "匯出為 JSON",
     "importFromJson": "從 JSON 匯入",
@@ -20720,7 +20849,7 @@
       "searchAroundTip": "載入緊鄰此事件之前與之後記錄的事件。",
       "noOfEventsTip": "圍繞此事件載入的事件數量。",
       "severityTip": "偵測到的日誌層級。選取即可查看偵測方式。",
-      "traceId": "Trace ID",
+      "traceId": "追蹤 ID",
       "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
@@ -21006,6 +21135,7 @@
     "showDetail": "顯示詳細資料",
     "hideDetail": "隱藏詳細資料",
     "runAs": "執行身分",
+    "runSuggestion": "執行 {query}",
     "searchTextFor": "搜尋文字「{text}」",
     "searchTextDesc": "將整段輸入視為一個詞組搜尋",
     "explain": {
@@ -21037,7 +21167,19 @@
     "dataStale": "資料已過時",
     "lastRefreshed": "上次重新整理：{time}",
     "refresh": "重新整理",
-    "refreshWithAge": "重新整理，上次重新整理於 {age}"
+    "refreshWithAge": "重新整理，上次重新整理於 {age}",
+    "refreshing": "正在重新整理",
+    "failed": "失敗",
+    "autoRefresh": "自動重新整理",
+    "autoOn": "自動 · {interval}",
+    "every": "每 {interval}",
+    "interval": {
+      "10s": "10 秒",
+      "30s": "30 秒",
+      "1m": "1 分鐘",
+      "5m": "5 分鐘",
+      "15m": "15 分鐘"
+    }
   },
   "synthetics": {
     "variables": {
@@ -21895,7 +22037,12 @@
       "noPrivateMatches": "沒有符合搜尋條件的私人位置",
       "newPrivateLocation": "新增私人位置",
       "publicSubtitle": "雲端區域，隨時可用",
-      "privateSubtitle": "當至少一個代理程式在線時，位置即為就緒"
+      "privateSubtitle": "當至少一個代理程式在線時，位置即為就緒",
+      "emptyState": {
+        "title": "還沒有位置",
+        "description": "位置是合成監控執行檢查的地點,例如某個雲端區域。",
+        "actionDesc": "新增執行檢查的位置"
+      }
     },
     "newCheck": {
       "comingSoon": "即將推出",
@@ -22976,7 +23123,10 @@
       "tokenLinkTooltip": "選擇程式碼片段使用的資料擷取權杖",
       "copiedWithToken": "已複製，使用組織權杖 {name}",
       "tokenIncludedHint": "複製的內容包含組織的資料擷取 token，該 token 在此處會保持隱藏。",
-      "maskedSelectionWarning": "隱藏的 token 已複製為點號。請使用「複製」，或先將其顯示。"
+      "maskedSelectionWarning": "隱藏的 token 已複製為點號。請使用「複製」，或先將其顯示。",
+      "wrapLines": "自動換行",
+      "showAll": "顯示全部 {count} 行",
+      "showLess": "顯示較少"
     },
     "spinner": {
       "loading": "載入中"
@@ -23021,7 +23171,10 @@
       "moreInfo": "更多資訊"
     },
     "dialog": {
-      "closeDialog": "關閉對話框"
+      "closeDialog": "關閉對話框",
+      "discardChanges": "捨棄變更?",
+      "keepEditing": "繼續編輯",
+      "discard": "捨棄"
     },
     "drawer": {
       "closeDrawer": "關閉抽屜"
@@ -23044,6 +23197,32 @@
       "clear": "清除"
     },
     "file": {
+      "removeNamed": "移除 {name}",
+      "sourceLabel": "匯入來源",
+      "sourceFile": "檔案",
+      "sourceUrl": "URL",
+      "sourcePaste": "貼上",
+      "dropPrompt": "將檔案拖放到此處或{choose}",
+      "dropPromptMultiple": "將檔案拖放到此處或{choose}",
+      "chooseAFile": "選擇檔案",
+      "chooseFiles": "選擇檔案",
+      "chooseFileButton": "選擇檔案",
+      "chooseFilesButton": "選擇檔案",
+      "noFileChosen": "未選擇檔案",
+      "dropToUpload": "拖放以上傳",
+      "upToSize": "最大 {size}",
+      "upToSizeEach": "每個最大 {size}",
+      "oneFile": "一個檔案",
+      "upToFiles": "最多 {count} 個檔案",
+      "typeRejected": "僅接受 {allowed} 檔案",
+      "sizeRejected": "{size} 超過 {max} 的限制",
+      "countRejected": "一次只能 {count} 個檔案",
+      "uploadFailed": "上傳失敗",
+      "uploaded": "已上傳",
+      "urlPlaceholder": "檔案 URL",
+      "urlHelp": "匯入時我們只會擷取一次。",
+      "textPlaceholder": "在此貼上內容",
+      "invalidJson": "不是有效的 JSON:{detail}",
       "removeFile": "移除檔案",
       "clearAll": "全部清除"
     },
@@ -23058,7 +23237,14 @@
     "pagination": {
       "pagination": "分頁",
       "previousPage": "上一頁",
-      "nextPage": "下一頁"
+      "nextPage": "下一頁",
+      "onFirstPage": "已在第一頁",
+      "onLastPage": "已在最後一頁",
+      "range": "第 {from}–{to} 項,共 {total} 項",
+      "rangeOfMany": "第 {from}–{to} 項,共有很多項",
+      "pageOf": "第 {page} 頁,共 {pages} 頁",
+      "perPage": "每頁 {size} 筆",
+      "pageSize": "每頁列數"
     },
     "select": {
       "more": "更多",
@@ -23068,6 +23254,10 @@
       "noOptionsFound": "找不到選項",
       "multiSelect": "多重選擇",
       "singleSelect": "單一選擇",
+      "any": "任何",
+      "noMatches": "沒有符合「{term}」的項目",
+      "clearSearch": "清除搜尋",
+      "addOption": "新增「{value}」",
       "moreInfoAbout": "關於{field}的更多資訊",
       "moreInfo": "更多資訊"
     },
@@ -23109,7 +23299,10 @@
       "removeColumnAria": "移除欄位",
       "formatColumnAria": "格式化欄位",
       "selectedOfTotal": "已選取 {selected} 個，共 {total} 個",
-      "selectedCount": "已選取 {selected} 個"
+      "selectedCount": "已選取 {selected} 個",
+      "clearSelection": "清除",
+      "rowActions": "列操作",
+      "moreRowActions": "更多操作"
     },
     "predefinedThemes": {
       "title": "主題",
@@ -23477,6 +23670,26 @@
         "past": "過去天數",
         "ended": "已結束"
       }
+    },
+    "jsonViewer": {
+      "include": "依此值篩選",
+      "exclude": "排除此值",
+      "copyValue": "複製值",
+      "fieldCount": "{count} 個欄位",
+      "itemCount": "{count} 項"
+    },
+    "tabs": {
+      "more": "更多",
+      "unsaved": "未儲存的變更",
+      "locked": "已鎖定"
+    },
+    "statStrip": {
+      "filters": "篩選器",
+      "showOnly": "僅顯示 {label}",
+      "alsoShow": "同時顯示 {label}",
+      "stopShowing": "停止顯示 {label}",
+      "scrollBack": "顯示上一組篩選器",
+      "scrollForward": "顯示更多篩選器"
     }
   },
   "functions": {
@@ -24347,6 +24560,12 @@
   },
   "passwordPolicy": {
     "complexity": "複雜度",
+    "complexityDesc": "每個新密碼必須包含的內容。",
+    "unitCharacters": "個字元",
+    "unitDays": "天",
+    "unitPasswords": "個密碼",
+    "unitAttempts": "次嘗試",
+    "unitSeconds": "秒",
     "minLength": "最小長度",
     "minLengthDesc": "可接受的最短密碼",
     "maxLength": "最大長度",
@@ -24362,6 +24581,7 @@
     "specialCharSet": "允許的特殊字元",
     "specialCharSetDesc": "留空以接受任何非英數字元",
     "maxLengthTooSmall": "最大長度必須介於最小長度和 128 之間。",
+    "maxLengthBelowMin": "必須為 {min} 或以上,以符合最小長度。",
     "confirmTitle": "儲存密碼原則？",
     "confirmMessage": "儲存後可能會強制所有原生使用者在繼續之前設定新密碼。Root、外部使用者與服務帳號不受此限——除非您是 root 帳號，否則這也包含您。此操作無法復原。",
     "saved": "密碼原則已儲存。 | 密碼原則已儲存。{count} 位使用者必須重設密碼。 | 密碼原則已儲存。{count} 位使用者必須重設密碼。",
@@ -24372,14 +24592,17 @@
     "loadFailed": "讀取目前原則時發生錯誤。",
     "rotation": "輪換",
     "rotationDays": "輪換期間",
+    "rotationDesc": "密碼何時到期,以及提前多久通知使用者。",
     "rotationDaysDesc": "密碼到期前的天數。0 = 永不到期",
     "rotationWarningDays": "到期前警告",
     "rotationWarningDaysDesc": "登入時提前通知的天數。0 = 不顯示警告",
+    "rotationWarningDaysOffDesc": "登入時提前通知的天數。在密碼到期後生效。",
     "warningDaysTooLong": "警告期間不能長於輪換期間。",
     "rotationPreview": "今天設定的密碼將於 {expires} 到期。登入警告會從 {warns} 開始。",
     "rotationPreviewNoWarning": "今天設定的密碼將於 {expires} 到期。在此之前不會顯示警告。",
     "reuse": "防止重複使用",
     "historyCount": "記住的密碼數",
+    "reuseDesc": "防止使用者改回舊密碼。",
     "historyCountDesc": "新密碼不得與先前這麼多個密碼相同。0 = 不檢查",
     "historyMaxRetained": "保留歷史筆數",
     "historyMaxRetainedDesc": "每位使用者保留多少個過去密碼",
@@ -24387,6 +24610,7 @@
     "reuseExplainer": "目前密碼會計入已記住的密碼集合之一——重複使用目前密碼會遭到此規則拒絕，而非由另一項檢查拒絕。",
     "lockout": "帳戶鎖定",
     "lockoutThreshold": "鎖定前的失敗嘗試次數",
+    "lockoutDesc": "多次登入失敗後會發生什麼事。",
     "lockoutThresholdDesc": "0 = 停用鎖定",
     "lockoutBucketSize": "每次進一步鎖定前的嘗試次數",
     "lockoutBucketSizeDesc": "0 = 沿用上方的值",
@@ -24401,6 +24625,7 @@
     "backoffLinear": "線性",
     "lockoutPreview": "{threshold} 次失敗 → {first} · 每再 {bucket} 次 → {rest} · 上限為 {max}。成功登入會重設所有設定。",
     "sessionEnforcement": "工作階段與強制執行",
+    "sessionEnforcementDesc": "登入工作階段持續多久,以及 root 是否遵循這些規則。",
     "cookieMaxAge": "工作階段存續時間",
     "cookieMaxAgeDesc": "已登入工作階段保持有效的秒數。0 = 使用 {envVar} 中的執行個體預設值",
     "applyToRoot": "套用至 root 帳戶",
@@ -24777,6 +25002,7 @@
       "packUnavailableHint": "此工作負載的精選內容尚未推出。在此期間，可先建立儀表板來繪製圖表。",
       "partialTelemetryKubernetes": "我們找到 Kubernetes 串流，但找不到此頁面所需的指標（kubeletstats 或 cluster receiver）。請檢查收集器的 receiver 設定。",
       "partialTelemetryHosts": "我們找到主機串流，但找不到此頁面所需的指標。請檢查收集器的 hostmetrics receiver 設定。",
+      "hostMetricsMissingTitle": "找不到主機指標",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}，還有 {count} 個",
       "hiddenFootnote": "你沒有存取權的資料來源也會顯示在這裡。",
@@ -27227,6 +27453,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "抑制此呼叫",
     "savePolicyFailed": "無法儲存原則",
+    "savePolicyFailedReason": "原則未儲存。{reason}",
     "state_triggered": "已觸發",
     "state_triaged": "已分流",
     "state_acknowledged": "已確認",
@@ -28844,6 +29071,11 @@
       "otherOrgs": "沒有其他組織 | {count} 個其他組織 | {count} 個其他組織",
       "connectedOn": "{date} 由 {user}",
       "helpContact": "說明聯絡人",
+      "helpContactHelp": "無法連結帳戶的使用者會被告知聯絡此聯絡人。",
+      "eventsLabel": "Slack 事件",
+      "connectionLabel": "連線",
+      "outboundLabel": "外送佇列",
+      "collaboratorsLabel": "應用程式協作者",
       "helpContactPlaceholder": "#o2-help，或可詢問的人",
       "helpContactSaved": "已儲存說明聯絡人",
       "disconnectSection": "中斷連結",
@@ -30497,9 +30729,9 @@
     },
     "queryTooltip": "以文字編輯篩選條件",
     "builderTooltip": "使用建構器編輯篩選條件",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
+    "editorModeLabel": "篩選編輯器",
+    "modeBuilder": "建構器",
+    "modeText": "文字"
   },
   "autoobserveLive": {
     "paging": {
@@ -30592,5 +30824,23 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "pageHeader": {
+    "about": "關於此頁面"
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· 佔 {percent}% 的追蹤,過去 24 小時",
+    "fallbacksNote": "依檢查順序輸入備用欄位,以逗號分隔。",
+    "fallbackInvalid": "請使用以逗號分隔的欄位名稱。僅限字母、數字與 . _ - : / {'@'}",
+    "sessions": {
+      "title": "工作階段顯示",
+      "help": "工作階段如何命名,以及從中隱藏哪些包裝文字。",
+      "noAgents": "還沒有代理程式。新增代理程式以隱藏其包裝文字。"
+    }
+  },
+  "copyButton": {
+    "copy": "複製",
+    "copied": "已複製",
+    "failed": "複製遭封鎖 · 請按 Ctrl C"
   }
 }

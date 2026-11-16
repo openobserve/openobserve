@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="secondary"
           class="mt-2"
           @click="addFormRow"
-          icon="add"
         >
           {{ t("alerts.addCondition") }}
         </OButton>
@@ -118,7 +117,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="secondary"
           class="mt-2"
           @click="addApiHeader"
-          icon="add"
         >
           {{ t("alerts.addCondition") }}
         </OButton>

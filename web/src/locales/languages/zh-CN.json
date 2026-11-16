@@ -56,6 +56,7 @@
         "ariaLabel": "正在等待数据"
       }
     },
+    "requestId": "请求 {id}",
     "createFirstItem": "创建您的第一个条目",
     "newBrowserCheck": "新建浏览器检查",
     "allCaughtUp": "没有更多内容了",
@@ -451,7 +452,9 @@
       "description": "没有 {noun} 与您当前的筛选条件或搜索条件相匹配。尝试调整或清除它们。",
       "action": "清除筛选条件",
       "actionDesc": "重置所有筛选条件和搜索",
-      "fallbackNoun": "结果"
+      "fallbackNoun": "结果",
+      "noMatches": "无匹配项",
+      "noMatchesText": "没有内容符合当前的搜索或筛选条件。"
     },
     "nouns": {
       "logs": "Logs",
@@ -490,6 +493,7 @@
       "evalTemplates": "评估模板",
       "enrichmentTables": "增强表",
       "cipherKeys": "加密密钥",
+      "announcementBanners": "公告横幅",
       "aiToolsets": "AI 工具集",
       "llmProviders": "LLM 提供商",
       "sourceMaps": "源映射",
@@ -633,6 +637,26 @@
     "noOncallUnrouted": {
       "title": "无需归属人",
       "description": "所有已触发的告警都已送达团队。"
+    },
+    "noSlackChannelDefaults": {
+      "title": "还没有频道设置默认组织",
+      "description": "未设置默认组织的频道中的提问会发送到每个人的默认组织(用户可使用 /o2 org 更改)。"
+    },
+    "noSlackLinkedPeople": {
+      "title": "此组织中还没有人关联 Slack"
+    },
+    "slackNotConnected": {
+      "title": "连接 Slack 工作区"
+    },
+    "noAnnouncementBanners": {
+      "title": "还没有横幅",
+      "description": "横幅会在应用顶部向你选择的组织显示一条通知。",
+      "action": "添加横幅",
+      "actionDesc": "撰写通知并安排发布时间"
+    },
+    "pageError": {
+      "title": "无法加载此页面",
+      "description": "此页面的数据均未加载。请立即重试,或稍后一分钟再试。"
     }
   },
   "accessBoundary": {
@@ -660,6 +684,7 @@
       "groups": "组",
       "serviceAccounts": "服务账号",
       "cipherKeys": "加密密钥",
+      "announcementBanners": "公告横幅",
       "regexPatterns": "正则表达式模式",
       "evalJobs": "在线评估任务",
       "billingGroup": "账单组",
@@ -716,6 +741,7 @@
       "groups": "组",
       "serviceAccounts": "服务账号",
       "cipherKeys": "加密密钥",
+      "announcementBanners": "公告横幅",
       "regexPatterns": "正则表达式模式",
       "unnamed": "此资源",
       "onCall": "值班",
@@ -773,9 +799,14 @@
   },
   "common": {
     "saveBar": {
-      "noChanges": "没有要保存的更改"
+      "noChanges": "没有要保存的更改",
+      "unsavedChanges": "{n} 项未保存的更改",
+      "changesShort": "{n} 项更改",
+      "fixFields": "修复 {n} 个字段",
+      "discard": "放弃"
     },
     "dismiss": "关闭",
+    "undo": "撤销",
     "exitFullscreen": "退出全屏",
     "moreActions": "更多操作",
     "moreOptions": "更多选项",
@@ -1014,6 +1045,8 @@
     "back": "返回",
     "save": "保存",
     "discardChanges": "放弃更改",
+    "switchOn": "开",
+    "switchOff": "关",
     "unsavedChanges": "未保存的更改",
     "update": "更新",
     "favourite": "收藏",
@@ -1128,6 +1161,8 @@
     "field": "字段",
     "enterValueOrVariable": "输入值或 $variable",
     "all": "全部",
+    "allStates": "所有状态",
+    "allStatuses": "所有状态",
     "jsonFilesOnlyHint": "仅限 .json 文件",
     "fileUploadJsonTab": "文件上传 / JSON",
     "urlImportTab": "URL 导入",
@@ -1234,7 +1269,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "采集器配置"
+        "fleet_config": "采集器配置",
+        "workflow": "工作流"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1244,6 +1280,11 @@
       "leaveMessageInBrowser": "保存 {entity}，将更改保留在此浏览器中，或丢弃更改。",
       "retentionInBrowser": "更改会在此浏览器中保留 {days} 天，或保留到您退出登录。每种类型仅保留最新的 {max} 个。",
       "dotUndated": "Unsaved draft"
+    },
+    "leaveGuard": {
+      "title": "有未保存的更改,确定离开?",
+      "message": "此页面有 {n} 项未保存的更改,离开后将丢失。",
+      "keepEditing": "继续编辑"
     }
   },
   "flow": {
@@ -1942,8 +1983,8 @@
     "histogramTitleRows": "在 {took} 毫秒内显示 {total} 行。 | 在 {took} 毫秒内显示 {total} 行。",
     "histogramTitleRowsWithScan": "在 {took} 毫秒内显示 {total} 行。（{scanLabel}：{scanSize}） | 在 {took} 毫秒内显示 {total} 行。（{scanLabel}：{scanSize}）",
     "pickStreamFirst": "请先选择一个流",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "自动刷新会更新搜索结果。可视化期间会暂停。",
+    "histogramNoTimeAxis": "分组结果没有时间轴"
   },
   "menu": {
     "alertCalibration": "告警校准",
@@ -3858,6 +3899,8 @@
     "your_complete_license_key": "您的完整许可证密钥：",
     "copy_key": "复制密钥",
     "usage_information": "使用信息",
+    "usage_chart_title": "本月每日摄取量",
+    "no_license_ingestion_limit": "没有许可证时,每天的摄取量限制为 <strong>{limit} GB</strong>。",
     "license_allows_ingestion": "当前许可证允许每天写入 <strong>{limit} GB</strong> 的数据。",
     "license_allows_unlimited_ingestion": "当前的许可证允许无限制地写入数据。",
     "limit_exceeded_days": "本月已在 <strong class=\"{colorClass}\">{days} 天</strong> 超出限制 | 本月已在 <strong class=\"{colorClass}\">{days} 天</strong> 超出限制",
@@ -4714,6 +4757,8 @@
     },
     "listOrganizations": {
       "subtitle": "您可以访问的组织",
+      "switch": "切换到此组织",
+      "current": "当前",
       "cannotEditWhileDeleting": "删除进行中时无法编辑",
       "edit": "编辑",
       "deleteOrganization": "删除组织",
@@ -10169,6 +10214,12 @@
       "noPanels": "无面板",
       "panelsDeletedHint": "其面板已被删除，因此当前不会绘制在任何面板上。请选择面板，或选择“全选”以解决此问题。",
       "blankFiltersHint": "没有值的条件将被忽略。"
+    },
+    "inlineCreate": {
+      "folderName": "新文件夹名称",
+      "createFolder": "创建文件夹",
+      "tabName": "新标签页名称",
+      "createTab": "创建标签页"
     }
   },
   "panel": {
@@ -14256,7 +14307,8 @@
         "mute": "你无法静默此项。",
         "onCall": "值班：{people}",
         "canAct": "也可操作：{people}",
-        "people": "值班：{onCall}。也可操作：{canAct}"
+        "people": "值班：{onCall}。也可操作：{canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "此告警未处于触发中状态，没有需要确认的内容。",
@@ -14315,7 +14367,11 @@
       "open": "在安全模块中编辑"
     },
     "newAlertTitle": "新建告警",
-    "newAnomalyTitle": "新建异常检测"
+    "newAnomalyTitle": "新建异常检测",
+    "rowAction": {
+      "paused": "{name} 已暂停",
+      "resumed": "{name} 已恢复"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "打开",
@@ -14774,6 +14830,7 @@
     "destination_type": "目标类型",
     "template": "模板",
     "actions": "操作",
+    "addHeader": "添加请求头",
     "addTitle": "添加目标",
     "updateTitle": "更新目标",
     "delete": "删除",
@@ -14919,7 +14976,9 @@
   },
   "pipeline_destinations": {
     "header": "流水线目标",
-    "search": "搜索目标"
+    "search": "搜索目标",
+    "destinationType": "目标类型",
+    "outputFormat": "输出格式"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15430,8 +15489,12 @@
     "groupIntegrations": "集成",
     "groupAccount": "账户",
     "slackApp": "Slack",
+    "slackAppDesc": "Slack 应用的工作区、频道默认值和账户关联",
     "generalDesc": "主题、查询默认值和核心首选项",
     "orgDesc": "组织参数和标识符",
+    "generalSubtitle": "{org} 的外观和查询默认值。",
+    "orgSubtitle": "{org} 的字段名称、数据保留和自动功能。",
+    "passwordPolicySubtitle": "原生邮箱和密码账户的规则。",
     "cipherKeysDesc": "用于敏感字段的加密密钥",
     "regexPatternsDesc": "用于脱敏的可重用 regex 模式",
     "domainManagementDesc": "限制仅允许的 SSO 域登录",
@@ -15718,10 +15781,59 @@
       "failedToLoadServices": "加载服务失败"
     },
     "domainManagement": {
-      "unknownTime": "未知时间"
+      "unknownTime": "未知时间",
+      "claimParserTitle": "声明解析器",
+      "claimParserSectionDesc": "将 SSO 和 LDAP 声明转换为组织和角色分配。",
+      "claimParserLabel": "声明解析器函数",
+      "claimParserHelp": "接收映射后的声明并返回要分配的组织和角色(或拒绝)的 {product1} 或 {product2} 函数。",
+      "claimParserFormatLink": "输入和输出格式",
+      "claimParserPlaceholder": "无函数",
+      "noFunctions": "还没有函数",
+      "restrictionsTitle": "域名限制",
+      "restrictionsDesc": "哪些邮箱域名和用户可以通过 SSO 登录。",
+      "domainLabel": "域名",
+      "addDomain": "添加域名",
+      "noDomains": "还没有域名。添加域名以限制可登录的用户。",
+      "accessFor": "{domain} 的访问权限",
+      "policyAllowAll": "允许所有用户",
+      "policyAllowSpecific": "仅允许列出的用户",
+      "policyBlockSpecific": "阻止列出的用户",
+      "policyBlockAll": "阻止所有用户",
+      "effectAllowSpecific": "只有邮箱地址以 {domain} 结尾且在列表中的用户才被允许登录。",
+      "effectBlockSpecific": "邮箱地址以 {domain} 结尾且在列表中的外部 SSO 用户将被系统阻止(界面、API 和数据摄取)。",
+      "emailLabel": "邮箱地址",
+      "noEmails": "还没有列出邮箱地址。",
+      "removeDomain": "移除 {domain}",
+      "removeEmail": "移除 {email}",
+      "saved": "SSO 设置已保存"
     },
     "general": {
       "close": "关闭",
+      "themeTitle": "主题",
+      "themeDescription": "{org} 在浅色和深色模式下的强调色。",
+      "accentColorLabel": "强调色",
+      "lightColorLabel": "更改浅色模式颜色,当前为 {color}",
+      "darkColorLabel": "更改深色模式颜色,当前为 {color}",
+      "queryDefaultsTitle": "查询默认值",
+      "queryDefaultsDescription": "指标采集和 PromQL 查询的默认值。",
+      "scrapeIntervalLabel": "采集间隔",
+      "scrapeIntervalHelp": "指标的采集频率。",
+      "unitSeconds": "秒",
+      "maxSeriesLabel": "每次查询的最大序列数",
+      "maxSeriesHelp": "单个 PromQL 查询最多可返回的序列数。留空则使用默认值 {n}。",
+      "unitSeries": "个序列",
+      "maxSeriesError": "输入 1,000 到 1,000,000 之间的值,或留空以使用默认值。",
+      "brandingTitle": "品牌",
+      "brandingDescription": "向此实例中每个组织显示的名称和徽标。",
+      "logoTextHelp": "替换应用中显示的默认名称。最多 100 个字符。",
+      "logoTextTooLong": "请使用不超过 100 个字符。",
+      "logoTextSaveFailed": "自定义徽标文字未能保存。{reason}",
+      "logoSaveFailed": "{mode}徽标未能上传。{reason}",
+      "brandingUpdated": "品牌已更新",
+      "logoLightLabel": "自定义徽标(浅色模式)",
+      "logoLightHelp": "在浅色模式下显示。PNG、JPG、GIF 或 BMP,最大 150 × 30 px。",
+      "logoDarkLabel": "自定义徽标(深色模式)",
+      "logoDarkHelp": "在深色模式下显示。PNG、JPG、GIF 或 BMP,最大 150 × 30 px。",
       "fileCounterLabel": "{constraint} {filesNumber} 个文件 {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
@@ -15743,18 +15855,30 @@
       "title": "数据保留默认值",
       "about": "适用于没有自身保留设置的数据流。留空或填 0 则使用全局值；否则至少为 3 天。",
       "defaultDays": "默认（天）",
+      "defaultLabel": "默认",
+      "unitDays": "天",
+      "daysFor": "{type}保留期(天)",
       "streamType": "数据流类型",
       "days": "天",
       "addType": "添加数据流类型",
+      "allTypesAdded": "每种流类型都已有一行。",
+      "removeTypeNamed": "移除{type}默认值",
       "removeType": "移除此数据流类型",
       "globalDefault": "全局：{value}",
       "globalType": "全局 {type}：{value}",
       "daysValue": "{days} 天",
       "forever": "永久保留",
-      "invalid": "请填 0 或至少 3 天"
+      "invalid": "请填 0 或至少 3 天",
+      "invalidType": "请至少使用 3 天,或移除此类型"
     },
     "organizationSettings": {
       "fieldNameHelp": "仅使用字母数字和 '+=,.{'@'}-_' 字符，不要空格。",
+      "sectionTitle": "数据处理",
+      "sectionDescription": "日志如何关联到链路追踪,以及启用了哪些自动功能。",
+      "traceIdHelp": "将日志行关联到其链路追踪的日志字段。仅限字母、数字和 + = , . {'@'} - _",
+      "spanIdHelp": "将日志行关联到其 span 的日志字段。字符限制同上。",
+      "ingestionLogsHelp": "记录摄取失败的记录日志。",
+      "usageStreamHelp": "将 {org} 的使用情况写入其自己的流,你可以对其进行查询。",
       "settingsUpdated": "组织设置更新成功",
       "settingsSaveError": "保存组织设置时出错"
     },
@@ -16409,6 +16533,7 @@
     "queryRange": "查询范围",
     "userSummary": "用户摘要",
     "allQueries": "所有查询",
+    "allFields": "所有字段",
     "queryType": "查询类型",
     "numOfQueries": "查询数量",
     "totalDuration": "执行总数持续时间",
@@ -17145,12 +17270,12 @@
       "truncated": "正在按开始时间顺序显示此追踪的第一个 Span。后续 Span 尚未加载。 | 正在按开始时间顺序显示此追踪的前 {count} 个 Span。后续 Span 尚未加载。",
       "loadMore": "加载下一个 Span | 加载接下来的 {size} 个 Span",
       "loadMoreFailed": "无法加载此追踪的更多 Span",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "在 {from} 到 {to} 之间没有此 ID 的链路追踪",
+      "notFoundText": "链路追踪 {traceId} 在此范围内的 {stream} 流中没有 span。它可能更早或更晚、位于其他流中,或未被采集。",
+      "searchWiderRange": "搜索更大的范围",
+      "searchSpansInRange": "在此范围内搜索 span",
+      "loadFailedTitle": "无法加载此链路追踪",
+      "loadFailedText": "无法读取链路追踪 {traceId}。请稍后重试。"
     },
     "traceTree": {
       "clickToExpand": "点击展开",
@@ -17345,6 +17470,8 @@
     "type": "类型",
     "step1WithType": "密钥库详情（类型：{type}）",
     "step2": "加密机制",
+    "sectionKey": "密钥",
+    "sectionSetup": "密钥存储和加密",
     "secret": "秘密",
     "baseURL": "基本网址",
     "accessId": "访问ID",
@@ -17583,6 +17710,8 @@
     "noTracesDescription": "在所选时间范围内未找到与此关联匹配的追踪。",
     "viewInTraces": "在轨迹中查看",
     "filters": "过滤器",
+    "fieldGroupsTitle": "字段组",
+    "fieldNamesColumn": "字段名称",
     "semanticFieldGroupsCaption": "将遥测字段名称映射到通用分组，以便 OpenObserve 跨数据流关联它们。",
     "exportToJson": "导出到 JSON",
     "importFromJson": "从 JSON 导入",
@@ -20725,7 +20854,7 @@
       "searchAroundTip": "加载紧邻此事件之前和之后记录的事件。",
       "noOfEventsTip": "围绕此事件加载的事件数量。",
       "severityTip": "检测到的日志级别。选择即可查看检测方式。",
-      "traceId": "Trace ID",
+      "traceId": "链路追踪 ID",
       "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
@@ -21011,6 +21140,7 @@
     "showDetail": "显示详情",
     "hideDetail": "隐藏细节",
     "runAs": "运行身份",
+    "runSuggestion": "运行 {query}",
     "searchTextFor": "搜索文本“{text}”",
     "searchTextDesc": "将整个输入作为短语进行搜索",
     "explain": {
@@ -21042,7 +21172,19 @@
     "dataStale": "数据已过时",
     "lastRefreshed": "上次刷新时间：{time}",
     "refresh": "刷新",
-    "refreshWithAge": "刷新，上次刷新 {age}"
+    "refreshWithAge": "刷新，上次刷新 {age}",
+    "refreshing": "正在刷新",
+    "failed": "失败",
+    "autoRefresh": "自动刷新",
+    "autoOn": "自动 · {interval}",
+    "every": "每 {interval}",
+    "interval": {
+      "10s": "10 秒",
+      "30s": "30 秒",
+      "1m": "1 分钟",
+      "5m": "5 分钟",
+      "15m": "15 分钟"
+    }
   },
   "synthetics": {
     "variables": {
@@ -21900,7 +22042,12 @@
       "noPrivateMatches": "没有私有位置符合你的搜索",
       "newPrivateLocation": "新建私有位置",
       "publicSubtitle": "云区域，始终可用",
-      "privateSubtitle": "当至少有一个代理在线时，位置即为就绪"
+      "privateSubtitle": "当至少有一个代理在线时，位置即为就绪",
+      "emptyState": {
+        "title": "还没有位置",
+        "description": "位置是合成监控运行检查的地点,例如某个云区域。",
+        "actionDesc": "添加运行检查的位置"
+      }
     },
     "newCheck": {
       "comingSoon": "即将推出",
@@ -22981,7 +23128,10 @@
       "tokenLinkTooltip": "选择代码片段使用的摄取令牌",
       "copiedWithToken": "已使用组织令牌 {name} 复制",
       "tokenIncludedHint": "复制内容中包含组织的摄取令牌，该令牌在此处保持隐藏。",
-      "maskedSelectionWarning": "隐藏的令牌已以圆点形式复制。请使用复制，或先将其显示。"
+      "maskedSelectionWarning": "隐藏的令牌已以圆点形式复制。请使用复制，或先将其显示。",
+      "wrapLines": "自动换行",
+      "showAll": "显示全部 {count} 行",
+      "showLess": "显示更少"
     },
     "spinner": {
       "loading": "加载中"
@@ -23026,7 +23176,10 @@
       "moreInfo": "更多信息"
     },
     "dialog": {
-      "closeDialog": "关闭对话框"
+      "closeDialog": "关闭对话框",
+      "discardChanges": "放弃更改?",
+      "keepEditing": "继续编辑",
+      "discard": "放弃"
     },
     "drawer": {
       "closeDrawer": "关闭抽屉"
@@ -23049,6 +23202,32 @@
       "clear": "清除"
     },
     "file": {
+      "removeNamed": "移除 {name}",
+      "sourceLabel": "导入来源",
+      "sourceFile": "文件",
+      "sourceUrl": "URL",
+      "sourcePaste": "粘贴",
+      "dropPrompt": "将文件拖放到此处或{choose}",
+      "dropPromptMultiple": "将文件拖放到此处或{choose}",
+      "chooseAFile": "选择文件",
+      "chooseFiles": "选择文件",
+      "chooseFileButton": "选择文件",
+      "chooseFilesButton": "选择文件",
+      "noFileChosen": "未选择文件",
+      "dropToUpload": "拖放以上传",
+      "upToSize": "最大 {size}",
+      "upToSizeEach": "每个最大 {size}",
+      "oneFile": "一个文件",
+      "upToFiles": "最多 {count} 个文件",
+      "typeRejected": "仅接受 {allowed} 文件",
+      "sizeRejected": "{size} 超过 {max} 的限制",
+      "countRejected": "一次只能 {count} 个文件",
+      "uploadFailed": "上传失败",
+      "uploaded": "已上传",
+      "urlPlaceholder": "文件 URL",
+      "urlHelp": "导入时我们只获取一次。",
+      "textPlaceholder": "在此粘贴内容",
+      "invalidJson": "不是有效的 JSON:{detail}",
       "removeFile": "移除文件",
       "clearAll": "全部清除"
     },
@@ -23063,7 +23242,14 @@
     "pagination": {
       "pagination": "分页",
       "previousPage": "上一页",
-      "nextPage": "下一页"
+      "nextPage": "下一页",
+      "onFirstPage": "已在第一页",
+      "onLastPage": "已在最后一页",
+      "range": "第 {from}–{to} 项,共 {total} 项",
+      "rangeOfMany": "第 {from}–{to} 项,共有很多项",
+      "pageOf": "第 {page} 页,共 {pages} 页",
+      "perPage": "每页 {size} 条",
+      "pageSize": "每页行数"
     },
     "select": {
       "more": "更多",
@@ -23073,6 +23259,10 @@
       "noOptionsFound": "未找到选项",
       "multiSelect": "多选",
       "singleSelect": "单选",
+      "any": "任意",
+      "noMatches": "没有匹配“{term}”的项",
+      "clearSearch": "清除搜索",
+      "addOption": "添加“{value}”",
       "moreInfoAbout": "关于{field}的更多信息",
       "moreInfo": "更多信息"
     },
@@ -23114,7 +23304,10 @@
       "removeColumnAria": "移除列",
       "formatColumnAria": "格式化列",
       "selectedOfTotal": "已选择 {selected}/{total}",
-      "selectedCount": "已选择 {selected}"
+      "selectedCount": "已选择 {selected}",
+      "clearSelection": "清除",
+      "rowActions": "行操作",
+      "moreRowActions": "更多操作"
     },
     "predefinedThemes": {
       "title": "主题",
@@ -23482,6 +23675,26 @@
         "past": "过去天数",
         "ended": "已结束"
       }
+    },
+    "jsonViewer": {
+      "include": "按此值筛选",
+      "exclude": "排除此值",
+      "copyValue": "复制值",
+      "fieldCount": "{count} 个字段",
+      "itemCount": "{count} 项"
+    },
+    "tabs": {
+      "more": "更多",
+      "unsaved": "未保存的更改",
+      "locked": "已锁定"
+    },
+    "statStrip": {
+      "filters": "筛选器",
+      "showOnly": "仅显示 {label}",
+      "alsoShow": "同时显示 {label}",
+      "stopShowing": "停止显示 {label}",
+      "scrollBack": "显示上一组筛选器",
+      "scrollForward": "显示更多筛选器"
     }
   },
   "functions": {
@@ -24352,6 +24565,12 @@
   },
   "passwordPolicy": {
     "complexity": "复杂度",
+    "complexityDesc": "每个新密码必须包含的内容。",
+    "unitCharacters": "个字符",
+    "unitDays": "天",
+    "unitPasswords": "个密码",
+    "unitAttempts": "次尝试",
+    "unitSeconds": "秒",
     "minLength": "最小长度",
     "minLengthDesc": "可接受的最短密码长度",
     "maxLength": "最大长度",
@@ -24367,6 +24586,7 @@
     "specialCharSet": "允许的特殊字符",
     "specialCharSetDesc": "留空则接受任意非字母数字字符",
     "maxLengthTooSmall": "最大长度必须介于最小长度和 128 之间。",
+    "maxLengthBelowMin": "必须不小于 {min},以与最小长度保持一致。",
     "confirmTitle": "保存密码策略？",
     "confirmMessage": "保存后可能强制所有原生用户在继续使用前设置新密码。Root、外部用户和服务账户除外——这包括你本人，除非你是 root 账户。此操作无法撤销。",
     "saved": "密码策略已保存。 | 密码策略已保存。{count} 个用户必须重置密码。 | 密码策略已保存。{count} 个用户必须重置密码。",
@@ -24377,14 +24597,17 @@
     "loadFailed": "读取当前策略时出错。",
     "rotation": "轮换",
     "rotationDays": "轮换周期",
+    "rotationDesc": "密码何时过期,以及提前多久通知用户。",
     "rotationDaysDesc": "密码过期前的天数。0 = 永不过期",
     "rotationWarningDays": "过期前提醒",
     "rotationWarningDaysDesc": "登录时提前提醒的天数。0 = 不提醒",
+    "rotationWarningDaysOffDesc": "登录时提前通知的天数。在密码过期后生效。",
     "warningDaysTooLong": "提醒窗口不能长于轮换周期。",
     "rotationPreview": "今天设置的密码将于 {expires} 过期。登录提醒将于 {warns} 开始。",
     "rotationPreviewNoWarning": "今天设置的密码将于 {expires} 过期。在此之前不会显示任何提醒。",
     "reuse": "防止重复使用",
     "historyCount": "记住的密码数",
+    "reuseDesc": "防止用户改回旧密码。",
     "historyCountDesc": "新密码不得与此数量的历史密码相同。0 = 不检查",
     "historyMaxRetained": "保留的历史密码数",
     "historyMaxRetainedDesc": "每个用户保留的历史密码数量",
@@ -24392,6 +24615,7 @@
     "reuseExplainer": "当前密码属于已记住的密码之一——重复使用它会被此规则拒绝，而不是通过单独的检查。",
     "lockout": "账户锁定",
     "lockoutThreshold": "锁定前的失败尝试次数",
+    "lockoutDesc": "多次登录失败后会发生什么。",
     "lockoutThresholdDesc": "0 = 禁用锁定",
     "lockoutBucketSize": "每次后续锁定前的尝试次数",
     "lockoutBucketSizeDesc": "0 = 重用上面的值",
@@ -24406,6 +24630,7 @@
     "backoffLinear": "线性",
     "lockoutPreview": "{threshold} 次失败 → {first} · 每再失败 {bucket} 次 → {rest} · 上限为 {max}。成功登录会重置一切。",
     "sessionEnforcement": "会话与强制执行",
+    "sessionEnforcementDesc": "登录会话持续多久,以及 root 是否遵循这些规则。",
     "cookieMaxAge": "会话有效期",
     "cookieMaxAgeDesc": "已登录会话保持有效的秒数。0 = 使用来自 {envVar} 的实例默认值",
     "applyToRoot": "应用到 root 账户",
@@ -24782,6 +25007,7 @@
       "packUnavailableHint": "此工作负载的精选内容尚未发布。你可以先构建一个仪表盘来展示它。",
       "partialTelemetryKubernetes": "我们找到了 Kubernetes 数据流，但缺少此页面所需的指标（kubeletstats 或 cluster receiver）。请检查收集器的 receiver。",
       "partialTelemetryHosts": "我们找到了主机数据流，但缺少此页面所需的指标。请检查收集器的 hostmetrics receiver。",
+      "hostMetricsMissingTitle": "未找到主机指标",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}，以及另外 {count} 项",
       "hiddenFootnote": "你无权访问的数据源也会显示在此处。",
@@ -27232,6 +27458,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "抑制该通知",
     "savePolicyFailed": "无法保存策略",
+    "savePolicyFailedReason": "策略未保存。{reason}",
     "state_triggered": "已触发",
     "state_triaged": "已分诊",
     "state_acknowledged": "已确认",
@@ -28849,6 +29076,11 @@
       "otherOrgs": "没有其他组织 | {count} 个其他组织 | {count} 个其他组织",
       "connectedOn": "{date}，由 {user} 连接",
       "helpContact": "帮助联系人",
+      "helpContactHelp": "无法关联账户的用户会被告知联系此联系人。",
+      "eventsLabel": "Slack 事件",
+      "connectionLabel": "连接",
+      "outboundLabel": "出站队列",
+      "collaboratorsLabel": "应用协作者",
       "helpContactPlaceholder": "#o2-help，或可咨询的人员",
       "helpContactSaved": "帮助联系人已保存",
       "disconnectSection": "断开连接",
@@ -30502,9 +30734,9 @@
     },
     "queryTooltip": "以文本编辑筛选条件",
     "builderTooltip": "使用构建器编辑筛选条件",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
+    "editorModeLabel": "筛选编辑器",
+    "modeBuilder": "构建器",
+    "modeText": "文本"
   },
   "autoobserveLive": {
     "paging": {
@@ -30597,5 +30829,23 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "pageHeader": {
+    "about": "关于此页面"
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· 占 {percent}% 的链路追踪,过去 24 小时",
+    "fallbacksNote": "按检查顺序输入备用字段,以逗号分隔。",
+    "fallbackInvalid": "请使用以逗号分隔的字段名称。仅限字母、数字和 . _ - : / {'@'}",
+    "sessions": {
+      "title": "会话显示",
+      "help": "会话如何命名,以及从中隐藏哪些包装文本。",
+      "noAgents": "还没有智能体。添加智能体以隐藏其包装文本。"
+    }
+  },
+  "copyButton": {
+    "copy": "复制",
+    "copied": "已复制",
+    "failed": "复制被阻止 · 请按 Ctrl C"
   }
 }

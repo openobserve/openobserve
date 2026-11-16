@@ -214,7 +214,6 @@
                 <OButton
                   v-if="rows.length < MAX_RANGES"
                   variant="secondary"
-                  icon="add"
                   data-test="dashboards-public-links-panel-add-range-btn"
                   @click="addRange"
                 >

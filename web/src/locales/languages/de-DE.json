@@ -56,6 +56,7 @@
         "ariaLabel": "Warte auf Daten"
       }
     },
+    "requestId": "Anfrage {id}",
     "createFirstItem": "Erstellen Sie Ihr erstes Element",
     "newBrowserCheck": "Neuer Browser-Check",
     "allCaughtUp": "Sie sind auf dem neuesten Stand",
@@ -199,6 +200,22 @@
       "description": "Chiffrenschlüssel werden verwendet, um sensible Felder in Ihren Daten-Streams zu verschlüsseln.",
       "action": "Neuer Schlüssel",
       "actionDesc": "Generieren Sie einen Chiffrenschlüssel"
+    },
+    "noSlackChannelDefaults": {
+      "title": "Noch kein Kanal hat eine Standardorganisation",
+      "description": "Fragen in einem Kanal ohne Standard gehen an die Standardorganisation der jeweiligen Person (diese lässt sich mit /o2 org ändern)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "Noch niemand in dieser Organisation hat Slack verknüpft"
+    },
+    "slackNotConnected": {
+      "title": "Slack-Workspace verbinden"
+    },
+    "noAnnouncementBanners": {
+      "title": "Noch keine Banner",
+      "description": "Banner zeigen den von Ihnen gewählten Organisationen oben in der App einen Hinweis.",
+      "action": "Banner hinzufügen",
+      "actionDesc": "Hinweis verfassen und planen"
     },
     "noAiToolsets": {
       "title": "Noch keine KI-Toolsets",
@@ -376,6 +393,10 @@
       "action": "Erneut versuchen",
       "actionDesc": "Versuchen Sie erneut, die Daten zu laden"
     },
+    "pageError": {
+      "title": "Diese Seite konnte nicht geladen werden",
+      "description": "Keine Daten dieser Seite wurden geladen. Versuchen Sie es jetzt erneut oder in einer Minute noch einmal."
+    },
     "noData": {
       "title": "Hier ist noch nichts",
       "description": "Im Moment gibt es keine Daten zum Anzeigen."
@@ -451,7 +472,9 @@
       "description": "Kein {noun} entspricht Ihren aktuellen Filtern oder Ihrer Suche. Versuchen Sie, sie anzupassen oder zu löschen.",
       "action": "Filter löschen",
       "actionDesc": "Alle Filter zurücksetzen und suchen",
-      "fallbackNoun": "Ergebnisse"
+      "fallbackNoun": "Ergebnisse",
+      "noMatches": "Keine Treffer",
+      "noMatchesText": "Nichts entspricht der aktuellen Suche oder den Filtern."
     },
     "nouns": {
       "logs": "aufzeichnen",
@@ -490,6 +513,7 @@
       "evalTemplates": "Bewertungsvorlagen",
       "enrichmentTables": "Anreicherungstabellen",
       "cipherKeys": "Verschlüsselungsschlüssel",
+      "announcementBanners": "Ankündigungsbanner",
       "aiToolsets": "KI-Toolsets",
       "llmProviders": "LLM-Anbieter",
       "sourceMaps": "Source Maps",
@@ -660,6 +684,7 @@
       "groups": "Gruppen",
       "serviceAccounts": "Dienstkonten",
       "cipherKeys": "Verschlüsselungsschlüssel",
+      "announcementBanners": "Ankündigungsbanner",
       "regexPatterns": "Regex-Muster",
       "evalJobs": "Online-Eval-Jobs",
       "billingGroup": "Abrechnungsgruppe",
@@ -716,6 +741,7 @@
       "groups": "Gruppen",
       "serviceAccounts": "Dienstkonten",
       "cipherKeys": "Verschlüsselungsschlüssel",
+      "announcementBanners": "Ankündigungsbanner",
       "regexPatterns": "Regex-Muster",
       "unnamed": "diese Ressource",
       "onCall": "On-Call",
@@ -771,11 +797,12 @@
       "popoverLabel": "Ausgeblendete Bereiche dieser Seite"
     }
   },
+  "pageHeader": {
+    "about": "Über diese Seite"
+  },
   "common": {
-    "saveBar": {
-      "noChanges": "Keine Änderungen zu speichern"
-    },
     "dismiss": "Schließen",
+    "undo": "Rückgängig",
     "exitFullscreen": "Vollbild verlassen",
     "moreActions": "Weitere Aktionen",
     "moreOptions": "Weitere Optionen",
@@ -1014,6 +1041,8 @@
     "back": "Zurück",
     "save": "Speichern",
     "discardChanges": "Änderungen verwerfen",
+    "switchOn": "Ein",
+    "switchOff": "Aus",
     "unsavedChanges": "Ungespeicherte Änderungen",
     "update": "Aktualisieren",
     "favourite": "Favorit",
@@ -1128,6 +1157,8 @@
     "field": "Feld",
     "enterValueOrVariable": "Wert oder $variable eingeben",
     "all": "Alle",
+    "allStates": "Alle Zustände",
+    "allStatuses": "Alle Status",
     "jsonFilesOnlyHint": "Nur .json-Dateien",
     "fileUploadJsonTab": "Dateiupload / JSON",
     "urlImportTab": "URL-Import",
@@ -1164,6 +1195,18 @@
     "boolFalse": "Falsch",
     "browserTimeWithZone": "Browser-Zeit ({zone})",
     "poweredBy": "Bereitgestellt von",
+    "saveBar": {
+      "noChanges": "Keine Änderungen zu speichern",
+      "unsavedChanges": "{n} nicht gespeicherte Änderung | {n} nicht gespeicherte Änderungen",
+      "changesShort": "{n} Änderung | {n} Änderungen",
+      "fixFields": "{n} Feld korrigieren | {n} Felder korrigieren",
+      "discard": "Verwerfen"
+    },
+    "leaveGuard": {
+      "title": "Mit nicht gespeicherten Änderungen verlassen?",
+      "message": "Sie haben {n} nicht gespeicherte Änderung auf dieser Seite. Sie geht verloren, wenn Sie die Seite verlassen. | Sie haben {n} nicht gespeicherte Änderungen auf dieser Seite. Sie gehen verloren, wenn Sie die Seite verlassen.",
+      "keepEditing": "Weiter bearbeiten"
+    },
     "editorDraft": {
       "restoreTitle": "Nicht gespeicherter Entwurf",
       "restoreTitleInBrowser": "Nicht gespeicherte lokale Änderungen",
@@ -1234,7 +1277,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "Collector-Konfiguration"
+        "fleet_config": "Collector-Konfiguration",
+        "workflow": "Workflow"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1245,6 +1289,17 @@
       "retentionInBrowser": "Änderungen werden in diesem Browser {days} Tage lang aufbewahrt oder bis Sie sich abmelden. Nur die {max} neuesten jeder Art werden behalten.",
       "dotUndated": "Unsaved draft"
     }
+  },
+  "filterBar": {
+    "builderTooltip": "Filter im Builder bearbeiten",
+    "queryTooltip": "Filter als Text bearbeiten",
+    "validation": {
+      "regexLength": "Verwenden Sie für das Muster höchstens {max} Zeichen.",
+      "regexInvalid": "Dieses Muster ist ungültig oder wird nicht unterstützt. Lookahead, Lookbehind und Rückverweise können nicht verwendet werden."
+    },
+    "editorModeLabel": "Filter-Editor",
+    "modeBuilder": "Builder",
+    "modeText": "Text"
   },
   "flow": {
     "stepPicker": {
@@ -1942,8 +1997,8 @@
     "histogramTitleRows": "{total} Zeile in {took} ms. | {total} Zeilen in {took} ms.",
     "histogramTitleRowsWithScan": "{total} Zeile in {took} ms. ({scanLabel}: {scanSize}) | {total} Zeilen in {took} ms. ({scanLabel}: {scanSize})",
     "pickStreamFirst": "Zuerst einen Stream auswählen",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "Die automatische Aktualisierung aktualisiert die Suchergebnisse. Sie pausiert, solange Sie visualisieren.",
+    "histogramNoTimeAxis": "Gruppierte Ergebnisse haben keine Zeitachse"
   },
   "menu": {
     "alertCalibration": "Alarmkalibrierung",
@@ -3330,6 +3385,7 @@
         "inThisView": "In dieser Ansicht",
         "pagesFunnelNote": "Ein Trichter-Schritt, der eine ausgeblendete Seite nennt, trifft weiterhin zu.",
         "fieldMissing": "Feld nicht in diesem Stream",
+        "fieldMissingOn": "{field}: Feld nicht in diesem Stream",
         "field": "Feld",
         "match": "Übereinstimmung",
         "values": "Werte",
@@ -3381,8 +3437,7 @@
         "edit": "Bearbeiten",
         "identityRowForm": "Auf dieser Karte gelten Identitätsregeln ab dem ersten identifizierten Ereignis",
         "newUsersOnly": "Nur neue Benutzer",
-        "newUsersSessionsTip": "„Nur neue Benutzer“ funktioniert nur im Benutzermodus",
-        "fieldMissingOn": "{field}: Feld nicht in diesem Stream"
+        "newUsersSessionsTip": "„Nur neue Benutzer“ funktioniert nur im Benutzermodus"
       },
       "appFilters": {
         "hiddenLabel": "Ausgeblendet durch App-Filter:",
@@ -3858,6 +3913,8 @@
     "your_complete_license_key": "Ihr vollständiger Lizenzschlüssel:",
     "copy_key": "Schlüssel kopieren",
     "usage_information": "Informationen zur Nutzung",
+    "usage_chart_title": "Tägliche Aufnahme in diesem Monat",
+    "no_license_ingestion_limit": "Ohne Lizenz ist die Aufnahme auf <strong>{limit} GB</strong> pro Tag begrenzt.",
     "license_allows_ingestion": "Die aktuelle Lizenz erlaubt die Aufnahme von <strong>{limit} GB</strong> Daten pro Tag.",
     "license_allows_unlimited_ingestion": "Die aktuelle Lizenz ermöglicht eine unbegrenzte Datenaufnahme.",
     "limit_exceeded_days": "Das Limit wurde an <strong class=\"{colorClass}\">{days} Tag</strong> in diesem Monat überschritten | Das Limit wurde an <strong class=\"{colorClass}\">{days} Tagen</strong> in diesem Monat überschritten",
@@ -4714,6 +4771,8 @@
     },
     "listOrganizations": {
       "subtitle": "Organisationen, auf die Sie zugreifen können",
+      "switch": "Zu dieser Organisation wechseln",
+      "current": "Aktuell",
       "cannotEditWhileDeleting": "Bearbeiten während des Löschvorgangs nicht möglich",
       "edit": "Bearbeiten",
       "deleteOrganization": "Organisation löschen",
@@ -8520,6 +8579,12 @@
     "dateFormatEpochms": "Epoch-Millisekunden (epochms)",
     "dateFormatEpochus": "Epoch-Mikrosekunden (epochus)",
     "newFolder": "Neuer Ordner",
+    "inlineCreate": {
+      "folderName": "Name des neuen Ordners",
+      "createFolder": "Ordner erstellen",
+      "tabName": "Name des neuen Tabs",
+      "createTab": "Tab erstellen"
+    },
     "updateFolder": "Ordner aktualisieren",
     "newReport": "Neuer Bericht",
     "scheduledDashboards": "Geplante Dashboards",
@@ -11541,10 +11606,7 @@
       "titleLoading": "Digest",
       "subtitle": "Umfasst {start} bis {end}, erstellt {time}",
       "back": "Digests",
-      "viewInLogs": "In Logs anzeigen",
-      "viewInLogsHint": "Öffnet die Datensätze dieses Laufs in Logs",
       "unavailableTitle": "Digest nicht verfügbar",
-      "loadFailed": "Der Digest konnte nicht geladen werden: {message}",
       "backToDigests": "Zurück zu den Digests",
       "partialCoverage": "Teilweise Abdeckung",
       "partialCoverageDesc": "Dieser Lauf konnte nicht das gesamte Fenster erfassen, daher sind die untenstehenden Zählungen eine Untergrenze, kein Gesamtwert, und keine Feststellung ist keine Freigabe.",
@@ -11570,7 +11632,10 @@
       "topOrgs": "Am stärksten betroffene Organisationen",
       "worstHours": "Schlimmste Stunden",
       "proposedActions": "Vorgeschlagene Aktionen",
-      "openAlert": "Alarm öffnen"
+      "openAlert": "Alarm öffnen",
+      "viewInLogs": "In Logs anzeigen",
+      "viewInLogsHint": "Öffnet die Datensätze dieses Laufs in Logs",
+      "loadFailed": "Der Digest konnte nicht geladen werden: {message}"
     },
     "dashboard": {
       "latestRunAgo": "Letzter Lauf {time}",
@@ -11615,11 +11680,11 @@
       "savedFirstRun": "Gespeichert. Der erste Lauf ist jetzt fällig.",
       "savedCadence": "Gespeichert. Das neue Intervall gilt ab dem nächsten Lauf, und ein kürzeres kann diesen Lauf vorziehen.",
       "saveFailed": "Die Einstellungen konnten nicht gespeichert werden: {message}",
-      "loadFailed": "Die Einstellungen konnten nicht geladen werden: {message}",
       "lastSaved": "Zuletzt gespeichert {time}",
       "runNowHeading": "Jetzt ausführen",
       "frequencyRange": "Wählen Sie einen Rhythmus zwischen 1 Stunde und 30 Tagen.",
-      "windowRange": "Wählen Sie ein Fenster zwischen 1 Minute und 90 Tagen."
+      "windowRange": "Wählen Sie ein Fenster zwischen 1 Minute und 90 Tagen.",
+      "loadFailed": "Die Einstellungen konnten nicht geladen werden: {message}"
     }
   },
   "alerts": {
@@ -11637,6 +11702,10 @@
     },
     "summaryTrainingFailed": "Training fehlgeschlagen",
     "startFromTemplate": "Mit einer Vorlage beginnen",
+    "rowAction": {
+      "paused": "{name} pausiert | {count} Alarme pausiert",
+      "resumed": "{name} fortgesetzt | {count} Alarme fortgesetzt"
+    },
     "firing": {
       "title": "Ausgelöst",
       "drawer": {
@@ -14256,7 +14325,8 @@
         "mute": "Sie können dies nicht stummschalten.",
         "onCall": "On-Call: {people}",
         "canAct": "Kann ebenfalls handeln: {people}",
-        "people": "Im Dienst: {onCall}. Kann ebenfalls handeln: {canAct}"
+        "people": "Im Dienst: {onCall}. Kann ebenfalls handeln: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "Dieser Alarm ist nicht ausgelöst, es gibt daher nichts zu bestätigen.",
@@ -14774,6 +14844,7 @@
     "destination_type": "Zieltyp",
     "template": "Vorlage",
     "actions": "Aktionen",
+    "addHeader": "Header hinzufügen",
     "addTitle": "Neues Ziel",
     "updateTitle": "Ziel aktualisieren",
     "delete": "Löschen",
@@ -14919,7 +14990,9 @@
   },
   "pipeline_destinations": {
     "header": "Pipeline-Ziele",
-    "search": "Ziel suchen"
+    "search": "Ziel suchen",
+    "destinationType": "Zieltyp",
+    "outputFormat": "Ausgabeformat"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15424,14 +15497,17 @@
     "groupGeneral": "Allgemein",
     "groupAccessSecurity": "Zugriff & Sicherheit",
     "groupDestinations": "Ziele",
-    "groupDataAI": "Daten & KI",
     "groupOperations": "Betrieb",
     "groupSynthetics": "Synthetics",
     "groupIntegrations": "Integrationen",
     "groupAccount": "Konto",
     "slackApp": "Slack",
+    "slackAppDesc": "Workspaces, Kanal-Standards und Kontoverknüpfung für die Slack-App",
     "generalDesc": "Design, Standardabfragen und zentrale Einstellungen",
     "orgDesc": "Organisationsparameter und Kennungen",
+    "generalSubtitle": "Wie {org} aussieht und welche Abfragestandards gelten.",
+    "orgSubtitle": "Feldnamen, Datenaufbewahrung und automatische Funktionen für {org}.",
+    "passwordPolicySubtitle": "Regeln für native E-Mail-und-Passwort-Konten.",
     "cipherKeysDesc": "Verschlüsselungsschlüssel für sensible Felder",
     "regexPatternsDesc": "Wiederverwendbare Regex-Muster zur Schwärzung",
     "domainManagementDesc": "Anmeldung auf zulässige SSO-Domänen beschränken",
@@ -15442,7 +15518,6 @@
     "storageSettingsDesc": "Speicherkonfiguration pro Organisation",
     "modelPricingDesc": "Kostenkonfiguration für LLM-Modelle",
     "correlationSettingsDesc": "Konfiguration der Telemetrie-Korrelation",
-    "llmProvidersDesc": "LLM-Anbieter für Online-Evaluierungen",
     "queryManagementDesc": "Laufende Abfragen prüfen und abbrechen",
     "nodesDesc": "Cluster-Knoten und deren Zustand",
     "licenseDesc": "Details zur Enterprise-Lizenz",
@@ -15450,7 +15525,6 @@
     "queryManagement": "Verwaltung von Abfragen",
     "scrapintervalLabel": "Scraping Intervall (in Sekunden) *",
     "logoLabel": "Logobild per Drag & Drop",
-    "customLogoTitle": "Benutzerdefiniertes Logo",
     "deleteLogoTitle": "Logo löschen",
     "deleteLogoMessage": "Möchten Sie das Logo-Bild {name} wirklich löschen? Klicken Sie zum Löschen auf OK.",
     "customLogoText": "Benutzerdefinierter Logo-Text",
@@ -15546,12 +15620,8 @@
     "themeManagementDescription": "Verwalten Sie die Themenfarben Ihrer Organisation sowohl für den hellen als auch für den dunklen Modus. Diese Farben werden auf Organisationsebene angewendet.",
     "enterpriseFeatures": "Enterprise-Funktionen",
     "noTextAvailable": "Kein Text verfügbar",
-    "customLogoTextDescription": "Benutzerdefinierter Logotext wird verwendet, um den in der Anwendung angezeigten Standard-Branding-Text zu ändern.",
     "lightMode": "Heller Modus",
-    "dragDropUpload": "Zum Hochladen per Drag & Drop klicken",
-    "customLogoLightDescription": "Benutzerdefiniertes Logo für das Lichtmodus-Thema. Dies wird angezeigt, wenn sich Benutzer im Lichtmodus befinden.",
     "darkMode": "Dunkler Modus",
-    "customLogoDarkDescription": "Benutzerdefiniertes Logo für das Dunkelmodus-Thema. Dies wird angezeigt, wenn sich Benutzer im Dunkelmodus befinden.",
     "pickCustomColor": "Wählen Sie eine benutzerdefinierte Farbe",
     "organizationSettingsUpdated": "Die Organisationseinstellungen wurden aktualisiert",
     "dangerZone": "Gefahrenzone",
@@ -15582,42 +15652,10 @@
     "logoDeletedSuccessfully": "Das {mode} -Logo wurde erfolgreich gelöscht.",
     "errorDeletingImage": "Fehler beim Löschen des Bilds.",
     "themeColorsResetSuccess": "Die Designfarben werden auf die Standardwerte zurückgesetzt und angewendet.",
-    "textMaxCharacters": "Der Text sollte weniger als 100 Zeichen lang sein.",
     "logoTextUpdatedSuccessfully": "Der Logotext wurde erfolgreich aktualisiert.",
     "errorUpdatingImage": "Fehler beim Aktualisieren des Images.",
     "fileFormatConstraint": "(Nur die Formate PNG, JPG, JPEG, GIF, BMP und maximale Größe: 150 x 30 Pixel)",
     "filesValidationFailed": "{count} Datei hat die Validierungsbeschränkungen nicht erfüllt | {count} Dateien haben die Validierungsbeschränkungen nicht erfüllt",
-    "genAiAgentMapping": {
-      "tabLabel": "GenAI Agentenzuordnung",
-      "title": "GenAI Agentenzuordnung",
-      "description": "Konfigurieren Sie Fallback-Telemetrieattribute zur Normalisierung der Agentenidentität für LLM-Traces und Auswertungen.",
-      "agentNameFields": "Fallback-Felder für Agentennamen",
-      "agentNameHelp": "Eingehende Attribute, die als Fallbacks für gen_ai.agent.name verwendet werden sollen.",
-      "agentNameInfo": "Wird nur überprüft, wenn das Standardattribut gen_ai.agent.name fehlt oder leer ist. Fügen Sie ein eingehendes Telemetrieattribut pro Zeile hinzu.",
-      "agentIdFields": "Fallback-Felder für Agenten-IDs",
-      "agentIdHelp": "Eingehende Attribute, die als Fallbacks für gen_ai.agent.id verwendet werden sollen.",
-      "agentIdInfo": "Wird nur überprüft, wenn das Standardattribut gen_ai.agent.id fehlt oder leer ist. Fügen Sie ein eingehendes Telemetrieattribut pro Zeile hinzu.",
-      "envFields": "Fallback-Felder für die Umgebung",
-      "envHelp": "Eingehende Attribute, die als Umgebung des Agents verwendet werden sollen.",
-      "envInfo": "Nur geprüft, wenn das Standard-Attribut deployment.environment.name fehlt oder leer ist. Fügen Sie ein eingehendes Telemetrie-Attribut pro Zeile hinzu.",
-      "versionFields": "Fallback-Felder für die Version",
-      "versionHelp": "Eingehende Attribute, die als Version des Agents verwendet werden sollen.",
-      "versionInfo": "Nur geprüft, wenn das Standard-Attribut gen_ai.agent.version fehlt oder leer ist. Fügen Sie ein eingehendes Telemetrie-Attribut pro Zeile hinzu.",
-      "alwaysAppliedStandard": "Standard (zuerst geprüft):",
-      "applyDefaults": "Standardwerte anwenden",
-      "resetToEmpty": "Auf leer zurücksetzen",
-      "clearRegistry": "Registrierung löschen",
-      "clearRegistryTitle": "Agentenregistrierung löschen?",
-      "clearRegistryDescription": "Dies löscht alle erkannten GenAI-Agenten-Registrierungseinträge für diese Organisation. Neue passende Traces füllen die Registrierung während der Datenerfassung wieder auf.",
-      "clearRegistryConfirm": "Registrierung löschen",
-      "saved": "Das GenAI-Agent-Mapping wurde erfolgreich gespeichert",
-      "clearRegistrySuccess": "GenAI-Agent-Registry geleert. {deletedCount} gespeicherte Agenten und {bufferCount} wartende Beobachtungen wurden gelöscht.",
-      "loadFailed": "GenAI Agent-Mapping konnte nicht geladen werden",
-      "saveFailed": "Die GenAI-Agentenzuordnung konnte nicht gespeichert werden",
-      "clearRegistryFailed": "Die GenAI-Agent-Registrierung konnte nicht gelöscht werden",
-      "defaultsLoadFailed": "Die Standardeinstellungen für die GenAI-Agentenzuordnung konnten nicht geladen werden",
-      "defaultsFetchFailed": "Standardwerte konnten nicht abgerufen werden ({status})"
-    },
     "correlation": {
       "identityConfigNoSets": "Konfigurieren Sie mindestens einen Identitätssatz, bevor Sie speichern.",
       "discoveredServicesTab": "Entdeckte Dienste",
@@ -15673,7 +15711,6 @@
       "resetServicesFailed": "Dienste konnten nicht zurückgesetzt werden",
       "workload": "Workload",
       "goToConfiguration": "Zur Konfiguration",
-      "configureServicesHint": "um zu konfigurieren, wie Dienste identifiziert und gruppiert werden.",
       "filterBy": "Filtern nach:",
       "selectFieldPlaceholder": "Feld auswählen",
       "selectValuePlaceholder": "Wert auswählen",
@@ -15691,7 +15728,8 @@
       "fieldNameMapping": "Feldnamenzuordnung",
       "logsWithCount": "Logs ({count})",
       "tracesWithCount": "Traces ({count})",
-      "metricsWithCount": "Metriken ({count})"
+      "metricsWithCount": "Metriken ({count})",
+      "configureServicesHint": "um zu konfigurieren, wie Dienste identifiziert und gruppiert werden."
     },
     "addRegexPattern": {
       "namePlaceholder": "Z. B. Interne Passwörter",
@@ -15718,14 +15756,60 @@
       "failedToLoadServices": "Fehler beim Laden der Dienste."
     },
     "domainManagement": {
-      "unknownTime": "Unbekannte Zeit"
+      "unknownTime": "Unbekannte Zeit",
+      "claimParserTitle": "Claim-Parser",
+      "claimParserSectionDesc": "Wandelt SSO- und LDAP-Claims in Zuweisungen von Organisationen und Rollen um.",
+      "claimParserLabel": "Claim-Parser-Funktion",
+      "claimParserHelp": "Eine {product1}- oder {product2}-Funktion, die die zugeordneten Claims erhält und die zuzuweisenden Organisationen und Rollen oder eine Ablehnung zurückgibt.",
+      "claimParserFormatLink": "Eingabe- und Ausgabeformat",
+      "claimParserPlaceholder": "Keine Funktion",
+      "noFunctions": "Noch keine Funktionen",
+      "restrictionsTitle": "Domain-Einschränkungen",
+      "restrictionsDesc": "Welche E-Mail-Domains und Benutzer sich über SSO anmelden dürfen.",
+      "domainLabel": "Domain",
+      "addDomain": "Domain hinzufügen",
+      "noDomains": "Noch keine Domains. Fügen Sie eine Domain hinzu, um einzuschränken, wer sich anmelden darf.",
+      "accessFor": "Zugriff für {domain}",
+      "policyAllowAll": "Alle Benutzer zulassen",
+      "policyAllowSpecific": "Nur aufgelistete Benutzer zulassen",
+      "policyBlockSpecific": "Aufgelistete Benutzer sperren",
+      "policyBlockAll": "Alle Benutzer sperren",
+      "effectAllowSpecific": "Nur die aufgelisteten Benutzer mit E-Mail-Adressen, die auf {domain} enden, dürfen sich anmelden.",
+      "effectBlockSpecific": "Die aufgelisteten externen SSO-Benutzer mit E-Mail-Adressen, die auf {domain} enden, werden vom System ausgeschlossen (UI, API und Aufnahme).",
+      "emailLabel": "E-Mail-Adresse",
+      "noEmails": "Noch keine E-Mail-Adressen aufgelistet.",
+      "removeDomain": "{domain} entfernen",
+      "removeEmail": "{email} entfernen",
+      "saved": "SSO-Einstellungen gespeichert"
     },
     "general": {
       "close": "Schließen",
+      "themeTitle": "Design",
+      "themeDescription": "Die Akzentfarbe für {org} im hellen und dunklen Modus.",
+      "accentColorLabel": "Akzentfarbe",
+      "lightColorLabel": "Farbe für den hellen Modus ändern, aktuell {color}",
+      "darkColorLabel": "Farbe für den dunklen Modus ändern, aktuell {color}",
+      "queryDefaultsTitle": "Abfragestandards",
+      "queryDefaultsDescription": "Standardwerte für die Metrikerfassung und PromQL-Abfragen.",
+      "scrapeIntervalLabel": "Scrape-Intervall",
+      "scrapeIntervalHelp": "Wie oft Metriken erfasst werden.",
+      "unitSeconds": "Sekunden",
+      "maxSeriesLabel": "Max. Serien pro Abfrage",
+      "maxSeriesHelp": "Die maximale Anzahl an Serien, die eine PromQL-Abfrage zurückgeben darf. Leer verwendet den Standardwert {n}.",
+      "unitSeries": "Serien",
+      "maxSeriesError": "Geben Sie 1.000 bis 1.000.000 ein oder lassen Sie das Feld leer, um den Standardwert zu verwenden.",
+      "brandingTitle": "Branding",
+      "brandingDescription": "Der Name und die Logos, die jeder Organisation in dieser Instanz angezeigt werden.",
+      "logoTextHelp": "Ersetzt den standardmäßig in der App angezeigten Namen. Bis zu 100 Zeichen.",
+      "logoTextTooLong": "Verwenden Sie höchstens 100 Zeichen.",
+      "logoTextSaveFailed": "Der benutzerdefinierte Logotext wurde nicht gespeichert. {reason}",
+      "logoSaveFailed": "Das Logo ({mode}) wurde nicht hochgeladen. {reason}",
+      "brandingUpdated": "Branding aktualisiert",
+      "logoLightLabel": "Benutzerdefiniertes Logo (heller Modus)",
+      "logoLightHelp": "Wird im hellen Modus angezeigt. PNG, JPG, GIF oder BMP, bis zu 150 × 30 px.",
+      "logoDarkLabel": "Benutzerdefiniertes Logo (dunkler Modus)",
+      "logoDarkHelp": "Wird im dunklen Modus angezeigt. PNG, JPG, GIF oder BMP, bis zu 150 × 30 px.",
       "fileCounterLabel": "{constraint} {filesNumber} Datei {'|'} {totalSize}"
-    },
-    "llmProvidersSettings": {
-      "subtitle": "LLM-Anbieter für Online-Evaluierungen"
     },
     "modelPricingEditor": {
       "copySuffix": " (Kopie)"
@@ -15743,18 +15827,30 @@
       "title": "Standardwerte für die Datenaufbewahrung",
       "about": "Für Streams ohne eigene Aufbewahrung. Leer oder 0 verwendet den globalen Wert; andernfalls mindestens 3 Tage.",
       "defaultDays": "Standard (Tage)",
-      "streamType": "Stream-Typ",
-      "days": "Tage",
+      "defaultLabel": "Standard",
+      "unitDays": "Tage",
+      "daysFor": "Aufbewahrung {type} (Tage)",
       "addType": "Stream-Typ hinzufügen",
-      "removeType": "Diesen Stream-Typ entfernen",
+      "allTypesAdded": "Jeder Stream-Typ hat bereits eine Zeile.",
+      "removeTypeNamed": "Standard für {type} entfernen",
       "globalDefault": "Global: {value}",
       "globalType": "Global {type}: {value}",
       "daysValue": "{days} Tage",
       "forever": "unbegrenzt aufbewahren",
-      "invalid": "0 oder mindestens 3 Tage verwenden"
+      "invalid": "0 oder mindestens 3 Tage verwenden",
+      "invalidType": "Verwenden Sie mindestens 3 Tage oder entfernen Sie diesen Typ",
+      "streamType": "Stream-Typ",
+      "days": "Tage",
+      "removeType": "Diesen Stream-Typ entfernen"
     },
     "organizationSettings": {
       "fieldNameHelp": "Verwenden Sie nur alphanumerische Zeichen und '+=,.{'@'}-_', ohne Leerzeichen.",
+      "sectionTitle": "Datenverarbeitung",
+      "sectionDescription": "Wie Logs mit Traces verknüpft werden und welche automatischen Funktionen aktiv sind.",
+      "traceIdHelp": "Das Log-Feld, das eine Logzeile mit ihrem Trace verknüpft. Nur Buchstaben, Ziffern und + = , . {'@'} - _.",
+      "spanIdHelp": "Das Log-Feld, das eine Logzeile mit ihrem Span verknüpft. Dieselben Zeichen wie oben.",
+      "ingestionLogsHelp": "Führt ein Protokoll der Datensätze, deren Aufnahme fehlschlägt.",
+      "usageStreamHelp": "Schreibt die Nutzung von {org} in einen eigenen Stream, den Sie abfragen können.",
       "settingsUpdated": "Organisationseinstellungen erfolgreich aktualisiert.",
       "settingsSaveError": "Fehler beim Speichern der Organisationseinstellungen."
     },
@@ -15813,9 +15909,6 @@
       "alreadyExists": "Muster \"{name}\" ist bereits vorhanden. Bitte verwenden Sie einen anderen Namen.",
       "importPatternFailed": "Fehler beim Importieren des Musters \"{name}\": {error}",
       "createFailed": "Regex-Muster - {index}: Erstellung von \"{name}\" fehlgeschlagen --> \n Grund: {error}"
-    },
-    "index": {
-      "genAiAgentMappingDesc": "GenAI-Spans Agentenbezeichnern zuordnen"
     },
     "organizationManagementPage": {
       "setUsageLimits": "Nutzungslimits festlegen",
@@ -15953,7 +16046,6 @@
       "discoveredPatternsHelp": "Wir haben diese Bereitstellungsmuster in Ihren Streams entdeckt. Verwenden Sie sie, um die Servicekorrelation zu konfigurieren.",
       "envFieldsDetected": "{env} Felder in Ihren Telemetriedaten erkannt.",
       "goToServices": "Zu Diensten gehen",
-      "toSeeDiscoveredServices": "um die tatsächlich entdeckten Dienste zu sehen.",
       "fieldsConfigured": "{n} Feld konfiguriert | {n} Felder konfiguriert",
       "recommended": "Empfohlen:",
       "recommendedUse": "Verwenden",
@@ -15980,7 +16072,8 @@
       "reasonCardinality": "{level} Kardinalität",
       "reasonCoverage": "{coverage}% Abdeckung",
       "reasonAcrossStreamTypes": "über {types} hinweg",
-      "reasonIdealForDisambiguation": "{details} — ideal zur Dienst-Disambiguierung"
+      "reasonIdealForDisambiguation": "{details} — ideal zur Dienst-Disambiguierung",
+      "toSeeDiscoveredServices": "um die tatsächlich entdeckten Dienste zu sehen."
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "z. B. {example}",
@@ -16169,6 +16262,51 @@
       "requestApproved": "{domain} verknüpft",
       "requestRejected": "Anfrage für {domain} abgelehnt",
       "decisionFailed": "Anfrage konnte nicht aktualisiert werden"
+    },
+    "groupDataAI": "Daten & KI",
+    "llmProvidersDesc": "LLM-Anbieter für Online-Evaluierungen",
+    "customLogoTitle": "Benutzerdefiniertes Logo",
+    "customLogoTextDescription": "Benutzerdefinierter Logotext wird verwendet, um den in der Anwendung angezeigten Standard-Branding-Text zu ändern.",
+    "dragDropUpload": "Zum Hochladen per Drag & Drop klicken",
+    "customLogoLightDescription": "Benutzerdefiniertes Logo für das Lichtmodus-Thema. Dies wird angezeigt, wenn sich Benutzer im Lichtmodus befinden.",
+    "customLogoDarkDescription": "Benutzerdefiniertes Logo für das Dunkelmodus-Thema. Dies wird angezeigt, wenn sich Benutzer im Dunkelmodus befinden.",
+    "textMaxCharacters": "Der Text sollte weniger als 100 Zeichen lang sein.",
+    "genAiAgentMapping": {
+      "tabLabel": "GenAI Agentenzuordnung",
+      "title": "GenAI Agentenzuordnung",
+      "description": "Konfigurieren Sie Fallback-Telemetrieattribute zur Normalisierung der Agentenidentität für LLM-Traces und Auswertungen.",
+      "agentNameFields": "Fallback-Felder für Agentennamen",
+      "agentNameHelp": "Eingehende Attribute, die als Fallbacks für gen_ai.agent.name verwendet werden sollen.",
+      "agentNameInfo": "Wird nur überprüft, wenn das Standardattribut gen_ai.agent.name fehlt oder leer ist. Fügen Sie ein eingehendes Telemetrieattribut pro Zeile hinzu.",
+      "agentIdFields": "Fallback-Felder für Agenten-IDs",
+      "agentIdHelp": "Eingehende Attribute, die als Fallbacks für gen_ai.agent.id verwendet werden sollen.",
+      "agentIdInfo": "Wird nur überprüft, wenn das Standardattribut gen_ai.agent.id fehlt oder leer ist. Fügen Sie ein eingehendes Telemetrieattribut pro Zeile hinzu.",
+      "envFields": "Fallback-Felder für die Umgebung",
+      "envHelp": "Eingehende Attribute, die als Umgebung des Agents verwendet werden sollen.",
+      "envInfo": "Nur geprüft, wenn das Standard-Attribut deployment.environment.name fehlt oder leer ist. Fügen Sie ein eingehendes Telemetrie-Attribut pro Zeile hinzu.",
+      "versionFields": "Fallback-Felder für die Version",
+      "versionHelp": "Eingehende Attribute, die als Version des Agents verwendet werden sollen.",
+      "versionInfo": "Nur geprüft, wenn das Standard-Attribut gen_ai.agent.version fehlt oder leer ist. Fügen Sie ein eingehendes Telemetrie-Attribut pro Zeile hinzu.",
+      "alwaysAppliedStandard": "Standard (zuerst geprüft):",
+      "applyDefaults": "Standardwerte anwenden",
+      "resetToEmpty": "Auf leer zurücksetzen",
+      "clearRegistry": "Registrierung löschen",
+      "clearRegistryTitle": "Agentenregistrierung löschen?",
+      "clearRegistryDescription": "Dies löscht alle erkannten GenAI-Agenten-Registrierungseinträge für diese Organisation. Neue passende Traces füllen die Registrierung während der Datenerfassung wieder auf.",
+      "clearRegistryConfirm": "Registrierung löschen",
+      "saved": "Das GenAI-Agent-Mapping wurde erfolgreich gespeichert",
+      "clearRegistrySuccess": "GenAI-Agent-Registry geleert. {deletedCount} gespeicherte Agenten und {bufferCount} wartende Beobachtungen wurden gelöscht.",
+      "loadFailed": "GenAI Agent-Mapping konnte nicht geladen werden",
+      "saveFailed": "Die GenAI-Agentenzuordnung konnte nicht gespeichert werden",
+      "clearRegistryFailed": "Die GenAI-Agent-Registrierung konnte nicht gelöscht werden",
+      "defaultsLoadFailed": "Die Standardeinstellungen für die GenAI-Agentenzuordnung konnten nicht geladen werden",
+      "defaultsFetchFailed": "Standardwerte konnten nicht abgerufen werden ({status})"
+    },
+    "llmProvidersSettings": {
+      "subtitle": "LLM-Anbieter für Online-Evaluierungen"
+    },
+    "index": {
+      "genAiAgentMappingDesc": "GenAI-Spans Agentenbezeichnern zuordnen"
     }
   },
   "reports": {
@@ -16398,7 +16536,6 @@
       "gt1Month": "> 1 Monat"
     },
     "selectOption": "Option auswählen",
-    "lastDataRefreshTime": "Letzte Datenaktualisierung:",
     "runningQueries": "Abfragen ausführen",
     "search": "Suchen",
     "queryList": "Details abfragen",
@@ -16409,6 +16546,7 @@
     "queryRange": "Abfragebereich",
     "userSummary": "Benutzerübersicht",
     "allQueries": "Alle Abfragen",
+    "allFields": "Alle Felder",
     "queryType": "Art der Abfrage",
     "numOfQueries": "Anzahl der Abfragen",
     "totalDuration": "Gesamtanzahl der Geschäftsführer Dauer",
@@ -16430,7 +16568,8 @@
     "cancelQueryFailed": "Fehler beim Abbrechen der Abfrage",
     "searchTypeDashboards": "Dashboards",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "Andere"
+    "searchTypeOthers": "Andere",
+    "lastDataRefreshTime": "Letzte Datenaktualisierung:"
   },
   "traces": {
     "nlNeedsSql": "Diese Frage benötigt SQL; öffnen Sie sie in Logs",
@@ -16958,15 +17097,6 @@
       "outputTokens": "Ausgabe-Tokens",
       "cost": "Kosten"
     },
-    "lLMErrorTable": {
-      "noData": "Keine Daten",
-      "noErrorsInRange": "Keine Fehler in diesem Zeitraum",
-      "loadFailed": "Letzte Fehler konnten nicht geladen werden",
-      "time": "Zeit",
-      "service": "Dienst",
-      "operation": "Vorgang",
-      "traceId": "Trace-ID"
-    },
     "lLMInsightsDashboard": {
       "stream": "Stream",
       "agent": "Agent",
@@ -17145,12 +17275,12 @@
       "truncated": "Zeigt den ersten Span dieses Traces in Startzeit-Reihenfolge an. Spätere Spans sind noch nicht geladen. | Zeigt die ersten {count} Spans dieses Traces in Startzeit-Reihenfolge an. Spätere Spans sind noch nicht geladen.",
       "loadMore": "Nächsten Span laden | Nächste {size} Spans laden",
       "loadMoreFailed": "Weitere Spans dieses Traces konnten nicht geladen werden",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "Kein Trace mit dieser ID zwischen {from} und {to}",
+      "notFoundText": "Trace {traceId} hat in diesem Zeitraum keine Spans im Stream {stream}. Er kann älter oder neuer sein, in einem anderen Stream liegen oder nicht erfasst worden sein.",
+      "searchWiderRange": "Größeren Zeitraum durchsuchen",
+      "searchSpansInRange": "Spans in diesem Zeitraum suchen",
+      "loadFailedTitle": "Dieser Trace konnte nicht geladen werden",
+      "loadFailedText": "Trace {traceId} konnte nicht gelesen werden. Versuchen Sie es gleich noch einmal."
     },
     "traceTree": {
       "clickToExpand": "Zum Erweitern klicken",
@@ -17278,6 +17408,15 @@
       "loadingPage": "Seite {page} wird geladen",
       "pageFailed": "Seite {page} konnte nicht geladen werden",
       "pageEmpty": "Seite {page} hat keine Ergebnisse"
+    },
+    "lLMErrorTable": {
+      "noData": "Keine Daten",
+      "noErrorsInRange": "Keine Fehler in diesem Zeitraum",
+      "loadFailed": "Letzte Fehler konnten nicht geladen werden",
+      "time": "Zeit",
+      "service": "Dienst",
+      "operation": "Vorgang",
+      "traceId": "Trace-ID"
     }
   },
   "aiToolset": {
@@ -17345,6 +17484,8 @@
     "type": "Typ",
     "step1WithType": "Schlüsselspeicher-Details (Typ: {type})",
     "step2": "Verschlüsselungsmechanismus",
+    "sectionKey": "Schlüssel",
+    "sectionSetup": "Schlüsselspeicher und Verschlüsselung",
     "secret": "Geheim",
     "baseURL": "Basis-URL",
     "accessId": "Zugriffs-ID",
@@ -17583,6 +17724,8 @@
     "noTracesDescription": "Für diese Korrelation wurden im ausgewählten Zeitraum keine Traces gefunden.",
     "viewInTraces": "In Traces anzeigen",
     "filters": "Filter",
+    "fieldGroupsTitle": "Feldgruppen",
+    "fieldNamesColumn": "Feldnamen",
     "semanticFieldGroupsCaption": "Ordnen Sie Ihre Telemetrie-Feldnamen gemeinsamen Gruppen zu, damit OpenObserve sie über Streams hinweg korrelieren kann.",
     "exportToJson": "Als JSON exportieren",
     "importFromJson": "Aus JSON importieren",
@@ -18686,7 +18829,6 @@
         "providerEndpointLabel": "Endpunkt:",
         "providerDefaultModelLabel": "Standardmodell:",
         "providerHelp": "Wählen Sie den LLM-Provider aus, den dieses Experiment aufruft. Verwalten Sie Provider unter {settingsLink}.",
-        "providerHelpSettingsLink": "Einstellungen",
         "temperatureLabel": "Temperatur",
         "temperatureHelp": "0–2. Höhere Werte variieren die Ausgabe.",
         "temperatureDeterministic": "0 — das Modell antwortet jedes Mal auf dieselbe Weise.",
@@ -18720,7 +18862,8 @@
         "promptTemperatureOverrideInherited": "Verwendet die Prompt-Parameter.",
         "taskTimeoutLabel": "Timeout (Sekunden)",
         "taskConcurrencyLabel": "Maximale Parallelität",
-        "taskOverrideHelp": "Überschreibt den veröffentlichten Wert des Tasks für diesen Lauf."
+        "taskOverrideHelp": "Überschreibt den veröffentlichten Wert des Tasks für diesen Lauf.",
+        "providerHelpSettingsLink": "Einstellungen"
       },
       "columns": {
         "name": "Name",
@@ -19072,10 +19215,6 @@
         "title": "Token-Trend",
         "subtitle": "Tokens nach Modell"
       },
-      "spanTrend": {
-        "title": "Span-Trend",
-        "subtitle": "Span-Anzahl nach Art"
-      },
       "latencyByModel": {
         "title": "Latenz nach Modell",
         "subtitle": "p50/p90/p95/p99"
@@ -19083,6 +19222,10 @@
       "tracesOverTime": {
         "title": "Anfragen im Laufe der Zeit",
         "subtitle": "Anzahl der Anfragen nach Service"
+      },
+      "spanTrend": {
+        "title": "Span-Trend",
+        "subtitle": "Span-Anzahl nach Art"
       },
       "errorsOverTime": {
         "title": "Fehler im Laufe der Zeit",
@@ -20172,7 +20315,6 @@
       "editTitleLlm": "LLM-Judge-Scorer aktualisieren",
       "descriptionPlaceholder": "Eine kurze Zusammenfassung dessen, was dieser Scorer misst.",
       "providerHelp": "Wählen Sie den LLM-Anbieter, den dieser Judge aufruft. Verwalten Sie Anbieter unter {settingsLink}.",
-      "providerHelpSettingsLink": "Einstellungen",
       "refreshProviders": "Anbieter aktualisieren",
       "selectedPrefix": "Ausgewählt:",
       "endpointLabel": "Endpunkt:",
@@ -20293,7 +20435,8 @@
         "resultReasoning": "Begründung",
         "resultRaw": "Rohantwort",
         "valuePlaceholder": "Wert für {variable}"
-      }
+      },
+      "providerHelpSettingsLink": "Einstellungen"
     },
     "job": {
       "detail": {
@@ -20647,6 +20790,16 @@
     "empty": {
       "title": "Noch keine LLM-Anbieter",
       "description": "LLM-Anbieter speichern die Verbindungsdaten (Basis-URL + Zugangsdaten) für die Sprachmodelle, die von Ihren LLM-Judge-Scorern aufgerufen werden. Fügen Sie einen hinzu, um richterbasierte Bewertungen auszuführen."
+    }
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· in {percent} % der Traces, in den letzten 24 Stunden",
+    "fallbacksNote": "Geben Sie Fallback-Felder durch Kommas getrennt in der Reihenfolge der Prüfung ein.",
+    "fallbackInvalid": "Verwenden Sie durch Kommas getrennte Feldnamen. Nur Buchstaben, Ziffern und . _ - : / {'@'}.",
+    "sessions": {
+      "title": "Sitzungsanzeige",
+      "help": "Wie Sitzungen benannt werden und welcher Wrapper-Text darin ausgeblendet wird.",
+      "noAgents": "Noch keine Agents. Fügen Sie einen Agent hinzu, um dessen Wrapper-Text auszublenden."
     }
   },
   "logs": {
@@ -21011,6 +21164,7 @@
     "showDetail": "Details anzeigen",
     "hideDetail": "Details ausblenden",
     "runAs": "Ausführen als",
+    "runSuggestion": "{query} ausführen",
     "searchTextFor": "Text für \"{text}\" suchen",
     "searchTextDesc": "Die gesamte Eingabe als eine Phrase suchen",
     "explain": {
@@ -21037,12 +21191,29 @@
     "minutesAgo": "vor {min} Min.",
     "hoursAgo": "vor {h} h",
     "notYetRefreshed": "Noch nicht aktualisiert",
-    "dataFresh": "Die Daten sind frisch",
-    "dataGettingStale": "Daten werden veraltet",
-    "dataStale": "Daten sind veraltet",
     "lastRefreshed": "Zuletzt aktualisiert: {time}",
     "refresh": "Aktualisieren",
-    "refreshWithAge": "Aktualisieren, zuletzt aktualisiert {age}"
+    "refreshWithAge": "Aktualisieren, zuletzt aktualisiert {age}",
+    "refreshing": "Wird aktualisiert",
+    "failed": "Fehlgeschlagen",
+    "autoRefresh": "Automatisch aktualisieren",
+    "autoOn": "Auto · {interval}",
+    "every": "Alle {interval}",
+    "interval": {
+      "10s": "10 s",
+      "30s": "30 s",
+      "1m": "1 Min.",
+      "5m": "5 Min.",
+      "15m": "15 Min."
+    },
+    "dataFresh": "Die Daten sind frisch",
+    "dataGettingStale": "Daten werden veraltet",
+    "dataStale": "Daten sind veraltet"
+  },
+  "copyButton": {
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "failed": "Kopieren blockiert · Strg C drücken"
   },
   "synthetics": {
     "variables": {
@@ -21833,6 +22004,11 @@
       "disabling": "Deaktiviere…",
       "editTitle": "Standort bearbeiten",
       "empty": "Keine Standorte verfügbar",
+      "emptyState": {
+        "title": "Noch keine Standorte",
+        "description": "Ein Standort ist ein Ort, von dem aus Ihre synthetischen Monitore ihre Prüfungen ausführen, etwa eine Cloud-Region.",
+        "actionDesc": "Einen Ort zum Ausführen von Prüfungen hinzufügen"
+      },
       "enable": "Aktivieren",
       "enabled": "Aktiviert",
       "enabledSuccess": "Standort aktiviert",
@@ -22981,7 +23157,17 @@
       "tokenLinkTooltip": "Wählen Sie, welches Datenerfassungs-Token die Snippets verwenden",
       "copiedWithToken": "Mit Organisations-Token {name} kopiert",
       "tokenIncludedHint": "Kopieren enthält das Datenerfassungs-Token der Organisation, das hier ausgeblendet bleibt.",
-      "maskedSelectionWarning": "Das ausgeblendete Token wurde als Punkte kopiert. Verwenden Sie Kopieren oder zeigen Sie es zuerst an."
+      "maskedSelectionWarning": "Das ausgeblendete Token wurde als Punkte kopiert. Verwenden Sie Kopieren oder zeigen Sie es zuerst an.",
+      "wrapLines": "Zeilen umbrechen",
+      "showAll": "Zeile {count} anzeigen | Alle {count} Zeilen anzeigen",
+      "showLess": "Weniger anzeigen"
+    },
+    "jsonViewer": {
+      "include": "Nach diesem Wert filtern",
+      "exclude": "Diesen Wert ausfiltern",
+      "copyValue": "Wert kopieren",
+      "fieldCount": "{count} Feld | {count} Felder",
+      "itemCount": "{count} Element | {count} Elemente"
     },
     "spinner": {
       "loading": "Wird geladen"
@@ -22990,6 +23176,19 @@
       "steps": "Schritte",
       "stepOf": "Schritt {current} von {total}",
       "swipeHint": "Wischen, um den Rest zu sehen"
+    },
+    "tabs": {
+      "more": "Mehr",
+      "unsaved": "Nicht gespeicherte Änderungen",
+      "locked": "Gesperrt"
+    },
+    "statStrip": {
+      "filters": "Filter",
+      "showOnly": "Nur {label} anzeigen",
+      "alsoShow": "{label} ebenfalls anzeigen",
+      "stopShowing": "{label} nicht mehr anzeigen",
+      "scrollBack": "Vorherige Filter anzeigen",
+      "scrollForward": "Weitere Filter anzeigen"
     },
     "attributeValueCell": {
       "addIcon": "Symbol hinzufügen"
@@ -23026,7 +23225,10 @@
       "moreInfo": "Weitere Informationen"
     },
     "dialog": {
-      "closeDialog": "Dialog schließen"
+      "closeDialog": "Dialog schließen",
+      "discardChanges": "Änderungen verwerfen?",
+      "keepEditing": "Weiter bearbeiten",
+      "discard": "Verwerfen"
     },
     "drawer": {
       "closeDrawer": "Drawer schließen"
@@ -23049,6 +23251,32 @@
       "clear": "Löschen"
     },
     "file": {
+      "removeNamed": "{name} entfernen",
+      "sourceLabel": "Importieren aus",
+      "sourceFile": "Datei",
+      "sourceUrl": "URL",
+      "sourcePaste": "Einfügen",
+      "dropPrompt": "Datei hier ablegen oder {choose}",
+      "dropPromptMultiple": "Dateien hier ablegen oder {choose}",
+      "chooseAFile": "eine Datei auswählen",
+      "chooseFiles": "Dateien auswählen",
+      "chooseFileButton": "Datei auswählen",
+      "chooseFilesButton": "Dateien auswählen",
+      "noFileChosen": "Keine Datei ausgewählt",
+      "dropToUpload": "Zum Hochladen ablegen",
+      "upToSize": "bis zu {size}",
+      "upToSizeEach": "bis zu {size} pro Datei",
+      "oneFile": "eine Datei",
+      "upToFiles": "bis zu {count} Dateien",
+      "typeRejected": "Nur {allowed}-Dateien werden akzeptiert",
+      "sizeRejected": "{size} überschreitet das Limit von {max}",
+      "countRejected": "Nur {count} Datei auf einmal | Nur {count} Dateien auf einmal",
+      "uploadFailed": "Hochladen fehlgeschlagen",
+      "uploaded": "Hochgeladen",
+      "urlPlaceholder": "Datei-URL",
+      "urlHelp": "Wir rufen sie einmalig beim Import ab.",
+      "textPlaceholder": "Inhalt hier einfügen",
+      "invalidJson": "Kein gültiges JSON: {detail}",
       "removeFile": "Datei entfernen",
       "clearAll": "Alle löschen"
     },
@@ -23063,7 +23291,14 @@
     "pagination": {
       "pagination": "Seitennummerierung",
       "previousPage": "Vorherige Seite",
-      "nextPage": "Nächste Seite"
+      "nextPage": "Nächste Seite",
+      "onFirstPage": "Bereits auf der ersten Seite",
+      "onLastPage": "Bereits auf der letzten Seite",
+      "range": "{from}–{to} von {total}",
+      "rangeOfMany": "{from}–{to} von vielen",
+      "pageOf": "Seite {page} von {pages}",
+      "perPage": "{size} pro Seite",
+      "pageSize": "Zeilen pro Seite"
     },
     "select": {
       "more": "mehr",
@@ -23073,6 +23308,10 @@
       "noOptionsFound": "Keine Optionen gefunden",
       "multiSelect": "Mehrfachauswahl",
       "singleSelect": "Einzelauswahl",
+      "any": "Beliebig",
+      "noMatches": "Keine Treffer für \"{term}\"",
+      "clearSearch": "Suche löschen",
+      "addOption": "\"{value}\" hinzufügen",
       "moreInfoAbout": "Weitere Informationen zu {field}",
       "moreInfo": "Weitere Informationen"
     },
@@ -23114,7 +23353,10 @@
       "removeColumnAria": "Spalte entfernen",
       "formatColumnAria": "Spalte formatieren",
       "selectedOfTotal": "{selected} von {total} ausgewählt",
-      "selectedCount": "{selected} ausgewählt"
+      "selectedCount": "{selected} ausgewählt",
+      "clearSelection": "Aufheben",
+      "rowActions": "Zeilenaktionen",
+      "moreRowActions": "Weitere Aktionen"
     },
     "predefinedThemes": {
       "title": "Design",
@@ -24352,6 +24594,12 @@
   },
   "passwordPolicy": {
     "complexity": "Komplexität",
+    "complexityDesc": "Was jedes neue Passwort enthalten muss.",
+    "unitCharacters": "Zeichen",
+    "unitDays": "Tage",
+    "unitPasswords": "Passwörter",
+    "unitAttempts": "Versuche",
+    "unitSeconds": "Sekunden",
     "minLength": "Minimale Länge",
     "minLengthDesc": "Kürzestes akzeptiertes Passwort",
     "maxLength": "Maximale Länge",
@@ -24367,6 +24615,7 @@
     "specialCharSet": "Erlaubte Sonderzeichen",
     "specialCharSetDesc": "Leer lassen, um beliebige nicht-alphanumerische Zeichen zu akzeptieren",
     "maxLengthTooSmall": "Die maximale Länge muss zwischen der minimalen Länge und 128 liegen.",
+    "maxLengthBelowMin": "Muss {min} oder mehr betragen, passend zur Mindestlänge.",
     "confirmTitle": "Passwortrichtlinie speichern?",
     "confirmMessage": "Beim Speichern müssen möglicherweise alle nativen Benutzer ein neues Passwort festlegen, bevor sie fortfahren können. Root, externe Benutzer und Dienstkonten sind ausgenommen — das gilt auch für Sie, es sei denn, Sie sind das Root-Konto. Dies kann nicht rückgängig gemacht werden.",
     "saved": "Passwortrichtlinie gespeichert. | Passwortrichtlinie gespeichert. {count} Benutzer muss sein Passwort zurücksetzen. | Passwortrichtlinie gespeichert. {count} Benutzer müssen ihr Passwort zurücksetzen.",
@@ -24377,14 +24626,17 @@
     "loadFailed": "Beim Lesen der aktuellen Richtlinie ist ein Fehler aufgetreten.",
     "rotation": "Rotation",
     "rotationDays": "Rotationszeitraum",
+    "rotationDesc": "Wann ein Passwort abläuft und wie viel Vorwarnung die Benutzer erhalten.",
     "rotationDaysDesc": "Tage, bevor ein Passwort abläuft. 0 = läuft nie ab",
     "rotationWarningDays": "Vor Ablauf warnen",
     "rotationWarningDaysDesc": "Tage Vorlaufzeit bei der Anmeldung. 0 = keine Warnung",
+    "rotationWarningDaysOffDesc": "Tage der Vorwarnung bei der Anmeldung. Wird verwendet, sobald Passwörter ablaufen.",
     "warningDaysTooLong": "Der Warnzeitraum darf nicht länger als der Rotationszeitraum sein.",
     "rotationPreview": "Ein heute festgelegtes Passwort läuft am {expires} ab. Die Anmeldewarnung beginnt am {warns}.",
     "rotationPreviewNoWarning": "Ein heute festgelegtes Passwort läuft am {expires} ab. Vorher wird keine Warnung angezeigt.",
     "reuse": "Wiederverwendung verhindern",
     "historyCount": "Gemerkte Passwörter",
+    "reuseDesc": "Verhindert, dass Benutzer zu einem alten Passwort zurückkehren.",
     "historyCountDesc": "Ein neues Passwort darf nicht mit so vielen vorherigen übereinstimmen. 0 = keine Prüfung",
     "historyMaxRetained": "Verlauf beibehalten",
     "historyMaxRetainedDesc": "Wie viele frühere Passwörter pro Benutzer gespeichert werden",
@@ -24392,6 +24644,7 @@
     "reuseExplainer": "Das aktuelle Passwort zählt zur gemerkten Menge — seine Wiederverwendung wird durch diese Regel abgelehnt, nicht durch eine separate Prüfung.",
     "lockout": "Kontosperrung",
     "lockoutThreshold": "Fehlgeschlagene Versuche vor der Sperrung",
+    "lockoutDesc": "Was nach wiederholten fehlgeschlagenen Anmeldungen passiert.",
     "lockoutThresholdDesc": "0 = Sperrung deaktiviert",
     "lockoutBucketSize": "Versuche vor jeder weiteren Sperrung",
     "lockoutBucketSizeDesc": "0 = Wert oben wiederverwenden",
@@ -24406,6 +24659,7 @@
     "backoffLinear": "Linear",
     "lockoutPreview": "{threshold} Fehlversuche → {first} · alle {bucket} weiteren → {rest} · begrenzt auf {max}. Eine erfolgreiche Anmeldung setzt alles zurück.",
     "sessionEnforcement": "Sitzung & Durchsetzung",
+    "sessionEnforcementDesc": "Wie lange eine Anmeldung gültig bleibt und ob root diese Regeln befolgt.",
     "cookieMaxAge": "Sitzungsdauer",
     "cookieMaxAgeDesc": "Sekunden, die eine angemeldete Sitzung gültig bleibt. 0 = Instanz-Standard aus {envVar} verwenden",
     "applyToRoot": "Auf das Root-Konto anwenden",
@@ -24782,6 +25036,7 @@
       "packUnavailableHint": "Kuratierte Inhalte für diese Workload gibt es noch nicht. Erstellen Sie in der Zwischenzeit ein Dashboard, um sie darzustellen.",
       "partialTelemetryKubernetes": "Wir haben Kubernetes-Streams gefunden, aber nicht die Metriken, die diese Seite benötigt (kubeletstats oder Cluster-Receiver). Prüfen Sie die Receiver Ihres Collectors.",
       "partialTelemetryHosts": "Wir haben Host-Streams gefunden, aber nicht die Metriken, die diese Seite benötigt. Prüfen Sie den hostmetrics-Receiver Ihres Collectors.",
+      "hostMetricsMissingTitle": "Keine Host-Metriken gefunden",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first} und {count} weitere",
       "hiddenFootnote": "Datenquellen, auf die Sie keinen Zugriff haben, erscheinen hier ebenfalls.",
@@ -27232,6 +27487,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Alarmierung unterdrücken",
     "savePolicyFailed": "Die Richtlinie konnte nicht gespeichert werden.",
+    "savePolicyFailedReason": "Richtlinie nicht gespeichert. {reason}",
     "state_triggered": "Ausgelöst",
     "state_triaged": "Eingestuft",
     "state_acknowledged": "Bestätigt",
@@ -28353,9 +28609,6 @@
       "legendLabel": "Legende",
       "config": "Detektor-Konfiguration",
       "lastFired": "Zuletzt ausgelöst",
-      "fixNoLink": "Label service.name hinzufügen",
-      "fixStopped": "Collector prüfen",
-      "fixQueued": "Nur Mock: „{action}“ für {service} wurde nirgendwohin gesendet",
       "viewLabel": "Abdeckungsansicht",
       "viewMap": "Karte",
       "viewTable": "Tabelle",
@@ -28417,7 +28670,10 @@
         "failed": "Fehlgeschlagen (Dead Letters)",
         "lag": "Consumer-Lag",
         "depth": "Warteschlangentiefe"
-      }
+      },
+      "fixNoLink": "Label service.name hinzufügen",
+      "fixStopped": "Collector prüfen",
+      "fixQueued": "Nur Mock: „{action}“ für {service} wurde nirgendwohin gesendet"
     },
     "activity": {
       "before": "Vorher",
@@ -28446,6 +28702,32 @@
       "nextStep": "Nächster Schritt",
       "fullReport": "Vollständiger Bericht",
       "fullReportHint": "Alles oben als ein Dokument, bereit zum Kopieren oder Herunterladen"
+    }
+  },
+  "autoobserveLive": {
+    "incidents": {
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
     }
   },
   "autoobserve2": {
@@ -28657,7 +28939,6 @@
       "fail": "Fehlgeschlagen"
     },
     "connect": {
-      "title": "Slack-Workspace verbinden",
       "description": "Ihr Team stellt OpenObserve Fragen aus Slack und erhält Antworten mit den eigenen Berechtigungen.",
       "stepCheckTitle": "Diesen Server prüfen",
       "stepCreateTitle": "App erstellen",
@@ -28687,7 +28968,8 @@
       "copyRequest": "Anfrage kopieren",
       "requestText": "Bitte fügen Sie die OpenObserve-Organisation {name} ({org}) zum Slack-Workspace {team} hinzu, unter _meta › Settings › Slack › Organizations.",
       "requestCopied": "Anfrage kopiert",
-      "setupAppOtherTeam": "Für einen anderen Slack-Workspace als {team} · OpenObserve erstellt Ihre eigene Slack-App aus einem Konfigurationstoken"
+      "setupAppOtherTeam": "Für einen anderen Slack-Workspace als {team} · OpenObserve erstellt Ihre eigene Slack-App aus einem Konfigurationstoken",
+      "title": "Slack-Workspace verbinden"
     },
     "wizard": {
       "title": "Slack-App einrichten",
@@ -28849,6 +29131,11 @@
       "otherOrgs": "Keine weitere Organisation | {count} weitere Organisation | {count} weitere Organisationen",
       "connectedOn": "{date} von {user}",
       "helpContact": "Hilfe-Kontakt",
+      "helpContactHelp": "Personen, die ihr Konto nicht verknüpfen können, werden an diesen Kontakt verwiesen.",
+      "eventsLabel": "Slack-Ereignisse",
+      "connectionLabel": "Verbindung",
+      "outboundLabel": "Ausgangswarteschlange",
+      "collaboratorsLabel": "App-Mitarbeiter",
       "helpContactPlaceholder": "#o2-help oder eine Ansprechperson",
       "helpContactSaved": "Hilfe-Kontakt gespeichert",
       "disconnectSection": "Trennen",
@@ -28885,8 +29172,6 @@
         "destination": "Von einem Alarmziel",
         "oncall": "Von /o2 oncall hier"
       },
-      "empty": "Noch kein Kanal hat eine Standardorganisation",
-      "emptyDescription": "Fragen in einem Kanal ohne Standard gehen an die Standardorganisation jeder Person (sie kann sie mit /o2 org ändern).",
       "channel": "Kanal",
       "channelPlaceholder": "Kanäle durchsuchen",
       "channelRequired": "Kanal auswählen",
@@ -28904,7 +29189,9 @@
       "ownOrgOnlyHint": "In einem Instanz-Workspace ordnen Sie Kanäle Ihrer eigenen Organisation zu",
       "claimableHint": "Nicht übernommene Kanäle und Kanäle im Besitz von {org}",
       "servedOrgsHint": "Jede Organisation, die dieser Workspace bedient",
-      "alertRoutes": "{count} Ziel | {count} Ziele"
+      "alertRoutes": "{count} Ziel | {count} Ziele",
+      "empty": "Noch kein Kanal hat eine Standardorganisation",
+      "emptyDescription": "Fragen in einem Kanal ohne Standard gehen an die Standardorganisation jeder Person (sie kann sie mit /o2 org ändern)."
     },
     "people": {
       "title": "Verknüpfte Personen",
@@ -29159,13 +29446,6 @@
       "unpricedTooltip": "Die Kosten sind eine Untergrenze: Für {tokens} Tokens auf {models} liegt kein Preis vor. Öffnen Sie den Tab „Ohne Preis“ in den LLM-Modellpreisen.",
       "pricedSinceTooltip": "Die Kosten sind eine Untergrenze: {tokens} Tokens auf {models} wurden vor dem Hinterlegen eines Preises erfasst und haben keine Kosten."
     },
-    "chart": {
-      "costMissing": "Nicht in diesem Diagramm: {models}. Für {tokens} Tokens liegt kein Preis vor.",
-      "costMissingPricedSince": "Nicht in diesem Diagramm: {models}. {tokens} Tokens wurden vor dem Hinterlegen eines Preises erfasst.",
-      "unpricedModels": "Ohne Preis: {models}",
-      "pricedSinceModels": "Vor dem Hinterlegen eines Preises erfasst: {models}",
-      "addPrice": "Preis hinzufügen"
-    },
     "health": {
       "title": "Datenzustand",
       "passing": "{n} bestanden",
@@ -29210,6 +29490,13 @@
           "fix": "Integrationsleitfaden"
         }
       }
+    },
+    "chart": {
+      "costMissing": "Nicht in diesem Diagramm: {models}. Für {tokens} Tokens liegt kein Preis vor.",
+      "costMissingPricedSince": "Nicht in diesem Diagramm: {models}. {tokens} Tokens wurden vor dem Hinterlegen eines Preises erfasst.",
+      "unpricedModels": "Ohne Preis: {models}",
+      "pricedSinceModels": "Vor dem Hinterlegen eines Preises erfasst: {models}",
+      "addPrice": "Preis hinzufügen"
     }
   },
   "onboarding": {
@@ -30495,44 +30782,39 @@
     "deletedQuery": "Gelöscht: {query}",
     "undo": "Rückgängig"
   },
-  "filterBar": {
-    "validation": {
-      "regexLength": "Verwenden Sie für das Muster höchstens {max} Zeichen.",
-      "regexInvalid": "Dieses Muster ist ungültig oder wird nicht unterstützt. Lookahead, Lookbehind und Rückverweise können nicht verwendet werden."
-    },
-    "queryTooltip": "Filter als Text bearbeiten",
-    "builderTooltip": "Filter im Builder bearbeiten",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
-  },
-  "autoobserveLive": {
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
-    "incidents": {
-      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
-      "routing": "Set up on-call routing"
-    },
-    "learning": {
-      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
-      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
-      "emptyTitle": "Learning your streams",
-      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
-      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
-      "until": "Learning until {date} · {streams}",
-      "streams": "Learning {count} stream | Learning {count} streams",
-      "streamUntil": "until {date}"
-    }
-  },
   "insight": {
+    "bulk": {},
+    "decisions": {
+      "saved": {
+        "applied": "Applied to {title}.",
+        "appliedEditor": "Saved and recorded for {title}.",
+        "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
+      },
+      "undone": {
+        "applyOne": "Undone: {title} is back to how it was.",
+        "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
+      },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undone": "Undone",
+        "you": "you"
+      }
+    },
     "kind": {
       "paged": {
         "page": {
@@ -30563,38 +30845,6 @@
           "next": "Check for a retry loop or a new sender writing to it.",
           "nextMany": "One cause is likely, such as a shared sender retrying."
         }
-      }
-    },
-    "bulk": {},
-    "decisions": {
-      "saved": {
-        "applied": "Applied to {title}.",
-        "appliedEditor": "Saved and recorded for {title}.",
-        "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
-      },
-      "apply": {
-        "edit": "Edit in alert editor",
-        "button": "Apply",
-        "where": "Folder {folder} · notifies {destinations}",
-        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
-        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
-        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
-        "changed": "This alert changed. Open it to review.",
-        "loading": "Checking what this changes…",
-        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
-        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
-        "cardNote": "Shows what changes before anything is saved.",
-        "gone": "This suggestion is no longer available. Open the alert to review it."
-      },
-      "applied": {
-        "title": "Applied changes",
-        "by": "by {actor} at {when}",
-        "undone": "Undone",
-        "you": "you"
-      },
-      "undone": {
-        "applyOne": "Undone: {title} is back to how it was.",
-        "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
   }

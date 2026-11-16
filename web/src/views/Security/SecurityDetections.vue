@@ -854,7 +854,6 @@ watch(orgId, () => void refresh());
       </OButton>
       <OButton
         variant="primary"
-        icon="add"
         :disabled="!canAuthor"
         data-test="security-detections-new"
         @click="openNew()"

@@ -453,7 +453,7 @@ describe("JumpToPalette", () => {
       const { query } = router.currentRoute.value;
       expect(router.currentRoute.value.path).toBe("/logs");
       expect(query).toMatchObject({ stream: "nginx", period: "15m", sql_mode: "false" });
-      expect(b64DecodeUnicode(String(query.query))).toBe("match_all('it''s down')");
+      expect(b64DecodeUnicode(String(query.query))).toBe("it's down");
     });
 
     it("leaves out a kind the user may not read, and keeps the others", async () => {

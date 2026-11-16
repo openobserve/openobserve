@@ -56,7 +56,6 @@
         <div class="flex items-center gap-2">
           <OButton
             variant="secondary"
-            icon="add"
             :disabled="samples.length >= MAX_SAMPLES"
             data-test="ai-remote-task-test-run-add"
             @click="addSample"

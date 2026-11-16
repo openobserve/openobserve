@@ -313,7 +313,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else-if="(setDistinguishBy[envKey] ?? []).filter(Boolean).length < 5"
                       variant="secondary"
                       @click="addingToEnv = envKey"
-                      icon="add"
                     >
                       {{ t("settings.correlation.addField") }}
                       <OTooltip side="top" :content="t('settings.correlation.addFieldTooltip')" />
@@ -367,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Add group -->
                 <div v-if="!addingToEnv" class="flex items-center justify-between py-3">
-                  <OButton variant="secondary" @click="addingToEnv = generateGroupId()" icon="add">
+                  <OButton variant="secondary" @click="addingToEnv = generateGroupId()">
                     {{ t("settings.correlation.addGroup") }}
                     <OTooltip side="top" :content="t('settings.correlation.addGroupTooltip')" />
                   </OButton>
@@ -509,7 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                   <!-- Add field button -->
-                  <OButton v-else variant="secondary" @click="addingTrackedAlias = true" icon="add">
+                  <OButton v-else variant="secondary" @click="addingTrackedAlias = true">
                     {{ t("settings.correlation.addField") }}
                   </OButton>
                 </div>

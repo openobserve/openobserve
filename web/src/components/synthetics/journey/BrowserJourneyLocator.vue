@@ -452,7 +452,6 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
           variant="secondary"
           class="mt-5 shrink-0"
           :disabled="!draft.trim()"
-          icon="add"
           :aria-label="t('synthetics.journey.locatorOverrideApply')"
           data-test="synthetics-journey-step-locator-add"
           @click="addOwn"

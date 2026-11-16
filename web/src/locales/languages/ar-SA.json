@@ -56,6 +56,7 @@
         "ariaLabel": "في انتظار البيانات"
       }
     },
+    "requestId": "الطلب {id}",
     "createFirstItem": "أنشئ أول عنصر لك",
     "newBrowserCheck": "فحص متصفح جديد",
     "allCaughtUp": "لقد تم الاطلاع على كل شيء",
@@ -199,6 +200,22 @@
       "description": "تستخدم مفاتيح التشفير لتشفير الحقول الحساسة في تدفقات بياناتك.",
       "action": "مفتاح جديد",
       "actionDesc": "توليد مفتاح التشفير"
+    },
+    "noSlackChannelDefaults": {
+      "title": "لا توجد مؤسسة افتراضية لأي قناة بعد",
+      "description": "تذهب الأسئلة في قناة بلا مؤسسة افتراضية إلى المؤسسة الافتراضية لكل شخص (يمكنهم تغييرها بالأمر /o2 org)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "لم يربط أحد في هذه المؤسسة Slack بعد"
+    },
+    "slackNotConnected": {
+      "title": "ربط مساحة عمل Slack"
+    },
+    "noAnnouncementBanners": {
+      "title": "لا توجد لافتات بعد",
+      "description": "تعرض اللافتات إشعارًا في أعلى التطبيق للمؤسسات التي تختارها.",
+      "action": "إضافة لافتة",
+      "actionDesc": "اكتب إشعارًا وحدد موعدًا له"
     },
     "noAiToolsets": {
       "title": "لا توجد مجموعات أدوات ذكاء اصطناعي حتى الآن",
@@ -376,6 +393,10 @@
       "action": "إعادة المحاولة",
       "actionDesc": "حاول تحميل البيانات مرة أخرى"
     },
+    "pageError": {
+      "title": "تعذّر تحميل هذه الصفحة",
+      "description": "لم يتم تحميل أي من بيانات هذه الصفحة. أعد المحاولة الآن أو حاول مجددًا بعد دقيقة."
+    },
     "noData": {
       "title": "لا شيء هنا حتى الآن",
       "description": "لا توجد بيانات يمكن عرضها حاليا."
@@ -451,7 +472,9 @@
       "description": "لا {noun} تطابق الفلاتر أو البحث الحالي. حاول تعديلها أو إزالتها.",
       "action": "مسح الفلاتر",
       "actionDesc": "إعادة ضبط جميع الفلاتر والبحث",
-      "fallbackNoun": "النتائج"
+      "fallbackNoun": "النتائج",
+      "noMatches": "لا توجد نتائج مطابقة",
+      "noMatchesText": "لا شيء يطابق البحث أو عوامل التصفية الحالية."
     },
     "nouns": {
       "logs": "السجلات",
@@ -490,6 +513,7 @@
       "evalTemplates": "قوالب التقييم",
       "enrichmentTables": "جداول الإثراء",
       "cipherKeys": "مفاتيح التشفير",
+      "announcementBanners": "لافتات الإعلانات",
       "aiToolsets": "مجموعات أدوات الذكاء الاصطناعي",
       "llmProviders": "مزودو LLM",
       "sourceMaps": "خرائط المصدر",
@@ -660,6 +684,7 @@
       "groups": "المجموعات",
       "serviceAccounts": "حسابات الخدمة",
       "cipherKeys": "مفاتيح التشفير",
+      "announcementBanners": "لافتات الإعلانات",
       "regexPatterns": "أنماط Regex",
       "evalJobs": "مهام التقييم عبر الإنترنت",
       "billingGroup": "مجموعة الفوترة",
@@ -716,6 +741,7 @@
       "groups": "المجموعات",
       "serviceAccounts": "حسابات الخدمة",
       "cipherKeys": "مفاتيح التشفير",
+      "announcementBanners": "لافتات الإعلانات",
       "regexPatterns": "أنماط Regex",
       "unnamed": "هذا المورد",
       "onCall": "المناوبة",
@@ -771,11 +797,12 @@
       "popoverLabel": "الأجزاء المخفية من هذه الصفحة"
     }
   },
+  "pageHeader": {
+    "about": "حول هذه الصفحة"
+  },
   "common": {
-    "saveBar": {
-      "noChanges": "لا توجد تغييرات للحفظ"
-    },
     "dismiss": "تجاهل",
+    "undo": "تراجع",
     "exitFullscreen": "إنهاء ملء الشاشة",
     "moreActions": "المزيد من الإجراءات",
     "moreOptions": "المزيد من الخيارات",
@@ -1014,6 +1041,8 @@
     "back": "العودة",
     "save": "حفظ",
     "discardChanges": "تجاهل التغييرات",
+    "switchOn": "مفعّل",
+    "switchOff": "متوقف",
     "unsavedChanges": "تغييرات غير محفوظة",
     "update": "تحديث",
     "favourite": "المفضل",
@@ -1128,6 +1157,8 @@
     "field": "الميدان",
     "enterValueOrVariable": "أدخل القيمة أو $variable",
     "all": "الجميع",
+    "allStates": "كل الحالات",
+    "allStatuses": "كل الحالات",
     "jsonFilesOnlyHint": ".json الملفات فقط",
     "fileUploadJsonTab": "رفع الملف / JSON",
     "urlImportTab": "استيراد الرابط",
@@ -1164,6 +1195,18 @@
     "boolFalse": "خطأ",
     "browserTimeWithZone": "وقت المتصفح ({zone})",
     "poweredBy": "بدعم من",
+    "saveBar": {
+      "noChanges": "لا توجد تغييرات للحفظ",
+      "unsavedChanges": "{n} تغيير غير محفوظ | {n} تغييرات غير محفوظة",
+      "changesShort": "{n} تغيير | {n} تغييرات",
+      "fixFields": "أصلح {n} حقل | أصلح {n} حقول",
+      "discard": "تجاهل"
+    },
+    "leaveGuard": {
+      "title": "المغادرة مع وجود تغييرات غير محفوظة؟",
+      "message": "لديك {n} تغيير غير محفوظ في هذه الصفحة. سيضيع إذا غادرت. | لديك {n} تغييرات غير محفوظة في هذه الصفحة. ستضيع إذا غادرت.",
+      "keepEditing": "متابعة التعديل"
+    },
     "editorDraft": {
       "restoreTitle": "مسودة غير محفوظة",
       "restoreTitleInBrowser": "تغييرات محلية غير محفوظة",
@@ -1234,7 +1277,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "إعدادات المجمّع"
+        "fleet_config": "إعدادات المجمّع",
+        "workflow": "سير العمل"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1245,6 +1289,17 @@
       "retentionInBrowser": "تُحفظ التغييرات في هذا المتصفح لمدة {days} من الأيام، أو حتى تسجيل خروجك. لا يُحتفظ إلا بأحدث {max} من كل نوع.",
       "dotUndated": "Unsaved draft"
     }
+  },
+  "filterBar": {
+    "builderTooltip": "تحرير عامل التصفية بالمنشئ",
+    "queryTooltip": "تحرير عامل التصفية كنص",
+    "validation": {
+      "regexLength": "اجعل النمط {max} حرفًا أو أقل.",
+      "regexInvalid": "هذا النمط غير صالح أو غير مدعوم. لا يمكن استخدام البحث الأمامي أو البحث الخلفي أو المراجع الخلفية."
+    },
+    "editorModeLabel": "محرر عوامل التصفية",
+    "modeBuilder": "المنشئ",
+    "modeText": "نص"
   },
   "flow": {
     "stepPicker": {
@@ -1942,8 +1997,8 @@
     "histogramTitleRows": "عرض {total} صف في {took} مللي ثانية. | عرض {total} صفوف في {took} مللي ثانية.",
     "histogramTitleRowsWithScan": "عرض {total} صف في {took} مللي ثانية. ({scanLabel}: {scanSize}) | عرض {total} صفوف في {took} مللي ثانية. ({scanLabel}: {scanSize})",
     "pickStreamFirst": "اختر تدفقاً أولاً",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "يحدّث التحديث التلقائي نتائج البحث. يتوقف مؤقتًا أثناء التصوير المرئي.",
+    "histogramNoTimeAxis": "النتائج المجمّعة ليس لها محور زمني"
   },
   "menu": {
     "alertCalibration": "معايرة التنبيهات",
@@ -3330,6 +3385,7 @@
         "inThisView": "في هذا العرض",
         "pagesFunnelNote": "لا تزال خطوة القمع التي تذكر صفحة مخفية مطابقة.",
         "fieldMissing": "الحقل غير موجود في هذا الجدول",
+        "fieldMissingOn": "{field}: الحقل غير موجود في هذا الجدول",
         "field": "الحقل",
         "match": "المطابقة",
         "values": "القيم",
@@ -3381,8 +3437,7 @@
         "edit": "تعديل",
         "identityRowForm": "في هذه البطاقة، تُطبَّق قواعد الهوية بدءًا من أول حدث مُعرّف",
         "newUsersOnly": "المستخدمون الجدد فقط",
-        "newUsersSessionsTip": "يعمل خيار المستخدمون الجدد فقط في وضع المستخدمين",
-        "fieldMissingOn": "{field}: الحقل غير موجود في هذا الجدول"
+        "newUsersSessionsTip": "يعمل خيار المستخدمون الجدد فقط في وضع المستخدمين"
       },
       "appFilters": {
         "hiddenLabel": "مخفية بواسطة مرشحات التطبيق:",
@@ -3858,6 +3913,8 @@
     "your_complete_license_key": "مفتاح رخصتك الكامل:",
     "copy_key": "نسخ المفتاح",
     "usage_information": "معلومات الاستخدام",
+    "usage_chart_title": "الإدخال اليومي هذا الشهر",
+    "no_license_ingestion_limit": "بدون ترخيص، يقتصر الإدخال على <strong>{limit} GB</strong> في اليوم.",
     "license_allows_ingestion": "تسمح الرخصة الحالية ب<strong>{limit} GB</strong> استيعاب البيانات يوميا.",
     "license_allows_unlimited_ingestion": "الترخيص الحالي يسمح باستيعاب البيانات بشكل غير محدود.",
     "limit_exceeded_days": "تم تجاوز الحد في <strong class=\"{colorClass}\">{days} day</strong> هذا الشهر | تم تجاوز الحد في <strong class=\"{colorClass}\">{days} days</strong> هذا الشهر",
@@ -4714,6 +4771,8 @@
     },
     "listOrganizations": {
       "subtitle": "المؤسسات التي يمكنك الوصول إليها",
+      "switch": "التبديل إلى هذه المؤسسة",
+      "current": "الحالية",
       "cannotEditWhileDeleting": "لا يمكن التعديل أثناء الحذف",
       "edit": "تعديل",
       "deleteOrganization": "حذف المؤسسة",
@@ -8520,6 +8579,12 @@
     "dateFormatEpochms": "مللي ثانية من الحقبة (epochms)",
     "dateFormatEpochus": "ميكروثانية من الحقبة (epochus)",
     "newFolder": "مجلد جديد",
+    "inlineCreate": {
+      "folderName": "اسم المجلد الجديد",
+      "createFolder": "إنشاء مجلد",
+      "tabName": "اسم التبويب الجديد",
+      "createTab": "إنشاء تبويب"
+    },
     "updateFolder": "تحديث المجلد",
     "newReport": "تقرير جديد",
     "scheduledDashboards": "لوحات المعلومات المجدولة",
@@ -11541,10 +11606,7 @@
       "titleLoading": "موجز",
       "subtitle": "يغطي من {start} إلى {end}، وتم إنشاؤه في {time}",
       "back": "الموجزات",
-      "viewInLogs": "عرض في السجلات",
-      "viewInLogsHint": "يفتح سجلات هذا التشغيل في السجلات",
       "unavailableTitle": "الموجز غير متاح",
-      "loadFailed": "تعذّر تحميل الموجز: {message}",
       "backToDigests": "العودة إلى الموجزات",
       "partialCoverage": "تغطية جزئية",
       "partialCoverageDesc": "لم يستطع هذا التشغيل رؤية النافذة بالكامل، لذا فالأعداد أدناه حدّ أدنى وليست إجمالًا، وعدم العثور على نتائج ليس بمثابة تبرئة.",
@@ -11570,7 +11632,10 @@
       "topOrgs": "المؤسسات الأكثر تأثرًا",
       "worstHours": "أسوأ الساعات",
       "proposedActions": "الإجراءات المقترحة",
-      "openAlert": "فتح التنبيه"
+      "openAlert": "فتح التنبيه",
+      "viewInLogs": "عرض في السجلات",
+      "viewInLogsHint": "يفتح سجلات هذا التشغيل في السجلات",
+      "loadFailed": "تعذّر تحميل الموجز: {message}"
     },
     "dashboard": {
       "latestRunAgo": "أحدث تشغيل {time}",
@@ -11615,11 +11680,11 @@
       "savedFirstRun": "تم الحفظ. التشغيل الأول مستحق الآن.",
       "savedCadence": "تم الحفظ. تُطبَّق الوتيرة الجديدة بدءًا من التشغيل التالي، وقد تؤدي الوتيرة الأقصر إلى تقديم موعد ذلك التشغيل.",
       "saveFailed": "تعذّر حفظ الإعدادات: {message}",
-      "loadFailed": "تعذّر تحميل الإعدادات: {message}",
       "lastSaved": "آخر حفظ {time}",
       "runNowHeading": "التشغيل الآن",
       "frequencyRange": "اختر وتيرة بين ساعة واحدة و30 يومًا.",
-      "windowRange": "اختر نافذة بين دقيقة واحدة و90 يومًا."
+      "windowRange": "اختر نافذة بين دقيقة واحدة و90 يومًا.",
+      "loadFailed": "تعذّر تحميل الإعدادات: {message}"
     }
   },
   "alerts": {
@@ -11637,6 +11702,10 @@
     },
     "summaryTrainingFailed": "فشل التدريب",
     "startFromTemplate": "ابدأ من قالب",
+    "rowAction": {
+      "paused": "تم إيقاف {name} مؤقتًا | تم إيقاف {count} تنبيهات مؤقتًا",
+      "resumed": "تم استئناف {name} | تم استئناف {count} تنبيهات"
+    },
     "firing": {
       "title": "قيد الإطلاق",
       "drawer": {
@@ -14256,7 +14325,8 @@
         "mute": "لا يمكنك كتم هذا.",
         "onCall": "المناوبة: {people}",
         "canAct": "يمكنهم التصرف أيضًا: {people}",
-        "people": "المناوبة: {onCall}. يمكنهم التصرف أيضًا: {canAct}"
+        "people": "المناوبة: {onCall}. يمكنهم التصرف أيضًا: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "هذا التنبيه ليس قيد الإطلاق، لذا لا يوجد ما يمكن الإقرار به.",
@@ -14774,6 +14844,7 @@
     "destination_type": "نوع الوجهة",
     "template": "القالب",
     "actions": "الإجراءات",
+    "addHeader": "إضافة ترويسة",
     "addTitle": "وجهة جديدة",
     "updateTitle": "تحديث وجهة",
     "delete": "حذف",
@@ -14919,7 +14990,9 @@
   },
   "pipeline_destinations": {
     "header": "وجهات مسارات المعالجة",
-    "search": "البحث في الوجهات"
+    "search": "البحث في الوجهات",
+    "destinationType": "نوع الوجهة",
+    "outputFormat": "تنسيق الإخراج"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15424,14 +15497,17 @@
     "groupGeneral": "عام",
     "groupAccessSecurity": "الوصول والأمن",
     "groupDestinations": "الوجهات",
-    "groupDataAI": "البيانات والذكاء الاصطناعي",
     "groupOperations": "العمليات",
     "groupSynthetics": "المراقبة الاصطناعية",
     "groupIntegrations": "التكاملات",
     "groupAccount": "الحساب",
     "slackApp": "Slack",
+    "slackAppDesc": "مساحات العمل والإعدادات الافتراضية للقنوات وربط الحسابات لتطبيق Slack",
     "generalDesc": "الموضوع، الإعدادات الافتراضية للاستعلام، والتفضيلات الأساسية",
     "orgDesc": "معايير المؤسسة والمعرفات",
+    "generalSubtitle": "كيف تبدو {org} وإعدادات الاستعلام الافتراضية لها.",
+    "orgSubtitle": "أسماء الحقول والاحتفاظ بالبيانات والميزات التلقائية لـ {org}.",
+    "passwordPolicySubtitle": "قواعد حسابات البريد الإلكتروني وكلمة المرور الأصلية.",
     "cipherKeysDesc": "مفاتيح التشفير للحقول الحساسة",
     "regexPatternsDesc": "أنماط regex القابلة لإعادة الاستخدام للحذف",
     "domainManagementDesc": "قيد تسجيل الدخول على نطاقات SSO المسموح بها",
@@ -15442,7 +15518,6 @@
     "storageSettingsDesc": "تكوين التخزين لكل مؤسسة",
     "modelPricingDesc": "تكوين تكلفة نموذج LLM",
     "correlationSettingsDesc": "تكوين الارتباط عن بعد",
-    "llmProvidersDesc": "مزودو LLM للتقييمات عبر الإنترنت",
     "queryManagementDesc": "فحص وإلغاء الاستعلامات الجارية",
     "nodesDesc": "عقد العنقود وصحتها",
     "licenseDesc": "تفاصيل ترخيص المؤسسات",
@@ -15450,7 +15525,6 @@
     "queryManagement": "إدارة الاستعلامات",
     "scrapintervalLabel": "فترة الخدش (بثوان) *",
     "logoLabel": "اسحب صورة الشعار وأفلتها",
-    "customLogoTitle": "شعار مخصص",
     "deleteLogoTitle": "حذف الشعار",
     "deleteLogoMessage": "هل أنت متأكد من أنك تريد حذف صورة الشعار {name}؟ انقر فوق موافق للحذف.",
     "customLogoText": "نص الشعار المخصص",
@@ -15546,12 +15620,8 @@
     "themeManagementDescription": "قم بإدارة ألوان موضوع مؤسستك لكل من الوضعين الفاتح والداكن. سيتم تطبيق هذه الألوان على مستوى المؤسسة.",
     "enterpriseFeatures": "ميزات المؤسسات",
     "noTextAvailable": "لا يوجد نص متوفر",
-    "customLogoTextDescription": "يستخدم نص الشعار المخصص لتغيير نص العلامة التجارية الافتراضي المعروض في التطبيق.",
     "lightMode": "وضع الضوء",
-    "dragDropUpload": "اسحب وإفلات أو انقر للرفع",
-    "customLogoLightDescription": "شعار مخصص لموضوع الوضع المضيء. سيتم عرض هذا عندما يكون المستخدمون في وضع الضوء.",
     "darkMode": "الوضع المظلم",
-    "customLogoDarkDescription": "شعار مخصص لموضوع الوضع الداكن. سيتم عرض هذا عندما يكون المستخدمون في الوضع الداكن.",
     "pickCustomColor": "اختر اللون المخصص",
     "organizationSettingsUpdated": "تحديث إعدادات المؤسسة",
     "dangerZone": "منطقة الخطر",
@@ -15582,42 +15652,10 @@
     "logoDeletedSuccessfully": "تم حذف {mode} الشعار بنجاح.",
     "errorDeletingImage": "خطأ أثناء حذف الصورة.",
     "themeColorsResetSuccess": "تم إعادة تعيين ألوان القالب إلى الإعدادات الافتراضية وتطبيقها.",
-    "textMaxCharacters": "يجب أن يكون النص أقل من 100 حرف.",
     "logoTextUpdatedSuccessfully": "تم تحديث نص الشعار بنجاح.",
     "errorUpdatingImage": "خطأ أثناء تحديث الصورة.",
     "fileFormatConstraint": "(فقط .png، .jpg، .jpeg، .gif، .bmp الصيغ وأقصى حجم: 150x30 بكسل)",
     "filesValidationFailed": "لم يجتز {count} ملف قيود التحقق | لم يجتز {count} من الملفات قيود التحقق",
-    "genAiAgentMapping": {
-      "tabLabel": "ربط وكلاء GenAI",
-      "title": "ربط وكلاء GenAI",
-      "description": "تكوين سمات القياس البديل المستخدمة لتطبيع هوية الوكيل لتتبع وتقييمات نماذج اللغة الكبيرة (LLM).",
-      "agentNameFields": "حقول الاحتياط لأسماء الوكلاء",
-      "agentNameHelp": "السمات الواردة لاستخدامها كبدائل ل gen_ai.agent.name.",
-      "agentNameInfo": "يتم التحقق فقط عندما تكون خاصية gen_ai.agent.name القياسية مفقودة أو فارغة. أضف خاصية تليمترية واردة واحدة لكل سطر.",
-      "agentIdFields": "حقول الاحتياط لمعرف الوكيل",
-      "agentIdHelp": "السمات الواردة لاستخدامها كبدائل ل gen_ai.agent.id.",
-      "agentIdInfo": "يتم التحقق فقط عندما تكون خاصية gen_ai.agent.id القياسية مفقودة أو فارغة. أضف سمة تليمترية واردة واحدة لكل سطر.",
-      "envFields": "مجالات الاحتياط البيئي",
-      "envHelp": "السمات الواردة لاستخدامها كبيئة للوكيل.",
-      "envInfo": "يتم التحقق فقط عندما تكون خاصية deployment.environment.name القياسية مفقودة أو فارغة. أضف سمة تليمترية واردة واحدة لكل سطر.",
-      "versionFields": "حقول النسخ الاحتياطي",
-      "versionHelp": "السمات الواردة لاستخدامها كنسخة للوكيل.",
-      "versionInfo": "يتم التحقق فقط عندما تكون خاصية gen_ai.agent.version القياسية مفقودة أو فارغة. أضف خاصية تليمترية واردة واحدة لكل سطر.",
-      "alwaysAppliedStandard": "المعيار (تم التحقق أولا):",
-      "applyDefaults": "تطبيق الافتراضيات",
-      "resetToEmpty": "إعادة التعيين إلى الفراغ",
-      "clearRegistry": "مسح السجل",
-      "clearRegistryTitle": "مسح سجل الوكلاء؟",
-      "clearRegistryDescription": "هذا يحذف جميع صفوف سجل وكلاء GenAI المكتشفة لهذه المؤسسة. ستعيد تتبع المطابقة الجديدة ملء السجل أثناء الاستيعاب.",
-      "clearRegistryConfirm": "مسح السجل",
-      "saved": "تم حفظ تعيين وكلاء GenAI بنجاح",
-      "clearRegistrySuccess": "تم مسح سجل وكلاء GenAI. الوكلاء المخزنون المحذوفون: {deletedCount}، والملاحظات المنتظرة المحذوفة: {bufferCount}.",
-      "loadFailed": "فشل في تحميل تعيين وكيل GenAI",
-      "saveFailed": "فشل في حفظ تعيين وكلاء GenAI",
-      "clearRegistryFailed": "فشل في مسح سجل وكلاء GenAI",
-      "defaultsLoadFailed": "فشل في تحميل إعدادات تعيين وكلاء GenAI الافتراضية",
-      "defaultsFetchFailed": "فشل في جلب الإعدادات الافتراضية ({status})"
-    },
     "correlation": {
       "identityConfigNoSets": "قم بتكوين مجموعة هوية واحدة على الأقل قبل الحفظ.",
       "discoveredServicesTab": "الخدمات المكتشفة",
@@ -15673,7 +15711,6 @@
       "resetServicesFailed": "فشل في إعادة ضبط الخدمات",
       "workload": "عبء العمل",
       "goToConfiguration": "اذهب إلى التكوين",
-      "configureServicesHint": "لتكوين كيفية تحديد وتجميع الخدمات.",
       "filterBy": "التصفية حسب :",
       "selectFieldPlaceholder": "اختيار الميدان",
       "selectValuePlaceholder": "اختيار القيمة",
@@ -15691,7 +15728,8 @@
       "fieldNameMapping": "رسم أسماء الحقول",
       "logsWithCount": "السجلات ({count})",
       "tracesWithCount": "تتبعات ({count})",
-      "metricsWithCount": "المقاييس ({count})"
+      "metricsWithCount": "المقاييس ({count})",
+      "configureServicesHint": "لتكوين كيفية تحديد وتجميع الخدمات."
     },
     "addRegexPattern": {
       "namePlaceholder": "مثلا. كلمات المرور الداخلية",
@@ -15718,14 +15756,60 @@
       "failedToLoadServices": "فشل تحميل الخدمات"
     },
     "domainManagement": {
-      "unknownTime": "وقت غير معروف"
+      "unknownTime": "وقت غير معروف",
+      "claimParserTitle": "محلل المطالبات",
+      "claimParserSectionDesc": "يحوّل مطالبات SSO وLDAP إلى تعيينات للمؤسسات والأدوار.",
+      "claimParserLabel": "دالة محلل المطالبات",
+      "claimParserHelp": "دالة {product1} أو {product2} تتلقى المطالبات المعيّنة وتعيد المؤسسات والأدوار المطلوب تعيينها، أو رفضًا.",
+      "claimParserFormatLink": "تنسيق الإدخال والإخراج",
+      "claimParserPlaceholder": "لا توجد دالة",
+      "noFunctions": "لا توجد دوال بعد",
+      "restrictionsTitle": "قيود النطاقات",
+      "restrictionsDesc": "نطاقات البريد الإلكتروني والمستخدمون الذين يمكنهم تسجيل الدخول عبر SSO.",
+      "domainLabel": "النطاق",
+      "addDomain": "إضافة نطاق",
+      "noDomains": "لا توجد نطاقات بعد. أضف نطاقًا لتقييد من يمكنه تسجيل الدخول.",
+      "accessFor": "الوصول لـ {domain}",
+      "policyAllowAll": "السماح لجميع المستخدمين",
+      "policyAllowSpecific": "السماح للمستخدمين المدرجين فقط",
+      "policyBlockSpecific": "حظر المستخدمين المدرجين",
+      "policyBlockAll": "حظر جميع المستخدمين",
+      "effectAllowSpecific": "سيُسمح بتسجيل الدخول فقط للمستخدمين المدرجين الذين تنتهي عناوين بريدهم الإلكتروني بـ {domain}.",
+      "effectBlockSpecific": "سيُحظر مستخدمو SSO الخارجيون المدرجون الذين تنتهي عناوين بريدهم الإلكتروني بـ {domain} من النظام (الواجهة وAPI والإدخال).",
+      "emailLabel": "عنوان البريد الإلكتروني",
+      "noEmails": "لم تُدرج عناوين بريد إلكتروني بعد.",
+      "removeDomain": "إزالة {domain}",
+      "removeEmail": "إزالة {email}",
+      "saved": "تم حفظ إعدادات SSO"
     },
     "general": {
       "close": "إغلاق",
+      "themeTitle": "السمة",
+      "themeDescription": "لون التمييز لـ {org} في الوضعين الفاتح والداكن.",
+      "accentColorLabel": "لون التمييز",
+      "lightColorLabel": "تغيير لون الوضع الفاتح، الحالي {color}",
+      "darkColorLabel": "تغيير لون الوضع الداكن، الحالي {color}",
+      "queryDefaultsTitle": "الإعدادات الافتراضية للاستعلام",
+      "queryDefaultsDescription": "الإعدادات الافتراضية لجمع المقاييس واستعلامات PromQL.",
+      "scrapeIntervalLabel": "فترة الجمع",
+      "scrapeIntervalHelp": "عدد مرات جمع المقاييس.",
+      "unitSeconds": "ثانية",
+      "maxSeriesLabel": "الحد الأقصى للسلاسل لكل استعلام",
+      "maxSeriesHelp": "أكبر عدد من السلاسل يمكن أن يعيده استعلام PromQL واحد. إذا تُرك فارغًا يُستخدم الافتراضي، {n}.",
+      "unitSeries": "سلسلة",
+      "maxSeriesError": "أدخل قيمة من 1,000 إلى 1,000,000، أو اتركه فارغًا لاستخدام الافتراضي.",
+      "brandingTitle": "العلامة التجارية",
+      "brandingDescription": "الاسم والشعارات المعروضة لكل مؤسسة على هذه النسخة.",
+      "logoTextHelp": "يستبدل الاسم الافتراضي المعروض في التطبيق. حتى 100 حرف.",
+      "logoTextTooLong": "استخدم 100 حرف أو أقل.",
+      "logoTextSaveFailed": "لم يتم حفظ نص الشعار المخصص. {reason}",
+      "logoSaveFailed": "لم يتم رفع الشعار {mode}. {reason}",
+      "brandingUpdated": "تم تحديث العلامة التجارية",
+      "logoLightLabel": "شعار مخصص (الوضع الفاتح)",
+      "logoLightHelp": "يُعرض في الوضع الفاتح. PNG أو JPG أو GIF أو BMP، حتى 150 × 30 بكسل.",
+      "logoDarkLabel": "شعار مخصص (الوضع الداكن)",
+      "logoDarkHelp": "يُعرض في الوضع الداكن. PNG أو JPG أو GIF أو BMP، حتى 150 × 30 بكسل.",
       "fileCounterLabel": "{constraint} {filesNumber} ملف {'|'} {totalSize}"
-    },
-    "llmProvidersSettings": {
-      "subtitle": "مزودو LLM للتقييمات عبر الإنترنت"
     },
     "modelPricingEditor": {
       "copySuffix": " (نسخة)"
@@ -15743,18 +15827,30 @@
       "title": "الإعدادات الافتراضية للاحتفاظ بالبيانات",
       "about": "للتدفقات التي ليس لها مدة احتفاظ خاصة بها. القيمة الفارغة أو 0 تستخدم القيمة العامة؛ وإلا فثلاثة أيام على الأقل.",
       "defaultDays": "الافتراضي (أيام)",
-      "streamType": "نوع التدفق",
-      "days": "الأيام",
+      "defaultLabel": "الافتراضي",
+      "unitDays": "أيام",
+      "daysFor": "الاحتفاظ بـ {type} (بالأيام)",
       "addType": "إضافة نوع تدفق",
-      "removeType": "إزالة نوع التدفق هذا",
+      "allTypesAdded": "كل نوع من أنواع التدفقات لديه صف بالفعل.",
+      "removeTypeNamed": "إزالة الافتراضي لـ {type}",
       "globalDefault": "القيمة العامة: {value}",
       "globalType": "القيمة العامة لـ {type}: {value}",
       "daysValue": "{days} يومًا",
       "forever": "الاحتفاظ إلى الأبد",
-      "invalid": "استخدم 0 أو 3 أيام على الأقل"
+      "invalid": "استخدم 0 أو 3 أيام على الأقل",
+      "invalidType": "استخدم 3 أيام على الأقل، أو أزل هذا النوع",
+      "streamType": "نوع التدفق",
+      "days": "الأيام",
+      "removeType": "إزالة نوع التدفق هذا"
     },
     "organizationSettings": {
       "fieldNameHelp": "استخدم الأحرف الأبجدية الرقمية و'+=,.{'@'}-_' فقط، بدون مسافات.",
+      "sectionTitle": "معالجة البيانات",
+      "sectionDescription": "كيف ترتبط السجلات بالتتبعات وأي الميزات التلقائية مفعّلة.",
+      "traceIdHelp": "حقل السجل الذي يربط سطر السجل بتتبعه. أحرف وأرقام و + = , . {'@'} - _ فقط.",
+      "spanIdHelp": "حقل السجل الذي يربط سطر السجل بالمقطع الخاص به. الأحرف نفسها المذكورة أعلاه.",
+      "ingestionLogsHelp": "يحتفظ بسجل للسجلات التي يفشل إدخالها.",
+      "usageStreamHelp": "يكتب استخدام {org} إلى تدفق خاص به يمكنك الاستعلام عنه.",
       "settingsUpdated": "تم تحديث إعدادات المؤسسة بنجاح",
       "settingsSaveError": "إعدادات المؤسسة في حفظ الخطأ"
     },
@@ -15813,9 +15909,6 @@
       "alreadyExists": "النمط \"{name}\" موجود بالفعل. يرجى استخدام اسم مختلف.",
       "importPatternFailed": "فشل في استيراد النمط \"{name}\": {error}",
       "createFailed": "نمط Regex - {index}: فشل إنشاء \"{name}\" -> \n السبب: {error}"
-    },
-    "index": {
-      "genAiAgentMappingDesc": "ربط امتدادات GenAI بمعرفات الوكلاء"
     },
     "organizationManagementPage": {
       "setUsageLimits": "تحديد حدود الاستخدام",
@@ -15953,7 +16046,6 @@
       "discoveredPatternsHelp": "اكتشفنا هذه الأنماط في تدفقاتك. استخدمها لتكوين ارتباط الخدمة.",
       "envFieldsDetected": "{env} الحقول التي تم اكتشافها في بيانات التليمترية الخاصة بك.",
       "goToServices": "اذهب إلى الخدمات",
-      "toSeeDiscoveredServices": "لرؤية الخدمات المكتشفة فعليا.",
       "fieldsConfigured": "تم تهيئة {n} حقل | تم تهيئة {n} من الحقول",
       "recommended": "موصى به:",
       "recommendedUse": "الاستخدام",
@@ -15980,7 +16072,8 @@
       "reasonCardinality": "{level} الكاردينالية",
       "reasonCoverage": "تغطية {coverage}٪",
       "reasonAcrossStreamTypes": "عبر {types}",
-      "reasonIdealForDisambiguation": "{details} — مثالي لتوضيح الخدمة"
+      "reasonIdealForDisambiguation": "{details} — مثالي لتوضيح الخدمة",
+      "toSeeDiscoveredServices": "لرؤية الخدمات المكتشفة فعليا."
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "مثلا: {example}",
@@ -16169,6 +16262,51 @@
       "requestApproved": "تم ربط {domain}",
       "requestRejected": "تم رفض الطلب الخاص بـ {domain}",
       "decisionFailed": "فشل تحديث الطلب"
+    },
+    "groupDataAI": "البيانات والذكاء الاصطناعي",
+    "llmProvidersDesc": "مزودو LLM للتقييمات عبر الإنترنت",
+    "customLogoTitle": "شعار مخصص",
+    "customLogoTextDescription": "يستخدم نص الشعار المخصص لتغيير نص العلامة التجارية الافتراضي المعروض في التطبيق.",
+    "dragDropUpload": "اسحب وإفلات أو انقر للرفع",
+    "customLogoLightDescription": "شعار مخصص لموضوع الوضع المضيء. سيتم عرض هذا عندما يكون المستخدمون في وضع الضوء.",
+    "customLogoDarkDescription": "شعار مخصص لموضوع الوضع الداكن. سيتم عرض هذا عندما يكون المستخدمون في الوضع الداكن.",
+    "textMaxCharacters": "يجب أن يكون النص أقل من 100 حرف.",
+    "genAiAgentMapping": {
+      "tabLabel": "ربط وكلاء GenAI",
+      "title": "ربط وكلاء GenAI",
+      "description": "تكوين سمات القياس البديل المستخدمة لتطبيع هوية الوكيل لتتبع وتقييمات نماذج اللغة الكبيرة (LLM).",
+      "agentNameFields": "حقول الاحتياط لأسماء الوكلاء",
+      "agentNameHelp": "السمات الواردة لاستخدامها كبدائل ل gen_ai.agent.name.",
+      "agentNameInfo": "يتم التحقق فقط عندما تكون خاصية gen_ai.agent.name القياسية مفقودة أو فارغة. أضف خاصية تليمترية واردة واحدة لكل سطر.",
+      "agentIdFields": "حقول الاحتياط لمعرف الوكيل",
+      "agentIdHelp": "السمات الواردة لاستخدامها كبدائل ل gen_ai.agent.id.",
+      "agentIdInfo": "يتم التحقق فقط عندما تكون خاصية gen_ai.agent.id القياسية مفقودة أو فارغة. أضف سمة تليمترية واردة واحدة لكل سطر.",
+      "envFields": "مجالات الاحتياط البيئي",
+      "envHelp": "السمات الواردة لاستخدامها كبيئة للوكيل.",
+      "envInfo": "يتم التحقق فقط عندما تكون خاصية deployment.environment.name القياسية مفقودة أو فارغة. أضف سمة تليمترية واردة واحدة لكل سطر.",
+      "versionFields": "حقول النسخ الاحتياطي",
+      "versionHelp": "السمات الواردة لاستخدامها كنسخة للوكيل.",
+      "versionInfo": "يتم التحقق فقط عندما تكون خاصية gen_ai.agent.version القياسية مفقودة أو فارغة. أضف خاصية تليمترية واردة واحدة لكل سطر.",
+      "alwaysAppliedStandard": "المعيار (تم التحقق أولا):",
+      "applyDefaults": "تطبيق الافتراضيات",
+      "resetToEmpty": "إعادة التعيين إلى الفراغ",
+      "clearRegistry": "مسح السجل",
+      "clearRegistryTitle": "مسح سجل الوكلاء؟",
+      "clearRegistryDescription": "هذا يحذف جميع صفوف سجل وكلاء GenAI المكتشفة لهذه المؤسسة. ستعيد تتبع المطابقة الجديدة ملء السجل أثناء الاستيعاب.",
+      "clearRegistryConfirm": "مسح السجل",
+      "saved": "تم حفظ تعيين وكلاء GenAI بنجاح",
+      "clearRegistrySuccess": "تم مسح سجل وكلاء GenAI. الوكلاء المخزنون المحذوفون: {deletedCount}، والملاحظات المنتظرة المحذوفة: {bufferCount}.",
+      "loadFailed": "فشل في تحميل تعيين وكيل GenAI",
+      "saveFailed": "فشل في حفظ تعيين وكلاء GenAI",
+      "clearRegistryFailed": "فشل في مسح سجل وكلاء GenAI",
+      "defaultsLoadFailed": "فشل في تحميل إعدادات تعيين وكلاء GenAI الافتراضية",
+      "defaultsFetchFailed": "فشل في جلب الإعدادات الافتراضية ({status})"
+    },
+    "llmProvidersSettings": {
+      "subtitle": "مزودو LLM للتقييمات عبر الإنترنت"
+    },
+    "index": {
+      "genAiAgentMappingDesc": "ربط امتدادات GenAI بمعرفات الوكلاء"
     }
   },
   "reports": {
@@ -16398,7 +16536,6 @@
       "gt1Month": "> شهر واحد"
     },
     "selectOption": "اختر الخيار",
-    "lastDataRefreshTime": "آخر وقت تحديث للبيانات:",
     "runningQueries": "الاستعلامات الجارية",
     "search": "البحث",
     "queryList": "تفاصيل الاستعلام",
@@ -16409,6 +16546,7 @@
     "queryRange": "نطاق الاستعلام",
     "userSummary": "ملخص المستخدم",
     "allQueries": "جميع الاستعلامات",
+    "allFields": "كل الحقول",
     "queryType": "نوع الاستعلام",
     "numOfQueries": "عدد الاستعلامات",
     "totalDuration": "مدة التنفيذ الكاملة",
@@ -16430,7 +16568,8 @@
     "cancelQueryFailed": "فشل في إلغاء الاستعلام",
     "searchTypeDashboards": "لوحات المعلومات",
     "searchTypeUi": "واجهة المستخدم",
-    "searchTypeOthers": "آخرون"
+    "searchTypeOthers": "آخرون",
+    "lastDataRefreshTime": "آخر وقت تحديث للبيانات:"
   },
   "traces": {
     "nlNeedsSql": "يتطلب هذا السؤال SQL؛ افتحه في السجلات",
@@ -16958,15 +17097,6 @@
       "outputTokens": "رموز الإخراج",
       "cost": "التكلفة"
     },
-    "lLMErrorTable": {
-      "noData": "لا توجد بيانات",
-      "noErrorsInRange": "لا توجد أخطاء في هذا النطاق الزمني",
-      "loadFailed": "تعذر تحميل الأخطاء الأخيرة",
-      "time": "الوقت",
-      "service": "الخدمة",
-      "operation": "التشغيل",
-      "traceId": "معرف التتبع"
-    },
     "lLMInsightsDashboard": {
       "stream": "التدفق",
       "agent": "وكيل",
@@ -17145,12 +17275,12 @@
       "truncated": "يُعرض أول Span من هذا التتبع، حسب ترتيب وقت البدء. لم يتم تحميل الـ Spans اللاحقة بعد. | يُعرض أول {count} من الـ Spans لهذا التتبع، حسب ترتيب وقت البدء. لم يتم تحميل الـ Spans اللاحقة بعد.",
       "loadMore": "تحميل الـ Span التالي | تحميل {size} من الـ Spans التالية",
       "loadMoreFailed": "تعذّر تحميل المزيد من الـ Spans لهذا التتبع",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "لا يوجد تتبع بهذا المعرّف بين {from} و{to}",
+      "notFoundText": "التتبع {traceId} ليس له مقاطع في تدفق {stream} ضمن هذا النطاق. قد يكون أقدم أو أحدث، أو في تدفق آخر، أو لم يُجمع.",
+      "searchWiderRange": "البحث في نطاق أوسع",
+      "searchSpansInRange": "البحث عن المقاطع في هذا النطاق",
+      "loadFailedTitle": "تعذّر تحميل هذا التتبع",
+      "loadFailedText": "تعذّرت قراءة التتبع {traceId}. أعد المحاولة بعد قليل."
     },
     "traceTree": {
       "clickToExpand": "انقر للتوسع",
@@ -17278,6 +17408,15 @@
       "loadingPage": "جارٍ تحميل الصفحة {page}",
       "pageFailed": "تعذّر تحميل الصفحة {page}",
       "pageEmpty": "لا تحتوي الصفحة {page} على نتائج"
+    },
+    "lLMErrorTable": {
+      "noData": "لا توجد بيانات",
+      "noErrorsInRange": "لا توجد أخطاء في هذا النطاق الزمني",
+      "loadFailed": "تعذر تحميل الأخطاء الأخيرة",
+      "time": "الوقت",
+      "service": "الخدمة",
+      "operation": "التشغيل",
+      "traceId": "معرف التتبع"
     }
   },
   "aiToolset": {
@@ -17345,6 +17484,8 @@
     "type": "النوع",
     "step1WithType": "تفاصيل المتجر الرئيسي (النوع: {type})",
     "step2": "آلية التشفير",
+    "sectionKey": "المفتاح",
+    "sectionSetup": "مخزن المفاتيح والتشفير",
     "secret": "السر",
     "baseURL": "رابط القاعدة",
     "accessId": "معرف الوصول",
@@ -17583,6 +17724,8 @@
     "noTracesDescription": "لم يتم العثور على أي تتبعات لهذا الارتباط في النطاق الزمني المختار.",
     "viewInTraces": "عرض في التتبعات",
     "filters": "الفلاتر",
+    "fieldGroupsTitle": "مجموعات الحقول",
+    "fieldNamesColumn": "أسماء الحقول",
     "semanticFieldGroupsCaption": "قم بربط أسماء حقول التليمترية الخاصة بك بالمجموعات الشائعة حتى تتمكن OpenObserve من ربطها عبر التدفقات.",
     "exportToJson": "التصدير إلى JSON",
     "importFromJson": "استيراد من JSON",
@@ -18686,7 +18829,6 @@
         "providerEndpointLabel": "نقطة النهاية:",
         "providerDefaultModelLabel": "النموذج الافتراضي:",
         "providerHelp": "اختر مزود LLM الذي تستدعيه هذه التجربة. أدر المزودين في {settingsLink}.",
-        "providerHelpSettingsLink": "الإعدادات",
         "temperatureLabel": "درجة الحرارة",
         "temperatureHelp": "0–2. كلما زادت النتائج، يتغير الإنتاج.",
         "temperatureDeterministic": "0 — يجيب النموذج بنفس الطريقة في كل مرة.",
@@ -18720,7 +18862,8 @@
         "promptTemperatureOverrideInherited": "يستخدم معاملات الموجّه.",
         "taskTimeoutLabel": "وقت مستقطع (ثواني)",
         "taskConcurrencyLabel": "أقصى التزامن",
-        "taskOverrideHelp": "يتجاوز القيمة المنشورة للمهمة في هذا التشغيل."
+        "taskOverrideHelp": "يتجاوز القيمة المنشورة للمهمة في هذا التشغيل.",
+        "providerHelpSettingsLink": "الإعدادات"
       },
       "columns": {
         "name": "الاسم",
@@ -19072,10 +19215,6 @@
         "title": "اتجاه الرموز",
         "subtitle": "الرموز حسب النموذج"
       },
-      "spanTrend": {
-        "title": "اتجاه الامتدادات",
-        "subtitle": "عدد الامتدادات حسب النوع"
-      },
       "latencyByModel": {
         "title": "التأخير حسب النموذج",
         "subtitle": "P50 / P90 / P95 / P99"
@@ -19083,6 +19222,10 @@
       "tracesOverTime": {
         "title": "الطلبات على مر الزمن",
         "subtitle": "عدد الطلبات حسب الخدمة"
+      },
+      "spanTrend": {
+        "title": "اتجاه الامتدادات",
+        "subtitle": "عدد الامتدادات حسب النوع"
       },
       "errorsOverTime": {
         "title": "الأخطاء مع مرور الوقت",
@@ -20172,7 +20315,6 @@
       "editTitleLlm": "تحديث أداة تقييم حكَم LLM",
       "descriptionPlaceholder": "ملخص قصير لما تقيسه أداة التقييم هذه.",
       "providerHelp": "اختر مزود LLM الذي يستدعيه هذا الحكَم. أدر المزودين في {settingsLink}.",
-      "providerHelpSettingsLink": "الإعدادات",
       "refreshProviders": "تحديث المزوّدين",
       "selectedPrefix": "المختارون:",
       "endpointLabel": "نقطة النهاية:",
@@ -20293,7 +20435,8 @@
         "resultReasoning": "الأسباب",
         "resultRaw": "الرد الخام",
         "valuePlaceholder": "القيمة {variable}"
-      }
+      },
+      "providerHelpSettingsLink": "الإعدادات"
     },
     "job": {
       "detail": {
@@ -20647,6 +20790,16 @@
     "empty": {
       "title": "لا يوجد مزودو LLM بعد",
       "description": "يخزّن مزوّدو LLM تفاصيل الاتصال (عنوان URL الأساسي + بيانات الاعتماد) لنماذج اللغة التي تستدعيها أدوات تقييم LLM Judge لديك. أضف واحدًا لبدء تشغيل التقييمات القائمة على الحكم."
+    }
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· في {percent}% من التتبعات، خلال آخر 24 ساعة",
+    "fallbacksNote": "أدخل الحقول البديلة مفصولة بفواصل، بترتيب الفحص.",
+    "fallbackInvalid": "استخدم أسماء حقول مفصولة بفواصل. أحرف وأرقام و . _ - : / {'@'} فقط.",
+    "sessions": {
+      "title": "عرض الجلسات",
+      "help": "كيف تُعنوَن الجلسات وأي نص تغليف يُخفى عنها.",
+      "noAgents": "لا يوجد وكلاء بعد. أضف وكيلًا لإخفاء نص التغليف الخاص به."
     }
   },
   "logs": {
@@ -21011,6 +21164,7 @@
     "showDetail": "عرض التفاصيل",
     "hideDetail": "إخفاء التفاصيل",
     "runAs": "التشغيل باسم",
+    "runSuggestion": "تشغيل {query}",
     "searchTextFor": "البحث عن النص \"{text}\"",
     "searchTextDesc": "البحث في المدخل بأكمله كعبارة واحدة",
     "explain": {
@@ -21037,12 +21191,29 @@
     "minutesAgo": "منذ {min}m",
     "hoursAgo": "منذ {h}h",
     "notYetRefreshed": "لم يتم تجديد نشاطه بعد",
-    "dataFresh": "البيانات جديدة",
-    "dataGettingStale": "البيانات أصبحت قديمة",
-    "dataStale": "البيانات قديمة",
     "lastRefreshed": "آخر تحديث: {time}",
     "refresh": "تحديث",
-    "refreshWithAge": "تحديث، آخر تحديث {age}"
+    "refreshWithAge": "تحديث، آخر تحديث {age}",
+    "refreshing": "جارٍ التحديث",
+    "failed": "فشل",
+    "autoRefresh": "تحديث تلقائي",
+    "autoOn": "تلقائي · {interval}",
+    "every": "كل {interval}",
+    "interval": {
+      "10s": "10 ث",
+      "30s": "30 ث",
+      "1m": "1 د",
+      "5m": "5 د",
+      "15m": "15 د"
+    },
+    "dataFresh": "البيانات جديدة",
+    "dataGettingStale": "البيانات أصبحت قديمة",
+    "dataStale": "البيانات قديمة"
+  },
+  "copyButton": {
+    "copy": "نسخ",
+    "copied": "تم النسخ",
+    "failed": "تم حظر النسخ · اضغط Ctrl C"
   },
   "synthetics": {
     "variables": {
@@ -21833,6 +22004,11 @@
       "disabling": "إعاقة...",
       "editTitle": "تحرير الموقع",
       "empty": "لا توجد مواقع متاحة",
+      "emptyState": {
+        "title": "لا توجد مواقع بعد",
+        "description": "الموقع هو المكان الذي تنفذ منه المراقبات الاصطناعية فحوصاتها، مثل منطقة سحابية.",
+        "actionDesc": "أضف مكانًا لتشغيل الفحوصات منه"
+      },
       "enable": "تمكين",
       "enabled": "مفعل",
       "enabledSuccess": "الموقع مفعل",
@@ -22981,7 +23157,17 @@
       "tokenLinkTooltip": "اختر رمز الاستيعاب الذي تستخدمه المقتطفات",
       "copiedWithToken": "تم النسخ باستخدام رمز المؤسسة {name}",
       "tokenIncludedHint": "يتضمن النسخ رمز الاستيعاب الخاص بالمؤسسة، والذي يبقى مخفيًا هنا.",
-      "maskedSelectionWarning": "تم نسخ الرمز المخفي على شكل نقاط. استخدم نسخ، أو اكشفه أولًا."
+      "maskedSelectionWarning": "تم نسخ الرمز المخفي على شكل نقاط. استخدم نسخ، أو اكشفه أولًا.",
+      "wrapLines": "التفاف الأسطر",
+      "showAll": "عرض السطر {count} بالكامل | عرض كل {count} أسطر",
+      "showLess": "عرض أقل"
+    },
+    "jsonViewer": {
+      "include": "تصفية بهذه القيمة",
+      "exclude": "استبعاد هذه القيمة",
+      "copyValue": "نسخ القيمة",
+      "fieldCount": "{count} حقل | {count} حقول",
+      "itemCount": "{count} عنصر | {count} عناصر"
     },
     "spinner": {
       "loading": "التحميل"
@@ -22990,6 +23176,19 @@
       "steps": "الخطوات",
       "stepOf": "الخطوة {current} من {total}",
       "swipeHint": "اسحب لرؤية الباقي"
+    },
+    "tabs": {
+      "more": "المزيد",
+      "unsaved": "تغييرات غير محفوظة",
+      "locked": "مقفل"
+    },
+    "statStrip": {
+      "filters": "عوامل التصفية",
+      "showOnly": "عرض {label} فقط",
+      "alsoShow": "عرض {label} أيضًا",
+      "stopShowing": "إيقاف عرض {label}",
+      "scrollBack": "عرض عوامل التصفية السابقة",
+      "scrollForward": "عرض المزيد من عوامل التصفية"
     },
     "attributeValueCell": {
       "addIcon": "إضافة أيقونة"
@@ -23026,7 +23225,10 @@
       "moreInfo": "مزيد من المعلومات"
     },
     "dialog": {
-      "closeDialog": "إغلاق الحوار"
+      "closeDialog": "إغلاق الحوار",
+      "discardChanges": "تجاهل التغييرات؟",
+      "keepEditing": "متابعة التعديل",
+      "discard": "تجاهل"
     },
     "drawer": {
       "closeDrawer": "أغلق الدرج"
@@ -23049,6 +23251,32 @@
       "clear": "مسح"
     },
     "file": {
+      "removeNamed": "إزالة {name}",
+      "sourceLabel": "استيراد من",
+      "sourceFile": "ملف",
+      "sourceUrl": "URL",
+      "sourcePaste": "لصق",
+      "dropPrompt": "أفلت ملفًا هنا أو {choose}",
+      "dropPromptMultiple": "أفلت الملفات هنا أو {choose}",
+      "chooseAFile": "اختر ملفًا",
+      "chooseFiles": "اختر ملفات",
+      "chooseFileButton": "اختيار ملف",
+      "chooseFilesButton": "اختيار ملفات",
+      "noFileChosen": "لم يتم اختيار ملف",
+      "dropToUpload": "أفلت للرفع",
+      "upToSize": "حتى {size}",
+      "upToSizeEach": "حتى {size} لكل ملف",
+      "oneFile": "ملف واحد",
+      "upToFiles": "حتى {count} ملفات",
+      "typeRejected": "يُقبل فقط الملفات من نوع {allowed}",
+      "sizeRejected": "{size} يتجاوز الحد {max}",
+      "countRejected": "ملف واحد فقط في كل مرة | {count} ملفات فقط في كل مرة",
+      "uploadFailed": "فشل الرفع",
+      "uploaded": "تم الرفع",
+      "urlPlaceholder": "عنوان URL للملف",
+      "urlHelp": "نجلبه مرة واحدة عند الاستيراد.",
+      "textPlaceholder": "الصق المحتوى هنا",
+      "invalidJson": "JSON غير صالح: {detail}",
       "removeFile": "إزالة الملف",
       "clearAll": "مسح الكل"
     },
@@ -23063,7 +23291,14 @@
     "pagination": {
       "pagination": "تقسيم الصفحات",
       "previousPage": "الصفحة السابقة",
-      "nextPage": "الصفحة التالية"
+      "nextPage": "الصفحة التالية",
+      "onFirstPage": "أنت في الصفحة الأولى بالفعل",
+      "onLastPage": "أنت في الصفحة الأخيرة بالفعل",
+      "range": "{from}–{to} من {total}",
+      "rangeOfMany": "{from}–{to} من أكثر من ذلك",
+      "pageOf": "الصفحة {page} من {pages}",
+      "perPage": "{size} لكل صفحة",
+      "pageSize": "الصفوف لكل صفحة"
     },
     "select": {
       "more": "المزيد",
@@ -23073,6 +23308,10 @@
       "noOptionsFound": "لم يتم العثور على خيارات",
       "multiSelect": "الاختيار المتعدد",
       "singleSelect": "اختيار فردي",
+      "any": "أي",
+      "noMatches": "لا نتائج مطابقة لـ \"{term}\"",
+      "clearSearch": "مسح البحث",
+      "addOption": "إضافة \"{value}\"",
       "moreInfoAbout": "مزيد من المعلومات حول {field}",
       "moreInfo": "مزيد من المعلومات"
     },
@@ -23114,7 +23353,10 @@
       "removeColumnAria": "إزالة العمود",
       "formatColumnAria": "عمود التنسيق",
       "selectedOfTotal": "تم تحديد {selected} من {total}",
-      "selectedCount": "تم تحديد {selected}"
+      "selectedCount": "تم تحديد {selected}",
+      "clearSelection": "مسح",
+      "rowActions": "إجراءات الصف",
+      "moreRowActions": "المزيد من الإجراءات"
     },
     "predefinedThemes": {
       "title": "الموضوع",
@@ -24352,6 +24594,12 @@
   },
   "passwordPolicy": {
     "complexity": "التعقيد",
+    "complexityDesc": "ما يجب أن تحتويه كل كلمة مرور جديدة.",
+    "unitCharacters": "أحرف",
+    "unitDays": "أيام",
+    "unitPasswords": "كلمات مرور",
+    "unitAttempts": "محاولات",
+    "unitSeconds": "ثوانٍ",
     "minLength": "الحد الأدنى للطول",
     "minLengthDesc": "أقصر كلمة مرور مقبولة",
     "maxLength": "الحد الأقصى للطول",
@@ -24367,6 +24615,7 @@
     "specialCharSet": "الأحرف الخاصة المسموح بها",
     "specialCharSetDesc": "اتركه فارغًا لقبول أي حرف غير أبجدي رقمي",
     "maxLengthTooSmall": "يجب أن يكون الحد الأقصى للطول بين الحد الأدنى للطول و128.",
+    "maxLengthBelowMin": "يجب أن تكون {min} أو أكثر لتطابق الحد الأدنى للطول.",
     "confirmTitle": "حفظ سياسة كلمة المرور؟",
     "confirmMessage": "قد يؤدي الحفظ إلى إلزام كل مستخدم أصلي بتعيين كلمة مرور جديدة قبل أن يتمكن من المتابعة. يُستثنى حساب Root والمستخدمون الخارجيون وحسابات الخدمة — وهذا يشملك ما لم تكن حساب Root. لا يمكن التراجع عن هذا الإجراء.",
     "saved": "تم حفظ سياسة كلمة المرور. | تم حفظ سياسة كلمة المرور. يجب على {count} مستخدم إعادة تعيين كلمة المرور. | تم حفظ سياسة كلمة المرور. يجب على {count} من المستخدمين إعادة تعيين كلمات المرور.",
@@ -24377,14 +24626,17 @@
     "loadFailed": "حدث خطأ أثناء قراءة السياسة الحالية.",
     "rotation": "التدوير",
     "rotationDays": "فترة التدوير",
+    "rotationDesc": "متى تنتهي صلاحية كلمة المرور وكم من الإشعار المسبق يحصل عليه الأشخاص.",
     "rotationDaysDesc": "عدد الأيام قبل انتهاء صلاحية كلمة المرور. 0 = لا تنتهي أبدًا",
     "rotationWarningDays": "التنبيه قبل الانتهاء",
     "rotationWarningDaysDesc": "عدد أيام الإشعار عند تسجيل الدخول. 0 = بلا تنبيه",
+    "rotationWarningDaysOffDesc": "أيام الإشعار عند تسجيل الدخول. تُستخدم بعد انتهاء صلاحية كلمات المرور.",
     "warningDaysTooLong": "لا يمكن أن تكون فترة التنبيه أطول من فترة التدوير.",
     "rotationPreview": "تنتهي صلاحية كلمة مرور معيّنة اليوم في {expires}. يبدأ تنبيه تسجيل الدخول في {warns}.",
     "rotationPreviewNoWarning": "تنتهي صلاحية كلمة مرور معيّنة اليوم في {expires}. لا يظهر أي تنبيه قبل ذلك.",
     "reuse": "منع إعادة الاستخدام",
     "historyCount": "كلمات المرور المتذكَّرة",
+    "reuseDesc": "يمنع الأشخاص من العودة إلى كلمة مرور قديمة.",
     "historyCountDesc": "لا يجوز أن تطابق كلمة المرور الجديدة هذا العدد من كلمات المرور السابقة. 0 = بلا فحص",
     "historyMaxRetained": "السجل المحفوظ",
     "historyMaxRetainedDesc": "عدد كلمات المرور السابقة المحفوظة لكل مستخدم",
@@ -24392,6 +24644,7 @@
     "reuseExplainer": "تُحتسب كلمة المرور الحالية ضمن المجموعة المتذكَّرة — رفض إعادة استخدامها يتم بواسطة هذه القاعدة، وليس بفحص منفصل.",
     "lockout": "قفل الحساب",
     "lockoutThreshold": "المحاولات الفاشلة قبل القفل",
+    "lockoutDesc": "ما يحدث بعد محاولات تسجيل دخول فاشلة متكررة.",
     "lockoutThresholdDesc": "0 = القفل معطّل",
     "lockoutBucketSize": "المحاولات قبل كل قفل لاحق",
     "lockoutBucketSizeDesc": "0 = إعادة استخدام القيمة أعلاه",
@@ -24406,6 +24659,7 @@
     "backoffLinear": "خطي",
     "lockoutPreview": "عدد المحاولات الفاشلة {threshold} → {first} · كل {bucket} إضافية → {rest} · بحد أقصى {max}. تؤدي عملية تسجيل الدخول الناجحة إلى إعادة تعيين كل شيء.",
     "sessionEnforcement": "الجلسة والإنفاذ",
+    "sessionEnforcementDesc": "مدة بقاء تسجيل الدخول، وما إذا كان مستخدم root يتبع هذه القواعد.",
     "cookieMaxAge": "عمر الجلسة",
     "cookieMaxAgeDesc": "عدد الثواني التي تظل فيها الجلسة المسجّلة صالحة. 0 = استخدام القيمة الافتراضية للمثيل من {envVar}",
     "applyToRoot": "تطبيق على حساب الجذر",
@@ -24782,6 +25036,7 @@
       "packUnavailableHint": "لم يتم إصدار المحتوى المنسّق لهذا الحمل العملي بعد. أنشئ لوحة معلومات لرسمه في الأثناء.",
       "partialTelemetryKubernetes": "وجدنا تدفقات Kubernetes، لكن ليس المقاييس التي تحتاجها هذه الصفحة (kubeletstats أو cluster receiver). تحقق من مستقبلات المجمّع لديك.",
       "partialTelemetryHosts": "وجدنا تدفقات المضيفين، لكن ليس المقاييس التي تحتاجها هذه الصفحة. تحقق من مستقبل hostmetrics في المجمّع لديك.",
+      "hostMetricsMissingTitle": "لم يتم العثور على مقاييس المضيف",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}، و{count} أخرى",
       "hiddenFootnote": "تظهر هنا أيضًا مصادر البيانات التي لا تملك صلاحية الوصول إليها.",
@@ -27232,6 +27487,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "كتم الاستدعاء",
     "savePolicyFailed": "تعذّر حفظ السياسة",
+    "savePolicyFailedReason": "لم يتم حفظ السياسة. {reason}",
     "state_triggered": "مُطلق",
     "state_triaged": "مُفرَز",
     "state_acknowledged": "تم الإقرار",
@@ -28353,9 +28609,6 @@
       "legendLabel": "المفتاح",
       "config": "إعداد الكاشف",
       "lastFired": "آخر إطلاق",
-      "fixNoLink": "أضف وسم service.name",
-      "fixStopped": "تحقق من المجمّع",
-      "fixQueued": "محاكاة فقط: لم يتم إرسال “{action}” لـ {service} إلى أي مكان",
       "viewLabel": "عرض التغطية",
       "viewMap": "خريطة",
       "viewTable": "جدول",
@@ -28417,7 +28670,10 @@
         "failed": "فشل (الرسائل الميتة)",
         "lag": "تأخر المستهلك",
         "depth": "عمق قائمة الانتظار"
-      }
+      },
+      "fixNoLink": "أضف وسم service.name",
+      "fixStopped": "تحقق من المجمّع",
+      "fixQueued": "محاكاة فقط: لم يتم إرسال “{action}” لـ {service} إلى أي مكان"
     },
     "activity": {
       "before": "قبل",
@@ -28446,6 +28702,32 @@
       "nextStep": "الخطوة التالية",
       "fullReport": "التقرير الكامل",
       "fullReportHint": "كل ما سبق في مستند واحد، جاهز للنسخ أو التنزيل"
+    }
+  },
+  "autoobserveLive": {
+    "incidents": {
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
     }
   },
   "autoobserve2": {
@@ -28657,7 +28939,6 @@
       "fail": "فشل"
     },
     "connect": {
-      "title": "ربط مساحة عمل Slack",
       "description": "يطرح فريقك الأسئلة على OpenObserve من Slack ويحصل على الإجابات وفقًا لصلاحيات كل عضو.",
       "stepCheckTitle": "تحقق من هذا الخادم",
       "stepCreateTitle": "أنشئ التطبيق",
@@ -28687,7 +28968,8 @@
       "copyRequest": "نسخ الطلب",
       "requestText": "يرجى إضافة مؤسسة OpenObserve {name} ({org}) إلى مساحة عمل Slack {team}، ضمن _meta › الإعدادات › Slack › المؤسسات.",
       "requestCopied": "تم نسخ الطلب",
-      "setupAppOtherTeam": "لمساحة عمل Slack مختلفة عن {team} · ينشئ OpenObserve تطبيق Slack خاصًا بك من رمز تكوين واحد"
+      "setupAppOtherTeam": "لمساحة عمل Slack مختلفة عن {team} · ينشئ OpenObserve تطبيق Slack خاصًا بك من رمز تكوين واحد",
+      "title": "ربط مساحة عمل Slack"
     },
     "wizard": {
       "title": "إعداد تطبيق Slack",
@@ -28849,6 +29131,11 @@
       "otherOrgs": "لا توجد مؤسسة أخرى | {count} مؤسسة أخرى | {count} مؤسسات أخرى",
       "connectedOn": "{date} بواسطة {user}",
       "helpContact": "جهة اتصال المساعدة",
+      "helpContactHelp": "يُطلب من الأشخاص الذين لا يستطيعون ربط حساباتهم التواصل مع جهة الاتصال هذه.",
+      "eventsLabel": "أحداث Slack",
+      "connectionLabel": "الاتصال",
+      "outboundLabel": "قائمة الصادر",
+      "collaboratorsLabel": "المتعاونون في التطبيق",
       "helpContactPlaceholder": "#o2-help، أو شخص يمكن سؤاله",
       "helpContactSaved": "تم حفظ جهة اتصال المساعدة",
       "disconnectSection": "قطع الاتصال",
@@ -28885,8 +29172,6 @@
         "destination": "من وجهة تنبيه",
         "oncall": "من /o2 oncall هنا"
       },
-      "empty": "لا توجد قناة لها مؤسسة افتراضية بعد",
-      "emptyDescription": "تنتقل الأسئلة في قناة لا تحتوي على افتراضي إلى المؤسسة الافتراضية لكل شخص (يمكنهم تغييرها عبر /o2 org).",
       "channel": "القناة",
       "channelPlaceholder": "ابحث عن القنوات",
       "channelRequired": "اختر قناة",
@@ -28904,7 +29189,9 @@
       "ownOrgOnlyHint": "في مساحة عمل المثيل، تربط القنوات بمؤسستك الخاصة",
       "claimableHint": "القنوات غير المطالب بها والقنوات التي تملكها {org}",
       "servedOrgsHint": "أي مؤسسة تخدمها مساحة العمل هذه",
-      "alertRoutes": "{count} وجهة | {count} وجهات"
+      "alertRoutes": "{count} وجهة | {count} وجهات",
+      "empty": "لا توجد قناة لها مؤسسة افتراضية بعد",
+      "emptyDescription": "تنتقل الأسئلة في قناة لا تحتوي على افتراضي إلى المؤسسة الافتراضية لكل شخص (يمكنهم تغييرها عبر /o2 org)."
     },
     "people": {
       "title": "الأشخاص المرتبطون",
@@ -29159,13 +29446,6 @@
       "unpricedTooltip": "التكلفة حد أدنى: {tokens} رمز على {models} بلا سعر. افتح علامة التبويب غير المسعّرة في تسعير نماذج LLM.",
       "pricedSinceTooltip": "التكلفة حد أدنى: سُجّل {tokens} رمز على {models} قبل إضافة سعر ولا يحتفظ بأي تكلفة."
     },
-    "chart": {
-      "costMissing": "غير مدرج في هذا المخطط: {models}. {tokens} رمز بلا سعر.",
-      "costMissingPricedSince": "غير مدرج في هذا المخطط: {models}. تم تسجيل {tokens} رمز قبل إضافة سعر.",
-      "unpricedModels": "بلا سعر: {models}",
-      "pricedSinceModels": "سُجّل قبل إضافة سعر: {models}",
-      "addPrice": "إضافة سعر"
-    },
     "health": {
       "title": "صحة البيانات",
       "passing": "{n} ناجحة",
@@ -29210,6 +29490,13 @@
           "fix": "دليل التكامل"
         }
       }
+    },
+    "chart": {
+      "costMissing": "غير مدرج في هذا المخطط: {models}. {tokens} رمز بلا سعر.",
+      "costMissingPricedSince": "غير مدرج في هذا المخطط: {models}. تم تسجيل {tokens} رمز قبل إضافة سعر.",
+      "unpricedModels": "بلا سعر: {models}",
+      "pricedSinceModels": "سُجّل قبل إضافة سعر: {models}",
+      "addPrice": "إضافة سعر"
     }
   },
   "onboarding": {
@@ -30495,44 +30782,39 @@
     "deletedQuery": "تم حذف {query}",
     "undo": "تراجع"
   },
-  "filterBar": {
-    "validation": {
-      "regexLength": "اجعل النمط {max} حرفًا أو أقل.",
-      "regexInvalid": "هذا النمط غير صالح أو غير مدعوم. لا يمكن استخدام البحث الأمامي أو البحث الخلفي أو المراجع الخلفية."
-    },
-    "queryTooltip": "تحرير عامل التصفية كنص",
-    "builderTooltip": "تحرير عامل التصفية بالمنشئ",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
-  },
-  "autoobserveLive": {
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
-    "incidents": {
-      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
-      "routing": "Set up on-call routing"
-    },
-    "learning": {
-      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
-      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
-      "emptyTitle": "Learning your streams",
-      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
-      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
-      "until": "Learning until {date} · {streams}",
-      "streams": "Learning {count} stream | Learning {count} streams",
-      "streamUntil": "until {date}"
-    }
-  },
   "insight": {
+    "bulk": {},
+    "decisions": {
+      "saved": {
+        "applied": "Applied to {title}.",
+        "appliedEditor": "Saved and recorded for {title}.",
+        "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
+      },
+      "undone": {
+        "applyOne": "Undone: {title} is back to how it was.",
+        "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
+      },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undone": "Undone",
+        "you": "you"
+      }
+    },
     "kind": {
       "paged": {
         "page": {
@@ -30563,38 +30845,6 @@
           "next": "Check for a retry loop or a new sender writing to it.",
           "nextMany": "One cause is likely, such as a shared sender retrying."
         }
-      }
-    },
-    "bulk": {},
-    "decisions": {
-      "saved": {
-        "applied": "Applied to {title}.",
-        "appliedEditor": "Saved and recorded for {title}.",
-        "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
-      },
-      "apply": {
-        "edit": "Edit in alert editor",
-        "button": "Apply",
-        "where": "Folder {folder} · notifies {destinations}",
-        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
-        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
-        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
-        "changed": "This alert changed. Open it to review.",
-        "loading": "Checking what this changes…",
-        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
-        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
-        "cardNote": "Shows what changes before anything is saved.",
-        "gone": "This suggestion is no longer available. Open the alert to review it."
-      },
-      "applied": {
-        "title": "Applied changes",
-        "by": "by {actor} at {when}",
-        "undone": "Undone",
-        "you": "you"
-      },
-      "undone": {
-        "applyOne": "Undone: {title} is back to how it was.",
-        "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
   }

@@ -219,7 +219,6 @@ const save = async (value: DefaultForm): Promise<void> => {
     <template #actions>
       <OButton
         variant="secondary"
-        icon="add"
         :disabled="readOnly"
         data-test="slack-channel-set-default"
         @click="openDrawer(null)"

@@ -722,6 +722,7 @@ export default defineComponent({
     // Set once the onMounted landing decision has run; folder-selection events
     // arriving earlier are child-initialization noise, not user intent.
     let landingDecided = false;
+    let folderFromUrl = false;
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref<string | null>(null);
     const selectedFolderToEdit = ref<string | null>(null);
@@ -1052,9 +1053,21 @@ export default defineComponent({
         //the selected dashboards are not shown
         selectedIds.value = [];
         // A folder switch starts a new list (page 1 in table and URL alike); the landing run has no previous folder and is the Back restore, which keeps the page.
-        const switching = previousFolder !== null;
+        const fromUrl = folderFromUrl;
+        folderFromUrl = false;
+        // Back/Forward restore the entry exactly: its page and scope are in the URL, not reset like a click.
+        const switching = previousFolder !== null && !fromUrl;
         if (switching) currentPage.value = 1;
-        const { page: _page, ...carriedQuery } = route.query;
+        else if (fromUrl) currentPage.value = Number(route.query.page) || 1;
+        // A click starts a new list, so the old list's search params must not ride into the new entry and be read back as state.
+        const {
+          page: _page,
+          "v.search": _search,
+          "v.all": _all,
+          "v.q": _q,
+          "v.page": _vpage,
+          ...carriedQuery
+        } = route.query;
         const baseQuery = switching ? carriedQuery : route.query;
         // The Favorites pseudo-folder has no backend list. Rows render
         // immediately from the stored favorites; fetch the involved folders'
@@ -1714,6 +1727,7 @@ export default defineComponent({
       if (folderId === activeFolderId.value) return;
       // A new folder the URL already names came from Back or Forward, and the URL restores its search too.
       const fromUrl = folderId === route.query.folder;
+      folderFromUrl = fromUrl;
       activeFolderId.value = folderId;
       if (fromUrl) return;
       filterQuery.value = "";

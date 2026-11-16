@@ -56,6 +56,7 @@
         "ariaLabel": "データを待機中"
       }
     },
+    "requestId": "リクエスト {id}",
     "createFirstItem": "最初のアイテムを作成",
     "newBrowserCheck": "新しいブラウザチェック",
     "allCaughtUp": "すべて確認済みです",
@@ -451,7 +452,9 @@
       "description": "{noun}が現在のフィルターまたは検索に一致しません。調整するかクリアしてみてください。",
       "action": "フィルターをクリア",
       "actionDesc": "すべてのフィルターをリセットして検索",
-      "fallbackNoun": "結果"
+      "fallbackNoun": "結果",
+      "noMatches": "一致するものがありません",
+      "noMatchesText": "現在の検索条件やフィルターに一致するものはありません。"
     },
     "nouns": {
       "logs": "ログ",
@@ -490,6 +493,7 @@
       "evalTemplates": "評価テンプレート",
       "enrichmentTables": "エンリッチメントテーブル",
       "cipherKeys": "暗号化キー",
+      "announcementBanners": "お知らせバナー",
       "aiToolsets": "AIツールセット",
       "llmProviders": "LLMプロバイダー",
       "sourceMaps": "ソースマップ",
@@ -633,6 +637,26 @@
     "noOncallUnrouted": {
       "title": "オーナーが必要なものはありません",
       "description": "発火したすべてのアラートはチームに届きました。"
+    },
+    "noSlackChannelDefaults": {
+      "title": "デフォルトの組織が設定されているチャンネルはまだありません",
+      "description": "デフォルトのないチャンネルでの質問は、各ユーザーのデフォルト組織に送られます（/o2 org で変更できます）。"
+    },
+    "noSlackLinkedPeople": {
+      "title": "この組織で Slack を連携したユーザーはまだいません"
+    },
+    "slackNotConnected": {
+      "title": "Slack ワークスペースを接続"
+    },
+    "noAnnouncementBanners": {
+      "title": "バナーはまだありません",
+      "description": "バナーは、選択した組織のアプリ上部にお知らせを表示します。",
+      "action": "バナーを追加",
+      "actionDesc": "お知らせを作成してスケジュールする"
+    },
+    "pageError": {
+      "title": "このページを読み込めませんでした",
+      "description": "このページのデータを読み込めませんでした。今すぐ再試行するか、しばらくしてからもう一度お試しください。"
     }
   },
   "accessBoundary": {
@@ -660,6 +684,7 @@
       "groups": "グループ",
       "serviceAccounts": "サービスアカウント",
       "cipherKeys": "暗号化キー",
+      "announcementBanners": "お知らせバナー",
       "regexPatterns": "正規表現パターン",
       "evalJobs": "オンライン評価ジョブ",
       "billingGroup": "請求グループ",
@@ -716,6 +741,7 @@
       "groups": "グループ",
       "serviceAccounts": "サービスアカウント",
       "cipherKeys": "暗号化キー",
+      "announcementBanners": "お知らせバナー",
       "regexPatterns": "正規表現パターン",
       "unnamed": "このリソース",
       "onCall": "オンコール",
@@ -773,9 +799,14 @@
   },
   "common": {
     "saveBar": {
-      "noChanges": "保存する変更はありません"
+      "noChanges": "保存する変更はありません",
+      "unsavedChanges": "未保存の変更が {n} 件あります | 未保存の変更が {n} 件あります",
+      "changesShort": "{n} 件の変更 | {n} 件の変更",
+      "fixFields": "{n} 件のフィールドを修正 | {n} 件のフィールドを修正",
+      "discard": "破棄"
     },
     "dismiss": "閉じる",
+    "undo": "元に戻す",
     "exitFullscreen": "全画面表示を終了",
     "moreActions": "その他のアクション",
     "moreOptions": "その他のオプション",
@@ -1014,6 +1045,8 @@
     "back": "戻る",
     "save": "保存",
     "discardChanges": "変更を破棄",
+    "switchOn": "オン",
+    "switchOff": "オフ",
     "unsavedChanges": "未保存の変更",
     "update": "更新",
     "favourite": "お気に入り",
@@ -1128,6 +1161,8 @@
     "field": "フィールド",
     "enterValueOrVariable": "値または $variable を入力",
     "all": "すべて",
+    "allStates": "すべての状態",
+    "allStatuses": "すべてのステータス",
     "jsonFilesOnlyHint": ".jsonファイルのみ",
     "fileUploadJsonTab": "ファイルアップロード / JSON",
     "urlImportTab": "URLインポート",
@@ -1234,7 +1269,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "コレクター設定"
+        "fleet_config": "コレクター設定",
+        "workflow": "ワークフロー"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1244,6 +1280,11 @@
       "leaveMessageInBrowser": "{entity}を保存するか、変更をこのブラウザに保持するか、破棄してください。",
       "retentionInBrowser": "変更はこのブラウザに {days} 日間、またはサインアウトするまで保持されます。各種類につき最新の {max} 件のみが保持されます。",
       "dotUndated": "Unsaved draft"
+    },
+    "leaveGuard": {
+      "title": "未保存の変更があります。移動しますか？",
+      "message": "このページに未保存の変更が {n} 件あります。移動すると失われます。 | このページに未保存の変更が {n} 件あります。移動すると失われます。",
+      "keepEditing": "編集を続ける"
     }
   },
   "flow": {
@@ -1942,8 +1983,8 @@
     "histogramTitleRows": "{total} 行を {took} ms で表示。 | {total} 行を {took} ms で表示。",
     "histogramTitleRowsWithScan": "{total} 行を {took} ms で表示。（{scanLabel}: {scanSize}） | {total} 行を {took} ms で表示。（{scanLabel}: {scanSize}）",
     "pickStreamFirst": "先にストリームを選択してください",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "自動更新は検索結果を更新します。可視化中は一時停止します。",
+    "histogramNoTimeAxis": "グループ化された結果には時間軸がありません"
   },
   "menu": {
     "alertCalibration": "アラートキャリブレーション",
@@ -3858,6 +3899,8 @@
     "your_complete_license_key": "完全なライセンスキー:",
     "copy_key": "キーをコピー",
     "usage_information": "使用情報",
+    "usage_chart_title": "今月の1日あたりのインジェスト量",
+    "no_license_ingestion_limit": "ライセンスがない場合、インジェストは1日あたり <strong>{limit} GB</strong> に制限されます。",
     "license_allows_ingestion": "現在のライセンスでは、1日あたり <strong>{limit} GB</strong> のデータ取り込みが許可されています。",
     "license_allows_unlimited_ingestion": "現在のライセンスでは、無制限のデータ取り込みが可能です。",
     "limit_exceeded_days": "今月、<strong class=\"{colorClass}\">{days} 日</strong>に制限を超えました | 今月、<strong class=\"{colorClass}\">{days} 日</strong>に制限を超えました",
@@ -4714,6 +4757,8 @@
     },
     "listOrganizations": {
       "subtitle": "アクセス可能な組織",
+      "switch": "この組織に切り替え",
+      "current": "現在",
       "cannotEditWhileDeleting": "削除中は編集できません",
       "edit": "編集",
       "deleteOrganization": "組織を削除",
@@ -10169,6 +10214,12 @@
       "noPanels": "パネルなし",
       "panelsDeletedHint": "そのパネルは削除されたため、現在どのパネルにも描画されません。パネルを選択するか、すべて選択を選んで修正してください。",
       "blankFiltersHint": "値のない条件は無視されます。"
+    },
+    "inlineCreate": {
+      "folderName": "新しいフォルダー名",
+      "createFolder": "フォルダーを作成",
+      "tabName": "新しいタブ名",
+      "createTab": "タブを作成"
     }
   },
   "panel": {
@@ -14256,7 +14307,8 @@
         "mute": "これはミュートできません。",
         "onCall": "オンコール: {people}",
         "canAct": "対応可能: {people}",
-        "people": "オンコール: {onCall}。対応可能: {canAct}"
+        "people": "オンコール: {onCall}。対応可能: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "このアラートは発火していないため、確認応答するものはありません。",
@@ -14315,7 +14367,11 @@
       "open": "セキュリティで編集"
     },
     "newAlertTitle": "新しいアラート",
-    "newAnomalyTitle": "新しい異常検知"
+    "newAnomalyTitle": "新しい異常検知",
+    "rowAction": {
+      "paused": "{name} を一時停止しました | {count} 件のアラートを一時停止しました",
+      "resumed": "{name} を再開しました | {count} 件のアラートを再開しました"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "開く",
@@ -14774,6 +14830,7 @@
     "destination_type": "宛先タイプ",
     "template": "テンプレート",
     "actions": "操作",
+    "addHeader": "ヘッダーを追加",
     "addTitle": "新規宛先",
     "updateTitle": "宛先を更新",
     "delete": "削除",
@@ -14919,7 +14976,9 @@
   },
   "pipeline_destinations": {
     "header": "パイプライン宛先",
-    "search": "宛先を検索"
+    "search": "宛先を検索",
+    "destinationType": "宛先タイプ",
+    "outputFormat": "出力形式"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15430,8 +15489,12 @@
     "groupIntegrations": "インテグレーション",
     "groupAccount": "アカウント",
     "slackApp": "Slack",
+    "slackAppDesc": "Slack アプリのワークスペース、チャンネルのデフォルト、アカウント連携",
     "generalDesc": "テーマ、クエリのデフォルト、基本設定",
     "orgDesc": "組織のパラメータと識別子",
+    "generalSubtitle": "{org} の外観とクエリのデフォルト。",
+    "orgSubtitle": "{org} のフィールド名、データ保持、自動機能。",
+    "passwordPolicySubtitle": "ネイティブのメールアドレスとパスワードのアカウントのルール。",
     "cipherKeysDesc": "機密フィールドの暗号化キー",
     "regexPatternsDesc": "墨消し用の再利用可能なregexパターン",
     "domainManagementDesc": "サインインを許可されたSSOドメインに制限",
@@ -15718,10 +15781,59 @@
       "failedToLoadServices": "サービスの読み込みに失敗しました"
     },
     "domainManagement": {
-      "unknownTime": "不明な時間"
+      "unknownTime": "不明な時間",
+      "claimParserTitle": "クレームパーサー",
+      "claimParserSectionDesc": "SSO と LDAP のクレームを組織とロールの割り当てに変換します。",
+      "claimParserLabel": "クレームパーサー関数",
+      "claimParserHelp": "マッピングされたクレームを受け取り、割り当てる組織とロール、または拒否を返す {product1} または {product2} 関数。",
+      "claimParserFormatLink": "入力と出力の形式",
+      "claimParserPlaceholder": "関数なし",
+      "noFunctions": "関数はまだありません",
+      "restrictionsTitle": "ドメイン制限",
+      "restrictionsDesc": "SSO でサインインできるメールドメインとユーザー。",
+      "domainLabel": "ドメイン",
+      "addDomain": "ドメインを追加",
+      "noDomains": "ドメインはまだありません。ドメインを追加してサインインできるユーザーを制限します。",
+      "accessFor": "{domain} のアクセス",
+      "policyAllowAll": "すべてのユーザーを許可",
+      "policyAllowSpecific": "一覧のユーザーのみ許可",
+      "policyBlockSpecific": "一覧のユーザーをブロック",
+      "policyBlockAll": "すべてのユーザーをブロック",
+      "effectAllowSpecific": "メールアドレスが {domain} で終わる一覧のユーザーのみログインできます。",
+      "effectBlockSpecific": "メールアドレスが {domain} で終わる一覧の外部 SSO ユーザーは、システム（UI、API、インジェスト）からブロックされます。",
+      "emailLabel": "メールアドレス",
+      "noEmails": "メールアドレスはまだ登録されていません。",
+      "removeDomain": "{domain} を削除",
+      "removeEmail": "{email} を削除",
+      "saved": "SSO 設定を保存しました"
     },
     "general": {
       "close": "閉じる",
+      "themeTitle": "テーマ",
+      "themeDescription": "ライトモードとダークモードでの {org} のアクセントカラー。",
+      "accentColorLabel": "アクセントカラー",
+      "lightColorLabel": "ライトモードの色を変更（現在 {color}）",
+      "darkColorLabel": "ダークモードの色を変更（現在 {color}）",
+      "queryDefaultsTitle": "クエリのデフォルト",
+      "queryDefaultsDescription": "メトリクス収集と PromQL クエリのデフォルト。",
+      "scrapeIntervalLabel": "スクレイプ間隔",
+      "scrapeIntervalHelp": "メトリクスを収集する頻度。",
+      "unitSeconds": "秒",
+      "maxSeriesLabel": "クエリあたりの最大シリーズ数",
+      "maxSeriesHelp": "1つの PromQL クエリが返せる最大シリーズ数。空の場合はデフォルトの {n} を使用します。",
+      "unitSeries": "シリーズ",
+      "maxSeriesError": "1,000 から 1,000,000 の値を入力するか、空のままにしてデフォルトを使用します。",
+      "brandingTitle": "ブランディング",
+      "brandingDescription": "このインスタンスのすべての組織に表示される名前とロゴ。",
+      "logoTextHelp": "アプリに表示されるデフォルトの名前を置き換えます。100 文字以内。",
+      "logoTextTooLong": "100 文字以内で入力してください。",
+      "logoTextSaveFailed": "カスタムロゴテキストを保存できませんでした。{reason}",
+      "logoSaveFailed": "{mode}ロゴをアップロードできませんでした。{reason}",
+      "brandingUpdated": "ブランディングを更新しました",
+      "logoLightLabel": "カスタムロゴ（ライトモード）",
+      "logoLightHelp": "ライトモードで表示されます。PNG、JPG、GIF、BMP、最大 150 × 30 px。",
+      "logoDarkLabel": "カスタムロゴ（ダークモード）",
+      "logoDarkHelp": "ダークモードで表示されます。PNG、JPG、GIF、BMP、最大 150 × 30 px。",
       "fileCounterLabel": "{constraint} {filesNumber} ファイル {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
@@ -15743,18 +15855,30 @@
       "title": "データ保持のデフォルト",
       "about": "独自の保持期間を持たないストリームに適用されます。空または 0 の場合はグローバル値を使用します。それ以外の場合は最低 3 日です。",
       "defaultDays": "デフォルト（日）",
+      "defaultLabel": "デフォルト",
+      "unitDays": "日",
+      "daysFor": "{type}の保持期間（日）",
       "streamType": "ストリームタイプ",
       "days": "日数",
       "addType": "ストリームタイプを追加",
+      "allTypesAdded": "すべてのストリームタイプに行があります。",
+      "removeTypeNamed": "{type}のデフォルトを削除",
       "removeType": "このストリームタイプを削除",
       "globalDefault": "グローバル: {value}",
       "globalType": "グローバル {type}: {value}",
       "daysValue": "{days} 日",
       "forever": "無期限に保持",
-      "invalid": "0 または 3 日以上を指定してください"
+      "invalid": "0 または 3 日以上を指定してください",
+      "invalidType": "3 日以上にするか、このタイプを削除してください"
     },
     "organizationSettings": {
       "fieldNameHelp": "英数字と'+=,.{'@'}-_'文字のみを使用し、スペースは使用しないでください。",
+      "sectionTitle": "データ処理",
+      "sectionDescription": "ログとトレースの関連付け方法と、有効な自動機能。",
+      "traceIdHelp": "ログ行をトレースに関連付けるログフィールド。使用できるのは英数字と + = , . {'@'} - _ のみです。",
+      "spanIdHelp": "ログ行をスパンに関連付けるログフィールド。使用できる文字は上記と同じです。",
+      "ingestionLogsHelp": "インジェストに失敗したレコードのログを保持します。",
+      "usageStreamHelp": "{org} の使用状況を専用のストリームに書き込みます。クエリで参照できます。",
       "settingsUpdated": "組織設定が正常に更新されました",
       "settingsSaveError": "組織設定の保存中にエラーが発生しました"
     },
@@ -16409,6 +16533,7 @@
     "queryRange": "クエリ範囲",
     "userSummary": "ユーザーサマリー",
     "allQueries": "すべてのクエリ",
+    "allFields": "すべてのフィールド",
     "queryType": "クエリタイプ",
     "numOfQueries": "クエリ数",
     "totalDuration": "合計実行時間",
@@ -17145,12 +17270,12 @@
       "truncated": "このトレースの最初のスパンを開始時刻順に表示しています。以降のスパンはまだ読み込まれていません。 | このトレースの最初の {count} スパンを開始時刻順に表示しています。以降のスパンはまだ読み込まれていません。",
       "loadMore": "次のスパンを読み込む | 次の {size} スパンを読み込む",
       "loadMoreFailed": "このトレースのスパンをこれ以上読み込めませんでした",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "{from} から {to} の間にこの ID のトレースはありません",
+      "notFoundText": "この範囲の {stream} ストリームに、トレース {traceId} のスパンはありません。古いか新しい、別のストリームにある、または収集されていない可能性があります。",
+      "searchWiderRange": "より広い範囲を検索",
+      "searchSpansInRange": "この範囲でスパンを検索",
+      "loadFailedTitle": "このトレースを読み込めませんでした",
+      "loadFailedText": "トレース {traceId} を読み取れませんでした。しばらくしてから再試行してください。"
     },
     "traceTree": {
       "clickToExpand": "クリックして展開",
@@ -17345,6 +17470,8 @@
     "type": "タイプ",
     "step1WithType": "キーストア詳細（タイプ: {type}）",
     "step2": "暗号化方式",
+    "sectionKey": "キー",
+    "sectionSetup": "キーストアと暗号化",
     "secret": "シークレット",
     "baseURL": "ベースURL",
     "accessId": "アクセスID",
@@ -17583,6 +17710,8 @@
     "noTracesDescription": "選択した時間範囲内にこの相関のトレースが見つかりません。",
     "viewInTraces": "トレースで表示",
     "filters": "フィルター",
+    "fieldGroupsTitle": "フィールドグループ",
+    "fieldNamesColumn": "フィールド名",
     "semanticFieldGroupsCaption": "相関と重複排除のためのフィールド名マッピングを定義します (例:ホスト、ホスト名、ノード →「ホスト」グループ)",
     "exportToJson": "JSON へのエクスポート",
     "importFromJson": "JSON からインポート",
@@ -20725,8 +20854,8 @@
       "searchAroundTip": "このイベントの直前と直後に記録されたイベントを読み込みます。",
       "noOfEventsTip": "このイベントの前後に読み込むイベント数。",
       "severityTip": "検出されたログレベル。選択すると検出方法を確認できます。",
-      "traceId": "Trace ID",
-      "spanId": "Span ID"
+      "traceId": "トレース ID",
+      "spanId": "スパン ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT * クエリは可視化でサポートされていません。",
@@ -21011,6 +21140,7 @@
     "showDetail": "詳細を表示",
     "hideDetail": "詳細を非表示にする",
     "runAs": "実行者",
+    "runSuggestion": "{query} を実行",
     "searchTextFor": "「{text}」のテキストを検索",
     "searchTextDesc": "入力全体を 1 つのフレーズとして検索",
     "explain": {
@@ -21042,7 +21172,19 @@
     "dataStale": "データが古い",
     "lastRefreshed": "最終更新: {time}",
     "refresh": "更新",
-    "refreshWithAge": "更新、最終更新 {age}"
+    "refreshWithAge": "更新、最終更新 {age}",
+    "refreshing": "更新中",
+    "failed": "失敗",
+    "autoRefresh": "自動更新",
+    "autoOn": "自動 · {interval}",
+    "every": "{interval}ごと",
+    "interval": {
+      "10s": "10 秒",
+      "30s": "30 秒",
+      "1m": "1 分",
+      "5m": "5 分",
+      "15m": "15 分"
+    }
   },
   "synthetics": {
     "variables": {
@@ -21900,7 +22042,12 @@
       "noPrivateMatches": "検索条件に一致するプライベートロケーションがありません",
       "newPrivateLocation": "新しいプライベートロケーション",
       "publicSubtitle": "クラウドリージョン、常に利用可能",
-      "privateSubtitle": "少なくとも1つのエージェントが稼働している場合、ロケーションは準備完了です"
+      "privateSubtitle": "少なくとも1つのエージェントが稼働している場合、ロケーションは準備完了です",
+      "emptyState": {
+        "title": "ロケーションはまだありません",
+        "description": "ロケーションは、シンセティックモニターがチェックを実行する場所です（クラウドリージョンなど）。",
+        "actionDesc": "チェックを実行する場所を追加"
+      }
     },
     "newCheck": {
       "comingSoon": "近日公開",
@@ -22981,7 +23128,10 @@
       "tokenLinkTooltip": "スニペットが使用する取り込みトークンを選択",
       "copiedWithToken": "組織トークン {name} でコピーしました",
       "tokenIncludedHint": "コピーには組織の取り込みトークンが含まれますが、ここでは非表示のままです。",
-      "maskedSelectionWarning": "非表示のトークンはドットとしてコピーされました。コピーを使用するか、先に表示してください。"
+      "maskedSelectionWarning": "非表示のトークンはドットとしてコピーされました。コピーを使用するか、先に表示してください。",
+      "wrapLines": "行を折り返す",
+      "showAll": "{count} 行をすべて表示 | {count} 行をすべて表示",
+      "showLess": "表示を減らす"
     },
     "spinner": {
       "loading": "読み込み中"
@@ -23026,7 +23176,10 @@
       "moreInfo": "詳細情報"
     },
     "dialog": {
-      "closeDialog": "ダイアログを閉じる"
+      "closeDialog": "ダイアログを閉じる",
+      "discardChanges": "変更を破棄しますか？",
+      "keepEditing": "編集を続ける",
+      "discard": "破棄"
     },
     "drawer": {
       "closeDrawer": "ドロワーを閉じる"
@@ -23049,6 +23202,32 @@
       "clear": "クリア"
     },
     "file": {
+      "removeNamed": "{name} を削除",
+      "sourceLabel": "インポート元",
+      "sourceFile": "ファイル",
+      "sourceUrl": "URL",
+      "sourcePaste": "貼り付け",
+      "dropPrompt": "ここにファイルをドロップするか、{choose}",
+      "dropPromptMultiple": "ここにファイルをドロップするか、{choose}",
+      "chooseAFile": "ファイルを選択",
+      "chooseFiles": "ファイルを選択",
+      "chooseFileButton": "ファイルを選択",
+      "chooseFilesButton": "ファイルを選択",
+      "noFileChosen": "ファイルが選択されていません",
+      "dropToUpload": "ドロップしてアップロード",
+      "upToSize": "最大 {size}",
+      "upToSizeEach": "各最大 {size}",
+      "oneFile": "1 ファイル",
+      "upToFiles": "最大 {count} ファイル",
+      "typeRejected": "{allowed} ファイルのみ受け付けます",
+      "sizeRejected": "{size} は上限 {max} を超えています",
+      "countRejected": "一度に {count} ファイルのみ | 一度に {count} ファイルのみ",
+      "uploadFailed": "アップロードに失敗しました",
+      "uploaded": "アップロードしました",
+      "urlPlaceholder": "ファイルの URL",
+      "urlHelp": "インポート時に一度だけ取得します。",
+      "textPlaceholder": "ここにコンテンツを貼り付け",
+      "invalidJson": "無効な JSON: {detail}",
       "removeFile": "ファイルを削除",
       "clearAll": "すべてクリア"
     },
@@ -23063,7 +23242,14 @@
     "pagination": {
       "pagination": "ページネーション",
       "previousPage": "前のページ",
-      "nextPage": "次のページ"
+      "nextPage": "次のページ",
+      "onFirstPage": "すでに最初のページです",
+      "onLastPage": "すでに最後のページです",
+      "range": "{from}～{to} / {total}",
+      "rangeOfMany": "{from}～{to} / 多数",
+      "pageOf": "{page} / {pages} ページ",
+      "perPage": "1ページあたり {size} 件",
+      "pageSize": "ページあたりの行数"
     },
     "select": {
       "more": "もっと",
@@ -23073,6 +23259,10 @@
       "noOptionsFound": "オプションが見つかりません",
       "multiSelect": "複数選択",
       "singleSelect": "単一選択",
+      "any": "すべて",
+      "noMatches": "「{term}」に一致するものがありません",
+      "clearSearch": "検索をクリア",
+      "addOption": "「{value}」を追加",
       "moreInfoAbout": "{field}の詳細情報",
       "moreInfo": "詳細情報"
     },
@@ -23114,7 +23304,10 @@
       "removeColumnAria": "列を削除",
       "formatColumnAria": "列の書式設定",
       "selectedOfTotal": "{total} 件中 {selected} 件を選択中",
-      "selectedCount": "{selected} 件を選択中"
+      "selectedCount": "{selected} 件を選択中",
+      "clearSelection": "クリア",
+      "rowActions": "行の操作",
+      "moreRowActions": "その他の操作"
     },
     "predefinedThemes": {
       "title": "テーマ",
@@ -23482,6 +23675,26 @@
         "past": "過去の日数",
         "ended": "終了"
       }
+    },
+    "jsonViewer": {
+      "include": "この値で絞り込む",
+      "exclude": "この値を除外",
+      "copyValue": "値をコピー",
+      "fieldCount": "{count} 個のフィールド | {count} 個のフィールド",
+      "itemCount": "{count} 個の項目 | {count} 個の項目"
+    },
+    "tabs": {
+      "more": "その他",
+      "unsaved": "未保存の変更",
+      "locked": "ロック中"
+    },
+    "statStrip": {
+      "filters": "フィルター",
+      "showOnly": "{label} のみ表示",
+      "alsoShow": "{label} も表示",
+      "stopShowing": "{label} の表示を停止",
+      "scrollBack": "前のフィルターを表示",
+      "scrollForward": "さらにフィルターを表示"
     }
   },
   "functions": {
@@ -24352,6 +24565,12 @@
   },
   "passwordPolicy": {
     "complexity": "複雑さ",
+    "complexityDesc": "新しいパスワードに必ず含める必要があるもの。",
+    "unitCharacters": "文字",
+    "unitDays": "日",
+    "unitPasswords": "パスワード",
+    "unitAttempts": "回",
+    "unitSeconds": "秒",
     "minLength": "最小文字数",
     "minLengthDesc": "受け付けるパスワードの最短文字数",
     "maxLength": "最大文字数",
@@ -24367,6 +24586,7 @@
     "specialCharSet": "許可する特殊文字",
     "specialCharSetDesc": "空欄にすると、英数字以外のすべての文字を許可します",
     "maxLengthTooSmall": "最大文字数は最小文字数以上128以下にする必要があります。",
+    "maxLengthBelowMin": "最小の長さに合わせて、{min} 以上にしてください。",
     "confirmTitle": "パスワードポリシーを保存しますか？",
     "confirmMessage": "保存すると、すべてのネイティブユーザーが続行前に新しいパスワードを設定する必要がある場合があります。root、外部ユーザー、サービスアカウントは対象外です。root アカウントでない限り、あなたも対象です。この操作は元に戻せません。",
     "saved": "パスワードポリシーを保存しました。 | パスワードポリシーを保存しました。{count} 人のユーザーがパスワードをリセットする必要があります。 | パスワードポリシーを保存しました。{count} 人のユーザーがパスワードをリセットする必要があります。",
@@ -24377,14 +24597,17 @@
     "loadFailed": "現在のポリシーの読み取り中にエラーが発生しました。",
     "rotation": "ローテーション",
     "rotationDays": "ローテーション期間",
+    "rotationDesc": "パスワードの有効期限と、事前通知の期間。",
     "rotationDaysDesc": "パスワードが有効期限切れになるまでの日数。0 = 無期限",
     "rotationWarningDays": "有効期限前の警告",
     "rotationWarningDaysDesc": "サインイン時の通知日数。0 = 警告なし",
+    "rotationWarningDaysOffDesc": "サインイン時の通知日数。パスワードの有効期限が切れると使用されます。",
     "warningDaysTooLong": "警告期間はローテーション期間より長くできません。",
     "rotationPreview": "今日設定したパスワードは {expires} に有効期限が切れます。サインイン時の警告は {warns} から始まります。",
     "rotationPreviewNoWarning": "今日設定したパスワードは {expires} に有効期限が切れます。それまで警告は表示されません。",
     "reuse": "再利用の防止",
     "historyCount": "記憶するパスワード数",
+    "reuseDesc": "以前のパスワードに戻すことを防ぎます。",
     "historyCountDesc": "新しいパスワードは、この数の過去のパスワードと一致してはいけません。0 = チェックなし",
     "historyMaxRetained": "保持する履歴",
     "historyMaxRetainedDesc": "ユーザーごとに保持される過去のパスワード数",
@@ -24392,6 +24615,7 @@
     "reuseExplainer": "現在のパスワードは記憶されるセットの1つとして数えられます。再利用が拒否されるのはこのルールによるもので、別のチェックによるものではありません。",
     "lockout": "アカウントのロックアウト",
     "lockoutThreshold": "ロックアウトまでの失敗回数",
+    "lockoutDesc": "サインインの失敗が繰り返された後の動作。",
     "lockoutThresholdDesc": "0 = ロックアウト無効",
     "lockoutBucketSize": "以降の各ロックアウトまでの試行回数",
     "lockoutBucketSizeDesc": "0 = 上記の値を使用",
@@ -24406,6 +24630,7 @@
     "backoffLinear": "線形",
     "lockoutPreview": "{threshold} 回失敗 → {first} · {bucket} 回ごとに → {rest} · 上限 {max}。サインインに成功するとすべてリセットされます。",
     "sessionEnforcement": "セッションと適用",
+    "sessionEnforcementDesc": "サインインの有効期間と、root がこれらのルールに従うかどうか。",
     "cookieMaxAge": "セッションの有効期間",
     "cookieMaxAgeDesc": "サインイン済みセッションが有効な秒数。0 = {envVar} のインスタンスデフォルトを使用",
     "applyToRoot": "root アカウントに適用",
@@ -24782,6 +25007,7 @@
       "packUnavailableHint": "このワークロード向けのキュレーションコンテンツはまだ提供されていません。それまでの間、ダッシュボードを作成して可視化してください。",
       "partialTelemetryKubernetes": "Kubernetes のストリームは見つかりましたが、このページに必要なメトリクス（kubeletstats または cluster レシーバー）がありません。コレクターのレシーバーを確認してください。",
       "partialTelemetryHosts": "ホストのストリームは見つかりましたが、このページに必要なメトリクスがありません。コレクターの hostmetrics レシーバーを確認してください。",
+      "hostMetricsMissingTitle": "ホストメトリクスが見つかりません",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}、他 {count} 件",
       "hiddenFootnote": "アクセス権のないデータソースもここに表示されます。",
@@ -27232,6 +27458,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "呼び出しを抑制する",
     "savePolicyFailed": "ポリシーを保存できませんでした",
+    "savePolicyFailedReason": "ポリシーを保存できませんでした。{reason}",
     "state_triggered": "トリガー済み",
     "state_triaged": "トリアージ済み",
     "state_acknowledged": "確認済み",
@@ -28849,6 +29076,11 @@
       "otherOrgs": "他の組織なし | {count} 件の他の組織 | {count} 件の他の組織",
       "connectedOn": "{date} · {user}",
       "helpContact": "ヘルプ窓口",
+      "helpContactHelp": "アカウントを連携できないユーザーには、この連絡先に問い合わせるよう案内されます。",
+      "eventsLabel": "Slack イベント",
+      "connectionLabel": "接続",
+      "outboundLabel": "送信キュー",
+      "collaboratorsLabel": "アプリの共同作業者",
       "helpContactPlaceholder": "#o2-help、または質問できる担当者",
       "helpContactSaved": "ヘルプ窓口を保存しました",
       "disconnectSection": "接続解除",
@@ -30502,9 +30734,9 @@
     },
     "queryTooltip": "フィルターをテキストで編集",
     "builderTooltip": "ビルダーでフィルターを編集",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
+    "editorModeLabel": "フィルターエディター",
+    "modeBuilder": "ビルダー",
+    "modeText": "テキスト"
   },
   "autoobserveLive": {
     "paging": {
@@ -30597,5 +30829,23 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "pageHeader": {
+    "about": "このページについて"
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· 過去24時間のトレースの {percent}%",
+    "fallbacksNote": "フォールバックフィールドをカンマ区切りで、確認する順に入力してください。",
+    "fallbackInvalid": "フィールド名をカンマ区切りで入力してください。使用できるのは英数字と . _ - : / {'@'} のみです。",
+    "sessions": {
+      "title": "セッション表示",
+      "help": "セッションのタイトルの付け方と、非表示にするラッパーテキスト。",
+      "noAgents": "エージェントはまだありません。エージェントを追加してラッパーテキストを非表示にします。"
+    }
+  },
+  "copyButton": {
+    "copy": "コピー",
+    "copied": "コピーしました",
+    "failed": "コピーがブロックされました · Ctrl C を押してください"
   }
 }

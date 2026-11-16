@@ -212,7 +212,6 @@
                 </div>
                 <OButton
                   variant="secondary"
-                  icon="add"
                   class="self-start"
                   data-test="ai-remote-task-form-header-add"
                   @click="addHeader"

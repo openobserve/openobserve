@@ -764,7 +764,6 @@ function openDetections() {
             <OButton
               v-if="canAuthor"
               variant="secondary"
-              icon="add"
               :data-test="`security-mitre-enable-${rule.id}`"
               @click="enableRule(rule.key)"
             >

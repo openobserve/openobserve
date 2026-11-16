@@ -85,7 +85,6 @@ const childLink = (child: CompositeChildOption): string =>
           :disabled-reason="addUnavailableReason || undefined"
           variant="secondary"
           size="sm"
-          icon="add"
           :disabled="!!addUnavailableReason"
           data-test="alerts-composite-child-add"
           @click="add"

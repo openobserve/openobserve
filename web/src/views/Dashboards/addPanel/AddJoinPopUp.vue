@@ -165,7 +165,6 @@
         <OButton
           variant="secondary"
           class="mt-2 w-fit shrink-0"
-          icon="add"
           data-test="dashboard-join-add-clause"
           @click="handleAddCondition(modelValue.conditions.length - 1)"
         >

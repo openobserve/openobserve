@@ -81,7 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OButton
       variant="secondary"
-      icon="add"
       class="self-start"
       :data-test="`${testPrefix}-add-condition`"
       @click="addRow"

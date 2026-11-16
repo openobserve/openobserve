@@ -18,6 +18,7 @@
     "rbacOff": "RBAC отключён для этой организации. Администратор включает его, задав {env} значение true в конфигурации сервера."
   },
   "emptyState": {
+    "requestId": "Запрос {id}",
     "illustrations": {
       "noHistoryYet": "Истории пока нет",
       "noLogsFound": "Логи не найдены",
@@ -451,7 +452,9 @@
       "description": "Нет {noun}, соответствующих текущим фильтрам или поиску. Попробуйте изменить или очистить их.",
       "action": "Очистить фильтры",
       "actionDesc": "Сбросить все фильтры и поиск",
-      "fallbackNoun": "результаты"
+      "fallbackNoun": "результаты",
+      "noMatches": "Совпадений нет",
+      "noMatchesText": "Ничего не соответствует текущему поиску или фильтрам."
     },
     "nouns": {
       "logs": "логи",
@@ -490,6 +493,7 @@
       "evalTemplates": "шаблоны оценки",
       "enrichmentTables": "таблицы обогащения",
       "cipherKeys": "ключи шифрования",
+      "announcementBanners": "баннеры объявлений",
       "aiToolsets": "наборы инструментов ИИ",
       "llmProviders": "поставщики LLM",
       "sourceMaps": "карты источников",
@@ -633,6 +637,26 @@
     "noOncallUnrouted": {
       "title": "Ничто не требует владельца",
       "description": "Каждое сработавшее оповещение дошло до команды."
+    },
+    "noSlackChannelDefaults": {
+      "title": "Ни у одного канала пока нет организации по умолчанию",
+      "description": "Вопросы в канале без организации по умолчанию попадают в организацию по умолчанию каждого пользователя (её можно изменить командой /o2 org)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "Пока никто в этой организации не подключил Slack"
+    },
+    "slackNotConnected": {
+      "title": "Подключите рабочее пространство Slack"
+    },
+    "noAnnouncementBanners": {
+      "title": "Баннеров пока нет",
+      "description": "Баннеры показывают уведомление в верхней части приложения выбранным организациям.",
+      "action": "Добавить баннер",
+      "actionDesc": "Напишите уведомление и запланируйте его показ"
+    },
+    "pageError": {
+      "title": "Не удалось загрузить эту страницу",
+      "description": "Данные этой страницы не загрузились. Повторите попытку сейчас или через минуту."
     }
   },
   "accessBoundary": {
@@ -660,6 +684,7 @@
       "groups": "Группы",
       "serviceAccounts": "Сервисные аккаунты",
       "cipherKeys": "Ключи шифрования",
+      "announcementBanners": "Баннеры объявлений",
       "regexPatterns": "Регулярные выражения",
       "evalJobs": "Задания онлайн-оценки",
       "billingGroup": "Группа выставления счетов",
@@ -716,6 +741,7 @@
       "groups": "группы",
       "serviceAccounts": "сервисные аккаунты",
       "cipherKeys": "ключи шифрования",
+      "announcementBanners": "баннеры объявлений",
       "regexPatterns": "регулярные выражения",
       "unnamed": "этот ресурс",
       "onCall": "дежурства",
@@ -773,9 +799,14 @@
   },
   "common": {
     "saveBar": {
-      "noChanges": "Нет изменений для сохранения"
+      "noChanges": "Нет изменений для сохранения",
+      "unsavedChanges": "{n} несохранённое изменение | {n} несохранённых изменений",
+      "changesShort": "{n} изменение | {n} изменений",
+      "fixFields": "Исправьте {n} поле | Исправьте полей: {n}",
+      "discard": "Отменить"
     },
     "dismiss": "Закрыть",
+    "undo": "Отменить",
     "exitFullscreen": "Выйти из полноэкранного режима",
     "moreActions": "Другие действия",
     "moreOptions": "Другие параметры",
@@ -1014,6 +1045,8 @@
     "back": "Назад",
     "save": "Сохранить",
     "discardChanges": "Отменить изменения",
+    "switchOn": "Вкл.",
+    "switchOff": "Выкл.",
     "unsavedChanges": "Несохраненные изменения",
     "update": "Обновить",
     "favourite": "Избранное",
@@ -1128,6 +1161,8 @@
     "field": "Поле",
     "enterValueOrVariable": "Введите значение или $variable",
     "all": "Все",
+    "allStates": "Все состояния",
+    "allStatuses": "Все статусы",
     "jsonFilesOnlyHint": "только файлы .json",
     "fileUploadJsonTab": "Загрузка файла / JSON",
     "urlImportTab": "Импорт по URL",
@@ -1234,7 +1269,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "конфигурация коллектора"
+        "fleet_config": "конфигурация коллектора",
+        "workflow": "рабочий процесс"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1244,6 +1280,11 @@
       "leaveMessageInBrowser": "Сохранить {entity}, сохранить изменения в этом браузере или отбросить их.",
       "retentionInBrowser": "Изменения хранятся в этом браузере в течение {days} дн. или до выхода из системы. Хранится не более {max} новейших изменений каждого типа.",
       "dotUndated": "Unsaved draft"
+    },
+    "leaveGuard": {
+      "title": "Выйти с несохранёнными изменениями?",
+      "message": "На этой странице {n} несохранённое изменение. Оно будет потеряно при выходе. | На этой странице несохранённых изменений: {n}. Они будут потеряны при выходе.",
+      "keepEditing": "Продолжить редактирование"
     }
   },
   "flow": {
@@ -1942,8 +1983,8 @@
     "histogramTitleRows": "{total} строка за {took} мс. | {total} строк за {took} мс.",
     "histogramTitleRowsWithScan": "{total} строка за {took} мс. ({scanLabel}: {scanSize}) | {total} строк за {took} мс. ({scanLabel}: {scanSize})",
     "pickStreamFirst": "Сначала выберите поток",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "Автообновление обновляет результаты поиска. Во время визуализации оно приостанавливается.",
+    "histogramNoTimeAxis": "У сгруппированных результатов нет временной оси"
   },
   "menu": {
     "alertCalibration": "Калибровка оповещений",
@@ -3858,6 +3899,8 @@
     "your_complete_license_key": "Ваш полный ключ лицензии:",
     "copy_key": "Скопировать ключ",
     "usage_information": "Информация об использовании",
+    "usage_chart_title": "Ежедневный приём данных в этом месяце",
+    "no_license_ingestion_limit": "Без лицензии приём данных ограничен <strong>{limit} ГБ</strong> в день.",
     "license_allows_ingestion": "Текущая лицензия позволяет <strong>{limit} ГБ</strong> приема данных в день.",
     "license_allows_unlimited_ingestion": "Текущая лицензия допускает неограниченный прием данных.",
     "limit_exceeded_days": "Лимит был превышен в течение <strong class=\"{colorClass}\">{days} дня</strong> в этом месяце | Лимит был превышен в этом месяце, дней: <strong class=\"{colorClass}\">{days}</strong>",
@@ -4714,6 +4757,8 @@
     },
     "listOrganizations": {
       "subtitle": "Организации, к которым у вас есть доступ",
+      "switch": "Переключиться на эту организацию",
+      "current": "Текущая",
       "cannotEditWhileDeleting": "Нельзя редактировать во время удаления",
       "edit": "Редактировать",
       "deleteOrganization": "Удалить организацию",
@@ -10169,6 +10214,12 @@
       "noPanels": "Нет панелей",
       "panelsDeletedHint": "Его панели были удалены, поэтому сейчас он не отображается ни на одной панели. Выберите панели или выберите «Выбрать все», чтобы исправить это.",
       "blankFiltersHint": "Условия без значения не учитываются."
+    },
+    "inlineCreate": {
+      "folderName": "Название новой папки",
+      "createFolder": "Создать папку",
+      "tabName": "Название новой вкладки",
+      "createTab": "Создать вкладку"
     }
   },
   "panel": {
@@ -14256,7 +14307,8 @@
         "mute": "Вы не можете это заглушить.",
         "onCall": "На дежурстве: {people}",
         "canAct": "Также могут действовать: {people}",
-        "people": "На дежурстве: {onCall}. Также могут действовать: {canAct}"
+        "people": "На дежурстве: {onCall}. Также могут действовать: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "Это оповещение не срабатывает, поэтому подтверждать нечего.",
@@ -14315,7 +14367,11 @@
       "open": "Изменить в Безопасности"
     },
     "newAlertTitle": "Новое оповещение",
-    "newAnomalyTitle": "Новое обнаружение аномалий"
+    "newAnomalyTitle": "Новое обнаружение аномалий",
+    "rowAction": {
+      "paused": "{name}: приостановлено | Приостановлено оповещений: {count}",
+      "resumed": "{name}: возобновлено | Возобновлено оповещений: {count}"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Открыть",
@@ -14774,6 +14830,7 @@
     "destination_type": "Тип получателя",
     "template": "Шаблон",
     "actions": "Действия",
+    "addHeader": "Добавить заголовок",
     "addTitle": "Новый получатель",
     "updateTitle": "Обновить получателя",
     "delete": "Удалить",
@@ -14919,7 +14976,9 @@
   },
   "pipeline_destinations": {
     "header": "Получатели конвейера",
-    "search": "Поиск получателя"
+    "search": "Поиск получателя",
+    "destinationType": "Тип назначения",
+    "outputFormat": "Формат вывода"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15430,8 +15489,12 @@
     "groupIntegrations": "Интеграции",
     "groupAccount": "Аккаунт",
     "slackApp": "Slack",
+    "slackAppDesc": "Рабочие пространства, настройки каналов по умолчанию и привязка аккаунтов для приложения Slack",
     "generalDesc": "Тема, настройки запросов по умолчанию и основные предпочтения",
     "orgDesc": "Параметры организации и идентификаторы",
+    "generalSubtitle": "Внешний вид {org} и параметры запросов по умолчанию.",
+    "orgSubtitle": "Имена полей, срок хранения данных и автоматические функции для {org}.",
+    "passwordPolicySubtitle": "Правила для встроенных учётных записей с email и паролем.",
     "cipherKeysDesc": "Ключи шифрования для конфиденциальных полей",
     "regexPatternsDesc": "Многоразовые шаблоны regex для редактирования",
     "domainManagementDesc": "Ограничить вход разрешенными доменами SSO",
@@ -15718,10 +15781,59 @@
       "failedToLoadServices": "Не удалось загрузить сервисы"
     },
     "domainManagement": {
-      "unknownTime": "Неизвестное время"
+      "unknownTime": "Неизвестное время",
+      "claimParserTitle": "Парсер claims",
+      "claimParserSectionDesc": "Преобразует claims SSO и LDAP в назначения организаций и ролей.",
+      "claimParserLabel": "Функция парсера claims",
+      "claimParserHelp": "Функция {product1} или {product2}, которая получает сопоставленные claims и возвращает организации и роли для назначения либо отказ.",
+      "claimParserFormatLink": "Формат входных и выходных данных",
+      "claimParserPlaceholder": "Нет функции",
+      "noFunctions": "Функций пока нет",
+      "restrictionsTitle": "Ограничения по доменам",
+      "restrictionsDesc": "Какие почтовые домены и пользователи могут входить через SSO.",
+      "domainLabel": "Домен",
+      "addDomain": "Добавить домен",
+      "noDomains": "Доменов пока нет. Добавьте домен, чтобы ограничить, кто может входить.",
+      "accessFor": "Доступ для {domain}",
+      "policyAllowAll": "Разрешить всем пользователям",
+      "policyAllowSpecific": "Разрешить только указанным пользователям",
+      "policyBlockSpecific": "Заблокировать указанных пользователей",
+      "policyBlockAll": "Заблокировать всех пользователей",
+      "effectAllowSpecific": "Входить смогут только указанные пользователи с адресами email, заканчивающимися на {domain}.",
+      "effectBlockSpecific": "Указанные внешние пользователи SSO с адресами email, заканчивающимися на {domain}, будут заблокированы в системе (UI, API и приём данных).",
+      "emailLabel": "Адрес email",
+      "noEmails": "Адреса email пока не указаны.",
+      "removeDomain": "Удалить {domain}",
+      "removeEmail": "Удалить {email}",
+      "saved": "Настройки SSO сохранены"
     },
     "general": {
       "close": "Закрыть",
+      "themeTitle": "Тема",
+      "themeDescription": "Акцентный цвет для {org} в светлом и тёмном режимах.",
+      "accentColorLabel": "Акцентный цвет",
+      "lightColorLabel": "Изменить цвет светлого режима, сейчас {color}",
+      "darkColorLabel": "Изменить цвет тёмного режима, сейчас {color}",
+      "queryDefaultsTitle": "Параметры запросов по умолчанию",
+      "queryDefaultsDescription": "Значения по умолчанию для сбора метрик и запросов PromQL.",
+      "scrapeIntervalLabel": "Интервал сбора",
+      "scrapeIntervalHelp": "Как часто собираются метрики.",
+      "unitSeconds": "секунд",
+      "maxSeriesLabel": "Макс. число серий на запрос",
+      "maxSeriesHelp": "Наибольшее число серий, которое может вернуть один запрос PromQL. Если поле пустое, используется значение по умолчанию: {n}.",
+      "unitSeries": "серий",
+      "maxSeriesError": "Введите число от 1 000 до 1 000 000 или оставьте поле пустым, чтобы использовать значение по умолчанию.",
+      "brandingTitle": "Брендинг",
+      "brandingDescription": "Название и логотипы, которые видят все организации в этом экземпляре.",
+      "logoTextHelp": "Заменяет название по умолчанию, отображаемое в приложении. До 100 символов.",
+      "logoTextTooLong": "Используйте не более 100 символов.",
+      "logoTextSaveFailed": "Пользовательский текст логотипа не сохранён. {reason}",
+      "logoSaveFailed": "Логотип ({mode}) не загружен. {reason}",
+      "brandingUpdated": "Брендинг обновлён",
+      "logoLightLabel": "Пользовательский логотип (светлый режим)",
+      "logoLightHelp": "Отображается в светлом режиме. PNG, JPG, GIF или BMP, до 150 × 30 px.",
+      "logoDarkLabel": "Пользовательский логотип (тёмный режим)",
+      "logoDarkHelp": "Отображается в тёмном режиме. PNG, JPG, GIF или BMP, до 150 × 30 px.",
       "fileCounterLabel": "{constraint} файлов: {filesNumber} {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
@@ -15743,18 +15855,30 @@
       "title": "Сроки хранения данных по умолчанию",
       "about": "Для потоков без собственного срока хранения. Пустое значение или 0 — используется глобальное; иначе не менее 3 дней.",
       "defaultDays": "По умолчанию (дн.)",
+      "defaultLabel": "По умолчанию",
+      "unitDays": "дней",
+      "daysFor": "Срок хранения: {type} (дни)",
       "streamType": "Тип потока",
       "days": "Дни",
       "addType": "Добавить тип потока",
+      "allTypesAdded": "Для каждого типа потока уже есть строка.",
+      "removeTypeNamed": "Удалить значение по умолчанию для {type}",
       "removeType": "Удалить этот тип потока",
       "globalDefault": "Глобальное: {value}",
       "globalType": "Глобальное {type}: {value}",
       "daysValue": "{days} дн.",
       "forever": "хранить бессрочно",
-      "invalid": "Укажите 0 или не менее 3 дней"
+      "invalid": "Укажите 0 или не менее 3 дней",
+      "invalidType": "Укажите не менее 3 дней или удалите этот тип"
     },
     "organizationSettings": {
       "fieldNameHelp": "Используйте только буквенно-цифровые символы и '+=,.{'@'}-_' без пробелов.",
+      "sectionTitle": "Обработка данных",
+      "sectionDescription": "Как логи связываются с трассировками и какие автоматические функции включены.",
+      "traceIdHelp": "Поле лога, связывающее строку лога с её трассировкой. Только буквы, цифры и + = , . {'@'} - _.",
+      "spanIdHelp": "Поле лога, связывающее строку лога с её спаном. Те же символы, что выше.",
+      "ingestionLogsHelp": "Ведёт журнал записей, которые не удалось принять.",
+      "usageStreamHelp": "Записывает данные об использовании {org} в отдельный поток, к которому можно делать запросы.",
       "settingsUpdated": "Настройки организации успешно обновлены",
       "settingsSaveError": "Ошибка при сохранении настроек организации"
     },
@@ -16409,6 +16533,7 @@
     "queryRange": "Диапазон запроса",
     "userSummary": "Сводка пользователя",
     "allQueries": "Все запросы",
+    "allFields": "Все поля",
     "queryType": "Тип запроса",
     "numOfQueries": "Количество запросов",
     "totalDuration": "Общее время выполнения",
@@ -17145,12 +17270,12 @@
       "truncated": "Показан первый спан этого трейса в порядке времени начала. Остальные спаны ещё не загружены. | Показаны первые спаны этого трейса ({count}) в порядке времени начала. Остальные спаны ещё не загружены.",
       "loadMore": "Загрузить следующий спан | Загрузить следующие спаны ({size})",
       "loadMoreFailed": "Не удалось загрузить дополнительные спаны этого трейса",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "Нет трассировки с этим ID между {from} и {to}",
+      "notFoundText": "В трассировке {traceId} нет спанов в потоке {stream} за этот период. Она может быть старше или новее, находиться в другом потоке или не собираться.",
+      "searchWiderRange": "Искать в более широком диапазоне",
+      "searchSpansInRange": "Искать спаны в этом диапазоне",
+      "loadFailedTitle": "Не удалось загрузить эту трассировку",
+      "loadFailedText": "Не удалось прочитать трассировку {traceId}. Повторите попытку через несколько секунд."
     },
     "traceTree": {
       "clickToExpand": "Нажмите, чтобы развернуть",
@@ -17345,6 +17470,8 @@
     "type": "Тип",
     "step1WithType": "Детали хранилища ключей (Тип: {type})",
     "step2": "Механизм шифрования",
+    "sectionKey": "Ключ",
+    "sectionSetup": "Хранилище ключей и шифрование",
     "secret": "Секрет",
     "baseURL": "Базовый URL",
     "accessId": "ID доступа",
@@ -17583,6 +17710,8 @@
     "noTracesDescription": "Трейсы не найдены для этой корреляции в выбранном временном диапазоне.",
     "viewInTraces": "Просмотреть в трейсах",
     "filters": "Фильтры",
+    "fieldGroupsTitle": "Группы полей",
+    "fieldNamesColumn": "Имена полей",
     "semanticFieldGroupsCaption": "Сопоставьте имена полей телеметрии с общими группами, чтобы OpenObserve мог коррелировать их между потоками.",
     "exportToJson": "Экспорт в JSON",
     "importFromJson": "Импорт из JSON",
@@ -20725,8 +20854,8 @@
       "searchAroundTip": "Загрузить события, записанные непосредственно до и после этого.",
       "noOfEventsTip": "Сколько событий загрузить вокруг этого.",
       "severityTip": "Определённый уровень лога. Выберите, чтобы узнать, как он определён.",
-      "traceId": "Trace ID",
-      "spanId": "Span ID"
+      "traceId": "ID трассировки",
+      "spanId": "ID спана"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Запрос SELECT * не поддерживается для визуализации.",
@@ -21011,6 +21140,7 @@
     "showDetail": "Показать подробности",
     "hideDetail": "Скрыть подробности",
     "runAs": "Запуск от имени",
+    "runSuggestion": "Выполнить {query}",
     "searchTextFor": "Поиск текста \"{text}\"",
     "searchTextDesc": "Искать весь ввод как одну фразу",
     "explain": {
@@ -21042,7 +21172,19 @@
     "dataStale": "Данные устарели",
     "lastRefreshed": "Последнее обновление: {time}",
     "refresh": "Обновить",
-    "refreshWithAge": "Обновить, последнее обновление {age}"
+    "refreshWithAge": "Обновить, последнее обновление {age}",
+    "refreshing": "Обновление",
+    "failed": "Ошибка",
+    "autoRefresh": "Автообновление",
+    "autoOn": "Авто · {interval}",
+    "every": "Каждые {interval}",
+    "interval": {
+      "10s": "10 с",
+      "30s": "30 с",
+      "1m": "1 мин",
+      "5m": "5 мин",
+      "15m": "15 мин"
+    }
   },
   "synthetics": {
     "variables": {
@@ -21900,7 +22042,12 @@
       "noPrivateMatches": "Нет приватных локаций, соответствующих вашему поиску",
       "newPrivateLocation": "Новая приватная локация",
       "publicSubtitle": "Облачные регионы, всегда доступны",
-      "privateSubtitle": "Локация готова, когда хотя бы один из ее агентов активен"
+      "privateSubtitle": "Локация готова, когда хотя бы один из ее агентов активен",
+      "emptyState": {
+        "title": "Локаций пока нет",
+        "description": "Локация — это место, откуда ваши синтетические мониторы выполняют проверки, например регион облака.",
+        "actionDesc": "Добавьте место, откуда будут выполняться проверки"
+      }
     },
     "newCheck": {
       "comingSoon": "Скоро",
@@ -22981,7 +23128,10 @@
       "tokenLinkTooltip": "Выберите, какой токен приема данных используют фрагменты кода",
       "copiedWithToken": "Скопировано с токеном организации {name}",
       "tokenIncludedHint": "Копирование включает токен приема данных организации, который здесь остаётся скрытым.",
-      "maskedSelectionWarning": "Скрытый токен был скопирован в виде точек. Используйте «Копировать» или сначала нажмите «Показать»."
+      "maskedSelectionWarning": "Скрытый токен был скопирован в виде точек. Используйте «Копировать» или сначала нажмите «Показать».",
+      "wrapLines": "Переносить строки",
+      "showAll": "Показать {count} строку | Показать все строки: {count}",
+      "showLess": "Показать меньше"
     },
     "spinner": {
       "loading": "Загрузка"
@@ -23026,7 +23176,10 @@
       "moreInfo": "Подробнее"
     },
     "dialog": {
-      "closeDialog": "Закрыть диалог"
+      "closeDialog": "Закрыть диалог",
+      "discardChanges": "Отменить изменения?",
+      "keepEditing": "Продолжить редактирование",
+      "discard": "Отменить"
     },
     "drawer": {
       "closeDrawer": "Закрыть панель"
@@ -23049,6 +23202,32 @@
       "clear": "Очистить"
     },
     "file": {
+      "removeNamed": "Удалить {name}",
+      "sourceLabel": "Импортировать из",
+      "sourceFile": "Файл",
+      "sourceUrl": "URL",
+      "sourcePaste": "Вставить",
+      "dropPrompt": "Перетащите файл сюда или {choose}",
+      "dropPromptMultiple": "Перетащите файлы сюда или {choose}",
+      "chooseAFile": "выберите файл",
+      "chooseFiles": "выберите файлы",
+      "chooseFileButton": "Выбрать файл",
+      "chooseFilesButton": "Выбрать файлы",
+      "noFileChosen": "Файл не выбран",
+      "dropToUpload": "Отпустите для загрузки",
+      "upToSize": "до {size}",
+      "upToSizeEach": "до {size} каждый",
+      "oneFile": "один файл",
+      "upToFiles": "до {count} файлов",
+      "typeRejected": "Принимаются только файлы: {allowed}",
+      "sizeRejected": "{size} превышает лимит {max}",
+      "countRejected": "Только {count} файл за раз | Только {count} файлов за раз",
+      "uploadFailed": "Не удалось загрузить",
+      "uploaded": "Загружено",
+      "urlPlaceholder": "URL файла",
+      "urlHelp": "Мы получим его один раз при импорте.",
+      "textPlaceholder": "Вставьте содержимое сюда",
+      "invalidJson": "Недопустимый JSON: {detail}",
       "removeFile": "Удалить файл",
       "clearAll": "Очистить всё"
     },
@@ -23063,7 +23242,14 @@
     "pagination": {
       "pagination": "Пагинация",
       "previousPage": "Предыдущая страница",
-      "nextPage": "Следующая страница"
+      "nextPage": "Следующая страница",
+      "onFirstPage": "Вы уже на первой странице",
+      "onLastPage": "Вы уже на последней странице",
+      "range": "{from}–{to} из {total}",
+      "rangeOfMany": "{from}–{to} из многих",
+      "pageOf": "Страница {page} из {pages}",
+      "perPage": "{size} на странице",
+      "pageSize": "Строк на странице"
     },
     "select": {
       "more": "ещё",
@@ -23073,6 +23259,10 @@
       "noOptionsFound": "Варианты не найдены",
       "multiSelect": "Множественный выбор",
       "singleSelect": "Одиночный выбор",
+      "any": "Любой",
+      "noMatches": "Нет совпадений для «{term}»",
+      "clearSearch": "Очистить поиск",
+      "addOption": "Добавить «{value}»",
       "moreInfoAbout": "Подробнее о поле {field}",
       "moreInfo": "Подробнее"
     },
@@ -23114,7 +23304,10 @@
       "removeColumnAria": "Удалить колонку",
       "formatColumnAria": "Форматировать колонку",
       "selectedOfTotal": "Выбрано {selected} из {total}",
-      "selectedCount": "Выбрано {selected}"
+      "selectedCount": "Выбрано {selected}",
+      "clearSelection": "Сбросить",
+      "rowActions": "Действия со строкой",
+      "moreRowActions": "Другие действия"
     },
     "predefinedThemes": {
       "title": "Тема",
@@ -23482,6 +23675,26 @@
         "past": "Прошедшие дни",
         "ended": "Завершено"
       }
+    },
+    "jsonViewer": {
+      "include": "Фильтровать по этому значению",
+      "exclude": "Исключить это значение",
+      "copyValue": "Копировать значение",
+      "fieldCount": "{count} поле | Полей: {count}",
+      "itemCount": "{count} элемент | Элементов: {count}"
+    },
+    "tabs": {
+      "more": "Ещё",
+      "unsaved": "Несохранённые изменения",
+      "locked": "Заблокировано"
+    },
+    "statStrip": {
+      "filters": "Фильтры",
+      "showOnly": "Показать только {label}",
+      "alsoShow": "Показать также {label}",
+      "stopShowing": "Перестать показывать {label}",
+      "scrollBack": "Показать предыдущие фильтры",
+      "scrollForward": "Показать другие фильтры"
     }
   },
   "functions": {
@@ -24352,6 +24565,12 @@
   },
   "passwordPolicy": {
     "complexity": "Сложность",
+    "complexityDesc": "Что должен содержать каждый новый пароль.",
+    "unitCharacters": "символов",
+    "unitDays": "дней",
+    "unitPasswords": "паролей",
+    "unitAttempts": "попыток",
+    "unitSeconds": "секунд",
     "minLength": "Минимальная длина",
     "minLengthDesc": "Наименьшая принимаемая длина пароля",
     "maxLength": "Максимальная длина",
@@ -24367,6 +24586,7 @@
     "specialCharSet": "Разрешенные специальные символы",
     "specialCharSetDesc": "Оставьте пустым, чтобы принимать любой небуквенно-цифровой символ",
     "maxLengthTooSmall": "Максимальная длина должна быть в диапазоне от минимальной длины до 128.",
+    "maxLengthBelowMin": "Должно быть не меньше {min}, чтобы соответствовать минимальной длине.",
     "confirmTitle": "Сохранить политику паролей?",
     "confirmMessage": "После сохранения всем встроенным пользователям может потребоваться задать новый пароль, прежде чем продолжить работу. Root, внешние пользователи и сервисные аккаунты не затрагиваются — включая вас, если вы не учетная запись root. Это действие нельзя отменить.",
     "saved": "Политика паролей сохранена. | Политика паролей сохранена. {count} пользователь должен сбросить пароль. | Политика паролей сохранена. Пользователей, которые должны сбросить пароль: {count}.",
@@ -24377,14 +24597,17 @@
     "loadFailed": "При чтении текущей политики произошла ошибка.",
     "rotation": "Ротация",
     "rotationDays": "Период ротации",
+    "rotationDesc": "Когда пароль истекает и за сколько дней пользователей предупреждают.",
     "rotationDaysDesc": "Дней до истечения срока действия пароля. 0 = не истекает",
     "rotationWarningDays": "Предупреждать до истечения",
     "rotationWarningDaysDesc": "За сколько дней предупреждать при входе. 0 = без предупреждения",
+    "rotationWarningDaysOffDesc": "Число дней предупреждения при входе. Применяется, когда пароли истекают.",
     "warningDaysTooLong": "Окно предупреждения не может быть больше периода ротации.",
     "rotationPreview": "Пароль, заданный сегодня, истекает {expires}. Предупреждение при входе начнется {warns}.",
     "rotationPreviewNoWarning": "Пароль, заданный сегодня, истекает {expires}. До этого предупреждение не показывается.",
     "reuse": "Запрет повторного использования",
     "historyCount": "Запоминаемых паролей",
+    "reuseDesc": "Не позволяет возвращаться к старым паролям.",
     "historyCountDesc": "Новый пароль не должен совпадать с таким числом предыдущих. 0 = без проверки",
     "historyMaxRetained": "Хранимая история",
     "historyMaxRetainedDesc": "Сколько прошлых паролей хранится для каждого пользователя",
@@ -24392,6 +24615,7 @@
     "reuseExplainer": "Текущий пароль входит в запоминаемый набор — его повторное использование отклоняется этим правилом, а не отдельной проверкой.",
     "lockout": "Блокировка аккаунта",
     "lockoutThreshold": "Неудачных попыток до блокировки",
+    "lockoutDesc": "Что происходит после повторных неудачных попыток входа.",
     "lockoutThresholdDesc": "0 = блокировка отключена",
     "lockoutBucketSize": "Попыток до каждой следующей блокировки",
     "lockoutBucketSizeDesc": "0 = использовать значение выше",
@@ -24406,6 +24630,7 @@
     "backoffLinear": "Линейная",
     "lockoutPreview": "Неудачных попыток: {threshold} → {first} · каждые {bucket} ещё → {rest} · не более {max}. Успешный вход сбрасывает всё.",
     "sessionEnforcement": "Сессия и применение политики",
+    "sessionEnforcementDesc": "Как долго действует вход и подчиняется ли этим правилам root.",
     "cookieMaxAge": "Время жизни сессии",
     "cookieMaxAgeDesc": "Сколько секунд сессия остаётся действительной. 0 = использовать значение экземпляра по умолчанию из {envVar}",
     "applyToRoot": "Применить к root-аккаунту",
@@ -24782,6 +25007,7 @@
       "packUnavailableHint": "Готовый контент для этой рабочей нагрузки ещё не выпущен. А пока создайте дашборд, чтобы отобразить её.",
       "partialTelemetryKubernetes": "Мы нашли потоки Kubernetes, но не метрики, необходимые этой странице (kubeletstats или cluster receiver). Проверьте приёмники вашего коллектора.",
       "partialTelemetryHosts": "Мы нашли потоки хостов, но не метрики, необходимые этой странице. Проверьте приёмник hostmetrics вашего коллектора.",
+      "hostMetricsMissingTitle": "Метрики хоста не найдены",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first} и ещё {count}",
       "hiddenFootnote": "Здесь также отображаются источники данных, к которым у вас нет доступа.",
@@ -27232,6 +27458,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Подавить вызов",
     "savePolicyFailed": "Не удалось сохранить политику",
+    "savePolicyFailedReason": "Политика не сохранена. {reason}",
     "state_triggered": "Сработал",
     "state_triaged": "Триаж пройден",
     "state_acknowledged": "Подтверждён",
@@ -28849,6 +29076,11 @@
       "otherOrgs": "Нет других организаций | {count} другая организация | {count} других организаций",
       "connectedOn": "{date}, {user}",
       "helpContact": "Контакт для помощи",
+      "helpContactHelp": "Пользователям, которые не могут привязать аккаунт, предлагается обратиться к этому контакту.",
+      "eventsLabel": "События Slack",
+      "connectionLabel": "Подключение",
+      "outboundLabel": "Исходящая очередь",
+      "collaboratorsLabel": "Соавторы приложения",
       "helpContactPlaceholder": "#o2-help или человек, к которому можно обратиться",
       "helpContactSaved": "Контакт для помощи сохранён",
       "disconnectSection": "Отключить",
@@ -30502,9 +30734,9 @@
     },
     "queryTooltip": "Редактировать фильтр как текст",
     "builderTooltip": "Редактировать фильтр в конструкторе",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
+    "editorModeLabel": "Редактор фильтра",
+    "modeBuilder": "Конструктор",
+    "modeText": "Текст"
   },
   "autoobserveLive": {
     "paging": {
@@ -30597,5 +30829,23 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "pageHeader": {
+    "about": "Об этой странице"
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· в {percent}% трассировок за последние 24 часа",
+    "fallbacksNote": "Введите резервные поля через запятую в порядке проверки.",
+    "fallbackInvalid": "Используйте имена полей через запятую. Только буквы, цифры и . _ - : / {'@'}.",
+    "sessions": {
+      "title": "Отображение сессий",
+      "help": "Как называются сессии и какой обрамляющий текст в них скрывается.",
+      "noAgents": "Агентов пока нет. Добавьте агента, чтобы скрыть его обрамляющий текст."
+    }
+  },
+  "copyButton": {
+    "copy": "Копировать",
+    "copied": "Скопировано",
+    "failed": "Копирование заблокировано · нажмите Ctrl C"
   }
 }

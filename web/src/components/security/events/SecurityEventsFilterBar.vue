@@ -121,7 +121,6 @@ function onSeverityChange(v: unknown) {
     </div>
     <OButton
       variant="secondary"
-      icon="add"
       :disabled="!builderField || !builderValue"
       data-test="security-events-builder-add"
       @click="commitFilter"

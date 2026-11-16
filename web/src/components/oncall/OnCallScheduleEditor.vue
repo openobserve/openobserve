@@ -38,7 +38,6 @@
             <span class="text-text-secondary text-sm">{{ t("oncall.scheduleHint") }}</span>
             <OButton
               variant="secondary"
-              icon="add"
               data-test="oncall-schedule-add-rotation"
               @click="addRotation"
             >

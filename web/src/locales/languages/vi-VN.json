@@ -56,6 +56,7 @@
         "ariaLabel": "Đang chờ dữ liệu"
       }
     },
+    "requestId": "Yêu cầu {id}",
     "createFirstItem": "Tạo mục đầu tiên của bạn",
     "newBrowserCheck": "Kiểm tra trình duyệt mới",
     "allCaughtUp": "Bạn đã xem hết",
@@ -451,7 +452,9 @@
       "description": "Không có {noun} nào khớp với bộ lọc hoặc tìm kiếm hiện tại. Hãy thử điều chỉnh hoặc xóa chúng.",
       "action": "Xóa bộ lọc",
       "actionDesc": "Đặt lại tất cả bộ lọc và tìm kiếm",
-      "fallbackNoun": "kết quả"
+      "fallbackNoun": "kết quả",
+      "noMatches": "Không có kết quả khớp",
+      "noMatchesText": "Không có gì khớp với tìm kiếm hoặc bộ lọc hiện tại."
     },
     "nouns": {
       "logs": "nhật ký",
@@ -490,6 +493,7 @@
       "evalTemplates": "mẫu đánh giá",
       "enrichmentTables": "bảng làm giàu",
       "cipherKeys": "khóa mã hóa",
+      "announcementBanners": "biểu ngữ thông báo",
       "aiToolsets": "bộ công cụ AI",
       "llmProviders": "nhà cung cấp LLM",
       "sourceMaps": "bản đồ nguồn",
@@ -633,6 +637,26 @@
     "noOncallUnrouted": {
       "title": "Không có gì cần người phụ trách",
       "description": "Mọi cảnh báo đã kích hoạt đều đã đến được một nhóm."
+    },
+    "noSlackChannelDefaults": {
+      "title": "Chưa có kênh nào có tổ chức mặc định",
+      "description": "Câu hỏi trong kênh không có mặc định sẽ chuyển đến tổ chức mặc định của từng người (họ có thể đổi bằng /o2 org)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "Chưa ai trong tổ chức này liên kết Slack"
+    },
+    "slackNotConnected": {
+      "title": "Kết nối không gian làm việc Slack"
+    },
+    "noAnnouncementBanners": {
+      "title": "Chưa có biểu ngữ nào",
+      "description": "Biểu ngữ hiển thị thông báo ở đầu ứng dụng cho các tổ chức bạn chọn.",
+      "action": "Thêm biểu ngữ",
+      "actionDesc": "Soạn thông báo và lên lịch"
+    },
+    "pageError": {
+      "title": "Không thể tải trang này",
+      "description": "Không có dữ liệu nào của trang này được tải. Hãy thử lại ngay hoặc thử lại sau một phút."
     }
   },
   "accessBoundary": {
@@ -660,6 +684,7 @@
       "groups": "Nhóm",
       "serviceAccounts": "Tài khoản dịch vụ",
       "cipherKeys": "Khóa mã hóa",
+      "announcementBanners": "Biểu ngữ thông báo",
       "regexPatterns": "Mẫu regex",
       "evalJobs": "Tác vụ đánh giá trực tuyến",
       "billingGroup": "Nhóm thanh toán",
@@ -716,6 +741,7 @@
       "groups": "nhóm",
       "serviceAccounts": "tài khoản dịch vụ",
       "cipherKeys": "khóa mã hóa",
+      "announcementBanners": "biểu ngữ thông báo",
       "regexPatterns": "mẫu regex",
       "unnamed": "tài nguyên này",
       "onCall": "trực",
@@ -773,9 +799,14 @@
   },
   "common": {
     "saveBar": {
-      "noChanges": "Không có thay đổi để lưu"
+      "noChanges": "Không có thay đổi để lưu",
+      "unsavedChanges": "{n} thay đổi chưa lưu",
+      "changesShort": "{n} thay đổi",
+      "fixFields": "Sửa {n} trường",
+      "discard": "Hủy bỏ"
     },
     "dismiss": "Bỏ qua",
+    "undo": "Hoàn tác",
     "exitFullscreen": "Thoát toàn màn hình",
     "moreActions": "Thêm thao tác",
     "moreOptions": "Thêm tùy chọn",
@@ -1014,6 +1045,8 @@
     "back": "Quay lại",
     "save": "Lưu",
     "discardChanges": "Hủy bỏ thay đổi",
+    "switchOn": "Bật",
+    "switchOff": "Tắt",
     "unsavedChanges": "Thay đổi chưa lưu",
     "update": "Cập nhật",
     "favourite": "Yêu thích",
@@ -1128,6 +1161,8 @@
     "field": "Trường",
     "enterValueOrVariable": "Nhập giá trị hoặc $variable",
     "all": "Tất cả",
+    "allStates": "Tất cả trạng thái",
+    "allStatuses": "Tất cả trạng thái",
     "jsonFilesOnlyHint": "Chỉ tệp .json",
     "fileUploadJsonTab": "Tải lên tệp / JSON",
     "urlImportTab": "Nhập bằng URL",
@@ -1234,7 +1269,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "cấu hình collector"
+        "fleet_config": "cấu hình collector",
+        "workflow": "quy trình làm việc"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1244,6 +1280,11 @@
       "leaveMessageInBrowser": "Lưu {entity}, giữ các thay đổi của bạn trong trình duyệt này, hoặc hủy bỏ chúng.",
       "retentionInBrowser": "Các thay đổi được giữ trong trình duyệt này trong {days} ngày, hoặc cho đến khi bạn đăng xuất. Chỉ {max} bản mới nhất của mỗi loại được giữ lại.",
       "dotUndated": "Unsaved draft"
+    },
+    "leaveGuard": {
+      "title": "Rời đi khi còn thay đổi chưa lưu?",
+      "message": "Trang này có {n} thay đổi chưa lưu. Chúng sẽ bị mất nếu bạn rời đi.",
+      "keepEditing": "Tiếp tục chỉnh sửa"
     }
   },
   "flow": {
@@ -1942,8 +1983,8 @@
     "histogramTitleRows": "Hiển thị {total} hàng trong {took} ms. | Hiển thị {total} hàng trong {took} ms.",
     "histogramTitleRowsWithScan": "Hiển thị {total} hàng trong {took} ms. ({scanLabel}: {scanSize}) | Hiển thị {total} hàng trong {took} ms. ({scanLabel}: {scanSize})",
     "pickStreamFirst": "Hãy chọn một luồng trước",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "Tự động làm mới cập nhật kết quả tìm kiếm. Tính năng này tạm dừng khi bạn trực quan hóa.",
+    "histogramNoTimeAxis": "Kết quả được nhóm không có trục thời gian"
   },
   "menu": {
     "alertCalibration": "Hiệu chỉnh cảnh báo",
@@ -3858,6 +3899,8 @@
     "your_complete_license_key": "Khóa giấy phép hoàn chỉnh của bạn:",
     "copy_key": "Sao chép khóa",
     "usage_information": "Thông tin sử dụng",
+    "usage_chart_title": "Lượng nạp dữ liệu hằng ngày trong tháng này",
+    "no_license_ingestion_limit": "Khi không có giấy phép, lượng nạp dữ liệu bị giới hạn ở <strong>{limit} GB</strong> mỗi ngày.",
     "license_allows_ingestion": "Giấy phép hiện tại cho phép <strong>{limit} GB</strong> dữ liệu được tiếp nhận mỗi ngày.",
     "license_allows_unlimited_ingestion": "Giấy phép hiện tại cho phép nhập dữ liệu không giới hạn.",
     "limit_exceeded_days": "Giới hạn đã bị vượt quá trong <strong class=\"{colorClass}\">{days} ngày</strong> trong tháng này | Giới hạn đã bị vượt quá trong <strong class=\"{colorClass}\">{days} ngày</strong> trong tháng này",
@@ -4714,6 +4757,8 @@
     },
     "listOrganizations": {
       "subtitle": "Các tổ chức bạn có thể truy cập",
+      "switch": "Chuyển sang tổ chức này",
+      "current": "Hiện tại",
       "cannotEditWhileDeleting": "Không thể chỉnh sửa trong khi đang xóa",
       "edit": "Chỉnh sửa",
       "deleteOrganization": "Xóa tổ chức",
@@ -10169,6 +10214,12 @@
       "noPanels": "Không có bảng",
       "panelsDeletedHint": "Các bảng của nó đã bị xóa, nên hiện tại không vẽ trên bảng nào. Chọn bảng, hoặc chọn Chọn tất cả, để khắc phục.",
       "blankFiltersHint": "Các điều kiện không có giá trị sẽ bị bỏ qua."
+    },
+    "inlineCreate": {
+      "folderName": "Tên thư mục mới",
+      "createFolder": "Tạo thư mục",
+      "tabName": "Tên tab mới",
+      "createTab": "Tạo tab"
     }
   },
   "panel": {
@@ -14256,7 +14307,8 @@
         "mute": "Bạn không thể tắt thông báo mục này.",
         "onCall": "Đang trực: {people}",
         "canAct": "Cũng có thể xử lý: {people}",
-        "people": "Trực: {onCall}. Cũng có thể xử lý: {canAct}"
+        "people": "Trực: {onCall}. Cũng có thể xử lý: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "Cảnh báo này không ở trạng thái đang kích hoạt nên không có gì để xác nhận.",
@@ -14315,7 +14367,11 @@
       "open": "Chỉnh sửa trong Security"
     },
     "newAlertTitle": "Cảnh báo mới",
-    "newAnomalyTitle": "Phát hiện bất thường mới"
+    "newAnomalyTitle": "Phát hiện bất thường mới",
+    "rowAction": {
+      "paused": "Đã tạm dừng {name}",
+      "resumed": "Đã tiếp tục {name}"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Mở",
@@ -14774,6 +14830,7 @@
     "destination_type": "Loại Đích",
     "template": "Mẫu",
     "actions": "Hành động",
+    "addHeader": "Thêm header",
     "addTitle": "Đích mới",
     "updateTitle": "Cập nhật đích",
     "delete": "Xóa",
@@ -14919,7 +14976,9 @@
   },
   "pipeline_destinations": {
     "header": "Đích Pipeline",
-    "search": "Tìm kiếm đích"
+    "search": "Tìm kiếm đích",
+    "destinationType": "Loại đích",
+    "outputFormat": "Định dạng đầu ra"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15430,8 +15489,12 @@
     "groupIntegrations": "Tích hợp",
     "groupAccount": "Tài khoản",
     "slackApp": "Slack",
+    "slackAppDesc": "Không gian làm việc, mặc định của kênh và liên kết tài khoản cho ứng dụng Slack",
     "generalDesc": "Chủ đề, mặc định truy vấn và tùy chọn cốt lõi",
     "orgDesc": "Tham số và định danh tổ chức",
+    "generalSubtitle": "Giao diện của {org} và các mặc định truy vấn.",
+    "orgSubtitle": "Tên trường, thời gian lưu trữ dữ liệu và các tính năng tự động cho {org}.",
+    "passwordPolicySubtitle": "Quy tắc cho tài khoản email và mật khẩu gốc.",
     "cipherKeysDesc": "Khóa mã hóa cho trường nhạy cảm",
     "regexPatternsDesc": "Mẫu regex tái sử dụng cho việc làm rõ",
     "domainManagementDesc": "Giới hạn đăng nhập vào tên miền SSO được phép",
@@ -15718,10 +15781,59 @@
       "failedToLoadServices": "Không thể tải dịch vụ"
     },
     "domainManagement": {
-      "unknownTime": "Thời gian không xác định"
+      "unknownTime": "Thời gian không xác định",
+      "claimParserTitle": "Bộ phân tích claim",
+      "claimParserSectionDesc": "Chuyển claim SSO và LDAP thành phân công tổ chức và vai trò.",
+      "claimParserLabel": "Hàm phân tích claim",
+      "claimParserHelp": "Một hàm {product1} hoặc {product2} nhận các claim đã ánh xạ và trả về các tổ chức và vai trò cần gán, hoặc từ chối.",
+      "claimParserFormatLink": "Định dạng đầu vào và đầu ra",
+      "claimParserPlaceholder": "Không có hàm",
+      "noFunctions": "Chưa có hàm nào",
+      "restrictionsTitle": "Hạn chế tên miền",
+      "restrictionsDesc": "Những miền email và người dùng nào có thể đăng nhập qua SSO.",
+      "domainLabel": "Tên miền",
+      "addDomain": "Thêm tên miền",
+      "noDomains": "Chưa có tên miền nào. Thêm tên miền để hạn chế người được đăng nhập.",
+      "accessFor": "Quyền truy cập cho {domain}",
+      "policyAllowAll": "Cho phép tất cả người dùng",
+      "policyAllowSpecific": "Chỉ cho phép người dùng trong danh sách",
+      "policyBlockSpecific": "Chặn người dùng trong danh sách",
+      "policyBlockAll": "Chặn tất cả người dùng",
+      "effectAllowSpecific": "Chỉ những người dùng trong danh sách có địa chỉ email kết thúc bằng {domain} mới được phép đăng nhập.",
+      "effectBlockSpecific": "Những người dùng SSO bên ngoài trong danh sách có địa chỉ email kết thúc bằng {domain} sẽ bị chặn khỏi hệ thống (giao diện, API và nạp dữ liệu).",
+      "emailLabel": "Địa chỉ email",
+      "noEmails": "Chưa có địa chỉ email nào trong danh sách.",
+      "removeDomain": "Xóa {domain}",
+      "removeEmail": "Xóa {email}",
+      "saved": "Đã lưu cài đặt SSO"
     },
     "general": {
       "close": "Đóng",
+      "themeTitle": "Giao diện",
+      "themeDescription": "Màu nhấn của {org} ở chế độ sáng và tối.",
+      "accentColorLabel": "Màu nhấn",
+      "lightColorLabel": "Đổi màu chế độ sáng, hiện là {color}",
+      "darkColorLabel": "Đổi màu chế độ tối, hiện là {color}",
+      "queryDefaultsTitle": "Mặc định truy vấn",
+      "queryDefaultsDescription": "Mặc định cho việc thu thập metric và truy vấn PromQL.",
+      "scrapeIntervalLabel": "Khoảng thời gian thu thập",
+      "scrapeIntervalHelp": "Tần suất thu thập metric.",
+      "unitSeconds": "giây",
+      "maxSeriesLabel": "Số chuỗi tối đa mỗi truy vấn",
+      "maxSeriesHelp": "Số chuỗi tối đa một truy vấn PromQL có thể trả về. Để trống sẽ dùng mặc định, {n}.",
+      "unitSeries": "chuỗi",
+      "maxSeriesError": "Nhập từ 1.000 đến 1.000.000, hoặc để trống để dùng mặc định.",
+      "brandingTitle": "Thương hiệu",
+      "brandingDescription": "Tên và logo hiển thị cho mọi tổ chức trên phiên bản này.",
+      "logoTextHelp": "Thay thế tên mặc định hiển thị trong ứng dụng. Tối đa 100 ký tự.",
+      "logoTextTooLong": "Dùng tối đa 100 ký tự.",
+      "logoTextSaveFailed": "Không lưu được văn bản logo tùy chỉnh. {reason}",
+      "logoSaveFailed": "Không tải lên được logo {mode}. {reason}",
+      "brandingUpdated": "Đã cập nhật thương hiệu",
+      "logoLightLabel": "Logo tùy chỉnh (chế độ sáng)",
+      "logoLightHelp": "Hiển thị ở chế độ sáng. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px.",
+      "logoDarkLabel": "Logo tùy chỉnh (chế độ tối)",
+      "logoDarkHelp": "Hiển thị ở chế độ tối. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px.",
       "fileCounterLabel": "{constraint} {filesNumber} tệp {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
@@ -15743,18 +15855,30 @@
       "title": "Mặc định lưu giữ dữ liệu",
       "about": "Áp dụng cho các stream không có thời hạn lưu riêng. Để trống hoặc 0 sẽ dùng giá trị toàn cục; nếu không, tối thiểu 3 ngày.",
       "defaultDays": "Mặc định (ngày)",
+      "defaultLabel": "Mặc định",
+      "unitDays": "ngày",
+      "daysFor": "Thời gian lưu {type} (ngày)",
       "streamType": "Loại stream",
       "days": "Ngày",
       "addType": "Thêm loại stream",
+      "allTypesAdded": "Mọi loại luồng đã có một hàng.",
+      "removeTypeNamed": "Xóa mặc định {type}",
       "removeType": "Xóa loại stream này",
       "globalDefault": "Toàn cục: {value}",
       "globalType": "Toàn cục {type}: {value}",
       "daysValue": "{days} ngày",
       "forever": "lưu giữ vĩnh viễn",
-      "invalid": "Dùng 0 hoặc tối thiểu 3 ngày"
+      "invalid": "Dùng 0 hoặc tối thiểu 3 ngày",
+      "invalidType": "Dùng ít nhất 3 ngày, hoặc xóa loại này"
     },
     "organizationSettings": {
       "fieldNameHelp": "Chỉ sử dụng ký tự chữ số và '+=,.{'@'}-_', không có khoảng trắng.",
+      "sectionTitle": "Xử lý dữ liệu",
+      "sectionDescription": "Cách log liên kết với trace và những tính năng tự động nào đang bật.",
+      "traceIdHelp": "Trường log liên kết một dòng log với trace của nó. Chỉ gồm chữ cái, chữ số và + = , . {'@'} - _",
+      "spanIdHelp": "Trường log liên kết một dòng log với span của nó. Cùng các ký tự như trên.",
+      "ingestionLogsHelp": "Lưu nhật ký các bản ghi nạp dữ liệu thất bại.",
+      "usageStreamHelp": "Ghi dữ liệu sử dụng của {org} vào luồng riêng mà bạn có thể truy vấn.",
       "settingsUpdated": "Đã cập nhật cài đặt tổ chức thành công",
       "settingsSaveError": "Lỗi khi lưu cài đặt tổ chức"
     },
@@ -16409,6 +16533,7 @@
     "queryRange": "Phạm vi truy vấn",
     "userSummary": "Tóm tắt người dùng",
     "allQueries": "Tất cả truy vấn",
+    "allFields": "Tất cả trường",
     "queryType": "Loại truy vấn",
     "numOfQueries": "Số lượng truy vấn",
     "totalDuration": "Tổng thời gian thực thi",
@@ -17145,12 +17270,12 @@
       "truncated": "Hiển thị span đầu tiên của trace này, theo thứ tự thời gian bắt đầu. Các span sau chưa được tải. | Hiển thị {count} span đầu tiên của trace này, theo thứ tự thời gian bắt đầu. Các span sau chưa được tải.",
       "loadMore": "Tải span tiếp theo | Tải {size} span tiếp theo",
       "loadMoreFailed": "Không thể tải thêm span của trace này",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "Không có trace nào với ID này trong khoảng {from} đến {to}",
+      "notFoundText": "Trace {traceId} không có span nào trong luồng {stream} ở khoảng này. Có thể nó cũ hơn hoặc mới hơn, nằm trong luồng khác, hoặc chưa được thu thập.",
+      "searchWiderRange": "Tìm trong khoảng rộng hơn",
+      "searchSpansInRange": "Tìm span trong khoảng này",
+      "loadFailedTitle": "Không thể tải trace này",
+      "loadFailedText": "Không đọc được trace {traceId}. Hãy thử lại sau giây lát."
     },
     "traceTree": {
       "clickToExpand": "Nhấp để mở rộng",
@@ -17345,6 +17470,8 @@
     "type": "Loại",
     "step1WithType": "Chi tiết Key Store (Loại: {type})",
     "step2": "Cơ chế mã hóa",
+    "sectionKey": "Khóa",
+    "sectionSetup": "Kho khóa và mã hóa",
     "secret": "Bí mật",
     "baseURL": "URL cơ sở",
     "accessId": "ID truy cập",
@@ -17583,6 +17710,8 @@
     "noTracesDescription": "Không tìm thấy trace nào cho tương quan này trong khoảng thời gian đã chọn.",
     "viewInTraces": "Xem trong Trace",
     "filters": "Bộ lọc",
+    "fieldGroupsTitle": "Nhóm trường",
+    "fieldNamesColumn": "Tên trường",
     "semanticFieldGroupsCaption": "Ánh xạ tên trường đo từ xa của bạn thành các nhóm chung để OpenObserve có thể tương quan chúng qua các stream.",
     "exportToJson": "Xuất ra JSON",
     "importFromJson": "Nhập từ JSON",
@@ -20725,8 +20854,8 @@
       "searchAroundTip": "Tải các sự kiện được ghi ngay trước và sau sự kiện này.",
       "noOfEventsTip": "Số sự kiện cần tải quanh sự kiện này.",
       "severityTip": "Mức nhật ký được phát hiện. Chọn để xem cách phát hiện.",
-      "traceId": "Trace ID",
-      "spanId": "Span ID"
+      "traceId": "ID trace",
+      "spanId": "ID span"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Truy vấn Select * không được hỗ trợ cho trực quan hóa.",
@@ -21011,6 +21140,7 @@
     "showDetail": "Hiển thị chi tiết",
     "hideDetail": "Ẩn chi tiết",
     "runAs": "Chạy với tư cách",
+    "runSuggestion": "Chạy {query}",
     "searchTextFor": "Tìm văn bản cho \"{text}\"",
     "searchTextDesc": "Tìm toàn bộ nội dung nhập như một cụm từ",
     "explain": {
@@ -21042,7 +21172,19 @@
     "dataStale": "Dữ liệu đã cũ",
     "lastRefreshed": "Cập nhật lần cuối: {time}",
     "refresh": "Làm mới",
-    "refreshWithAge": "Làm mới, lần làm mới cuối {age}"
+    "refreshWithAge": "Làm mới, lần làm mới cuối {age}",
+    "refreshing": "Đang làm mới",
+    "failed": "Thất bại",
+    "autoRefresh": "Tự động làm mới",
+    "autoOn": "Tự động · {interval}",
+    "every": "Mỗi {interval}",
+    "interval": {
+      "10s": "10 giây",
+      "30s": "30 giây",
+      "1m": "1 phút",
+      "5m": "5 phút",
+      "15m": "15 phút"
+    }
   },
   "synthetics": {
     "variables": {
@@ -21900,7 +22042,12 @@
       "noPrivateMatches": "Không có vị trí riêng tư nào khớp với tìm kiếm của bạn",
       "newPrivateLocation": "Vị trí riêng tư mới",
       "publicSubtitle": "Các khu vực đám mây, luôn sẵn sàng",
-      "privateSubtitle": "Vị trí sẵn sàng khi có ít nhất một agent của nó đang hoạt động"
+      "privateSubtitle": "Vị trí sẵn sàng khi có ít nhất một agent của nó đang hoạt động",
+      "emptyState": {
+        "title": "Chưa có vị trí nào",
+        "description": "Vị trí là nơi các monitor tổng hợp của bạn chạy kiểm tra, chẳng hạn một vùng đám mây.",
+        "actionDesc": "Thêm nơi để chạy kiểm tra"
+      }
     },
     "newCheck": {
       "comingSoon": "Sắp ra mắt",
@@ -22981,7 +23128,10 @@
       "tokenLinkTooltip": "Chọn token tiếp nhận dữ liệu mà các đoạn mã sử dụng",
       "copiedWithToken": "Đã sao chép với token tổ chức {name}",
       "tokenIncludedHint": "Việc sao chép bao gồm token tiếp nhận dữ liệu của tổ chức, token này vẫn được ẩn ở đây.",
-      "maskedSelectionWarning": "Token ẩn đã được sao chép dưới dạng dấu chấm. Hãy dùng Sao chép, hoặc Hiện nó trước."
+      "maskedSelectionWarning": "Token ẩn đã được sao chép dưới dạng dấu chấm. Hãy dùng Sao chép, hoặc Hiện nó trước.",
+      "wrapLines": "Ngắt dòng",
+      "showAll": "Hiện tất cả {count} dòng",
+      "showLess": "Hiện ít hơn"
     },
     "spinner": {
       "loading": "Đang tải"
@@ -23026,7 +23176,10 @@
       "moreInfo": "Thêm thông tin"
     },
     "dialog": {
-      "closeDialog": "Đóng hộp thoại"
+      "closeDialog": "Đóng hộp thoại",
+      "discardChanges": "Hủy bỏ thay đổi?",
+      "keepEditing": "Tiếp tục chỉnh sửa",
+      "discard": "Hủy bỏ"
     },
     "drawer": {
       "closeDrawer": "Đóng ngăn kéo"
@@ -23049,6 +23202,32 @@
       "clear": "Xóa"
     },
     "file": {
+      "removeNamed": "Xóa {name}",
+      "sourceLabel": "Nhập từ",
+      "sourceFile": "Tệp",
+      "sourceUrl": "URL",
+      "sourcePaste": "Dán",
+      "dropPrompt": "Thả tệp vào đây hoặc {choose}",
+      "dropPromptMultiple": "Thả các tệp vào đây hoặc {choose}",
+      "chooseAFile": "chọn một tệp",
+      "chooseFiles": "chọn tệp",
+      "chooseFileButton": "Chọn tệp",
+      "chooseFilesButton": "Chọn các tệp",
+      "noFileChosen": "Chưa chọn tệp",
+      "dropToUpload": "Thả để tải lên",
+      "upToSize": "tối đa {size}",
+      "upToSizeEach": "tối đa {size} mỗi tệp",
+      "oneFile": "một tệp",
+      "upToFiles": "tối đa {count} tệp",
+      "typeRejected": "Chỉ chấp nhận tệp {allowed}",
+      "sizeRejected": "{size} vượt quá giới hạn {max}",
+      "countRejected": "Mỗi lần chỉ {count} tệp",
+      "uploadFailed": "Tải lên thất bại",
+      "uploaded": "Đã tải lên",
+      "urlPlaceholder": "URL tệp",
+      "urlHelp": "Chúng tôi tải một lần khi bạn nhập.",
+      "textPlaceholder": "Dán nội dung vào đây",
+      "invalidJson": "Không phải JSON hợp lệ: {detail}",
       "removeFile": "Xóa tệp",
       "clearAll": "Xóa tất cả"
     },
@@ -23063,7 +23242,14 @@
     "pagination": {
       "pagination": "Phân trang",
       "previousPage": "Trang trước",
-      "nextPage": "Trang sau"
+      "nextPage": "Trang sau",
+      "onFirstPage": "Đã ở trang đầu",
+      "onLastPage": "Đã ở trang cuối",
+      "range": "{from}–{to} trong {total}",
+      "rangeOfMany": "{from}–{to} trong nhiều",
+      "pageOf": "Trang {page} trên {pages}",
+      "perPage": "{size} mỗi trang",
+      "pageSize": "Số hàng mỗi trang"
     },
     "select": {
       "more": "thêm",
@@ -23073,6 +23259,10 @@
       "noOptionsFound": "Không tìm thấy tùy chọn",
       "multiSelect": "Chọn nhiều",
       "singleSelect": "Chọn một",
+      "any": "Bất kỳ",
+      "noMatches": "Không có kết quả khớp với \"{term}\"",
+      "clearSearch": "Xóa tìm kiếm",
+      "addOption": "Thêm \"{value}\"",
       "moreInfoAbout": "Thêm thông tin về {field}",
       "moreInfo": "Thêm thông tin"
     },
@@ -23114,7 +23304,10 @@
       "removeColumnAria": "Xóa cột",
       "formatColumnAria": "Định dạng cột",
       "selectedOfTotal": "Đã chọn {selected} trong {total}",
-      "selectedCount": "Đã chọn {selected}"
+      "selectedCount": "Đã chọn {selected}",
+      "clearSelection": "Xóa",
+      "rowActions": "Thao tác hàng",
+      "moreRowActions": "Thao tác khác"
     },
     "predefinedThemes": {
       "title": "Chủ đề",
@@ -23482,6 +23675,26 @@
         "past": "Ngày đã qua",
         "ended": "Đã kết thúc"
       }
+    },
+    "jsonViewer": {
+      "include": "Lọc theo giá trị này",
+      "exclude": "Lọc loại trừ giá trị này",
+      "copyValue": "Sao chép giá trị",
+      "fieldCount": "{count} trường",
+      "itemCount": "{count} mục"
+    },
+    "tabs": {
+      "more": "Thêm",
+      "unsaved": "Thay đổi chưa lưu",
+      "locked": "Đã khóa"
+    },
+    "statStrip": {
+      "filters": "Bộ lọc",
+      "showOnly": "Chỉ hiện {label}",
+      "alsoShow": "Hiện thêm {label}",
+      "stopShowing": "Ngừng hiện {label}",
+      "scrollBack": "Hiện các bộ lọc trước",
+      "scrollForward": "Hiện thêm bộ lọc"
     }
   },
   "functions": {
@@ -24352,6 +24565,12 @@
   },
   "passwordPolicy": {
     "complexity": "Độ phức tạp",
+    "complexityDesc": "Những gì mọi mật khẩu mới phải có.",
+    "unitCharacters": "ký tự",
+    "unitDays": "ngày",
+    "unitPasswords": "mật khẩu",
+    "unitAttempts": "lần thử",
+    "unitSeconds": "giây",
     "minLength": "Độ dài tối thiểu",
     "minLengthDesc": "Mật khẩu ngắn nhất được chấp nhận",
     "maxLength": "Độ dài tối đa",
@@ -24367,6 +24586,7 @@
     "specialCharSet": "Ký tự đặc biệt được phép",
     "specialCharSetDesc": "Để trống để chấp nhận mọi ký tự không phải chữ và số",
     "maxLengthTooSmall": "Độ dài tối đa phải nằm trong khoảng từ độ dài tối thiểu đến 128.",
+    "maxLengthBelowMin": "Phải từ {min} trở lên để khớp với độ dài tối thiểu.",
     "confirmTitle": "Lưu chính sách mật khẩu?",
     "confirmMessage": "Việc lưu có thể buộc mọi người dùng nội bộ đặt mật khẩu mới trước khi có thể tiếp tục. Tài khoản root, người dùng bên ngoài và tài khoản dịch vụ được miễn trừ — bao gồm cả bạn, trừ khi bạn là tài khoản root. Thao tác này không thể hoàn tác.",
     "saved": "Đã lưu chính sách mật khẩu. | Đã lưu chính sách mật khẩu. {count} người dùng phải đặt lại mật khẩu. | Đã lưu chính sách mật khẩu. {count} người dùng phải đặt lại mật khẩu.",
@@ -24377,14 +24597,17 @@
     "loadFailed": "Đã xảy ra lỗi khi đọc chính sách hiện tại.",
     "rotation": "Luân chuyển",
     "rotationDays": "Chu kỳ luân chuyển",
+    "rotationDesc": "Khi nào mật khẩu hết hạn và người dùng được báo trước bao lâu.",
     "rotationDaysDesc": "Số ngày trước khi mật khẩu hết hạn. 0 = không bao giờ hết hạn",
     "rotationWarningDays": "Cảnh báo trước khi hết hạn",
     "rotationWarningDaysDesc": "Số ngày cảnh báo khi đăng nhập. 0 = không cảnh báo",
+    "rotationWarningDaysOffDesc": "Số ngày báo trước khi đăng nhập. Được dùng khi mật khẩu hết hạn.",
     "warningDaysTooLong": "Khoảng thời gian cảnh báo không thể dài hơn chu kỳ luân chuyển.",
     "rotationPreview": "Mật khẩu đặt hôm nay sẽ hết hạn vào {expires}. Cảnh báo đăng nhập bắt đầu từ {warns}.",
     "rotationPreviewNoWarning": "Mật khẩu đặt hôm nay sẽ hết hạn vào {expires}. Không có cảnh báo nào trước thời điểm đó.",
     "reuse": "Ngăn chặn tái sử dụng",
     "historyCount": "Số mật khẩu ghi nhớ",
+    "reuseDesc": "Ngăn người dùng quay lại mật khẩu cũ.",
     "historyCountDesc": "Mật khẩu mới không được trùng với số mật khẩu trước đó này. 0 = không kiểm tra",
     "historyMaxRetained": "Số mật khẩu lưu giữ",
     "historyMaxRetainedDesc": "Số mật khẩu cũ được lưu cho mỗi người dùng",
@@ -24392,6 +24615,7 @@
     "reuseExplainer": "Mật khẩu hiện tại được tính là một trong tập mật khẩu ghi nhớ — việc tái sử dụng nó bị từ chối bởi quy tắc này, chứ không phải bởi một kiểm tra riêng.",
     "lockout": "Khóa tài khoản",
     "lockoutThreshold": "Số lần thử thất bại trước khi khóa",
+    "lockoutDesc": "Điều xảy ra sau nhiều lần đăng nhập thất bại.",
     "lockoutThresholdDesc": "0 = tắt khóa tài khoản",
     "lockoutBucketSize": "Số lần thử trước mỗi lần khóa tiếp theo",
     "lockoutBucketSizeDesc": "0 = dùng lại giá trị ở trên",
@@ -24406,6 +24630,7 @@
     "backoffLinear": "Tuyến tính",
     "lockoutPreview": "{threshold} lần thất bại → {first} · cứ thêm {bucket} lần → {rest} · tối đa {max}. Đăng nhập thành công sẽ đặt lại mọi thứ.",
     "sessionEnforcement": "Phiên làm việc & thực thi",
+    "sessionEnforcementDesc": "Một phiên đăng nhập kéo dài bao lâu và root có tuân theo các quy tắc này không.",
     "cookieMaxAge": "Thời hạn phiên",
     "cookieMaxAgeDesc": "Số giây một phiên đăng nhập còn hiệu lực. 0 = dùng giá trị mặc định của instance từ {envVar}",
     "applyToRoot": "Áp dụng cho tài khoản root",
@@ -24782,6 +25007,7 @@
       "packUnavailableHint": "Nội dung được tuyển chọn cho workload này chưa được phát hành. Hãy tạo một bảng điều khiển để trực quan hóa nó trong lúc chờ.",
       "partialTelemetryKubernetes": "Chúng tôi tìm thấy các stream Kubernetes, nhưng không thấy các chỉ số mà trang này cần (kubeletstats hoặc cluster receiver). Hãy kiểm tra các receiver của collector.",
       "partialTelemetryHosts": "Chúng tôi tìm thấy các stream host, nhưng không thấy các chỉ số mà trang này cần. Hãy kiểm tra hostmetrics receiver của collector.",
+      "hostMetricsMissingTitle": "Không tìm thấy metric của máy chủ",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}, và {count} mục khác",
       "hiddenFootnote": "Các nguồn dữ liệu bạn không có quyền truy cập cũng xuất hiện ở đây.",
@@ -27232,6 +27458,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Chặn thông báo trực",
     "savePolicyFailed": "Không thể lưu chính sách",
+    "savePolicyFailedReason": "Chưa lưu chính sách. {reason}",
     "state_triggered": "Đã kích hoạt",
     "state_triaged": "Đã phân loại",
     "state_acknowledged": "Đã xác nhận",
@@ -28849,6 +29076,11 @@
       "otherOrgs": "Không có tổ chức khác | {count} tổ chức khác | {count} tổ chức khác",
       "connectedOn": "{date} bởi {user}",
       "helpContact": "Liên hệ trợ giúp",
+      "helpContactHelp": "Những người không thể liên kết tài khoản sẽ được yêu cầu liên hệ người này.",
+      "eventsLabel": "Sự kiện Slack",
+      "connectionLabel": "Kết nối",
+      "outboundLabel": "Hàng đợi gửi đi",
+      "collaboratorsLabel": "Cộng tác viên ứng dụng",
       "helpContactPlaceholder": "#o2-help, hoặc một người để hỏi",
       "helpContactSaved": "Đã lưu liên hệ trợ giúp",
       "disconnectSection": "Ngắt kết nối",
@@ -30502,9 +30734,9 @@
     },
     "queryTooltip": "Sửa bộ lọc dạng văn bản",
     "builderTooltip": "Sửa bộ lọc bằng trình dựng",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
+    "editorModeLabel": "Trình chỉnh sửa bộ lọc",
+    "modeBuilder": "Trình tạo",
+    "modeText": "Văn bản"
   },
   "autoobserveLive": {
     "paging": {
@@ -30597,5 +30829,23 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "pageHeader": {
+    "about": "Giới thiệu trang này"
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· trong {percent}% số trace, 24 giờ qua",
+    "fallbacksNote": "Nhập các trường dự phòng cách nhau bằng dấu phẩy, theo thứ tự cần kiểm tra.",
+    "fallbackInvalid": "Dùng tên trường cách nhau bằng dấu phẩy. Chỉ gồm chữ cái, chữ số và . _ - : / {'@'}",
+    "sessions": {
+      "title": "Hiển thị phiên",
+      "help": "Cách đặt tiêu đề phiên và văn bản bao bọc nào bị ẩn khỏi phiên.",
+      "noAgents": "Chưa có agent nào. Thêm agent để ẩn văn bản bao bọc của nó."
+    }
+  },
+  "copyButton": {
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "failed": "Sao chép bị chặn · nhấn Ctrl C"
   }
 }

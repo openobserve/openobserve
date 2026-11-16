@@ -169,7 +169,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="gapRows.length > 1"
               variant="ghost"
-              icon="add"
               class="mt-2 shrink-0"
               :disabled="saving"
               data-test="edit-role-companions-add-all"
@@ -222,7 +221,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="gap.keys.length"
                 variant="secondary"
-                icon="add"
                 :aria-label="t('iam.editRole.companionAddItem', { item: gap.label })"
                 :disabled="saving"
                 :data-test="`edit-role-companion-add-${gap.module}`"

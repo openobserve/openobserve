@@ -56,6 +56,7 @@
         "ariaLabel": "데이터를 기다리는 중"
       }
     },
+    "requestId": "요청 {id}",
     "createFirstItem": "첫 번째 항목을 만드세요",
     "newBrowserCheck": "새 브라우저 검사",
     "allCaughtUp": "모두 확인했습니다",
@@ -451,7 +452,9 @@
       "description": "현재 필터 또는 검색과 일치하는 {noun} 이 (가) 없습니다.조정하거나 지워 보세요.",
       "action": "필터 지우기",
       "actionDesc": "모든 필터 재설정 및 검색",
-      "fallbackNoun": "결과"
+      "fallbackNoun": "결과",
+      "noMatches": "일치하는 항목 없음",
+      "noMatchesText": "현재 검색어나 필터와 일치하는 항목이 없습니다."
     },
     "nouns": {
       "logs": "로그",
@@ -490,6 +493,7 @@
       "evalTemplates": "평가 템플릿",
       "enrichmentTables": "보강 테이블",
       "cipherKeys": "암호 키",
+      "announcementBanners": "공지 배너",
       "aiToolsets": "AI 도구 모음",
       "llmProviders": "LLM 공급자",
       "sourceMaps": "소스 맵",
@@ -633,6 +637,26 @@
     "noOncallUnrouted": {
       "title": "담당자가 필요하지 않습니다",
       "description": "발생한 모든 알림이 팀에 전달되었습니다."
+    },
+    "noSlackChannelDefaults": {
+      "title": "기본 조직이 설정된 채널이 아직 없습니다",
+      "description": "기본값이 없는 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다(/o2 org로 변경할 수 있습니다)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "이 조직에서 Slack을 연결한 사용자가 아직 없습니다"
+    },
+    "slackNotConnected": {
+      "title": "Slack 워크스페이스 연결"
+    },
+    "noAnnouncementBanners": {
+      "title": "아직 배너가 없습니다",
+      "description": "배너는 선택한 조직의 앱 상단에 공지를 표시합니다.",
+      "action": "배너 추가",
+      "actionDesc": "공지를 작성하고 예약합니다"
+    },
+    "pageError": {
+      "title": "이 페이지를 불러올 수 없습니다",
+      "description": "이 페이지의 데이터를 불러오지 못했습니다. 지금 다시 시도하거나 잠시 후 다시 시도하세요."
     }
   },
   "accessBoundary": {
@@ -660,6 +684,7 @@
       "groups": "그룹",
       "serviceAccounts": "서비스 계정",
       "cipherKeys": "암호 키",
+      "announcementBanners": "공지 배너",
       "regexPatterns": "정규식 패턴",
       "evalJobs": "온라인 평가 작업",
       "billingGroup": "결제 그룹",
@@ -716,6 +741,7 @@
       "groups": "그룹",
       "serviceAccounts": "서비스 계정",
       "cipherKeys": "암호 키",
+      "announcementBanners": "공지 배너",
       "regexPatterns": "정규식 패턴",
       "unnamed": "이 리소스",
       "onCall": "온콜",
@@ -773,9 +799,14 @@
   },
   "common": {
     "saveBar": {
-      "noChanges": "저장할 변경 사항 없음"
+      "noChanges": "저장할 변경 사항 없음",
+      "unsavedChanges": "저장되지 않은 변경 {n}개 | 저장되지 않은 변경 {n}개",
+      "changesShort": "변경 {n}개 | 변경 {n}개",
+      "fixFields": "필드 {n}개 수정 | 필드 {n}개 수정",
+      "discard": "취소"
     },
     "dismiss": "닫기",
+    "undo": "실행 취소",
     "exitFullscreen": "전체 화면 종료",
     "moreActions": "작업 더 보기",
     "moreOptions": "옵션 더 보기",
@@ -1014,6 +1045,8 @@
     "back": "뒤로",
     "save": "저장",
     "discardChanges": "변경 내용 취소",
+    "switchOn": "켜짐",
+    "switchOff": "꺼짐",
     "unsavedChanges": "저장되지 않은 변경 사항",
     "update": "업데이트",
     "favourite": "즐겨찾기",
@@ -1128,6 +1161,8 @@
     "field": "필드",
     "enterValueOrVariable": "값 또는 $variable 입력",
     "all": "전체",
+    "allStates": "모든 상태",
+    "allStatuses": "모든 상태",
     "jsonFilesOnlyHint": ".json 파일만",
     "fileUploadJsonTab": "파일 업로드 / JSON",
     "urlImportTab": "URL 가져오기",
@@ -1234,7 +1269,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "수집기 구성"
+        "fleet_config": "수집기 구성",
+        "workflow": "워크플로"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1244,6 +1280,11 @@
       "leaveMessageInBrowser": "{entity}을(를) 저장하거나, 변경 사항을 이 브라우저에 보관하거나, 삭제하세요.",
       "retentionInBrowser": "변경 사항은 이 브라우저에 {days}일 동안 또는 로그아웃할 때까지 보관됩니다. 각 종류별로 최신 {max}개만 보관됩니다.",
       "dotUndated": "Unsaved draft"
+    },
+    "leaveGuard": {
+      "title": "저장하지 않은 변경 사항이 있습니다. 나가시겠습니까?",
+      "message": "이 페이지에 저장되지 않은 변경 {n}개가 있습니다. 나가면 사라집니다. | 이 페이지에 저장되지 않은 변경 {n}개가 있습니다. 나가면 사라집니다.",
+      "keepEditing": "계속 편집"
     }
   },
   "flow": {
@@ -1942,8 +1983,8 @@
     "histogramTitleRows": "{took}ms 동안 {total}개 행 표시. | {took}ms 동안 {total}개 행 표시.",
     "histogramTitleRowsWithScan": "{took}ms 동안 {total}개 행 표시. ({scanLabel}: {scanSize}) | {took}ms 동안 {total}개 행 표시. ({scanLabel}: {scanSize})",
     "pickStreamFirst": "먼저 스트림을 선택하세요",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "자동 새로 고침은 검색 결과를 업데이트합니다. 시각화하는 동안에는 일시 중지됩니다.",
+    "histogramNoTimeAxis": "그룹화된 결과에는 시간 축이 없습니다"
   },
   "menu": {
     "alertCalibration": "알림 캘리브레이션",
@@ -3858,6 +3899,8 @@
     "your_complete_license_key": "전체 라이선스 키:",
     "copy_key": "키 복사",
     "usage_information": "사용 정보",
+    "usage_chart_title": "이번 달 일별 수집량",
+    "no_license_ingestion_limit": "라이선스가 없으면 수집량이 하루 <strong>{limit} GB</strong>로 제한됩니다.",
     "license_allows_ingestion": "현재 라이선스는 하루에 <strong>{limit} GB</strong>의 데이터 수집을 허용합니다.",
     "license_allows_unlimited_ingestion": "현재 라이선스는 무제한 데이터 수집을 허용합니다.",
     "limit_exceeded_days": "이번 달 <strong class=\"{colorClass}\">{days}일</strong>에 한도가 초과되었습니다 | 이번 달 <strong class=\"{colorClass}\">{days}일</strong>에 한도가 초과되었습니다",
@@ -4714,6 +4757,8 @@
     },
     "listOrganizations": {
       "subtitle": "액세스 가능한 조직",
+      "switch": "이 조직으로 전환",
+      "current": "현재",
       "cannotEditWhileDeleting": "삭제 진행 중에는 편집할 수 없습니다",
       "edit": "편집",
       "deleteOrganization": "조직 삭제",
@@ -10169,6 +10214,12 @@
       "noPanels": "패널 없음",
       "panelsDeletedHint": "해당 패널이 삭제되어 현재 어떤 패널에도 표시되지 않습니다. 패널을 선택하거나 모두 선택을 선택하여 이 문제를 해결하세요.",
       "blankFiltersHint": "값이 없는 조건은 무시됩니다."
+    },
+    "inlineCreate": {
+      "folderName": "새 폴더 이름",
+      "createFolder": "폴더 만들기",
+      "tabName": "새 탭 이름",
+      "createTab": "탭 만들기"
     }
   },
   "panel": {
@@ -14256,7 +14307,8 @@
         "mute": "이 항목을 음소거할 수 없습니다.",
         "onCall": "온콜: {people}",
         "canAct": "함께 조치 가능: {people}",
-        "people": "온콜: {onCall}. 함께 조치 가능: {canAct}"
+        "people": "온콜: {onCall}. 함께 조치 가능: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "이 알림은 발생 상태가 아니므로 확인할 항목이 없습니다.",
@@ -14315,7 +14367,11 @@
       "open": "보안에서 편집"
     },
     "newAlertTitle": "새 알림",
-    "newAnomalyTitle": "새 이상 탐지"
+    "newAnomalyTitle": "새 이상 탐지",
+    "rowAction": {
+      "paused": "{name} 일시 중지됨 | 알림 {count}개 일시 중지됨",
+      "resumed": "{name} 재개됨 | 알림 {count}개 재개됨"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "열기",
@@ -14774,6 +14830,7 @@
     "destination_type": "대상 유형",
     "template": "템플릿",
     "actions": "액션",
+    "addHeader": "헤더 추가",
     "addTitle": "새 대상",
     "updateTitle": "대상 업데이트",
     "delete": "삭제",
@@ -14919,7 +14976,9 @@
   },
   "pipeline_destinations": {
     "header": "파이프라인 대상",
-    "search": "대상 검색"
+    "search": "대상 검색",
+    "destinationType": "대상 유형",
+    "outputFormat": "출력 형식"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15430,8 +15489,12 @@
     "groupIntegrations": "연동",
     "groupAccount": "계정",
     "slackApp": "Slack",
+    "slackAppDesc": "Slack 앱의 워크스페이스, 채널 기본값, 계정 연결",
     "generalDesc": "테마, 쿼리 기본값 및 핵심 환경설정",
     "orgDesc": "조직 매개변수 및 식별자",
+    "generalSubtitle": "{org}의 모양과 쿼리 기본값입니다.",
+    "orgSubtitle": "{org}의 필드 이름, 데이터 보존, 자동 기능입니다.",
+    "passwordPolicySubtitle": "기본 이메일 및 비밀번호 계정에 대한 규칙입니다.",
     "cipherKeysDesc": "민감한 필드를 위한 암호화 키",
     "regexPatternsDesc": "수정에 재사용 가능한 regex 패턴",
     "domainManagementDesc": "허용된 SSO 도메인으로 로그인 제한",
@@ -15718,10 +15781,59 @@
       "failedToLoadServices": "서비스 로드에 실패했습니다."
     },
     "domainManagement": {
-      "unknownTime": "알 수 없는 시간"
+      "unknownTime": "알 수 없는 시간",
+      "claimParserTitle": "클레임 파서",
+      "claimParserSectionDesc": "SSO 및 LDAP 클레임을 조직 및 역할 할당으로 변환합니다.",
+      "claimParserLabel": "클레임 파서 함수",
+      "claimParserHelp": "매핑된 클레임을 받아 할당할 조직과 역할 또는 거부를 반환하는 {product1} 또는 {product2} 함수입니다.",
+      "claimParserFormatLink": "입력 및 출력 형식",
+      "claimParserPlaceholder": "함수 없음",
+      "noFunctions": "아직 함수가 없습니다",
+      "restrictionsTitle": "도메인 제한",
+      "restrictionsDesc": "SSO로 로그인할 수 있는 이메일 도메인과 사용자입니다.",
+      "domainLabel": "도메인",
+      "addDomain": "도메인 추가",
+      "noDomains": "아직 도메인이 없습니다. 도메인을 추가해 로그인할 수 있는 사용자를 제한하세요.",
+      "accessFor": "{domain} 액세스",
+      "policyAllowAll": "모든 사용자 허용",
+      "policyAllowSpecific": "나열된 사용자만 허용",
+      "policyBlockSpecific": "나열된 사용자 차단",
+      "policyBlockAll": "모든 사용자 차단",
+      "effectAllowSpecific": "이메일 주소가 {domain}으로 끝나는 나열된 사용자만 로그인할 수 있습니다.",
+      "effectBlockSpecific": "이메일 주소가 {domain}으로 끝나는 나열된 외부 SSO 사용자는 시스템(UI, API, 수집)에서 차단됩니다.",
+      "emailLabel": "이메일 주소",
+      "noEmails": "아직 나열된 이메일 주소가 없습니다.",
+      "removeDomain": "{domain} 제거",
+      "removeEmail": "{email} 제거",
+      "saved": "SSO 설정이 저장되었습니다"
     },
     "general": {
       "close": "닫기",
+      "themeTitle": "테마",
+      "themeDescription": "라이트 및 다크 모드에서 {org}의 강조 색상입니다.",
+      "accentColorLabel": "강조 색상",
+      "lightColorLabel": "라이트 모드 색상 변경, 현재 {color}",
+      "darkColorLabel": "다크 모드 색상 변경, 현재 {color}",
+      "queryDefaultsTitle": "쿼리 기본값",
+      "queryDefaultsDescription": "메트릭 수집 및 PromQL 쿼리의 기본값입니다.",
+      "scrapeIntervalLabel": "스크레이프 간격",
+      "scrapeIntervalHelp": "메트릭을 수집하는 빈도입니다.",
+      "unitSeconds": "초",
+      "maxSeriesLabel": "쿼리당 최대 시리즈",
+      "maxSeriesHelp": "하나의 PromQL 쿼리가 반환할 수 있는 최대 시리즈 수입니다. 비워 두면 기본값 {n}을 사용합니다.",
+      "unitSeries": "시리즈",
+      "maxSeriesError": "1,000에서 1,000,000 사이의 값을 입력하거나 비워 두어 기본값을 사용하세요.",
+      "brandingTitle": "브랜딩",
+      "brandingDescription": "이 인스턴스의 모든 조직에 표시되는 이름과 로고입니다.",
+      "logoTextHelp": "앱에 표시되는 기본 이름을 대체합니다. 최대 100자.",
+      "logoTextTooLong": "100자 이하로 입력하세요.",
+      "logoTextSaveFailed": "사용자 지정 로고 텍스트가 저장되지 않았습니다. {reason}",
+      "logoSaveFailed": "{mode} 로고가 업로드되지 않았습니다. {reason}",
+      "brandingUpdated": "브랜딩이 업데이트되었습니다",
+      "logoLightLabel": "사용자 지정 로고(라이트 모드)",
+      "logoLightHelp": "라이트 모드에서 표시됩니다. PNG, JPG, GIF 또는 BMP, 최대 150 × 30 px.",
+      "logoDarkLabel": "사용자 지정 로고(다크 모드)",
+      "logoDarkHelp": "다크 모드에서 표시됩니다. PNG, JPG, GIF 또는 BMP, 최대 150 × 30 px.",
       "fileCounterLabel": "{constraint} {filesNumber}개 파일 {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
@@ -15743,18 +15855,30 @@
       "title": "데이터 보존 기본값",
       "about": "자체 보존 기간이 없는 스트림의 경우. 비어 있거나 0이면 전역 값을 사용하며, 그렇지 않으면 최소 3일입니다.",
       "defaultDays": "기본값(일)",
+      "defaultLabel": "기본값",
+      "unitDays": "일",
+      "daysFor": "{type} 보존 기간(일)",
       "streamType": "스트림 유형",
       "days": "일",
       "addType": "스트림 유형 추가",
+      "allTypesAdded": "모든 스트림 유형에 이미 행이 있습니다.",
+      "removeTypeNamed": "{type} 기본값 제거",
       "removeType": "이 스트림 유형 제거",
       "globalDefault": "전역: {value}",
       "globalType": "전역 {type}: {value}",
       "daysValue": "{days}일",
       "forever": "영구 보존",
-      "invalid": "0 또는 최소 3일을 사용하세요"
+      "invalid": "0 또는 최소 3일을 사용하세요",
+      "invalidType": "3일 이상으로 설정하거나 이 유형을 제거하세요"
     },
     "organizationSettings": {
       "fieldNameHelp": "영숫자 및 '+=,.{'@'}-_' 문자만 사용하고 공백은 사용하지 마세요.",
+      "sectionTitle": "데이터 처리",
+      "sectionDescription": "로그가 트레이스에 연결되는 방식과 켜져 있는 자동 기능입니다.",
+      "traceIdHelp": "로그 줄을 트레이스에 연결하는 로그 필드입니다. 문자, 숫자와 + = , . {'@'} - _ 만 사용할 수 있습니다.",
+      "spanIdHelp": "로그 줄을 스팬에 연결하는 로그 필드입니다. 위와 같은 문자를 사용할 수 있습니다.",
+      "ingestionLogsHelp": "수집에 실패한 레코드의 로그를 유지합니다.",
+      "usageStreamHelp": "{org}의 사용량을 쿼리할 수 있는 별도의 스트림에 기록합니다.",
       "settingsUpdated": "조직 설정이 성공적으로 업데이트되었습니다.",
       "settingsSaveError": "조직 설정 저장 중 오류가 발생했습니다."
     },
@@ -16409,6 +16533,7 @@
     "queryRange": "쿼리 범위",
     "userSummary": "사용자 요약",
     "allQueries": "모든 쿼리",
+    "allFields": "모든 필드",
     "queryType": "쿼리 유형",
     "numOfQueries": "쿼리 개수",
     "totalDuration": "토탈 이그제큐티브기간",
@@ -17145,12 +17270,12 @@
       "truncated": "이 트레이스의 첫 번째 스팬을 시작 시간 순으로 표시합니다. 이후 스팬은 아직 로드되지 않았습니다. | 이 트레이스의 처음 {count}개 스팬을 시작 시간 순으로 표시합니다. 이후 스팬은 아직 로드되지 않았습니다.",
       "loadMore": "다음 스팬 로드 | 다음 {size}개 스팬 로드",
       "loadMoreFailed": "이 트레이스의 스팬을 더 로드할 수 없습니다",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "{from}에서 {to} 사이에 이 ID의 트레이스가 없습니다",
+      "notFoundText": "트레이스 {traceId}는 이 범위의 {stream} 스트림에 스팬이 없습니다. 더 오래되었거나 최신이거나, 다른 스트림에 있거나, 수집되지 않았을 수 있습니다.",
+      "searchWiderRange": "더 넓은 범위 검색",
+      "searchSpansInRange": "이 범위에서 스팬 검색",
+      "loadFailedTitle": "이 트레이스를 불러올 수 없습니다",
+      "loadFailedText": "트레이스 {traceId}를 읽을 수 없습니다. 잠시 후 다시 시도하세요."
     },
     "traceTree": {
       "clickToExpand": "클릭하여 펼치기",
@@ -17345,6 +17470,8 @@
     "type": "타입",
     "step1WithType": "키 저장소 세부 정보 (유형: {type})",
     "step2": "암호화 메커니즘",
+    "sectionKey": "키",
+    "sectionSetup": "키 저장소 및 암호화",
     "secret": "시크릿",
     "baseURL": "기본 URL",
     "accessId": "액세스 ID",
@@ -17583,6 +17710,8 @@
     "noTracesDescription": "선택한 시간 범위에서 이 상관관계에 대한 트레이스를 찾을 수 없습니다.",
     "viewInTraces": "트레이스에서 보기",
     "filters": "필터",
+    "fieldGroupsTitle": "필드 그룹",
+    "fieldNamesColumn": "필드 이름",
     "semanticFieldGroupsCaption": "OpenObserve가 스트림 간에 상관관계를 분석할 수 있도록 텔레메트리 필드 이름을 공통 그룹에 매핑하세요.",
     "exportToJson": "JSON으로 내보내기",
     "importFromJson": "JSON에서 가져오기",
@@ -20725,8 +20854,8 @@
       "searchAroundTip": "이 이벤트 바로 전후에 기록된 이벤트를 불러옵니다.",
       "noOfEventsTip": "이 이벤트 주변에서 불러올 이벤트 수입니다.",
       "severityTip": "감지된 로그 수준입니다. 선택하면 감지 방법을 볼 수 있습니다.",
-      "traceId": "Trace ID",
-      "spanId": "Span ID"
+      "traceId": "트레이스 ID",
+      "spanId": "스팬 ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "시각화에 SELECT * 쿼리가 지원되지 않습니다.",
@@ -21011,6 +21140,7 @@
     "showDetail": "세부 정보 보기",
     "hideDetail": "세부 정보 숨기기",
     "runAs": "다른 사용자로 실행",
+    "runSuggestion": "{query} 실행",
     "searchTextFor": "\"{text}\"에 대한 텍스트 검색",
     "searchTextDesc": "전체 입력을 하나의 구문으로 검색",
     "explain": {
@@ -21042,7 +21172,19 @@
     "dataStale": "데이터가 오래됨",
     "lastRefreshed": "마지막 새로 고침: {time}",
     "refresh": "새로고침",
-    "refreshWithAge": "새로고침, 마지막 새로고침 {age}"
+    "refreshWithAge": "새로고침, 마지막 새로고침 {age}",
+    "refreshing": "새로 고치는 중",
+    "failed": "실패",
+    "autoRefresh": "자동 새로 고침",
+    "autoOn": "자동 · {interval}",
+    "every": "{interval}마다",
+    "interval": {
+      "10s": "10초",
+      "30s": "30초",
+      "1m": "1분",
+      "5m": "5분",
+      "15m": "15분"
+    }
   },
   "synthetics": {
     "variables": {
@@ -21900,7 +22042,12 @@
       "noPrivateMatches": "검색 조건과 일치하는 프라이빗 위치가 없습니다",
       "newPrivateLocation": "새 프라이빗 위치",
       "publicSubtitle": "클라우드 리전, 항상 사용 가능",
-      "privateSubtitle": "위치는 에이전트 중 하나 이상이 활성 상태일 때 준비됩니다"
+      "privateSubtitle": "위치는 에이전트 중 하나 이상이 활성 상태일 때 준비됩니다",
+      "emptyState": {
+        "title": "아직 위치가 없습니다",
+        "description": "위치는 합성 모니터가 점검을 실행하는 장소입니다(예: 클라우드 리전).",
+        "actionDesc": "점검을 실행할 위치 추가"
+      }
     },
     "newCheck": {
       "comingSoon": "곧 제공 예정",
@@ -22981,7 +23128,10 @@
       "tokenLinkTooltip": "코드 조각에서 사용할 수집 토큰 선택",
       "copiedWithToken": "조직 토큰 {name}(으)로 복사됨",
       "tokenIncludedHint": "복사 내용에는 조직의 수집 토큰이 포함되며, 이 토큰은 여기에서 숨김 상태로 유지됩니다.",
-      "maskedSelectionWarning": "숨겨진 토큰이 점으로 복사되었습니다. 복사를 사용하거나 먼저 표시하세요."
+      "maskedSelectionWarning": "숨겨진 토큰이 점으로 복사되었습니다. 복사를 사용하거나 먼저 표시하세요.",
+      "wrapLines": "줄 바꿈",
+      "showAll": "{count}줄 모두 표시 | {count}줄 모두 표시",
+      "showLess": "간략히 보기"
     },
     "spinner": {
       "loading": "로딩 중"
@@ -23026,7 +23176,10 @@
       "moreInfo": "자세한 정보"
     },
     "dialog": {
-      "closeDialog": "대화 상자 닫기"
+      "closeDialog": "대화 상자 닫기",
+      "discardChanges": "변경 사항을 취소하시겠습니까?",
+      "keepEditing": "계속 편집",
+      "discard": "취소"
     },
     "drawer": {
       "closeDrawer": "드로어 닫기"
@@ -23049,6 +23202,32 @@
       "clear": "지우기"
     },
     "file": {
+      "removeNamed": "{name} 제거",
+      "sourceLabel": "가져올 위치",
+      "sourceFile": "파일",
+      "sourceUrl": "URL",
+      "sourcePaste": "붙여넣기",
+      "dropPrompt": "여기에 파일을 놓거나 {choose}",
+      "dropPromptMultiple": "여기에 파일을 놓거나 {choose}",
+      "chooseAFile": "파일을 선택하세요",
+      "chooseFiles": "파일을 선택하세요",
+      "chooseFileButton": "파일 선택",
+      "chooseFilesButton": "파일 선택",
+      "noFileChosen": "선택된 파일 없음",
+      "dropToUpload": "놓아서 업로드",
+      "upToSize": "최대 {size}",
+      "upToSizeEach": "각각 최대 {size}",
+      "oneFile": "파일 1개",
+      "upToFiles": "최대 {count}개 파일",
+      "typeRejected": "{allowed} 파일만 허용됩니다",
+      "sizeRejected": "{size}이(가) {max} 제한을 초과합니다",
+      "countRejected": "한 번에 {count}개 파일만 가능 | 한 번에 {count}개 파일만 가능",
+      "uploadFailed": "업로드 실패",
+      "uploaded": "업로드됨",
+      "urlPlaceholder": "파일 URL",
+      "urlHelp": "가져올 때 한 번만 불러옵니다.",
+      "textPlaceholder": "여기에 내용을 붙여넣으세요",
+      "invalidJson": "올바르지 않은 JSON: {detail}",
       "removeFile": "파일 삭제",
       "clearAll": "모두 지우기"
     },
@@ -23063,7 +23242,14 @@
     "pagination": {
       "pagination": "페이지네이션",
       "previousPage": "이전 페이지",
-      "nextPage": "다음 페이지"
+      "nextPage": "다음 페이지",
+      "onFirstPage": "이미 첫 페이지입니다",
+      "onLastPage": "이미 마지막 페이지입니다",
+      "range": "{total}개 중 {from}–{to}",
+      "rangeOfMany": "많은 항목 중 {from}–{to}",
+      "pageOf": "{page} / {pages} 페이지",
+      "perPage": "페이지당 {size}개",
+      "pageSize": "페이지당 행 수"
     },
     "select": {
       "more": "더보기",
@@ -23073,6 +23259,10 @@
       "noOptionsFound": "옵션을 찾을 수 없음",
       "multiSelect": "다중 선택",
       "singleSelect": "단일 선택",
+      "any": "모두",
+      "noMatches": "\"{term}\"과(와) 일치하는 항목 없음",
+      "clearSearch": "검색 지우기",
+      "addOption": "\"{value}\" 추가",
       "moreInfoAbout": "{field}에 대한 자세한 정보",
       "moreInfo": "자세한 정보"
     },
@@ -23114,7 +23304,10 @@
       "removeColumnAria": "열 제거",
       "formatColumnAria": "열 서식",
       "selectedOfTotal": "{total}개 중 {selected}개 선택됨",
-      "selectedCount": "{selected}개 선택됨"
+      "selectedCount": "{selected}개 선택됨",
+      "clearSelection": "지우기",
+      "rowActions": "행 작업",
+      "moreRowActions": "작업 더 보기"
     },
     "predefinedThemes": {
       "title": "테마",
@@ -23482,6 +23675,26 @@
         "past": "지난 사용일",
         "ended": "종료됨"
       }
+    },
+    "jsonViewer": {
+      "include": "이 값으로 필터",
+      "exclude": "이 값 제외",
+      "copyValue": "값 복사",
+      "fieldCount": "필드 {count}개 | 필드 {count}개",
+      "itemCount": "항목 {count}개 | 항목 {count}개"
+    },
+    "tabs": {
+      "more": "더 보기",
+      "unsaved": "저장되지 않은 변경 사항",
+      "locked": "잠김"
+    },
+    "statStrip": {
+      "filters": "필터",
+      "showOnly": "{label}만 표시",
+      "alsoShow": "{label}도 표시",
+      "stopShowing": "{label} 표시 중지",
+      "scrollBack": "이전 필터 표시",
+      "scrollForward": "더 많은 필터 표시"
     }
   },
   "functions": {
@@ -24352,6 +24565,12 @@
   },
   "passwordPolicy": {
     "complexity": "복잡도",
+    "complexityDesc": "모든 새 비밀번호에 포함되어야 하는 항목입니다.",
+    "unitCharacters": "자",
+    "unitDays": "일",
+    "unitPasswords": "비밀번호",
+    "unitAttempts": "회",
+    "unitSeconds": "초",
     "minLength": "최소 길이",
     "minLengthDesc": "허용되는 가장 짧은 비밀번호",
     "maxLength": "최대 길이",
@@ -24367,6 +24586,7 @@
     "specialCharSet": "허용되는 특수 문자",
     "specialCharSetDesc": "비워 두면 영숫자가 아닌 모든 문자를 허용합니다",
     "maxLengthTooSmall": "최대 길이는 최소 길이 이상 128 이하여야 합니다.",
+    "maxLengthBelowMin": "최소 길이에 맞게 {min} 이상이어야 합니다.",
     "confirmTitle": "비밀번호 정책을 저장하시겠습니까?",
     "confirmMessage": "저장하면 모든 네이티브 사용자가 계속하려면 새 비밀번호를 설정해야 할 수 있습니다. Root, 외부 사용자 및 서비스 계정은 예외입니다. 여기에는 root 계정이 아닌 한 본인도 포함됩니다. 이 작업은 되돌릴 수 없습니다.",
     "saved": "비밀번호 정책이 저장되었습니다. | 비밀번호 정책이 저장되었습니다. {count}명의 사용자가 비밀번호를 재설정해야 합니다. | 비밀번호 정책이 저장되었습니다. {count}명의 사용자가 비밀번호를 재설정해야 합니다.",
@@ -24377,14 +24597,17 @@
     "loadFailed": "현재 정책을 읽는 중 문제가 발생했습니다.",
     "rotation": "교체",
     "rotationDays": "교체 주기",
+    "rotationDesc": "비밀번호가 만료되는 시점과 사전 알림 기간입니다.",
     "rotationDaysDesc": "비밀번호가 만료되기까지의 일수입니다. 0 = 만료되지 않음",
     "rotationWarningDays": "만료 전 경고",
     "rotationWarningDaysDesc": "로그인 시 사전 알림 일수입니다. 0 = 경고 없음",
+    "rotationWarningDaysOffDesc": "로그인 시 알림 일수입니다. 비밀번호가 만료되면 사용됩니다.",
     "warningDaysTooLong": "경고 기간은 교체 주기보다 길 수 없습니다.",
     "rotationPreview": "오늘 설정한 비밀번호는 {expires}에 만료됩니다. 로그인 경고는 {warns}부터 시작됩니다.",
     "rotationPreviewNoWarning": "오늘 설정한 비밀번호는 {expires}에 만료됩니다. 그 전까지는 경고가 표시되지 않습니다.",
     "reuse": "재사용 방지",
     "historyCount": "기억되는 비밀번호 수",
+    "reuseDesc": "이전 비밀번호로 되돌아가는 것을 방지합니다.",
     "historyCountDesc": "새 비밀번호는 이 개수만큼의 이전 비밀번호와 일치할 수 없습니다. 0 = 검사 안 함",
     "historyMaxRetained": "보관되는 이력",
     "historyMaxRetainedDesc": "사용자당 보관되는 이전 비밀번호 수",
@@ -24392,6 +24615,7 @@
     "reuseExplainer": "현재 비밀번호는 기억되는 집합 중 하나로 간주됩니다. 이를 재사용하는 것은 별도의 검사가 아니라 이 규칙에 의해 거부됩니다.",
     "lockout": "계정 잠금",
     "lockoutThreshold": "잠금 전 실패 시도 횟수",
+    "lockoutDesc": "로그인 실패가 반복된 후의 동작입니다.",
     "lockoutThresholdDesc": "0 = 잠금 비활성화",
     "lockoutBucketSize": "추가 잠금마다 필요한 시도 횟수",
     "lockoutBucketSizeDesc": "0 = 위 값 재사용",
@@ -24406,6 +24630,7 @@
     "backoffLinear": "선형",
     "lockoutPreview": "{threshold}회 실패 → {first} · {bucket}회 추가마다 → {rest} · 최대 {max}. 로그인에 성공하면 모두 초기화됩니다.",
     "sessionEnforcement": "세션 및 적용",
+    "sessionEnforcementDesc": "로그인이 유지되는 시간과 root가 이 규칙을 따르는지 여부입니다.",
     "cookieMaxAge": "세션 수명",
     "cookieMaxAgeDesc": "로그인된 세션이 유효하게 유지되는 시간(초). 0 = {envVar}의 인스턴스 기본값 사용",
     "applyToRoot": "루트 계정에 적용",
@@ -24782,6 +25007,7 @@
       "packUnavailableHint": "이 워크로드에 대한 큐레이션된 콘텐츠가 아직 제공되지 않았습니다. 그동안 대시보드를 만들어 차트로 표시하세요.",
       "partialTelemetryKubernetes": "Kubernetes 스트림은 찾았지만 이 페이지에 필요한 메트릭(kubeletstats 또는 클러스터 수신기)은 없습니다. 수집기의 수신기를 확인하세요.",
       "partialTelemetryHosts": "호스트 스트림은 찾았지만 이 페이지에 필요한 메트릭은 없습니다. 수집기의 hostmetrics 수신기를 확인하세요.",
+      "hostMetricsMissingTitle": "호스트 메트릭을 찾을 수 없습니다",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first} 외 {count}개",
       "hiddenFootnote": "접근 권한이 없는 데이터 소스도 여기에 표시됩니다.",
@@ -27232,6 +27458,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "호출 억제",
     "savePolicyFailed": "정책을 저장하지 못했습니다",
+    "savePolicyFailedReason": "정책이 저장되지 않았습니다. {reason}",
     "state_triggered": "트리거됨",
     "state_triaged": "분류됨",
     "state_acknowledged": "확인됨",
@@ -28849,6 +29076,11 @@
       "otherOrgs": "다른 조직 없음 | 다른 조직 {count}개 | 다른 조직 {count}개",
       "connectedOn": "{user}님이 {date}에 연결",
       "helpContact": "도움말 담당자",
+      "helpContactHelp": "계정을 연결할 수 없는 사용자에게는 이 담당자에게 문의하라고 안내됩니다.",
+      "eventsLabel": "Slack 이벤트",
+      "connectionLabel": "연결",
+      "outboundLabel": "발신 대기열",
+      "collaboratorsLabel": "앱 공동 작업자",
       "helpContactPlaceholder": "#o2-help 또는 문의할 담당자",
       "helpContactSaved": "도움말 담당자가 저장되었습니다",
       "disconnectSection": "연결 해제",
@@ -30502,9 +30734,9 @@
     },
     "queryTooltip": "필터를 텍스트로 편집",
     "builderTooltip": "빌더로 필터 편집",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
+    "editorModeLabel": "필터 편집기",
+    "modeBuilder": "빌더",
+    "modeText": "텍스트"
   },
   "autoobserveLive": {
     "paging": {
@@ -30597,5 +30829,23 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "pageHeader": {
+    "about": "이 페이지 정보"
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· 최근 24시간 트레이스의 {percent}%",
+    "fallbacksNote": "대체 필드를 확인할 순서대로 쉼표로 구분하여 입력하세요.",
+    "fallbackInvalid": "필드 이름을 쉼표로 구분하여 입력하세요. 문자, 숫자와 . _ - : / {'@'} 만 사용할 수 있습니다.",
+    "sessions": {
+      "title": "세션 표시",
+      "help": "세션 제목을 정하는 방식과 숨길 래퍼 텍스트입니다.",
+      "noAgents": "아직 에이전트가 없습니다. 에이전트를 추가해 래퍼 텍스트를 숨기세요."
+    }
+  },
+  "copyButton": {
+    "copy": "복사",
+    "copied": "복사됨",
+    "failed": "복사가 차단됨 · Ctrl C를 누르세요"
   }
 }

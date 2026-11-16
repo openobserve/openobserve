@@ -166,7 +166,6 @@ const opLabel = (op: string) =>
       <OButton
         v-if="canAuthor && !adding"
         variant="secondary"
-        icon="add"
         data-test="security-detection-exceptions-add"
         @click="startAdding"
         >{{ t("siem.detections.exceptions.add") }}</OButton

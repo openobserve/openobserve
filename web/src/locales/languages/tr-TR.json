@@ -56,6 +56,7 @@
         "ariaLabel": "Veri bekleniyor"
       }
     },
+    "requestId": "İstek {id}",
     "createFirstItem": "İlk öğenizi oluşturun",
     "newBrowserCheck": "Yeni tarayıcı kontrolü",
     "allCaughtUp": "Her şey güncel",
@@ -451,7 +452,9 @@
       "description": "Şu anki filtrelerinizle veya aramanızla eşleşen {noun} yok. Onları ayarlamayı veya temizlemeyi deneyin.",
       "action": "Filtreleri temizle",
       "actionDesc": "Tüm filtreleri sıfırlayın ve arayın",
-      "fallbackNoun": "sonuçlar"
+      "fallbackNoun": "sonuçlar",
+      "noMatches": "Eşleşme yok",
+      "noMatchesText": "Geçerli arama veya filtrelerle eşleşen bir şey yok."
     },
     "nouns": {
       "logs": "günlükler",
@@ -490,6 +493,7 @@
       "evalTemplates": "değerlendirme şablonları",
       "enrichmentTables": "zenginleştirme tabloları",
       "cipherKeys": "şifreleme anahtarları",
+      "announcementBanners": "duyuru afişleri",
       "aiToolsets": "yapay zeka araç setleri",
       "llmProviders": "LLM sağlayıcıları",
       "sourceMaps": "kaynak haritaları",
@@ -633,6 +637,26 @@
     "noOncallUnrouted": {
       "title": "Sahip gerektiren bir şey yok",
       "description": "Tetiklenen her uyarı bir ekibe ulaştı."
+    },
+    "noSlackChannelDefaults": {
+      "title": "Hiçbir kanalın henüz varsayılan kuruluşu yok",
+      "description": "Varsayılanı olmayan bir kanaldaki sorular, her kişinin varsayılan kuruluşuna gider (kişiler bunu /o2 org ile değiştirebilir)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "Bu kuruluştaki hiç kimse henüz Slack'i bağlamadı"
+    },
+    "slackNotConnected": {
+      "title": "Bir Slack çalışma alanı bağlayın"
+    },
+    "noAnnouncementBanners": {
+      "title": "Henüz afiş yok",
+      "description": "Afişler, seçtiğiniz kuruluşlara uygulamanın üstünde bir duyuru gösterir.",
+      "action": "Afiş ekle",
+      "actionDesc": "Bir duyuru yazın ve zamanlayın"
+    },
+    "pageError": {
+      "title": "Bu sayfa yüklenemedi",
+      "description": "Bu sayfanın hiçbir verisi yüklenmedi. Şimdi yeniden deneyin ya da bir dakika sonra tekrar deneyin."
     }
   },
   "accessBoundary": {
@@ -660,6 +684,7 @@
       "groups": "Gruplar",
       "serviceAccounts": "Hizmet hesapları",
       "cipherKeys": "Şifreleme anahtarları",
+      "announcementBanners": "Duyuru afişleri",
       "regexPatterns": "Regex desenleri",
       "evalJobs": "Çevrimiçi değerlendirme işleri",
       "billingGroup": "Faturalandırma grubu",
@@ -716,6 +741,7 @@
       "groups": "gruplar",
       "serviceAccounts": "hizmet hesapları",
       "cipherKeys": "şifreleme anahtarları",
+      "announcementBanners": "duyuru afişleri",
       "regexPatterns": "regex desenleri",
       "unnamed": "bu kaynak",
       "onCall": "nöbet",
@@ -773,9 +799,14 @@
   },
   "common": {
     "saveBar": {
-      "noChanges": "Kaydedilecek değişiklik yok"
+      "noChanges": "Kaydedilecek değişiklik yok",
+      "unsavedChanges": "{n} kaydedilmemiş değişiklik",
+      "changesShort": "{n} değişiklik",
+      "fixFields": "{n} alanı düzeltin",
+      "discard": "Vazgeç"
     },
     "dismiss": "Kapat",
+    "undo": "Geri al",
     "exitFullscreen": "Tam ekrandan çık",
     "moreActions": "Daha fazla işlem",
     "moreOptions": "Daha fazla seçenek",
@@ -1014,6 +1045,8 @@
     "back": "Geri",
     "save": "Kaydet",
     "discardChanges": "Değişiklikleri iptal et",
+    "switchOn": "Açık",
+    "switchOff": "Kapalı",
     "unsavedChanges": "Kaydedilmemiş değişiklikler",
     "update": "Güncelle",
     "favourite": "Favori",
@@ -1128,6 +1161,8 @@
     "field": "Alan",
     "enterValueOrVariable": "Değer veya $variable girin",
     "all": "Tümü",
+    "allStates": "Tüm durumlar",
+    "allStatuses": "Tüm durumlar",
     "jsonFilesOnlyHint": "Yalnızca .json dosyaları",
     "fileUploadJsonTab": "Dosya Yükleme / JSON",
     "urlImportTab": "URL İçe Aktarma",
@@ -1234,7 +1269,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "toplayıcı yapılandırması"
+        "fleet_config": "toplayıcı yapılandırması",
+        "workflow": "iş akışı"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1244,6 +1280,11 @@
       "leaveMessageInBrowser": "{entity} kaydedin, değişikliklerinizi bu tarayıcıda tutun veya atın.",
       "retentionInBrowser": "Değişiklikler bu tarayıcıda {days} gün boyunca veya oturumu kapatana kadar saklanır. Her türden yalnızca en yeni {max} tanesi saklanır.",
       "dotUndated": "Unsaved draft"
+    },
+    "leaveGuard": {
+      "title": "Kaydedilmemiş değişikliklerle ayrılınsın mı?",
+      "message": "Bu sayfada {n} kaydedilmemiş değişiklik var. Ayrılırsanız kaybolur.",
+      "keepEditing": "Düzenlemeye devam et"
     }
   },
   "flow": {
@@ -1942,8 +1983,8 @@
     "histogramTitleRows": "{took} ms içinde {total} satır gösteriliyor. | {took} ms içinde {total} satır gösteriliyor.",
     "histogramTitleRowsWithScan": "{took} ms içinde {total} satır gösteriliyor. ({scanLabel}: {scanSize}) | {took} ms içinde {total} satır gösteriliyor. ({scanLabel}: {scanSize})",
     "pickStreamFirst": "Önce bir akış seçin",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "Otomatik yenileme arama sonuçlarını günceller. Görselleştirirken duraklar.",
+    "histogramNoTimeAxis": "Gruplanmış sonuçların zaman ekseni yoktur"
   },
   "menu": {
     "alertCalibration": "Uyarı Kalibrasyonu",
@@ -3858,6 +3899,8 @@
     "your_complete_license_key": "Tam lisans anahtarınız:",
     "copy_key": "Anahtarı Kopyala",
     "usage_information": "Kullanım Bilgisi",
+    "usage_chart_title": "Bu ayki günlük alım",
+    "no_license_ingestion_limit": "Lisans olmadan alım günde <strong>{limit} GB</strong> ile sınırlıdır.",
     "license_allows_ingestion": "Mevcut lisans, günde <strong>{limit} GB</strong> veri alımına izin verir.",
     "license_allows_unlimited_ingestion": "Mevcut lisans sınırsız veri alımına izin verir.",
     "limit_exceeded_days": "Limit, <strong class=\"{colorClass}\">{days} gün</strong> bu ay aşıldı | Limit, <strong class=\"{colorClass}\">{days} gün</strong> bu ay aşıldı",
@@ -4714,6 +4757,8 @@
     },
     "listOrganizations": {
       "subtitle": "Erişebileceğiniz kuruluşlar",
+      "switch": "Bu kuruluşa geç",
+      "current": "Geçerli",
       "cannotEditWhileDeleting": "Silme işlemi devam ederken düzenleme yapılamaz",
       "edit": "Düzenle",
       "deleteOrganization": "Kuruluşu sil",
@@ -10169,6 +10214,12 @@
       "noPanels": "Panel yok",
       "panelsDeletedHint": "Panelleri silindiği için şu anda hiçbir panelde çizilmiyor. Bunu düzeltmek için panel seçin veya Tümünü seç'i tercih edin.",
       "blankFiltersHint": "Değeri olmayan koşullar yok sayılır."
+    },
+    "inlineCreate": {
+      "folderName": "Yeni klasör adı",
+      "createFolder": "Klasör oluştur",
+      "tabName": "Yeni sekme adı",
+      "createTab": "Sekme oluştur"
     }
   },
   "panel": {
@@ -14256,7 +14307,8 @@
         "mute": "Bunu sessize alamazsınız.",
         "onCall": "Nöbette: {people}",
         "canAct": "Ayrıca işlem yapabilir: {people}",
-        "people": "Nöbette: {onCall}. Ayrıca işlem yapabilir: {canAct}"
+        "people": "Nöbette: {onCall}. Ayrıca işlem yapabilir: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "Bu uyarı tetiklenmiş durumda değil, onaylanacak bir şey yok.",
@@ -14315,7 +14367,11 @@
       "open": "Security'de düzenle"
     },
     "newAlertTitle": "Yeni uyarı",
-    "newAnomalyTitle": "Yeni anomali tespiti"
+    "newAnomalyTitle": "Yeni anomali tespiti",
+    "rowAction": {
+      "paused": "{name} duraklatıldı",
+      "resumed": "{name} sürdürüldü"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Aç",
@@ -14774,6 +14830,7 @@
     "destination_type": "Hedef Türü",
     "template": "Şablon",
     "actions": "Eylemler",
+    "addHeader": "Başlık ekle",
     "addTitle": "Yeni Hedef",
     "updateTitle": "Hedefi Güncelle",
     "delete": "Sil",
@@ -14919,7 +14976,9 @@
   },
   "pipeline_destinations": {
     "header": "İşlem Hattı Hedefleri",
-    "search": "Hedef ara"
+    "search": "Hedef ara",
+    "destinationType": "Hedef türü",
+    "outputFormat": "Çıktı biçimi"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15430,8 +15489,12 @@
     "groupIntegrations": "Entegrasyonlar",
     "groupAccount": "Hesap",
     "slackApp": "Slack",
+    "slackAppDesc": "Slack uygulaması için çalışma alanları, kanal varsayılanları ve hesap bağlama",
     "generalDesc": "Tema, sorgu varsayılanları ve temel tercihler",
     "orgDesc": "Kuruluş parametreleri ve tanımlayıcıları",
+    "generalSubtitle": "{org} kuruluşunun görünümü ve sorgu varsayılanları.",
+    "orgSubtitle": "{org} için alan adları, veri saklama ve otomatik özellikler.",
+    "passwordPolicySubtitle": "Yerel e-posta ve parola hesapları için kurallar.",
     "cipherKeysDesc": "Hassas alanlar için şifreleme anahtarları",
     "regexPatternsDesc": "Maskeleme için yeniden kullanılabilir regex desenleri",
     "domainManagementDesc": "Oturum açmayı izin verilen SSO alan adlarıyla kısıtlayın",
@@ -15718,10 +15781,59 @@
       "failedToLoadServices": "Hizmetler yüklenemedi"
     },
     "domainManagement": {
-      "unknownTime": "Bilinmeyen zaman"
+      "unknownTime": "Bilinmeyen zaman",
+      "claimParserTitle": "Talep ayrıştırıcı",
+      "claimParserSectionDesc": "SSO ve LDAP taleplerini kuruluş ve rol atamalarına dönüştürür.",
+      "claimParserLabel": "Talep ayrıştırıcı işlevi",
+      "claimParserHelp": "Eşlenen talepleri alıp atanacak kuruluşları ve rolleri ya da bir ret döndüren bir {product1} veya {product2} işlevi.",
+      "claimParserFormatLink": "Girdi ve çıktı biçimi",
+      "claimParserPlaceholder": "İşlev yok",
+      "noFunctions": "Henüz işlev yok",
+      "restrictionsTitle": "Alan adı kısıtlamaları",
+      "restrictionsDesc": "SSO ile hangi e-posta alan adları ve kullanıcılar oturum açabilir.",
+      "domainLabel": "Alan adı",
+      "addDomain": "Alan adı ekle",
+      "noDomains": "Henüz alan adı yok. Kimin oturum açabileceğini kısıtlamak için bir alan adı ekleyin.",
+      "accessFor": "{domain} için erişim",
+      "policyAllowAll": "Tüm kullanıcılara izin ver",
+      "policyAllowSpecific": "Yalnızca listelenen kullanıcılara izin ver",
+      "policyBlockSpecific": "Listelenen kullanıcıları engelle",
+      "policyBlockAll": "Tüm kullanıcıları engelle",
+      "effectAllowSpecific": "Yalnızca e-posta adresi {domain} ile biten listelenen kullanıcıların oturum açmasına izin verilir.",
+      "effectBlockSpecific": "E-posta adresi {domain} ile biten listelenen harici SSO kullanıcıları sistemden (arayüz, API ve alım) engellenir.",
+      "emailLabel": "E-posta adresi",
+      "noEmails": "Henüz listelenmiş e-posta adresi yok.",
+      "removeDomain": "{domain} öğesini kaldır",
+      "removeEmail": "{email} öğesini kaldır",
+      "saved": "SSO ayarları kaydedildi"
     },
     "general": {
       "close": "Kapat",
+      "themeTitle": "Tema",
+      "themeDescription": "{org} için açık ve koyu moddaki vurgu rengi.",
+      "accentColorLabel": "Vurgu rengi",
+      "lightColorLabel": "Açık mod rengini değiştir, şu an {color}",
+      "darkColorLabel": "Koyu mod rengini değiştir, şu an {color}",
+      "queryDefaultsTitle": "Sorgu varsayılanları",
+      "queryDefaultsDescription": "Metrik toplama ve PromQL sorguları için varsayılanlar.",
+      "scrapeIntervalLabel": "Toplama aralığı",
+      "scrapeIntervalHelp": "Metriklerin ne sıklıkla toplandığı.",
+      "unitSeconds": "saniye",
+      "maxSeriesLabel": "Sorgu başına en fazla seri",
+      "maxSeriesHelp": "Tek bir PromQL sorgusunun döndürebileceği en fazla seri sayısı. Boş bırakılırsa varsayılan, {n}, kullanılır.",
+      "unitSeries": "seri",
+      "maxSeriesError": "1.000 ile 1.000.000 arasında bir değer girin veya varsayılanı kullanmak için boş bırakın.",
+      "brandingTitle": "Marka",
+      "brandingDescription": "Bu örnekteki her kuruluşa gösterilen ad ve logolar.",
+      "logoTextHelp": "Uygulamada gösterilen varsayılan adın yerine geçer. En fazla 100 karakter.",
+      "logoTextTooLong": "En fazla 100 karakter kullanın.",
+      "logoTextSaveFailed": "Özel logo metni kaydedilemedi. {reason}",
+      "logoSaveFailed": "{mode} logosu yüklenemedi. {reason}",
+      "brandingUpdated": "Marka güncellendi",
+      "logoLightLabel": "Özel logo (açık mod)",
+      "logoLightHelp": "Açık modda gösterilir. PNG, JPG, GIF veya BMP, en fazla 150 × 30 px.",
+      "logoDarkLabel": "Özel logo (koyu mod)",
+      "logoDarkHelp": "Koyu modda gösterilir. PNG, JPG, GIF veya BMP, en fazla 150 × 30 px.",
       "fileCounterLabel": "{constraint} {filesNumber} dosya {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
@@ -15743,18 +15855,30 @@
       "title": "Veri saklama varsayılanları",
       "about": "Kendi saklama ayarı olmayan akışlar için. Boş veya 0, genel değeri kullanır; aksi takdirde en az 3 gün.",
       "defaultDays": "Varsayılan (gün)",
+      "defaultLabel": "Varsayılan",
+      "unitDays": "gün",
+      "daysFor": "{type} saklama süresi (gün)",
       "streamType": "Akış türü",
       "days": "Gün",
       "addType": "Akış türü ekle",
+      "allTypesAdded": "Her akış türünün zaten bir satırı var.",
+      "removeTypeNamed": "{type} varsayılanını kaldır",
       "removeType": "Bu akış türünü kaldır",
       "globalDefault": "Genel: {value}",
       "globalType": "Genel {type}: {value}",
       "daysValue": "{days} gün",
       "forever": "sonsuza kadar sakla",
-      "invalid": "0 veya en az 3 gün kullanın"
+      "invalid": "0 veya en az 3 gün kullanın",
+      "invalidType": "En az 3 gün kullanın veya bu türü kaldırın"
     },
     "organizationSettings": {
       "fieldNameHelp": "Yalnızca alfanümerik ve '+=,.{'@'}-_' karakterlerini kullanın, boşluk olmadan.",
+      "sectionTitle": "Veri işleme",
+      "sectionDescription": "Logların izlere nasıl bağlandığı ve hangi otomatik özelliklerin açık olduğu.",
+      "traceIdHelp": "Bir log satırını izine bağlayan log alanı. Yalnızca harfler, rakamlar ve + = , . {'@'} - _ .",
+      "spanIdHelp": "Bir log satırını span'ine bağlayan log alanı. Yukarıdakiyle aynı karakterler.",
+      "ingestionLogsHelp": "Alımı başarısız olan kayıtların bir günlüğünü tutar.",
+      "usageStreamHelp": "{org} kuruluşunun kullanımını, sorgulayabileceğiniz kendi akışına yazar.",
       "settingsUpdated": "Kuruluş ayarları başarıyla güncellendi",
       "settingsSaveError": "Kuruluş ayarları kaydedilirken hata oluştu"
     },
@@ -16409,6 +16533,7 @@
     "queryRange": "Sorgu Aralığı",
     "userSummary": "Kullanıcı Özeti",
     "allQueries": "Tüm Sorgular",
+    "allFields": "Tüm alanlar",
     "queryType": "Sorgu Türü",
     "numOfQueries": "Sorgu Sayısı",
     "totalDuration": "Toplam Yönetici. Süre",
@@ -17145,12 +17270,12 @@
       "truncated": "Bu izin ilk span'ı başlangıç zamanına göre sıralanmış olarak gösteriliyor. Sonraki span'lar henüz yüklenmedi. | Bu izin ilk {count} span'ı başlangıç zamanına göre sıralanmış olarak gösteriliyor. Sonraki span'lar henüz yüklenmedi.",
       "loadMore": "Sonraki span'ı yükle | Sonraki {size} span'ı yükle",
       "loadMoreFailed": "Bu izin daha fazla span'ı yüklenemedi",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "{from} ile {to} arasında bu kimliğe sahip iz yok",
+      "notFoundText": "{traceId} izinin bu aralıkta {stream} akışında span'i yok. Daha eski veya daha yeni olabilir, başka bir akışta olabilir ya da toplanmamış olabilir.",
+      "searchWiderRange": "Daha geniş bir aralıkta ara",
+      "searchSpansInRange": "Bu aralıktaki span'leri ara",
+      "loadFailedTitle": "Bu iz yüklenemedi",
+      "loadFailedText": "{traceId} izi okunamadı. Birazdan yeniden deneyin."
     },
     "traceTree": {
       "clickToExpand": "Genişletmek için tıklayın",
@@ -17345,6 +17470,8 @@
     "type": "Tür",
     "step1WithType": "Anahtar Deposu Ayrıntıları (Tür: {type})",
     "step2": "Şifreleme Mekanizması",
+    "sectionKey": "Anahtar",
+    "sectionSetup": "Anahtar deposu ve şifreleme",
     "secret": "GİZLİ",
     "baseURL": "Temel URL",
     "accessId": "Erişim Kimliği",
@@ -17583,6 +17710,8 @@
     "noTracesDescription": "Seçilen zaman aralığında bu ilişkilendirme için iz bulunamadı.",
     "viewInTraces": "İzlerde Görüntüle",
     "filters": "Filtreler",
+    "fieldGroupsTitle": "Alan grupları",
+    "fieldNamesColumn": "Alan adları",
     "semanticFieldGroupsCaption": "Korelasyon ve tekilleştirme için alan adı eşlemelerini tanımlayın (örn., ana bilgisayar adı, düğüm → 'ana bilgisayar' grubu)",
     "exportToJson": "JSON'a dışa aktar",
     "importFromJson": "JSON'dan içe aktar",
@@ -20725,8 +20854,8 @@
       "searchAroundTip": "Bu olaydan hemen önce ve sonra kaydedilen olayları yükler.",
       "noOfEventsTip": "Bu olayın çevresinde kaç olay yükleneceği.",
       "severityTip": "Algılanan günlük düzeyi. Nasıl algılandığını görmek için seçin.",
-      "traceId": "Trace ID",
-      "spanId": "Span ID"
+      "traceId": "İz kimliği",
+      "spanId": "Span kimliği"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT * sorgusu görselleştirme için desteklenmiyor.",
@@ -21011,6 +21140,7 @@
     "showDetail": "Ayrıntıları göster",
     "hideDetail": "Ayrıntıları gizle",
     "runAs": "Şu olarak çalıştır",
+    "runSuggestion": "{query} çalıştır",
     "searchTextFor": "\"{text}\" için metin ara",
     "searchTextDesc": "Tüm girdiyi tek bir ifade olarak ara",
     "explain": {
@@ -21042,7 +21172,19 @@
     "dataStale": "Veriler bayat",
     "lastRefreshed": "Son yenileme: {time}",
     "refresh": "Yenile",
-    "refreshWithAge": "Yenile, son yenileme {age}"
+    "refreshWithAge": "Yenile, son yenileme {age}",
+    "refreshing": "Yenileniyor",
+    "failed": "Başarısız",
+    "autoRefresh": "Otomatik yenileme",
+    "autoOn": "Otomatik · {interval}",
+    "every": "Her {interval}",
+    "interval": {
+      "10s": "10 sn",
+      "30s": "30 sn",
+      "1m": "1 dk",
+      "5m": "5 dk",
+      "15m": "15 dk"
+    }
   },
   "synthetics": {
     "variables": {
@@ -21900,7 +22042,12 @@
       "noPrivateMatches": "Aramanızla eşleşen özel konum yok",
       "newPrivateLocation": "Yeni özel konum",
       "publicSubtitle": "Bulut bölgeleri, her zaman kullanılabilir",
-      "privateSubtitle": "Konum, aracılarından en az biri etkin olduğunda hazırdır"
+      "privateSubtitle": "Konum, aracılarından en az biri etkin olduğunda hazırdır",
+      "emptyState": {
+        "title": "Henüz konum yok",
+        "description": "Konum, sentetik izleyicilerinizin kontrollerini çalıştırdığı yerdir; örneğin bir bulut bölgesi.",
+        "actionDesc": "Kontrollerin çalışacağı bir yer ekleyin"
+      }
     },
     "newCheck": {
       "comingSoon": "Çok Yakında",
@@ -22981,7 +23128,10 @@
       "tokenLinkTooltip": "Kod parçacıklarının hangi veri alımı token'ını kullanacağını seçin",
       "copiedWithToken": "org token'ı {name} ile kopyalandı",
       "tokenIncludedHint": "Kopyalama, kuruluşun veri alımı token'ını içerir; bu token burada gizli kalır.",
-      "maskedSelectionWarning": "Gizli token noktalar olarak kopyalandı. Kopyala'yı kullanın veya önce Göster'e tıklayın."
+      "maskedSelectionWarning": "Gizli token noktalar olarak kopyalandı. Kopyala'yı kullanın veya önce Göster'e tıklayın.",
+      "wrapLines": "Satırları kaydır",
+      "showAll": "Tüm {count} satırı göster",
+      "showLess": "Daha az göster"
     },
     "spinner": {
       "loading": "Yükleniyor"
@@ -23026,7 +23176,10 @@
       "moreInfo": "Daha fazla bilgi"
     },
     "dialog": {
-      "closeDialog": "İletişim kutusunu kapat"
+      "closeDialog": "İletişim kutusunu kapat",
+      "discardChanges": "Değişiklikler silinsin mi?",
+      "keepEditing": "Düzenlemeye devam et",
+      "discard": "Vazgeç"
     },
     "drawer": {
       "closeDrawer": "Çekmeceyi kapat"
@@ -23049,6 +23202,32 @@
       "clear": "Temizle"
     },
     "file": {
+      "removeNamed": "{name} öğesini kaldır",
+      "sourceLabel": "İçe aktarma kaynağı",
+      "sourceFile": "Dosya",
+      "sourceUrl": "URL",
+      "sourcePaste": "Yapıştır",
+      "dropPrompt": "Bir dosyayı buraya bırakın veya {choose}",
+      "dropPromptMultiple": "Dosyaları buraya bırakın veya {choose}",
+      "chooseAFile": "bir dosya seçin",
+      "chooseFiles": "dosya seçin",
+      "chooseFileButton": "Dosya seç",
+      "chooseFilesButton": "Dosyaları seç",
+      "noFileChosen": "Dosya seçilmedi",
+      "dropToUpload": "Yüklemek için bırakın",
+      "upToSize": "en fazla {size}",
+      "upToSizeEach": "her biri en fazla {size}",
+      "oneFile": "tek dosya",
+      "upToFiles": "en fazla {count} dosya",
+      "typeRejected": "Yalnızca {allowed} dosyaları kabul edilir",
+      "sizeRejected": "{size}, {max} sınırını aşıyor",
+      "countRejected": "Bir seferde yalnızca {count} dosya",
+      "uploadFailed": "Yükleme başarısız",
+      "uploaded": "Yüklendi",
+      "urlPlaceholder": "Dosya URL'si",
+      "urlHelp": "İçe aktardığınızda bir kez getiririz.",
+      "textPlaceholder": "İçeriği buraya yapıştırın",
+      "invalidJson": "Geçerli JSON değil: {detail}",
       "removeFile": "Dosyayı kaldır",
       "clearAll": "Tümünü temizle"
     },
@@ -23063,7 +23242,14 @@
     "pagination": {
       "pagination": "Sayfalama",
       "previousPage": "Önceki sayfa",
-      "nextPage": "Sonraki sayfa"
+      "nextPage": "Sonraki sayfa",
+      "onFirstPage": "Zaten ilk sayfadasınız",
+      "onLastPage": "Zaten son sayfadasınız",
+      "range": "{from}–{to} / {total}",
+      "rangeOfMany": "{from}–{to} / çok sayıda",
+      "pageOf": "Sayfa {page} / {pages}",
+      "perPage": "Sayfa başına {size}",
+      "pageSize": "Sayfa başına satır"
     },
     "select": {
       "more": "daha fazla",
@@ -23073,6 +23259,10 @@
       "noOptionsFound": "Seçenek bulunamadı",
       "multiSelect": "Çoklu seçim",
       "singleSelect": "Tekli seçim",
+      "any": "Herhangi",
+      "noMatches": "\"{term}\" için eşleşme yok",
+      "clearSearch": "Aramayı temizle",
+      "addOption": "\"{value}\" ekle",
       "moreInfoAbout": "{field} hakkında daha fazla bilgi",
       "moreInfo": "Daha fazla bilgi"
     },
@@ -23114,7 +23304,10 @@
       "removeColumnAria": "Sütunu kaldır",
       "formatColumnAria": "Sütunu biçimlendir",
       "selectedOfTotal": "{total} öğeden {selected} tanesi seçildi",
-      "selectedCount": "{selected} öğe seçildi"
+      "selectedCount": "{selected} öğe seçildi",
+      "clearSelection": "Temizle",
+      "rowActions": "Satır işlemleri",
+      "moreRowActions": "Diğer işlemler"
     },
     "predefinedThemes": {
       "title": "Tema",
@@ -23482,6 +23675,26 @@
         "past": "Geçmiş günler",
         "ended": "Sona erdi"
       }
+    },
+    "jsonViewer": {
+      "include": "Bu değere göre filtrele",
+      "exclude": "Bu değeri filtreden çıkar",
+      "copyValue": "Değeri kopyala",
+      "fieldCount": "{count} alan",
+      "itemCount": "{count} öğe"
+    },
+    "tabs": {
+      "more": "Daha fazla",
+      "unsaved": "Kaydedilmemiş değişiklikler",
+      "locked": "Kilitli"
+    },
+    "statStrip": {
+      "filters": "Filtreler",
+      "showOnly": "Yalnızca {label} göster",
+      "alsoShow": "{label} öğesini de göster",
+      "stopShowing": "{label} öğesini göstermeyi bırak",
+      "scrollBack": "Önceki filtreleri göster",
+      "scrollForward": "Daha fazla filtre göster"
     }
   },
   "functions": {
@@ -24352,6 +24565,12 @@
   },
   "passwordPolicy": {
     "complexity": "Karmaşıklık",
+    "complexityDesc": "Her yeni parolanın içermesi gerekenler.",
+    "unitCharacters": "karakter",
+    "unitDays": "gün",
+    "unitPasswords": "parola",
+    "unitAttempts": "deneme",
+    "unitSeconds": "saniye",
     "minLength": "Minimum uzunluk",
     "minLengthDesc": "Kabul edilen en kısa parola",
     "maxLength": "Maksimum uzunluk",
@@ -24367,6 +24586,7 @@
     "specialCharSet": "İzin verilen özel karakterler",
     "specialCharSetDesc": "Herhangi bir alfanümerik olmayan karakteri kabul etmek için boş bırakın",
     "maxLengthTooSmall": "Maksimum uzunluk, minimum uzunluk ile 128 arasında olmalıdır.",
+    "maxLengthBelowMin": "En az uzunlukla eşleşmesi için {min} veya daha fazla olmalıdır.",
     "confirmTitle": "Parola ilkesi kaydedilsin mi?",
     "confirmMessage": "Kaydetmek, her yerel kullanıcıyı devam edebilmesi için yeni bir parola belirlemeye zorlayabilir. Root, harici kullanıcılar ve hizmet hesapları muaftır — root hesabı değilseniz bu sizi de kapsar. Bu işlem geri alınamaz.",
     "saved": "Parola ilkesi kaydedildi. | Parola ilkesi kaydedildi. {count} kullanıcının parolasını sıfırlaması gerekiyor. | Parola ilkesi kaydedildi. {count} kullanıcının parolasını sıfırlaması gerekiyor.",
@@ -24377,14 +24597,17 @@
     "loadFailed": "Geçerli ilke okunurken bir şeyler ters gitti.",
     "rotation": "Rotasyon",
     "rotationDays": "Rotasyon süresi",
+    "rotationDesc": "Bir parolanın ne zaman sona erdiği ve kişilere ne kadar önceden bildirim yapıldığı.",
     "rotationDaysDesc": "Parolanın süresi dolmadan önceki gün sayısı. 0 = hiç süresi dolmaz",
     "rotationWarningDays": "Süresi dolmadan önce uyar",
     "rotationWarningDaysDesc": "Oturum açma sırasında bildirim gün sayısı. 0 = uyarı yok",
+    "rotationWarningDaysOffDesc": "Oturum açarken bildirim günleri. Parolalar sona erdiğinde kullanılır.",
     "warningDaysTooLong": "Uyarı penceresi rotasyon süresinden uzun olamaz.",
     "rotationPreview": "Bugün belirlenen bir parolanın süresi {expires} tarihinde dolar. Oturum açma uyarısı {warns} tarihinde başlar.",
     "rotationPreviewNoWarning": "Bugün belirlenen bir parolanın süresi {expires} tarihinde dolar. O zamana kadar uyarı gösterilmez.",
     "reuse": "Yeniden kullanımı önleme",
     "historyCount": "Hatırlanan parolalar",
+    "reuseDesc": "Kişilerin eski bir parolaya dönmesini engeller.",
     "historyCountDesc": "Yeni bir parola bu sayıdaki önceki parolayla eşleşemez. 0 = kontrol yok",
     "historyMaxRetained": "Saklanan geçmiş",
     "historyMaxRetainedDesc": "Kullanıcı başına kaç geçmiş parolanın saklandığı",
@@ -24392,6 +24615,7 @@
     "reuseExplainer": "Geçerli parola, hatırlanan kümenin bir parçası sayılır — onu yeniden kullanmak ayrı bir kontrolle değil, bu kuralla reddedilir.",
     "lockout": "Hesap kilitleme",
     "lockoutThreshold": "Kilitleme öncesi başarısız deneme sayısı",
+    "lockoutDesc": "Tekrarlanan başarısız oturum açma denemelerinden sonra ne olacağı.",
     "lockoutThresholdDesc": "0 = kilitleme devre dışı",
     "lockoutBucketSize": "Her ek kilitleme öncesi deneme sayısı",
     "lockoutBucketSizeDesc": "0 = yukarıdaki değeri kullan",
@@ -24406,6 +24630,7 @@
     "backoffLinear": "Doğrusal",
     "lockoutPreview": "{threshold} başarısız deneme → {first} · her {bucket} denemede bir → {rest} · üst sınır {max}. Başarılı bir oturum açma her şeyi sıfırlar.",
     "sessionEnforcement": "Oturum ve zorlama",
+    "sessionEnforcementDesc": "Bir oturumun ne kadar sürdüğü ve root'un bu kurallara uyup uymadığı.",
     "cookieMaxAge": "Oturum ömrü",
     "cookieMaxAgeDesc": "Oturum açmış bir oturumun geçerli kaldığı saniye sayısı. 0 = {envVar} içindeki örnek varsayılanını kullan",
     "applyToRoot": "Root hesabına uygula",
@@ -24782,6 +25007,7 @@
       "packUnavailableHint": "Bu iş yükü için özel içerik henüz yayınlanmadı. Bu arada görselleştirmek için bir gösterge panosu oluşturun.",
       "partialTelemetryKubernetes": "Kubernetes akışlarını bulduk, ancak bu sayfanın ihtiyaç duyduğu metrikleri (kubeletstats veya cluster alıcısı) bulamadık. Toplayıcınızın alıcılarını kontrol edin.",
       "partialTelemetryHosts": "Ana makine akışlarını bulduk, ancak bu sayfanın ihtiyaç duyduğu metrikleri bulamadık. Toplayıcınızın hostmetrics alıcısını kontrol edin.",
+      "hostMetricsMissingTitle": "Ana bilgisayar metrikleri bulunamadı",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first} ve {count} tane daha",
       "hiddenFootnote": "Erişiminiz olmayan veri kaynakları da burada görünür.",
@@ -27232,6 +27458,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Çağrıyı bastır",
     "savePolicyFailed": "Politika kaydedilemedi",
+    "savePolicyFailedReason": "Politika kaydedilmedi. {reason}",
     "state_triggered": "Tetiklenen",
     "state_triaged": "Değerlendirildi",
     "state_acknowledged": "Onaylandı",
@@ -28849,6 +29076,11 @@
       "otherOrgs": "Başka kuruluş yok | {count} başka kuruluş | {count} başka kuruluş",
       "connectedOn": "{date} tarihinde {user} tarafından",
       "helpContact": "Yardım iletişimi",
+      "helpContactHelp": "Hesabını bağlayamayan kişilere bu kişiye başvurmaları söylenir.",
+      "eventsLabel": "Slack olayları",
+      "connectionLabel": "Bağlantı",
+      "outboundLabel": "Giden kuyruk",
+      "collaboratorsLabel": "Uygulama ortak çalışanları",
       "helpContactPlaceholder": "#o2-help veya sorabileceğiniz bir kişi",
       "helpContactSaved": "Yardım iletişimi kaydedildi",
       "disconnectSection": "Bağlantıyı kes",
@@ -30502,9 +30734,9 @@
     },
     "queryTooltip": "Filtreyi metin olarak düzenle",
     "builderTooltip": "Filtreyi oluşturucuyla düzenle",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
+    "editorModeLabel": "Filtre düzenleyici",
+    "modeBuilder": "Oluşturucu",
+    "modeText": "Metin"
   },
   "autoobserveLive": {
     "paging": {
@@ -30597,5 +30829,23 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "pageHeader": {
+    "about": "Bu sayfa hakkında"
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· izlerin %{percent} oranında, son 24 saat",
+    "fallbacksNote": "Yedek alanları virgülle ayırarak, kontrol edilecek sırayla girin.",
+    "fallbackInvalid": "Alan adlarını virgülle ayırarak girin. Yalnızca harfler, rakamlar ve . _ - : / {'@'}.",
+    "sessions": {
+      "title": "Oturum görünümü",
+      "help": "Oturumların nasıl adlandırıldığı ve hangi sarmalayıcı metnin onlardan gizlendiği.",
+      "noAgents": "Henüz aracı yok. Sarmalayıcı metnini gizlemek için bir aracı ekleyin."
+    }
+  },
+  "copyButton": {
+    "copy": "Kopyala",
+    "copied": "Kopyalandı",
+    "failed": "Kopyalama engellendi · Ctrl C'ye basın"
   }
 }

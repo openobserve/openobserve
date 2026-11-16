@@ -22,7 +22,6 @@ import { firingAlertsQuery } from "@/services/alerts.queries";
 import { dashboardsSearchQuery } from "@/services/dashboards.queries";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { alertEvidenceRoute, type AlertEvidencePage } from "@/utils/alerts/alertEvidenceRoute";
-import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { pickDashboardPanelStream, restoreLogsSelectedStreams } from "@/utils/streamPersist";
 import {
   ACTIONS_AREA_KEY,
@@ -256,7 +255,7 @@ export function useJumpToObjects(
             to: alertEvidenceRoute({
               page: "logs",
               stream,
-              filter: { kind: "where", where: `match_all('${escapeSingleQuotes(text)}')` },
+              filter: { kind: "where", where: text },
               window: { period: EXPLORE_PERIOD },
               org: org.value,
             }),

@@ -71,7 +71,6 @@ async function onDelete(list: AllowList) {
       <OButton
         v-if="!editing"
         variant="secondary"
-        icon="add"
         :disabled="!canAuthor"
         data-test="security-allowlists-add"
         @click="editing = 'new'"

@@ -576,7 +576,6 @@ const selectedLocations = computed({
               <span>{{ t("synthetics.locations.privateEmptyBody") }}</span>
               <OButton
                 variant="secondary"
-                icon="add"
                 data-test="synthetics-check-locations-private-empty-cta"
                 @click="emit('new-location')"
               >

@@ -44,14 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip side="bottom" :content="label" />
       </OButtonGroup>
 
-      <OButton
-        v-else
-        :variant="variant"
-        :size="size"
-        icon="add"
-        :loading="busy"
-        :data-test="dataTest"
-      >
+      <OButton v-else :variant="variant" :size="size" :loading="busy" :data-test="dataTest">
         {{ label }}
       </OButton>
     </template>

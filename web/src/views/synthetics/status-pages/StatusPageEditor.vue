@@ -243,7 +243,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #actions>
                   <OButton
                     variant="secondary"
-                    icon="add"
                     data-test="status-page-add-component"
                     @click="addComponent"
                     >{{ t("statusPages.components.add") }}</OButton

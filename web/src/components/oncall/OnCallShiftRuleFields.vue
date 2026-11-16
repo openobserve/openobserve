@@ -182,7 +182,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex">
           <OButton
             variant="secondary"
-            icon="add"
             :data-test="`oncall-schedule-restriction-add-${ruleIndex}`"
             @click="addRestriction(rule)"
           >

@@ -18,6 +18,7 @@
     "rbacOff": "RBAC ปิดอยู่สำหรับองค์กรนี้ ผู้ดูแลระบบเปิดได้โดยตั้งค่า {env} เป็น true ในการกำหนดค่าเซิร์ฟเวอร์"
   },
   "emptyState": {
+    "requestId": "คำขอ {id}",
     "illustrations": {
       "noHistoryYet": "No history yet",
       "noLogsFound": "No logs found",
@@ -451,7 +452,9 @@
       "description": "No {noun} match your current filters or search. Try adjusting or clearing them.",
       "action": "Clear filters",
       "actionDesc": "Reset all filters and search",
-      "fallbackNoun": "results"
+      "fallbackNoun": "results",
+      "noMatches": "ไม่พบรายการที่ตรงกัน",
+      "noMatchesText": "ไม่มีรายการที่ตรงกับการค้นหาหรือตัวกรองปัจจุบัน"
     },
     "nouns": {
       "logs": "logs",
@@ -490,6 +493,7 @@
       "evalTemplates": "evaluation templates",
       "enrichmentTables": "enrichment tables",
       "cipherKeys": "cipher keys",
+      "announcementBanners": "แบนเนอร์ประกาศ",
       "aiToolsets": "AI toolsets",
       "llmProviders": "LLM providers",
       "sourceMaps": "source maps",
@@ -633,6 +637,26 @@
     "noOncallUnrouted": {
       "title": "ยังไม่มีรายการที่ต้องมีผู้รับผิดชอบ",
       "description": "การแจ้งเตือนที่เกิดขึ้นทุกครั้งส่งถึงทีมแล้ว"
+    },
+    "noSlackChannelDefaults": {
+      "title": "ยังไม่มีช่องทางใดที่มีองค์กรเริ่มต้น",
+      "description": "คำถามในช่องทางที่ไม่มีค่าเริ่มต้นจะถูกส่งไปยังองค์กรเริ่มต้นของแต่ละคน (เปลี่ยนได้ด้วย /o2 org)"
+    },
+    "noSlackLinkedPeople": {
+      "title": "ยังไม่มีใครในองค์กรนี้เชื่อมต่อ Slack"
+    },
+    "slackNotConnected": {
+      "title": "เชื่อมต่อเวิร์กสเปซ Slack"
+    },
+    "noAnnouncementBanners": {
+      "title": "ยังไม่มีแบนเนอร์",
+      "description": "แบนเนอร์จะแสดงประกาศที่ด้านบนของแอปให้กับองค์กรที่คุณเลือก",
+      "action": "เพิ่มแบนเนอร์",
+      "actionDesc": "เขียนประกาศและกำหนดเวลาแสดง"
+    },
+    "pageError": {
+      "title": "โหลดหน้านี้ไม่ได้",
+      "description": "ไม่สามารถโหลดข้อมูลของหน้านี้ได้ ลองอีกครั้งตอนนี้หรืออีกสักครู่"
     }
   },
   "accessBoundary": {
@@ -660,6 +684,7 @@
       "groups": "กลุ่ม",
       "serviceAccounts": "บัญชีบริการ",
       "cipherKeys": "คีย์เข้ารหัส",
+      "announcementBanners": "แบนเนอร์ประกาศ",
       "regexPatterns": "แพตเทิร์น Regex",
       "evalJobs": "งานประมวลผลการประเมินแบบออนไลน์",
       "billingGroup": "กลุ่มการเรียกเก็บเงิน",
@@ -716,6 +741,7 @@
       "groups": "กลุ่ม",
       "serviceAccounts": "บัญชีบริการ",
       "cipherKeys": "คีย์เข้ารหัส",
+      "announcementBanners": "แบนเนอร์ประกาศ",
       "regexPatterns": "รูปแบบ regex",
       "unnamed": "ทรัพยากรนี้",
       "onCall": "เวรประจำการ (On-Call)",
@@ -773,9 +799,14 @@
   },
   "common": {
     "saveBar": {
-      "noChanges": "ไม่มีการเปลี่ยนแปลงที่จะบันทึก"
+      "noChanges": "ไม่มีการเปลี่ยนแปลงที่จะบันทึก",
+      "unsavedChanges": "มี {n} การเปลี่ยนแปลงที่ยังไม่บันทึก",
+      "changesShort": "{n} การเปลี่ยนแปลง",
+      "fixFields": "แก้ไข {n} ฟิลด์",
+      "discard": "ละทิ้ง"
     },
     "dismiss": "ปิดการแจ้งเตือน",
+    "undo": "เลิกทำ",
     "exitFullscreen": "ออกจากโหมดเต็มหน้าจอ",
     "moreActions": "การดำเนินการเพิ่มเติม",
     "moreOptions": "ตัวเลือกเพิ่มเติม",
@@ -1014,6 +1045,8 @@
     "back": "ย้อนกลับ",
     "save": "บันทึก",
     "discardChanges": "Discard changes",
+    "switchOn": "เปิด",
+    "switchOff": "ปิด",
     "unsavedChanges": "Unsaved changes",
     "update": "อัปเดต",
     "favourite": "Favorite",
@@ -1128,6 +1161,8 @@
     "field": "Field",
     "enterValueOrVariable": "Enter value or $variable",
     "all": "ทั้งหมด",
+    "allStates": "ทุกสถานะ",
+    "allStatuses": "ทุกสถานะ",
     "jsonFilesOnlyHint": ".json files only",
     "fileUploadJsonTab": "File Upload / JSON",
     "urlImportTab": "URL Import",
@@ -1234,7 +1269,8 @@
         "remote_task": "งานระยะไกล",
         "eval_job": "งานประมวลผลการประเมิน",
         "eval_scorer": "ตัวประเมินคะแนน",
-        "fleet_config": "การกำหนดค่าตัวรวบรวมข้อมูล"
+        "fleet_config": "การกำหนดค่าตัวรวบรวมข้อมูล",
+        "workflow": "เวิร์กโฟลว์"
       },
       "signOutTitle": "ออกจากระบบและทิ้งฉบับร่างหรือไม่",
       "signOutMessage": "คุณมีฉบับร่างที่ยังไม่ได้บันทึก {count} รายการในเบราว์เซอร์นี้ การออกจากระบบจะทิ้งฉบับร่างนี้ | คุณมีฉบับร่างที่ยังไม่ได้บันทึก {count} รายการในเบราว์เซอร์นี้ การออกจากระบบจะทิ้งฉบับร่างนี้",
@@ -1244,6 +1280,11 @@
       "leaveMessageInBrowser": "บันทึก {entity} หรือเก็บการเปลี่ยนแปลงของคุณไว้ในเบราว์เซอร์นี้ หรือทิ้งการเปลี่ยนแปลงเหล่านั้น",
       "retentionInBrowser": "การเปลี่ยนแปลงจะถูกเก็บไว้ในเบราว์เซอร์นี้เป็นเวลา {days} วัน หรือจนกว่าคุณจะออกจากระบบ โดยจะเก็บเฉพาะ {max} รายการใหม่ล่าสุดของแต่ละประเภทเท่านั้น",
       "dotUndated": "ฉบับร่างที่ยังไม่ได้บันทึก"
+    },
+    "leaveGuard": {
+      "title": "ออกโดยไม่บันทึกการเปลี่ยนแปลงหรือไม่",
+      "message": "หน้านี้มี {n} การเปลี่ยนแปลงที่ยังไม่บันทึก ข้อมูลจะสูญหายหากคุณออกจากหน้านี้",
+      "keepEditing": "แก้ไขต่อ"
     }
   },
   "flow": {
@@ -1942,8 +1983,8 @@
     "histogramTitleRows": "แสดง {total} แถวใน {took} ms | แสดง {total} แถวใน {took} ms",
     "histogramTitleRowsWithScan": "แสดง {total} แถวใน {took} ms ({scanLabel}: {scanSize}) | แสดง {total} แถวใน {took} ms ({scanLabel}: {scanSize})",
     "pickStreamFirst": "เลือกสตรีมก่อน",
-    "autoRefreshPausedInVisualize": "Auto refresh updates search results. It pauses while you visualize.",
-    "histogramNoTimeAxis": "Grouped results have no time axis"
+    "autoRefreshPausedInVisualize": "การรีเฟรชอัตโนมัติจะอัปเดตผลการค้นหา และจะหยุดชั่วคราวขณะที่คุณสร้างภาพข้อมูล",
+    "histogramNoTimeAxis": "ผลลัพธ์ที่จัดกลุ่มไม่มีแกนเวลา"
   },
   "menu": {
     "alertCalibration": "การปรับเทียบการแจ้งเตือน",
@@ -3857,6 +3898,8 @@
     "your_complete_license_key": "Your complete license key:",
     "copy_key": "Copy Key",
     "usage_information": "Usage Information",
+    "usage_chart_title": "การนำเข้าข้อมูลรายวันในเดือนนี้",
+    "no_license_ingestion_limit": "หากไม่มีใบอนุญาต การนำเข้าข้อมูลจะจำกัดที่ <strong>{limit} GB</strong> ต่อวัน",
     "license_allows_ingestion": "The current license allows <strong>{limit} GB</strong> of data ingestion per day.",
     "license_allows_unlimited_ingestion": "The current license allows unlimited data ingestion.",
     "limit_exceeded_days": "The limit was exceeded on <strong class=\"{colorClass}\">{days} day</strong> this month | The limit was exceeded on <strong class=\"{colorClass}\">{days} days</strong> this month",
@@ -4713,6 +4756,8 @@
     },
     "listOrganizations": {
       "subtitle": "Organizations you can access",
+      "switch": "สลับไปยังองค์กรนี้",
+      "current": "ปัจจุบัน",
       "cannotEditWhileDeleting": "Cannot edit while deletion is in progress",
       "edit": "แก้ไข",
       "deleteOrganization": "Delete organization",
@@ -10166,6 +10211,12 @@
       "noPanels": "No panels",
       "panelsDeletedHint": "Its panels were deleted, so it currently draws on no panel. Select panels, or choose Select all, to fix this.",
       "blankFiltersHint": "Conditions with no value are ignored."
+    },
+    "inlineCreate": {
+      "folderName": "ชื่อโฟลเดอร์ใหม่",
+      "createFolder": "สร้างโฟลเดอร์",
+      "tabName": "ชื่อแท็บใหม่",
+      "createTab": "สร้างแท็บ"
     }
   },
   "panel": {
@@ -14253,7 +14304,8 @@
         "mute": "คุณไม่สามารถปิดเสียงแจ้งเตือนรายการนี้ได้",
         "onCall": "On call: {people}",
         "canAct": "สามารถดำเนินการได้ด้วย: {people}",
-        "people": "เวรประจำการ (On-Call): {onCall} สามารถดำเนินการได้ด้วย: {canAct}"
+        "people": "เวรประจำการ (On-Call): {onCall} สามารถดำเนินการได้ด้วย: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "This alert is not firing, so there is nothing to acknowledge.",
@@ -14312,7 +14364,11 @@
       "open": "แก้ไขใน Security"
     },
     "newAlertTitle": "การแจ้งเตือนใหม่",
-    "newAnomalyTitle": "การตรวจจับความผิดปกติใหม่"
+    "newAnomalyTitle": "การตรวจจับความผิดปกติใหม่",
+    "rowAction": {
+      "paused": "หยุด {name} ชั่วคราวแล้ว | หยุดการแจ้งเตือน {count} รายการชั่วคราวแล้ว",
+      "resumed": "เปิดใช้ {name} ต่อแล้ว | เปิดใช้การแจ้งเตือน {count} รายการต่อแล้ว"
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -14771,6 +14827,7 @@
     "destination_type": "Destination Type",
     "template": "Template",
     "actions": "การดำเนินการ",
+    "addHeader": "เพิ่มส่วนหัว",
     "addTitle": "New Destination",
     "updateTitle": "Update Destination",
     "delete": "ลบ",
@@ -14916,7 +14973,9 @@
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",
-    "search": "Search destination"
+    "search": "Search destination",
+    "destinationType": "ประเภทปลายทาง",
+    "outputFormat": "รูปแบบเอาต์พุต"
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
@@ -15427,8 +15486,12 @@
     "groupIntegrations": "Integrations",
     "groupAccount": "Account",
     "slackApp": "Slack",
+    "slackAppDesc": "เวิร์กสเปซ ค่าเริ่มต้นของช่องทาง และการเชื่อมบัญชีสำหรับแอป Slack",
     "generalDesc": "Theme, query defaults, and core preferences",
     "orgDesc": "Organization parameters and identifiers",
+    "generalSubtitle": "รูปลักษณ์ของ {org} และค่าเริ่มต้นของการสืบค้น",
+    "orgSubtitle": "ชื่อฟิลด์ การเก็บรักษาข้อมูล และฟีเจอร์อัตโนมัติสำหรับ {org}",
+    "passwordPolicySubtitle": "กฎสำหรับบัญชีอีเมลและรหัสผ่านแบบเนทีฟ",
     "cipherKeysDesc": "Encryption keys for sensitive fields",
     "regexPatternsDesc": "Reusable regex patterns for redaction",
     "domainManagementDesc": "Restrict sign-in to allowed SSO domains",
@@ -15715,10 +15778,59 @@
       "failedToLoadServices": "Failed to load services"
     },
     "domainManagement": {
-      "unknownTime": "Unknown time"
+      "unknownTime": "Unknown time",
+      "claimParserTitle": "ตัวแยกวิเคราะห์ claim",
+      "claimParserSectionDesc": "แปลง claim ของ SSO และ LDAP เป็นการกำหนดองค์กรและบทบาท",
+      "claimParserLabel": "ฟังก์ชันตัวแยกวิเคราะห์ claim",
+      "claimParserHelp": "ฟังก์ชัน {product1} หรือ {product2} ที่รับ claim ที่แมปแล้วและคืนค่าองค์กรและบทบาทที่จะกำหนด หรือการปฏิเสธ",
+      "claimParserFormatLink": "รูปแบบอินพุตและเอาต์พุต",
+      "claimParserPlaceholder": "ไม่มีฟังก์ชัน",
+      "noFunctions": "ยังไม่มีฟังก์ชัน",
+      "restrictionsTitle": "ข้อจำกัดโดเมน",
+      "restrictionsDesc": "โดเมนอีเมลและผู้ใช้ที่สามารถเข้าสู่ระบบผ่าน SSO ได้",
+      "domainLabel": "โดเมน",
+      "addDomain": "เพิ่มโดเมน",
+      "noDomains": "ยังไม่มีโดเมน เพิ่มโดเมนเพื่อจำกัดผู้ที่เข้าสู่ระบบได้",
+      "accessFor": "การเข้าถึงสำหรับ {domain}",
+      "policyAllowAll": "อนุญาตผู้ใช้ทั้งหมด",
+      "policyAllowSpecific": "อนุญาตเฉพาะผู้ใช้ที่ระบุ",
+      "policyBlockSpecific": "บล็อกผู้ใช้ที่ระบุ",
+      "policyBlockAll": "บล็อกผู้ใช้ทั้งหมด",
+      "effectAllowSpecific": "เฉพาะผู้ใช้ที่ระบุซึ่งมีอีเมลลงท้ายด้วย {domain} เท่านั้นที่จะเข้าสู่ระบบได้",
+      "effectBlockSpecific": "ผู้ใช้ SSO ภายนอกที่ระบุซึ่งมีอีเมลลงท้ายด้วย {domain} จะถูกบล็อกจากระบบ (UI, API และการนำเข้าข้อมูล)",
+      "emailLabel": "ที่อยู่อีเมล",
+      "noEmails": "ยังไม่มีที่อยู่อีเมลในรายการ",
+      "removeDomain": "ลบ {domain}",
+      "removeEmail": "ลบ {email}",
+      "saved": "บันทึกการตั้งค่า SSO แล้ว"
     },
     "general": {
       "close": "ปิด",
+      "themeTitle": "ธีม",
+      "themeDescription": "สีเน้นของ {org} ในโหมดสว่างและมืด",
+      "accentColorLabel": "สีเน้น",
+      "lightColorLabel": "เปลี่ยนสีของโหมดสว่าง ขณะนี้คือ {color}",
+      "darkColorLabel": "เปลี่ยนสีของโหมดมืด ขณะนี้คือ {color}",
+      "queryDefaultsTitle": "ค่าเริ่มต้นของการสืบค้น",
+      "queryDefaultsDescription": "ค่าเริ่มต้นสำหรับการเก็บเมตริกและการสืบค้น PromQL",
+      "scrapeIntervalLabel": "ช่วงเวลาการ scrape",
+      "scrapeIntervalHelp": "ความถี่ในการเก็บเมตริก",
+      "unitSeconds": "วินาที",
+      "maxSeriesLabel": "จำนวนซีรีส์สูงสุดต่อการสืบค้น",
+      "maxSeriesHelp": "จำนวนซีรีส์สูงสุดที่การสืบค้น PromQL หนึ่งครั้งคืนค่าได้ หากเว้นว่างจะใช้ค่าเริ่มต้น {n}",
+      "unitSeries": "ซีรีส์",
+      "maxSeriesError": "กรอกค่า 1,000 ถึง 1,000,000 หรือเว้นว่างเพื่อใช้ค่าเริ่มต้น",
+      "brandingTitle": "การสร้างแบรนด์",
+      "brandingDescription": "ชื่อและโลโก้ที่แสดงให้ทุกองค์กรในอินสแตนซ์นี้",
+      "logoTextHelp": "แทนที่ชื่อเริ่มต้นที่แสดงในแอป ไม่เกิน 100 ตัวอักษร",
+      "logoTextTooLong": "ใช้ไม่เกิน 100 ตัวอักษร",
+      "logoTextSaveFailed": "ไม่ได้บันทึกข้อความโลโก้ที่กำหนดเอง {reason}",
+      "logoSaveFailed": "ไม่ได้อัปโหลดโลโก้ ({mode}) {reason}",
+      "brandingUpdated": "อัปเดตการสร้างแบรนด์แล้ว",
+      "logoLightLabel": "โลโก้ที่กำหนดเอง (โหมดสว่าง)",
+      "logoLightHelp": "แสดงในโหมดสว่าง PNG, JPG, GIF หรือ BMP ขนาดไม่เกิน 150 × 30 px",
+      "logoDarkLabel": "โลโก้ที่กำหนดเอง (โหมดมืด)",
+      "logoDarkHelp": "แสดงในโหมดมืด PNG, JPG, GIF หรือ BMP ขนาดไม่เกิน 150 × 30 px",
       "fileCounterLabel": "{constraint} {filesNumber} file {'|'} {totalSize}"
     },
     "llmProvidersSettings": {
@@ -15740,18 +15852,30 @@
       "title": "ค่าเริ่มต้นการเก็บข้อมูล",
       "about": "สำหรับสตรีมที่ไม่ได้กำหนดระยะเวลาเก็บรักษาข้อมูลของตัวเอง หากเว้นว่างหรือเป็น 0 จะใช้ค่าส่วนกลาง มิฉะนั้นต้องมีอย่างน้อย 3 วัน",
       "defaultDays": "ค่าเริ่มต้น (วัน)",
+      "defaultLabel": "ค่าเริ่มต้น",
+      "unitDays": "วัน",
+      "daysFor": "การเก็บรักษา {type} (วัน)",
       "streamType": "ประเภทสตรีม",
       "days": "วัน",
       "addType": "เพิ่มประเภทสตรีม",
+      "allTypesAdded": "ทุกประเภทสตรีมมีแถวแล้ว",
+      "removeTypeNamed": "ลบค่าเริ่มต้นของ {type}",
       "removeType": "ลบประเภทสตรีมนี้",
       "globalDefault": "ส่วนกลาง: {value}",
       "globalType": "ส่วนกลาง {type}: {value}",
       "daysValue": "{days} วัน",
       "forever": "เก็บไว้ตลอดไป",
-      "invalid": "โปรดใช้ 0 หรืออย่างน้อย 3 วัน"
+      "invalid": "โปรดใช้ 0 หรืออย่างน้อย 3 วัน",
+      "invalidType": "ใช้อย่างน้อย 3 วัน หรือลบประเภทนี้"
     },
     "organizationSettings": {
       "fieldNameHelp": "Use alphanumeric and '+=,.{'@'}-_' characters only, without spaces.",
+      "sectionTitle": "การจัดการข้อมูล",
+      "sectionDescription": "วิธีที่ล็อกเชื่อมโยงกับเทรซ และฟีเจอร์อัตโนมัติที่เปิดอยู่",
+      "traceIdHelp": "ฟิลด์ล็อกที่เชื่อมบรรทัดล็อกกับเทรซ ใช้ได้เฉพาะตัวอักษร ตัวเลข และ + = , . {'@'} - _",
+      "spanIdHelp": "ฟิลด์ล็อกที่เชื่อมบรรทัดล็อกกับสแปน ใช้อักขระเดียวกับด้านบน",
+      "ingestionLogsHelp": "เก็บบันทึกของเรคคอร์ดที่นำเข้าไม่สำเร็จ",
+      "usageStreamHelp": "เขียนข้อมูลการใช้งานของ {org} ลงสตรีมของตัวเอง ซึ่งคุณสืบค้นได้",
       "settingsUpdated": "Organization settings updated successfully",
       "settingsSaveError": "Error saving organization settings"
     },
@@ -16406,6 +16530,7 @@
     "queryRange": "Query Range",
     "userSummary": "User Summary",
     "allQueries": "All Queries",
+    "allFields": "ทุกฟิลด์",
     "queryType": "Query Type",
     "numOfQueries": "Number of Queries",
     "totalDuration": "Total Exec. Duration",
@@ -17142,12 +17267,12 @@
       "truncated": "Showing the first span of this trace, in start-time order. Later spans are not loaded yet. | Showing the first {count} spans of this trace, in start-time order. Later spans are not loaded yet.",
       "loadMore": "Load the next span | Load next {size} spans",
       "loadMoreFailed": "Could not load more spans of this trace",
-      "notFoundTitle": "No trace with this ID between {from} and {to}",
-      "notFoundText": "Trace {traceId} has no spans in the {stream} stream in this range. It may be older or newer, in another stream, or not collected.",
-      "searchWiderRange": "Search a wider range",
-      "searchSpansInRange": "Search spans in this range",
-      "loadFailedTitle": "Couldn't load this trace",
-      "loadFailedText": "Trace {traceId} could not be read. Retry in a moment."
+      "notFoundTitle": "ไม่พบเทรซที่มี ID นี้ระหว่าง {from} ถึง {to}",
+      "notFoundText": "เทรซ {traceId} ไม่มีสแปนในสตรีม {stream} ในช่วงนี้ อาจเก่าหรือใหม่กว่านี้ อยู่ในสตรีมอื่น หรือไม่ได้ถูกเก็บ",
+      "searchWiderRange": "ค้นหาในช่วงที่กว้างขึ้น",
+      "searchSpansInRange": "ค้นหาสแปนในช่วงนี้",
+      "loadFailedTitle": "โหลดเทรซนี้ไม่ได้",
+      "loadFailedText": "อ่านเทรซ {traceId} ไม่ได้ ลองอีกครั้งในอีกสักครู่"
     },
     "traceTree": {
       "clickToExpand": "Click to expand",
@@ -17342,6 +17467,8 @@
     "type": "ประเภท",
     "step1WithType": "Key Store Details (Type: {type})",
     "step2": "Encryption Mechanism",
+    "sectionKey": "คีย์",
+    "sectionSetup": "ที่เก็บคีย์และการเข้ารหัส",
     "secret": "Secret",
     "baseURL": "Base URL",
     "accessId": "Access ID",
@@ -17580,6 +17707,8 @@
     "noTracesDescription": "No traces found for this correlation in the selected time range.",
     "viewInTraces": "View in Traces",
     "filters": "Filters",
+    "fieldGroupsTitle": "กลุ่มฟิลด์",
+    "fieldNamesColumn": "ชื่อฟิลด์",
     "semanticFieldGroupsCaption": "Map your telemetry field names to common groups so OpenObserve can correlate them across streams.",
     "exportToJson": "Export to JSON",
     "importFromJson": "Import from JSON",
@@ -21008,6 +21137,7 @@
     "showDetail": "Show details",
     "hideDetail": "Hide details",
     "runAs": "Run as",
+    "runSuggestion": "เรียกใช้ {query}",
     "searchTextFor": "Search text for \"{text}\"",
     "searchTextDesc": "Search the whole input as one phrase",
     "explain": {
@@ -21039,7 +21169,19 @@
     "dataStale": "Data is stale",
     "lastRefreshed": "Last refreshed: {time}",
     "refresh": "รีเฟรช",
-    "refreshWithAge": "รีเฟรช, รีเฟรชล่าสุด {age}"
+    "refreshWithAge": "รีเฟรช, รีเฟรชล่าสุด {age}",
+    "refreshing": "กำลังรีเฟรช",
+    "failed": "ล้มเหลว",
+    "autoRefresh": "รีเฟรชอัตโนมัติ",
+    "autoOn": "อัตโนมัติ · {interval}",
+    "every": "ทุก {interval}",
+    "interval": {
+      "10s": "10 วิ",
+      "30s": "30 วิ",
+      "1m": "1 นาที",
+      "5m": "5 นาที",
+      "15m": "15 นาที"
+    }
   },
   "synthetics": {
     "variables": {
@@ -21897,7 +22039,12 @@
       "noPrivateMatches": "No private locations match your search",
       "newPrivateLocation": "New private location",
       "publicSubtitle": "Cloud regions, always available",
-      "privateSubtitle": "Location is ready when at least one of its agents is live"
+      "privateSubtitle": "Location is ready when at least one of its agents is live",
+      "emptyState": {
+        "title": "ยังไม่มีสถานที่",
+        "description": "สถานที่คือจุดที่มอนิเตอร์สังเคราะห์ของคุณใช้ตรวจสอบ เช่น รีเจียนของคลาวด์",
+        "actionDesc": "เพิ่มสถานที่สำหรับรันการตรวจสอบ"
+      }
     },
     "newCheck": {
       "comingSoon": "Coming Soon",
@@ -22978,7 +23125,10 @@
       "tokenLinkTooltip": "Choose which ingestion token the snippets use",
       "copiedWithToken": "Copied with org token {name}",
       "tokenIncludedHint": "Copy includes the org's ingestion token, which stays hidden here.",
-      "maskedSelectionWarning": "The hidden token was copied as dots. Use Copy, or Reveal it first."
+      "maskedSelectionWarning": "The hidden token was copied as dots. Use Copy, or Reveal it first.",
+      "wrapLines": "ตัดบรรทัด",
+      "showAll": "แสดงทั้งหมด {count} บรรทัด",
+      "showLess": "แสดงน้อยลง"
     },
     "spinner": {
       "loading": "กำลังโหลด"
@@ -23023,7 +23173,10 @@
       "moreInfo": "More information"
     },
     "dialog": {
-      "closeDialog": "Close dialog"
+      "closeDialog": "Close dialog",
+      "discardChanges": "ละทิ้งการเปลี่ยนแปลงหรือไม่",
+      "keepEditing": "แก้ไขต่อ",
+      "discard": "ละทิ้ง"
     },
     "drawer": {
       "closeDrawer": "Close drawer"
@@ -23046,6 +23199,32 @@
       "clear": "ล้าง"
     },
     "file": {
+      "removeNamed": "ลบ {name}",
+      "sourceLabel": "นำเข้าจาก",
+      "sourceFile": "ไฟล์",
+      "sourceUrl": "URL",
+      "sourcePaste": "วาง",
+      "dropPrompt": "วางไฟล์ที่นี่หรือ {choose}",
+      "dropPromptMultiple": "วางไฟล์ที่นี่หรือ {choose}",
+      "chooseAFile": "เลือกไฟล์",
+      "chooseFiles": "เลือกไฟล์",
+      "chooseFileButton": "เลือกไฟล์",
+      "chooseFilesButton": "เลือกไฟล์",
+      "noFileChosen": "ยังไม่ได้เลือกไฟล์",
+      "dropToUpload": "วางเพื่ออัปโหลด",
+      "upToSize": "ไม่เกิน {size}",
+      "upToSizeEach": "ไม่เกิน {size} ต่อไฟล์",
+      "oneFile": "หนึ่งไฟล์",
+      "upToFiles": "ไม่เกิน {count} ไฟล์",
+      "typeRejected": "รับเฉพาะไฟล์ {allowed} เท่านั้น",
+      "sizeRejected": "{size} เกินขีดจำกัด {max}",
+      "countRejected": "ครั้งละ {count} ไฟล์เท่านั้น",
+      "uploadFailed": "อัปโหลดล้มเหลว",
+      "uploaded": "อัปโหลดแล้ว",
+      "urlPlaceholder": "URL ของไฟล์",
+      "urlHelp": "เราจะดึงไฟล์เพียงครั้งเดียวเมื่อคุณนำเข้า",
+      "textPlaceholder": "วางเนื้อหาที่นี่",
+      "invalidJson": "JSON ไม่ถูกต้อง: {detail}",
       "removeFile": "Remove file",
       "clearAll": "ล้างทั้งหมด"
     },
@@ -23060,7 +23239,14 @@
     "pagination": {
       "pagination": "Pagination",
       "previousPage": "Previous page",
-      "nextPage": "Next page"
+      "nextPage": "Next page",
+      "onFirstPage": "อยู่ที่หน้าแรกแล้ว",
+      "onLastPage": "อยู่ที่หน้าสุดท้ายแล้ว",
+      "range": "{from}–{to} จาก {total}",
+      "rangeOfMany": "{from}–{to} จากทั้งหมดจำนวนมาก",
+      "pageOf": "หน้า {page} จาก {pages}",
+      "perPage": "{size} ต่อหน้า",
+      "pageSize": "แถวต่อหน้า"
     },
     "select": {
       "more": "more",
@@ -23070,6 +23256,10 @@
       "noOptionsFound": "No options found",
       "multiSelect": "Multi select",
       "singleSelect": "Single select",
+      "any": "ใดก็ได้",
+      "noMatches": "ไม่พบรายการที่ตรงกับ \"{term}\"",
+      "clearSearch": "ล้างการค้นหา",
+      "addOption": "เพิ่ม \"{value}\"",
       "moreInfoAbout": "More information about {field}",
       "moreInfo": "More information"
     },
@@ -23111,7 +23301,10 @@
       "removeColumnAria": "Remove column",
       "formatColumnAria": "Format column",
       "selectedOfTotal": "{selected} of {total} selected",
-      "selectedCount": "{selected} selected"
+      "selectedCount": "{selected} selected",
+      "clearSelection": "ล้าง",
+      "rowActions": "การดำเนินการของแถว",
+      "moreRowActions": "การดำเนินการเพิ่มเติม"
     },
     "predefinedThemes": {
       "title": "Theme",
@@ -23479,6 +23672,26 @@
         "past": "Past days",
         "ended": "Ended"
       }
+    },
+    "jsonViewer": {
+      "include": "กรองตามค่านี้",
+      "exclude": "กรองค่านี้ออก",
+      "copyValue": "คัดลอกค่า",
+      "fieldCount": "{count} ฟิลด์",
+      "itemCount": "{count} รายการ"
+    },
+    "tabs": {
+      "more": "เพิ่มเติม",
+      "unsaved": "การเปลี่ยนแปลงที่ยังไม่บันทึก",
+      "locked": "ล็อกอยู่"
+    },
+    "statStrip": {
+      "filters": "ตัวกรอง",
+      "showOnly": "แสดงเฉพาะ {label}",
+      "alsoShow": "แสดง {label} ด้วย",
+      "stopShowing": "เลิกแสดง {label}",
+      "scrollBack": "แสดงตัวกรองก่อนหน้า",
+      "scrollForward": "แสดงตัวกรองเพิ่มเติม"
     }
   },
   "functions": {
@@ -24349,6 +24562,12 @@
   },
   "passwordPolicy": {
     "complexity": "Complexity",
+    "complexityDesc": "สิ่งที่รหัสผ่านใหม่ทุกรายการต้องมี",
+    "unitCharacters": "ตัวอักษร",
+    "unitDays": "วัน",
+    "unitPasswords": "รหัสผ่าน",
+    "unitAttempts": "ครั้ง",
+    "unitSeconds": "วินาที",
     "minLength": "Minimum length",
     "minLengthDesc": "Shortest password accepted",
     "maxLength": "Maximum length",
@@ -24364,6 +24583,7 @@
     "specialCharSet": "Allowed special characters",
     "specialCharSetDesc": "Leave empty to accept any non-alphanumeric character",
     "maxLengthTooSmall": "Maximum length must be between the minimum length and 128.",
+    "maxLengthBelowMin": "ต้องเป็น {min} ขึ้นไป เพื่อให้สอดคล้องกับความยาวขั้นต่ำ",
     "confirmTitle": "Save password policy?",
     "confirmMessage": "Saving may force every native user to set a new password before they can continue. Root, external users and service accounts are exempt — this includes you unless you are the root account. It cannot be undone.",
     "saved": "Password policy saved. | Password policy saved. {count} user must reset their password. | Password policy saved. {count} users must reset their password.",
@@ -24374,14 +24594,17 @@
     "loadFailed": "Something went wrong while reading the current policy.",
     "rotation": "Rotation",
     "rotationDays": "Rotation period",
+    "rotationDesc": "เวลาที่รหัสผ่านหมดอายุและระยะเวลาที่แจ้งเตือนล่วงหน้า",
     "rotationDaysDesc": "Days before a password expires. 0 = never expires",
     "rotationWarningDays": "Warn before expiry",
     "rotationWarningDaysDesc": "Days of notice at sign-in. 0 = no warning",
+    "rotationWarningDaysOffDesc": "จำนวนวันที่แจ้งเตือนล่วงหน้าตอนเข้าสู่ระบบ ใช้เมื่อรหัสผ่านหมดอายุ",
     "warningDaysTooLong": "The warning window cannot be longer than the rotation period.",
     "rotationPreview": "A password set today expires {expires}. The sign-in warning starts {warns}.",
     "rotationPreviewNoWarning": "A password set today expires {expires}. No warning is shown before then.",
     "reuse": "Reuse prevention",
     "historyCount": "Passwords remembered",
+    "reuseDesc": "ป้องกันไม่ให้กลับไปใช้รหัสผ่านเก่า",
     "historyCountDesc": "A new password may not match this many previous ones. 0 = no check",
     "historyMaxRetained": "History retained",
     "historyMaxRetainedDesc": "How many past passwords are kept per user",
@@ -24389,6 +24612,7 @@
     "reuseExplainer": "The current password counts as one of the remembered set — reusing it is refused by this rule, not by a separate check.",
     "lockout": "Account lockout",
     "lockoutThreshold": "Failed attempts before lockout",
+    "lockoutDesc": "สิ่งที่เกิดขึ้นหลังจากเข้าสู่ระบบไม่สำเร็จซ้ำๆ",
     "lockoutThresholdDesc": "0 = lockout disabled",
     "lockoutBucketSize": "Attempts before each further lockout",
     "lockoutBucketSizeDesc": "0 = reuse the value above",
@@ -24403,6 +24627,7 @@
     "backoffLinear": "Linear",
     "lockoutPreview": "{threshold} failures → {first} · every {bucket} more → {rest} · capped at {max}. A successful sign-in resets everything.",
     "sessionEnforcement": "Session & enforcement",
+    "sessionEnforcementDesc": "ระยะเวลาที่การเข้าสู่ระบบคงอยู่ และ root ต้องปฏิบัติตามกฎเหล่านี้หรือไม่",
     "cookieMaxAge": "Session lifetime",
     "cookieMaxAgeDesc": "Seconds a signed-in session stays valid. 0 = use the instance default from {envVar}",
     "applyToRoot": "Apply to the root account",
@@ -24779,6 +25004,7 @@
       "packUnavailableHint": "Curated content for this workload hasn't shipped. Build a dashboard to chart it in the meantime.",
       "partialTelemetryKubernetes": "We found Kubernetes streams, but not the metrics this page needs (kubeletstats or cluster receiver). Check your collector's receivers.",
       "partialTelemetryHosts": "We found host streams, but not the metrics this page needs. Check your collector's hostmetrics receiver.",
+      "hostMetricsMissingTitle": "ไม่พบเมตริกของโฮสต์",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}, and {count} more",
       "hiddenFootnote": "Data sources you don't have access to also appear here.",
@@ -27229,6 +27455,7 @@
     "l0BudgetInvalidNotSaved": "ระยะเวลาหน่วงต้องอยู่ระหว่าง 30 ถึง 600 วินาที",
     "l0AllowSuppress": "Suppress the page",
     "savePolicyFailed": "Could not save the policy",
+    "savePolicyFailedReason": "ไม่ได้บันทึกนโยบาย {reason}",
     "state_triggered": "Triggered",
     "state_triaged": "Triaged",
     "state_acknowledged": "Acknowledged",
@@ -28629,7 +28856,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Step 1 · Server prerequisites",
+      "title": "ขั้นตอนที่ 1 · ข้อกำหนดเบื้องต้นของเซิร์ฟเวอร์",
       "subtitle": "Checked on this server before any Slack work",
       "columnSetting": "Setting",
       "columnResult": "Result",
@@ -28700,7 +28927,7 @@
       "back": "ย้อนกลับ",
       "finish": "Finish",
       "connection": {
-        "title": "Step 2 · Connection",
+        "title": "ขั้นตอนที่ 2 · การเชื่อมต่อ",
         "description": "The check reaches Slack from this server through the same code path production uses.",
         "allPassed": "Slack is reachable from this server",
         "someFailed": "Slack is not reachable from this server. Allow *.slack.com through your proxy or firewall, then Re-check.",
@@ -28709,7 +28936,7 @@
         "socketHost": "WebSocket host {host}"
       },
       "create": {
-        "title": "Step 3 · Create the app",
+        "title": "ขั้นตอนที่ 3 · สร้างแอป",
         "modeLabel": "Connection mode",
         "socket": "Socket Mode",
         "socketDescription": "Recommended. OpenObserve opens the connection, so Slack needs no public URL",
@@ -28738,7 +28965,7 @@
         "signingSecretRequired": "HTTP mode needs the signing secret"
       },
       "install": {
-        "title": "Step 4 · Install",
+        "title": "ขั้นตอนที่ 4 · ติดตั้ง",
         "created": "App created · {appId}",
         "allowHint": "Opens Slack's install screen: click Allow there. The bot token comes back from Slack by itself; nothing to copy.",
         "allow": "Allow in Slack",
@@ -28761,7 +28988,7 @@
         "appNotCreatedByO2": "OpenObserve did not create this app, so it stays in Slack. Delete it there if you no longer need it."
       },
       "test": {
-        "title": "Step 5 · Test and linking",
+        "title": "ขั้นตอนที่ 5 · ทดสอบและเชื่อมบัญชี",
         "run": "Run checks",
         "signIn": "Test Sign in with Slack",
         "signInPassed": "Sign in with Slack works",
@@ -28846,6 +29073,11 @@
       "otherOrgs": "No other org | {count} other org | {count} other orgs",
       "connectedOn": "{date} by {user}",
       "helpContact": "Help contact",
+      "helpContactHelp": "ผู้ที่เชื่อมบัญชีไม่ได้จะถูกแจ้งให้ติดต่อผู้ติดต่อนี้",
+      "eventsLabel": "เหตุการณ์ Slack",
+      "connectionLabel": "การเชื่อมต่อ",
+      "outboundLabel": "คิวขาออก",
+      "collaboratorsLabel": "ผู้ร่วมงานของแอป",
       "helpContactPlaceholder": "#o2-help, or a person to ask",
       "helpContactSaved": "Help contact saved",
       "disconnectSection": "Disconnect",
@@ -30587,8 +30819,26 @@
   "filterBar": {
     "queryTooltip": "แก้ไขตัวกรองเป็นข้อความ",
     "builderTooltip": "แก้ไขตัวกรองด้วยตัวสร้าง",
-    "editorModeLabel": "Filter editor",
-    "modeBuilder": "Builder",
-    "modeText": "Text"
+    "editorModeLabel": "ตัวแก้ไขตัวกรอง",
+    "modeBuilder": "ตัวสร้าง",
+    "modeText": "ข้อความ"
+  },
+  "pageHeader": {
+    "about": "เกี่ยวกับหน้านี้"
+  },
+  "genAiAgentMapping": {
+    "coverageValue": "· ใน {percent}% ของเทรซ ในช่วง 24 ชั่วโมงที่ผ่านมา",
+    "fallbacksNote": "กรอกฟิลด์สำรองโดยคั่นด้วยเครื่องหมายจุลภาค ตามลำดับที่ต้องการตรวจสอบ",
+    "fallbackInvalid": "ใช้ชื่อฟิลด์คั่นด้วยเครื่องหมายจุลภาค ใช้ได้เฉพาะตัวอักษร ตัวเลข และ . _ - : / {'@'}",
+    "sessions": {
+      "title": "การแสดงเซสชัน",
+      "help": "วิธีตั้งชื่อเซสชันและข้อความส่วนห่อที่จะซ่อน",
+      "noAgents": "ยังไม่มีเอเจนต์ เพิ่มเอเจนต์เพื่อซ่อนข้อความส่วนห่อของเอเจนต์นั้น"
+    }
+  },
+  "copyButton": {
+    "copy": "คัดลอก",
+    "copied": "คัดลอกแล้ว",
+    "failed": "การคัดลอกถูกบล็อก · กด Ctrl C"
   }
 }

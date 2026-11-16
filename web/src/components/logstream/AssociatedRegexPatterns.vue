@@ -343,7 +343,6 @@
                     : 'associated-regex-patterns-add-pattern-btn'
                 "
                 @click="handleAddOrRemovePattern"
-                :icon="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'delete' : 'add'"
               >
                 {{
                   checkIfPatternIsApplied(userClickedPattern.pattern_id)

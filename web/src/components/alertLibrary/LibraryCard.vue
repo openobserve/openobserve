@@ -165,7 +165,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           variant="secondary"
-          icon="add"
           :title="t('alert_library.drawer.install')"
           :aria-describedby="titleId"
           :data-test="`alert-library-card-add-${entry.id}`"

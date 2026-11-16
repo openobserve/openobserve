@@ -546,7 +546,6 @@ const draftOperator = computed(() => {
             <OButton
               variant="ghost"
               size="sm"
-              icon="add"
               :disabled="Boolean(limitReason)"
               :data-test="`${dataTest}-add-condition`"
               @mousedown.prevent
@@ -559,7 +558,6 @@ const draftOperator = computed(() => {
             <OButton
               variant="ghost"
               size="sm"
-              icon="add"
               :disabled="Boolean(limitReason)"
               :data-test="`${dataTest}-add-group`"
               @mousedown.prevent

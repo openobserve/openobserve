@@ -117,7 +117,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OButton
       variant="ghost"
-      icon="add"
       class="self-start"
       :data-test="`${dataTestPrefix}-add-btn`"
       @click="addRow"
