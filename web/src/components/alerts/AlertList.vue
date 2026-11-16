@@ -1978,12 +1978,19 @@ export default defineComponent({
     // + token colour keep it theme-aware and hardcode-free.
     const alertRowStyle = (row: any): Record<string, string> => {
       const s = alertState(row);
+      // Unknown run state shows no firing colour: a stale firing must not read as live.
+      const live = s === "active" && !statusUnavailable.value && !row?.status_unavailable;
+      const firing = live && isFiringRow(row);
       const color =
         s === "failed"
           ? "var(--color-error-500)"
           : s === "paused"
             ? "var(--color-grey-400)"
-            : "var(--color-success-500)";
+            : firing && isAckedFiring(row) && !ackCanChange(row)
+              ? "var(--color-warning-500)"
+              : firing
+                ? "var(--color-error-500)"
+                : "var(--color-success-500)";
       return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 

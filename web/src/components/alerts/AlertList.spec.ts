@@ -4063,6 +4063,47 @@ describe("AlertList — Acknowledge and alert-scoped Mute (MK-3)", () => {
     return { wrapper, row };
   };
 
+  it.each([
+    ["failed", { is_real_time: "anomaly", status: "failed", enabled: true }, "error-500"],
+    ["firing", { enabled: true, last_outcome: "firing" }, "error-500"],
+    ["fully acknowledged", { enabled: true, last_outcome: "firing", ack }, "warning-500"],
+    [
+      "partly acknowledged",
+      {
+        enabled: true,
+        last_outcome: "firing",
+        multi_alert: true,
+        groups_firing: 2,
+        ack: { ...ack, groups_acked: 1 },
+      },
+      "error-500",
+    ],
+    [
+      "lower-bound acknowledged",
+      {
+        enabled: true,
+        last_outcome: "firing",
+        multi_alert: true,
+        groups_firing: 2,
+        groups_firing_is_lower_bound: true,
+        ack: { ...ack, groups_acked: 2 },
+      },
+      "error-500",
+    ],
+    ["paused", { enabled: false, last_outcome: "firing" }, "grey-400"],
+    ["quiet", { enabled: true, last_outcome: "ok" }, "success-500"],
+    [
+      "status-unknown",
+      { enabled: true, last_outcome: "firing", status_unavailable: true },
+      "success-500",
+    ],
+  ])("colours the row rail for a %s alert", async (_state, row, token) => {
+    const wrapper: any = await mountAlertList({ renderTable: false });
+    expect(wrapper.vm.alertRowStyle(row).boxShadow).toBe(
+      `var(--shadow-rail-geom) var(--color-${token})`,
+    );
+  });
+
   it("carries the list's ack onto the row", async () => {
     const { row } = await loadAckRows();
     expect(row("acked-firing").ack).toMatchObject({ acked_by: "bob@acme.io" });
