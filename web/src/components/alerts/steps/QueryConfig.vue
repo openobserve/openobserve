@@ -1052,8 +1052,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Realtime — no threshold sentence, just filters always visible -->
-            <div v-else class="mb-1" :class="!sectionTargets && 'px-3'">
-              <div class="flex items-center gap-2 py-1">
+            <div v-else class="mb-1" :class="sectionTargets ? 'pb-2' : 'px-3'">
+              <div v-if="!sectionTargets" class="flex items-center gap-2 py-1">
                 <div
                   class="filters-inline-toggle rounded-default bg-surface-panel hover:bg-tabs-hover-bg flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors select-none"
                   @click="toggleFilters"
@@ -1096,7 +1096,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
               </div>
-              <div v-show="showFilters" ref="customPreviewRef">
+              <div v-show="showFilters || sectionTargets" ref="customPreviewRef">
                 <FilterBuilder
                   ref="conditionsBuilderRef"
                   profile="alert"
@@ -1450,7 +1450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <Teleport
                 :to="sectionTargets?.queryCondition"
                 :disabled="!sectionTargets?.queryCondition"
-                ><div class="flex flex-col gap-0 px-1">
+                ><div class="flex flex-col gap-0">
                   <!-- SQL: Simple vs Multi alert choice — placed before the
                    condition row so the row below reads as "pick a mode,
                    then fill in its shape", not "fill in a row, then a
