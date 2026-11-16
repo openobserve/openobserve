@@ -540,6 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- One instance on every width, since a remount re-applies the opening URL's zone. -->
         <!-- Both targets are always in the DOM, so a move never waits on another component's render. -->
+        <!-- Stays enabled while panels load: a disabled trigger drops focus, and a new range aborts the stale run. -->
         <Teleport defer :to="hasTimeRow ? '#dashboard-time-row' : '#dashboard-header-time'">
           <DateTimePickerDashboard
             preset="dashboard"
@@ -554,7 +555,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             :modelValue="timeGate.picked.value ?? selectedDate"
             :initialTimezone="initialTimezone"
-            :disable="arePanelsLoading"
             :retention-days="dashboardStreamLimits.retentionDays"
             @update:modelValue="timeGate.onApply"
             @show="timeGate.onShow"

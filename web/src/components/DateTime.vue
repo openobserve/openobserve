@@ -548,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   focusable-unavailable
                   :tooltip="chip.reason ? raw(chip.reason) : undefined"
                   :aria-label="chip.title"
-                  class="o-time-chip data-[state=on]:bg-accent! data-[state=on]:text-text-inverse! data-disabled:border-border-default data-disabled:bg-surface-base! h-6! tabular-nums data-disabled:border forced-colors:data-disabled:text-[color:GrayText]! forced-colors:data-[state=on]:bg-[color:Highlight]! forced-colors:data-[state=on]:text-[color:HighlightText]! forced-colors:data-[state=on]:forced-color-adjust-none pointer-coarse:h-8! pointer-coarse:min-w-10"
+                  class="o-time-chip data-[state=on]:bg-accent! data-[state=on]:text-text-inverse! h-6! tabular-nums forced-colors:data-disabled:text-[color:GrayText]! forced-colors:data-[state=on]:bg-[color:Highlight]! forced-colors:data-[state=on]:text-[color:HighlightText]! forced-colors:data-[state=on]:forced-color-adjust-none pointer-coarse:h-8! pointer-coarse:min-w-10"
                   :data-test="`date-time-chip-${chip.label}`"
                   >{{ raw(chip.label) }}<OTooltip v-if="!chip.disabled" :content="chip.title"
                 /></OToggleGroupItem>
@@ -3087,6 +3087,8 @@ export default defineComponent({
 
     // Enter takes the field's text first, then applies when it read.
     const onTimeFieldEnter = (event: KeyboardEvent) => {
+      // Focus is back on the trigger before keypress fires, so an unprevented Enter reopens the panel.
+      event.preventDefault();
       const input = event.target instanceof HTMLInputElement ? event.target : null;
       const field = fieldOf(input);
       if (input && field) commitFieldText(field, input.value);

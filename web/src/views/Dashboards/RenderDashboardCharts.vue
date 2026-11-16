@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         menu-align="start"
                         class="panel-time-picker-widget invisible absolute start-0 top-0"
-                        @update:modelValue="(val) => getPanelTimeGate(item.id).onPick(val)"
+                        @update:modelValue="(val, meta) => onPanelTimeApply(item.id, val, meta)"
                         @show="getPanelTimeGate(item.id).onShow()"
                         @hide="onPanelTimePickerHide(item.id)"
                         @timezone-change="getPanelTimeGate(item.id).flush()"
@@ -429,6 +429,7 @@ import { getVariableKey, useVariablesManager } from "@/composables/dashboard/use
 import {
   useDashboardTimeGate,
   type DashboardTimeGate,
+  type DashboardTimeApplyMeta,
 } from "@/composables/dashboard/useDashboardTimeGate";
 import useStreams from "@/composables/useStreams";
 import {
@@ -1812,6 +1813,7 @@ export default defineComponent({
 
     // Gates outlive a picker remount, so a range still waiting survives a tab switch.
     const panelTimeGates = new Map<string, DashboardTimeGate>();
+    const panelAutoRuns = new Map<string, number>();
     const panelTimeGateScope = effectScope(true);
     onBeforeUnmount(() => panelTimeGateScope.stop());
 
@@ -1828,7 +1830,10 @@ export default defineComponent({
         gate = panelTimeGateScope.run(() =>
           useDashboardTimeGate({
             isAutoRunOn: () => dashboardAutoRun.value === true,
-            onAutoApply: () => refreshPanelRequest(panelId, false),
+            onAutoApply: () => {
+              panelAutoRuns.set(panelId, (panelAutoRuns.get(panelId) ?? 0) + 1);
+              refreshPanelRequest(panelId, false);
+            },
             showInPicker: (value) =>
               panelTimePickers
                 .get(panelId)
@@ -1841,6 +1846,18 @@ export default defineComponent({
     };
 
     const getPanelPickedTime = (panelId: string) => getPanelTimeGate(panelId).picked.value;
+
+    // A user's apply runs the panel even with Auto Run off; the gate's own auto-apply may already have run it.
+    const onPanelTimeApply = (panelId: string, value: any, meta?: DashboardTimeApplyMeta) => {
+      const gate = getPanelTimeGate(panelId);
+      const before = gate.applied.value;
+      const runsBefore = panelAutoRuns.get(panelId) ?? 0;
+      gate.onApply(value, meta);
+      const ranAlready = (panelAutoRuns.get(panelId) ?? 0) !== runsBefore;
+      if (before && gate.applied.value !== before && !ranAlready) {
+        refreshPanelRequest(panelId, false);
+      }
+    };
 
     const panelTimeChips = new Map<string, { $el?: HTMLElement }>();
     const setPanelTimeChip = (panelId: string, chip: any) => {
@@ -2123,6 +2140,7 @@ export default defineComponent({
       panelTimeValues,
       hasPanelTime,
       getPanelTimeGate,
+      onPanelTimeApply,
       getPanelPickedTime,
       isPanelTimeWaiting,
       setPanelTimePicker,

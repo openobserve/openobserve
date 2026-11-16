@@ -833,6 +833,16 @@ describe("RenderDashboardCharts", () => {
       dateTime().findComponent(DateTime).vm.setRelativeDate(unit, value);
       await flushPromises();
     };
+    // A picker correction (not a user apply) is the one way a range still waits with Auto Run off.
+    const holdRange = async (period: string) => {
+      wrapper.vm
+        .getPanelTimeGate("P1")
+        .onApply(
+          { type: "relative", valueType: "relative", relativeTimePeriod: period },
+          { userChanged: false },
+        );
+      await flushPromises();
+    };
     const panelRefreshRequests = () =>
       (wrapper.emitted("refreshPanelRequest") ?? []).filter((args: any[]) => args[0] === "P1");
 
@@ -855,10 +865,23 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.vm.getPanelTimeGate("P1").applied.value.relativeTimePeriod).toBe("1h");
     });
 
-    it("keeps a picked range waiting with Auto Run off and marks only that panel", async () => {
+    it("runs a picked range at once with Auto Run off and writes it to the URL (N3)", async () => {
       await mountWithPanelPicker();
 
       await pickPreset("h", 6);
+
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("6h");
+      expect(replaceSpy).toHaveBeenCalledWith({
+        query: expect.objectContaining({ "pt-period.P1": "6h" }),
+      });
+      expect(panelRefreshRequests()).toEqual([["P1", false]]);
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+    });
+
+    it("keeps a range the picker set on its own waiting with Auto Run off and marks only that panel", async () => {
+      await mountWithPanelPicker();
+
+      await holdRange("6h");
 
       expect(wrapper.vm.getPanelTimeGate("P1").picked.value.relativeTimePeriod).toBe("6h");
       expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("1h");
@@ -869,7 +892,7 @@ describe("RenderDashboardCharts", () => {
 
     it("applies the waiting range when the panel's own refresh is clicked", async () => {
       await mountWithPanelPicker();
-      await pickPreset("h", 6);
+      await holdRange("6h");
 
       panel().vm.$emit("refreshPanelRequest", "P1", false);
       await flushPromises();
@@ -884,7 +907,7 @@ describe("RenderDashboardCharts", () => {
 
     it("applies the waiting range on the dashboard Refresh", async () => {
       await mountWithPanelPicker();
-      await pickPreset("h", 6);
+      await holdRange("6h");
 
       await wrapper.vm.syncAllPanelDateTimePickers();
       await flushPromises();
@@ -895,9 +918,9 @@ describe("RenderDashboardCharts", () => {
 
     it("clears the marker without a reload when the applied range is picked again", async () => {
       await mountWithPanelPicker();
-      await pickPreset("h", 6);
+      await holdRange("6h");
 
-      await pickPreset("h", 1);
+      await holdRange("1h");
 
       expect(panel().props("isTimeRangeWaiting")).toBe(false);
       expect(panelRefreshRequests()).toHaveLength(0);
@@ -917,7 +940,7 @@ describe("RenderDashboardCharts", () => {
 
     it("applies a waiting range when Auto Run is turned on", async () => {
       await mountWithPanelPicker();
-      await pickPreset("h", 6);
+      await holdRange("6h");
 
       autoRun.value = true;
       await flushPromises();

@@ -677,6 +677,14 @@ describe("ViewDashboard time range gate", () => {
     expect(refreshButton().props("variant")).toBe("primary");
   });
 
+  it("keeps the time picker enabled while panels load, so focus can return to its trigger (N2)", async () => {
+    await mountDashboard();
+    wrapper.vm.arePanelsLoading = true;
+    await flushPromises();
+
+    expect(picker().props("disable")).toBe(false);
+  });
+
   it("swaps Refresh for a labelled Cancel while enterprise panels load, with the options arrow to match", async () => {
     const wasEnterprise = config.isEnterprise;
     config.isEnterprise = "true";

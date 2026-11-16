@@ -149,8 +149,13 @@
   --color-toggle-item-active-text: var(--color-primary-700);
   --color-toggle-item-active-border: var(--color-primary-600);
   --color-toggle-item-disabled: var(--color-text-disabled);
-  /* Picker-local, re-pointed onto the shared disabled tokens by the time-picker-scope utility. */
-  --color-time-range-item-disabled: var(--color-grey-500);
+  /* Picker-local, re-pointed onto the shared disabled tokens by the time-picker-scope utility.
+     Darker than grey-500, which is 4.35:1 on the grey-100 track the greyed chips sit on. */
+  --color-time-range-item-disabled: color-mix(
+    in srgb,
+    var(--color-grey-500) 80%,
+    var(--color-grey-600)
+  );
   --color-toggle-border: var(--color-border-subtle);
   --color-toggle-focus-ring: var(--color-focus-ring-accent);
   /* Insertion line shown while dragging to reorder (reorderable groups) */

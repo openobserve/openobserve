@@ -712,6 +712,12 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     if (reading.type !== "timestamp" || !reading.fold) return label;
     const atMs = startUs / 1000;
     const abbreviation = formatZoneAbbreviation(zone.value, atMs, intlLocale.value);
+    const endAbbreviation = formatZoneAbbreviation(zone.value, endUs / 1000, intlLocale.value);
+    const dash = label.indexOf(" – ");
+    // An end past the fall-back hour is in the other zone, so each side names its own.
+    if (endAbbreviation !== abbreviation && dash >= 0) {
+      return `${label.slice(0, dash)} ${abbreviation}${label.slice(dash)} ${endAbbreviation}`;
+    }
     return `${label} ${abbreviation} (${formatZoneOffset(zone.value, atMs)})`;
   };
 

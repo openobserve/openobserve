@@ -60,9 +60,9 @@ const brandScope = (themeColor: string, mode: "light" | "dark"): Map<string, str
 };
 
 describe("time picker disabled item token", () => {
-  // The chips sit on surface-base; calendar days and list rows on the overlay panel.
+  // Greyed chips have no fill of their own, so their text sits on the toggle track.
   it.each(MODES)("clears 4.5:1 on the picker's surfaces in %s", (mode) => {
-    for (const surface of ["--color-surface-base", "--color-surface-overlay"]) {
+    for (const surface of ["--color-toggle-track-bg", "--color-surface-overlay"]) {
       expect(ratio(ITEM_DISABLED, surface, THEMES[mode])).toBeGreaterThanOrEqual(TEXT_MIN);
     }
   });
