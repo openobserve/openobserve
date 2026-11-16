@@ -76,7 +76,7 @@ test.describe("Span View Logs (#12013, #15028)", { tag: "@enterprise" }, () => {
   );
 
   test(
-    "logs in streams with different namespace fields open on the span, with no field error",
+    "logs in streams with different namespace fields open on the trace, with no field error",
     {
       tag: ["@bug-15028", "@P1", "@regression", "@tracesRegression"],
     },

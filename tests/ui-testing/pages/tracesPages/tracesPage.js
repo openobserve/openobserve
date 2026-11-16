@@ -3870,6 +3870,8 @@ export class TracesPage {
   }
 
   async expectSpanNoLogsNotice(message) {
-    await expect(this.page.locator('[data-test="traces-span-drawer-no-logs-notice"]')).toContainText(message, { timeout: 30000 });
+    const notice = this.page.locator('[data-test="traces-span-drawer-no-logs-notice"]');
+    await expect(notice).toBeVisible({ timeout: 30000 });
+    await expect(notice).toContainText(message);
   }
 }
