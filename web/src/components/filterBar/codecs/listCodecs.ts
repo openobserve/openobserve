@@ -265,6 +265,14 @@ export const profilesCodec = () =>
     },
   });
 
+/** An alert's groups table filters the rows it holds, so the saved format is the condition itself. */
+export const alertGroupsCodec = () =>
+  flatCodec<FlatCondition>({
+    read: ({ field, operator, values }) => ({ field, operator, values: [...values] }),
+    label: (item) => `${item.field} ${OPERATORS[item.operator].symbol} ${item.values.join(", ")}`,
+    write: ({ field, operator, values }) => ({ field, operator, values: [...values] }),
+  });
+
 const SYNTHETICS_OPERATORS: Record<string, FilterOperatorId> = {
   eq: "eq",
   ne: "neq",
