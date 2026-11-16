@@ -401,6 +401,14 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       expect(trigger).toMatchObject({ frequency: 25, silence: 45 });
     });
 
+    it("a form mounted without a period still links frequency and silence to the first one typed", async () => {
+      const host = mountLive({ frequency: 10, silence: 10, frequency_type: "minutes" });
+
+      const trigger = await typePeriod(host, "20");
+
+      expect(trigger).toMatchObject({ frequency: 20, silence: 20 });
+    });
+
     it("a form re-seeded without remount re-links fields that match its new period", async () => {
       const host = mountLive();
       await typePeriod(host, "20");

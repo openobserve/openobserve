@@ -426,6 +426,11 @@ describe("AddAlert (OForm owner)", () => {
         form.setFieldValue("query_condition.sql", sql);
       };
 
+      const saveSettled = async () => {
+        await wrapper.vm.form.handleSubmit();
+        await flushPromises();
+      };
+
       it("blocks an immediate save of invalid SQL and makes no save request", async () => {
         vi.mocked(searchService.search).mockRejectedValueOnce({
           response: { status: 400, data: { message: "SQL error: syntax error at FROM" } },
@@ -452,21 +457,41 @@ describe("AddAlert (OForm owner)", () => {
         expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
       });
 
-      it("saves valid SQL after the check passes", async () => {
+      it("saves valid SQL after checking that same SQL", async () => {
+        const sql = 'SELECT count(*) AS total FROM "_rundata"';
         vi.mocked(searchService.search).mockResolvedValueOnce({ data: {} } as never);
         wrapper = mountAlert();
         await flushPromises();
-        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+        seedSql(wrapper.vm.form, sql);
 
         await wrapper.vm.form.handleSubmit();
         await vi.waitFor(() => expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1), {
           timeout: 2000,
         });
 
-        expect(searchService.search).toHaveBeenCalledWith(
-          expect.objectContaining({ validate: true }),
-        );
+        const [check] = vi.mocked(searchService.search).mock.calls[0];
+        expect(check).toEqual(expect.objectContaining({ validate: true }));
+        // The validator sends the SQL as typed; any base64 encoding happens later in the service.
+        expect(check.query.query.sql).toBe(sql);
+        const [, payload] = vi.mocked(alertsService.create_by_alert_id).mock.calls[0];
+        expect(payload.query_condition.sql).toBe(check.query.query.sql);
         expect(wrapper.vm.sqlQueryErrorMsg).toBe("");
+      });
+
+      it("runs the cheap save gates before the SQL check", async () => {
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+        wrapper.vm.form.setFieldValue("trigger_condition.frequency_type", "cron");
+        wrapper.vm.form.setFieldValue("trigger_condition.cron", "not-a-cron");
+
+        await saveSettled();
+
+        expect(toast).toHaveBeenCalledWith(
+          expect.objectContaining({ message: "Invalid cron expression" }),
+        );
+        expect(searchService.search).not.toHaveBeenCalled();
+        expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
       });
 
       it("saves once the fresh check clears an error left from an earlier query", async () => {
@@ -480,11 +505,6 @@ describe("AddAlert (OForm owner)", () => {
           timeout: 2000,
         });
       });
-
-      const saveSettled = async () => {
-        await wrapper.vm.form.handleSubmit();
-        await flushPromises();
-      };
 
       it("blocks the save without a SQL error when the VRL function fails", async () => {
         vi.mocked(searchService.search).mockResolvedValueOnce({
@@ -523,6 +543,26 @@ describe("AddAlert (OForm owner)", () => {
           }),
         );
         expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+        const variants = vi.mocked(toast).mock.calls.map(([options]) => options.variant);
+        expect(variants).toContain("success");
+        expect(variants.indexOf("warning")).toBeGreaterThan(variants.indexOf("success"));
+      });
+
+      it("does not claim an unchecked save when the save itself fails", async () => {
+        vi.mocked(searchService.search).mockRejectedValueOnce(new Error("Network Error"));
+        vi.mocked(alertsService.create_by_alert_id).mockRejectedValueOnce(new Error("save failed"));
+        wrapper = mountAlert();
+        await flushPromises();
+        seedSql(wrapper.vm.form, 'SELECT count(*) AS total FROM "_rundata"');
+
+        await saveSettled();
+
+        expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+        expect(toast).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: i18n.global.t("alerts.messages.sqlCheckUnavailable"),
+          }),
+        );
       });
 
       it("shows the select-all message for a SELECT * query", async () => {
@@ -552,11 +592,32 @@ describe("AddAlert (OForm owner)", () => {
           destinations: [{ name: "email" }],
         });
         await flushPromises();
+        wrapper.vm.form.setFieldValue("query_condition.sql", `  ${sql}\n`);
         wrapper.vm.sqlQueryErrorMsg = "Search stream not found: app_logs";
 
         await saveSettled();
 
         expect(searchService.search).not.toHaveBeenCalled();
+        expect(alertsService.update_by_alert_id).toHaveBeenCalledTimes(1);
+      });
+
+      it("checks the stored SQL again when an edit changes its VRL function", async () => {
+        const sql = 'SELECT count(*) AS total FROM "app_logs"';
+        wrapper = mountAlert({
+          isUpdated: true,
+          modelValue: savedAlert({
+            query_condition: { ...savedAlert().query_condition, type: "sql", sql },
+          }),
+          destinations: [{ name: "email" }],
+        });
+        await flushPromises();
+        wrapper.vm.form.setFieldValue("query_condition.vrl_function", ".a = 1");
+
+        await saveSettled();
+
+        expect(searchService.search).toHaveBeenCalledWith(
+          expect.objectContaining({ validate: true }),
+        );
         expect(alertsService.update_by_alert_id).toHaveBeenCalledTimes(1);
       });
 
