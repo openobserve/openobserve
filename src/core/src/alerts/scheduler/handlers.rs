@@ -5474,13 +5474,8 @@ fn report_next_run(
     })
 }
 
-/// End of a cron pipeline window that starts at `t0`, before the minute alignment.
-///
-/// The window end is later cut to the minute. When the cron seconds field is not 0
-/// (for example `7 */2 * * * *`), the next cron time after `t0` can fall in the same
-/// minute as `t0`, and the cut end then equals `t0`. That run is skipped without
-/// moving `t0`, so every later run is skipped too. Take the first cron time in a
-/// later minute instead.
+/// The end is cut to the minute later, so a cron time in `t0`'s minute (seconds field
+/// not 0) would give an empty window that never moves `t0`: take a later minute.
 fn cron_window_end(
     trigger_condition: &TriggerCondition,
     tz_offset: i32,
