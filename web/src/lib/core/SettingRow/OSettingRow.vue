@@ -37,15 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bare && 'min-w-28',
       ]"
     >
-      <div class="text-text-heading flex items-center gap-1 text-sm font-medium">
-        <span
-          >{{ label }}<span v-if="required" class="text-text-body">{{ requiredMark }}</span></span
-        >
+      <div class="text-text-heading text-sm font-medium">
+        {{ label }}<span v-if="required" class="text-text-body">{{ requiredMark }}</span>
         <span
           v-if="info"
           tabindex="0"
           role="img"
-          class="text-text-secondary flex items-center"
+          class="text-text-secondary ms-0.5 inline-flex align-middle"
           :aria-label="info"
           :data-test="dataTest ? `${dataTest}-info` : undefined"
         >
