@@ -762,6 +762,7 @@ import { dashboardTimeUs, fixedShareLabel, withRollingPeriod } from "@/utils/sha
 import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
 import { fixedRangeEnd } from "@/utils/autoRefreshPause";
 import { formatPeriodLabel } from "@/utils/timeRangeRail";
+import { getIntlLocale } from "@/locales";
 import { urlTimeToMicros } from "@/utils/dashboard/urlTimeParams";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -2699,7 +2700,7 @@ export default defineComponent({
     );
     const dashboardRollingLabel = computed(() =>
       dashboardPeriod.value
-        ? String(formatPeriodLabel(dashboardPeriod.value, store.state.timezone, t))
+        ? String(formatPeriodLabel(dashboardPeriod.value, store.state.timezone, t, getIntlLocale()))
         : "",
     );
     const dashboardShareDefaultKind = computed(() => dashboardShareKind(dashboardPeriod.value));

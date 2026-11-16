@@ -143,10 +143,10 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
   });
 
   // TC-05
-  test("a pasted window ending past the present is cut to now, and Next cannot move it further", {
+  test("a pasted window still in progress keeps its real end, and Next stays disabled", {
     tag: ['@date-time-next-shift-cap', '@all', '@P1']
   }, async ({ page }) => {
-    testLogger.info('Verifying a pasted end past the present stops at now');
+    testLogger.info('Verifying a pasted end past the present is kept as an in-progress range');
 
     // Whole seconds, as the Start and End fields hold them.
     const { startMicros, endMicros } = await page.evaluate(() => {
@@ -161,24 +161,14 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
 
     await pm.dateTimePickerPage.clickCopy();
     const pasted = await pm.dateTimePickerPage.readCopiedRange();
-    const afterPaste = await page.evaluate(() => Date.now() * 1_000);
     expect(pasted.start_date).toBe(startMicros);
-    expect(pasted.end_date).toBeLessThanOrEqual(afterPaste);
-    expect(pasted.end_date).toBeGreaterThan(startMicros);
+    expect(pasted.end_date).toBe(endMicros);
 
-    // Next stays within the present whether or not a second has passed since the paste.
+    // The range already ends past now, so there is nothing later to step to.
     await pm.dateTimePickerPage.closePickerWithEscape();
-    if (await pm.dateTimePickerPage.nextShiftBtn.isEnabled()) {
-      await pm.dateTimePickerPage.clickNext();
-    }
-    await pm.dateTimePickerPage.openPicker();
-    await pm.dateTimePickerPage.clickCopy();
-    const shifted = await pm.dateTimePickerPage.readCopiedRange();
-    const afterNext = await page.evaluate(() => Date.now() * 1_000);
-    expect(shifted.end_date).toBeLessThanOrEqual(afterNext);
-    expect(shifted.end_date - shifted.start_date).toBe(pasted.end_date - pasted.start_date);
+    await pm.dateTimePickerPage.expectNextDisabled();
 
-    testLogger.info('Pasted end cut to now; Next never passes the present');
+    testLogger.info('Pasted in-progress end kept; Next disabled');
   });
 
   // TC-06

@@ -326,6 +326,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import DateTime from "@/components/DateTime.vue";
 import usePageTimeRange from "@/composables/usePageTimeRange";
+import useTimeRangeContext from "@/composables/useTimeRangeContext";
+import { rangeToLegacy } from "@/utils/timeRangeModel";
 import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -380,6 +382,7 @@ const triggerFilter = defineModel<RunTriggerFilter>("triggerFilter", { default: 
 
 const { t } = useI18nTyped();
 const store = useStore();
+const timeContext = useTimeRangeContext();
 const dash = raw("—");
 
 // Loading + the runs list live in SHARED state (workflowObj.runsHistory) so the
@@ -610,6 +613,14 @@ const columns = computed<OTableColumnDef[]>(() => [
 // `force` for the refresh and retry buttons; a mount or window change reads the cache.
 const fetchHistory = async (force = false) => {
   if (!props.workflowId) return;
+  // A rolling range resolves at query time; the picker's instants trail the clock.
+  if (dateTimeType.value === "relative") {
+    const { startTime, endTime } = rangeToLegacy(
+      { kind: "rolling", span: relativeTime.value },
+      timeContext.now(),
+    );
+    dateTimeValues.value = { startTime, endTime };
+  }
   const res = await loadRunsHistory({
     orgId: props.orgId,
     workflowId: props.workflowId,

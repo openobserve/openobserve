@@ -261,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :ai-enabled="isAiEnabled"
                         :stream-doc-time-range="streamDocTimeRange"
                         :query-window-us="queryWindowUs"
+                        :chart-filter="chartFilter"
                         @update:datetime="setHistogramDate"
                         @update:scroll="getMoreData"
                         @update:sort="runQueryOnSort"
@@ -330,6 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 // @ts-nocheck
 import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
+import { getIntlLocale } from "@/locales";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import {
   ref,
@@ -2126,6 +2128,9 @@ const onFiltersReset = () => {
 const tracesContextOn = computed(() =>
   contextViewOn(tracesContext.value, searchObj.data.editorValue),
 );
+const chartFilter = computed(() =>
+  tracesContextOn.value ? "" : String(searchObj.data.editorValue ?? ""),
+);
 const tracesContextText = computed(() =>
   tracesContextOn.value && tracesContext.value
     ? contextViewStripText(tracesContext.value, store.state.timezone, t)
@@ -2150,6 +2155,7 @@ const onTracesSearchAround = (request: { row: any; seconds: number; keepFilters:
   );
   // Keep filters is no context view: the range moves and runs like any drag-zoom.
   if (request.keepFilters) {
+    tracesContext.value = null;
     bar.enterContextWindow(range);
     return;
   }
@@ -2199,10 +2205,10 @@ const staleRangeText = computed(() => {
   if (!queried) return null;
   const range =
     queried.type === "relative"
-      ? String(formatPeriodLabel(queried.period, store.state.timezone, t))
+      ? String(formatPeriodLabel(queried.period, store.state.timezone, t, getIntlLocale()))
       : formatRangeLabel(
           { startUs: queried.startUs, endUs: queried.endUs },
-          { timezone: store.state.timezone, surface: "summary" },
+          { timezone: store.state.timezone, surface: "summary", locale: getIntlLocale() },
         );
   return t("search.resultsAreForRange", { range });
 });
@@ -2231,11 +2237,11 @@ const arrivalRangeText = computed(() => {
   const entry = arrival.value;
   if (!entry) return null;
   if (isRelativeHistoryEntry(entry))
-    return formatPeriodLabel(entry.relative, store.state.timezone, t);
+    return formatPeriodLabel(entry.relative, store.state.timezone, t, getIntlLocale());
   return raw(
     formatRangeLabel(
       { startUs: entry.startUs, endUs: entry.endUs },
-      { timezone: store.state.timezone, surface: "summary" },
+      { timezone: store.state.timezone, surface: "summary", locale: getIntlLocale() },
     ),
   );
 });
@@ -2642,6 +2648,9 @@ const onApplySavedView = async (view: TracesSavedView) => {
 /** Applies a stream, filter, window and mode in place, then runs unless only loading. */
 const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   const seq = ++savedViewApplySeq;
+  // A view or Recent entry is a range the user chose, so a refused link no longer holds the page.
+  tracesRangeLink.fromLink = false;
+  tracesRangeLink.refusal = null;
   const streamName = view.stream?.value;
   const streamChanged = streamName !== searchObj.data.stream.selectedStream.value;
   if (

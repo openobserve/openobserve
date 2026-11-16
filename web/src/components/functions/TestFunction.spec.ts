@@ -8,6 +8,14 @@ import enLocale from "@/locales/languages/en-US.json";
 import searchService from "@/services/search";
 import { flushPromises } from "@vue/test-utils";
 
+const { mockRangesFromServerError } = vi.hoisted(() => ({
+  mockRangesFromServerError: vi.fn(() => Promise.resolve([] as unknown[])),
+}));
+vi.mock("@/utils/query/sqlDiagnostics", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  rangesFromServerError: (...a: unknown[]) => mockRangesFromServerError(...(a as [])),
+}));
+
 // Mock dependencies
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
@@ -913,6 +921,41 @@ describe("TestFunction.vue Branch Coverage", () => {
       await flushPromises();
       expect(JSON.parse(vm.inputEvents)).toEqual([{ run: "newer" }]);
       expect(vm.loading.events).toBe(false);
+    });
+
+    it("does not let an older failed query's late diagnostics mark a newer result", async () => {
+      const replies: Array<{ resolve: (v: unknown) => void; reject: (e: unknown) => void }> = [];
+      vi.mocked(searchService.search).mockImplementation(
+        () => new Promise((resolve, reject) => replies.push({ resolve, reject })) as any,
+      );
+      let diagnose: (ranges: unknown[]) => void = () => {};
+      mockRangesFromServerError.mockImplementationOnce(
+        () => new Promise((resolve) => (diagnose = resolve)),
+      );
+      const wrapper = mount(TestFunction, {
+        props: defaultProps,
+        global: {
+          plugins: [mockI18n],
+          provide: { store: mockStore },
+          stubs: {
+            "query-editor": true,
+            DateTime: true,
+            FullViewContainer: true,
+            O2AIContextAddBtn: true,
+          },
+        },
+      });
+      const vm = wrapper.vm as any;
+      vm.getResults();
+      replies[0].reject({ response: { data: { message: "bad sql", code: 400 } } });
+      await flushPromises();
+      vm.getResults();
+      replies[1].resolve({ data: { hits: [{ run: "newer" }] } });
+      await flushPromises();
+      diagnose([{ startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 4 }]);
+      await flushPromises();
+      expect(vm.sqlErrorRanges).toEqual([]);
+      expect(vm.sqlQueryErrorMsg).toBe("");
     });
   });
 });

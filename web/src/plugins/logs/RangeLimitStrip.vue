@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { getIntlLocale } from "@/locales";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -66,16 +67,16 @@ const { t } = useI18nTyped();
 
 const askedLabel = computed(() =>
   props.refusal.period
-    ? formatPeriodLabel(props.refusal.period, props.timezone, t)
+    ? formatPeriodLabel(props.refusal.period, props.timezone, t, getIntlLocale())
     : raw(
         formatRangeLabel(
           { startUs: props.refusal.asked.startUs, endUs: props.refusal.asked.endUs },
-          { timezone: props.timezone, surface: "summary" },
+          { timezone: props.timezone, surface: "summary", locale: getIntlLocale() },
         ),
       ),
 );
 const allowedLabel = computed(() =>
-  formatPeriodLabel(props.refusal.allowedPeriod, props.timezone, t),
+  formatPeriodLabel(props.refusal.allowedPeriod, props.timezone, t, getIntlLocale()),
 );
 const text = computed(() =>
   t("dateTime.linkOverLimit", {

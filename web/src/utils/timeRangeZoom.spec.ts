@@ -150,6 +150,46 @@ describe("drag-zoom over a Logs histogram bar [Bug 1, Bug 2]", () => {
   );
 });
 
+describe("drag-zoom on the repeated hour of a clocks-go-back day", () => {
+  let originalTz: string | undefined;
+  beforeEach(() => {
+    originalTz = process.env.TZ;
+  });
+  afterEach(() => {
+    process.env.TZ = originalTz;
+  });
+
+  it.each(["UTC", "America/New_York"])(
+    "never collapses to zero width in New York on Nov 1 (browser %s)",
+    (browser) => {
+      process.env.TZ = browser;
+      const zone = "America/New_York";
+      // 05:00Z (01:00 EDT) and 06:00Z (01:00 EST) are both drawn at 01:00 on the chart's clock.
+      const origin = Date.UTC(2026, 10, 1, 4, 0);
+      const shifted = (ms: number) => toZonedTime(ms, zone).getTime();
+      const barAt = shifted(Date.UTC(2026, 10, 1, 5, 0));
+      for (const [from, to] of [
+        [-10, 10],
+        [-25, 25],
+        [5, 20],
+      ]) {
+        const snapped = snapZoomToBuckets(
+          barAt + from * MINUTE_MS,
+          barAt + to * MINUTE_MS,
+          HOUR_MS,
+          shifted(origin),
+          zone,
+        );
+        const start = instantFromShiftedMs(snapped.start, zone);
+        const end = instantFromShiftedMs(snapped.end, zone);
+        expect(end, `${from}..${to}`).toBeGreaterThan(start);
+        expect(start).toBeLessThanOrEqual(Date.UTC(2026, 10, 1, 5, 0) * 1000);
+        expect(end).toBeGreaterThanOrEqual(Date.UTC(2026, 10, 1, 6, 0) * 1000);
+      }
+    },
+  );
+});
+
 describe("snapZoomToBuckets", () => {
   const origin = Date.UTC(2026, 10, 16, 0, 0);
 

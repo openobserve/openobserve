@@ -79,6 +79,7 @@ export interface TimeRangeSteppingProps {
   queryRangeRestrictionMsg: string;
   shortcuts: boolean;
   undoable: boolean;
+  fiscalYearStartMonth?: number | null;
 }
 
 interface AppliedSelection {
@@ -337,13 +338,16 @@ export default function useTimeRangeStepping(
   const shiftFixedPeriodRange = (direction: "prev" | "next"): boolean => {
     const period = fixedPeriodStep(direction === "prev" ? -1 : 1);
     if (!period) return false;
-    if (period.startUs >= forwardCeilingMicros()) return true;
-    if (exceedsRangeRestriction(period.startUs, period.endUs, props.queryRangeRestrictionInHour)) {
+    const ceiling = forwardCeilingMicros();
+    if (period.startUs >= ceiling) return true;
+    // A host's last day (`maxDate`) cuts the period; without one a whole period may run past now.
+    const endUs = props.maxDate ? Math.min(period.endUs, ceiling) : period.endUs;
+    if (exceedsRangeRestriction(period.startUs, endUs, props.queryRangeRestrictionInHour)) {
       showRestrictionToast();
       return true;
     }
     captureUndo();
-    fields.writeInstants(period.startUs, period.endUs);
+    fields.writeInstants(period.startUs, endUs);
     selectedType.value = "absolute";
     saveDate("absolute", false, "step");
     closeMenu();
@@ -501,7 +505,7 @@ export default function useTimeRangeStepping(
     zone: zone.value,
     weekStart: weekStartsOn(),
     locale: clock.intlLocale.value,
-    fiscalYearStartMonth: null,
+    fiscalYearStartMonth: props.fiscalYearStartMonth ?? null,
   });
 
   // A calendar period, or a single whole day, steps by its unit and is named by it.

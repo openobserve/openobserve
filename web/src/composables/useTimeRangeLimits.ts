@@ -118,9 +118,12 @@ export default function useTimeRangeLimits(props: TimeRangeLimitProps, clock: Ti
       : t("common.timeRangeStartInFuture");
   };
 
-  // An End typed past maxDate is refused like a Start; without one a fixed range may run on (§2).
+  // An End typed past maxDate is refused like a Start; without one a fixed range may run on (§2), up to the ten years a link keeps.
   const endBoundError = (endMicros: number): I18nText | null => {
-    if (!props.maxDate || !(endMicros > forwardCeilingMicros())) return null;
+    if (!props.maxDate) {
+      return endMicros > Date.now() * 1000 + MAX_FUTURE_US ? t("common.timeRangeInputError") : null;
+    }
+    if (!(endMicros > forwardCeilingMicros())) return null;
     const date = formatCivilDay(props.maxDate, zone.value, tooltipNow.value, intlLocale.value);
     return t("common.timeRangeAfterMax", { date });
   };

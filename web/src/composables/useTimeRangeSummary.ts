@@ -62,6 +62,7 @@ export interface TimeRangeSummaryProps {
   kinds: TimeRangeKind[];
   wholeDays: boolean;
   queryRangeRestrictionInHour: number;
+  fiscalYearStartMonth?: number | null;
 }
 
 export interface TimeRangeSummaryDeps {
@@ -111,7 +112,7 @@ export default function useTimeRangeSummary(
     zone: zone.value,
     weekStart: weekStartsOn(),
     locale: intlLocale.value,
-    fiscalYearStartMonth: null,
+    fiscalYearStartMonth: props.fiscalYearStartMonth ?? null,
   });
 
   const kindText = (live: boolean | undefined) =>

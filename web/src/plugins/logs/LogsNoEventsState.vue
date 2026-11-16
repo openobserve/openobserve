@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { getIntlLocale } from "@/locales";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
@@ -200,6 +201,7 @@ const jumpTargetSublabel = computed(() => {
   const lastDataUs = props.streamDocTimeRange!.max;
   const formatted = DateTime.fromMillis(lastDataUs / 1000)
     .setZone(zone)
+    .setLocale(getIntlLocale())
     .toFormat("MMM d, yyyy HH:mm:ss");
   return t("logs.logsNoEventsState.lastData", { formatted, zone });
 });
@@ -212,7 +214,7 @@ const currentPeriodLabel = computed(() => {
   if (w)
     return formatRangeLabel(
       { startUs: w.start, endUs: w.end },
-      { timezone: props.timezone, surface: "summary" },
+      { timezone: props.timezone, surface: "summary", locale: getIntlLocale() },
     );
   return isRelative.value
     ? periodToLabel(props.relativeTimePeriod)
@@ -226,6 +228,6 @@ const tryChip = computed(() => {
   return nextLongerChip(w.end - w.start, chips);
 });
 const tryChipLabel = computed(() =>
-  tryChip.value ? formatPeriodLabel(tryChip.value.value, props.timezone, t) : "",
+  tryChip.value ? formatPeriodLabel(tryChip.value.value, props.timezone, t, getIntlLocale()) : "",
 );
 </script>

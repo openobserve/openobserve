@@ -151,8 +151,12 @@ export class DateTimePickerPage {
     }
 
     async expectShiftAriaLabels() {
-        await expect(this.prevShiftBtn).toHaveAttribute('aria-label', 'Previous');
-        await expect(this.nextShiftBtn).toHaveAttribute('aria-label', 'Next');
+        // Labels name the step: "Previous 15m", "Back one hour", "Next 15m", "Already at now".
+        await expect(this.prevShiftBtn).toHaveAttribute('aria-label', /^(Previous|Back one) \S.*$/);
+        await expect(this.nextShiftBtn).toHaveAttribute(
+            'aria-label',
+            /^((Next|Forward one|Back to) \S.*|Already at now)$/,
+        );
     }
 
     async expectNextEnabled() {

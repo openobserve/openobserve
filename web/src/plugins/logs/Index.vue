@@ -743,6 +743,7 @@ import {
   onBeforeUnmount,
   onUnmounted,
 } from "vue";
+import { getIntlLocale } from "@/locales";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -4132,10 +4133,10 @@ export default defineComponent({
       if (!queried) return null;
       const range =
         queried.type === "relative"
-          ? String(formatPeriodLabel(queried.period, store.state.timezone, t))
+          ? String(formatPeriodLabel(queried.period, store.state.timezone, t, getIntlLocale()))
           : formatRangeLabel(
               { startUs: queried.startUs, endUs: queried.endUs },
-              { timezone: store.state.timezone, surface: "summary" },
+              { timezone: store.state.timezone, surface: "summary", locale: getIntlLocale() },
             );
       return t("search.resultsAreForRange", { range });
     });

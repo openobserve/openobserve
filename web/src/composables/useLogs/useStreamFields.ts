@@ -1343,6 +1343,11 @@ export const useStreamFields = () => {
           searchObj.data.hasSearchDataTimestampField ||
           selectedFields.includes(store.state.zoConfig.timestamp_column)
         ) {
+          const zoneLabel = rowsZoneLabel(
+            store.state.timezone,
+            searchObj.data.queryResults?.hits ?? [],
+            store.state.zoConfig.timestamp_column,
+          );
           searchObj.data.resultGrid.columns.unshift({
             name: store.state.zoConfig.timestamp_column,
             id: store.state.zoConfig.timestamp_column,
@@ -1358,12 +1363,8 @@ export const useStreamFields = () => {
                 store.state.timezone,
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
-            label: t("search.timestampWithTimezone", {
-              timezone: formatZoneOffset(store.state.timezone),
-            }),
-            header: t("search.timestampWithTimezone", {
-              timezone: formatZoneOffset(store.state.timezone),
-            }),
+            label: t("search.timestampWithTimezone", { timezone: zoneLabel }),
+            header: t("search.timestampWithTimezone", { timezone: zoneLabel }),
             align: "left",
             sortable: true,
             enableResizing: false,

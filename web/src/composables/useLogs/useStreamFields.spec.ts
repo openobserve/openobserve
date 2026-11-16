@@ -393,6 +393,29 @@ describe("useStreamFields Composable", () => {
       }
     });
 
+    it("labels the header with the rows' offset when fields are selected (Codex pass 2 B-5)", () => {
+      const zone = store.state.timezone;
+      store.state.timezone = "America/New_York";
+      searchObj.data.stream.selectedFields = ["message"];
+      searchObj.data.queryResults = {
+        hits: [Date.UTC(2026, 0, 10), Date.UTC(2026, 0, 12)].map((ms) => ({
+          _timestamp: ms * 1000,
+          message: "m",
+        })),
+      } as any;
+      vi.useFakeTimers();
+      vi.setSystemTime(Date.UTC(2026, 6, 1));
+      try {
+        wrapper.vm.updateGridColumns();
+        const ts = searchObj.data.resultGrid.columns.find((c: any) => c.id === "_timestamp");
+        expect(ts.header).toBe("timestamp (UTC-05:00)");
+        expect(ts.label).toBe("timestamp (UTC-05:00)");
+      } finally {
+        vi.useRealTimers();
+        store.state.timezone = zone;
+      }
+    });
+
     it("leaves a single-stream result unchanged", () => {
       searchObj.data.stream.selectedStream = ["app"];
 

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { getIntlLocale } from "@/locales";
 import { formatRangeLabel, formatZoneOffset, type RangeLabelSurface } from "@/utils/timeRangeLabel";
 
 /** A fixed link pins the window it was copied with; a live one re-resolves its period when opened. */
@@ -71,6 +72,9 @@ export const fixedShareLabel = (
   surface: RangeLabelSurface = "toast",
 ): string => {
   if (!(startUs > 0 && endUs > startUs)) return "";
-  const range = formatRangeLabel({ startUs, endUs }, { timezone, surface });
+  const range = formatRangeLabel(
+    { startUs, endUs },
+    { timezone, surface, locale: getIntlLocale() },
+  );
   return `${range} ${formatZoneOffset(timezone, endUs / 1000)}`;
 };

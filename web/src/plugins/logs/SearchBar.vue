@@ -1816,6 +1816,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // @ts-nocheck
 import { saveFunctionMutation } from "@/services/jstransform.queries";
+import { getIntlLocale } from "@/locales";
 import {
   createSavedViewMutation,
   updateSavedViewMutation,
@@ -4596,7 +4597,7 @@ export default defineComponent({
     );
     const shareRollingLabel = computed(() =>
       sharePeriod.value
-        ? String(formatPeriodLabel(sharePeriod.value, store.state.timezone, t))
+        ? String(formatPeriodLabel(sharePeriod.value, store.state.timezone, t, getIntlLocale()))
         : "",
     );
     // Logs keep a stale relativeTimePeriod on absolute ranges, so only type and end decide.

@@ -781,6 +781,7 @@ import {
   toRef,
   shallowRef,
 } from "vue";
+import { getIntlLocale } from "@/locales";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
@@ -987,7 +988,9 @@ export default defineComponent({
     const shareRollingLabel = computed(() => {
       const date = searchObj.data.datetime;
       if (date.type !== "relative" || !date.relativeTimePeriod) return "";
-      return String(formatPeriodLabel(date.relativeTimePeriod, store.state.timezone, t));
+      return String(
+        formatPeriodLabel(date.relativeTimePeriod, store.state.timezone, t, getIntlLocale()),
+      );
     });
     const queryEditorRef = ref(null);
 

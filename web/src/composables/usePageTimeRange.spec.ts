@@ -123,6 +123,23 @@ describe("usePageTimeRange: run rules reach the page's own handler", () => {
   });
 });
 
+describe("usePageTimeRange: a page with no separate run", () => {
+  it("resolves a rolling range at the moment it runs, not at the last clock tick", () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    const t0 = Date.UTC(2026, 10, 16, 10, 0, 0);
+    vi.setSystemTime(t0);
+    const p = page();
+    vi.setSystemTime(t0 + 4_000);
+    p.onApply(LAST_1H, PANEL);
+    expect(p.onRange.mock.calls[0][0]).toMatchObject({
+      startTime: (t0 + 4_000 - 3_600_000) * 1000,
+      endTime: (t0 + 4_000) * 1000,
+    });
+    p.stop();
+    vi.useRealTimers();
+  });
+});
+
 describe("usePageTimeRange: a page whose Run query is separate from storing the range", () => {
   it("stores every apply but runs only by the explorer-manual rule", () => {
     const run = vi.fn();

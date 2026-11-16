@@ -40,6 +40,8 @@ export interface FieldsSnapshot {
   date: { from: string; to: string };
   time: { startTime: string; endTime: string };
   seededEnd: ShownEnd | null;
+  // The exact instants the fields stood for, where they hold bounds the fields cannot show.
+  instants?: { start: number; end: number } | null;
 }
 
 export interface TimeRangeFieldsDeps {
@@ -110,6 +112,10 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
     date: { ...selectedDate.value },
     time: { ...selectedTime.value },
     seededEnd,
+    instants:
+      heldInstants?.key === absoluteFieldsKey()
+        ? { start: heldInstants.startUTC, end: heldInstants.endUTC }
+        : null,
   });
 
   // The one way the picker writes its own Absolute fields; an omitted shown end keeps the current one.
@@ -191,6 +197,13 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
     const shown = getUTCTimeStamp();
     if (shown.startUTC === held.startUTC && shown.endUTC === held.endUTC) return;
     heldInstants = { key: absoluteFieldsKey(), ...held };
+  };
+
+  // Puts back a snapshot, with its exact instants, so an edit since then leaves no held bound behind.
+  const restoreFields = (snapshot: FieldsSnapshot) => {
+    writeSeededFields({ ...snapshot.date, ...snapshot.time }, snapshot.seededEnd);
+    heldInstants = null;
+    if (snapshot.instants) holdUnshownInstants(snapshot.instants.start, snapshot.instants.end);
   };
 
   // A finished calendar period ends at the next one's start; second-precision fields show its last second, as its tooltip does.
@@ -388,6 +401,21 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
       ? micros + MICROS_PER_SECOND
       : micros;
 
+  const pointOf = (text: string, ceilingMs?: number): number | null => {
+    const reading = parseTimeInput(text, { now: new Date(), timeZone: zone.value, ceilingMs });
+    return reading ? readingAnchorMicros(reading, zone.value) : null;
+  };
+
+  // The fields omit the current year, so yearless text keeps the field's year: an End later this year is not last year's.
+  const readFieldPoint = (field: TimeField, text: string): number | null => {
+    const past = pointOf(text);
+    const ahead = pointOf(text, Number.POSITIVE_INFINITY);
+    if (ahead === null || ahead === past) return past;
+    const year = fieldDate(field).slice(0, 4);
+    const inYear = (us: number | null) => us !== null && convertUnixTime(us).date.startsWith(year);
+    return inYear(past) || !inYear(ahead) ? past : ahead;
+  };
+
   // A clock time alone keeps the field's day; other text goes through the bar's point parser in the picker zone.
   const readFieldText = (field: TimeField, text: string): number | null => {
     const typed = text.trim();
@@ -398,8 +426,7 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
       const at = absoluteToMicros(fieldDate(field), formatTypedTime(clockTime));
       return throughLastSecond(field, at + fractionMicros(clockOnly[2]));
     }
-    const reading = parseTimeInput(typed, { now: new Date(), timeZone: zone.value });
-    const anchor = reading ? readingAnchorMicros(reading, zone.value) : null;
+    const anchor = readFieldPoint(field, typed);
     if (anchor !== null) return throughLastSecond(field, Math.round(anchor));
     const stamp = deps.readPastedStamp(typed);
     if (!stamp) return null;
@@ -498,6 +525,7 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
     forgetSeededEnd,
     forgetEndCut,
     snapshotFields,
+    restoreFields,
     writeSeededFields,
     resetTime,
     shownEndMicros,

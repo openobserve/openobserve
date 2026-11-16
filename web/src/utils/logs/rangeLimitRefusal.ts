@@ -59,7 +59,9 @@ export const chipsWithinLimit = <T extends { value: string }>(
   if (!(limitHours > 0)) return [...chips];
   const limitUs = limitHours * 3600 * 1_000_000;
   return chips.filter((chip) => {
-    const spanUs = periodToMicros(chip.value);
+    // A rolling day steps local days, so a 7d chip across a DST fall-back runs 169 h.
+    const resolved = getConsumableRelativeTime(chip.value);
+    const spanUs = resolved ? resolved.endTime - resolved.startTime : periodToMicros(chip.value);
     return spanUs !== null && spanUs <= limitUs;
   });
 };

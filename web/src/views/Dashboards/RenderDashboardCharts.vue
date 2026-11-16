@@ -269,8 +269,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template v-if="hasPanelTime(item) && panelTimeValues[item.id]" #panel-time>
                     <!-- The chip stands in for the picker's trigger; the hidden picker under it anchors its panel there. -->
+                    <!-- A fixed range is long: the chip ellipsises before it can push the panel controls out. -->
                     <span
-                      class="relative inline-flex shrink-0"
+                      class="relative inline-flex max-w-full min-w-0"
                       :data-test="`dashboard-panel-${item.id}-time-picker`"
                     >
                       <OTag
@@ -278,16 +279,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         icon="timer"
                         clickable
-                        :aria-label="
-                          t('dashboard.panelTimeChipLabel', {
-                            range: String(panelTimeChipText(item.id)),
-                          })
-                        "
+                        class="max-w-full min-w-0"
+                        :aria-label="panelTimeChipName(item.id)"
                         :data-test="`dashboard-panel-${item.id}-time-chip`"
                         :ref="(chip) => setPanelTimeChip(item.id, chip)"
                         @click="openPanelTimePicker(item.id)"
-                        >{{ panelTimeChipText(item.id)
-                        }}<OTooltip :content="t('dashboard.panelTimeEnabled')" side="bottom"
+                        ><span
+                          class="truncate"
+                          :data-test="`dashboard-panel-${item.id}-time-chip-text`"
+                          >{{ panelTimeChipText(item.id) }}</span
+                        ><OTooltip :content="panelTimeChipName(item.id)" side="bottom"
                       /></OTag>
                       <DateTimePickerDashboard
                         preset="dashboard"
@@ -1852,6 +1853,8 @@ export default defineComponent({
         t,
         getIntlLocale(),
       );
+    const panelTimeChipName = (panelId: string): I18nText =>
+      t("dashboard.panelTimeChipLabel", { range: String(panelTimeChipText(panelId)) });
     const openPanelTimePicker = (panelId: string) => {
       panelTimePickers.get(panelId)?.dateTimePicker?.openMenu?.();
     };
@@ -2110,6 +2113,7 @@ export default defineComponent({
       setPanelTimePicker,
       setPanelTimeChip,
       panelTimeChipText,
+      panelTimeChipName,
       panelTimePickers,
       openPanelTimePicker,
       onPanelTimePickerHide,

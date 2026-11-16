@@ -84,4 +84,18 @@ describe("chipsWithinLimit", () => {
     expect(chipsWithinLimit(chips, 24).map((c) => c.value)).toEqual(["15m", "1h", "4h", "24h"]);
     expect(chipsWithinLimit(chips, 2).map((c) => c.value)).toEqual(["15m", "1h"]);
   });
+
+  it("checks a chip by the span it resolves to, so a fall-back week is 169 h (Codex pass 2 B-4)", () => {
+    const zone = process.env.TZ;
+    process.env.TZ = "America/New_York";
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-03T12:00:00Z"));
+    try {
+      expect(chipsWithinLimit(chips, 168).map((c) => c.value)).not.toContain("7d");
+      expect(chipsWithinLimit(chips, 169).map((c) => c.value)).toContain("7d");
+    } finally {
+      vi.useRealTimers();
+      process.env.TZ = zone;
+    }
+  });
 });

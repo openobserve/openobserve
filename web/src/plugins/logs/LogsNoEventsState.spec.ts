@@ -85,6 +85,20 @@ describe("LogsNoEventsState", () => {
     expect(text).toContain("No events in Oct 1 – 31");
   });
 
+  it("dates the empty range in the user's locale (Codex pass 2 B-6)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T03:00:00Z"));
+    const locale = i18n.global.locale;
+    (i18n.global as any).locale = "fr";
+    try {
+      const text = mountWithWindow("calendar:month:-1").text();
+      expect(text).toMatch(/oct\./);
+      expect(text).not.toContain("Oct ");
+    } finally {
+      (i18n.global as any).locale = locale;
+    }
+  });
+
   it("offers the next longer quick range and emits its period (R7, O4)", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-16T03:19:00Z"));

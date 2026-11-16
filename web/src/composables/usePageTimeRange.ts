@@ -81,7 +81,11 @@ const changeRange = (value: PageDateChange): TimeRange | null => {
 /** `useTimeRangeHost` for a page whose loading lives in an existing date handler (ui-spec §4). */
 export default function usePageTimeRange(o: PageTimeRangeOptions): PageTimeRange {
   const context = useTimeRangeContext();
-  const toPage = (): PageDateChange => ({ ...host.legacy.value, userChangedValue: true });
+  // Resolved now, not from `host.legacy`, whose clock ticks every few seconds.
+  const toPage = (): PageDateChange => ({
+    ...rangeToLegacy(host.range.value, context.now()),
+    userChangedValue: true,
+  });
   const host: TimeRangeHost = useTimeRangeHost({
     ...o,
     run: () => (o.run ? o.run() : o.onRange(toPage())),

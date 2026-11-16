@@ -165,6 +165,22 @@ describe("WorkflowRunsPanel", () => {
     expect(mockList).toHaveBeenCalledTimes(1);
   });
 
+  it("resolves a rolling range against the clock when it queries, not when it was picked", async () => {
+    const t0 = Date.UTC(2026, 10, 17, 10, 0, 0);
+    const clock = vi.spyOn(Date, "now").mockReturnValue(t0);
+    try {
+      const wrapper = mountPanel();
+      await flushPromises();
+      clock.mockReturnValue(t0 + 60_000);
+      await (wrapper.vm as any).fetchHistory(true);
+      const last = mockList.mock.calls.at(-1)?.[0];
+      expect(last.end_time).toBe((t0 + 60_000) * 1000);
+      expect(last.start_time).toBe((t0 + 60_000 - 15 * 60_000) * 1000);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it("emits select-run with the clicked run's id", async () => {
     const wrapper = mountPanel();
     await flushPromises();
@@ -1042,8 +1058,10 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
     const w = await mountHttp([
       row({ run_id: "h-1", event_type: "Webhook", http_request: facts() }),
     ]);
-    expect(timeline(w).props("start")).toBe(1000);
-    expect(timeline(w).props("end")).toBe(2000);
+    const start = timeline(w).props("start") as number;
+    const end = timeline(w).props("end") as number;
+    expect(end - start).toBe(15 * 60e6);
+    expect(Math.abs(end - Date.now() * 1000)).toBeLessThan(60e6);
     await setFilter(w, "alert_fired");
     expect(rowIds(w)).toEqual([]);
     expect(timeline(w).exists()).toBe(true);

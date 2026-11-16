@@ -1136,6 +1136,7 @@ export default defineComponent({
       calendarPresets: calendarAllowed,
       futureAllowed: computed(() => props.capabilities?.future === true),
       undoable: computed(() => !isForm.value),
+      fiscalYearStartMonth,
     };
     const view = reactive({ ...toRefs(props), ...flags });
     const railView = reactive({
@@ -1151,7 +1152,6 @@ export default defineComponent({
       kinds,
       future: flags.futureAllowed,
       wholeDays: computed(() => props.capabilities?.wholeDays === true),
-      fiscalYearStartMonth,
     });
     const limits = useTimeRangeLimits(view, clock);
     const { calendarMinDate, calendarMaxDate, trustedRange, calendarExceedsRestriction } = limits;
@@ -1878,6 +1878,7 @@ export default defineComponent({
         date: { from: start.date, to: end.date },
         time: { startTime: start.time, endTime: end.time },
         seededEnd: null,
+        instants: { start: applied.startTime, end: applied.endTime },
       };
     };
 
@@ -1889,7 +1890,7 @@ export default defineComponent({
       relativeValue.value = appliedSelection.relativeValue;
       const atOpen = absoluteAtOpen;
       if (appliedSinceOpen || atOpen === null) return;
-      writeSeededFields({ ...atOpen.date, ...atOpen.time }, atOpen.seededEnd);
+      fields.restoreFields(atOpen);
     };
 
     function appliedModel(): TimeRange | null {

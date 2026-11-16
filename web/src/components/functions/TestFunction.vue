@@ -652,7 +652,7 @@ const getResults = async () => {
         query: inputQuery.value,
         streamName: selectedStream.value?.name,
       }).then((ranges) => {
-        sqlErrorRanges.value = ranges;
+        if (isLatest()) sqlErrorRanges.value = ranges;
       });
 
       // Show error only if it is not real time alert

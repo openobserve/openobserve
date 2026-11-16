@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import i18n from "@/locales";
 import {
   dashboardTimeUs,
   fixedShareLabel,
@@ -75,5 +76,21 @@ describe("share link kinds", () => {
     expect(fixedShareLabel(startUs, endUs, "UTC")).toMatch(/15:42 – 15:44 UTC$/);
     expect(fixedShareLabel(startUs, endUs, "Asia/Kolkata")).toMatch(/21:12 – 21:14 UTC\+05:30$/);
     expect(fixedShareLabel(endUs, startUs, "UTC")).toBe("");
+  });
+
+  describe("in the user's locale", () => {
+    const original = (i18n.global as any).locale;
+    afterEach(() => {
+      (i18n.global as any).locale = original;
+    });
+
+    it("dates a fixed window in the user's locale (Codex pass 2 B-6)", () => {
+      (i18n.global as any).locale = "fr";
+      const startUs = Date.UTC(2026, 9, 3, 8, 0) * 1000;
+      const endUs = Date.UTC(2026, 9, 5, 9, 0) * 1000;
+      const label = fixedShareLabel(startUs, endUs, "UTC");
+      expect(label).toMatch(/oct\./);
+      expect(label).not.toContain("Oct ");
+    });
   });
 });

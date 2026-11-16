@@ -168,6 +168,23 @@ describe("TracesNoEventsState", () => {
       }
     });
 
+    it("dates the empty range in the user's locale (Codex pass 2 B-6)", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-16T03:00:00Z"));
+      const locale = i18n.global.locale;
+      (i18n.global as any).locale = "fr";
+      try {
+        wrapper.unmount();
+        mockSearchObj.data.datetime.relativeTimePeriod = "calendar:month:-1";
+        wrapper = mountComponentWithStore();
+        expect(wrapper.text()).toMatch(/oct\./);
+        expect(wrapper.text()).not.toContain("Oct ");
+      } finally {
+        (i18n.global as any).locale = locale;
+        vi.useRealTimers();
+      }
+    });
+
     it("offers the next longer quick range through the page's apply (R6, O4)", async () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(new Date("2026-11-16T03:19:00Z"));

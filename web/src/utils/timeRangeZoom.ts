@@ -50,9 +50,11 @@ export const snapZoomToBuckets = (
   const origin = toTrue(originMs);
   // ECharts centres a time-axis bar on its bucket start, so the bar under a point is the nearest start.
   const first = Math.round((toTrue(startMs) - origin) / intervalMs);
-  const last = Math.max(Math.round((toTrue(endMs) - origin) / intervalMs), first);
-  return {
-    start: toShifted(origin + first * intervalMs),
-    end: toShifted(origin + (last + 1) * intervalMs),
-  };
+  let last = Math.max(Math.round((toTrue(endMs) - origin) / intervalMs), first);
+  const start = toShifted(origin + first * intervalMs);
+  // A clocks-go-back day draws two buckets at one shifted value, so the end moves on until it is later.
+  for (let step = 0; step < 4 && toShifted(origin + (last + 1) * intervalMs) <= start; step++) {
+    last++;
+  }
+  return { start, end: toShifted(origin + (last + 1) * intervalMs) };
 };

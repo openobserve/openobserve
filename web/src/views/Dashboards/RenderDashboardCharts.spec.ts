@@ -994,6 +994,29 @@ describe("RenderDashboardCharts", () => {
       ).toBe(false);
     });
 
+    it("lets a long fixed-range chip shrink and ellipsise in a narrow panel, keeping the full range in its name and tooltip", async () => {
+      const start = Date.UTC(2026, 9, 13, 10, 0, 0) * 1000;
+      await mountWithPanelPicker({
+        type: "absolute",
+        startTime: start,
+        endTime: start + 30 * 60e6,
+      });
+      const holder = wrapper.get('[data-test="dashboard-panel-P1-time-picker"]');
+      const chip = wrapper.get('[data-test="dashboard-panel-P1-time-chip"]');
+      const text = chip.get('[data-test="dashboard-panel-P1-time-chip-text"]');
+      const range = text.text();
+      expect(range.length).toBeGreaterThan(20);
+
+      expect(holder.classes()).not.toContain("shrink-0");
+      expect(holder.classes()).toEqual(expect.arrayContaining(["min-w-0", "max-w-full"]));
+      expect(chip.classes()).toEqual(expect.arrayContaining(["min-w-0", "max-w-full"]));
+      expect(text.classes()).toContain("truncate");
+      expect(chip.attributes("aria-label")).toBe(`Panel-Specific Time Range: ${range}`);
+      expect(chip.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        `Panel-Specific Time Range: ${range}`,
+      );
+    });
+
     it("opens that panel's picker from its chip", async () => {
       await mountWithPanelPicker();
       const realPicker = dateTime().findComponent(DateTime);

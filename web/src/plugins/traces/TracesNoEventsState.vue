@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, inject } from "vue";
+import { getIntlLocale } from "@/locales";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { DateTime } from "luxon";
@@ -217,6 +218,7 @@ const jumpTargetSublabel = computed(() => {
   const lastDataUs = streamDocTimeRange.value!.max;
   const formatted = DateTime.fromMillis(lastDataUs / 1000)
     .setZone(zone)
+    .setLocale(getIntlLocale())
     .toFormat("MMM d, yyyy HH:mm:ss");
   return t("traces.tracesNoEventsState.lastData", { formatted, zone });
 });
@@ -239,7 +241,7 @@ const currentPeriodLabel = computed(() => {
   if (!w) return periodLabel.value;
   return formatRangeLabel(
     { startUs: w.start, endUs: w.end },
-    { timezone: store?.state?.timezone, surface: "summary" },
+    { timezone: store?.state?.timezone, surface: "summary", locale: getIntlLocale() },
   );
 });
 
@@ -252,6 +254,8 @@ const tryChip = computed(() => {
   return nextLongerChip(w.end - w.start, chipsWithinLimit(TIME_RANGE_CHIP_SETS.ops, limitHours));
 });
 const tryChipLabel = computed(() =>
-  tryChip.value ? formatPeriodLabel(tryChip.value.value, store?.state?.timezone, t) : "",
+  tryChip.value
+    ? formatPeriodLabel(tryChip.value.value, store?.state?.timezone, t, getIntlLocale())
+    : "",
 );
 </script>

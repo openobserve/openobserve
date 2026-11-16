@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             startTime: searchObj.data.datetime.startTime,
             endTime: searchObj.data.datetime.endTime,
           }"
-          :filter="searchObj.data.editorValue"
+          :filter="chartFilter ?? searchObj.data.editorValue"
           :streamFields="searchObj.data.stream.selectedStreamFields"
           :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
           :ai-enabled="aiEnabled"
@@ -325,6 +325,11 @@ export default defineComponent({
     },
     queryWindowUs: {
       type: Object as PropType<{ start: number; end: number }>,
+      default: undefined,
+    },
+    /** The filter the rows ran with; the context view runs none while the typed query stays. */
+    chartFilter: {
+      type: String,
       default: undefined,
     },
   },
