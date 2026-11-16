@@ -105,7 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <template v-if="!running && !voice.mine.value">
                 <span
-                  class="bg-badge-default-soft-bg ring-badge-default-ol-border/30 rounded-default flex h-7 shrink-0 items-center px-2 ring-1 ring-inset"
+                  :class="[
+                    'bg-badge-default-soft-bg ring-badge-default-ol-border/30 rounded-default flex h-7 shrink-0 items-center px-2 ring-1 ring-inset',
+                    SWITCH_HIT_AREA_CLASS,
+                  ]"
                 >
                   <OSwitch
                     v-model="autoNavigation"
@@ -343,6 +346,7 @@ import {
   noteCap,
   noteDraftCleared,
   STRIP_LINK_CLASS,
+  SWITCH_HIT_AREA_CLASS,
 } from "./composerUi";
 import { useAssistantVoice } from "./useAssistantVoice";
 import { useComposerQueue } from "./useComposerQueue";

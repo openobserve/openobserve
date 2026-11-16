@@ -48,6 +48,12 @@ export const CHIP_HIT_AREA_CLASS = [
   "[&>button]:relative [&>button]:z-1",
 ].join(" ");
 
+/** A 1.5 × 0.875 rem switch takes a 2.75 rem tap area on touch and below md. */
+export const SWITCH_HIT_AREA_CLASS = [
+  "max-md:[&_[role=switch]]:after:absolute max-md:[&_[role=switch]]:after:-inset-x-2.5 max-md:[&_[role=switch]]:after:-inset-y-4",
+  "pointer-coarse:[&_[role=switch]]:after:absolute pointer-coarse:[&_[role=switch]]:after:-inset-x-2.5 pointer-coarse:[&_[role=switch]]:after:-inset-y-4",
+].join(" ");
+
 /** A strip link reads as inline text but fills the strip's 2.75 rem height on touch and below md. */
 export const STRIP_LINK_CLASS =
   "h-auto! min-h-0! px-0! font-medium max-md:min-h-11! pointer-coarse:min-h-11!";
