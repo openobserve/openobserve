@@ -662,11 +662,18 @@ fn issue_incident(
     }
 }
 
-/// The finding's decision kind, its stream's entity id and the onset its firing recorded.
+/// The finding's decision kind, its stream's entity id and the onset of its current firing.
 fn issue_key(item: &AutoObserveIncident) -> Option<IssueKey> {
     let f = &item.finding;
     let entity_id = format!("{}/{}", f.stream_type.as_ref()?, f.stream_name.as_ref()?);
-    Some((f.kind.clone()?, entity_id, f.first_seen_at))
+    let onset = current_onset(item, &f.id).unwrap_or(f.first_seen_at);
+    Some((f.kind.clone()?, entity_id, onset))
+}
+
+/// The finding's newest firing in the incident, the episode `next_step::finding_key` runs RCA on.
+fn current_onset(item: &AutoObserveIncident, finding: &str) -> Option<i64> {
+    let held = item.firings.iter().filter(|(id, _)| id == finding);
+    held.map(|(_, onset)| *onset).max()
 }
 
 /// Owns its inputs: a lookup future borrowing the item fails the handler's `Send` check.
@@ -691,8 +698,8 @@ fn member_issues(org: &str, items: &[AutoObserveIncident]) -> Vec<MemberIssue> {
             };
             let entity = format!("{stream_type}/{name}");
             if let Some(kind) = paged_kind(org, &m.id, &entity) {
-                let key = (kind.to_string(), entity, m.first_seen_at);
-                out.push((n, key, m.recovered_at));
+                let onset = current_onset(item, &m.id).unwrap_or(m.first_seen_at);
+                out.push((n, (kind.to_string(), entity, onset), m.recovered_at));
             }
         }
     }
@@ -1105,6 +1112,7 @@ mod tests {
             incident_id: "older".into(),
             ..IssueIncident::default()
         });
+        older.firings.insert((checkout.clone(), 3));
         let items = [cohort, older];
         let members = member_issues(org, &items);
         let keys: Vec<(usize, &str, &str, i64)> = members
@@ -1114,11 +1122,12 @@ mod tests {
         assert_eq!(
             keys,
             [
-                (0, silence, "logs/checkout", 10),
+                (0, silence, "logs/checkout", 50 * MINUTE),
                 (0, drop, "logs/okta_system_log", 20 * MINUTE),
                 (0, silence, "logs/okta_admin", 30 * MINUTE),
-                (1, silence, "logs/checkout", 1),
-            ]
+                (1, silence, "logs/checkout", 3),
+            ],
+            "a member and a memberless finding read their newest firing, the one RCA runs on"
         );
         let found: Vec<Option<IssueRef>> = members
             .iter()
@@ -1144,7 +1153,7 @@ mod tests {
             .iter()
             .flatten()
             .cloned()
-            .chain([at(50 * MINUTE), at(5), at(60 * MINUTE)])
+            .chain([at(10), at(5), at(60 * MINUTE)])
             .map(|issue| incident_of(org, &issue, &items).map(|i| i.incident_id))
             .collect();
         let named = |s: &str| Some(s.to_string());
