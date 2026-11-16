@@ -22,25 +22,86 @@
           >{{ t("serviceVersions.actions.retry") }}</OButton
         >
       </div>
-      <div v-if="places.length > 1" class="flex items-center gap-2">
-        <OSelect
-          :model-value="where"
-          :label="t('serviceVersions.catalog.where')"
-          label-position="inside"
-          size="sm"
-          data-test="svcver-where"
-          @update:model-value="(value) => panel.update(String(value), 'versions')"
-          ><OSelectItem
-            v-for="place in places"
-            :key="place.key"
-            :value="place.key"
-            :label="raw(place.label)"
-            :data-test="`svcver-where-option-${place.key}`"
-            ><OTruncatedText v-if="place.outside" class="text-text-secondary block flex-1">{{
-              place.label
-            }}</OTruncatedText></OSelectItem
-          ></OSelect
+      <!-- Both rows keep their size from first paint, so the picker, rows and card that land later move neither. -->
+      <div class="flex h-8.5 min-w-0 items-center gap-3" data-test="svcver-where-row">
+        <div class="w-64 shrink-0">
+          <OSkeleton
+            v-if="discovery.isPending.value"
+            class="h-8.5 w-full"
+            data-test="svcver-where-loading"
+          />
+          <OSelect
+            v-else-if="places.length"
+            :model-value="where"
+            :label="t('serviceVersions.catalog.where')"
+            label-position="inside"
+            size="sm"
+            :disabled="places.length < 2"
+            data-test="svcver-where"
+            @update:model-value="(value) => panel.update(String(value), 'versions')"
+            ><OSelectItem
+              v-for="place in places"
+              :key="place.key"
+              :value="place.key"
+              :label="raw(place.label)"
+              :data-test="`svcver-where-option-${place.key}`"
+              ><OTruncatedText v-if="place.outside" class="text-text-secondary block flex-1">{{
+                place.label
+              }}</OTruncatedText></OSelectItem
+            ></OSelect
+          >
+        </div>
+        <OTruncatedText
+          :lines="2"
+          class="text-text-secondary flex-1 text-xs"
+          data-test="svcver-history-scope"
+          >{{ t("serviceVersions.panel.historyScope") }}</OTruncatedText
         >
+      </div>
+      <div
+        v-if="versioned.length || !unversioned"
+        class="flex h-8.5 min-w-0 items-center gap-2"
+        data-test="svcver-versions-toolbar"
+      >
+        <span class="inline-flex" data-test="svcver-include-inactive-wrap"
+          ><OSwitch
+            :model-value="showStopped"
+            size="sm"
+            :disabled="query.isPending.value || noneRunning"
+            data-test="svcver-include-inactive"
+            :label="t('serviceVersions.panel.showStopped')"
+            @update:model-value="(value) => (inactive = Boolean(value))" /><OTooltip
+            v-if="noneRunning"
+            :content="t('serviceVersions.panel.noneRunning')"
+            data-test="svcver-none-running"
+        /></span>
+        <span class="flex-1" />
+        <OSearchInput
+          v-model="search"
+          size="sm"
+          class="w-48!"
+          :placeholder="t('serviceVersions.compare.searchVersions')"
+          data-test="svcver-version-search"
+          data-no-autofocus
+        />
+        <span class="inline-flex" data-test="svcver-compare-wrap"
+          ><OButton
+            variant="outline"
+            size="sm"
+            icon-left="compare-arrows"
+            :disabled="selected.length !== 2"
+            data-test="svcver-compare"
+            @click="compare"
+            >{{ t("serviceVersions.actions.compare") }}</OButton
+          ><OTooltip
+            v-if="selected.length !== 2 && !query.isPending.value"
+            :content="
+              versioned.length === 1
+                ? t('serviceVersions.panel.onlyOneVersion')
+                : t('serviceVersions.panel.selectTwo')
+            "
+            data-test="svcver-compare-hint"
+        /></span>
       </div>
       <p v-if="noCluster" class="text-text-secondary text-xs" data-test="svcver-no-cluster">
         {{ t("serviceVersions.env.noCluster") }}
@@ -53,6 +114,7 @@
         :where="where"
         :where-label="currentWhereLabel"
         :identity="latest"
+        :show-scope="!headerShowsScope"
         :version="latest.version"
         :deploy-key="latest.deploys?.[0]?.deploy_key"
         :pre-existing="preExisting(latest)"
@@ -100,7 +162,7 @@
         class="text-text-secondary text-sm"
         data-test="svcver-panel-empty"
       >
-        {{ t("serviceVersions.compare.empty") }}
+        {{ emptyText }}
       </p>
       <OTable
         v-if="rows.length"
@@ -200,7 +262,13 @@
             @open="
               open(row.version, row.verdict.deploy_key || row.deploys?.[0]?.deploy_key, row.image)
             "
-          /><OTag
+          /><span
+            v-else-if="row.preTracking"
+            class="text-xs"
+            :data-test="`svcver-verdict-${row.version_key}-pre-tracking`"
+            ><NotComparedMark
+              :reason="noVerdictText(query.data.value?.tracking, t, undefined, false)" /></span
+          ><OTag
             v-else-if="row.preExisting"
             type="versionVerdict"
             value="pre_existing"
@@ -256,6 +324,8 @@
               :name="expanded.includes(row.version_key) ? 'expand-less' : 'expand-more'"
               size="sm"
           /></OButton>
+          <!-- Rows without history keep the expander's slot, so every row's label sits at one edge. -->
+          <span v-else class="size-6 shrink-0" aria-hidden="true" />
         </template>
         <template #expansion="{ row }">
           <div
@@ -317,45 +387,6 @@
         :where="latest ? undefined : where"
         :where-label="latest ? undefined : currentWhereLabel"
       />
-      <div v-if="versioned.length || !unversioned" class="flex flex-wrap items-center gap-2">
-        <OSwitch
-          v-model="inactive"
-          size="sm"
-          data-test="svcver-include-inactive"
-          :label="t('serviceVersions.panel.showStopped')"
-        />
-        <span class="text-text-secondary text-xs">{{
-          t("serviceVersions.panel.showStoppedHint")
-        }}</span>
-        <span class="flex-1" />
-        <OSearchInput
-          v-model="search"
-          size="sm"
-          class="w-48!"
-          :placeholder="t('serviceVersions.compare.searchVersions')"
-          data-test="svcver-version-search"
-          data-no-autofocus
-        />
-        <span
-          v-if="selected.length !== 2"
-          class="text-text-secondary text-xs"
-          data-test="svcver-compare-hint"
-          >{{
-            versioned.length === 1
-              ? t("serviceVersions.panel.onlyOneVersion")
-              : t("serviceVersions.panel.selectTwo")
-          }}</span
-        >
-        <OButton
-          variant="outline"
-          size="sm"
-          icon-left="compare-arrows"
-          :disabled="selected.length !== 2"
-          data-test="svcver-compare"
-          @click="compare"
-          >{{ t("serviceVersions.actions.compare") }}</OButton
-        >
-      </div>
       <p
         v-if="(query.data.value?.purged_versions || 0) > 0"
         class="text-text-secondary text-xs"
@@ -391,6 +422,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import VerdictChip from "./VerdictChip.vue";
+import NotComparedMark from "./NotComparedMark.vue";
 import { CATALOG_COLUMN_SIZES } from "@/plugins/traces/servicesCatalogVersions";
 import NoVersionState from "./NoVersionState.vue";
 import ServicePanelVerdictCard from "./ServicePanelVerdictCard.vue";
@@ -406,8 +438,10 @@ import {
 } from "./versionImages";
 import {
   baselineSourceLabel,
-  isOutsideK8s,
+  noVerdictText,
   sameBuild,
+  trackingNotStarted,
+  versionPlaces,
   versionImageLabel,
   whereSentence,
   whereText,
@@ -417,10 +451,16 @@ type Transition = DeployMarker & { verdict?: VerdictSummary | null };
 type PanelRow = Version & {
   verdict?: VerdictSummary;
   preExisting: boolean;
+  preTracking: boolean;
   unjudged: boolean;
   history: Transition[];
 };
-const props = defineProps<{ service: string }>();
+type AutoPick = { owner: string; where: string };
+const props = defineProps<{ service: string; autoPick?: AutoPick; headerShowsScope?: boolean }>();
+const emit = defineEmits<{
+  scope: [scope: { service: string; where: string }];
+  "update:autoPick": [pick: AutoPick];
+}>();
 const enabled = config.isEnterprise === "true" || config.isCloud === "true";
 const historyEnd = Date.now() * 1000;
 const pageSize = 20;
@@ -431,8 +471,7 @@ const org = computed(() => store.state.selectedOrganization?.identifier || ""),
   lang = computed(() => String(unref(locale) || "en"));
 const service = computed(() => props.service);
 const panel = useServicePanelRoute();
-const where = computed(() => panel.state.value.where);
-const inactive = ref(true),
+const inactive = ref(false),
   search = ref(""),
   expanded = ref<string[]>([]),
   baseline = ref<BaselineMark | undefined>();
@@ -450,7 +489,8 @@ const columns = computed<OTableColumnDef<PanelRow>[]>(() => [
     header: t("serviceVersions.catalog.deployVerdict"),
     size: CATALOG_COLUMN_SIZES.version_verdict,
   },
-  { id: "action", header: raw(""), size: 156, isAction: true },
+  // Not pinned: in a narrow panel the table scrolls, and a pinned column would cover the columns before it.
+  { id: "action", header: t("serviceVersions.actions.compare"), size: 156 },
 ]);
 const discovery = useQuery(
   computed(() => ({
@@ -461,6 +501,37 @@ const discovery = useQuery(
     }),
     enabled: enabled && Boolean(props.service && org.value),
   })),
+);
+// The no-cluster place pools unlabelled instances, so it is never the first, auto-picked place while a named one exists.
+const places = computed(() => versionPlaces(discovery.data.value?.versions || [], t));
+// An auto-picked place stays local and fixed while valid; only a user pick writes the route, which also scopes spans.
+const autoWhere = ref("");
+const owner = computed(() => JSON.stringify([org.value, user.value, props.service]));
+// The panel keeps the pick, since switching tabs remounts this tab and a fresh first place would move it.
+watch(
+  [places, owner] as const,
+  ([values, key], prev) => {
+    const valid = (where?: string) => values.some((place) => place.key === where);
+    if (prev?.[1] === key && valid(autoWhere.value)) return;
+    const kept = props.autoPick?.owner === key ? props.autoPick.where : "";
+    autoWhere.value = valid(kept) ? kept : values[0]?.key || "";
+  },
+  { immediate: true },
+);
+// Another service can land on the same place, so a new owner is saved even when the place stays.
+watch(
+  [autoWhere, owner] as const,
+  ([where, key]) => {
+    if (where) emit("update:autoPick", { owner: key, where });
+  },
+  { immediate: true },
+);
+const where = computed(() => panel.state.value.where || autoWhere.value);
+// A cached service can land on the same place, so the pair is re-announced when either half changes.
+watch(
+  [() => props.service, where] as const,
+  ([service, value]) => emit("scope", { service, where: value }),
+  { immediate: true },
 );
 const query = useQuery(
   computed(() => ({
@@ -505,21 +576,15 @@ const scoped = computed(() =>
 // Spans with no version are the setup guide's subject, never a version row to pick or compare.
 const versioned = computed(() => scoped.value.filter((row) => row.version));
 const unversioned = computed(() => scoped.value.some((row) => !row.version));
+// Running means seen in the registry's last 15 minutes, so a service with traffic earlier in the window can have
+// none; then stopped versions show, or the list would contradict the card and badge.
+const noneRunning = computed(
+  () => versioned.value.length > 0 && !versioned.value.some((row) => row.active),
+);
+const showStopped = computed(() => inactive.value || noneRunning.value);
 const noCluster = computed(() =>
   scoped.value.some((row) => row.where?.kind === "k8s" && !row.where.k8s_cluster),
 );
-const places = computed(() => {
-  const seen = new Map<string, { label: string; outside: boolean }>();
-  for (const row of discovery.data.value?.versions || [])
-    if (!seen.has(row.where_key))
-      seen.set(row.where_key, {
-        label: whereText(row.where_key, row.where, t),
-        outside: isOutsideK8s(row.where_key, row.where),
-      });
-  return [...seen]
-    .map(([key, place]) => ({ key, ...place }))
-    .sort((a, b) => a.key.localeCompare(b.key));
-});
 const currentWhereLabel = computed(
   () =>
     places.value.find((place) => place.key === where.value)?.label ||
@@ -536,13 +601,6 @@ const transitionsTitle = computed(() =>
     {},
     t,
   ),
-);
-watch(
-  places,
-  (values) => {
-    if (!where.value && values.length > 0) void panel.update(values[0].key, "versions");
-  },
-  { immediate: true },
 );
 const deployVerdicts = computed(
   () =>
@@ -592,13 +650,14 @@ const allRows = computed<PanelRow[]>(() =>
         ...row,
         verdict,
         preExisting: preExisting(row),
+        preTracking: trackingNotStarted(query.data.value?.tracking, row.tracking_started),
         unjudged: unjudged(row, verdict),
         history: historyOf(row),
       };
     })
     .filter(
       (row) =>
-        (inactive.value || row.active) &&
+        (showStopped.value || row.active) &&
         row.version.toLowerCase().includes(search.value.toLowerCase()),
     )
     .sort(
@@ -617,6 +676,12 @@ const imageView = computed(() =>
   ),
 );
 const rows = computed(() => imageView.value.rows);
+// An empty table names what emptied it: the search or no versions at all; hidden stopped versions never do.
+const emptyText = computed(() =>
+  search.value && versioned.value.length
+    ? t("serviceVersions.panel.emptySearch", { search: search.value })
+    : t("serviceVersions.panel.emptyNone"),
+);
 const moreAfter = computed(() => new Map(imageView.value.more.map((more) => [more.after, more])));
 const expansionIds = computed(() => [...new Set([...expanded.value, ...moreAfter.value.keys()])]);
 function moreLine(key: string) {
@@ -661,6 +726,12 @@ watch([() => props.service, where, org, user, inactive, search], () => {
   selected.value = [];
   expanded.value = [];
   imagesShown.value = new Set();
+});
+// A refresh can hide a selected row (a version running again hides the stopped ones), and Compare reads only shown rows.
+watch(rows, (list) => {
+  const shown = new Set(list.map((row) => row.version_key));
+  if (selected.value.some((key) => !shown.has(key)))
+    selected.value = selected.value.filter((key) => shown.has(key));
 });
 function toggle(key: string) {
   expanded.value = expanded.value.includes(key)

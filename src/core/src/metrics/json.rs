@@ -42,7 +42,7 @@ use config::{
 use datafusion::arrow::datatypes::Schema;
 use db::{self, alerts::alert::cache_stream_key};
 use infra::schema::SchemaCache;
-use ingestion_common::{IngestionResponse, StreamStatus};
+use ingestion_common::{IngestionResponse, RecordStatus, StreamStatus};
 
 use super::ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream};
 use crate::{
@@ -75,7 +75,14 @@ struct StreamLookups {
 /// Why `buffer_record` left a record out.
 enum Skipped {
     Deleting,
-    KeyTooLong { stream_name: String, reason: String },
+    KeyTooLong {
+        stream_name: String,
+        reason: String,
+    },
+    OutOfWindow {
+        stream_name: String,
+        discard: ingest::WindowDiscard,
+    },
 }
 
 /// The value a JSON metric record carries, put through the same policy as every other
@@ -110,6 +117,7 @@ async fn buffer_record(
     org_id: &str,
     stream_name: Option<&str>,
     record: json::Value,
+    window: ingest::IngestWindow,
     lookups: &mut StreamLookups,
     pipeline_inputs: &mut PipelineInputs<&'static str>,
     records_by_stream: &mut RecordsByStream<&'static str>,
@@ -159,6 +167,29 @@ async fn buffer_record(
             stream_name,
         }));
     }
+
+    let timestamp: i64 = match record.get(TIMESTAMP_COL_NAME) {
+        None => now_micros(),
+        // `as_f64` is `None` for a literal out of f64 range (`1e400`), which unwrapping
+        // turned into a panic on a request body anyone can send
+        Some(json::Value::Number(s)) => time::parse_f64_to_timestamp_micros(
+            s.as_f64()
+                .ok_or_else(|| anyhow::anyhow!("invalid _timestamp, out of range"))?,
+        ),
+        Some(_) => {
+            return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
+        }
+    };
+    if let Some(discard) = window.discard(timestamp) {
+        return Ok(Some(Skipped::OutOfWindow {
+            stream_name,
+            discard,
+        }));
+    }
+    record.insert(
+        TIMESTAMP_COL_NAME.to_string(),
+        json::Value::Number(timestamp.into()),
+    );
 
     // default to gauge if __type__ is missing
     let raw_type = record
@@ -212,23 +243,6 @@ async fn buffer_record(
             .insert(stream_name.clone(), SchemaCache::new(schema));
     }
 
-    let timestamp: i64 = match record.get(TIMESTAMP_COL_NAME) {
-        None => now_micros(),
-        // `as_f64` is `None` for a literal out of f64 range (`1e400`), which unwrapping
-        // turned into a panic on a request body anyone can send
-        Some(json::Value::Number(s)) => time::parse_f64_to_timestamp_micros(
-            s.as_f64()
-                .ok_or_else(|| anyhow::anyhow!("invalid _timestamp, out of range"))?,
-        ),
-        Some(_) => {
-            return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
-        }
-    };
-    record.insert(
-        TIMESTAMP_COL_NAME.to_string(),
-        json::Value::Number(timestamp.into()),
-    );
-
     if lookups
         .pipelines
         .get(&stream_name)
@@ -249,17 +263,18 @@ async fn buffer_record(
     Ok(None)
 }
 
-fn fail_stream(
-    stream_status_map: &mut HashMap<String, StreamStatus>,
+fn fail_stream<'a>(
+    stream_status_map: &'a mut HashMap<String, StreamStatus>,
     stream_name: &str,
     records: usize,
     error: String,
-) {
+) -> &'a mut RecordStatus {
     let stream_status = stream_status_map
         .entry(stream_name.to_string())
         .or_insert_with(|| StreamStatus::new(stream_name));
     stream_status.status.failed += records as u32;
     stream_status.status.error = error;
+    &mut stream_status.status
 }
 
 /// One stream's rows, each with a checked value, `__hash__` and string labels, and its first type.
@@ -450,12 +465,14 @@ pub async fn ingest(
     let mut records_by_stream: RecordsByStream<&'static str> = HashMap::new();
     let mut skipped_records: u32 = 0;
 
+    let window = ingest::IngestWindow::now();
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader {
         let skipped = buffer_record(
             org_id,
             stream_name,
             record,
+            window,
             &mut lookups,
             &mut pipeline_inputs,
             &mut records_by_stream,
@@ -467,7 +484,16 @@ pub async fn ingest(
             Some(Skipped::KeyTooLong {
                 stream_name,
                 reason,
-            }) => fail_stream(&mut stream_status_map, &stream_name, 1, reason),
+            }) => {
+                fail_stream(&mut stream_status_map, &stream_name, 1, reason);
+            }
+            Some(Skipped::OutOfWindow {
+                stream_name,
+                discard,
+            }) => {
+                fail_stream(&mut stream_status_map, &stream_name, 1, discard.message())
+                    .policy_dropped += 1;
+            }
         }
     }
 
@@ -611,6 +637,63 @@ mod tests {
         assert_eq!(
             infra::schema::exists("test_org_id", StreamType::Metrics, &long_name).await,
             !bounded
+        );
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_ingest_drops_only_the_out_of_window_records() {
+        let limit = &config::get_config().limit;
+        let now = now_micros();
+        let too_old = now - limit.ingest_allowed_upto_micro - 60_000_000;
+        let too_new = now + limit.ingest_allowed_in_future_micro + 60_000_000;
+        let record = |name: &str, ts: i64| json!({"__name__": name, "__type__": "gauge", "value": 1, "_timestamp": ts});
+        let body = json!([
+            record("test_json_window_mixed", now),
+            {"__name__": "test_json_window_mixed", "__type__": "gauge", "value": 1},
+            record("test_json_window_mixed", too_old),
+            record("test_json_window_mixed", too_new),
+            record("test_json_window_all_new", too_new),
+        ]);
+        let resp = ingest(
+            "test_org_id",
+            None,
+            Bytes::from(body.to_string()),
+            ingestion_common::IngestUser::from_user_email("a@a.com"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.code, 200);
+        let status = |name: &str| {
+            resp.status
+                .iter()
+                .find(|s| s.name == name)
+                .map(|s| s.status.clone())
+                .unwrap()
+        };
+        let mixed = status("test_json_window_mixed");
+        assert_eq!(
+            (mixed.successful, mixed.failed, mixed.policy_dropped),
+            (2, 2, 2)
+        );
+        assert!(schema::is_window_discard_error(&anyhow!(mixed.error)));
+        let all_new = status("test_json_window_all_new");
+        assert_eq!(
+            (all_new.successful, all_new.failed, all_new.policy_dropped),
+            (0, 1, 1)
+        );
+        assert_eq!(
+            all_new.error,
+            schema::get_future_discard_error().to_string()
+        );
+        assert!(
+            !infra::schema::exists(
+                "test_org_id",
+                StreamType::Metrics,
+                "test_json_window_all_new"
+            )
+            .await
         );
     }
 

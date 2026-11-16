@@ -34,6 +34,7 @@ use config::{
         gen_ai::GenAiAgentMappingConfig,
         otlp::OtlpRequestType,
         self_reporting::usage::{RequestStats, UsageType},
+        service_identity::SERVICE_IDENTITY_FIELDS,
         stream::{StreamParams, StreamPartition, StreamType},
     },
     metrics,
@@ -83,9 +84,7 @@ use crate::{
     logs::IngestJsonData,
     traces::{
         otel::{OtelIngestionProcessor, SpanContext, is_llm_trace},
-        service_identity::{
-            SERVICE_IDENTITY_FIELD_PREFIX, SERVICE_IDENTITY_FIELDS, ServiceIdentityCollector,
-        },
+        service_identity::{SERVICE_IDENTITY_FIELD_PREFIX, ServiceIdentityCollector},
     },
 };
 

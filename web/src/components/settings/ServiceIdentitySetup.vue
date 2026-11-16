@@ -1164,7 +1164,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
-import { servicesListQuery } from "@/services/service_streams.queries";
+import { dimensionAnalyticsQuery, servicesListQuery } from "@/services/service_streams.queries";
 import { bySignalOrder, serviceNameCount, serviceValueCount } from "@/utils/serviceCount";
 import { queryClient } from "@/composables/query/queryClient";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
@@ -2895,6 +2895,7 @@ async function loadDiscoveredServiceCount() {
       .map((record) => ({
         service_name: record.service_name,
         display_name: record.display_name,
+        display_qualifier: record.display_qualifier,
         all_dimensions: record.all_dimensions,
         disambiguation: record.disambiguation,
       }));
@@ -2913,8 +2914,10 @@ async function loadData() {
   void loadDiscoveredServiceCount();
   try {
     // 1. Load Analytics (which now includes available_groups)
-    const analyticsRes = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
-    const summary: DimensionAnalyticsSummary = analyticsRes.data;
+    // Shared query: the semantic-groups watch below fires on the same load and must reuse this read.
+    const summary: DimensionAnalyticsSummary = await queryClient.fetchQuery(
+      dimensionAnalyticsQuery(props.orgIdentifier),
+    );
 
     // Apply frontend deduplication and consistent sorting as safety net
     const rawGroups = summary.available_groups ?? [];
@@ -2984,9 +2987,16 @@ async function loadData() {
  * config, so any unsaved distinguish_by/tracked-alias edits are preserved.
  */
 async function refreshAvailableGroups() {
+  const query = dimensionAnalyticsQuery(props.orgIdentifier);
+  const state = queryClient.getQueryState(query.queryKey);
+  // fetchQuery joins a read in flight, and one started before a mapping save lacks the saved field.
+  const pendingStale = state?.isInvalidated && state.fetchStatus === "fetching";
   try {
-    const res = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
-    const summary: DimensionAnalyticsSummary = res.data;
+    // A Field Mappings save invalidates this query first, so only a real change refetches.
+    if (pendingStale) await queryClient.fetchQuery(query).catch(() => undefined);
+    const summary: DimensionAnalyticsSummary = await queryClient.fetchQuery(
+      pendingStale ? { ...query, staleTime: 0 } : query,
+    );
     availableGroups.value = deduplicateAndSortGroups(summary.available_groups ?? []);
     serviceFieldSources.value = summary.service_field_sources ?? [];
     valueDisplay.value = summary.value_display ?? {};

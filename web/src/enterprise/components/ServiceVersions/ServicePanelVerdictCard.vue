@@ -7,11 +7,14 @@
     <header class="border-border-default flex flex-col gap-1.5 border-b px-4 py-2">
       <div class="flex flex-wrap items-center gap-2">
         <VersionCompareTitle :service="service" :title="title" test-id="svcver-card-title" />
-        <ServiceEnvChip v-if="identity" :identity="identity" :service="service" />
-        <ServiceScopeChip facet="where" :where-key="where" :value="whereLabel" />
+        <template v-if="showScope">
+          <ServiceEnvChip v-if="identity" :identity="identity" :service="service" />
+          <ServiceScopeChip facet="where" :where-key="where" :value="whereLabel" />
+        </template>
       </div>
-      <div class="flex flex-wrap items-center gap-1">
-        <OTooltip :content="t('serviceVersions.actions.shareWaiting')" :disabled="!!result"
+      <!-- A version with nothing to compare never gets a compare to share; that is known before the first paint. -->
+      <div v-if="!skipped" class="flex flex-wrap items-center gap-1">
+        <OTooltip :content="shareReason" :disabled="!!result"
           ><OButton
             variant="outline"
             size="sm"
@@ -171,18 +174,28 @@ import {
 import { rumEvidence } from "./deepLinks";
 import { errorCounts, rumEarly } from "./errorTypes";
 import { formatCount, sectionFailed } from "./VersionSummaryTiles.format";
-const props = defineProps<{
-  org: string;
-  user: string;
-  service: string;
-  where: string;
-  whereLabel?: string;
-  identity?: Environment & Pick<Version, "tracking_started" | "image" | "version_images">;
-  version: string;
-  deployKey?: string;
-  preExisting?: boolean;
-  tracking?: Tracking | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    org: string;
+    user: string;
+    service: string;
+    where: string;
+    whereLabel?: string;
+    identity?: Environment & Pick<Version, "tracking_started" | "image" | "version_images">;
+    version: string;
+    deployKey?: string;
+    preExisting?: boolean;
+    tracking?: Tracking | null;
+    showScope?: boolean;
+  }>(),
+  {
+    whereLabel: undefined,
+    identity: undefined,
+    deployKey: undefined,
+    tracking: undefined,
+    showScope: true,
+  },
+);
 const emit = defineEmits<{ baseline: [baseline: BaselineMark | undefined] }>();
 const { t } = useI18nTyped();
 const drawer = useVersionCompareDrawer();
@@ -290,6 +303,11 @@ const sessionsLink = computed(() =>
 const signal = ref<Signal>("traces");
 // A section that timed out or failed measured nothing, so the card offers the same retry as a failed read.
 const sectionError = computed(() => sectionFailed(result.value?.[signal.value]));
+const shareReason = computed(() =>
+  query.isError.value
+    ? t("serviceVersions.actions.shareFailed")
+    : t("serviceVersions.actions.shareWaiting"),
+);
 const pending = ref(false),
   message = ref("");
 let generation = 0;

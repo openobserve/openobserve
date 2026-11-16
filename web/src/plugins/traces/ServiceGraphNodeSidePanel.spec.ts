@@ -27,6 +27,7 @@ const {
   notifyMock,
   toastMock,
   routerPushMock,
+  routerReplaceMock,
   deploysQueryMock,
   routeQuery,
   panelVersions,
@@ -35,6 +36,7 @@ const {
   notifyMock: vi.fn(),
   toastMock: vi.fn(),
   routerPushMock: vi.fn(),
+  routerReplaceMock: vi.fn(),
   deploysQueryMock: vi.fn(),
   routeQuery: {} as Record<string, string>,
   panelVersions: [] as unknown[],
@@ -61,14 +63,9 @@ vi.mock("@/utils/chartTheme", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/chartTheme")>()),
   chartColor: (token: string) => token,
 }));
-vi.mock("@/services/search", async (importOriginal) => {
-  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
-  return overlayServiceMock(await importOriginal(), {
-    default: {
-      search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
-    },
-  });
-});
+vi.mock("@/plugins/correlation/correlationStream", () => ({
+  streamTraceRows: vi.fn().mockResolvedValue([]),
+}));
 
 vi.mock("@/services/service_streams", () => ({
   correlate: vi.fn().mockResolvedValue({
@@ -133,7 +130,7 @@ vi.mock("vue-router", async (importOriginal) => {
     ...actual,
     useRouter: () => ({
       push: routerPushMock,
-      replace: vi.fn(),
+      replace: routerReplaceMock,
       currentRoute: { value: { path: "/", query: {} } },
     }),
     useRoute: () => route,
@@ -145,7 +142,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
-import searchService from "@/services/search";
+import { streamTraceRows } from "@/plugins/correlation/correlationStream";
 import { correlate as correlateStreams, getDimensionAnalytics } from "@/services/service_streams";
 
 // ---------------------------------------------------------------------------
@@ -584,8 +581,8 @@ describe("ServiceGraphNodeSidePanel", () => {
       await flushPromises();
 
       const errorEl = wrapper.find('[data-test="service-graph-side-panel-metrics-error"]');
-      expect(errorEl.exists()).toBe(true);
-      expect(errorEl.text()).toContain("Network failure");
+      expect(errorEl.attributes("role")).toBe("alert");
+      expect(errorEl.text()).toContain("Couldn't load this service's correlated metrics.");
     });
 
     it("should call fetchMetricsCorrelation with true when retry button is clicked", async () => {
@@ -625,40 +622,45 @@ describe("ServiceGraphNodeSidePanel", () => {
   // -------------------------------------------------------------------------
 
   describe("operations data fetch", () => {
-    it("should call searchService.search for operations on mount", async () => {
+    it("should call streamTraceRows for operations on mount", async () => {
       wrapper = mountPanel({ streamFilter: "traces-stream" });
       await flushPromises();
-      expect(searchService.search).toHaveBeenCalledWith(
-        expect.objectContaining({
-          page_type: "traces",
-          org_identifier: "default",
-        }),
-      );
+      expect(streamTraceRows).toHaveBeenCalledWith(expect.objectContaining({ org: "default" }));
     });
 
-    it("should NOT call searchService.search when streamFilter is 'all'", async () => {
-      vi.mocked(searchService.search).mockClear();
+    it("should NOT call streamTraceRows when streamFilter is 'all'", async () => {
+      vi.mocked(streamTraceRows).mockClear();
       wrapper = mountPanel({ streamFilter: "all" });
       await flushPromises();
-      expect(searchService.search).not.toHaveBeenCalled();
+      expect(streamTraceRows).not.toHaveBeenCalled();
     });
 
-    it("should NOT call searchService.search when visible is false", async () => {
-      vi.mocked(searchService.search).mockClear();
+    it("should NOT call streamTraceRows when visible is false", async () => {
+      vi.mocked(streamTraceRows).mockClear();
       wrapper = mountPanel({ visible: false });
       await flushPromises();
-      expect(searchService.search).not.toHaveBeenCalled();
+      expect(streamTraceRows).not.toHaveBeenCalled();
     });
 
     it("should show 'No operations found' when search returns empty hits", async () => {
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: { hits: [] },
-      } as any);
+      vi.mocked(streamTraceRows).mockResolvedValue([]);
       wrapper = mountPanel({ streamFilter: "default" });
       await flushPromises();
       const panel = wrapper.find('[data-test="service-graph-side-panel-recent-operations"]');
       expect(panel.exists()).toBe(true);
       expect(panel.text()).toContain("No operations found");
+    });
+
+    it("shows the operations a partial streamed answer returned instead of an empty table", async () => {
+      // The real helper rejects a partial answer unless the caller keeps it.
+      vi.mocked(streamTraceRows).mockImplementation(async (request) => {
+        if (!request.keepPartial) throw new Error("Incomplete stream search");
+        return [{ operation_name: "GET /cart", request_count: 3 }] as any;
+      });
+      wrapper = mountPanel({ streamFilter: "default" });
+      await flushPromises();
+      expect(wrapper.vm.recentOperations.map((op: any) => op.name)).toEqual(["GET /cart"]);
+      vi.mocked(streamTraceRows).mockReset().mockResolvedValue([]);
     });
 
     // A tool node's caller is its OWNING AGENT, which sits on an ancestor span —
@@ -667,16 +669,14 @@ describe("ServiceGraphNodeSidePanel", () => {
     // bug: it used raw service_name, showing the host app as the caller while the
     // graph correctly showed the agent.
     it("climbs the parent chain for a TOOL node's caller (matches the graph)", async () => {
-      vi.mocked(searchService.search).mockClear();
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: { hits: [] },
-      } as any);
+      vi.mocked(streamTraceRows).mockClear();
+      vi.mocked(streamTraceRows).mockResolvedValue([]);
       wrapper = mountPanel({
         streamFilter: "sre_agent_v2",
         selectedNode: { ...baseNode, name: "load_skill", service_type: "tool" },
       });
       await flushPromises();
-      const sql = vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      const sql = vi.mocked(streamTraceRows).mock.calls[0][0].sql;
       // Nearest-ancestor-agent caller, not raw service_name.
       expect(sql).toContain("COALESCE(c.gen_ai_agent_name, p1.gen_ai_agent_name");
       expect(sql).toContain("c.service_name)");
@@ -693,24 +693,22 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it("keeps raw service_name as caller for an INFERRED dependency node", async () => {
-      vi.mocked(searchService.search).mockClear();
-      vi.mocked(searchService.search).mockResolvedValue({
-        data: { hits: [] },
-      } as any);
+      vi.mocked(streamTraceRows).mockClear();
+      vi.mocked(streamTraceRows).mockResolvedValue([]);
       wrapper = mountPanel({
         streamFilter: "default",
         selectedNode: { ...baseNode, name: "postgres", service_type: "database" },
       });
       await flushPromises();
-      const sql = vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      const sql = vi.mocked(streamTraceRows).mock.calls[0][0].sql;
       // Inferred deps genuinely have the caller on service_name — no agent climb.
       expect(sql).toContain("service_name as caller_service");
       expect(sql).not.toContain("LEFT JOIN");
     });
 
     it("filters catalog-origin inferred dependencies by type and system", async () => {
-      vi.mocked(searchService.search).mockClear();
-      vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as any);
+      vi.mocked(streamTraceRows).mockClear();
+      vi.mocked(streamTraceRows).mockResolvedValue([]);
       wrapper = mountPanel({
         streamFilter: "default",
         selectedNode: {
@@ -723,7 +721,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
       await flushPromises();
 
-      const sql = vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      const sql = vi.mocked(streamTraceRows).mock.calls[0][0].sql;
       expect(sql).toContain("infer_service_name = 'sso'");
       expect(sql).toContain("infer_service_type = 'database'");
       expect(sql).toContain("infer_service_system = 'mysql'");
@@ -769,14 +767,14 @@ describe("ServiceGraphNodeSidePanel", () => {
       wrapper = mountPanel({ streamFilter: "default" });
       await flushPromises();
 
-      const initialCallCount = vi.mocked(searchService.search).mock.calls.length;
+      const initialCallCount = vi.mocked(streamTraceRows).mock.calls.length;
 
       await wrapper.setProps({
         selectedNode: { ...baseNode, id: "new-service", name: "new-service" },
       });
       await flushPromises();
 
-      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(initialCallCount);
+      expect(vi.mocked(streamTraceRows).mock.calls.length).toBeGreaterThan(initialCallCount);
     });
   });
 
@@ -1096,19 +1094,18 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     describe("when operations are loaded", () => {
       beforeEach(async () => {
-        vi.mocked(searchService.search).mockResolvedValue({
-          data: { hits: mockOperationsHits },
-        } as any);
+        vi.mocked(streamTraceRows).mockResolvedValue(mockOperationsHits);
         wrapper = mountPanel({ streamFilter: "default" });
         await flushPromises();
       });
 
-      it("should return unsorted rows when sortBy is empty", () => {
+      it("lists the busiest operations first until a sort is picked", () => {
         const rows = wrapper.vm.sortedOperationsTableRows;
-        expect(rows).toHaveLength(3);
-        expect(rows[0].operation).toBe("GET /api/users");
-        expect(rows[1].operation).toBe("POST /api/orders");
-        expect(rows[2].operation).toBe("GET /api/products");
+        expect(rows.map((row: { operation: string }) => row.operation)).toEqual([
+          "POST /api/orders",
+          "GET /api/users",
+          "GET /api/products",
+        ]);
       });
 
       it("should sort by p99 ascending when sortBy is p99 and sortOrder is asc", () => {
@@ -1156,9 +1153,7 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     describe("when operations are empty", () => {
       beforeEach(async () => {
-        vi.mocked(searchService.search).mockResolvedValue({
-          data: { hits: [] },
-        } as any);
+        vi.mocked(streamTraceRows).mockResolvedValue([]);
         wrapper = mountPanel({ streamFilter: "default" });
         await flushPromises();
       });
@@ -1416,13 +1411,23 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(wrapper.vm.selectedWorkloadFields[0]).toBe("service-version");
     });
 
+    it("keeps one tab per meaning: Version traffic replaces the generic version breakdown", async () => {
+      givenGroups("service_service_version", "o2_service_version");
+      wrapper = mountPanel();
+      await flushPromises();
+      await flushPromises();
+      expect(wrapper.vm.availableResourceTabConfigs.map((c: { id: string }) => c.id)).toEqual([
+        "service-version",
+      ]);
+    });
+
     it("names the version breakdown tab apart from the Versions tab", async () => {
       givenGroups("service_k8s_namespace_name", "o2_service_version");
       wrapper = mountPanel();
       await flushPromises();
       await flushPromises();
       const tab = wrapper.vm.availableResourceTabConfigs[0];
-      expect(String(tab.label)).toBe("By version");
+      expect(String(tab.label)).toBe("Version traffic");
       expect(String(tab.colLabel)).toBe("Version");
     });
 
@@ -1535,16 +1540,18 @@ describe("ServiceGraphNodeSidePanel", () => {
   // ---------------------------------------------------------------------------
 
   describe("metrics tab visibility for inferred services", () => {
-    it("should render metrics tab for regular (non-inferred) services", () => {
+    it("should render metrics tab for regular (non-inferred) services", async () => {
       wrapper = mountPanel({ selectedNode: baseNode });
+      await flushPromises();
       const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(true);
     });
 
-    it("should NOT render metrics tab for inferred services", () => {
+    it("should NOT render metrics tab for inferred services", async () => {
       wrapper = mountPanel({
         selectedNode: { ...baseNode, service_type: "database" },
       });
+      await flushPromises();
       const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(false);
     });
@@ -1602,7 +1609,15 @@ describe("ServiceGraphNodeSidePanel", () => {
       wrapper = mountPanel();
       await flushPromises();
       expect(rate(wrapper).config.unit).toBe("custom");
-      expect(rate(wrapper).config.unit_custom).toBe("spans/s");
+      expect(rate(wrapper).config.unit_custom).toBe("\u00a0spans/s");
+    });
+
+    it("counts Errors over every span, so a bucket with spans and no errors plots 0", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+      const errors = panels(wrapper).find((p: any) => p.title === "Errors").queries[0].query;
+      expect(errors).toContain("count(*) FILTER (WHERE span_status = 'ERROR')");
+      expect(errors).not.toContain("WHERE span_status = 'ERROR' AND");
     });
 
     it("adds Duration p95 in ms from the same service-scoped trace search", async () => {
@@ -1679,45 +1694,104 @@ describe("ServiceGraphNodeSidePanel", () => {
   });
 
   describe("versions tab placement and identity header", () => {
-    it("orders Operations, Versions with its count, then Metrics and shows the current identity", async () => {
+    it.each([
+      { scope: "route's", panel: "operations", where: "k8s:c1/web", spans: "k8s:c1/web" },
+      { scope: "Versions tab's own", panel: "versions", where: "", spans: "" },
+      // The count does not wait for the tab: it takes the place the tab will open on.
+      { scope: "first", panel: "operations", where: "", spans: "", countOnly: true },
+    ])(
+      "orders Operations, then Metrics, then Versions last with its count, and shows the $scope place",
+      async (c) => {
+        const previous = config.isEnterprise;
+        config.isEnterprise = "true";
+        getStreamMock.mockResolvedValueOnce({
+          schema: ["service_name", "o2_service_where"].map((name) => ({ name, type: "keyword" })),
+        });
+        // The place has spans, so its header keeps the version.
+        vi.mocked(streamTraceRows).mockResolvedValue([
+          { operation_name: "GET /", request_count: 1 },
+        ]);
+        Object.assign(routeQuery, { panel: c.panel, panelSvc: "frontend", panelWhere: c.where });
+        panelVersions.splice(
+          0,
+          panelVersions.length,
+          ...[
+            { version: "2.0", active: true, first_seen: 2 },
+            { version: "1.0", active: false, first_seen: 1 },
+            { version: "9.9", active: true, first_seen: 3, where_key: "k8s:c2/web" },
+          ].map((row) => ({
+            version_key: row.version,
+            where_key: "k8s:c1/web",
+            where: { kind: "k8s", k8s_cluster: "c1", k8s_namespace: "web" },
+            env: "prod",
+            env_source: "attribute",
+            signals: {},
+            deploys: [],
+            ...row,
+          })),
+        );
+        try {
+          wrapper = mountPanel();
+          await flushPromises();
+          await flushPromises();
+          const tabs = wrapper
+            .findAll('[data-test="service-graph-node-panel-tabs"] [data-test]')
+            .map((tab) => tab.attributes("data-test"))
+            .filter((id) => /tab-operations|svcver-versions-tab|tab-metrics/.test(id || ""));
+          expect(tabs).toEqual([
+            "service-graph-node-panel-tab-operations",
+            "service-graph-node-panel-tab-metrics",
+            "svcver-versions-tab",
+          ]);
+          expect(wrapper.find('[data-test="svcver-versions-count"]').text()).toBe("2");
+          const identity = wrapper.find('[data-test="svcver-panel-identity"]').text();
+          if (!c.countOnly) expect(identity).toContain("c1 · web");
+          if (!c.countOnly) expect(identity).toContain("2.0");
+          const ops = vi
+            .mocked(streamTraceRows)
+            .mock.calls.map((call: any) => call[0].sql)
+            .find((sql: string) => sql.includes("GROUP BY operation_name"));
+          if (c.spans) expect(ops).toContain(`o2_service_where = '${c.spans}'`);
+          else expect(ops).not.toContain("o2_service_where");
+        } finally {
+          config.isEnterprise = previous;
+          vi.mocked(streamTraceRows).mockResolvedValue([]);
+          for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+          panelVersions.splice(0);
+        }
+      },
+    );
+
+    it("says the stream's spans report no version, and shows a picked place as a chip that undoes the pick", async () => {
       const previous = config.isEnterprise;
       config.isEnterprise = "true";
-      Object.assign(routeQuery, { panel: "operations", panelSvc: "svc", panelWhere: "k8s:c1/web" });
-      panelVersions.splice(
-        0,
-        panelVersions.length,
-        ...[
-          { version: "2.0", active: true, first_seen: 2 },
-          { version: "1.0", active: false, first_seen: 1 },
-          { version: "9.9", active: true, first_seen: 3, where_key: "k8s:c2/web" },
-        ].map((row) => ({
-          version_key: row.version,
-          where_key: "k8s:c1/web",
-          where: { kind: "k8s", k8s_cluster: "c1", k8s_namespace: "web" },
-          env: "prod",
-          env_source: "attribute",
-          signals: {},
-          deploys: [],
-          ...row,
-        })),
-      );
+      Object.assign(routeQuery, { panel: "operations", panelSvc: "frontend", panelWhere: "" });
+      panelVersions.splice(0, panelVersions.length, {
+        version_key: "2.0",
+        version: "2.0",
+        active: true,
+        first_seen: 2,
+        where_key: "k8s:c1/web",
+        where: { kind: "k8s", k8s_cluster: "c1", k8s_namespace: "web" },
+        env: "prod",
+        env_source: "attribute",
+        signals: {},
+        deploys: [],
+      });
       try {
-        wrapper = mountPanel();
+        wrapper = mountPanel({ selectedNode: { ...baseNode, where_key: "" } });
+        await flushPromises();
+        const header = () => wrapper.get('[data-test="svcver-panel-identity"]');
+        expect(header().text()).toBe("This service's spans don't report env, where or version");
+        reactive(routeQuery).panelWhere = "k8s:c1/web";
         await flushPromises();
         await flushPromises();
-        const tabs = wrapper
-          .findAll('[data-test="service-graph-node-panel-tabs"] [data-test]')
-          .map((tab) => tab.attributes("data-test"))
-          .filter((id) => /tab-operations|svcver-versions-tab|tab-metrics/.test(id || ""));
-        expect(tabs).toEqual([
-          "service-graph-node-panel-tab-operations",
-          "svcver-versions-tab",
-          "service-graph-node-panel-tab-metrics",
-        ]);
-        expect(wrapper.find('[data-test="svcver-versions-count"]').text()).toBe("2");
-        const identity = wrapper.find('[data-test="svcver-panel-identity"]').text();
-        expect(identity).toContain("c1 · web");
-        expect(identity).toContain("2.0");
+        expect(header().text()).toContain("c1 · web");
+        expect(header().text()).toContain("2.0");
+        await header().get('[data-test="svcver-panel-place-clear"]').trigger("click");
+        expect(routerReplaceMock).toHaveBeenLastCalledWith({
+          query: expect.objectContaining({ panelWhere: "", panel: "operations" }),
+        });
       } finally {
         config.isEnterprise = previous;
         for (const key of Object.keys(routeQuery)) delete routeQuery[key];
@@ -1725,7 +1799,246 @@ describe("ServiceGraphNodeSidePanel", () => {
       }
     });
 
-    it("keeps the Versions tab when the same service's row refreshes, and resets it for another service", async () => {
+    it("says once that a picked place has no spans here, and drops the env and version it can't show", async () => {
+      const previous = config.isEnterprise;
+      config.isEnterprise = "true";
+      getStreamMock.mockResolvedValue({
+        schema: ["service_name", "o2_service_where"].map((name) => ({ name, type: "keyword" })),
+      });
+      Object.assign(routeQuery, { panel: "operations", panelSvc: "frontend", panelWhere: "" });
+      panelVersions.splice(0, panelVersions.length, {
+        version_key: "2.0",
+        version: "2.0",
+        active: true,
+        first_seen: 2,
+        where_key: "default",
+        where: { kind: "default" },
+        env: "prod",
+        env_source: "attribute",
+        signals: {},
+        deploys: [],
+      });
+      try {
+        wrapper = mountPanel({ selectedNode: { ...baseNode, where_key: "" } });
+        await flushPromises();
+        reactive(routeQuery).panelWhere = "default";
+        await flushPromises();
+        await flushPromises();
+        const header = wrapper.get('[data-test="svcver-panel-identity"]');
+        expect(header.find('[data-test="svcver-panel-place"]').exists()).toBe(true);
+        expect(header.text()).not.toContain("2.0");
+        expect(wrapper.find('[data-test="svcver-place-no-spans"]').exists()).toBe(true);
+        // The note speaks for one range, so a failed read of another range does not inherit it.
+        vi.mocked(streamTraceRows).mockRejectedValue(new Error("range read failed"));
+        await wrapper.setProps({ timeRange: { startTime: NOW - 86_400_000_000, endTime: NOW } });
+        await flushPromises();
+        expect(wrapper.find('[data-test="svcver-place-no-spans"]').exists()).toBe(false);
+      } finally {
+        vi.mocked(streamTraceRows).mockReset().mockResolvedValue([]);
+        config.isEnterprise = previous;
+        getStreamMock.mockResolvedValue({ schema: [] });
+        for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+        panelVersions.splice(0);
+      }
+    });
+
+    it("lets a datastore panel own the route that names its kind", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [{ name: "server_address", type: "keyword" }],
+      });
+      Object.assign(routeQuery, { panel: "hosts", panelSvc: "mysql", panelKind: "database" });
+      try {
+        wrapper = mountPanel({
+          selectedNode: { id: "mysql", name: "mysql", label: "mysql", service_type: "database" },
+        });
+        await flushPromises();
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("hosts");
+      } finally {
+        for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+      }
+    });
+
+    it.each([
+      { tab: "service-version", lands: "service-version" },
+      { tab: "k8s-pod", lands: "k8s-pod" },
+      { tab: "metrics", lands: "metrics" },
+      { tab: "behavior", lands: "operations" },
+      { tab: "stale-tab", lands: "operations" },
+    ])(
+      "opens the route's $tab tab on $lands and keeps it when the route moves there",
+      async ({ tab, lands }) => {
+        const previous = config.isEnterprise;
+        config.isEnterprise = "true";
+        getStreamMock.mockResolvedValueOnce({
+          schema: ["service_name", "o2_service_version", "service_k8s_pod_name"].map((name) => ({
+            name,
+            type: "keyword",
+          })),
+        });
+        vi.mocked(getDimensionAnalytics).mockResolvedValueOnce({
+          data: {
+            available_groups: [
+              {
+                group_id: "k8s-pod",
+                display: "K8s Pod Name",
+                stream_types: ["traces"],
+                aliases: { traces: "service_k8s_pod_name" },
+                recommended: true,
+              },
+            ],
+          },
+        } as never);
+        Object.assign(routeQuery, { panel: tab, panelSvc: "frontend", panelWhere: "" });
+        try {
+          wrapper = mountPanel();
+          await flushPromises();
+          await flushPromises();
+          expect((wrapper.vm as any).activeTab).toBe(lands);
+          reactive(routeQuery).panel = "versions";
+          await flushPromises();
+          (wrapper.vm as any).onTabChange(tab);
+          reactive(routeQuery).panel = tab;
+          await flushPromises();
+          expect((wrapper.vm as any).activeTab).toBe(lands);
+        } finally {
+          config.isEnterprise = previous;
+          for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+        }
+      },
+    );
+
+    const podGroups = (groups: string[]) => ({
+      data: {
+        available_groups: groups.map((group_id) => ({
+          group_id,
+          display: "K8s Pod Name",
+          stream_types: ["traces"],
+          aliases: { traces: "service_k8s_pod_name" },
+          recommended: true,
+        })),
+      },
+    });
+    const podSchema = {
+      schema: ["service_name", "o2_service_version", "service_k8s_pod_name"].map((name) => ({
+        name,
+        type: "keyword",
+      })),
+    };
+
+    it.each([
+      {
+        discovery: "resolves",
+        tabs: ["operations", "service-version", "k8s-pod", "metrics"],
+      },
+      { discovery: "fails", tabs: ["operations", "metrics"] },
+    ])(
+      "holds a tab skeleton until discovery $discovery, then shows every tab at once",
+      async (c) => {
+        getStreamMock.mockResolvedValueOnce(podSchema);
+        let settle: (ok: boolean) => void = () => {};
+        vi.mocked(getDimensionAnalytics).mockReturnValueOnce(
+          new Promise((resolve, reject) => {
+            settle = (ok) => (ok ? resolve(podGroups(["k8s-pod"])) : reject(new Error("down")));
+          }) as never,
+        );
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        const shown = () =>
+          wrapper
+            .findAll('[data-test="service-graph-node-panel-tabs"] .o-tab-stub')
+            .map((tab) => tab.attributes("data-test"));
+        const skeleton = '[data-test="service-graph-node-panel-tabs-skeleton"]';
+        wrapper = mountPanel();
+        await flushPromises();
+        expect(shown()).toEqual([]);
+        expect(wrapper.find(skeleton).exists()).toBe(true);
+        settle(c.discovery === "resolves");
+        await flushPromises();
+        expect(shown()).toEqual([
+          ...c.tabs.map((id) => `service-graph-node-panel-tab-${id}`),
+          "svcver-versions-tab",
+        ]);
+        expect(wrapper.find(skeleton).exists()).toBe(false);
+        expect(
+          wrapper.find('[data-test="service-graph-node-panel-workload-fields-btn"]').exists(),
+        ).toBe(c.discovery === "resolves");
+      },
+    );
+
+    it("lets the user hide the active resource tab and moves to Operations", async () => {
+      getStreamMock.mockResolvedValueOnce(podSchema);
+      Object.assign(routeQuery, { panel: "service-version", panelSvc: "frontend", panelWhere: "" });
+      try {
+        wrapper = mountPanel();
+        await flushPromises();
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("service-version");
+        await wrapper
+          .get(
+            '[data-test="service-graph-node-panel-workload-field-service-version"] [role="checkbox"]',
+          )
+          .trigger("click");
+        await flushPromises();
+        expect((wrapper.vm as any).selectedWorkloadFields).not.toContain("service-version");
+        expect((wrapper.vm as any).activeTab).toBe("operations");
+      } finally {
+        for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+      }
+    });
+
+    it("ignores the previous org's late tab discovery after an org switch", async () => {
+      const orgState = store.state.selectedOrganization as { identifier: string };
+      const firstOrg = orgState.identifier;
+      let settleFirst: (value: unknown) => void = () => {};
+      getStreamMock.mockResolvedValue(podSchema);
+      vi.mocked(getDimensionAnalytics).mockImplementation((() =>
+        orgState.identifier === firstOrg
+          ? new Promise((resolve) => (settleFirst = resolve))
+          : Promise.resolve(podGroups(["k8s-pod"]))) as never);
+      Object.assign(routeQuery, { panel: "k8s-pod", panelSvc: "frontend", panelWhere: "" });
+      try {
+        wrapper = mountPanel();
+        await flushPromises();
+        orgState.identifier = `${firstOrg}-other`;
+        await flushPromises();
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("k8s-pod");
+        settleFirst(podGroups([]));
+        await flushPromises();
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("k8s-pod");
+        expect((wrapper.vm as any).activeResourceTabConfigs.map((c: any) => c.id)).toContain(
+          "k8s-pod",
+        );
+      } finally {
+        orgState.identifier = firstOrg;
+        for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+        getStreamMock.mockResolvedValue({ schema: [] });
+        vi.mocked(getDimensionAnalytics).mockReset();
+        vi.mocked(getDimensionAnalytics).mockResolvedValue({
+          data: { available_groups: [] },
+        } as never);
+      }
+    });
+
+    it.each([
+      { schema: "fails", stream: () => getStreamMock.mockRejectedValueOnce(new Error("schema")) },
+      { schema: "is empty", stream: () => getStreamMock.mockResolvedValueOnce({ schema: [] }) },
+    ])("loads a restored Metrics tab when the stream schema $schema", async ({ stream }) => {
+      stream();
+      Object.assign(routeQuery, { panel: "metrics", panelSvc: "frontend", panelWhere: "" });
+      try {
+        wrapper = mountPanel();
+        await flushPromises();
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("metrics");
+        expect((wrapper.vm as any).metricsCorrelationLoaded).toBe(true);
+      } finally {
+        for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+      }
+    });
+
+    it("keeps the tab the route names on its own service, and resets it off the route or on another node", async () => {
       const previous = config.isEnterprise;
       config.isEnterprise = "true";
       Object.assign(routeQuery, {
@@ -1740,6 +2053,18 @@ describe("ServiceGraphNodeSidePanel", () => {
         await wrapper.setProps({ selectedNode: { ...baseNode, health_status: "healthy" } });
         await flushPromises();
         expect((wrapper.vm as any).activeTab).toBe("versions");
+        await wrapper.setProps({ selectedNode: { ...baseNode, id: "frontend@k8s:c2/web" } });
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("versions");
+        routerReplaceMock.mockClear();
+        await wrapper.setProps({
+          selectedNode: { id: "mysql", name: "mysql", label: "mysql", service_type: "database" },
+        });
+        await flushPromises();
+        await flushPromises();
+        expect((wrapper.vm as any).activeTab).toBe("operations");
+        expect(routerReplaceMock).not.toHaveBeenCalled();
+        for (const key of Object.keys(routeQuery)) delete reactive(routeQuery)[key];
         await wrapper.setProps({ selectedNode: { ...baseNode, id: "cart", name: "cart" } });
         await flushPromises();
         expect((wrapper.vm as any).activeTab).toBe("operations");
@@ -1752,8 +2077,7 @@ describe("ServiceGraphNodeSidePanel", () => {
   describe("selected where scopes the panel's source queries", () => {
     const WHERE_A = "k8s:c1/o'shop";
     const WHERE_B = "k8s:c2/shop";
-    const sqls = () =>
-      vi.mocked(searchService.search).mock.calls.map((call: any) => call[0].query.query.sql);
+    const sqls = () => vi.mocked(streamTraceRows).mock.calls.map((call: any) => call[0].sql);
     const redQueries = (w: VueWrapper) =>
       ((w.vm as any).dashboardData?.tabs?.[0]?.panels ?? []).map((p: any) => p.queries[0].query);
     const givenSchema = (fields: string[]) => {
@@ -1774,12 +2098,22 @@ describe("ServiceGraphNodeSidePanel", () => {
         },
       } as never);
     };
-    const openAt = (where: string) =>
+    let rowNode: Record<string, unknown> = baseNode;
+    const rowAt = (where: string, node: Record<string, unknown> = baseNode) => ({
+      ...node,
+      id: JSON.stringify([where, node.name]),
+      where_key: where,
+    });
+    const openAt = (where: string) => {
+      rowNode = rowAt(where);
       Object.assign(reactive(routeQuery), {
         panel: "versions",
         panelSvc: "frontend",
         panelWhere: where,
       });
+    };
+    const mountAt = (props: Record<string, unknown> = {}) =>
+      mountPanel({ selectedNode: rowNode, ...props });
 
     afterEach(() => {
       for (const key of Object.keys(routeQuery)) delete routeQuery[key];
@@ -1788,7 +2122,7 @@ describe("ServiceGraphNodeSidePanel", () => {
     it("filters RED charts, Operations, recent spans and resource tables by the escaped where", async () => {
       givenSchema(["service_name", "o2_service_where", "o2_service_version"]);
       openAt(WHERE_A);
-      wrapper = mountPanel();
+      wrapper = mountAt();
       await flushPromises();
       await flushPromises();
       const predicate = "o2_service_where = 'k8s:c1/o''shop'";
@@ -1802,7 +2136,11 @@ describe("ServiceGraphNodeSidePanel", () => {
       await flushPromises();
       expect(sqls().find((sql) => sql.includes("o2_service_version as"))).toContain(predicate);
 
-      vi.mocked(searchService.search).mockClear();
+      (wrapper.vm as any).onTabChange("metrics");
+      await flushPromises();
+      expect(vi.mocked(streamTraceRows).mock.calls.at(-1)?.[0].sql).toContain(predicate);
+
+      vi.mocked(streamTraceRows).mockClear();
       (wrapper.vm as any).operationsViewMode = "spans";
       await flushPromises();
       const spanSqls = sqls().filter((sql) => sql.includes("SELECT operation_name, duration"));
@@ -1813,16 +2151,20 @@ describe("ServiceGraphNodeSidePanel", () => {
     it("reloads every source query when the where picker moves to a second where", async () => {
       givenSchema(["service_name", "o2_service_where", "o2_service_version"]);
       openAt(WHERE_A);
-      wrapper = mountPanel();
+      wrapper = mountAt();
       await flushPromises();
       await flushPromises();
       const tabId = (wrapper.vm as any).activeResourceTabConfigs[0].id;
       (wrapper.vm as any).onTabChange(tabId);
+      reactive(routeQuery).panel = tabId;
       await flushPromises();
       expect((wrapper.vm as any).resourceTabData[tabId]).toEqual([]);
-      vi.mocked(searchService.search).mockClear();
+      vi.mocked(streamTraceRows).mockClear();
 
+      givenSchema(["service_name", "o2_service_where", "o2_service_version"]);
       reactive(routeQuery).panelWhere = WHERE_B;
+      await wrapper.setProps({ selectedNode: rowAt(WHERE_B) });
+      await flushPromises();
       await flushPromises();
 
       const predicate = `o2_service_where = '${WHERE_B}'`;
@@ -1835,31 +2177,137 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(sqls().join("\n")).not.toContain("k8s:c1/");
     });
 
+    // An empty answer is kept; a failed read shows the red error and reads again when reopened.
+    it.each([
+      ["an empty version breakdown once", false, 1, []],
+      ["a failed version breakdown again", true, 2, ["v2"]],
+    ])("reads %s when its tab is opened again", async (_case, failed, reads, names) => {
+      givenSchema(["service_name", "o2_service_where", "o2_service_version"]);
+      openAt(WHERE_A);
+      wrapper = mountAt();
+      await flushPromises();
+      await flushPromises();
+      const { id: tabId, colId } = (wrapper.vm as any).activeResourceTabConfigs[0];
+      let versionReads = 0;
+      vi.mocked(streamTraceRows).mockImplementation(async (request) => {
+        if (!request.sql.includes("o2_service_version as")) return [];
+        versionReads += 1;
+        if (versionReads > 1) return [{ [`${colId}_name`]: "v2", request_count: 42 }];
+        if (failed) throw new Error("temporary 503");
+        return [];
+      });
+      try {
+        (wrapper.vm as any).onTabChange(tabId);
+        await flushPromises();
+        const error = wrapper.find(`[data-test="service-graph-side-panel-${tabId}-error"]`);
+        expect(error.exists()).toBe(failed);
+        for (const tab of ["operations", tabId]) {
+          (wrapper.vm as any).onTabChange(tab);
+          await flushPromises();
+        }
+        expect(versionReads).toBe(reads);
+        expect((wrapper.vm as any).resourceTabData[tabId].map((row: any) => row.name)).toEqual(
+          names,
+        );
+      } finally {
+        vi.mocked(streamTraceRows).mockReset().mockResolvedValue([]);
+      }
+    });
+
+    it("keeps the new stream's resource rows when the old stream's read fails late", async () => {
+      const resource = {
+        id: "host",
+        label: "Host",
+        groupField: "host_name",
+        colId: "host",
+        colLabel: "Host",
+        environment: "runtime",
+      };
+      let failOld: (error: Error) => void = () => {};
+      try {
+        wrapper = mountPanel({ streamFilter: "stream-a" });
+        await flushPromises();
+        const vm = wrapper.vm as any;
+        vi.mocked(streamTraceRows).mockImplementationOnce(
+          () => new Promise((_resolve, reject) => (failOld = reject)),
+        );
+        const oldRead = vm.fetchResourceData(resource);
+        await wrapper.setProps({ streamFilter: "stream-b" });
+        await flushPromises();
+        vi.mocked(streamTraceRows).mockResolvedValueOnce([
+          { host_name: "new-host", request_count: 10 },
+        ]);
+        await vm.fetchResourceData(resource);
+        failOld(new Error("stream-a unavailable"));
+        await oldRead;
+        await flushPromises();
+        expect(vm.resourceTabError.host || "").toBe("");
+        expect(vm.resourceTabData.host.map((row: any) => row.name)).toEqual(["new-host"]);
+        expect(vm.resourceTabLoading.host).toBe(false);
+      } finally {
+        vi.mocked(streamTraceRows).mockReset().mockResolvedValue([]);
+      }
+    });
+
+    it.each([
+      { from: "catalog row without a place", route: "", node: rowAt(""), scoped: "" },
+      {
+        from: "catalog row",
+        route: WHERE_B,
+        node: rowAt(WHERE_B),
+        scoped: `o2_service_where = '${WHERE_B}'`,
+      },
+      {
+        from: "catalog row whose place was re-picked",
+        route: "k8s:b/prod",
+        node: rowAt("k8s:a/prod"),
+        scoped: "o2_service_where = 'k8s:b/prod'",
+      },
+      {
+        from: "graph node",
+        route: "k8s:staging/web",
+        node: baseNode,
+        scoped: "o2_service_where = 'k8s:staging/web'",
+      },
+    ])("scopes span queries of a $from by the route's place", async (c) => {
+      givenSchema(["service_name", "o2_service_where"]);
+      openAt(c.route);
+      wrapper = mountAt({ selectedNode: c.node });
+      await flushPromises();
+      await flushPromises();
+      const ops = sqls().find((sql) => sql.includes("GROUP BY operation_name")) || "";
+      expect(ops).toContain("service_name = 'frontend'");
+      expect(ops).not.toContain("'default'");
+      if (c.scoped) expect(ops).toContain(c.scoped);
+      else expect(ops).not.toContain("o2_service_where");
+      expect(redQueries(wrapper).length).toBe(3);
+      for (const query of redQueries(wrapper)) expect(query).not.toContain("'default'");
+    });
+
     it("drops a response that lands after the where changed", async () => {
       givenSchema(["service_name", "o2_service_where"]);
       openAt(WHERE_A);
       let release: (value: unknown) => void = () => {};
-      vi.mocked(searchService.search).mockImplementation(((req: any) =>
-        req.query.query.sql.includes("k8s:c1/")
+      vi.mocked(streamTraceRows).mockImplementation(((req: any) =>
+        req.sql.includes("k8s:c1/")
           ? new Promise((resolve) => (release = resolve))
-          : Promise.resolve({
-              data: { hits: [{ operation_name: "b-op", request_count: 2 }] },
-            })) as never);
+          : Promise.resolve([{ operation_name: "b-op", request_count: 2 }])) as never);
       try {
-        wrapper = mountPanel();
+        wrapper = mountAt();
         await flushPromises();
         await flushPromises();
         reactive(routeQuery).panelWhere = WHERE_B;
+        await wrapper.setProps({ selectedNode: rowAt(WHERE_B) });
         await flushPromises();
         expect(
           sqls().some((sql) => sql.includes("k8s:c1/") && sql.includes("GROUP BY operation_name")),
         ).toBe(true);
-        release({ data: { hits: [{ operation_name: "a-op", request_count: 1 }] } });
+        release([{ operation_name: "a-op", request_count: 1 }]);
         await flushPromises();
         expect((wrapper.vm as any).recentOperations.map((op: any) => op.name)).toEqual(["b-op"]);
       } finally {
-        vi.mocked(searchService.search).mockReset();
-        vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as never);
+        vi.mocked(streamTraceRows).mockReset();
+        vi.mocked(streamTraceRows).mockResolvedValue([]);
       }
     });
 
@@ -1867,10 +2315,15 @@ describe("ServiceGraphNodeSidePanel", () => {
       let settle: (value: unknown) => void = () => {};
       getStreamMock.mockImplementationOnce(() => new Promise((resolve) => (settle = resolve)));
       openAt(WHERE_B);
-      wrapper = mountPanel();
+      wrapper = mountAt();
       await flushPromises();
       expect(sqls().filter((sql) => sql.includes("service_name = 'frontend'"))).toEqual([]);
       expect(redQueries(wrapper)).toEqual([]);
+      // Meanwhile charts and tables show their loading state, never an empty-state message.
+      const chartsLoading = () =>
+        wrapper.find('[data-test="service-graph-side-panel-red-charts-loading"]').exists();
+      expect(chartsLoading()).toBe(true);
+      expect((wrapper.vm as any).loadingOperations).toBe(true);
 
       settle({ schema: [{ name: "o2_service_where", type: "keyword" }] });
       await flushPromises();
@@ -1879,12 +2332,24 @@ describe("ServiceGraphNodeSidePanel", () => {
         `o2_service_where = '${WHERE_B}'`,
       );
       for (const query of redQueries(wrapper)) expect(query).toContain("o2_service_where");
+      expect(chartsLoading()).toBe(false);
+    });
+
+    it("gives a link without a place the opened row's place, as a click would", async () => {
+      rowNode = rowAt(WHERE_A);
+      Object.assign(reactive(routeQuery), { panel: "versions", panelSvc: "frontend" });
+      routerReplaceMock.mockClear();
+      wrapper = mountAt();
+      await flushPromises();
+      expect(routerReplaceMock).toHaveBeenCalledWith({
+        query: expect.objectContaining({ panel: "versions", panelWhere: WHERE_A }),
+      });
     });
 
     it("skips the predicate on a stream without o2_service_where", async () => {
       givenSchema(["service_name"]);
       openAt(WHERE_B);
-      wrapper = mountPanel();
+      wrapper = mountAt();
       await flushPromises();
       await flushPromises();
       const ops = sqls().find((sql) => sql.includes("GROUP BY operation_name"));
@@ -1896,7 +2361,7 @@ describe("ServiceGraphNodeSidePanel", () => {
     it("drops the where on a failed schema read and says the view is not scoped", async () => {
       getStreamMock.mockRejectedValueOnce(new Error("schema down"));
       openAt(WHERE_B);
-      wrapper = mountPanel();
+      wrapper = mountAt();
       await flushPromises();
       await flushPromises();
       const ops = sqls().find((sql) => sql.includes("GROUP BY operation_name"));
@@ -1913,12 +2378,12 @@ describe("ServiceGraphNodeSidePanel", () => {
       getStreamMock.mockResolvedValue({ schema: [{ name: "o2_service_where", type: "keyword" }] });
       openAt(WHERE_B);
       try {
-        wrapper = mountPanel();
+        wrapper = mountAt();
         await flushPromises();
         await flushPromises();
-        vi.mocked(searchService.search).mockClear();
+        vi.mocked(streamTraceRows).mockClear();
         await wrapper.setProps({
-          selectedNode: { ...baseNode, id: "cart", name: "cart", label: "cart" },
+          selectedNode: rowAt(WHERE_B, { ...baseNode, name: "cart", label: "cart" }),
         });
         await flushPromises();
         await flushPromises();
@@ -1941,13 +2406,13 @@ describe("ServiceGraphNodeSidePanel", () => {
       );
       openAt(WHERE_B);
       try {
-        wrapper = mountPanel({ streamFilter: "stream_a" });
+        wrapper = mountAt({ streamFilter: "stream_a" });
         await flushPromises();
         await wrapper.setProps({ streamFilter: "stream_b" });
         await flushPromises();
         await flushPromises();
         for (const query of redQueries(wrapper)) expect(query).toContain(WHERE_B);
-        vi.mocked(searchService.search).mockClear();
+        vi.mocked(streamTraceRows).mockClear();
 
         settleA({ schema: [{ name: "service_name", type: "keyword" }] });
         await flushPromises();
@@ -1972,7 +2437,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       );
       openAt(WHERE_B);
       try {
-        wrapper = mountPanel({ streamFilter: "stream_a" });
+        wrapper = mountAt({ streamFilter: "stream_a" });
         await flushPromises();
         await wrapper.setProps({ streamFilter: "stream_b" });
         await flushPromises();
@@ -2000,7 +2465,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       );
       openAt(WHERE_B);
       try {
-        wrapper = mountPanel();
+        wrapper = mountAt();
         await flushPromises();
         orgState.identifier = `${firstOrg}-other`;
         await flushPromises();
@@ -2019,8 +2484,12 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("leaves inferred nodes unscoped", async () => {
       openAt(WHERE_B);
-      wrapper = mountPanel({
-        selectedNode: { ...baseNode, service_type: "database", service_system: "mysql" },
+      wrapper = mountAt({
+        selectedNode: rowAt(WHERE_B, {
+          ...baseNode,
+          service_type: "database",
+          service_system: "mysql",
+        }),
       });
       await flushPromises();
       await flushPromises();

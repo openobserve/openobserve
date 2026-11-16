@@ -90,6 +90,13 @@ describe("streamTraceRows", () => {
     await expect(streamTraceRows(request)).rejects.toThrow("boom");
   });
 
+  it("resolves a kept partial answer with the rows that arrived, but still rejects an error", async () => {
+    answer([meta({ is_partial: true }), hits([{ a: 1 }])]);
+    await expect(streamTraceRows({ ...request, keepPartial: true })).resolves.toEqual([{ a: 1 }]);
+    answer([meta({ is_partial: true, error: "Search stopped" }), hits([{ a: 1 }])]);
+    await expect(streamTraceRows({ ...request, keepPartial: true })).rejects.toThrow("Incomplete");
+  });
+
   it("cancels the stream when the query is aborted", async () => {
     answer([], "none");
     const controller = new AbortController();

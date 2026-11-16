@@ -12,6 +12,7 @@ import {
   QUICK_MUTE_PRESETS,
   buildQuickMuteRequest,
   groupSelection,
+  overIdCap,
   presetSeconds,
 } from "@/utils/downtimes/quickMute";
 import {
@@ -178,5 +179,46 @@ describe("quick mute with no folder to file in", () => {
     expect(mute?.disabled).toBe(true);
     expect(downtimes.create).not.toHaveBeenCalled();
     wrapper.unmount();
+  });
+});
+
+describe("quick mute of more items than a downtime holds", () => {
+  it("names the cap of 200 per module and sends nothing for 201 alerts", async () => {
+    queryClient.clear();
+    vi.mocked(common.list_Folders).mockResolvedValue({
+      data: { list: [{ folderId: "default", name: "default" }] },
+    } as never);
+    vi.mocked(downtimes.create).mockClear();
+    const store = createStore({
+      state: {
+        timezone: "UTC",
+        selectedOrganization: { identifier: "acme" },
+        zoConfig: { downtimes_enabled: true },
+      },
+    });
+    const ids = Array.from({ length: 201 }, (_, i) => `a${i}`);
+    const wrapper = mount(QuickMuteDialog, {
+      props: { open: false, selection: [{ module: "alerts", ids }] },
+      global: { plugins: [store] },
+      attachTo: document.body,
+    });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+    await vi.waitFor(() =>
+      expect(document.body.querySelector('[data-test="quick-mute-too-many"]')).not.toBeNull(),
+    );
+    expect(document.body.textContent).toContain("Select at most 200 items per module.");
+    const mute = document.body.querySelector<HTMLButtonElement>(
+      '[data-test="o-dialog-primary-btn"]',
+    );
+    expect(mute?.disabled).toBe(true);
+    expect(downtimes.create).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("allows exactly 200", () => {
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => `a${i}`);
+    expect(overIdCap([{ module: "alerts", ids: ids(200) }])).toBe(false);
+    expect(overIdCap([{ module: "alerts", ids: ids(201) }])).toBe(true);
   });
 });

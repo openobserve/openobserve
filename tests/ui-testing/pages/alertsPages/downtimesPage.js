@@ -696,6 +696,10 @@ export class DowntimesPage {
     await this.page.locator(this.detailMuteHour).click();
   }
 
+  async expectNoMuteForHour() {
+    await expect(this.page.locator(this.detailMuteHour)).toHaveCount(0);
+  }
+
   async sendTestFromDetail() {
     await this.page.locator(this.detailSendTest).click();
     const dialog = this.page.locator(this.detailSendTestConfirm).filter({ visible: true });
