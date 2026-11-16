@@ -785,7 +785,11 @@ import {
   type PanelEditorFocusTarget,
 } from "@/composables/dashboard/usePanelEditorFocus";
 import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
-import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
+import {
+  panelQueryStreams,
+  panelRangeHours,
+  usePanelNotices,
+} from "@/composables/dashboard/usePanelNotices";
 import { ANNOTATION_SOURCE_ROW_LIMIT } from "@/utils/dashboard/annotationSources";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
@@ -1040,7 +1044,10 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
-    } = usePanelNotices(() => store.state.timezone);
+    } = usePanelNotices(() => store.state.timezone, {
+      streams: () => panelQueryStreams(props.data),
+      rangeHours: () => panelRangeHours(props.selectedTimeDate),
+    });
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);

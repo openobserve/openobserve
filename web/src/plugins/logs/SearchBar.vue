@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         ref="toolbarLeftRef"
         class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 max-md:w-full max-md:flex-none"
+        :style="{ minWidth: `${toolbarLeftMinWidth}px` }"
       >
         <!-- Collapsible region — clips its overflow so the More button (a
              shrink-0 sibling below) always stays visible. Pinned items hide via
@@ -563,7 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         ref="toolbarRightRef"
-        class="flex flex-shrink-0 items-center gap-2 max-md:w-full max-md:flex-wrap max-md:justify-end max-md:gap-x-1 max-md:gap-y-1"
+        class="flex min-w-0 items-center gap-2 max-md:w-full max-md:flex-wrap max-md:justify-end max-md:gap-x-1 max-md:gap-y-1"
       >
         <OPageHeaderStatus />
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
@@ -852,7 +853,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :url="shareURL"
           :live-url="shareRollingURL"
           :fixed-label="shareFixedLabel"
-          :fixed-copy-label="shareFixedCopyLabel"
           :live-label="shareRollingLabel"
           :range-context="shareRangeContext"
           variant="outline"
@@ -1880,6 +1880,7 @@ import type { HistoryStatus, QueryHistoryEntry } from "@/services/query_history"
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useLogs from "@/composables/useLogs";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
+import { pickerSlack, toggleGroupWidths } from "@/plugins/logs/logsToolbarLayout";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -2660,16 +2661,7 @@ export default defineComponent({
     // Responsive toolbar — width tracking via shared composable
     // V1: the picker trigger walks its own forms first, so the budget counts it at its shortest.
     const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive({
-      rightSlack: () => {
-        const picker = dateTimeRef.value as {
-          $el?: Element;
-          shortestFormWidth?: () => number;
-        } | null;
-        const shortest = picker?.shortestFormWidth?.() ?? 0;
-        const el = picker?.$el;
-        if (!shortest || !(el instanceof Element)) return 0;
-        return el.getBoundingClientRect().width - shortest;
-      },
+      rightSlack: () => pickerSlack(dateTimeRef.value),
     });
 
     // ── Pinned toolbar items ──────────────────────────────────────────────
@@ -2693,8 +2685,11 @@ export default defineComponent({
 
     // Rendered widths (px) of the left-section controls at the 34px toolbar size; collapse
     // thresholds derive from them so they cannot drift apart when a control is resized.
-    const TOGGLE_LABELS_WIDTH = computed(() => (isNarrowToolbar.value ? 367 : 383));
-    const TOGGLE_ICONS_WIDTH = 168;
+    const toggleWidths = computed(() =>
+      toggleGroupWidths(isNarrowToolbar.value, !!store.state.zoConfig.timechart_enabled),
+    );
+    const TOGGLE_LABELS_WIDTH = computed(() => toggleWidths.value.labels);
+    const TOGGLE_ICONS_WIDTH = computed(() => toggleWidths.value.icons);
     const TOGGLE_DROPDOWN_WIDTH = 120;
     const RESET_LABEL_WIDTH = computed(() => (isNarrowToolbar.value ? 77 : 81));
     const RESET_ICON_WIDTH = 34;
@@ -2719,15 +2714,22 @@ export default defineComponent({
       () =>
         availableLeftWidth.value < leftContentWidth(TOGGLE_LABELS_WIDTH.value, RESET_ICON_WIDTH),
     );
-    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 288);
-    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 216);
+    const iconsExtra = computed(
+      () => TOGGLE_ICONS_WIDTH.value - toggleGroupWidths(true, false).icons,
+    );
+    const toolbarMoveResetToMenu = computed(
+      () => availableLeftWidth.value < 288 + iconsExtra.value,
+    );
+    const toolbarToggleAsDropdown = computed(
+      () => availableLeftWidth.value < 216 + iconsExtra.value,
+    );
 
     // Width consumed by the always-present left content (toggle group in its
     // current collapse state, reset) plus the reserved More button.
     const baseReservedWidth = computed(() => {
       let w = 0;
       if (toolbarToggleAsDropdown.value) w += TOGGLE_DROPDOWN_WIDTH;
-      else if (toolbarToggleIconOnly.value) w += TOGGLE_ICONS_WIDTH;
+      else if (toolbarToggleIconOnly.value) w += TOGGLE_ICONS_WIDTH.value;
       else w += TOGGLE_LABELS_WIDTH.value;
       if (!toolbarMoveResetToMenu.value) {
         w +=
@@ -2754,6 +2756,7 @@ export default defineComponent({
         savedViews: false,
         syntaxGuide: false,
         syntaxGuideIconOnly: false,
+        used: 0,
       };
       const tryFit = (width: number) => {
         const need = (used > 0 ? PIN_ITEM_GAP : 0) + width;
@@ -2775,8 +2778,13 @@ export default defineComponent({
           res.syntaxGuideIconOnly = true;
         }
       }
+      res.used = used;
       return res;
     });
+    // The left keeps the room its collapse stage needs, so the picker trigger walks its forms instead (V1).
+    const toolbarLeftMinWidth = computed(() =>
+      Math.min(availableLeftWidth.value, baseReservedWidth.value + pinnedVisibility.value.used),
+    );
 
     // Function editor lives on the right toolbar (next to the date picker), so it
     // is not part of the left-section budget.
@@ -4587,9 +4595,6 @@ export default defineComponent({
     const shareFixedLabel = computed(() =>
       fixedShareLabel(shareBoundsUs.value.start, shareBoundsUs.value.end, store.state.timezone),
     );
-    const shareFixedCopyLabel = computed(() =>
-      fixedShareLabel(shareBoundsUs.value.start, shareBoundsUs.value.end, "UTC"),
-    );
     const shareRangeContext = computed(() =>
       [t("menu.search"), searchObj.data.stream.selectedStream.join(", ")]
         .filter(Boolean)
@@ -5573,7 +5578,6 @@ export default defineComponent({
       shareURL,
       shareRollingURL,
       shareFixedLabel,
-      shareFixedCopyLabel,
       shareRangeContext,
       refreshRangeStartUs,
       refreshRangeSpanUs,
@@ -5691,6 +5695,7 @@ export default defineComponent({
       shouldMoveShareToMenu,
       toolbarLeftRef,
       toolbarRightRef,
+      toolbarLeftMinWidth,
       shouldHideToolbarButtonText,
       toolbarToggleIconOnly,
       toolbarMoveResetToMenu,

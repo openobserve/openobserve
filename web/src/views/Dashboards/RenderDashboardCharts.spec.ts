@@ -1017,6 +1017,19 @@ describe("RenderDashboardCharts", () => {
       );
     });
 
+    it("never cuts a short relative chip: it holds its width and the title gives way (B8)", async () => {
+      await mountWithPanelPicker();
+      const holder = wrapper.get('[data-test="dashboard-panel-P1-time-picker"]');
+      const chip = wrapper.get('[data-test="dashboard-panel-P1-time-chip"]');
+      const text = chip.get('[data-test="dashboard-panel-P1-time-chip-text"]');
+      expect(text.text()).toBe("1h");
+
+      expect(holder.classes()).toContain("shrink-0");
+      expect(holder.classes()).not.toContain("min-w-0");
+      expect(chip.classes()).not.toContain("min-w-0");
+      expect(text.classes()).not.toContain("truncate");
+    });
+
     it("opens that panel's picker from its chip", async () => {
       await mountWithPanelPicker();
       const realPicker = dateTime().findComponent(DateTime);
@@ -1026,6 +1039,48 @@ describe("RenderDashboardCharts", () => {
       await flushPromises();
 
       expect(realPicker.vm.menuOpen).toBe(true);
+    });
+
+    it("returns focus to the panel's chip once Escape's close animation unmounts the menu (B5, C-1)", async () => {
+      await mountWithPanelPicker();
+      document.body.appendChild(wrapper.element);
+      const realPicker = dateTime().findComponent(DateTime);
+      const chip = wrapper.get('[data-test="dashboard-panel-P1-time-chip"]').element as HTMLElement;
+
+      const menu = document.createElement("div");
+      const field = document.createElement("input");
+      menu.appendChild(field);
+      document.body.appendChild(menu);
+      realPicker.vm.menuEl = menu;
+      await wrapper.get('[data-test="dashboard-panel-P1-time-chip"]').trigger("click");
+      field.focus();
+
+      realPicker.vm.onMenuOpenChange(false);
+      await flushPromises();
+      // reka's hidden trigger cannot take focus, so removing the menu leaves it on <body>.
+      menu.remove();
+      expect(document.activeElement).toBe(document.body);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(document.activeElement).toBe(chip);
+      wrapper.element.remove();
+    });
+
+    it("leaves focus where the user moved it when the panel picker closes", async () => {
+      await mountWithPanelPicker();
+      document.body.appendChild(wrapper.element);
+      const realPicker = dateTime().findComponent(DateTime);
+      const elsewhere = document.createElement("button");
+      document.body.appendChild(elsewhere);
+
+      realPicker.vm.onMenuOpenChange(true);
+      elsewhere.focus();
+      realPicker.vm.onMenuOpenChange(false);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+      wrapper.element.remove();
     });
 
     it("names a waiting pick on the chip", async () => {

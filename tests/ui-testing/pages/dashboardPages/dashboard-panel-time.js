@@ -82,6 +82,11 @@ export default class DashboardPanelTime {
     return await this.panelTimePickerWrapper.textContent();
   }
 
+  /** The config picker trigger's accessible name ("Time range: Last 6 days · …"); a narrow trigger shows dates alone. */
+  async getConfigPanelTimePickerName() {
+    return (await this.panelTimePickerWrapper.locator("#date-time-button").first().getAttribute("aria-label")) ?? "";
+  }
+
   /** Wait for the date-time menu to become visible */
   async waitForDateTimeMenuVisible(timeout = 5000) {
     await this.dateTimeMenu.waitFor({ state: "visible", timeout });
@@ -456,6 +461,11 @@ export default class DashboardPanelTime {
     return await this.panelTimePickerDisplayBtn(panelId).textContent();
   }
 
+  /** The panel chip's short form alone (e.g. "1h"), without the hidden trigger's dates. */
+  async getPanelTimeChipText(panelId) {
+    return ((await this.panelTimePickerBtn(panelId).textContent()) ?? "").trim();
+  }
+
   /**
    * Wait for panel time picker to show specific time text
    * @param {string} panelId - Panel ID
@@ -656,6 +666,21 @@ export default class DashboardPanelTime {
     await this.clickGlobalTimePicker();
     await openDateFields(this.page, 5000);
     await this.page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {});
+  }
+
+  /** Picks one in-view day (start and end on the same cell) in the open calendar; Apply stays disabled until an edit. */
+  async pickOneDayInOpenCalendar() {
+    const firstDay = this.page
+      .locator(
+        '[data-test="daterangecalendar-root"] [data-test^="daterangecalendar-cell-"]:not([data-outside-view]):not([data-disabled]):not([data-unavailable])',
+      )
+      .first();
+    await firstDay.waitFor({ state: "attached", timeout: 10000 });
+    // Cells re-render between the two clicks, so target the day by its id and click through the DOM.
+    const cell = this.page.locator(`[data-test="${await firstDay.getAttribute("data-test")}"]`).first();
+    await cell.evaluate((el) => el.click());
+    await cell.evaluate((el) => el.click());
+    await expect(this.page.locator('[data-test="date-time-apply-btn"]').first()).toBeEnabled({ timeout: 5000 });
   }
 
   /**

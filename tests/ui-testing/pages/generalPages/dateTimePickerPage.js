@@ -116,9 +116,9 @@ export class DateTimePickerPage {
         await expect(this.liveBtn).toBeEnabled();
     }
 
-    /** The selection is relative: Live has nothing to do. */
+    /** The selection is relative: the panel offers Freeze instead, so there is no Live button at all. */
     async expectRelativePanelActive() {
-        await expect(this.liveBtn).toBeDisabled();
+        await expect(this.liveBtn).toHaveCount(0);
     }
 
     // ==================== Copy / paste controls ====================
@@ -233,9 +233,10 @@ export class DateTimePickerPage {
         if (closed) await this.openPicker();
     }
 
-    /** Pasted text that reads as no range shows the bar's error and applies nothing. */
+    /** Pasted text that reads as no range shows the bar's error (common.timeRangeInputError) and applies nothing. */
     async expectPasteUnreadable() {
         await expect(this.inputError).toBeVisible();
+        await expect(this.inputError).toContainText(/Didn.t catch that/);
     }
 
     async expectPasteEmptyToast() {

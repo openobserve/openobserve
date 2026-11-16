@@ -78,6 +78,12 @@ describe("share link kinds", () => {
     expect(fixedShareLabel(endUs, startUs, "UTC")).toBe("");
   });
 
+  it("reads yesterday in the viewer's zone as one day with its offset (B11)", () => {
+    const startUs = Date.UTC(2026, 10, 14, 18, 30) * 1000;
+    const endUs = Date.UTC(2026, 10, 15, 18, 30) * 1000;
+    expect(fixedShareLabel(startUs, endUs, "Asia/Kolkata")).toBe("Nov 15 UTC+05:30");
+  });
+
   describe("in the user's locale", () => {
     const original = (i18n.global as any).locale;
     afterEach(() => {

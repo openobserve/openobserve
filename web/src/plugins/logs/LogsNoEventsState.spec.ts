@@ -110,6 +110,49 @@ describe("LogsNoEventsState", () => {
     expect(wrapper.emitted("apply-range")).toEqual([["1h"]]);
   });
 
+  it("rounds a live range's bounds to the minute (B9, R5)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T03:19:48Z"));
+    const text = mountWithWindow("15m").text();
+    expect(text).toContain("No events in Nov 16, 03:04 – 03:19");
+    expect(text).not.toContain(":48");
+  });
+
+  it("keeps the dated message and Try beside the jump card (B10, R7)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T03:19:00Z"));
+    const r = getConsumableRelativeTime("15m", "UTC")!;
+    const wrapper = mount(LogsNoEventsState, {
+      props: {
+        sqlMode: false,
+        query: "",
+        editorValue: "",
+        relativeTimePeriod: "15m",
+        dateType: "relative",
+        aiEnabled: false,
+        queryWindowUs: { start: r.startTime, end: r.endTime },
+        streamDocTimeRange: { min: 1_000_000, max: 10_000_000 },
+        timezone: "UTC",
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          OEmptyState: defineComponent({
+            setup(_, { slots }) {
+              return () => h("div", [slots.description?.(), slots.actions?.(), slots.extra?.()]);
+            },
+          }),
+        },
+      },
+    });
+    expect(wrapper.find('[data-test="logs-no-events-jump-to-data-card"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("No events in Nov 16, 03:04 – 03:19");
+    expect(wrapper.text()).not.toContain("doesn't contain any data");
+    expect(wrapper.find('[data-test="logs-no-events-try-range-btn"]').text()).toBe(
+      "Try Last 1 hour",
+    );
+  });
+
   it("offers no longer range when it is over the stream's query-range limit", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-16T03:19:00Z"));

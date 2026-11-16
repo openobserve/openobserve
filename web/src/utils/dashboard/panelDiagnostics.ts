@@ -65,7 +65,7 @@ export const toMessages = (value: unknown): string[] => {
   return typeof value === "string" && value.trim() !== "" ? [value] : [];
 };
 
-const isRangeClamp = (message: string) =>
+export const isRangeClamp = (message: string) =>
   RANGE_CLAMP_MARKERS.some((marker) => message.includes(marker));
 
 type MessageKind = "range" | "function" | "partial";

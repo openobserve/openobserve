@@ -851,7 +851,6 @@ import {
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
 import RangeLimitStrip from "./RangeLimitStrip.vue";
-import { liveTimeSelection, staleQueriedRange } from "@/utils/logsStaleRange";
 import { formatRangeLabel } from "@/utils/timeRangeLabel";
 import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import {
@@ -4121,15 +4120,12 @@ export default defineComponent({
       }
       (searchBarRef.value as { handleRunQueryFn?: () => void } | null)?.handleRunQueryFn?.();
     };
-    // A range applied over unrun query edits waits for Run, so say which range the shown results are for.
+    // Unrun query edits wait for Run, so say which range the shown results are for (decision a).
     const staleRangeText = computed(() => {
-      if (isAutoRunOn.value || searchObj.loading || !searchObj.meta.editorDirty) return null;
+      if (searchObj.loading || !searchObj.meta.editorDirty) return null;
       if (contextViewText.value) return null;
       if (searchObj.meta.logsVisualizeToggle !== "logs") return null;
-      const queried = staleQueriedRange(
-        searchObj.meta.executed?.signature?.time,
-        liveTimeSelection(searchObj.data.datetime ?? {}),
-      );
+      const queried = searchObj.meta.executed?.signature?.time;
       if (!queried) return null;
       const range =
         queried.type === "relative"

@@ -582,7 +582,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(wrapper!.vm.searchObj.data.datetime.relativeTimePeriod).toBe("1h");
     });
 
-    it("holds a user's range change behind unrun query edits (decision a)", async () => {
+    it("runs a user's range change over unrun query edits, edits included (decision a, B12)", async () => {
       const { logs, searchObj } = await setup({ liveMode: false });
       vi.useFakeTimers();
       wrapper!.vm.onEditorUserEdit();
@@ -594,9 +594,8 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         userChangedValue: true,
       });
       await vi.advanceTimersByTimeAsync(3000);
-      expect(logs).not.toHaveBeenCalled();
-      expect(searchObj.meta.runPending).toBe(true);
-      expect(searchObj.meta.editorDirty).toBe(true);
+      expect(logs).toHaveBeenCalledTimes(1);
+      expect(searchObj.meta.editorDirty).toBe(false);
     });
 
     it("a programmatic range change keeps the auto-run rules", async () => {
@@ -793,13 +792,13 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(logs).not.toHaveBeenCalled();
     });
 
-    it("leaves a zoom pending while the editor is dirty", async () => {
+    it("runs a zoom over unrun editor edits too (decision a, B12)", async () => {
       const { logs, searchObj } = await setup();
       wrapper!.vm.onEditorUserEdit();
       wrapper!.vm.markZoom(ZOOM);
       await wrapper!.vm.updateDateTime(zoomPayload(ZOOM));
-      expect(logs).not.toHaveBeenCalled();
-      expect(searchObj.meta.runPending).toBe(true);
+      expect(logs).toHaveBeenCalledTimes(1);
+      expect(searchObj.meta.editorDirty).toBe(false);
     });
 
     it("does not run a function applied while a saved view loads", async () => {

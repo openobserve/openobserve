@@ -520,6 +520,7 @@ export default function useTimeRangeFields(deps: TimeRangeFieldsDeps) {
     timeFieldFocused,
     timeFieldError,
     unreadableFields,
+    fieldDrafts,
     typedFieldTime,
     isSeeding,
     forgetSeededEnd,

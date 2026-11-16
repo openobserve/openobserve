@@ -277,9 +277,8 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     // Open config panel sidebar
     await pm.dashboardPanelConfigs.openConfigPanel();
     // Step 3: Verify top date time picker shows "Last 1h" (NOT global time)
-    const pickerText = await pm.dashboardPanelTime.getConfigPanelTimePickerText();
-    expect(pickerText).toContain("1");
-    expect(pickerText.toLowerCase()).toContain("hour");
+    // A narrow trigger shows only the dates, so read the period from its accessible name.
+    expect(await pm.dashboardPanelTime.getConfigPanelTimePickerName()).toContain("Last 1 hour");
 
     // Step 4: Change panel time to "Last 6d"
     // Config is already open, picker is visible since panel time is enabled
@@ -295,9 +294,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await editPanel(page, panelName);
     await pm.dashboardPanelConfigs.openConfigPanel();
     // Step 6: Verify picker shows "Last 6d"
-    const pickerText2 = await pm.dashboardPanelTime.getConfigPanelTimePickerText();
-    expect(pickerText2).toContain("6");
-    expect(pickerText2.toLowerCase()).toContain("day");
+    expect(await pm.dashboardPanelTime.getConfigPanelTimePickerName()).toContain("Last 6 days");
 
     // Close without saving
     // Edits open the in-app leave dialog, which discardPanelChanges answers with Discard
@@ -500,15 +497,11 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await assertPanelTimeInURL(page, panelBId, "15m");
 
     // Step 3: Verify Panel A picker shows "Last 1h" (has custom time)
-    const panelAText = await pm.dashboardPanelTime.panelTimePicker(panelAId).textContent();
-    expect(panelAText).toContain("1");
-    expect(panelAText.toLowerCase()).toContain("hour");
+    expect(await pm.dashboardPanelTime.getPanelTimeChipText(panelAId)).toBe("1h");
 
     // Step 4: Verify Panel B has picker visible showing "15m" (initial global time)
     await assertPanelTimePickerVisible(page, panelBId);
-    const panelBText = await pm.dashboardPanelTime.panelTimePicker(panelBId).textContent();
-    expect(panelBText).toContain("15");
-    expect(panelBText.toLowerCase()).toContain("minute");
+    expect(await pm.dashboardPanelTime.getPanelTimeChipText(panelBId)).toBe("15m");
 
     // Step 5: Verify Panel C has no picker (useDefaultTime disabled)
     await assertPanelTimePickerNotVisible(page, panelCId);
@@ -521,9 +514,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await assertPanelTimeInURL(page, panelAId, "6d");
 
     // Step 8: Verify Panel A picker updated to show "6d"
-    const panelATextAfter = await pm.dashboardPanelTime.panelTimePicker(panelAId).textContent();
-    expect(panelATextAfter).toContain("6");
-    expect(panelATextAfter.toLowerCase()).toContain("day");
+    expect(await pm.dashboardPanelTime.getPanelTimeChipText(panelAId)).toBe("6d");
 
     // Step 9: Verify Panel B still shows "15m" in URL (initial global time, doesn't update when global changes)
     await assertPanelTimeInURL(page, panelBId, "15m");

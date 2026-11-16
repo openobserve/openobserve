@@ -450,7 +450,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :url="tracesShareURL"
             :live-url="shareRollingURL"
             :fixed-label="shareFixedLabel"
-            :fixed-copy-label="shareFixedCopyLabel"
             :live-label="shareRollingLabel"
             :range-context="shareRangeContext"
             variant="outline"
@@ -840,7 +839,6 @@ import {
 } from "@/utils/traces/filterUtils";
 import {
   isDatetimeChanged,
-  tracesQueryEdited,
   tracesRangeLink,
   tracesRunIsStaged,
   tracesToolbarLayout,
@@ -977,10 +975,6 @@ export default defineComponent({
     const shareFixedLabel = computed(() => {
       const { startTime, endTime } = searchObj.data.datetime;
       return fixedShareLabel(Number(startTime), Number(endTime), store.state.timezone);
-    });
-    const shareFixedCopyLabel = computed(() => {
-      const { startTime, endTime } = searchObj.data.datetime;
-      return fixedShareLabel(Number(startTime), Number(endTime), "UTC");
     });
     const shareRangeContext = computed(() =>
       [t("menu.traces"), searchObj.data.stream.selectedStream?.value].filter(Boolean).join(" · "),
@@ -1352,12 +1346,8 @@ export default defineComponent({
         return;
       }
 
-      // A user's range apply runs whatever Auto Run says, unless it would also run unrun query edits.
-      if (
-        value.userChangedValue === true &&
-        (datetimeChanged || value.rerun === true) &&
-        !tracesQueryEdited(searchObj.meta.lastRunSignature, searchObj)
-      ) {
+      // A user's range apply always runs, unrun query edits included (decision a).
+      if (value.userChangedValue === true && (datetimeChanged || value.rerun === true)) {
         emit("searchdata");
       }
 
@@ -1894,7 +1884,6 @@ export default defineComponent({
       tracesShareURL,
       shareRollingURL,
       shareFixedLabel,
-      shareFixedCopyLabel,
       shareRangeContext,
       tracesStreamLimits,
       shareRollingLabel,

@@ -437,8 +437,8 @@ describe("OrganizationSettings", () => {
       );
     });
 
-    it("blocks a guard the server would refuse", async () => {
-      for (const days of ["3651", "-1", "1.5"]) {
+    it("blocks a guard outside 1 to 3650 days, a typed 0 included", async () => {
+      for (const days of ["3651", "-1", "1.5", "0", 0, "-0"]) {
         vi.clearAllMocks();
         const wrapper = createWrapper();
         const form = getForm(wrapper);

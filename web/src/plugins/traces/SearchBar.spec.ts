@@ -409,7 +409,7 @@ const sharedStubs = {
   },
   ShareButton: {
     template: '<button data-test="logs-search-bar-share-link-btn" class="share-btn-stub" />',
-    props: ["url", "buttonClass", "buttonSize"],
+    props: ["url", "buttonClass", "buttonSize", "fixedLabel", "fixedCopyLabel"],
   },
   // OToggleGroup: stub to render inline without Reka UI context requirements
   OToggleGroup: {
@@ -2139,6 +2139,26 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("searchdata")).toHaveLength(1);
     });
 
+    it("copies the range line in the display zone, as the share menu shows it (B11, R4)", async () => {
+      const zone = store.state.timezone;
+      const datetime = { ...searchObjInstance.data.datetime };
+      store.state.timezone = "Asia/Kolkata";
+      try {
+        Object.assign(searchObjInstance.data.datetime, {
+          type: "absolute",
+          startTime: Date.UTC(2026, 10, 11, 12, 27) * 1000,
+          endTime: Date.UTC(2026, 10, 11, 12, 42) * 1000,
+        });
+        wrapper = mountSearchBar();
+        await flushPromises();
+        const props = wrapper.findComponent(".share-btn-stub").props();
+        expect(props.fixedCopyLabel || props.fixedLabel).toMatch(/17:57 – 18:12 UTC\+05:30$/);
+      } finally {
+        store.state.timezone = zone;
+        Object.assign(searchObjInstance.data.datetime, datetime);
+      }
+    });
+
     it("runs a user's range apply with live mode off, once (decision a)", async () => {
       store.state.zoConfig = { auto_query_enabled: true };
       searchObjInstance.meta.liveMode = false;
@@ -2158,7 +2178,7 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("searchdata")).toHaveLength(1);
     });
 
-    it("holds a user's range apply while the query text has unrun edits (decision a)", async () => {
+    it("runs a user's range apply over unrun query edits too (decision a, B12)", async () => {
       searchObjInstance.meta.liveMode = false;
       wrapper = mountSearchBar();
       await flushPromises();
@@ -2174,7 +2194,7 @@ describe("SearchBar", () => {
         userChangedValue: true,
       });
 
-      expect(wrapper.emitted("searchdata")).toBeUndefined();
+      expect(wrapper.emitted("searchdata")).toHaveLength(1);
     });
 
     it("keeps a refused over-limit link unclamped; a user's apply clears the refusal (R2, O1)", async () => {

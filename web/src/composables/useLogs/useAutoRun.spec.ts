@@ -899,13 +899,12 @@ describe("explicit zoom", () => {
     expect(h.hits()).toHaveLength(1);
   });
 
-  it("stays pending when the editor is dirty", () => {
+  it("runs the editor's unrun edits with it (decision a, B12)", () => {
     const h = makeHarness();
     h.engine.markEditorDirty();
-    expect(h.engine.requestRun("zoom")).toBe("pending-dirty");
-    expect(h.requests).toHaveLength(0);
-    expect(h.store.meta.runPending).toBe(true);
-    expect(h.store.meta.editorDirty).toBe(true);
+    expect(h.engine.requestRun("zoom")).toBe("dispatched");
+    expect(h.hits()).toHaveLength(1);
+    expect(h.store.meta.editorDirty).toBe(false);
   });
 });
 
@@ -937,14 +936,13 @@ describe("explicit range change", () => {
     expect(h.estimate.mock.calls.length).toBe(calls);
   });
 
-  it("waits behind unrun editor edits and keeps them unrun", () => {
+  it("runs over unrun editor edits and runs them too (decision a, B12)", () => {
     const h = makeHarness({ liveMode: false });
     h.engine.markEditorDirty();
-    expect(h.engine.requestRun("range")).toBe("pending-dirty");
+    expect(h.engine.requestRun("range")).toBe("dispatched");
     vi.runAllTimers();
-    expect(h.requests).toHaveLength(0);
-    expect(h.store.meta.runPending).toBe(true);
-    expect(h.store.meta.editorDirty).toBe(true);
+    expect(h.hits()).toHaveLength(1);
+    expect(h.store.meta.editorDirty).toBe(false);
   });
 });
 

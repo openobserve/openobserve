@@ -1110,6 +1110,19 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     suggestionsDismissed.value = true;
   };
 
+  const markUnreadable = () => {
+    const text = inputText.value.trim();
+    const reason = explainTimeInputFailure(text, parseOptions());
+    reportParseFailure(text, reason);
+    inputRefusal.value =
+      reason === "future"
+        ? t("common.timeRangeStartInFuture")
+        : reason === "reversed"
+          ? t("common.timeRangeEndBeforeStart")
+          : null;
+    inputError.value = true;
+  };
+
   // Enter reads again against a fresh now; only alternatives of text with no reading are shown before applying.
   const commitInput = () => {
     if (!inputText.value.trim()) return;
@@ -1117,6 +1130,8 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     const listWasOpen = suggestionsOpen.value;
     readInputText(listWasOpen && !pending);
     lastReadText = inputText.value.trim();
+    // A failed read unfilters the list, so a second Enter would otherwise take its first row.
+    inputError.value = false;
     if (textAnswer.value === "fiscalUnset") {
       inputRefusal.value = t("dateTime.fiscalYearUnset");
       inputError.value = true;
@@ -1144,16 +1159,7 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
       deps.pickListRow(firstMatch);
       return;
     }
-    const text = inputText.value.trim();
-    const reason = explainTimeInputFailure(text, parseOptions());
-    reportParseFailure(text, reason);
-    inputRefusal.value =
-      reason === "future"
-        ? t("common.timeRangeStartInFuture")
-        : reason === "reversed"
-          ? t("common.timeRangeEndBeforeStart")
-          : null;
-    inputError.value = true;
+    markUnreadable();
   };
 
   // An example is copied into the bar to be read, never applied.
@@ -1262,6 +1268,8 @@ export default function useTimeRangeTyping(props: TimeRangeTypingProps, deps: Ti
     onInputEdit();
     readInputText();
     lastReadText = inputText.value;
+    // A paste is a finished entry, so text that reads as nothing fails as an Enter would.
+    if (exampleRows.value.length > 0) markUnreadable();
     inputBar.value?.focus();
   };
 

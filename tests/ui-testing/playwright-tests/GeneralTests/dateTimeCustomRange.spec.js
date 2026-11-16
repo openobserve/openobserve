@@ -5,7 +5,7 @@ const PageManager = require('../../pages/page-manager.js');
 /**
  * E2E coverage for how the DateTime picker (web/src/components/DateTime.vue)
  * respects a stream's max_query_range: over-limit chips and list rows are
- * disabled with the reason, a typed over-limit period is refused (not clamped),
+ * disabled with the reason, a typed over-limit period offers the longest allowed,
  * an unreadable typed value is flagged, and an in-limit chip still applies.
  *
  * Parallel-safety: the unreadable-input case uses the read-only `e2e_automate`
@@ -17,8 +17,8 @@ const PageManager = require('../../pages/page-manager.js');
 const NO_RESTRICTION_STREAM = 'e2e_automate';
 const RESTRICTION_STREAM = 'e2e_datetime_restriction';
 const ORG_ID = process.env.ORGNAME || 'default';
-// search.queryRangeRestrictionMsg, with common.timeRangeOverLimit as the fallback copy.
-const RESTRICTION_REASON = /query range is restricted to|longer than the \d+-hour limit/i;
+// dateTime.maxLimit on chips and rows ("Max 2h"), dateTime.overLimit on typed text ("6h is over the 2-hour limit").
+const RESTRICTION_REASON = /Max \d+[mhdw]\b|is over the \d+-(hour|day) limit/i;
 
 test.describe('DateTime range limit and typed input testcases', () => {
   let pm;
@@ -86,20 +86,16 @@ test.describe('DateTime range limit and typed input testcases', () => {
     });
 
     // TC-03
-    test('should refuse a typed period over the limit and keep the applied range', {
+    test('should flag a typed period over the limit and apply the longest allowed on Enter', {
       tag: ['@date-time-custom-range', '@all', '@P1']
     }, async () => {
-      const labelBefore = await pm.dateTimePickerPage.getTriggerLabel();
-
-      // DateTime.vue plans an over-limit period as "restricted": the note explains, Enter does nothing.
+      // The note explains the limit; Enter takes the offered "Longest allowed" row, never the typed 6h.
       await pm.dateTimePickerPage.typeText('6h');
       await pm.dateTimePickerPage.expectPreviewNote(RESTRICTION_REASON);
       await pm.dateTimePickerPage.textInput.press('Enter');
-      await expect(pm.dateTimePickerPage.panel).toBeVisible();
 
-      await pm.dateTimePickerPage.clearInputAndClose();
-      expect(await pm.dateTimePickerPage.getTriggerLabel()).toBe(labelBefore);
-      testLogger.info('Over-limit typed period refused');
+      await expect.poll(() => pm.dateTimePickerPage.getTriggerLabel()).toBe('Last 2 hours');
+      testLogger.info('Over-limit typed period applied as the longest allowed');
     });
 
     // TC-04

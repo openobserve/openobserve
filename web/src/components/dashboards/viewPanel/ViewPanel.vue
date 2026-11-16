@@ -319,7 +319,7 @@ import { replaceHistogramInterval } from "@/utils/dashboard/histogramIntervalRep
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
-import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
+import { panelQueryStreams, usePanelNotices } from "@/composables/dashboard/usePanelNotices";
 import {
   PANEL_EDITOR_FOCUS_PARAM,
   type PanelEditorFocusTarget,
@@ -517,7 +517,9 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
-    } = usePanelNotices(() => store.state.timezone);
+    } = usePanelNotices(() => store.state.timezone, {
+      streams: () => panelQueryStreams(dashboardPanelData.data),
+    });
     const limitNumberOfSeriesWarningMessage = ref("");
     const sparklineWarning = ref("");
     const errorMessage = ref("");

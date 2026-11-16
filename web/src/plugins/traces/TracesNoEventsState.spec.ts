@@ -208,6 +208,45 @@ describe("TracesNoEventsState", () => {
       }
     });
 
+    it("rounds a live range's bounds to the minute (R5)", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-16T03:19:48Z"));
+      try {
+        wrapper.unmount();
+        wrapper = mountComponentWithStore();
+        expect(wrapper.text()).toContain("No traces in Nov 16, 03:04 – 03:19");
+        expect(wrapper.text()).not.toContain(":48");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("keeps the dated message and Try beside the jump card (B10, R6/R7)", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-16T03:19:00Z"));
+      try {
+        wrapper.unmount();
+        wrapper = mount(TracesNoEventsState, {
+          props: { streamDocTimeRange: { min: 1_000_000, max: 10_000_000 } },
+          global: {
+            plugins: [i18n, store],
+            provide: { [TRACES_APPLY_RANGE as symbol]: vi.fn() },
+            stubs: { OEmptyState: OEmptyStateStub, EmptyStateActionCard: EmptyStateActionCardStub },
+          },
+        });
+        expect(wrapper.find('[data-test="traces-no-events-jump-to-data-card"]').exists()).toBe(
+          true,
+        );
+        expect(wrapper.text()).toContain("No traces in Nov 16, 03:04 – 03:19");
+        expect(wrapper.text()).not.toContain("doesn't contain any data");
+        expect(wrapper.find('[data-test="traces-no-events-try-range-btn"]').text()).toBe(
+          "Try Last 1 hour",
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("offers no longer range when it is over the stream's query-range limit", () => {
       wrapper.unmount();
       const dt = mockSearchObj.data.datetime as Record<string, unknown>;

@@ -5,6 +5,7 @@
       error ||
       exemplarError ||
       maxQueryRangeWarning ||
+      rangeLimitText ||
       sparklineWarning ||
       xAliasInconsistencyWarning ||
       isCachedDataDifferWithCurrentTimeRange ||
@@ -172,14 +173,14 @@
       icon="lock"
       clickable
       class="me-1 shrink-0"
-      :aria-label="maxQueryRangeWarning"
+      :aria-label="rangeLimitDetail"
       data-test="panel-max-duration-chip"
     >
       {{ rangeLimitText }}
       <OTooltip side="bottom" align="end" max-width="26.25rem">
         <template #content
           ><div class="whitespace-pre-wrap" data-test="panel-max-duration-warning-content">
-            {{ maxQueryRangeWarning }}
+            {{ rangeLimitDetail }}
           </div></template
         >
       </OTooltip>
@@ -276,7 +277,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import PanelNoticeContent from "@/components/dashboards/PanelNoticeContent.vue";
-import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
+import { isRangeClamp, type SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
 import { formatLimitShorthand } from "@/utils/timeRangeList";
@@ -319,6 +320,16 @@ export default defineComponent({
     maxQueryRangeWarning: {
       type: String,
       default: "",
+    },
+    /** The panel streams' query-range limit in hours, for a clamp notice that names none. */
+    rangeLimitHours: {
+      type: Number,
+      default: 0,
+    },
+    /** The panel's window is over `rangeLimitHours`, so the server clipped it even if it said nothing. */
+    rangeOverLimit: {
+      type: Boolean,
+      default: false,
     },
     limitNumberOfSeriesWarningMessage: {
       type: String,
@@ -432,9 +443,17 @@ export default defineComponent({
     );
 
     const rangeLimitText = computed(() => {
-      const hours = Number(RANGE_LIMIT_HOURS.exec(props.maxQueryRangeWarning)?.[1]);
+      const named = Number(RANGE_LIMIT_HOURS.exec(props.maxQueryRangeWarning)?.[1]);
+      const clamped = isRangeClamp(props.maxQueryRangeWarning) || props.rangeOverLimit;
+      const hours = named || (clamped ? props.rangeLimitHours : 0);
       return hours > 0 ? t("dateTime.maxLimit", { limit: raw(formatLimitShorthand(hours)) }) : "";
     });
+
+    const rangeLimitDetail = computed(
+      () =>
+        props.maxQueryRangeWarning ||
+        t("common.timeRangeOverLimit", { count: props.rangeLimitHours }),
+    );
 
     const collapsedTone = computed(() =>
       notices.value.some((notice) => notice.tone === "error") ? "error" : "warning",
@@ -483,6 +502,7 @@ export default defineComponent({
       t,
       notices,
       rangeLimitText,
+      rangeLimitDetail,
       collapsedTone,
       collapsedLabel,
       collapseClasses,

@@ -22,7 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     1. The selected range has no data but the stream does — either the window
        misses the data entirely, or (with no filter) it overlaps the stream's
        min/max envelope yet lands in a gap with no records
-       → "Jump to latest data" card (last 15 min around doc_time_max)
+       → dated message + "Jump to latest data" card (last 15 min around
+         doc_time_max) + "Try {range}" (R7)
 
     2. Window overlaps stream data but a filter excluded everything
        → "relax your filters" message (no action card; Ask AI / history below)
@@ -43,9 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="windowHasStreamData && hasFilters"
         v-html="DOMPurify.sanitize(t('logs.noEvents.descWithFilters'))"
       />
-      <!-- We know where the stream's last data is: offer to jump to it. -->
-      <span v-else-if="jumpTarget">{{ t("logs.noEvents.descOutOfRange") }}</span>
-      <!-- No stream stats: generic fallback. -->
       <span v-else>{{ t("logs.noEvents.descNoFilters", { range: currentPeriodLabel }) }}</span>
     </template>
 
@@ -67,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #extra>
       <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
-          v-if="tryChip && !jumpTarget"
+          v-if="tryChip"
           variant="outline"
           size="sm"
           data-test="logs-no-events-try-range-btn"
@@ -211,9 +209,15 @@ const jumpTargetSublabel = computed(() => {
 const isRelative = computed(() => props.dateType === "relative" && !!props.relativeTimePeriod);
 const currentPeriodLabel = computed(() => {
   const w = props.queryWindowUs;
+  // A live range ends at now, so its bounds read to the minute like the trigger's (R5).
   if (w)
     return formatRangeLabel(
-      { startUs: w.start, endUs: w.end },
+      {
+        startUs: w.start,
+        endUs: w.end,
+        live: isRelative.value,
+        calendar: props.relativeTimePeriod?.startsWith("calendar:"),
+      },
       { timezone: props.timezone, surface: "summary", locale: getIntlLocale() },
     );
   return isRelative.value

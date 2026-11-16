@@ -1394,7 +1394,7 @@ describe("DateTime paste", () => {
         expect(field().value).toBe("yesterday");
       });
 
-      it("marks unreadable pasted text only after Enter, like typed text", async () => {
+      it("marks unreadable pasted text at once, as a finished entry (B7)", async () => {
         createWrapper();
         await openMenu();
         const before = emitCount();
@@ -1402,7 +1402,8 @@ describe("DateTime paste", () => {
         tick();
         firePaste(document.querySelector("#date-time-menu")!, "not a date range at all");
         await flushPromises();
-        expect(inMenu("date-time-input-error")).toBeNull();
+        expect(inMenu("date-time-input-error")?.textContent).toContain("Didn’t catch that");
+        await pressEnter();
         await pressEnter();
 
         expect(emitCount()).toBe(before);

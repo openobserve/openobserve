@@ -202,8 +202,13 @@ export default function useTimeRangeStepping(
   const captureUndo = (ran: boolean = deps.appliedRan()) => {
     if (!props.undoable || props.hideRangeShift) return;
     const applied = deps.appliedSelection();
+    // Callers may already hold the next selection, so a live origin resolves its own period, not the fields.
+    const live =
+      applied.selectedType === "relative" && applied.calendarToken === null
+        ? resolveRelativePeriod(`${applied.relativeValue}${applied.relativePeriod}`, Date.now())
+        : null;
     const { startTime, endTime } =
-      (applied.selectedType === "absolute" ? deps.appliedBounds() : null) ??
+      (applied.selectedType === "absolute" ? deps.appliedBounds() : live) ??
       getConsumableDateTime();
     const step = {
       label: String(deps.triggerLabel.value),

@@ -53,7 +53,8 @@ export const makeOrganizationSettingsSchema = (t: (_key: string) => string) => {
 export const rangeGuardDaysPayload = (value: unknown): number =>
   isGuardOff(value) ? 0 : Number(value);
 
-const isGuardOff = (v: unknown) => v === "" || v === null || v === undefined || Number(v) === 0;
+// Only an empty field turns the guard off, as the help text says; a typed 0 is out of range.
+const isGuardOff = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
 
 const isGuardDays = (v: unknown) =>
   Number.isInteger(Number(v)) && Number(v) >= 1 && Number(v) <= MAX_RANGE_GUARD_DAYS;

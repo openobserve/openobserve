@@ -125,7 +125,8 @@ test.describe("Dashboard Panel Time - Apply Button Behavior", () => {
     // Step 3: Open date time picker and switch to absolute time
     await pm.dashboardPanelTime.openGlobalPickerAbsoluteTab();
 
-    // Step 4: Click Apply button and wait for data
+    // Step 4: Pick a day (Apply is disabled until something changes), then Apply and wait for data
+    await pm.dashboardPanelTime.pickOneDayInOpenCalendar();
     await pm.dashboardPanelTime.clickDateTimeApply();
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 

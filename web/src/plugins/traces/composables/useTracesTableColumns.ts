@@ -37,6 +37,7 @@
 import { ref } from "vue";
 import { useStore } from "vuex";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
+import { formatZoneOffset } from "@/utils/timeRangeLabel";
 import { raw, useI18nTyped, type I18nKey, type TranslateFn } from "@/types/i18n";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -235,7 +236,7 @@ export function useTracesTableColumns() {
     if (!selectedFields.find((col) => col === timestampCol))
       cols.unshift({
         id: timestampCol,
-        header: raw(`${t("traces.timestamp")} (${store.state.timezone})`),
+        header: raw(`${t("traces.timestamp")} (${formatZoneOffset(store.state.timezone)})`),
         size: 210,
         meta: { sortable: true, headerClass: "capitalize!" },
         accessorFn: (row: any) =>

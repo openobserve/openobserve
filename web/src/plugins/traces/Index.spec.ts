@@ -910,6 +910,24 @@ describe("Index.vue (Main Traces Page)", () => {
       }
     });
 
+    it("names the shown results' range for query edits alone, the range unchanged (B12)", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = true;
+      const editorValue = mockSearchObj.data.editorValue;
+      try {
+        mockSearchObj.meta.lastRunSignature = tracesSearchRunSignature(mockSearchObj);
+        mockSearchObj.data.editorValue = "service_name = 'checkout'";
+        wrapper = mountTraces();
+        await flushPromises();
+        expect(wrapper.vm.staleRangeText).toContain("Results are for");
+        expect(wrapper.vm.staleRangeText).toContain("15");
+      } finally {
+        mockSearchObj.data.editorValue = editorValue;
+        mockSearchObj.meta.lastRunSignature = null;
+        mockSearchObj.meta.liveMode = false;
+      }
+    });
+
     it("shows no range strip for a range change alone, which runs (decision a)", async () => {
       mockSearchObj.meta.liveMode = false;
       const datetime = mockSearchObj.data.datetime;
@@ -952,6 +970,38 @@ describe("Index.vue (Main Traces Page)", () => {
         await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled(), {
           timeout: 3000,
         });
+      });
+
+      it("moves the picker itself to the applied range, so the trigger shows it (B2)", async () => {
+        localStorage.setItem(historyKey(), JSON.stringify([{ ...LOGS_RANGE, source: "Logs" }]));
+        mockSearchObj.data.datetime = {
+          ...mockSearchObj.data.datetime,
+          type: "relative",
+          relativeTimePeriod: "15m",
+        };
+        const setRange = vi.fn();
+        wrapper = mount(Index, {
+          attachTo: node,
+          global: {
+            plugins: [i18n, router],
+            provide: { store: store },
+            stubs: {
+              "search-bar": {
+                template: "<div />",
+                setup: () => ({ dateTimeRef: { setRange }, setEditorValue: vi.fn() }),
+              },
+              "index-list": true,
+              "search-result": true,
+              "service-graph": true,
+              "services-catalog": true,
+              SanitizedHtmlRenderer: true,
+            },
+          },
+        });
+        await flushPromises();
+        expect(wrapper.vm.arrivalRangeText).toBeTruthy();
+        wrapper.vm.applyArrival();
+        expect(setRange).toHaveBeenCalledWith({ kind: "fixed", ...LOGS_RANGE });
       });
 
       it("dates the offered range in the user's locale (Codex pass 2 B-6)", async () => {

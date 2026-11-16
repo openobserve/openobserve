@@ -379,7 +379,14 @@ const CONSENT_IGNORING_REASONS = new Set<RunReason>(["url", "activation", "visua
 // A picked range can widen the scan, so it re-checks the budget like Narrow to.
 const GUARDED_EXPLICIT_REASONS = new Set<RunReason>(["narrow", "range"]);
 
-const DIRTY_CLEARING_REASONS = new Set<RunReason>(["run", "saved-view", "explicit"]);
+// A range change runs the editor's text with it (decision a), so its edits are no longer unrun.
+const DIRTY_CLEARING_REASONS = new Set<RunReason>([
+  "run",
+  "saved-view",
+  "explicit",
+  "zoom",
+  "range",
+]);
 
 const SCAN_GATED_ACTIONS = new Set<PersistAction>([
   "create-alert",
@@ -1051,11 +1058,6 @@ export function createAutoRun(deps: AutoRunDeps) {
     options: RequestRunOptions,
   ): RequestRunResult {
     if (reason === "run-anyway") return runAnyway(options);
-    // A range change must not run the editor's unrun text with it.
-    if ((reason === "zoom" || reason === "range") && meta.editorDirty) {
-      meta.runPending = true;
-      return "pending-dirty";
-    }
     dropPendingForExplicit(reason);
     if (DIRTY_CLEARING_REASONS.has(reason)) meta.editorDirty = false;
     return execute({

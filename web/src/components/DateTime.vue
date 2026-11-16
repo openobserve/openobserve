@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="disable"
           @mouseenter="onTriggerHover(true)"
           @mouseleave="onTriggerHover(false)"
-          @focus="onTriggerHover(true)"
+          @focus="onTriggerFocus"
           @blur="onTriggerHover(false)"
         >
           <template #icon-left>
@@ -607,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('common.timeRangeStart')"
                 :placeholder="t('common.timeRangeStart')"
                 :error="unreadableFields.start || timeFieldError?.field === 'start'"
-                :model-value="fieldsBlank ? '' : startFieldText"
+                :model-value="startFieldShown"
                 data-test="datetime-start-time"
                 @update:model-value="onFieldInput('start', $event)"
                 @change="onFieldChange('start', $event)"
@@ -627,7 +627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('common.timeRangeEnd')"
                 :placeholder="t('common.timeRangeEnd')"
                 :error="unreadableFields.end || timeFieldError?.field === 'end'"
-                :model-value="fieldsBlank ? '' : endFieldText"
+                :model-value="endFieldShown"
                 data-test="datetime-end-time"
                 @update:model-value="onFieldInput('end', $event)"
                 @change="onFieldChange('end', $event)"
@@ -1384,6 +1384,7 @@ export default defineComponent({
       timeFieldFocused,
       timeFieldError,
       unreadableFields,
+      fieldDrafts,
       typedFieldTime,
       writeSeededFields,
       resetTime,
@@ -2337,6 +2338,16 @@ export default defineComponent({
         triggerTooltipOpen.value = true;
       }, 400);
     };
+    // Focus handed back after a mouse pick is not focus-visible, so its tooltip would cover the page.
+    const onTriggerFocus = (event: FocusEvent) => {
+      const target = event.currentTarget;
+      try {
+        if (target instanceof HTMLElement && !target.matches(":focus-visible")) return;
+      } catch {
+        // An engine without :focus-visible keeps the focus tooltip.
+      }
+      onTriggerHover(true);
+    };
     onBeforeUnmount(() => onTriggerHover(false));
     const triggerElement = computed<HTMLElement | null>(() => {
       const button = datetimeBtn.value as { $el?: HTMLElement } | null;
@@ -3001,6 +3012,13 @@ export default defineComponent({
     );
     // From a live range nothing is picked yet, so Start and End stay empty rather than echo the live dates.
     const fieldsBlank = computed(() => needsStartDate.value);
+    // Text typed while the fields are blank is kept, or each re-render would wipe the keystrokes.
+    const startFieldShown = computed(() =>
+      fieldsBlank.value ? (fieldDrafts.value.start ?? "") : startFieldText.value,
+    );
+    const endFieldShown = computed(() =>
+      fieldsBlank.value ? (fieldDrafts.value.end ?? "") : endFieldText.value,
+    );
     // The days a calendar pick would apply, and those its pointer or focus previews, against the page's limits.
     const calendarLimit = computed<{ selection: string | null; preview: string | null }>(() => {
       if (!calendarMode.value || selectedType.value !== "absolute") {
@@ -3359,6 +3377,8 @@ export default defineComponent({
       applyBlockedReason,
       needsStartDate,
       fieldsBlank,
+      startFieldShown,
+      endFieldShown,
       zoomOutBlocked,
       menuEl,
       onTimeFieldEnter,
@@ -3377,6 +3397,7 @@ export default defineComponent({
       triggerElement,
       triggerTooltipOpen,
       onTriggerHover,
+      onTriggerFocus,
       copyDisabled,
       copyShortcut,
       chipsNotes,

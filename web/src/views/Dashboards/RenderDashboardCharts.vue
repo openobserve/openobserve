@@ -269,9 +269,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template v-if="hasPanelTime(item) && panelTimeValues[item.id]" #panel-time>
                     <!-- The chip stands in for the picker's trigger; the hidden picker under it anchors its panel there. -->
-                    <!-- A fixed range is long: the chip ellipsises before it can push the panel controls out. -->
+                    <!-- Only a long fixed range may ellipsise; a short relative one holds its width and the title gives way. -->
                     <span
-                      class="relative inline-flex max-w-full min-w-0"
+                      class="relative inline-flex"
+                      :class="panelTimeChipIsFixed(item.id) ? 'max-w-full min-w-0' : 'shrink-0'"
                       :data-test="`dashboard-panel-${item.id}-time-picker`"
                     >
                       <OTag
@@ -279,13 +280,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         icon="timer"
                         clickable
-                        class="max-w-full min-w-0"
+                        :class="{ 'max-w-full min-w-0': panelTimeChipIsFixed(item.id) }"
                         :aria-label="panelTimeChipName(item.id)"
                         :data-test="`dashboard-panel-${item.id}-time-chip`"
                         :ref="(chip) => setPanelTimeChip(item.id, chip)"
                         @click="openPanelTimePicker(item.id)"
                         ><span
-                          class="truncate"
+                          :class="{ truncate: panelTimeChipIsFixed(item.id) }"
                           :data-test="`dashboard-panel-${item.id}-time-chip-text`"
                           >{{ panelTimeChipText(item.id) }}</span
                         ><OTooltip :content="panelTimeChipName(item.id)" side="bottom"
@@ -1853,18 +1854,32 @@ export default defineComponent({
         t,
         getIntlLocale(),
       );
+    const panelTimeChipIsFixed = (panelId: string): boolean => {
+      const value = getPanelPickedTime(panelId) ?? panelTimeValues.value[panelId];
+      return !!value && (value.valueType ?? value.type) !== "relative";
+    };
     const panelTimeChipName = (panelId: string): I18nText =>
       t("dashboard.panelTimeChipLabel", { range: String(panelTimeChipText(panelId)) });
     const openPanelTimePicker = (panelId: string) => {
       panelTimePickers.get(panelId)?.dateTimePicker?.openMenu?.();
     };
+    // Reka returns focus only once the close animation unmounts the menu, and the picker's hidden trigger cannot take it.
+    const afterMenuUnmounts = (
+      menu: HTMLElement | null | undefined,
+      done: () => void,
+      frames = 60,
+    ) => {
+      if (!menu?.isConnected || frames <= 0) return void nextTick(done);
+      requestAnimationFrame(() => afterMenuUnmounts(menu, done, frames - 1));
+    };
     // The picker's own trigger is hidden, so focus returns to the chip that opened it.
     const onPanelTimePickerHide = (panelId: string) => {
       getPanelTimeGate(panelId).onHide();
-      nextTick(() => {
+      const picker = panelTimePickers.get(panelId);
+      afterMenuUnmounts(picker?.dateTimePicker?.menuEl, () => {
         const active = document.activeElement;
-        const picker = panelTimePickers.get(panelId)?.$el as HTMLElement | undefined;
-        if (active && active !== document.body && !picker?.contains(active)) return;
+        const pickerEl = picker?.$el as HTMLElement | undefined;
+        if (active && active !== document.body && !pickerEl?.contains(active)) return;
         panelTimeChips.get(panelId)?.$el?.focus();
       });
     };
@@ -2114,6 +2129,7 @@ export default defineComponent({
       setPanelTimeChip,
       panelTimeChipText,
       panelTimeChipName,
+      panelTimeChipIsFixed,
       panelTimePickers,
       openPanelTimePicker,
       onPanelTimePickerHide,

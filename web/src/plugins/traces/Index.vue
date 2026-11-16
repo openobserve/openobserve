@@ -375,8 +375,8 @@ import useTimeRangeHistory, {
   isRelativeHistoryEntry,
   type TimeRangeHistoryEntry,
 } from "@/composables/useTimeRangeHistory";
-import { liveTimeSelection, staleQueriedRange } from "@/utils/logsStaleRange";
 import { formatRangeLabel } from "@/utils/timeRangeLabel";
+import { rangeFromToken, type TimeRange } from "@/utils/timeRangeModel";
 import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
@@ -2193,15 +2193,12 @@ const backFromTracesContext = async () => {
   searchData();
 };
 
-// A range applied over unrun query edits waits for Run, so say which range the shown results are for.
+// Unrun query edits wait for Run, so say which range the shown results are for (decision a).
 const staleRangeText = computed(() => {
   if (searchObj.loading) return null;
   if (tracesContextOn.value) return null;
   if (!tracesQueryEdited(searchObj.meta.lastRunSignature, searchObj)) return null;
-  const queried = staleQueriedRange(
-    tracesRunTimeSelection(searchObj.meta.lastRunSignature),
-    liveTimeSelection(searchObj.data.datetime ?? {}),
-  );
+  const queried = tracesRunTimeSelection(searchObj.meta.lastRunSignature);
   if (!queried) return null;
   const range =
     queried.type === "relative"
@@ -2245,24 +2242,26 @@ const arrivalRangeText = computed(() => {
     ),
   );
 });
-// Programmatic picker sync, so the one run below is the only search.
+// setRange moves the trigger too without searching, so the one run below is the only search.
 const applyArrival = () => {
   const entry = arrival.value;
   arrivalDismissed.value = true;
   if (!entry) return;
   tracesRangeLink.fromLink = false;
   tracesRangeLink.refusal = null;
-  const picker = searchBarRef.value?.dateTimeRef;
+  const picker = searchBarRef.value?.dateTimeRef as {
+    setRange?: (range: TimeRange | null) => void;
+  } | null;
   if (isRelativeHistoryEntry(entry)) {
     const resolved = getConsumableRelativeTime(entry.relative);
     if (!resolved) return;
-    picker?.setRelativeTime(entry.relative);
+    picker?.setRange?.(rangeFromToken(entry.relative));
     searchObj.data.datetime.startTime = resolved.startTime;
     searchObj.data.datetime.endTime = resolved.endTime;
     searchObj.data.datetime.relativeTimePeriod = entry.relative;
     searchObj.data.datetime.type = "relative";
   } else {
-    picker?.setAbsoluteTime(entry.startUs, entry.endUs);
+    picker?.setRange?.({ kind: "fixed", startUs: entry.startUs, endUs: entry.endUs });
     searchObj.data.datetime.startTime = entry.startUs;
     searchObj.data.datetime.endTime = entry.endUs;
     searchObj.data.datetime.type = "absolute";

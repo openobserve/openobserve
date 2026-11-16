@@ -463,11 +463,24 @@ describe("Logs Index", async () => {
       expect(handleRunQueryFn).toHaveBeenCalled();
     });
 
-    it("hides while the range still matches, or a search is running", async () => {
+    it("shows for query edits alone, with Auto Run on too (decision a, B12)", async () => {
       await showStaleRange();
       wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "15m";
-      expect(wrapper.vm.staleRangeText).toBeNull();
-      wrapper.vm.searchObj.data.datetime.relativeTimePeriod = "1h";
+      const autoQuery = store.state.zoConfig.auto_query_enabled;
+      store.state.zoConfig.auto_query_enabled = true;
+      wrapper.vm.searchObj.meta.liveMode = true;
+      try {
+        await flushPromises();
+        expect(wrapper.vm.staleRangeText).toContain("15");
+        expect(wrapper.find('[data-test="logs-search-bar-stale-range-strip"]').exists()).toBe(true);
+      } finally {
+        store.state.zoConfig.auto_query_enabled = autoQuery;
+        wrapper.vm.searchObj.meta.liveMode = false;
+      }
+    });
+
+    it("hides while a search is running, or off the logs tab", async () => {
+      await showStaleRange();
       wrapper.vm.searchObj.loading = true;
       expect(wrapper.vm.staleRangeText).toBeNull();
       wrapper.vm.searchObj.loading = false;

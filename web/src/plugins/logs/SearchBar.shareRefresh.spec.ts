@@ -87,8 +87,32 @@ describe("SearchBar share kinds and auto-refresh pause", () => {
   it("names the page and streams for the copied range line", () => {
     wrapper!.vm.searchObj.data.stream.selectedStream = ["default", "k8s"];
     expect(wrapper!.vm.shareRangeContext).toBe("Logs · default, k8s");
-    setRange("absolute");
-    expect(wrapper!.vm.shareFixedCopyLabel).toMatch(/12:27 – 12:42 UTC$/);
+  });
+
+  it("copies the range line in the display zone, as the share menu shows it (B11, R4)", async () => {
+    const zone = store.state.timezone;
+    const width = window.innerWidth;
+    store.state.timezone = "Asia/Kolkata";
+    window.innerWidth = 1366;
+    try {
+      wrapper!.unmount();
+      wrapper = mount(SearchBar, {
+        props: { retentionDays: 7 },
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+          stubs: { QueryEditor: true, DateTime: true },
+        },
+      });
+      setRange("absolute");
+      await wrapper.vm.$nextTick();
+      const share = wrapper.findComponent({ name: "ShareButton" });
+      const copied = share.props("fixedCopyLabel") || share.props("fixedLabel");
+      expect(copied).toMatch(/17:57 – 18:12 UTC\+05:30$/);
+    } finally {
+      store.state.timezone = zone;
+      window.innerWidth = width;
+    }
   });
 
   it.each([true, false])(

@@ -62,9 +62,8 @@ test.describe("Dashboard Panel Time - Part 3: Advanced Features and Edge Cases",
     await pm.dashboardPanelTime.closeViewPanelModal();
 
     // Step 9: Verify Panel in dashboard still shows "Last 1h" (not affected by View Panel change)
-    const pickerText = await pm.dashboardPanelTime.getPanelTimeDisplayText(panelId);
-    expect(pickerText).toContain("1");
-    expect(pickerText).not.toContain("7");
+    // The wrapper also holds the hidden trigger's dates, so read the chip alone.
+    expect(await pm.dashboardPanelTime.getPanelTimeChipText(panelId)).toBe("1h");
 
     // Step 10: Verify URL still has "1h"
     await assertPanelTimeInURL(page, panelId, "1h");
