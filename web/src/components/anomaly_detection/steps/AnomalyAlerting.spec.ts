@@ -34,6 +34,7 @@ vi.mock("@/services/alert_templates", () => ({
 
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import templateService from "@/services/alert_templates";
+import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
 
 const makeConfig = (overrides: Record<string, any> = {}) => ({
   alert_enabled: true,
@@ -46,14 +47,14 @@ const makeDestinations = () => [
   { name: "pagerduty-dest", type: "pagerduty" },
 ];
 
-async function mountComp(props: Record<string, any> = {}) {
+async function mountComp(props: Record<string, any> = {}, provide: Record<symbol, unknown> = {}) {
   return mount(AnomalyAlerting, {
     props: {
       config: makeConfig(),
       destinations: makeDestinations(),
       ...props,
     },
-    global: { plugins: [i18n, store] },
+    global: { plugins: [i18n, store], provide },
   });
 }
 
@@ -222,5 +223,58 @@ describe("AnomalyAlerting - template override", () => {
   it("hides the picker while notifications are off", async () => {
     const w = await mountComp({ config: makeConfig({ alert_enabled: false }) });
     expect(w.findComponent({ name: "TemplateOverridePicker" }).exists()).toBe(false);
+  });
+});
+
+describe("AnomalyAlerting - setting rows", () => {
+  const rowTests = [
+    "anomaly-priority-row",
+    "anomaly-tags-row",
+    "anomaly-notifications-row",
+    "anomaly-destination-row",
+    "anomaly-template-row",
+    "anomaly-alert-direction-row",
+    "anomaly-window-share-row",
+  ];
+
+  it("lays every setting out as a flat row inside the sectioned editor", async () => {
+    const w = await mountComp({}, { [SETTING_ROW_BARE_KEY]: true });
+    const rows = w.findAll("[data-o-setting-row]");
+    expect(rows.map((r) => r.attributes("data-test"))).toEqual(rowTests);
+    expect(rows.every((r) => !r.classes().includes("border-b"))).toBe(true);
+    expect(w.find(".step-content").classes()).not.toContain("border");
+  });
+
+  it("keeps its own card when rendered outside the sectioned editor", async () => {
+    const w = await mountComp();
+    expect(w.find(".step-content").classes()).toContain("border");
+  });
+
+  it("puts the three window share inputs in one row, each named for screen readers", async () => {
+    const w = await mountComp();
+    const row = w.find('[data-test="anomaly-window-share-row"]');
+    const inputs = row.findAll("input");
+    expect(inputs.map((i) => i.attributes("aria-label"))).toEqual([
+      i18n.global.t("alerts.anomaly.windowBuckets"),
+      i18n.global.t("alerts.anomaly.windowFirePct"),
+      i18n.global.t("alerts.anomaly.windowRecoverPct"),
+    ]);
+    expect(row.text()).toContain(i18n.global.t("alerts.anomaly.windowBucketsPrefix"));
+    expect(row.text()).toContain(i18n.global.t("alerts.anomaly.windowBucketsSuffix"));
+  });
+
+  it("writes a typed bucket count back into the config as a number", async () => {
+    const config = makeConfig({ alert_window_buckets: 1 });
+    const w = await mountComp({ config });
+    await w.find('[data-test="anomaly-window-buckets"] input').setValue("4");
+    expect(config.alert_window_buckets).toBe(4);
+  });
+
+  it("opens the destinations page from the add button", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const w = await mountComp();
+    await w.find('[data-test="anomaly-add-destination"]').trigger("click");
+    expect(openSpy).toHaveBeenCalledWith("/alerts/destinations", "_blank");
+    openSpy.mockRestore();
   });
 });
