@@ -92,6 +92,33 @@ test.describe("Query Values variables - dashboard runtime", { tag: ["@dashboards
     await expect(page.locator('[data-test="dashboard-panel-table"]').nth(2)).toContainText("search");
   });
 
+  test("F2: an Auto child of a custom parent set to All filters on the parent's listed options", async ({ page }) => {
+    const qv = new PageManager(page).dashboardQueryVariable;
+    const id = await fx.createDashboard(fx.dashboardBody(uniqueTitle("e2e_qv_f2_child"), {
+      variables: [
+        fx.customVariable("cl", ["prod-eu", "prod-us", "staging"]),
+        customSql("pm", NS_QUERY, "k8s_namespace", { multiSelect: true, selectAllValueForMultiSelect: "all" }),
+        fx.queryValuesVariable("child", {
+          stream_type: "logs", stream: S, field: "service_name", max_record_size: null,
+          filter: [{ name: "k8s_namespace", operator: "=", value: "$pm" }],
+        }),
+      ],
+      panels: [fx.logsTablePanel("pm_panel", NS_PANEL)],
+    }));
+    const queries = fx.trackQueries(page);
+    await qv.openDashboard(fx.dashboardUrl(id, "&var-cl=prod-eu"));
+
+    const childSql = await fx.waitForSearch(queries, '"k8s_namespace" IN (', { kind: "values" });
+    expect(childSql).not.toContain("_o2_all_");
+    expect(sortedIn(childSql, 'k8s_namespace"')).toEqual(["checkout", "monitoring", "payments"]);
+
+    queries.clear();
+    await qv.selectOptions("pm", ["payments"]);
+    await qv.refreshDashboard();
+    const narrowed = await fx.waitForSearch(queries, "\"k8s_namespace\" IN ('payments')", { kind: "values" });
+    expect(narrowed).not.toContain("_o2_all_");
+  });
+
   test("F3: a multi-select custom child of a parent drives its panel through the chain", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const id = await fx.createDashboard(runtimeDashboard(uniqueTitle("e2e_qv_f3")));
