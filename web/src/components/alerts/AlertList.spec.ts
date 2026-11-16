@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { foldersQuery } from "@/services/common.queries";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
@@ -232,16 +233,18 @@ let alertsDB: AlertV2[] = [];
 let mountedWrappers: ReturnType<typeof mount>[] = [];
 
 // Tests that only call vm methods skip the table: its render is the slowest part of a mount.
-async function mountAlertList({ renderTable = true } = {}) {
+async function mountAlertList({ renderTable = true, realFolders = false, keepRoute = false } = {}) {
   const wrapper = mount(AlertList, {
     attachTo: node,
     global: {
       plugins: [i18n, store, router],
       stubs: {
         OTable: !renderTable,
-        FolderList: {
-          template: '<div data-test="stub-folder-list"></div>',
-        },
+        FolderList: realFolders
+          ? false
+          : {
+              template: '<div data-test="stub-folder-list"></div>',
+            },
         MoveAcrossFolders: {
           name: "MoveAcrossFolders",
           props: ["open", "activeFolderId", "moduleId", "anomalyConfigIds", "type"],
@@ -283,7 +286,7 @@ async function mountAlertList({ renderTable = true } = {}) {
   });
   // emulate current route
   wrapper.vm.router.currentRoute.value.name = "alertList";
-  wrapper.vm.router.currentRoute.value.query = {} as any;
+  if (!keepRoute) wrapper.vm.router.currentRoute.value.query = {} as any;
   // Tracked so afterEach can tear it down: every mount here attaches to the one
   // shared `node`, so an un-unmounted tree keeps its watchers and observers
   // alive for the rest of the file and each later test pays for all of them.
@@ -2294,6 +2297,15 @@ describe("AlertList - filters from the Overview links", () => {
       },
       1,
     ],
+    [
+      "an anomaly's open firing",
+      {
+        alert_type: "anomaly_detection",
+        status: "ready",
+        firing_started_at: 1_800_000_000_000_000,
+      },
+      0,
+    ],
   ])("shows and counts an errored evaluation during %s as firing", async (_case, live, acked) => {
     alertsDB = [{ ...makeAlert(91), last_outcome: "error", ...live } as any];
     const wrapper = await withQuery({});
@@ -2322,6 +2334,85 @@ describe("AlertList - filters from the Overview links", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
+  });
+
+  it.each([
+    [
+      "edit",
+      async (vm: any, row: any) => {
+        const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+        await vm.editAlert(row);
+        const folder = push.mock.lastCall?.[0] && (push.mock.lastCall[0] as any).query.folder;
+        push.mockRestore();
+        return folder;
+      },
+    ],
+    [
+      "pause",
+      async (vm: any, row: any) => {
+        await vm.toggleAlertState(row);
+        return alertsSvc.toggle_state_by_alert_id.mock.lastCall?.[3];
+      },
+    ],
+    [
+      "delete",
+      async (vm: any, row: any) => {
+        vm.selectedDelete = row;
+        vm.deleteAlertByAlertId();
+        await flushPromises();
+        return alertsSvc.delete_by_alert_id.mock.lastCall?.[2];
+      },
+    ],
+    [
+      "move",
+      async (vm: any, row: any) => {
+        vm.moveAlertToAnotherFolder(row);
+        return vm.activeFolderToMove;
+      },
+    ],
+    [
+      "clone",
+      async (vm: any, row: any) => {
+        await vm.duplicateAlert(row);
+        return vm.folderIdToBeCloned;
+      },
+    ],
+    [
+      "export",
+      async (vm: any, row: any) => {
+        await vm.exportAlert(row);
+        return /folder_id\s*=\s*"production"/.test(vm.alertsTerraform.hcl) ? "production" : "";
+      },
+    ],
+  ])("acts on %s for a row from another folder in its owning folder", async (_action, act) => {
+    alertsDB = [makeAlert(902, { folder_id: "production", folder_name: "Production" } as any)];
+    const wrapper = await withQuery({ state: ALERT_LIST_ALL_STATES, all_folders: "true" });
+    expect(wrapper.vm.activeFolderId).toBe("default");
+    expect(await act(wrapper.vm, wrapper.vm.displayedAlerts[0])).toBe("production");
+  });
+
+  it("keeps an all-folders link applied when the folder list mirrors its missing folder", async () => {
+    const folders = [
+      { folderId: "default", name: "Default" },
+      { folderId: "production", name: "Production" },
+    ];
+    store.state.organizationData.foldersByType = { alerts: folders } as any;
+    queryClient.setQueryData(
+      foldersQuery(store.state.selectedOrganization.identifier, "alerts").queryKey,
+      folders,
+    );
+    router.currentRoute.value.query = { state: ALERT_LIST_ALL_STATES, folder: "production" };
+    const wrapper: any = await mountAlertList({
+      renderTable: false,
+      realFolders: true,
+      keepRoute: true,
+    });
+    await flushPromises();
+    expect(wrapper.vm.activeFolderId).toBe("production");
+
+    await router.push({ name: "alertList", query: { state: "firing", all_folders: "true" } });
+    await flushPromises();
+    expect(wrapper.vm.searchAcrossFolders).toBe(true);
   });
 
   it("strips state, level and scope from the URL after reading them, keeping other keys", async () => {

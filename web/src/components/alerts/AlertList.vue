@@ -2565,6 +2565,8 @@ export default defineComponent({
       router.replace({ query: rest });
     };
     dropListLink();
+    // FolderList mirrors a folder-less link to "default" in this same flush; only a user's pick may end the link's scope.
+    let ignoreFolderSync = false;
     // The in-list editor closes onto this same instance, so a `?state=` it navigates with applies here too.
     watch(
       () => router.currentRoute.value.query.state,
@@ -2575,6 +2577,10 @@ export default defineComponent({
         levelFilter.value = parseQueryChoice(route.query.level, ALERT_LEVEL_FILTERS);
         // Same as a fresh mount: the link's scope, and no search left over to hide the linked rows.
         searchAcrossFolders.value = route.query.all_folders === ALERT_LIST_ALL_FOLDERS;
+        if (searchAcrossFolders.value && route.query.folder === undefined) {
+          ignoreFolderSync = true;
+          void nextTick(() => (ignoreFolderSync = false));
+        }
         searchQuery.value = "";
         filterQuery.value = "";
         dropListLink();
@@ -2657,6 +2663,11 @@ export default defineComponent({
       // Built field by field: anything unlisted is invisible to the table.
       last_outcome: anomaly.last_outcome ?? null,
       last_outcome_at: anomaly.last_outcome_at ?? null,
+      // The Firing tile reads these to keep an open firing whose latest run errored.
+      firing_started_at: anomaly.firing_started_at ?? null,
+      groups_firing: anomaly.groups_firing,
+      groups_firing_is_lower_bound: anomaly.groups_firing_is_lower_bound,
+      ack: anomaly.ack ?? null,
       // Feature 2 carries these on anomaly configs too, and the API sends them
       // — `anomaly_priority_tag_tests` pins that. This branch returns before
       // the mapping that reads them for scheduled alerts, so an anomaly row
@@ -3098,6 +3109,9 @@ export default defineComponent({
     // Anomaly configs have no alert-scoped routes, so they keep the generic downtime mute.
     const isAlertScopedMute = (row: any): boolean => row?.type !== "anomaly";
 
+    // In the all-folders view a row's folder is not the sidebar's, and the API checks access per folder.
+    const rowFolderId = (row: any): string => row?.folder_name?.id || activeFolderId.value;
+
     const rowActionTarget = (row: any): AlertActionTarget => ({
       alertId: String(row.alert_id),
       name: row.name,
@@ -3329,7 +3343,7 @@ export default defineComponent({
               action: "update",
               name: props.row.name,
               org_identifier: store.state.selectedOrganization.identifier,
-              folder: activeFolderId.value,
+              folder: editFolderId.value || activeFolderId.value,
             },
           });
         }
@@ -3486,6 +3500,7 @@ export default defineComponent({
       if (isSloRow(row)) return;
       toBeClonedID.value = row.alert_id;
       toBeCloneAlertName.value = row.name;
+      folderIdToBeCloned.value = rowFolderId(row);
       toBeClonedIsAnomaly.value = row.type === "anomaly";
       toBeClonedIsComposite.value = row.alert_type === "Composite";
       // Pre-fill from the original alert's row — composite rows carry no
@@ -3889,7 +3904,7 @@ export default defineComponent({
         .delete_by_alert_id(
           store.state.selectedOrganization.identifier,
           selectedDelete.value.alert_id,
-          activeFolderId.value,
+          rowFolderId(selectedDelete.value),
         )
         .then(async (res: any) => {
           if (res.data.code == 200) {
@@ -4047,7 +4062,7 @@ export default defineComponent({
         .mutateAsync({
           alertId: row.alert_id,
           enabled: !row?.enabled,
-          folderId: activeFolderId.value,
+          folderId: rowFolderId(row),
         })
         .then((res: any) => {
           const isEnabled = res.data.enabled;
@@ -4130,10 +4145,11 @@ export default defineComponent({
     // and the user picks there.
     const showExportDialog = ref(false);
     const alertsToExport = ref<Record<string, unknown>[]>([]);
+    const exportFolderId = ref("");
     // Converted here rather than inside the dialog: each resource type has its
     // own exporter, and the dialog only renders what it is handed.
     const alertsTerraform = computed(() =>
-      alertsToTerraform(alertsToExport.value, { folderId: activeFolderId.value }),
+      alertsToTerraform(alertsToExport.value, { folderId: exportFolderId.value }),
     );
     // Destination names only exist in the source org; Terraform keeps them for re-applying to it.
     const alertsJsonExport = computed(() =>
@@ -4166,6 +4182,7 @@ export default defineComponent({
         const alert = await fetchAlertForExport(row.alert_id);
         if (!alert) throw new Error("empty export payload");
         alertsToExport.value = [alert];
+        exportFolderId.value = rowFolderId(row);
         showExportDialog.value = true;
       } catch (error: any) {
         if (error?.response?.status === 403) return;
@@ -4243,6 +4260,10 @@ export default defineComponent({
     };
 
     const updateActiveFolderId = async (newVal: any) => {
+      if (ignoreFolderSync) {
+        ignoreFolderSync = false;
+        return;
+      }
       //this is the condition we kept because when we we click on the any folder that is there in the the row when we do search across folders
       //at that time if it is the same folder it wont trigger the watch and it will show the alerts of the filtered only
       //so we are fetching the alerts by the folderId and then filtering the alerts by the activeTab this is done explicitly on only if users clicks on same folder
@@ -4315,7 +4336,7 @@ export default defineComponent({
           params: { anomaly_id: row.alert_id },
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
-            folder: activeFolderId.value,
+            folder: rowFolderId(row),
             tab: activeTab.value,
           },
         });
@@ -4331,7 +4352,7 @@ export default defineComponent({
           action: "update",
           name: row.name,
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: row.folder_id || activeFolderId.value,
+          folder: rowFolderId(row),
         },
       });
     };
@@ -4346,7 +4367,7 @@ export default defineComponent({
         selectedAlertToMove.value = [row.alert_id];
         selectedAnomalyConfigsToMove.value = [];
       }
-      activeFolderToMove.value = activeFolderId.value;
+      activeFolderToMove.value = rowFolderId(row);
     };
 
     // A delete inside the dependency popover — reload the current folder's alerts
@@ -4533,6 +4554,7 @@ export default defineComponent({
         // without this the dialog opens on a blank definition.
         if (!usable.length) throw new Error("empty export payload");
         alertsToExport.value = usable;
+        exportFolderId.value = activeFolderId.value;
         showExportDialog.value = true;
 
         // A definition that came back empty is a gap in the export. Dropping it
