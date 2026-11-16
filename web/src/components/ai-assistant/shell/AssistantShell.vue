@@ -1865,9 +1865,10 @@ watch(lower, (el, _was, onCleanup) => {
       el.scrollHeight > el.clientHeight + 1 ||
       (!!shell && shell.scrollHeight > shell.clientHeight + 1);
     if (!overflows || store.state.shell.sheetSnap !== "half") return;
-    if (cramped) crampedGrown = true;
     store.setSheetSnap("full");
-    region.value?.announce(t("assistant.announce.sheetExpanded"));
+    // The cramped grow is part of opening, so it keeps the open announcement instead of saying Expanded.
+    if (cramped) crampedGrown = true;
+    else region.value?.announce(t("assistant.announce.sheetExpanded"));
   };
   const sizes = new ResizeObserver(grow);
   const watchChildren = () => {

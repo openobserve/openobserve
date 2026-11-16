@@ -908,6 +908,7 @@ describe("WP-06 conversation wiring", () => {
       notify();
       await flushPromises();
       expect(store.state.shell.sheetSnap).toBe("full");
+      expect(wrapper.get('[data-test="assistant-status-region"]').text()).not.toContain("Expanded");
       // A user who snaps back to half keeps it, though the transcript is still short.
       store.setSheetSnap("half");
       notify();
