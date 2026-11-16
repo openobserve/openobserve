@@ -37,7 +37,7 @@ jobs:
         run: |
           # Blobs exist only for main pushes that changed UI code and live 1 day, so a week without such a push skips.
           # List live artifacts, not runs: a re-run of an old run carries fresh blobs.
-          live=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=ui-unit-blob-1&per_page=100" \
+          live=$(gh api --paginate "repos/${{ github.repository }}/actions/artifacts?name=ui-unit-blob-1&per_page=100" \
             --jq '.artifacts[] | select((.expired | not) and .workflow_run.head_branch == "main") | .workflow_run.id')
           mapfile -t ids < <(awk 'NF && !seen[$0]++' <<< "$live")
           for id in "${ids[@]}"; do
@@ -144,8 +144,8 @@ jobs:
           PUSH=1
           if git fetch origin "$BRANCH" 2>/dev/null; then
             SHA=$(git rev-parse FETCH_HEAD)
-            # Never overwrite a human's commits on the shared branch.
-            if git log --format=%ae "origin/main..$SHA" | grep -qvxF -- "$EMAIL"; then
+            # Never overwrite a human's commits; the PAT owner is a person too, so match the bot's subject as well.
+            if git log --format='%ae %s' "origin/main..$SHA" | grep -qvxF -- "$EMAIL chore(ci): refresh UI shard durations"; then
               echo "::warning::$BRANCH has commits from someone else; leaving it alone."
               echo "Skipped: $BRANCH has commits from someone else." >> "$GITHUB_STEP_SUMMARY"
               exit 0
