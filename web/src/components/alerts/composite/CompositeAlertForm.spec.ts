@@ -131,6 +131,24 @@ describe("CompositeAlertForm", () => {
     );
   });
 
+  it("lays sub-alerts, expression and settings out as setting rows with the explainer behind an info icon", () => {
+    const wrapper = mountForm(draft());
+    const rows = wrapper.findAll("[data-o-setting-row]");
+
+    expect(rows.map((row) => row.attributes("data-test"))).toEqual([
+      "alerts-composite-sub-alerts-row",
+      "alerts-composite-expression-row",
+      "alerts-composite-warning-row",
+      "alerts-composite-stale-policy-row",
+    ]);
+    expect(rows[1].find('[data-test="alerts-composite-expression-builder"]').exists()).toBe(true);
+    expect(
+      wrapper.find('[data-test="alerts-composite-expression-row-info"]').attributes("aria-label"),
+    ).toBe(i18n.global.t("alerts.composite.banner"));
+    expect(wrapper.text()).not.toContain(i18n.global.t("alerts.composite.banner"));
+    expect(rows[3].find('[data-test="alerts-composite-stale-policy-help"]').exists()).toBe(true);
+  });
+
   it("defaults Warning to firing and stale children to explicit use-last-state", () => {
     const wrapper = mountForm(draft());
 

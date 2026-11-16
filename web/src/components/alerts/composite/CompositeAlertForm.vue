@@ -9,7 +9,7 @@ import CompositeExpressionBuilder from "./CompositeExpressionBuilder.vue";
 import alertsService from "@/services/alerts";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import type {
   CompositeAlertChild,
   CompositeAlertDraft,
@@ -184,86 +184,77 @@ watch(
     ]"
     data-test="alerts-composite-form"
   >
-    <!-- Left column: sub-alerts, expression, settings -->
-    <div class="flex min-w-0 flex-col gap-4">
-      <div class="bg-card-glass-bg rounded-default border-border-default border">
-        <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
-          <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
-            {{ t("alerts.composite.subAlerts") }} <span class="text-text-body">*</span>
-          </span>
-        </div>
-        <div class="px-3 py-2">
-          <CompositeChildSelector
-            :model-value="selectedIds"
-            :options="availableChildren"
-            :max="10"
-            @update:model-value="updateSelectedIds"
-          />
-        </div>
-      </div>
+    <div class="flex min-w-0 flex-col">
+      <OSettingRow
+        :label="t('alerts.composite.subAlerts')"
+        required
+        fill
+        data-test="alerts-composite-sub-alerts-row"
+      >
+        <CompositeChildSelector
+          :model-value="selectedIds"
+          :options="availableChildren"
+          :max="10"
+          @update:model-value="updateSelectedIds"
+        />
+      </OSettingRow>
 
       <Teleport
         :to="sectionTargets?.compositeCondition"
         :disabled="!sectionTargets?.compositeCondition"
       >
-        <div class="bg-card-glass-bg rounded-default border-border-default border">
-          <div class="border-border-default flex items-center border-b px-3 py-2.5">
-            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
-            <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
-              {{ t("alerts.composite.triggerExpression") }} <span class="text-text-body">*</span>
-            </span>
-          </div>
-          <div class="flex flex-col gap-3 px-3 py-2">
-            <OBanner variant="info" dense :content="t('alerts.composite.banner')" />
-            <CompositeExpressionBuilder
-              :model-value="draft.composite_condition.expression"
-              :selected-children="selectedChildren"
-              @update:model-value="updateCondition({ expression: $event })"
-            />
-          </div>
-        </div>
+        <OSettingRow
+          :label="t('alerts.composite.triggerExpression')"
+          :info="t('alerts.composite.banner')"
+          required
+          fill
+          data-test="alerts-composite-expression-row"
+        >
+          <CompositeExpressionBuilder
+            :model-value="draft.composite_condition.expression"
+            :selected-children="selectedChildren"
+            @update:model-value="updateCondition({ expression: $event })"
+          />
+        </OSettingRow>
 
-        <div class="bg-card-glass-bg rounded-default border-border-default border">
-          <div class="border-border-default flex items-center border-b px-3 py-2.5">
-            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
-            <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
-              {{ t("alerts.composite.settings") }}
-            </span>
-          </div>
-          <div class="flex flex-col gap-3 px-3 py-2">
-            <OSwitch
-              :model-value="draft.composite_condition.warning_counts_as_firing"
-              :label="t('alerts.composite.warningCountsAsFiring')"
-              data-test="alerts-composite-warning-counts-as-firing"
-              @update:model-value="updateCondition({ warning_counts_as_firing: Boolean($event) })"
+        <OSettingRow
+          :label="t('alerts.composite.warningCountsAsFiring')"
+          data-test="alerts-composite-warning-row"
+        >
+          <OSwitch
+            :model-value="draft.composite_condition.warning_counts_as_firing"
+            :aria-label="t('alerts.composite.warningCountsAsFiring')"
+            data-test="alerts-composite-warning-counts-as-firing"
+            @update:model-value="updateCondition({ warning_counts_as_firing: Boolean($event) })"
+          />
+        </OSettingRow>
+
+        <OSettingRow
+          :label="t('alerts.composite.stalePolicy')"
+          data-test="alerts-composite-stale-policy-row"
+        >
+          <template #description>
+            <span data-test="alerts-composite-stale-policy-help">{{ stalePolicyHelp }}</span>
+          </template>
+          <div class="w-60 max-md:w-full">
+            <OSelect
+              :model-value="draft.composite_condition.stale_child_policy"
+              :options="stalePolicyOptions"
+              :aria-label="t('alerts.composite.stalePolicy')"
+              :searchable="false"
+              data-test="alerts-composite-stale-policy"
+              :data-value="draft.composite_condition.stale_child_policy"
+              @update:model-value="
+                updateCondition({ stale_child_policy: $event as StaleChildPolicy })
+              "
             />
-            <div class="flex flex-col gap-1">
-              <OSelect
-                :model-value="draft.composite_condition.stale_child_policy"
-                :options="stalePolicyOptions"
-                :label="t('alerts.composite.stalePolicy')"
-                :searchable="false"
-                data-test="alerts-composite-stale-policy"
-                :data-value="draft.composite_condition.stale_child_policy"
-                @update:model-value="
-                  updateCondition({ stale_child_policy: $event as StaleChildPolicy })
-                "
-              />
-              <span
-                class="text-text-secondary text-xs"
-                data-test="alerts-composite-stale-policy-help"
-              >
-                {{ stalePolicyHelp }}
-              </span>
-            </div>
           </div>
-        </div>
+        </OSettingRow>
       </Teleport>
     </div>
 
     <!-- Right column: live preview + summary -->
-    <div class="flex min-w-0 flex-col gap-4">
+    <div class="flex min-w-0 flex-col gap-4 empty:hidden">
       <Teleport
         :to="sectionTargets?.compositePreview"
         :disabled="!sectionTargets?.compositePreview"
