@@ -8228,6 +8228,7 @@ dependencies = [
  "serde_json",
  "stream",
  "tokio",
+ "tower",
  "tracing",
  "transform",
  "url",
