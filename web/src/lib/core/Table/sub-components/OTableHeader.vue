@@ -661,11 +661,9 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           ]"
         >
           <!-- Sortable header -->
-          <OTooltip
+          <!-- Only while sorting is off: a tooltip trigger on the button mutes the header help bubble. -->
+          <template
             v-if="(header.column.columnDef.meta as any)?.sortable && isPlainLabelHeader(header)"
-            :content="sortDisabledReason"
-            :disabled="!(sortDisabled && sortDisabledReason)"
-            side="top"
           >
             <button
               type="button"
@@ -736,7 +734,12 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 />
               </span>
             </button>
-          </OTooltip>
+            <OTooltip
+              v-if="sortDisabled && sortDisabledReason"
+              :content="sortDisabledReason"
+              side="top"
+            />
+          </template>
 
           <!-- A button must not nest interactive content, so a component header sorts from a sibling button -->
           <template v-else-if="(header.column.columnDef.meta as any)?.sortable">
@@ -768,12 +771,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 {{ headerSubLabel(header) }}
               </OTruncatedText>
             </div>
-            <OTooltip
-              v-if="sortingEnabled"
-              :content="sortDisabledReason"
-              :disabled="!(sortDisabled && sortDisabledReason)"
-              side="top"
-            >
+            <template v-if="sortingEnabled">
               <button
                 type="button"
                 :class="[
@@ -813,7 +811,12 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   data-test-sort-direction="none"
                 />
               </button>
-            </OTooltip>
+              <OTooltip
+                v-if="sortDisabled && sortDisabledReason"
+                :content="sortDisabledReason"
+                side="top"
+              />
+            </template>
           </template>
 
           <!-- Non-sortable header -->
@@ -1108,11 +1111,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             headerAlignClass(header),
           ]"
         >
-          <OTooltip
+          <template
             v-if="(header.column.columnDef.meta as any)?.sortable && isPlainLabelHeader(header)"
-            :content="sortDisabledReason"
-            :disabled="!(sortDisabled && sortDisabledReason)"
-            side="top"
           >
             <button
               type="button"
@@ -1180,7 +1180,12 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 />
               </template>
             </button>
-          </OTooltip>
+            <OTooltip
+              v-if="sortDisabled && sortDisabledReason"
+              :content="sortDisabledReason"
+              side="top"
+            />
+          </template>
           <template v-else-if="(header.column.columnDef.meta as any)?.sortable">
             <OTruncatedText
               :id="headerLabelId(header)"
@@ -1195,12 +1200,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             >
               <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
             </OTruncatedText>
-            <OTooltip
-              v-if="sortingEnabled"
-              :content="sortDisabledReason"
-              :disabled="!(sortDisabled && sortDisabledReason)"
-              side="top"
-            >
+            <template v-if="sortingEnabled">
               <button
                 type="button"
                 :class="[
@@ -1240,7 +1240,12 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   data-test-sort-direction="none"
                 />
               </button>
-            </OTooltip>
+              <OTooltip
+                v-if="sortDisabled && sortDisabledReason"
+                :content="sortDisabledReason"
+                side="top"
+              />
+            </template>
           </template>
           <OTruncatedText
             v-else

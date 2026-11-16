@@ -5,9 +5,10 @@
         ><span
           ><b>{{ shown }}</b
           ><template v-if="pinnedShown">{{ raw(" · ") }}{{ sentence }}</template></span
-        ><span v-if="alsoSeen" class="opacity-70" data-test="svcver-env-also">{{
-          alsoSeen
-        }}</span></span
+        ><template v-if="alsoSeen"
+          ><span class="sr-only">{{ lineEnd }}</span
+          ><span class="opacity-70" data-test="svcver-env-also">{{ alsoSeen }}</span></template
+        ></span
       ></template
     ><span class="inline-flex max-w-full min-w-0" data-test="svcver-env-chip"
       ><ODimensionChip
@@ -58,10 +59,13 @@
                     : t("serviceVersions.envEdit.clickToChange")
                 }}</span
               ></span
-            ><span v-if="alsoSeen" class="opacity-70" data-test="svcver-env-also">{{
-              alsoSeen
-            }}</span
-            ><span v-if="detected" class="opacity-70">{{ detected }}</span
+            ><span class="sr-only">{{ lineEnd }}</span
+            ><template v-if="alsoSeen"
+              ><span class="opacity-70" data-test="svcver-env-also">{{ alsoSeen }}</span
+              ><span class="sr-only">{{ lineEnd }}</span></template
+            ><template v-if="detected"
+              ><span class="opacity-70">{{ detected }}</span
+              ><span class="sr-only">{{ lineEnd }}</span></template
             ><span class="opacity-70">{{ whereLine }}</span></span
           ></template
         ></OTooltip
@@ -153,4 +157,6 @@ const alsoSeen = computed(() => {
   return t("serviceVersions.env.alsoSeenIn", { envs: list });
 });
 const whereLine = computed(() => envWhereLine(props.identity, t));
+// The tooltip's accessible text is its flattened textContent, so each line needs its own sentence end.
+const lineEnd = raw(". ");
 </script>

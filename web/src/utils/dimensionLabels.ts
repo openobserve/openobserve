@@ -28,11 +28,12 @@ const K8S_LABELS: Record<string, I18nKey> = {
 };
 
 /** The reader-facing name of a dimension id; an id without a label reads as words, never as the raw key. */
-export function dimensionLabel(key: string, t: TranslateFn): I18nText {
-  const label = K8S_LABELS[key];
+export function dimensionLabel(key: string, t: TranslateFn, compact = false): I18nText {
+  const label = compact ? undefined : K8S_LABELS[key];
   if (label) return t(label);
+  // A compact chip drops the shared K8s prefix so the value keeps the room.
   return raw(
-    key
+    (compact ? key.replace(/^k8s-/, "") : key)
       .split(/[-_]+/)
       .filter(Boolean)
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
