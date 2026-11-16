@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::pin::Pin;
+use std::{collections::HashMap, pin::Pin};
 
 use config::{meta::stream::StreamType, metrics};
 use futures::Stream;
@@ -29,7 +29,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::handler::grpc::{
     MetadataMap,
     cluster_rpc::{
-        MetricsQueryRequest, MetricsQueryResponse, MetricsQueryStmt, metrics_server::Metrics,
+        MetricsQueryRequest, MetricsQueryResponse, MetricsQueryStmt, WalMinTsRequest,
+        WalMinTsResponse, metrics_server::Metrics,
     },
 };
 
@@ -124,6 +125,27 @@ impl Metrics for MetricsQuerier {
         let out_stream = ReceiverStream::new(rx);
         Ok(Response::new(Box::pin(out_stream) as Self::DataStream))
     }
+
+    #[tracing::instrument(name = "grpc:metrics:wal_min_ts", skip_all, fields(org_id = req.get_ref().org_id))]
+    async fn wal_min_ts(
+        &self,
+        req: Request<WalMinTsRequest>,
+    ) -> Result<Response<WalMinTsResponse>, Status> {
+        let req = req.into_inner();
+        // the names become directory components of the WAL parquet path
+        if !is_path_segment(&req.org_id) || !req.streams.iter().all(|s| is_path_segment(s)) {
+            return Err(Status::invalid_argument("invalid org_id or stream name"));
+        }
+        let stream_type = StreamType::Metrics.as_str();
+        let mut min_ts = HashMap::with_capacity(req.streams.len());
+        for stream in req.streams {
+            let ts = ingester::wal_min_ts(&req.org_id, stream_type, &stream)
+                .await
+                .unwrap_or(0);
+            min_ts.insert(stream, ts);
+        }
+        Ok(Response::new(WalMinTsResponse { min_ts }))
+    }
 }
 
 /// Runs the request under its own `{trace_id}-{suffix}` id that a cancel of `trace_id` reaches.
@@ -147,6 +169,10 @@ fn query_and_trace_id(req: &MetricsQueryRequest) -> Result<(&MetricsQueryStmt, S
         return Err(Status::invalid_argument("metrics request has no job"));
     };
     Ok((query, job.trace_id.clone()))
+}
+
+fn is_path_segment(name: &str) -> bool {
+    !name.is_empty() && name != "." && name != ".." && !name.contains(['/', '\\'])
 }
 
 #[cfg(test)]
@@ -205,5 +231,37 @@ mod tests {
         assert!(first_id.starts_with("t-"));
         assert_eq!(first_id, first_registration.tracker().query_id());
         assert_eq!(second_id, second_registration.tracker().query_id());
+    }
+
+    #[tokio::test]
+    async fn test_wal_min_ts_reports_zero_for_streams_without_wal_data() {
+        let req = WalMinTsRequest {
+            org_id: "wal_min_ts_rpc_org".to_string(),
+            streams: vec!["up".to_string(), "cpu_usage".to_string()],
+        };
+        let resp = MetricsQuerier
+            .wal_min_ts(Request::new(req))
+            .await
+            .unwrap()
+            .into_inner();
+        assert_eq!(resp.min_ts.len(), 2);
+        assert_eq!(resp.min_ts.get("up"), Some(&0));
+        assert_eq!(resp.min_ts.get("cpu_usage"), Some(&0));
+    }
+
+    #[tokio::test]
+    async fn test_wal_min_ts_rejects_names_that_escape_the_wal_dir() {
+        let bad = [("", "up"), ("org", ".."), ("org", "a/b"), ("../org", "up")];
+        for (org_id, stream) in bad {
+            let req = WalMinTsRequest {
+                org_id: org_id.to_string(),
+                streams: vec![stream.to_string()],
+            };
+            let status = MetricsQuerier
+                .wal_min_ts(Request::new(req))
+                .await
+                .unwrap_err();
+            assert_eq!(status.code(), tonic::Code::InvalidArgument);
+        }
     }
 }
