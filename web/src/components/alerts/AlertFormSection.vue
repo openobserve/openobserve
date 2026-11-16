@@ -45,7 +45,7 @@ provide(SETTING_ROW_BARE_KEY, true);
     class="max-lg:border-border-default flex flex-col max-lg:border-b max-lg:last:border-b-0 [&_[data-snap-stop]]:scroll-mt-24"
   >
     <header
-      class="bg-surface-base sticky top-0 z-1 flex items-start gap-3 px-4 pt-4 pb-3 max-lg:static max-lg:z-auto max-lg:pt-3"
+      class="bg-surface-base sticky top-0 z-30 flex items-start gap-3 px-4 pt-4 pb-3 max-lg:static max-lg:z-auto max-lg:pt-3"
     >
       <span
         v-if="icon"
