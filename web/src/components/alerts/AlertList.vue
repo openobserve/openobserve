@@ -3574,15 +3574,16 @@ export default defineComponent({
         }
       }
     };
-    // Unfiltered like an editor save: a tile or search left set would hide the new, never-evaluated alert.
+    // Unfiltered: a tile or search left set would hide the new, never-evaluated alert. Scope goes first,
+    // or the forced read refreshes the org-wide list and the folder reopens from its pre-save cache.
     const showSavedAlert = async (folderId: string) => {
-      await getAlertsFn(store, folderId, "", true, "", true);
       activeFolderId.value = folderId;
       stateFilters.value = [];
       levelFilter.value = null;
       filterQuery.value = "";
       searchAcrossFolders.value = false;
       searchQuery.value = "";
+      await getAlertsFn(store, folderId, "", true, "", true);
     };
     const submitForm = async () => {
       // #14627: neither clone endpoint rejects a blank name, and an unnamed
@@ -3789,10 +3790,6 @@ export default defineComponent({
       }
     };
     const refreshList = async (folderId?: string, options?: AlertSavedOptions) => {
-      //here we are fetching the alerts from the server because after creating the alert we should get the latest alerts
-      //and then we are setting the activeFolderId to the folderId
-      //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
-      //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
       const resolvedFolderId = folderId || activeFolderId.value || "default";
       // An editor save lands here, and the editor opens alerts from their detail
       // cache (getAlertById): mark those stale, or a reopen within a minute shows
@@ -3802,16 +3799,14 @@ export default defineComponent({
         predicate: (q: any) => q.queryKey[3] === "detail",
         refetchType: "none",
       });
-      // Always fetch the latest alerts for the folder from backend
-      await getAlertsFn(store, resolvedFolderId, "", true, "", true);
-      // Re-apply active search/filter on the freshly fetched data
-      if (filterQuery.value) {
-        filterAlertsByQuery(filterQuery.value);
+      // The leave dialog's Save: the pending navigation decides where the user goes, so the list keeps its scope.
+      if (options?.navigate === false) {
+        await getAlertsFn(store, resolvedFolderId, "", true, "", true);
+        if (filterQuery.value) filterAlertsByQuery(filterQuery.value);
+        return;
       }
-      // The leave dialog's Save: the pending navigation decides where the user goes.
-      if (options?.navigate === false) return;
+      await showSavedAlert(resolvedFolderId);
       await hideForm();
-      activeFolderId.value = resolvedFolderId;
     };
     const hideForm = async () => {
       showAddAlertDialog.value = false;

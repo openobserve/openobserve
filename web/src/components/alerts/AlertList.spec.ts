@@ -916,14 +916,19 @@ describe("AlertList - row actions", () => {
   });
 
   it.each([
-    ["a scheduled", {}],
-    ["an anomaly", { toBeClonedIsAnomaly: true }],
-    ["a composite", { toBeClonedIsComposite: true }],
+    ["a scheduled clone", "Firing with a search", false, {}],
+    ["an anomaly clone", "Firing with a search", false, { toBeClonedIsAnomaly: true }],
+    ["a composite clone", "Firing with a search", false, { toBeClonedIsComposite: true }],
+    ["a scheduled clone", "All folders", true, {}],
+    ["an editor save", "All folders", true, null],
   ])(
-    "shows %s clone after saving, though the list opened on Firing with a search",
-    async (_kind, flags) => {
+    "shows %s after saving, though the list opened on %s",
+    async (_save, _start, allFolders, cloneFlags) => {
+      queryClient.clear();
       router.currentRoute.value.query = {};
       alertsDB = [{ ...makeAlert(1), last_outcome: "firing" } as any];
+      // A copy per read, so a cached list keeps the rows it was read with.
+      alertsSvc.listByFolderId.mockImplementation(async () => ({ data: { list: [...alertsDB] } }));
       const clone = vi
         .spyOn(alertsSvc, "clone_by_id")
         .mockImplementation(async (_org: any, _id: any, body: any) => {
@@ -933,15 +938,25 @@ describe("AlertList - row actions", () => {
       const wrapper: any = await mountAlertList({ renderTable: false });
       await flushPromises();
       expect(wrapper.vm.stateFilters).toEqual(["firing"]);
-      await wrapper.vm.duplicateAlert(wrapper.vm.displayedAlerts[0]);
-      wrapper.vm.filterQuery = "Alert 1";
-      Object.assign(wrapper.vm, flags, { toBeCloneAlertName: "new clone" });
+      if (allFolders) {
+        wrapper.vm.searchAcrossFolders = true;
+        await flushPromises();
+      }
 
-      await wrapper.vm.submitForm();
+      if (cloneFlags) {
+        await wrapper.vm.duplicateAlert(wrapper.vm.displayedAlerts[0]);
+        if (!allFolders) wrapper.vm.filterQuery = "Alert 1";
+        Object.assign(wrapper.vm, cloneFlags, { toBeCloneAlertName: "new clone" });
+        await wrapper.vm.submitForm();
+      } else {
+        alertsDB.push(makeAlert(998, { name: "new clone" }));
+        await wrapper.vm.refreshList("default");
+      }
       await flushPromises();
       clone.mockRestore();
 
       expect(wrapper.vm.filterQuery || "").toBe("");
+      expect(wrapper.vm.searchAcrossFolders).toBe(false);
       expect(wrapper.vm.displayedAlerts.map((a: any) => a.name)).toContain("new clone");
     },
   );
