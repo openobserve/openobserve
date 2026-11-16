@@ -28,6 +28,5 @@ const { t } = useI18nTyped();
     <span class="text-text-heading text-sm font-medium">{{
       t("alerts.sections.optional.title")
     }}</span>
-    <span class="text-text-secondary text-xs">{{ t("alerts.sections.optional.help") }}</span>
   </div>
 </template>

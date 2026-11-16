@@ -31,7 +31,12 @@
   "at least 1 group" alongside per-group evaluation.
 -->
 <template>
-  <OSettingRow :label="t('alerts.multiAlert.label')" fill data-test="alerts-alertmultitoggle-row">
+  <OSettingRow
+    :label="t('alerts.multiAlert.label')"
+    :info="t(onDescriptionKey)"
+    fill
+    data-test="alerts-alertmultitoggle-row"
+  >
     <div class="flex flex-col gap-1">
       <!-- An explicit two-option choice, not a switch (§5.4 calls it a
            "Simple vs Multi alert choice"). A switch was tried and read as
@@ -51,9 +56,6 @@
           @update:model-value="emit('change', $event)"
         />
       </div>
-      <p class="text-text-secondary text-xs">
-        {{ enabled ? t(onDescriptionKey) : t("alerts.multiAlert.simpleDescription") }}
-      </p>
     </div>
   </OSettingRow>
 </template>
