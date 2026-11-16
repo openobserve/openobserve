@@ -36,7 +36,6 @@ const ATOMIC_PATHS = new Set([
   "query_condition.multi_time_range",
   "query_condition.promql_condition",
   "composite_condition",
-  "deduplication",
 ]);
 
 const FIELD_LABELS: Record<string, I18nKey> = {
@@ -78,7 +77,7 @@ const FIELD_LABELS: Record<string, I18nKey> = {
   template: "alerts.editMode.unsaved.fields.template",
   context_attributes: "alerts.editMode.unsaved.fields.variables",
   oncall_team: "alerts.editMode.unsaved.fields.oncall",
-  deduplication: "alerts.editMode.unsaved.fields.dedup",
+  suppress_repeats: "alerts.editMode.unsaved.fields.suppressRepeats",
   row_template: "alerts.editMode.unsaved.fields.rowTemplate",
   priority: "alerts.editMode.unsaved.fields.priority",
   tags: "alerts.editMode.unsaved.fields.tags",

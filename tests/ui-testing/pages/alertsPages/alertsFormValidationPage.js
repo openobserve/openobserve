@@ -3,6 +3,7 @@
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { openNavFlyoutChild } = require('../commonActions.js');
 import { goToAlertSection } from './alertSectionHelpers.js';
+const { FilterBuilderDriver } = require('../generalPages/filterBuilderPage.js');
 
 export class AlertsFormValidationPage {
   /**

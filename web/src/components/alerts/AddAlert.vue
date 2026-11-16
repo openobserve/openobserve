@@ -401,8 +401,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :promqlCondition="formData.query_condition.promql_condition"
                 :triggerCondition="formData.trigger_condition"
                 @update:tab="updateTab"
-                @update-group="updateGroup"
-                @remove-group="removeConditionGroup"
                 @input:update="onInputUpdate"
                 @update:sqlQuery="updateSqlQuery"
                 @update:promqlQuery="updatePromqlQuery"
@@ -552,18 +550,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="empty:hidden"
                 data-snap-stop
               />
-              <div
-                v-if="formData.is_real_time === 'false' && tiers.isVisible('dedup')"
-                data-snap-stop
-                :class="rowGroup"
-                data-row-group
-              >
-                <Deduplication
-                  :deduplication="formData.deduplication"
-                  :columns="filteredColumns"
-                  @update:deduplication="updateDeduplication"
-                />
-              </div>
               <AlertTierLinks
                 v-if="!isAnomalyMode"
                 section="notify"
@@ -710,6 +696,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :formattedDestinations="getFormattedDestinations"
                 :destinationObjects="destinations"
                 :workflows="formData.workflows"
+                :destinationRequired="destinationRequired"
                 @update:trigger="updateTriggerCondition"
                 @update:aggregation="updateAggregation"
                 @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
@@ -841,6 +828,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isSubmitting"
             @discard="discardChanges"
           />
+          <p
+            v-if="silentAutoObserveDraft"
+            class="text-status-error-text flex min-w-0 items-start gap-1.5 text-xs"
+            data-test="add-alert-no-destination"
+          >
+            <OIcon name="error" size="xs" class="mt-0.5 shrink-0" />
+            <span
+              >{{ unreachableLine(t, reachGap, 1) }}
+              <OButton
+                v-if="reachGap === 'noTeam'"
+                variant="ghost-primary"
+                size="xs"
+                icon-right="arrow-forward"
+                data-test="add-alert-setup-oncall"
+                @click="openOncallSetup()"
+                >{{ t("alerts.reach.setUpOncall") }}</OButton
+              >
+              <OButton
+                v-if="reachGap === 'noTeam'"
+                variant="ghost-primary"
+                size="xs"
+                :loading="checkingReach"
+                data-test="add-alert-check-oncall"
+                @click="checkOncallAgain()"
+                >{{ t("alerts.reach.checkAgain") }}</OButton
+              ></span
+            >
+          </p>
+          <p
+            v-else-if="viaIncidentDraft"
+            class="text-text-secondary min-w-0 text-xs"
+            data-test="add-alert-via-incident"
+          >
+            {{ viaIncidentLine(t, 1) }}
+          </p>
         </div>
         <OButton
           data-test="add-alert-cancel-btn"
@@ -1035,6 +1057,10 @@ import AlertRecentRuns from "./AlertRecentRuns.vue";
 import { useAlertEditHeader } from "@/composables/alerts/useAlertEditHeader";
 import { useAlertUnsavedChanges } from "@/composables/alerts/useAlertUnsavedChanges";
 import { cloneDeep } from "lodash-es";
+import { unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
+import { useOnCallSetup } from "@/composables/useOnCallSetup";
+import { getFoldersListByType } from "@/utils/commons";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 
 const RAIL_VERDICT_ICONS = {
   fires: { name: "notifications-active", class: "text-status-error-text" },
@@ -1278,13 +1304,16 @@ export default defineComponent({
         icon: "bolt",
         dataTest: "add-alert-type-tab-true",
       },
-      ...(isAnomalyDetectionEnabled.value
+      ...(isAnomalyDetectionEnabled.value || anomalyLicenseLocked.value
         ? [
             {
               label: alertForm.t("alerts.sections.whenUnusual"),
-              description: alertForm.t("alerts.sections.typeHelp.anomaly"),
+              description: anomalyLicenseLocked.value
+                ? anomalyLockedReason.value
+                : alertForm.t("alerts.sections.typeHelp.anomaly"),
               value: "anomaly",
-              icon: "query-stats" as const,
+              icon: anomalyLicenseLocked.value ? ("lock" as const) : ("query-stats" as const),
+              disabled: anomalyLicenseLocked.value,
               dataTest: "add-alert-type-tab-anomaly",
             },
           ]
@@ -1599,7 +1628,6 @@ export default defineComponent({
         case "holdFor":
         case "recovery":
         case "keepFiring":
-        case "dedup":
           return scheduled;
         case "groupBy":
           return (
@@ -1651,11 +1679,6 @@ export default defineComponent({
           return fd.notify_on_recovery === true || (fd.recovery_destinations ?? []).length > 0;
         case "oncall":
           return has(fd.oncall_team);
-        case "dedup":
-          return (
-            fd.deduplication?.enabled === true ||
-            (fd.deduplication?.fingerprint_fields ?? []).length > 0
-          );
         case "keepFiring":
           return Number(fd.keep_firing_for) > 0;
         case "priority":
@@ -1699,6 +1722,12 @@ export default defineComponent({
         case "name":
         case "folder":
           return !alertForm.beingUpdated.value;
+        case "suppressRepeats":
+          return (
+            fd.is_real_time === "false" &&
+            !alertForm.isAnomalyMode.value &&
+            (config.isEnterprise === "true" || config.isCloud === "true")
+          );
         default:
           return true;
       }
@@ -1958,6 +1987,7 @@ export default defineComponent({
       onNameInput,
       onNameFocus,
       onNameEnter,
+      anomalyLockedReason,
       activeFolderName,
       goBackToAlertsList,
       onStreamTypeChange,

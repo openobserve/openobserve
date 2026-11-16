@@ -155,6 +155,7 @@ const props = withDefaults(
     wrap: false,
     list: false,
     settingRow: false,
+    targetRequired: false,
   },
 );
 
