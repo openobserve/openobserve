@@ -37,6 +37,7 @@ const DESCRIPTION_MAX: usize = 4096;
 const FIELD_NAME_MAX: usize = 256;
 const FIELD_VALUE_MAX: usize = 1024;
 const MAX_FIELDS: usize = 25;
+const EMBED_TOTAL_MAX: usize = 6000;
 
 /// Row data, formatted as one more embed field — mirrors how Slack/Teams/
 /// Email all surface `rows`/`row_lines` rather than silently dropping them.
@@ -82,7 +83,38 @@ pub fn render_discord(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     // `escape_markdown` (a CommonMark-compliant escape Discord DOES honor),
     // so no additional escaping runs on the body itself, only on raw field
     // values below (see `escape_discord_markdown`'s doc comment).
-    let mut description = clamp(&c.body_markdown, DESCRIPTION_MAX);
+    let mut fields: Vec<Value> = c
+        .fields
+        .iter()
+        .take(MAX_FIELDS)
+        .map(|(name, value)| {
+            json!({
+                "name": clamp(&escape_discord_markdown(name), FIELD_NAME_MAX),
+                "value": clamp(&escape_discord_markdown(value), FIELD_VALUE_MAX),
+                "inline": true,
+            })
+        })
+        .collect();
+    if fields.len() < MAX_FIELDS
+        && let Some(row_field) = row_data_field(c)
+    {
+        fields.push(row_field);
+    }
+
+    let title = clamp(&c.title, TITLE_MAX);
+    // Discord rejects an embed over 6000 characters in all, so the description takes what is left.
+    let others = title.chars().count()
+        + fields
+            .iter()
+            .map(|f| {
+                ["name", "value"]
+                    .iter()
+                    .map(|k| f[k].as_str().map_or(0, |v| v.chars().count()))
+                    .sum::<usize>()
+            })
+            .sum::<usize>();
+    let desc_max = DESCRIPTION_MAX.min(EMBED_TOTAL_MAX.saturating_sub(others));
+    let mut description = clamp(&c.body_markdown, desc_max);
 
     // An embed has one title link: the Primary link takes it, and the others become markdown
     // links in the description.
@@ -120,7 +152,7 @@ pub fn render_discord(c: &RenderedContent, ctx: &NotificationContext) -> Value {
             .map(|(_, t)| t.chars().count() + 3)
             .sum::<usize>()
     };
-    while width(&parts) > DESCRIPTION_MAX {
+    while width(&parts) > desc_max {
         let Some(i) = parts.iter().rposition(|(reserved, _)| !reserved) else {
             break;
         };
@@ -133,31 +165,13 @@ pub fn render_discord(c: &RenderedContent, ctx: &NotificationContext) -> Value {
             .collect::<Vec<_>>()
             .join(" · ");
         // The body yields room first, so a long body cannot push the object link out.
-        let room = DESCRIPTION_MAX.saturating_sub(extra_text.chars().count() + 2);
+        let room = desc_max.saturating_sub(extra_text.chars().count() + 2);
         let body = clamp(&c.body_markdown, room.max(1));
-        description = clamp(&format!("{body}\n\n{extra_text}"), DESCRIPTION_MAX);
-    }
-
-    let mut fields: Vec<Value> = c
-        .fields
-        .iter()
-        .take(MAX_FIELDS)
-        .map(|(name, value)| {
-            json!({
-                "name": clamp(&escape_discord_markdown(name), FIELD_NAME_MAX),
-                "value": clamp(&escape_discord_markdown(value), FIELD_VALUE_MAX),
-                "inline": true,
-            })
-        })
-        .collect();
-    if fields.len() < MAX_FIELDS
-        && let Some(row_field) = row_data_field(c)
-    {
-        fields.push(row_field);
+        description = clamp(&format!("{body}\n\n{extra_text}"), desc_max);
     }
 
     let mut embed = json!({
-        "title": clamp(&c.title, TITLE_MAX),
+        "title": title,
         "description": description,
         "fields": fields,
     });

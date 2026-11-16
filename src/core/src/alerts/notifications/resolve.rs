@@ -80,7 +80,7 @@ impl Link {
 
     /// The label a human-facing channel shows; an empty one reads the channel default.
     pub fn display_label(&self) -> &str {
-        if self.label.is_empty() {
+        if self.label.trim().is_empty() {
             super::render::DEFAULT_LINK_LABEL
         } else {
             &self.label

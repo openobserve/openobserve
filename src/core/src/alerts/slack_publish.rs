@@ -1352,7 +1352,7 @@ mod tests {
         ctx.alert_detail_label = "Open alert".into();
         let padded = format!(" {} ", ctx.alert_detail_url);
         let mut links = vec![
-            Link::authored("", padded),
+            Link::authored(" ", padded),
             Link::authored("", " https://wiki/rb "),
         ];
         crate::alerts::notifications::resolve::append_system_links(&mut links, &ctx);

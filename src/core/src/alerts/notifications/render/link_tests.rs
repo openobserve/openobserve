@@ -482,3 +482,38 @@ fn a_message_card_keeps_four_actions_and_lists_the_rest_as_text_links() {
         "{text}"
     );
 }
+
+#[test]
+fn a_full_discord_embed_stays_within_the_total_and_keeps_the_object_link() {
+    let ctx = alert_ctx();
+    let mut content = resolve_content(
+        &compiled_default_content(),
+        &ctx,
+        ChannelFormat::Discord.channel_family(),
+    );
+    content.title = "t".into();
+    content.body_markdown = "b".repeat(994);
+    content.fields = (0..5).map(|i| (i.to_string(), "v".repeat(1_000))).collect();
+    content.rows.clear();
+    content.row_lines = None;
+    let RenderedMessage::Http { body } = render(ChannelFormat::Discord, &content, &ctx).unwrap()
+    else {
+        panic!("Discord renders an HTTP body");
+    };
+    let embed = &serde_json::from_str::<Value>(&body).unwrap()["embeds"][0];
+    let chars = |v: &Value| v.as_str().map_or(0, |s| s.chars().count());
+    let total = chars(&embed["title"])
+        + chars(&embed["description"])
+        + embed["fields"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| chars(&f["name"]) + chars(&f["value"]))
+            .sum::<usize>();
+    assert!(total <= 6_000, "{total}");
+    let description = embed["description"].as_str().unwrap();
+    assert!(
+        description.ends_with(&format!("[Open alert]({DETAIL_URL})")),
+        "{description}"
+    );
+}
