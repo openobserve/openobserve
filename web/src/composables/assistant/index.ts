@@ -150,6 +150,9 @@ export {
   readVoiceOptIn,
   writeVoiceOptIn,
   watchPrefs,
+  isLauncherDismissed,
+  launcherDismissalVersion,
+  setLauncherDismissed,
 } from "./prefs";
 export { assistantDashboardDraft, clearDashboardDraft } from "./actions/appliers/drafts";
 export { queuedDraftSid } from "./drafts";

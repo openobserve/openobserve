@@ -528,7 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTable
                   v-show="!showTableSkeleton"
                   ref="searchTableRef"
-                  v-bind="LOGS_V2_TABLE"
+                  focus-toolbar
                   :columns="tableColumns"
                   :data="tableRows"
                   :wrap="searchObj.meta.toggleSourceWrap"
@@ -631,15 +631,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("logs.cellActions.copy") }}
                       </ODropdownItem>
-                      <AiEntryButton v-bind="logRowDoor(row, 'explain')" appearance="menu-item" />
-                      <AiEntryButton
-                        v-bind="logRowDoor(row, 'add_to_chat')"
-                        appearance="menu-item"
-                      />
                     </ODropdown>
                     <template v-else-if="active && !contextMenuOpen">
+                      <template v-if="column.id === logsTimestampCol">
+                        <O2AIContextAddBtn
+                          v-if="assistantDoorsShown"
+                          data-test="logs-search-result-ai-btn"
+                          @send-to-ai-chat="addDoorToChat(logRowDoor(row), userOrgKey)"
+                        />
+                      </template>
                       <CellActions
-                        v-if="showLogCellActions(column, row)"
+                        v-else-if="showLogCellActions(column, row)"
                         :bound-org="doorBoundOrg"
                         :column="column"
                         :row="row"
@@ -649,19 +651,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :hide-ai="column.id === 'source'"
                         copy-in-place
                         @add-search-term="addSearchTerm"
-                      />
-                      <OSeparator
-                        v-if="showLogCellActions(column, row) && column.id !== 'source'"
-                        vertical
-                        class="mx-0.5 h-4"
-                      />
-                      <AiEntryButton
-                        v-bind="logRowDoor(row, 'explain')"
-                        appearance="toolbar-icon"
-                      />
-                      <AiEntryButton
-                        v-bind="logRowDoor(row, 'add_to_chat')"
-                        appearance="toolbar-icon"
                       />
                     </template>
                   </template>
@@ -789,49 +778,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OContextMenuItem>
               </template>
 
-              <OContextMenuSeparator />
-              <template v-if="contextCellIsStreamField">
-                <AiEntryButton
-                  v-bind="logFieldDoor(contextCell, 'explain')"
-                  appearance="menu-item"
-                />
-                <AiEntryButton
-                  v-bind="logFieldDoor(contextCell, 'add_to_chat')"
-                  appearance="menu-item"
-                />
+              <template v-if="assistantDoorsShown">
+                <OContextMenuSeparator />
+                <AiEntryButton v-bind="logFieldDoor(contextCell)" appearance="menu-item" />
+                <AiEntryButton v-bind="logRowDoor(contextCell.row)" appearance="menu-item" />
               </template>
-              <AiEntryButton
-                v-bind="logRowDoor(contextCell.row, 'explain')"
-                appearance="menu-item"
-              />
-              <AiEntryButton
-                v-bind="logRowDoor(contextCell.row, 'add_to_chat')"
-                appearance="menu-item"
-              />
             </template>
           </OContextMenu>
-          <!-- After the table and sticky, so selecting the first row never shifts the rows under the pointer. -->
-          <div
-            v-if="selectedLogRows.length > 0"
-            role="toolbar"
-            :aria-label="t('components.table.selectedCount', { selected: selectedLogRows.length })"
-            class="border-border-default bg-surface-panel rounded-default sticky bottom-2 z-10 mx-2 flex w-fit flex-wrap items-center gap-2 border px-2 py-1 shadow-lg"
-            data-test="logs-search-result-selection-bar"
-          >
-            <span class="text-text-secondary text-sm">
-              {{ t("components.table.selectedCount", { selected: selectedLogRows.length }) }}
-            </span>
-            <AiEntryButton v-bind="logRowsDoor()" />
-            <OButton
-              variant="ghost"
-              size="sm"
-              class="max-md:min-h-11 pointer-coarse:min-h-11"
-              data-test="logs-search-result-selection-clear"
-              @click="clearLogSelection"
-            >
-              {{ t("assistant.entry.clearSelection") }}
-            </OButton>
-          </div>
         </template>
 
         <!-- Patterns View -->
@@ -968,7 +921,6 @@ import {
   computed,
   defineComponent,
   ref,
-  shallowRef,
   onMounted,
   onUpdated,
   onBeforeUnmount,
@@ -1044,14 +996,16 @@ import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButto
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import {
+  addDoorToChat,
+  currentUserOrgKey,
   logFieldBuild,
   logRowBuild,
-  logRowsBuild,
   logsDoorBase,
   rowKeyOf,
+  useAssistantDoorShown,
 } from "@/plugins/logs/logsDoors";
-import { MAX_EXPLAIN_ROWS, rowsOverCap } from "@/utils/assistant/prompts/caps";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { quickModeHiddenFieldCount } from "@/utils/query/quickModeFieldList";
@@ -1070,7 +1024,6 @@ import OContextMenuSeparator from "@/lib/overlay/ContextMenu/OContextMenuSeparat
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LogsTableSkeleton from "@/plugins/logs/LogsTableSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1122,9 +1075,9 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     OTable: defineAsyncComponent(() => import("@/lib/core/Table/OTable.vue")),
     CellActions,
-    OSeparator,
     LogsMissingStreamBanner,
     LogsTableSkeleton,
+    O2AIContextAddBtn,
     AiEntryButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
     ),
@@ -3022,87 +2975,39 @@ export default defineComponent({
       () => store.state.selectedOrganization?.identifier ?? "",
     );
     const doorBoundOrg = computed(() => loadedOrg.value);
-    const LOGS_V2_TABLE = {
-      focusToolbar: true,
-      selection: "multiple",
-      onSelectionChange: (rows: Record<string, unknown>[]) => onLogSelectionChange(rows),
-    } as const;
     const coarsePointer =
       typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)")?.matches;
     const logsRowHeight = computed(() => (coarsePointer || isMobile.value ? 44 : 20));
-    const selectedLogRows = shallowRef<Record<string, unknown>[]>([]);
     const doorBase = (row?: Record<string, unknown>) => () =>
       logsDoorBase(searchObj, store.state, row);
 
-    const logRowDoor = (row: Record<string, unknown>, verb: "explain" | "add_to_chat") => ({
-      verb,
+    const logRowDoor = (row: Record<string, unknown>) => ({
+      verb: "add_to_chat" as const,
       entryKind: "object_verb" as const,
       boundOrg: loadedOrg.value,
       objectKind: "log_row" as const,
-      label: t(verb === "explain" ? "assistant.entry.explainLogRow" : "assistant.entry.addLogRow"),
-      tooltip: t(
-        verb === "explain" ? "assistant.entry.tooltip.explainRow" : "assistant.entry.tooltip.add",
-      ),
-      dataTest:
-        verb === "explain"
-          ? ("ai-entry-log-row-explain" as const)
-          : ("ai-entry-log-row-add" as const),
+      label: t("assistant.entry.addLogRow"),
+      tooltip: t("assistant.entry.tooltip.add"),
+      dataTest: "ai-entry-log-row-add" as const,
       build: logRowBuild(doorBase(row), row),
       objectKey: rowKeyOf(row, logsTimestampCol.value),
     });
 
-    const logFieldDoor = (cell: ContextCell, verb: "explain" | "add_to_chat") => ({
-      verb,
+    // The separator goes with the doors: shown ready or locked, hidden otherwise (AiEntryButton's states).
+    const assistantDoorsShown = useAssistantDoorShown();
+    const userOrgKey = currentUserOrgKey();
+
+    const logFieldDoor = (cell: ContextCell) => ({
+      verb: "add_to_chat" as const,
       entryKind: "object_verb" as const,
       boundOrg: loadedOrg.value,
       objectKind: "log_field" as const,
-      label: t(verb === "explain" ? "assistant.entry.explainField" : "assistant.entry.addField"),
-      tooltip: t(
-        verb === "explain" ? "assistant.entry.tooltip.explainField" : "assistant.entry.tooltip.add",
-      ),
-      dataTest:
-        verb === "explain"
-          ? ("ai-entry-log-field-explain" as const)
-          : ("ai-entry-log-field-add" as const),
+      label: t("assistant.entry.addField"),
+      tooltip: t("assistant.entry.tooltip.add"),
+      dataTest: "ai-entry-log-field-add" as const,
       build: logFieldBuild(doorBase(cell.row), cell.columnId, cell.value, cell.row),
       objectKey: `${rowKeyOf(cell.row, logsTimestampCol.value)}:${cell.columnId}`,
     });
-
-    // Measured once per selection, not on every render of the bar.
-    const selectionOverCap = computed(() => rowsOverCap(selectedLogRows.value));
-    const logRowsDoor = () => {
-      const rows = selectedLogRows.value;
-      return {
-        verb: "explain" as const,
-        entryKind: "object_verb" as const,
-        boundOrg: loadedOrg.value,
-        objectKind: "log_row" as const,
-        count: rows.length,
-        tooltip: t("assistant.entry.tooltip.explainRows", { count: rows.length }, rows.length),
-        dataTest: "ai-entry-log-rows-explain" as const,
-        build: logRowsBuild(doorBase(), () => selectedLogRows.value),
-        disabledReason: selectionOverCap.value
-          ? t("assistant.entry.tooManyRows", { max: MAX_EXPLAIN_ROWS })
-          : undefined,
-      };
-    };
-
-    const onLogSelectionChange = (rows: Record<string, unknown>[]) => {
-      selectedLogRows.value = [...rows];
-    };
-
-    const clearLogSelection = () => {
-      searchTableRef.value?.clearSelection?.();
-      selectedLogRows.value = [];
-    };
-
-    // A new search replaces the rows a selection pointed at.
-    watch(
-      () => searchObj.data.queryResults?.hits,
-      () => {
-        if (selectedLogRows.value.length) clearLogSelection();
-      },
-    );
 
     const toSearchTermValue = (value: unknown): string | number | boolean => {
       if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
@@ -3277,14 +3182,12 @@ export default defineComponent({
 
     return {
       doorBoundOrg,
-      LOGS_V2_TABLE,
       logsRowHeight,
-      selectedLogRows,
       logRowDoor,
       logFieldDoor,
-      logRowsDoor,
-      onLogSelectionChange,
-      clearLogSelection,
+      addDoorToChat,
+      assistantDoorsShown,
+      userOrgKey,
       noFtsRecoverySchemas,
       noFtsRecoveryTerm,
       gridLockReason,

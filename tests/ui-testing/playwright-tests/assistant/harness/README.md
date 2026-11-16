@@ -3,7 +3,7 @@
 Runs the real OpenObserve frontend against a real (open-source) backend and fakes every
 AI endpoint with Playwright, so every assistant surface can be tested end to end without
 o2-ai, an LLM or an enterprise backend. It is the CI baseline for the assistant: every PR
-runs `SMOKE-01` (the legacy path with the `assistant_v2` flag off) and its own flows here.
+runs its own flows here.
 
 The design folder's `capture.mjs` and `gap1-multitab.mjs` import these modules by path, so
 `createMockState`, `installMocks`, `nextScenario`, `login` and `forceCloudBuild` keep their
@@ -225,14 +225,11 @@ Declared with a no-op default, filled in by the WP that owns the behaviour:
 | `captureTelemetry(page)` | The events `trackAssistant` copied into `window.__o2telemetry` (`installMocks` enables the sink) |
 | `readAnnouncements(page)` | Text of every `role="status"` region |
 
-## Useful selectors (legacy UI, flag off)
+## Useful selectors
 
 Header toggle `[data-test=menu-link-ai-item]` (also reused by the alert dialog, pipeline
 query node, functions toolbar and JSON editor); regex drawer
-`[data-test=add-regex-pattern-open-close-ai-btn]`; chat root `.chat-container`; composer
-`.chat-container [contenteditable=true]`; logs NL toggle
-`[data-test=logs-search-bar-ai-toggle-btn]`, NL input
-`[data-test=logs-search-bar-ai-input-field-field]`; row add-to-context
+`[data-test=add-regex-pattern-open-close-ai-btn]`; row add-to-context
 `[data-test=logs-search-result-ai-btn]`; Home tab `[data-test=home-tab-ai]`.
 
 Known limits: the NL-bar stack check depends on unminified module names (Vite dev server

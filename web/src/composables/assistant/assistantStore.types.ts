@@ -331,6 +331,8 @@ export interface OpenAssistantArgs {
   container?: "auto" | "sidebar" | "full" | "docked";
   dockHost?: DockHostId;
   invoker?: HTMLElement | null;
+  /** Add to chat also opens a hidden chat (the table sparkle, as on main). */
+  reveal?: boolean;
 }
 
 export type OpenAssistantResult =
@@ -897,8 +899,8 @@ export interface AssistantStoreApi {
   stop(sid: Sid): Promise<void>;
   /** Pre-admission keeps the turn id; post-admission mints a new one. */
   retry(sid: Sid): Promise<TurnTerminal>;
-  /** Stages `assistant.turn.continuePrefill` and the previous chips; never sends. */
-  continueTurn(sid: Sid): void;
+  /** Sends `assistant.turn.continueDraft` with the previous chips; the composer's draft is untouched. */
+  continueTurn(sid: Sid): Promise<TurnTerminal>;
   /** Re-POSTs a not-saved turn (server mode only). */
   retrySave(sid: Sid, turnId: string): Promise<void>;
   /** Posts on `sessions[sid].sid`. */
@@ -1090,7 +1092,7 @@ export interface TurnEngine {
   /** Another tab signed out: every running turn here cancels and ends `failed{signed_out}`, never a reload. */
   signedOutElsewhere?(): Promise<void>;
   retry(sid: Sid): Promise<TurnTerminal>;
-  continueTurn(sid: Sid): void;
+  continueTurn(sid: Sid): Promise<TurnTerminal>;
   retrySave(sid: Sid, turnId: string): Promise<void>;
   /** The last ended turn still has the snapshot a Retry resends (HT-03 AC 5). */
   canRetry?(sid: Sid): boolean;

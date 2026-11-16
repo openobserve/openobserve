@@ -209,6 +209,15 @@ describe("gate first (DG-02 AC 8)", () => {
     },
   );
 
+  it("add to chat stays hidden by default, and opens the chat with reveal", async () => {
+    const quiet = setup();
+    await quiet.open(addToChat());
+    expect(quiet.store.state.shell.placement.kind).toBe("hidden");
+    const shown = setup();
+    await shown.open({ ...addToChat(), reveal: true });
+    expect(shown.store.state.shell.placement.kind).not.toBe("hidden");
+  });
+
   it("opens nothing during loading and reports the click without a gate reason", async () => {
     const { store, open } = setup({ gate: "loading" });
     await expect(open(headerOpen)).resolves.toEqual({ ok: false, reason: "loading" });

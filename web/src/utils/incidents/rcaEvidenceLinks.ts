@@ -16,8 +16,6 @@
 // Build evidence links from stored query targets, never server- or model-provided URLs.
 
 import type { RouteLocationRaw } from "vue-router";
-import { buildNavigationRoute } from "@/components/O2AIChat.navigation";
-import { raw } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import type { RcaBlindSpotFix, RcaEvidenceTarget } from "@/services/incidents";
 
@@ -42,6 +40,31 @@ const hasRange = (link: RcaEvidenceTarget): boolean =>
 /** The logs handoff type that runs the query on arrival (`plugins/logs/Index.vue`). */
 const RCA_LOGS_TYPE = "rca_evidence_query";
 
+/** The logs-page query that runs `sql` on arrival; the `query` value is plain (non URL-safe) base64. */
+function sqlQuery(
+  signal: RcaEvidencePage,
+  sql: string,
+  streams: string[] | undefined,
+  range: RcaEvidenceTarget | null,
+  org: string,
+): Record<string, string> {
+  return {
+    org_identifier: org,
+    stream_type: signal,
+    refresh: "0",
+    sql_mode: "true",
+    quick_mode: "false",
+    show_histogram: "true",
+    type: RCA_LOGS_TYPE,
+    ...(streams ? { stream: streams.join(",") } : {}),
+    ...(range
+      ? { from: String(range.start_us), to: String(range.end_us) }
+      : { period: NO_RANGE_PERIOD }),
+    query: btoa(unescape(encodeURIComponent(sql))),
+    fn_editor: "false",
+  };
+}
+
 export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEvidenceLink | null {
   const ranged = hasRange(link);
 
@@ -49,28 +72,13 @@ export function rcaEvidenceLink(link: RcaEvidenceTarget, org: string): RcaEviden
   // `rca_evidence_query` type makes Logs run the query on arrival; the AI chat's
   // `ai_chat_query` only re-applies it. The label names the signal, not the page.
   if (link.sql && isSqlSignal(link.signal)) {
-    const route = buildNavigationRoute(
-      {
-        resource_type: link.signal,
-        action: "load_query",
-        label: raw(""),
-        target: {
-          query: link.sql,
-          sql_mode: true,
-          stream: link.streams,
-          ...(ranged
-            ? { from: link.start_us as number, to: link.end_us as number }
-            : { period: NO_RANGE_PERIOD }),
-        },
+    return {
+      page: link.signal,
+      route: {
+        path: "/logs",
+        query: sqlQuery(link.signal, link.sql, link.streams, ranged ? link : null, org),
       },
-      org,
-    );
-    return route
-      ? {
-          page: link.signal,
-          route: { path: "/logs", query: { ...route.query, type: RCA_LOGS_TYPE } },
-        }
-      : null;
+    };
   }
 
   // PromQL: the `/metrics` guard opens a `query` parameter in Visualize; from/to are ms.

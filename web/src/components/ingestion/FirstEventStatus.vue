@@ -45,7 +45,7 @@ import {
 import FirstEventStillStuck from "./FirstEventStillStuck.vue";
 import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
 import { HEARD_FROM_ASKED_BY_HOST } from "@/components/login/heardFrom";
-import { REJECTION_REASON_KEYS, type AskAiContext } from "./firstEventAskAi";
+import { REJECTION_REASON_KEYS, type AskAiContext } from "@/utils/assistant/prompts/ingestion";
 
 const props = withDefaults(
   defineProps<{

@@ -27,12 +27,12 @@ export const AXE_ALLOW = [
   {
     rule: "color-contrast",
     selector: ".text-text-link",
-    reason: "the shared text-text-link token is 3.94:1 on white app-wide; a token change restyles every flag-off link",
+    reason: "the shared text-text-link token is 3.94:1 on white app-wide; a token change restyles every link outside the assistant",
   },
   {
     rule: "color-contrast",
     selector: '[role="menu"] [data-test="o-shortcut"]',
-    reason: "ODropdownItem's shortcut cap uses the shared kbd pair (text-secondary on surface-subtle, 4.34:1) in every menu; darkening it restyles every flag-off menu",
+    reason: "ODropdownItem's shortcut cap uses the shared kbd pair (text-secondary on surface-subtle, 4.34:1) in every menu; darkening it restyles every menu outside the assistant",
   },
 ];
 

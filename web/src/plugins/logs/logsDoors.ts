@@ -13,10 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { computed, type ComputedRef } from "vue";
 import type { Router } from "vue-router";
 import type { Store } from "vuex";
 
-import type { OpenAssistantArgs } from "@/composables/assistant/pure";
+import {
+  runtimeHandle,
+  useAssistantGate,
+  type ContextChip,
+  type OpenAssistantArgs,
+  type OpenAssistantResult,
+} from "@/composables/assistant/pure";
 import type { LogRowInput } from "@/utils/assistant/prompts";
 
 /** What every Logs door prompt reads from the page; built at click time, never at render. */
@@ -73,19 +80,13 @@ export function logsDoorBase(
   };
 }
 
-/** Explain / Add to chat on one row; the builders load only when a door is used. */
+/** Add a row to chat; the builders load only when a door is used. */
 export function logRowBuild(base: () => LogsDoorBase, row: Record<string, unknown>) {
   return async (): Promise<Payload> =>
     (await import("@/utils/assistant/prompts")).buildLogRowPrompt({ ...base(), row });
 }
 
-/** Explain these {n} rows: one chip, the reproducing query in the text. */
-export function logRowsBuild(base: () => LogsDoorBase, rows: () => Record<string, unknown>[]) {
-  return async (): Promise<Payload> =>
-    (await import("@/utils/assistant/prompts")).buildLogRowsPrompt({ ...base(), rows: rows() });
-}
-
-/** Explain this field / Add field to chat: `{field, value}` with its row for the time and id. */
+/** Add field to chat: `{field, value}` with its row for the time and id. */
 export function logFieldBuild(
   base: () => LogsDoorBase,
   field: string,
@@ -190,6 +191,54 @@ export function noStreamBuild(org: () => string, streamType: () => string) {
       org: org(),
       streamType: streamType(),
     });
+}
+
+/** What an Add to chat button sends: the object's builder and the org its rows were loaded under. */
+export interface ChatDoor {
+  entryKind: OpenAssistantArgs["entryKind"];
+  objectKind: OpenAssistantArgs["objectKind"];
+  build: () => Payload | Promise<Payload>;
+  boundOrg?: string;
+}
+
+// Ready and locked gates show the button (openAssistant explains a lock); others hide it.
+const DOOR_GATES = ["available", "unhealthy", "no_permission", "off_for_org"];
+
+/** Whether the Add to chat buttons show for the current assistant gate. */
+export function useAssistantDoorShown(): ComputedRef<boolean> {
+  const gate = useAssistantGate();
+  return computed(() => DOOR_GATES.includes(gate.value));
+}
+
+/** The user and org a host was mounted under, for `addDoorToChat`; null before the assistant loads. */
+export const currentUserOrgKey = (): string | null =>
+  runtimeHandle().value?.store.state.userOrgKey ?? null;
+
+/** Add to chat: stage the door's chips, stamped with its bound org, in the current chat and open it. */
+export async function addDoorToChat(
+  door: ChatDoor,
+  userOrgKey?: string | null,
+): Promise<OpenAssistantResult> {
+  // The clicked button has focus now; the chat returns focus to it when it closes.
+  const invoker = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const [built, { openAssistant }] = await Promise.all([
+    door.build(),
+    import("@/composables/assistant"),
+  ]);
+  const stamp = (chip: ContextChip): ContextChip =>
+    chip.ref && door.boundOrg ? { ...chip, ref: { ...chip.ref, org: door.boundOrg } } : chip;
+  const chips = (built?.chips ?? []).map(stamp);
+  return openAssistant({
+    entryKind: door.entryKind,
+    entryVerb: "add_to_chat",
+    objectKind: door.objectKind,
+    intent: chips.length ? "stage" : "open",
+    thread: "current",
+    payload: { chips },
+    reveal: true,
+    invoker,
+    ...(userOrgKey && { userOrgKey }),
+  });
 }
 
 /** A cheap, stable key for the object behind an Add door, so its "In chat" tick never outlives it. */

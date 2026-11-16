@@ -217,7 +217,7 @@ function runDoor(env: OpenAssistantEnv, args: OpenAssistantCall): OpenAssistantR
   if (!plan.session) storeSeed(env, sid, args);
   const wasVisible = store.anyContainerVisible();
   // Add to chat is non-destructive: it never opens a hidden container over the page; the door offers Open.
-  if (!wasVisible && args.intent === "stage" && args.entryVerb === "add_to_chat") {
+  if (!wasVisible && args.intent === "stage" && args.entryVerb === "add_to_chat" && !args.reveal) {
     store.setActive(sid);
     return { ok: true, sid, container, staged, sent: false, queued: false };
   }

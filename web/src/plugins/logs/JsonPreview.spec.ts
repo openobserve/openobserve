@@ -570,6 +570,67 @@ describe("JsonPreview Component", () => {
   });
 
   describe("Context Menu", () => {
+    it("has one add-to-chat item per field menu, no explain item, and keeps Create regex pattern", () => {
+      const slotted = { template: "<div><slot /></div>" };
+      const doorStub = { props: ["dataTest"], template: '<i :data-test="dataTest" />' };
+      const w = mount(JsonPreview, {
+        props: { value: mockValue, mode: "sidebar", streamName: "test-stream" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            ODropdown: slotted,
+            ODropdownItem: slotted,
+            AiEntryButton: doorStub,
+            OButton: true,
+            OIcon: true,
+            OTooltip: true,
+            LogsHighLighting: true,
+            ChunkedContent: true,
+            EqualIcon: true,
+            NotEqualIcon: true,
+          },
+        },
+      });
+      const fieldMenus = w.findAll('[data-test="redirect-to-regex-pattern-btn"]').length;
+      expect(fieldMenus).toBeGreaterThan(0);
+      expect(w.findAll('[data-test="ai-entry-log-field-add"]')).toHaveLength(fieldMenus);
+      expect(w.find('[data-test="ai-entry-log-field-explain"]').exists()).toBe(false);
+      w.unmount();
+    });
+
+    it("emits closeTable when a field add opens the chat, not when it fails", async () => {
+      const w = mount(JsonPreview, {
+        props: { value: mockValue, mode: "sidebar", streamName: "test-stream" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            ODropdown: { template: "<div><slot /></div>" },
+            ODropdownItem: { template: "<div><slot /></div>" },
+            AiEntryButton: {
+              props: ["dataTest"],
+              emits: ["opened"],
+              template: '<i :data-test="dataTest" />',
+            },
+            OButton: true,
+            OIcon: true,
+            OTooltip: true,
+            LogsHighLighting: true,
+            ChunkedContent: true,
+            EqualIcon: true,
+            NotEqualIcon: true,
+          },
+        },
+      });
+      const door = w.findComponent('[data-test="ai-entry-log-field-add"]');
+      await door.vm.$emit("opened", { ok: false });
+      expect(w.emitted("closeTable")).toBeUndefined();
+      await door.vm.$emit("opened", { ok: true });
+      expect(w.emitted("closeTable")).toHaveLength(1);
+      w.unmount();
+    });
+
     it("offers Create regex pattern for a field and a selection without the assistant", async () => {
       const slotted = { template: "<div><slot /></div>" };
       const w = mount(JsonPreview, {

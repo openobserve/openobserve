@@ -21,7 +21,7 @@ export const MAX_EXPLAIN_ROWS = 20;
 /** And at most this many bytes of selected rows. */
 export const MAX_EXPLAIN_BYTES = 64 * 1024;
 
-/** True when the selection is over the multi-select cap, so the door is disabled with `assistant.entry.tooManyRows`. */
+/** True when the selection is over the multi-select cap. */
 export function rowsOverCap(rows: readonly unknown[]): boolean {
   if (rows.length > MAX_EXPLAIN_ROWS) return true;
   return new TextEncoder().encode(JSON.stringify(rows)).length > MAX_EXPLAIN_BYTES;

@@ -29,6 +29,7 @@ import { trackAssistant } from "@/services/assistantAnalytics";
 import type { AssistantStoreInternal } from "./assistantStore";
 import type { GateCode, Sid } from "./assistantStore.types";
 import { openAssistant } from "./openAssistant";
+import { setLauncherDismissed } from "./prefs";
 import { getAssistantRuntime } from "./runtime";
 import { ASSISTANT_ROOT_SELECTOR } from "./surfaces";
 
@@ -248,6 +249,7 @@ export function onAssistantOpen(event?: KeyboardEvent): void {
   // MS-IME converts on Ctrl+I, and a hold in the textbox dictates at the caret, which a refocus would move.
   if (event?.isComposing || event?.keyCode === 229) return;
   const { store } = getAssistantRuntime();
+  setLauncherDismissed(store.state.userOrgKey, false);
   if (document.activeElement?.matches(COMPOSER_SELECTOR) && !assistantFocusCard()) {
     cycleComposersOnTap(store, event);
     return;

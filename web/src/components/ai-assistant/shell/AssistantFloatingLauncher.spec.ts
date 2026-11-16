@@ -78,6 +78,14 @@ describe("AssistantFloatingLauncher", () => {
     expect(wrapper.get('[data-test="assistant-launcher-more"]').text()).toBe("+3");
   });
 
+  it("puts the +N chip after the top preview in the same slot row", async () => {
+    const wrapper = mountLauncher(5);
+    await hover(wrapper);
+    const slot = wrapper.findAll('[data-test="assistant-launcher-slot"]')[0];
+    const kids = Array.from(slot.element.children).map((c) => c.getAttribute("data-test"));
+    expect(kids).toEqual(["assistant-launcher-preview", "assistant-launcher-more"]);
+  });
+
   it("keeps the previews through a short pointer gap and closes after the grace", async () => {
     const wrapper = mountLauncher(2);
     const root = wrapper.get('[data-test="assistant-launcher"]');
@@ -122,6 +130,18 @@ describe("AssistantFloatingLauncher", () => {
     expect(wrapper.emitted("toggle")).toHaveLength(2);
   });
 
+  it("offers a named Hide button on hover and focus that dismisses without opening the chat", async () => {
+    const wrapper = mountLauncher(2);
+    expect(wrapper.find('[data-test="assistant-launcher-dismiss"]').exists()).toBe(false);
+    await wrapper.get('[data-test="assistant-launcher"]').trigger("focusin");
+    const dismiss = wrapper.get('[data-test="assistant-launcher-dismiss"]');
+    expect(dismiss.attributes("aria-label")).toBe("Hide");
+    await dismiss.trigger("click");
+    expect(wrapper.emitted("dismiss")).toHaveLength(1);
+    expect(wrapper.emitted("toggle")).toBeUndefined();
+    expect(wrapper.emitted("restore")).toBeUndefined();
+  });
+
   it("places previews above and left of the icon", async () => {
     const wrapper = mountLauncher(3);
     await hover(wrapper);
@@ -157,10 +177,11 @@ describe("AssistantFloatingLauncher", () => {
     );
   });
 
-  it("keeps the badge small at the top-right corner", () => {
+  it("keeps the badge small at the bottom-right corner, leaving the top-right to Hide", () => {
     const badge = mountLauncher(2).get('[data-test="assistant-launcher-badge"]');
-    for (const c of ["h-6!", "text-xs", "-top-2", "-end-2", "ring-2", "ring-surface-base"])
+    for (const c of ["h-6!", "text-xs", "-bottom-2", "-end-2", "ring-2", "ring-surface-base"])
       expect(badge.classes()).toContain(c);
+    expect(badge.classes()).not.toContain("-top-2");
   });
 
   it("stays calm with no chat answering and flags needs-you on the badge", () => {

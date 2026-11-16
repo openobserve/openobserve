@@ -24,6 +24,23 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
+const assistantEnv = await vi.hoisted(async () => ({
+  gate: (await import("vue")).ref("available"),
+  add: (await import("vitest")).vi.fn(),
+}));
+vi.mock("@/composables/assistant/pure", async (importOriginal) => {
+  const { computed } = await import("vue");
+  return {
+    ...(await importOriginal<typeof import("@/composables/assistant/pure")>()),
+    runtimeHandle: () => ({ value: { store: { state: { userOrgKey: "u|org-a" } } } }),
+    useAssistantGate: () => computed(() => assistantEnv.gate.value),
+  };
+});
+vi.mock("@/plugins/logs/logsDoors", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/plugins/logs/logsDoors")>()),
+  addDoorToChat: assistantEnv.add,
+}));
+
 // A plain (non-reactive) object, so tests that change it remount the component.
 const mockStreams = vi.hoisted(() => ({ selected: ["stream1"] }));
 
@@ -477,6 +494,94 @@ describe("DetailTable Component", () => {
   // Test 56-60: Component Props Validation
 
   // Test 61-70: Cross-Linking Functionality
+  describe("AI doors in the drawer (as on main: add to chat only)", () => {
+    const slotted = { template: "<div><slot /></div>" };
+    const doorStub = {
+      props: ["dataTest"],
+      emits: ["added", "opened"],
+      template: '<i :data-test="dataTest" />',
+    };
+    const sparkleStub = {
+      emits: ["sendToAiChat"],
+      template: "<button @click=\"$emit('sendToAiChat')\" />",
+    };
+    const mountTable = async () => {
+      const w = mount(DetailTable, {
+        attachTo: "#app",
+        props: { ...defaultProps, initialTab: "table" },
+        global: {
+          ...globalMountOptions,
+          stubs: {
+            ...globalMountOptions.stubs,
+            ODropdown: slotted,
+            ODropdownItem: slotted,
+            AiEntryButton: doorStub,
+            O2AIContextAddBtn: sparkleStub,
+          },
+        },
+      });
+      await flushPromises();
+      return w;
+    };
+
+    beforeEach(() => {
+      assistantEnv.add.mockReset();
+      assistantEnv.gate.value = "available";
+    });
+    const headerBtn = '[data-test="logs-detail-ai-context-btn"]';
+
+    it("has main's sparkle once in the header and no explain door", async () => {
+      const w = await mountTable();
+      expect(w.findAll(headerBtn)).toHaveLength(1);
+      expect(w.find('[data-test="ai-entry-log-record-explain"]').exists()).toBe(false);
+      w.unmount();
+    });
+
+    it("adds the record with the key captured at mount, closing the drawer only when ok", async () => {
+      const w = await mountTable();
+      assistantEnv.add.mockResolvedValueOnce({ ok: false, reason: "org_changed" });
+      await w.get(headerBtn).trigger("click");
+      await flushPromises();
+      expect(assistantEnv.add).toHaveBeenCalledWith(
+        expect.objectContaining({ objectKind: "log_row" }),
+        "u|org-a",
+      );
+      expect(w.emitted("closeTable")).toBeUndefined();
+      assistantEnv.add.mockResolvedValueOnce({ ok: true });
+      await w.get(headerBtn).trigger("click");
+      await flushPromises();
+      expect(w.emitted("closeTable")).toHaveLength(1);
+      w.unmount();
+    });
+
+    it("closes the drawer on a field add only when ok", async () => {
+      const w = await mountTable();
+      const field = w.findComponent('[data-test="ai-entry-log-field-add"]');
+      await field.vm.$emit("opened", { ok: false });
+      expect(w.emitted("closeTable")).toBeUndefined();
+      await field.vm.$emit("opened", { ok: true });
+      expect(w.emitted("closeTable")).toHaveLength(1);
+      w.unmount();
+    });
+
+    it("hides the header sparkle while the assistant is loading", async () => {
+      assistantEnv.gate.value = "loading";
+      const w = await mountTable();
+      expect(w.find(headerBtn).exists()).toBe(false);
+      w.unmount();
+    });
+
+    it("has one add-to-chat item per field menu, no explain item, and keeps Create regex pattern", async () => {
+      const w = await mountTable();
+      const fieldMenus = w.findAll('[data-test="ai-entry-regex-field-ask"]').length;
+      expect(fieldMenus).toBeGreaterThan(0);
+      expect(w.findAll('[data-test="ai-entry-log-field-add"]')).toHaveLength(fieldMenus);
+      expect(w.find('[data-test="ai-entry-log-field-explain"]').exists()).toBe(false);
+      expect(w.find('[data-test="ai-entry-regex-field-ask"]').exists()).toBe(true);
+      w.unmount();
+    });
+  });
+
   describe("Cross-Linking Functionality", () => {
     const mockCrossLinks = {
       stream_links: [

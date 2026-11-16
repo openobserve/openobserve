@@ -951,9 +951,17 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       const source = turn.state === "failed" && !edited ? "regenerate" : previous.source;
       return start(sid, opts, { snapshot, source, clearsComposer });
     },
+    // Sent as its own snapshot, so a draft in the composer stays where it is.
     continueTurn(sid) {
-      const chips = last.get(sid)?.snapshot.chips ?? [];
-      deps.store().stage(sid, { text: t("assistant.turn.continueDraft"), chips, mode: "replace" });
+      const kept = toRaw(sessionOf(sid)?.composer.timeOverride);
+      const snapshot: ComposerSnapshot = {
+        text: t("assistant.turn.continueDraft"),
+        chips: last.get(sid)?.snapshot.chips ?? [],
+        images: [],
+        mentions: [],
+        timeOverride: kept ? { ...kept } : null,
+      };
+      return engine.send(sid, { input: "continue", snapshot });
     },
     async retrySave(sid, turnId) {
       const session = sessionOf(sid);

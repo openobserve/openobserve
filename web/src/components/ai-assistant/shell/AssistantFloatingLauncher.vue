@@ -35,26 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(item, index) in shown"
         :key="item.sid"
-        :class="['flex gap-2', index === 0 ? 'flex-col items-end' : 'items-center', SLOT[index]]"
+        :class="['flex items-center gap-2', SLOT[index]]"
         :data-slot="SLOT_NAME[index]"
         data-test="assistant-launcher-slot"
       >
         <OButton
-          v-if="index === 0 && more > 0"
-          variant="outline"
-          size="chip"
-          :class="['assistant-pop-in origin-bottom-right', PILL, STAGGER[2]]"
-          :aria-label="t('assistant.launcher.more', { count: more })"
-          data-test="assistant-launcher-more"
-          @click="onToggle"
-        >
-          {{ t("assistant.tray.more", { count: more }) }}
-        </OButton>
-        <OButton
           variant="outline"
           size="sm"
           :class="[
-            'assistant-pop-in max-w-[min(16rem,calc(100vw-3rem))] origin-bottom-right gap-1.5',
+            'assistant-pop-in max-w-[min(16rem,calc(100vw-6rem))] min-w-0 origin-bottom-right gap-1.5',
             PILL,
             STAGGER[index],
           ]"
@@ -69,6 +58,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             placement="inline"
           />
           <span>{{ previewTitle(item.title) }}</span>
+        </OButton>
+        <OButton
+          v-if="index === 0 && more > 0"
+          variant="outline"
+          size="chip"
+          :class="['assistant-pop-in shrink-0 origin-bottom-right', PILL, STAGGER[2]]"
+          :aria-label="t('assistant.launcher.more', { count: more })"
+          data-test="assistant-launcher-more"
+          @click="onToggle"
+        >
+          {{ t("assistant.tray.more", { count: more }) }}
         </OButton>
       </div>
     </div>
@@ -88,9 +88,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <img :src="logoSrc" alt="" class="size-8" data-test="assistant-launcher-logo" />
     </OButton>
+    <!-- Its own small corner chip, so the touch-size floor of the shared icon button cannot grow it into the page -->
+    <span v-if="wanted" class="absolute -end-1.5 -top-1.5 z-10 flex">
+      <OButton
+        variant="outline"
+        size="icon-xs-circle"
+        class="bg-status-error-bg! text-status-error-text! border-status-error-text! enabled:hover:bg-status-error-text! enabled:hover:text-surface-base! size-5! min-h-0! min-w-0! shadow-sm"
+        :aria-label="t('common.hide')"
+        data-test="assistant-launcher-dismiss"
+        @click="onDismiss"
+      >
+        <OIcon :name="assistantGlyph.close" size="xs" />
+        <OTooltip :content="t('common.hide')" />
+      </OButton>
+    </span>
     <span
       v-if="working > 0"
-      class="bg-surface-base border-border-strong ring-surface-base pointer-events-none absolute -end-1.5 -bottom-1.5 flex h-4 items-center gap-0.5 rounded-full border px-1.5 shadow-sm ring-2"
+      class="bg-surface-base border-border-strong ring-surface-base pointer-events-none absolute -start-1.5 -bottom-1.5 flex h-4 items-center gap-0.5 rounded-full border px-1.5 shadow-sm ring-2"
       data-test="assistant-launcher-working-dot"
     >
       <span class="bg-text-heading size-1 rounded-full motion-safe:animate-pulse" />
@@ -105,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="items.length > 0"
       variant="primary"
       size="sm"
-      class="ring-surface-base pointer-events-none absolute -end-2 -top-2 h-6! min-w-6 justify-center px-1.5! py-0! text-xs ring-2"
+      class="ring-surface-base pointer-events-none absolute -end-2 -bottom-2 h-6! min-w-6 justify-center px-1.5! py-0! text-xs ring-2"
       :data-state="waiting > 0 ? 'needsYou' : 'calm'"
       data-test="assistant-launcher-badge"
     >
@@ -177,15 +191,18 @@ export function previewTitle(title: string): string {
 import { computed, onBeforeUnmount, ref } from "vue";
 
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { useTheme } from "@/composables/useTheme";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps<AssistantFloatingLauncherProps>();
 
-const emit = defineEmits<{ toggle: []; restore: [sid: Sid] }>();
+const emit = defineEmits<{ toggle: []; restore: [sid: Sid]; dismiss: [] }>();
 
 const { t } = useI18nTyped();
 const { isDark } = useTheme();
@@ -236,6 +253,11 @@ function onToggle(): void {
 function onRestore(sid: Sid): void {
   close();
   emit("restore", sid);
+}
+
+function onDismiss(): void {
+  close();
+  emit("dismiss");
 }
 
 onBeforeUnmount(() => clearTimeout(timer));

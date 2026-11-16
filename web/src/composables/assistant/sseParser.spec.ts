@@ -256,7 +256,7 @@ describe("parseStream", () => {
     expect(h.frame.mock.calls.map(([frame]) => frame.type)).toEqual(["status", "complete"]);
   });
 
-  it("reports a body read failure as eof, so the turn ends as dropped (flips O2AIChat.stream.spec.ts:2004)", async () => {
+  it("reports a body read failure as eof, so the turn ends as dropped", async () => {
     const h = handlers();
     const end = await parseStream(
       body(['data: {"type":"message_delta","content":"a"}\n'], new TypeError("network reset")),
@@ -324,11 +324,11 @@ describe("the final-chunk gap is closed for the new path", () => {
 
   it.each([
     [
-      "confirmation_required (O2AIChat.stream.spec.ts:528)",
+      "confirmation_required",
       '{"type":"confirmation_required","tool":"o2_delete","message":"Delete?"}',
     ],
     [
-      "navigation_action (O2AIChat.stream.spec.ts:1178)",
+      "navigation_action",
       '{"type":"navigation_action","resource_type":"logs","action":"load_query","label":"Open","target":{}}',
     ],
   ])("applies %s when it is the last bytes of the stream", async (_name, json) => {

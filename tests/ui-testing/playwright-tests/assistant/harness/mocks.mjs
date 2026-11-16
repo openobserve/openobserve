@@ -749,7 +749,7 @@ export const HTTP_SCENARIOS = {
     status: 402,
     body: { code: 402, message: "Free trial quota exhausted (500/500 used). Subscribe to continue using this feature." },
   },
-  // 429 turn limit (useChatStream.ts:103-108)
+  // 429 turn limit
   turn_limit: { status: 429, body: { code: 429, error_code: "turn_limit", message: "Too many chats are running. Wait for one to finish." } },
   // WP-03: the request never reaches the server (`networkError`), or each wire shape of `__fixtures__/errors/wire`; `envelope` is the B-01 body (`envelopeEnabled`).
   offline: { networkError: true },

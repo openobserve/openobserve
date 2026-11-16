@@ -37,6 +37,7 @@ import {
   useAssistantShortcuts,
   HOLD_MS,
 } from "./shortcuts";
+import { isLauncherDismissed, setLauncherDismissed } from "./prefs";
 
 const { placement, recency, openAssistant, storeClose } = vi.hoisted(() => ({
   placement: { kind: "hidden" } as { kind: string },
@@ -48,7 +49,7 @@ const { placement, recency, openAssistant, storeClose } = vi.hoisted(() => ({
 vi.mock("./runtime", () => ({
   getAssistantRuntime: () => ({
     store: {
-      state: { shell: { placement } },
+      state: { shell: { placement }, userOrgKey: "u1:o1" },
       close: storeClose,
       anyContainerVisible: () => placement.kind !== "hidden",
       windowsByRecency: () => recency,
@@ -378,6 +379,12 @@ describe("assistantOpen", () => {
       name: "ai_shortcut",
       properties: { shortcut_id: "assistantOpen", effect: "open" },
     });
+  });
+
+  it("brings a dismissed launcher back", () => {
+    setLauncherDismissed("u1:o1", true);
+    onAssistantOpen();
+    expect(isLauncherDismissed("u1:o1")).toBe(false);
   });
 
   it("focuses a pending card before the composer and never closes", () => {

@@ -160,6 +160,8 @@ export interface AiEntryButtonProps {
   added?: boolean;
   pressed?: boolean;
   dockHost?: DockHostId;
+  /** Add to chat also opens a hidden chat, for hosts that close themselves after it (the log drawer). */
+  reveal?: boolean;
   size?: "sm" | "md";
   dataTest: `ai-entry-${string}-${string}`;
   /** Keeps the door focusable but inert with this reason as its tooltip (the multi-select cap). */
@@ -745,6 +747,7 @@ function callFor(
     thread: threadFor(),
     invoker,
     ...(props.dockHost && { dockHost: props.dockHost }),
+    ...(props.reveal && { reveal: true }),
     ...(callerKey() !== undefined && { userOrgKey: callerKey() as string }),
   };
   if (props.verb === "explain" || props.verb === "troubleshoot" || props.verb === "fix")

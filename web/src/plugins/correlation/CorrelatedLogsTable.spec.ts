@@ -47,6 +47,42 @@ vi.mock("@/composables/useCorrelatedLogs", () => ({
   })),
 }));
 
+vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", async () => {
+  const { defineComponent, h } = await import("vue");
+  return {
+    __esModule: true,
+    default: defineComponent({
+      inheritAttrs: false,
+      setup:
+        (_, { attrs }) =>
+        () =>
+          h("i", { "data-test": attrs.dataTest }),
+    }),
+  };
+});
+const assistantEnv = await vi.hoisted(async () => ({
+  gate: (await import("vue")).ref("available"),
+  add: (await import("vitest")).vi.fn(),
+}));
+vi.mock("@/composables/assistant/pure", async (importOriginal) => {
+  const { computed } = await import("vue");
+  return {
+    ...(await importOriginal<typeof import("@/composables/assistant/pure")>()),
+    useAssistantGate: () => computed(() => assistantEnv.gate.value),
+  };
+});
+vi.mock("@/plugins/logs/logsDoors", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/plugins/logs/logsDoors")>()),
+  addDoorToChat: assistantEnv.add,
+  currentUserOrgKey: () => "u|org-a",
+}));
+vi.mock("@/components/common/O2AIContextAddBtn.vue", () => ({
+  default: {
+    emits: ["sendToAiChat"],
+    template: '<button data-test="sparkle-stub" @click="$emit(\'sendToAiChat\')" />',
+  },
+}));
+
 // Mock useServiceCorrelation composable
 vi.mock("@/composables/useServiceCorrelation", () => ({
   useServiceCorrelation: vi.fn(() => ({
@@ -138,6 +174,66 @@ describe("CorrelatedLogsTable.vue", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe("AI doors (as on main: add to chat only)", () => {
+    const mountHovers = async () => {
+      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
+      const row = { _timestamp: 1234567890, field1: "value1" };
+      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
+        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
+        searchResults: { value: [row] },
+        pagedResults: { value: [row] },
+        hasResults: { value: true },
+        isEmpty: { value: false },
+      });
+      const hover = (id: string, closable: boolean) =>
+        `<div data-test="hover-${id}"><slot name="cell-hover-actions" :row='${JSON.stringify(row)}' :column="{ id: '${id}', meta: { closable: ${closable} } }" :active="true" /></div>`;
+      wrapper = createWrapper(
+        {},
+        {
+          global: {
+            plugins: [i18n, store],
+            stubs: {
+              DimensionFiltersBar: true,
+              OTable: {
+                name: "OTable",
+                template: `<div>${hover("_timestamp", false)}${hover("field1", true)}</div>`,
+              },
+            },
+          },
+        },
+      );
+      await vi.dynamicImportSettled();
+      await flushPromises();
+    };
+
+    beforeEach(() => {
+      assistantEnv.gate.value = "available";
+    });
+
+    it("offers main's sparkle on the timestamp hover and on a field hover, adding the row or the field", async () => {
+      await mountHovers();
+      const ts = wrapper.find('[data-test="hover-_timestamp"]');
+      const field = wrapper.find('[data-test="hover-field1"]');
+      expect(ts.findAll('[data-test="sparkle-stub"]')).toHaveLength(1);
+      expect(field.findAll('[data-test="sparkle-stub"]')).toHaveLength(1);
+      expect(wrapper.find('[data-test$="-explain"]').exists()).toBe(false);
+      await ts.get('[data-test="sparkle-stub"]').trigger("click");
+      expect(assistantEnv.add.mock.lastCall?.[0]).toMatchObject({
+        objectKind: "log_row",
+        boundOrg: expect.any(String),
+      });
+      expect(assistantEnv.add.mock.lastCall?.[1]).toBe("u|org-a");
+      await field.get('[data-test="sparkle-stub"]').trigger("click");
+      expect(assistantEnv.add.mock.lastCall?.[0]).toMatchObject({ objectKind: "log_field" });
+    });
+
+    it("hides the sparkle while the assistant is not entitled", async () => {
+      assistantEnv.gate.value = "not_entitled";
+      await mountHovers();
+      expect(wrapper.find('[data-test="sparkle-stub"]').exists()).toBe(false);
+    });
   });
 
   describe("Column Visibility Management", () => {

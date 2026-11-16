@@ -140,16 +140,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <LogLineLinkPopover source="drawer" />
         </div>
-        <span class="flex items-center gap-1 max-lg:order-first">
-          <AiEntryButton
-            v-bind="recordDoor('explain')"
-            :appearance="lgUp ? 'button' : 'toolbar-icon'"
-          />
-          <AiEntryButton
-            v-bind="recordDoor('add_to_chat')"
-            :appearance="lgUp ? 'button' : 'toolbar-icon'"
-          />
-        </span>
+        <O2AIContextAddBtn
+          v-if="assistantDoorsShown"
+          data-test="logs-detail-ai-context-btn"
+          @sendToAiChat="addRecordToChat"
+        />
         <!-- Lives in the header rather than inside the JSON tab so the action
              stays reachable from every tab. JsonPreview is told to hide its own
              copy via `hide-view-trace`. -->
@@ -388,12 +383,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </ODropdownItem>
                       </template>
                       <AiEntryButton
-                        v-bind="fieldDoor(row.field, row.value, 'explain')"
+                        v-bind="fieldDoor(row.field, row.value)"
                         appearance="menu-item"
-                      />
-                      <AiEntryButton
-                        v-bind="fieldDoor(row.field, row.value, 'add_to_chat')"
-                        appearance="menu-item"
+                        reveal
+                        @opened="closeOnAdd"
                       />
                       <AiEntryButton
                         v-bind="regexDoor(row.field, row.value)"
@@ -420,10 +413,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :show-braces="false"
                       :query-string="scopeHighlightQuery(highlightQuery, row.field)"
                     /></pre>
-                    <AiEntryButton
-                      v-bind="fieldDoor(row.field, row.value, 'add_to_chat')"
-                      appearance="toolbar-icon"
-                    />
                   </div>
                 </div>
               </template>
@@ -670,6 +659,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import JsonPreview from "./JsonPreview.vue";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { resolveLogSeverity, type KnownLogSeverityLevel } from "@/utils/logs/statusParser";
@@ -711,14 +701,16 @@ import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
-import useBreakpoint from "@/composables/useBreakpoint";
 import {
   logFieldBuild,
+  addDoorToChat,
+  currentUserOrgKey,
   logRowBuild,
   logsDoorBase,
   regexFieldHandoff,
   regexPatternsOpener,
   rowKeyOf,
+  useAssistantDoorShown,
   type LogsDoorBase,
 } from "@/plugins/logs/logsDoors";
 const SEVERITY_BORDER_CLASSES: Record<KnownLogSeverityLevel, string> = {
@@ -752,6 +744,7 @@ export default defineComponent({
     EqualIcon,
     NotEqualIcon,
     JsonPreview,
+    O2AIContextAddBtn,
     AiEntryButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
     ),
@@ -1439,45 +1432,37 @@ export default defineComponent({
       () => store.state.selectedOrganization?.identifier ?? "",
     );
     const doorBoundOrg = computed(() => props.boundOrg ?? loadedOrg.value);
-    const { lgUp } = useBreakpoint();
     const recordDoorBase = (): LogsDoorBase =>
       props.doorContext?.() ?? logsDoorBase(searchObj, store.state, rowData.value);
-    // The drawer stays open on Add: no door emits closeTable.
-    const recordDoor = (verb: "explain" | "add_to_chat") => ({
-      verb,
+    // As on main, Add opens the chat and closes the drawer.
+    const closeOnAdd = (result: { ok: boolean }) => {
+      if (result.ok) emit("closeTable");
+    };
+    const assistantDoorsShown = useAssistantDoorShown();
+    const userOrgKey = currentUserOrgKey();
+    const addRecordToChat = async () =>
+      closeOnAdd(
+        await addDoorToChat(
+          {
+            entryKind: "object_verb",
+            boundOrg: doorBoundOrg.value,
+            objectKind: "log_row",
+            build: logRowBuild(recordDoorBase, { ...rowData.value }),
+          },
+          userOrgKey,
+        ),
+      );
+    const fieldDoor = (field: string, value: unknown) => ({
+      verb: "add_to_chat" as const,
       entryKind: "object_verb" as const,
-      boundOrg: props.boundOrg ?? loadedOrg.value,
-      objectKind: "log_row" as const,
-      label: t(verb === "explain" ? "assistant.entry.explainRecord" : "assistant.entry.addRecord"),
-      tooltip: t(
-        verb === "explain"
-          ? "assistant.entry.tooltip.explainRecord"
-          : "assistant.entry.tooltip.add",
-      ),
-      dataTest:
-        verb === "explain"
-          ? ("ai-entry-log-record-explain" as const)
-          : ("ai-entry-log-record-add" as const),
-      build: logRowBuild(recordDoorBase, { ...rowData.value }),
-      objectKey: rowKeyOf(rowData.value),
-    });
-    const fieldDoor = (field: string, value: unknown, verb: "explain" | "add_to_chat") => ({
-      verb,
-      entryKind: "object_verb" as const,
-      boundOrg: props.boundOrg ?? loadedOrg.value,
+      boundOrg: doorBoundOrg.value,
       objectKind: "log_field" as const,
-      label: t(verb === "explain" ? "assistant.entry.explainField" : "assistant.entry.addField"),
-      tooltip: t(
-        verb === "explain" ? "assistant.entry.tooltip.explainField" : "assistant.entry.tooltip.add",
-      ),
-      dataTest:
-        verb === "explain"
-          ? ("ai-entry-log-field-explain" as const)
-          : ("ai-entry-log-field-add" as const),
+      label: t("assistant.entry.addField"),
+      tooltip: t("assistant.entry.tooltip.add"),
+      dataTest: "ai-entry-log-field-add" as const,
       build: logFieldBuild(recordDoorBase, String(field), value, { ...rowData.value }),
       objectKey: `${rowKeyOf(rowData.value)}:${String(field)}`,
     });
-
     // The regex drawer receives the prompt in its own dock; the sidebar never also gets it.
     const regexDoor = (field: string, value: unknown) => ({
       verb: "ask" as const,
@@ -1581,12 +1566,13 @@ export default defineComponent({
       canSearchAroundStream,
       scopeHighlightQuery,
       doorBoundOrg,
-      lgUp,
       recordDoorBase,
-      recordDoor,
+      assistantDoorsShown,
+      addRecordToChat,
       fieldDoor,
       addSearchTerm,
       closeTable,
+      closeOnAdd,
       showCorrelation,
       showCorrelationHeader,
       correlationScope,

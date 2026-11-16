@@ -22,12 +22,8 @@ import { describe, expect, it } from "vitest";
 const WEB = resolve(__dirname, "../../..");
 const SRC = join(WEB, "src");
 
-// Frozen allow-lists: legacy code that predates the assistant rules. They only shrink (to zero at cutover, WP-15/WP-16).
-const LEGACY_AI_EVENT_FILES = [
-  "composables/useAiChat.ts",
-  "composables/useNLQuery.ts",
-  "services/ai_toolsets.ts",
-];
+// Frozen allow-lists: legacy code that predates the assistant rules. They only shrink; the remaining AI-event entries are live legacy emitters.
+const LEGACY_AI_EVENT_FILES = ["composables/useNLQuery.ts", "services/ai_toolsets.ts"];
 const LEGACY_ASSISTANT_UI = [/^components\/ai-assistant\/welcome\//];
 const AUTO_AWESOME_CALL_SITES = [
   "components/ai-assistant/common/glyphs.ts",
@@ -42,12 +38,10 @@ const AUTO_AWESOME_CALL_SITES = [
   "components/autoobserve/live/LiveIssueBody.vue",
   "components/autoobserve/mock/live/LivePaged.vue",
   "components/alerts/rca/RcaAnalysisBar.vue",
-  "components/autoobserve/v2/TopBar.vue",
   "components/login/firstSourceOptions.ts",
   // Main's folder icon picker lists every registry icon by name; it is a catalog, not an assistant glyph.
   "lib/forms/EmojiPicker/flatIconCatalog.ts",
   "layouts/MainLayout.vue",
-  "components/rum/productAnalytics/FunnelBuilder.vue",
   "components/rum/productAnalytics/funnelParts/FunnelAddStep.vue",
   "components/settings/ServiceIdentitySetup.vue",
   "components/settings/TestModelMatchDialog.vue",
@@ -55,7 +49,6 @@ const AUTO_AWESOME_CALL_SITES = [
   "enterprise/components/onlineEvals/quality/QualityConfigsTable.vue",
   "enterprise/views/AIObservability/AgentSignalDetailPanel.vue",
   "enterprise/views/AIObservability/Index.vue",
-  "layouts/MainLayout.vue",
   "lib/core/EmptyState/presets.ts",
   "lib/core/Icon/OIcon.icons.ts",
   "plugins/logs/SearchResult.vue",
@@ -68,27 +61,22 @@ const AUTO_AWESOME_CALL_SITES = [
 // IW-01 AC 4: the assistant's legacy look may be read only by its own files (plus the frozen legacy consumers below).
 const AI_TOKEN_OWNERS = [
   /^components\/ai-assistant\//,
-  /^components\/O2AIChat/,
+  /^components\/common\/O2AIContextAddBtn\.vue$/,
   /^components\/Header\.vue$/,
   /^lib\/styles\/tokens\//,
   /^styles\/utilities\.css$/,
 ];
 const AI_TOKEN_LEGACY_CONSUMERS = [
   "components/alerts/IncidentTimeline.vue",
-  "components/alerts/QueryEditorDialog.vue",
   "components/autoobserve/v2/ChangesPage.vue",
   "components/autoobserve/mock/v2/ChangesPage.vue",
   "enterprise/components/AIObservability/VersionOverlayChart.vue",
   "enterprise/components/ServiceVersions/RumVersionChart.vue",
   "enterprise/components/ServiceVersions/VersionCompareDrawer.vue",
   "enterprise/components/ServiceVersions/VersionSummaryTiles.vue",
-  "components/common/QueryErrorState.vue",
   "components/dbm/DbmSuggestFixButton.vue",
-  "components/functions/FunctionsToolbar.vue",
-  "components/pipeline/NodeForm/Query.vue",
   "components/pipeline/PipelineEditor.vue",
   "components/QueryEditor.vue",
-  "components/settings/AddRegexPattern.vue",
   "lib/core/Button/OButton.vue",
   "lib/core/EmptyState/EmptyStateIngestionChip.vue",
   "plugins/logs/SearchBar.vue",

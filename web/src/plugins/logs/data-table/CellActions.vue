@@ -38,20 +38,24 @@
         <OTooltip :content="t('logs.cellActions.excludeTerm')" />
       </OButton>
     </template>
-    <template v-if="!hideAi">
-      <AiEntryButton v-bind="fieldDoor('explain')" appearance="toolbar-icon" />
-      <AiEntryButton v-bind="fieldDoor('add_to_chat')" appearance="toolbar-icon" />
-    </template>
+    <O2AIContextAddBtn
+      v-if="!hideAi && doorShown"
+      @send-to-ai-chat="addDoorToChat(fieldDoor(), userOrgKey)"
+      class="size-6! border border-solid border-white"
+      :imageHeight="'14'"
+      :imageWidth="'14'"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from "vue";
+import { computed } from "vue";
 import type { PropType } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -59,11 +63,14 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStore } from "vuex";
-import { logFieldBuild, logsDoorBase, rowKeyOf, type LogsDoorBase } from "@/plugins/logs/logsDoors";
-
-const AiEntryButton = defineAsyncComponent(
-  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
-);
+import {
+  addDoorToChat,
+  currentUserOrgKey,
+  logFieldBuild,
+  logsDoorBase,
+  useAssistantDoorShown,
+  type LogsDoorBase,
+} from "@/plugins/logs/logsDoors";
 
 const props = defineProps({
   /** The org the host loaded this row under; its doors carry it so a stale row is refused. */
@@ -135,27 +142,20 @@ const loadedOrg = useLoadedOrg(
   () => store.state.selectedOrganization?.identifier ?? "",
 );
 
+const doorShown = useAssistantDoorShown();
+const userOrgKey = currentUserOrgKey();
+
 // Field doors attach `{field, value}` with the field name, the stream and range as provenance.
-const fieldDoor = (verb: "explain" | "add_to_chat") => ({
-  verb,
+const fieldDoor = () => ({
   entryKind: "object_verb" as const,
   boundOrg: props.boundOrg ?? loadedOrg.value,
   objectKind: "log_field" as const,
-  label: t(verb === "explain" ? "assistant.entry.explainField" : "assistant.entry.addField"),
-  tooltip: t(
-    verb === "explain" ? "assistant.entry.tooltip.explainField" : "assistant.entry.tooltip.add",
-  ),
-  dataTest:
-    verb === "explain"
-      ? ("ai-entry-log-field-explain" as const)
-      : ("ai-entry-log-field-add" as const),
   build: logFieldBuild(
     () => props.doorContext?.() ?? logsDoorBase(searchObj, store.state, props.row),
     String(props.column.id),
     cellValue.value,
     props.row,
   ),
-  objectKey: `${rowKeyOf(props.row, store.state.zoConfig?.timestamp_column || undefined)}:${String(props.column.id)}`,
 });
 
 const isStreamField = computed(() =>

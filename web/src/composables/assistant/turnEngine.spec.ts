@@ -702,7 +702,7 @@ describe("turnEngine: refusals and retry (HT-03)", () => {
     expect(h.save).not.toHaveBeenCalled();
   });
 
-  it("flips useChatStream.spec.ts:163-171: an offline send is refused{offline} with the snapshot back", async () => {
+  it("an offline send is refused{offline} with the snapshot back", async () => {
     const h = setup();
     withChip(h);
     h.results.push({
@@ -995,7 +995,7 @@ describe("turnEngine: stop (HT-04)", () => {
     expect(h.session().turnMeta.cancelUnconfirmed).toBe(true);
   });
 
-  it("flips O2AIChat.session.spec.ts:485: stopAll(org_switch) aborts and cancels under the captured key", async () => {
+  it("stopAll(org_switch) aborts and cancels under the captured key", async () => {
     const h = setup();
     h.type("why?");
     const run = h.store.send(h.current.sid);
@@ -1561,7 +1561,7 @@ describe("turnEngine: outcomes", () => {
     expect(failedAfterChange(outcomeError(stored!))).toBe(true);
   });
 
-  it("stages Continue with the previous chips and never sends (30 §8.4)", async () => {
+  it("sends Continue with the previous chips at once and leaves the composer as it was", async () => {
     const h = setup();
     h.store.addChip(h.current.sid, {
       id: "s",
@@ -1574,10 +1574,30 @@ describe("turnEngine: outcomes", () => {
     const { run } = await start(h);
     await h.store.stop(h.current.sid);
     await run;
-    h.store.continueTurn(h.current.sid);
-    expect(h.session().composer.text).toBe("Continue the answer above");
-    expect(h.session().composer.chips.map((c) => c.id)).toEqual(["s"]);
-    expect(h.sends).toHaveLength(1);
+    const chipsLeft = h.session().composer.chips.map((c) => c.id);
+    void h.store.continueTurn(h.current.sid);
+    await settle();
+    expect(h.sends).toHaveLength(2);
+    const asked = h
+      .session()
+      .messages.filter((m) => m.role === "user")
+      .at(-1);
+    expect(asked?.content).toBe("Continue the answer above");
+    expect(asked?.chips?.map((c) => c.id)).toEqual(["s"]);
+    expect(h.session().composer.text).toBe("");
+    expect(h.session().composer.chips.map((c) => c.id)).toEqual(chipsLeft);
+  });
+
+  it("keeps a draft in the composer when Continue sends", async () => {
+    const h = setup();
+    const { run } = await start(h);
+    await h.store.stop(h.current.sid);
+    await run;
+    h.type("my draft");
+    void h.store.continueTurn(h.current.sid);
+    await settle();
+    expect(h.sends).toHaveLength(2);
+    expect(h.session().composer.text).toBe("my draft");
   });
 
   it("re-posts a not-saved turn in server mode only", async () => {

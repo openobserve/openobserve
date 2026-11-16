@@ -346,7 +346,6 @@ const COLOR_LITERAL =
 const COLOR_ALLOWLIST = [
   "web/src/components/CodeQueryEditor.vue",
   "web/src/components/EnterpriseUpgradeDialog.vue",
-  "web/src/components/O2AIChat.vue",
   "web/src/components/alerts/FilterGroup.vue",
   "web/src/components/alerts/IncidentDetailDrawer.vue",
   "web/src/components/alerts/IncidentServiceGraph.vue",
@@ -673,20 +672,15 @@ const I18N_IMPORT_BAN = {
   message:
     "Import useI18nTyped from '@/types/i18n' instead (or gt() outside a setup context) — useI18n() returns an unbranded string and defeats the I18nText check.",
 };
-// Outside the folder only the barrel, the flag and the pure entry are public; the public chunk and the flag-off path must never load the runtime.
+// Outside the folder only the barrel and the pure entry are public; the public chunk must never load the runtime.
 const ASSISTANT_IMPORT_BAN = {
-  group: [
-    "@/composables/assistant/*",
-    "!@/composables/assistant/flags",
-    "!@/composables/assistant/pure",
-  ],
+  group: ["@/composables/assistant/*", "!@/composables/assistant/pure"],
   message:
-    "Import the assistant through '@/composables/assistant' (or its /flags and /pure entries); everything else in the folder is private.",
+    "Import the assistant through '@/composables/assistant' (or its /pure entry); everything else in the folder is private.",
 };
 const DARK_MODE_SELECTORS = [
   {
-    selector:
-      "BinaryExpression[operator=/^[!=]==?$/] > MemberExpression[property.name='theme']",
+    selector: "BinaryExpression[operator=/^[!=]==?$/] > MemberExpression[property.name='theme']",
     message:
       "Dark mode has one JS seam: useTheme().isDark or chartColor(). Do not compare store.state.theme (§3.R).",
   },
@@ -703,26 +697,15 @@ const AI_EVENT_SELECTORS = [
   "CallExpression[callee.property.name=/^(track|addAction)$/][arguments.0.quasis.0.value.raw=/^ai_/]",
   "CallExpression[callee.name=/^(track|addAction)$/][arguments.0.quasis.0.value.raw=/^ai_/]",
 ].map((selector) => ({ selector, message: AI_EVENT_MESSAGE }));
-// Legacy emitters of the old ai_* names; they go at cutover (WP-15) and the list only shrinks.
-const LEGACY_AI_EVENT_FILES = [
-  "src/composables/useAiChat.ts",
-  "src/composables/useChatStream.ts",
-  "src/composables/useNLQuery.ts",
-  "src/services/ai_toolsets.ts",
-];
+// Legacy emitters of the old ai_* names; the list only shrinks.
+const LEGACY_AI_EVENT_FILES = ["src/composables/useNLQuery.ts", "src/services/ai_toolsets.ts"];
 const ASSISTANT_UI_FILES = [
   "src/components/ai-assistant/**/*.{vue,ts}",
   "src/views/AssistantView.vue",
   "src/lib/overlay/Sheet/**/*.{vue,ts}",
 ];
-// The legacy chat components predate the assistant rules and are deleted at cutover (00 §2.3).
-const LEGACY_ASSISTANT_UI_FILES = [
-  "src/components/ai-assistant/chat/**",
-  "src/components/ai-assistant/welcome/**",
-  "src/components/ai-assistant/share/AiChatShareDialog.vue",
-  "src/components/ai-assistant/share/AiChatSharedByMe.vue",
-  "src/components/ai-assistant/share/AiChatShareRow.vue",
-];
+// Legacy assistant UI that predates the assistant rules; the list only shrinks.
+const LEGACY_ASSISTANT_UI_FILES = ["src/components/ai-assistant/welcome/**"];
 
 // Read .gitignore to use as ignore patterns
 const gitignore = fs.existsSync(".gitignore")
@@ -1018,18 +1001,6 @@ export default [
       "no-restricted-imports": "off",
       "@intlify/vue-i18n/no-missing-keys": "off",
       "local/no-missing-gt-keys": "off",
-    },
-  },
-  {
-    // WP-03 and WP-08 leave re-export shims here that must deep-import; the barrel would load the runtime on the flag-off path.
-    files: [
-      "src/components/O2AIChat.reducer.ts",
-      "src/components/O2AIChat.history.ts",
-      "src/components/O2AIChat.framing.ts",
-      "src/components/O2AIChat.navigation.ts",
-    ],
-    rules: {
-      "no-restricted-imports": ["error", { paths: [I18N_IMPORT_BAN] }],
     },
   },
   {

@@ -269,7 +269,7 @@ export default defineComponent({
   },
   emit: ["close", "update:list", "update:open"],
   components: {
-    // The assistant's parts load only where the revamp renders them, never in the flag-off chunk.
+    // The assistant's parts load only where the revamp renders them, never in the page's own chunk.
     AiEntryButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
     ),

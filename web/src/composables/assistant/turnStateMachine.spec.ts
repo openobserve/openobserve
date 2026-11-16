@@ -616,7 +616,7 @@ describe("turnReducer: every transition", () => {
     expect(next.effects).toContainEqual({ kind: "meta", patch: { cancelUnconfirmed: true } });
   });
 
-  it("flips O2AIChat.stream.spec.ts:2004: a reader failure mid-stream ends failed{stream_dropped}", () => {
+  it("a reader failure mid-stream ends failed{stream_dropped}", () => {
     // parseStream turns a body read failure into "eof", so the turn never ends silently.
     const next = run(S.writing, { type: "eof", hasTail: false });
     expect(next.turn).toMatchObject({ state: "failed", error: { code: "stream_dropped" } });
@@ -742,7 +742,7 @@ describe("turnStatusText", () => {
     });
   });
 
-  it("flips O2AIChat.stream.spec.ts:1268: an active tool reads as its step label, in a neutral tone", () => {
+  it("an active tool reads as its step label, in a neutral tone", () => {
     const status = turnStatusText(S.tool, meta({ lastFrameAt: 3_000 }), t, 4_000);
     expect(status).toEqual({ line: "Querying default", elapsed: "4 s", tone: "neutral" });
     expect(turnStatusText(S.tool, meta({ lastFrameAt: 8_000 }), t, 12_000)?.line).toBe(
@@ -800,7 +800,7 @@ describe("turnStatusText", () => {
     expect(turnStatusText(S.thinking, caught, t, 12_500)?.line).toBe("Thinking");
   });
 
-  it("flips O2AIChat.reducer.spec.ts tail flush: the final-chunk frame reaches the machine", () => {
+  it("the final-chunk frame reaches the machine", () => {
     const frames: TurnEvent[] = [];
     const parser = createSseParser({
       frame: (frame) => frames.push(frame),

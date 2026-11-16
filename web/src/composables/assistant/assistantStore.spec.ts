@@ -755,7 +755,7 @@ describe("turn actions", () => {
       send: vi.fn().mockResolvedValue(DONE),
       stop: vi.fn(),
       retry: vi.fn().mockResolvedValue(DONE),
-      continueTurn: vi.fn(),
+      continueTurn: vi.fn().mockResolvedValue(DONE),
       retrySave: vi.fn(),
     };
     const approvals = { ...deps.approvals, decide: vi.fn().mockResolvedValue({ status: "done" }) };
@@ -767,7 +767,7 @@ describe("turn actions", () => {
     expect(engine.send).toHaveBeenCalledWith(sid, { mode: "chat" });
     await store.stop(sid);
     await store.retry(sid);
-    store.continueTurn(sid);
+    await store.continueTurn(sid);
     await store.retrySave(sid, "t1");
     await store.decideApproval(sid, { approved: true, scope: "once" });
     await store.resolveConsent(sid, true, true);

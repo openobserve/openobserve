@@ -84,7 +84,7 @@ export default defineComponent({
   components: {
     QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OButton,
-    // The assistant's parts load only where the revamp renders them, never in the flag-off chunk.
+    // The assistant's parts load only where the revamp renders them, never in the page's own chunk.
     AiLabel: defineAsyncComponent(() => import("@/components/ai-assistant/entry/AiLabel.vue")),
     AssistantDiffBlock: defineAsyncComponent(
       () => import("@/components/ai-assistant/evidence/AssistantDiffBlock.vue"),

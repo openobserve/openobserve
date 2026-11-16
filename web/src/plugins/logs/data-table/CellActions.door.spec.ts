@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import i18n from "@/locales";
@@ -29,36 +29,66 @@ vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn().mockResolvedValue
 vi.mock("@/composables/useLogs/searchState", () => ({
   searchState: () => ({ searchObj: { data: { stream: {}, datetime: {} }, meta: {} } }),
 }));
-const doors = vi.hoisted(() => ({ props: [] as Record<string, unknown>[] }));
-vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", async () => {
-  const { defineComponent, h } = await import("vue");
+const env = await vi.hoisted(async () => ({
+  gate: (await import("vue")).ref("available"),
+  add: (await import("vitest")).vi.fn(),
+}));
+vi.mock("@/composables/assistant/pure", async (importOriginal) => {
+  const { computed } = await import("vue");
   return {
-    __esModule: true,
-    default: defineComponent({
-      inheritAttrs: false,
-      setup: (_, { attrs }) => {
-        doors.props.push(attrs);
-        return () => h("span");
-      },
-    }),
+    ...(await importOriginal<typeof import("@/composables/assistant/pure")>()),
+    runtimeHandle: () => ({ value: { store: { state: { userOrgKey: "u|org-a" } } } }),
+    useAssistantGate: () => computed(() => env.gate.value),
   };
 });
+vi.mock("@/plugins/logs/logsDoors", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/plugins/logs/logsDoors")>()),
+  addDoorToChat: env.add,
+}));
+vi.mock("@/components/common/O2AIContextAddBtn.vue", () => ({
+  default: {
+    emits: ["sendToAiChat"],
+    template: '<button data-test="ai-sparkle-stub" @click="$emit(\'sendToAiChat\')" />',
+  },
+}));
 
-describe("CellActions field doors", () => {
-  it("carry the org the host loaded the rows under, not the org at hover time (W3)", async () => {
-    mount(CellActions, {
-      global: { plugins: [i18n] },
-      props: {
-        boundOrg: "org-a",
-        column: { id: "status" },
-        row: { status: "200" },
-        selectedStreamFields: [{ name: "status", isSchemaField: true }],
-      },
-    });
-    await vi.dynamicImportSettled();
-    await flushPromises();
-    expect(doors.props.length).toBeGreaterThan(0);
-    expect(doors.props.every((p) => p.boundOrg === "org-a")).toBe(true);
+const mountActions = (props: Record<string, unknown> = {}) =>
+  mount(CellActions, {
+    global: { plugins: [i18n] },
+    props: {
+      column: { id: "status" },
+      row: { status: "200" },
+      selectedStreamFields: [{ name: "status", isSchemaField: true }],
+      ...props,
+    },
+  });
+
+describe("CellActions AI button (main's sparkle)", () => {
+  beforeEach(() => {
+    env.add.mockClear();
+    env.gate.value = "available";
+  });
+
+  it("adds the field bound to the org the host loaded the rows under, with the key captured at mount (W3)", async () => {
+    const w = mountActions({ boundOrg: "org-a" });
+    await w.get('[data-test="ai-sparkle-stub"]').trigger("click");
+    expect(env.add).toHaveBeenCalledWith(
+      expect.objectContaining({ objectKind: "log_field", boundOrg: "org-a" }),
+      "u|org-a",
+    );
+  });
+
+  it("holds copy, include, exclude and the AI button together in one toolbar, as on main", () => {
+    const bar = mountActions().get(".table-cell-actions");
+    expect(bar.find('[data-test="logs-cell-actions-copy-btn"]').exists()).toBe(true);
+    expect(bar.find('[data-test="log-details-include-field-200"]').exists()).toBe(true);
+    expect(bar.find('[data-test="log-details-exclude-field-200"]').exists()).toBe(true);
+    expect(bar.findAll('[data-test="ai-sparkle-stub"]')).toHaveLength(1);
+  });
+
+  it("hides the AI button while the assistant is not configured", () => {
+    env.gate.value = "not_configured";
+    expect(mountActions().find('[data-test="ai-sparkle-stub"]').exists()).toBe(false);
   });
 });
 

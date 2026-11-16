@@ -67,34 +67,6 @@ export function traceTimeMs(value: unknown): number | undefined {
   return n > 1e14 ? Math.round(n / 1e3) : n;
 }
 
-export function traceRowBuild(base: () => TracesDoorBase, row: Record<string, unknown>) {
-  return async (): Promise<Payload> => {
-    const page = base();
-    const errors = Number(row.errors ?? NaN);
-    const status =
-      typeof row.span_status === "string" && row.span_status
-        ? row.span_status
-        : Number.isFinite(errors)
-          ? errors > 0
-            ? "ERROR"
-            : "OK"
-          : undefined;
-    const duration = Number(row.duration ?? NaN);
-    const spans = Number(row.spans ?? NaN);
-    return (await import("@/utils/assistant/prompts")).buildTracePrompt({
-      org: page.org,
-      traceId: String(row.trace_id ?? ""),
-      service: String(row.service_name ?? ""),
-      ...(Number.isFinite(spans) && { spanCount: spans }),
-      ...(Number.isFinite(duration) && { durationMs: duration / 1000 }),
-      ...(status && { status }),
-      startedAt: traceTimeMs(row._start_time_ns ?? row.start_time ?? row._timestamp),
-      timeZone: page.timeZone,
-      range: page.range,
-    });
-  };
-}
-
 export function tracingSetupBuild() {
   return async (): Promise<Payload> =>
     (await import("@/utils/assistant/prompts")).buildTracingSetupPrompt();

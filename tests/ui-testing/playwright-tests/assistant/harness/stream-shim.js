@@ -219,7 +219,7 @@
       });
     }
     if (/\/api\/[^/]+\/ai\/confirm\//.test(url)) {
-      // The legacy chat posts a string body; axios' fetch adapter (keepalive) passes a Request.
+      // A caller may post a string body; axios' fetch adapter (keepalive) passes a Request.
       const request = new Request(input, init);
       const text = typeof init.body === "string" ? init.body : await request.clone().text().catch(() => "");
       let body = {};

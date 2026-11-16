@@ -175,10 +175,11 @@
               {{ crossLink.name }}
             </ODropdownItem>
           </template>
-          <AiEntryButton v-bind="fieldDoor(key, value[key], 'explain')" appearance="menu-item" />
           <AiEntryButton
-            v-bind="fieldDoor(key, value[key], 'add_to_chat')"
+            v-bind="fieldDoor(String(key), value[key])"
             appearance="menu-item"
+            reveal
+            @opened="closeOnAdd"
           />
           <AiEntryButton
             v-if="regexDoorShown"
@@ -830,20 +831,18 @@ export default {
       const base = logsDoorBase(searchObj, store.state, props.value);
       return props.streamName ? { ...base, stream: props.streamName } : base;
     };
-    // The drawer stays open on Add: nothing here emits closeTable.
-    const fieldDoor = (key: string, fieldValue: unknown, verb: "explain" | "add_to_chat") => ({
-      verb,
+    // As on main, Add opens the chat and closes the drawer around this preview.
+    const closeOnAdd = (result: { ok: boolean }) => {
+      if (result.ok) emit("closeTable");
+    };
+    const fieldDoor = (key: string, fieldValue: unknown) => ({
+      verb: "add_to_chat" as const,
       entryKind: "object_verb" as const,
       boundOrg: props.boundOrg ?? loadedOrg.value,
       objectKind: "log_field" as const,
-      label: t(verb === "explain" ? "assistant.entry.explainField" : "assistant.entry.addField"),
-      tooltip: t(
-        verb === "explain" ? "assistant.entry.tooltip.explainField" : "assistant.entry.tooltip.add",
-      ),
-      dataTest:
-        verb === "explain"
-          ? ("ai-entry-log-field-explain" as const)
-          : ("ai-entry-log-field-add" as const),
+      label: t("assistant.entry.addField"),
+      tooltip: t("assistant.entry.tooltip.add"),
+      dataTest: "ai-entry-log-field-add" as const,
       build: logFieldBuild(fieldDoorBase, key, fieldValue, props.value),
       objectKey: `${rowKeyOf(props.value)}:${key}`,
     });
@@ -988,6 +987,7 @@ export default {
       regexHandoff,
       handoffSelection,
       fieldDoor,
+      closeOnAdd,
       config,
       showMenu,
       menuX,

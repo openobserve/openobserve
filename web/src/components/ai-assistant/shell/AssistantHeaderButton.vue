@@ -166,21 +166,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { AssistantSession, GateReason } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
 
-export type HeaderButtonState =
-  "loading" | "hidden" | "idle" | "open" | "working" | "needs_you" | "unread" | "locked" | "off";
+export type HeaderButtonState = "loading" | "hidden" | "idle" | "open" | "locked" | "off";
 
 /** Hidden turns raise one quiet toast; the header region is the one speaker, so the toast is silent. */
 export const HEADER_TOAST_MS = 6_000;
-
-const AT_REST: ReadonlySet<string> = new Set(["idle", "done", "failed", "refused", "stopped"]);
 
 interface HeaderView {
   state: HeaderButtonState;
   name: I18nText;
   tooltip: I18nText;
   badge: "locked" | "notSetUp" | null;
-  /** Only another org's chats lit it. */
-  otherOrg?: boolean;
   /** The pitch or setup card a click opens instead of the container. */
   dialog: GateReason | null;
 }
@@ -193,10 +188,6 @@ function needsYou(session: AssistantSession): boolean {
     !!session.pendingApproval ||
     !!session.pendingConsent
   );
-}
-
-function isRunning(session: AssistantSession): boolean {
-  return !AT_REST.has(session.turn.state);
 }
 </script>
 
@@ -221,12 +212,12 @@ import {
   openAssistant,
   openWindowsOf,
   sessionView,
+  setLauncherDismissed,
   useAssistantCapability,
   useAssistantHistory,
   useAssistantName,
   useAssistantOpenChord,
   useAssistantPlacement,
-  useAssistantRuns,
   useAssistantStore,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -255,7 +246,6 @@ const { isDark } = useTheme();
 const { product } = useAssistantName();
 const store = useAssistantStore();
 const history = useAssistantHistory();
-const runs = useAssistantRuns();
 const capability = useAssistantCapability();
 const placement = useAssistantPlacement(store);
 const lockedPanel = useLockedPanel();
@@ -290,16 +280,13 @@ const lockedGate = computed<GateReason>(() =>
   capability.gate.value === "off_for_org" ? "off_for_org" : "no_permission",
 );
 
-// A chat another tab or device lights may be known only by its history row; else no title is claimed.
-function knownTitle(sid: string | null): I18nText | null {
-  if (!sid) return null;
-  const session = store.state.sessions[sid];
-  if (session) return session.title ?? t("assistant.thread.newChatTitle");
-  return history.rows.value.find((row) => row.sid === sid)?.title ?? null;
-}
-
+// A chat another tab or device lights may be known only by its history row.
 function titleOf(sid: string | null): I18nText {
-  return knownTitle(sid) ?? t("assistant.thread.newChatTitle");
+  const session = sid ? store.state.sessions[sid] : undefined;
+  if (session) return session.title ?? t("assistant.thread.newChatTitle");
+  return (
+    history.rows.value.find((row) => row.sid === sid)?.title ?? t("assistant.thread.newChatTitle")
+  );
 }
 
 function plain(state: HeaderButtonState, name: I18nText, tooltip: I18nText): HeaderView {
@@ -350,70 +337,11 @@ function gateView(): HeaderView | null {
   return null;
 }
 
+// Chat activity never restyles the button; only the container and the gate do (owner decision).
 function lightView(): HeaderView {
-  const light = store.headerLight.value;
-  const p = { product };
-  const open = visible.value;
-  if (light.state === "needs_you") {
-    const waiting = runs.needsCount.value || mine.value.filter(needsYou).length;
-    const session = light.sid ? store.state.sessions[light.sid] : undefined;
-    const consent = session?.turn.state === "awaiting_consent" || !!session?.pendingConsent;
-    return {
-      ...plain(
-        "needs_you",
-        waiting > 0
-          ? t(
-              open
-                ? "assistant.header.needsYouCountNameOpen"
-                : "assistant.header.needsYouCountName",
-              { ...p, count: waiting },
-            )
-          : t(open ? "assistant.header.needsYouNameOpen" : "assistant.header.needsYouName", p),
-        consent ? t("assistant.turn.waitingConsent") : t("assistant.notice.decision"),
-      ),
-    };
-  }
-  if (light.state === "working") {
-    const running = mine.value.filter(isRunning).length;
-    const name = t(
-      open ? "assistant.header.answeringNameOpen" : "assistant.header.answeringName",
-      p,
-    );
-    const title = knownTitle(light.sid);
-    return {
-      ...plain(
-        "working",
-        name,
-        running > 1
-          ? t("assistant.header.stateRunningCount", { count: running }, running)
-          : title
-            ? t("assistant.header.stateWorking", { title })
-            : name,
-      ),
-    };
-  }
-  if (light.state === "unread") {
-    const title = { title: titleOf(light.sid) };
-    return light.failed
-      ? {
-          ...plain(
-            "unread",
-            t("assistant.header.failedName", p),
-            t("assistant.header.stateFailed", title),
-          ),
-        }
-      : {
-          ...plain(
-            "unread",
-            t("assistant.header.readyName", p),
-            t("assistant.header.stateDone", title),
-          ),
-        };
-  }
-  const others = otherOrgView();
-  if (others) return others;
-  if (light.state === "open" || open) return openView();
-  return plain("idle", t("assistant.header.tooltip", p), t("assistant.header.tooltip", p));
+  if (store.headerLight.value.state === "open" || visible.value) return openView();
+  const name = t("assistant.header.tooltip", { product });
+  return plain("idle", name, name);
 }
 
 // The label names what a click does: close the sidebar, or bring windows-only users to a sidebar chat.
@@ -429,25 +357,6 @@ function openView(): HeaderView {
     return plain("open", name, name);
   }
   return plain("open", t("assistant.header.nameOpen", p), t("assistant.header.stateOpen", p));
-}
-
-// Another org's chats count in the light; a click lists them, never opens them in place (PO B51).
-function otherOrgView(): HeaderView | null {
-  const rows = runs.otherOrg.value;
-  if (!rows.length) return null;
-  const p = { product };
-  const waiting = rows.filter((row) => row.group === "needs_you").length;
-  if (waiting)
-    return {
-      ...plain(
-        "needs_you",
-        t("assistant.header.needsYouCountName", { ...p, count: waiting }),
-        t("assistant.notice.decision"),
-      ),
-      otherOrg: true,
-    };
-  const name = t("assistant.header.answeringName", p);
-  return { ...plain("working", name, name), otherOrg: true };
 }
 
 function buttonEl(): HTMLElement | null {
@@ -471,7 +380,7 @@ function onClick(): void {
     }
     return;
   }
-  if (current.otherOrg) return void runs.requestOpen(buttonEl());
+  setLauncherDismissed(store.state.userOrgKey, false);
   if (toggleSidebar()) return;
   openOnLitSession(buttonEl());
 }

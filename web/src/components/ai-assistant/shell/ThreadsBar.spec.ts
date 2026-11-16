@@ -22,6 +22,8 @@ import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
+import { setLauncherDismissed } from "@/composables/assistant/prefs";
+
 import ThreadsBar from "./ThreadsBar.vue";
 
 const mocks = vi.hoisted(() => ({
@@ -47,10 +49,14 @@ vi.mock("@tanstack/vue-query", async () => {
 vi.mock("@/composables/assistant", async () => {
   const { computed, reactive: live } = await import("vue");
   const rows = live(mocks.rows);
+  const prefs = await import("@/composables/assistant/prefs");
   return {
+    isLauncherDismissed: prefs.isLauncherDismissed,
+    launcherDismissalVersion: prefs.launcherDismissalVersion,
+    setLauncherDismissed: prefs.setLauncherDismissed,
     useAssistantRuns: () => ({ rows: computed(() => rows.value), open: vi.fn() }),
     useAssistantStore: () => ({
-      state: { sessions: { s1: { sid: "s1" } } },
+      state: { sessions: { s1: { sid: "s1" } }, userOrgKey: "u1:o1" },
       floatChat: mocks.floatChat,
       open: mocks.open,
       openSession: vi.fn(() => Promise.resolve()),
@@ -117,6 +123,25 @@ describe("ThreadsBar", () => {
   afterEach(() => {
     config.isEnterprise = original;
     document.body.innerHTML = "";
+    localStorage.clear();
+  });
+
+  it("hides the launcher in this browser once dismissed, until the assistant is opened again", async () => {
+    const wrapper = mountBar();
+    await flushPromises();
+    await wrapper.get('[data-test="assistant-launcher"]').trigger("pointerenter");
+    await wrapper.get('[data-test="assistant-launcher-dismiss"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="threads-bar"]').exists()).toBe(false);
+    expect(mocks.open).not.toHaveBeenCalled();
+    expect(mocks.floatChat).not.toHaveBeenCalled();
+    wrapper.unmount();
+    const again = mountBar();
+    await flushPromises();
+    expect(again.find('[data-test="threads-bar"]').exists()).toBe(false);
+    setLauncherDismissed("u1:o1", false);
+    await flushPromises();
+    expect(again.find('[data-test="assistant-launcher"]').exists()).toBe(true);
   });
 
   it("badges every listed chat and previews the waiting one first", async () => {

@@ -118,7 +118,7 @@ describe("toAssistantError: the thirteen wire shapes", () => {
     });
   });
 
-  it("flips O2AIChat.stream.spec.ts:1288: an error frame is a typed provider_error, never answer text", () => {
+  it("an error frame is a typed provider_error, never answer text", () => {
     const frame = {
       type: "error",
       error_type: "llm_overload",

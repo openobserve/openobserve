@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
             <img
               data-test="header-openobserve-logo"
-              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer object-contain object-left transition-opacity duration-200 hover:opacity-80 max-md:max-w-24"
+              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
               :src="
                 getImageURL(
                   isDark
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
-            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer object-contain object-left transition-opacity duration-200 hover:opacity-80 max-md:max-w-24"
+            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
             :src="
               getImageURL(
                 isDark
@@ -144,11 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
-    <!-- On a phone the switcher is the one item that may give way, so the assistant and account stay on screen -->
     <div
       v-if="securityAccess.canOpen.value"
-      class="ms-3 flex shrink-0 items-center max-md:ms-1 max-md:min-w-0 max-md:shrink max-md:overflow-hidden"
-      data-test="header-solution-switcher-slot"
+      class="ms-3 flex shrink-0 items-center md:max-xl:min-w-0 md:max-xl:shrink"
     >
       <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
     </div>
@@ -156,10 +154,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
     <div class="min-w-0 flex-1" />
 
-    <!-- RIGHT SIDE: Controls; from md up only the decision strip gives way, so no control is pushed off-screen -->
+    <!-- RIGHT SIDE: Controls -->
     <div
-      class="group/header-right flex shrink-0 items-center justify-end gap-1 pe-3 *:shrink-0 md:min-w-0 md:shrink"
-      data-test="header-right"
+      class="flex shrink-0 items-center justify-end gap-1 pe-3 md:max-xl:min-w-0 md:max-xl:shrink"
     >
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
       <SampleDataHeaderChip class="me-2" />
@@ -185,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- HEADER MENU: Contains all header navigation and user controls -->
-      <div class="header-menu flex items-center gap-x-2 *:shrink-0 md:min-w-0 md:shrink!">
+      <div class="header-menu flex items-center gap-x-2 md:max-xl:min-w-0">
         <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ingestion_quota_used >= 85"
@@ -217,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'primary'
           "
           size="xs"
-          class="max-lg:hidden"
+          class="max-md:hidden md:max-xl:min-w-0"
           data-test="upgrade-to-enterprise-btn"
           @click="openEnterpriseDialog"
         >
@@ -242,10 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="handleOrgSelection"
         />
 
-        <div
-          class="header-utility-icons flex items-center gap-x-2 *:shrink-0 md:min-w-0 md:shrink!"
-          data-test="header-utility-icons"
-        >
+        <div class="header-utility-icons flex items-center gap-x-2 md:max-xl:shrink-0">
           <!-- AI ASSISTANT: leads the utility-icon cluster; a license that lacks it shows the lock. -->
           <OButton
             v-if="aiLicenseLocked"

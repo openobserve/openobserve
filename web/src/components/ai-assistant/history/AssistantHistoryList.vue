@@ -327,7 +327,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @navigate="(event) => keys.onKeydown(event, item.row.sid)"
                 @rename="(sid, title) => history.rename(sid, title)"
                 @pin="(sid, pinned) => history.pin(sid, pinned)"
-                @float="floatRow"
                 @stop="stopRow"
                 @share="shareRow"
                 @export="(sid) => exporter.exportChat(sid, 'markdown')"
@@ -371,7 +370,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @navigate="(event) => keys.onKeydown(event, row.sid)"
                   @rename="(sid, title) => history.rename(sid, title)"
                   @pin="(sid, pinned) => history.pin(sid, pinned)"
-                  @float="floatRow"
                   @stop="stopRow"
                   @share="shareRow"
                   @export="(sid) => exporter.exportChat(sid, 'markdown')"
@@ -539,7 +537,6 @@ import AssistantShareControl from "@/components/ai-assistant/share/AssistantShar
 import {
   groupOf,
   LOCAL_CAP,
-  MAX_FLOATING_CHATS,
   registerHistoryTarget,
   runAgentKey,
   useAssistantCapability,
@@ -550,7 +547,6 @@ import {
   type RunRow,
 } from "@/composables/assistant";
 import { rosterOffersChoice, homeQueryFrom } from "@/composables/assistant/pure";
-import useBreakpoint from "@/composables/useBreakpoint";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -594,7 +590,6 @@ const history = useAssistantHistory();
 const capability = useAssistantCapability();
 const store = useAssistantStore();
 const runs = useAssistantRuns();
-const { lgUp } = useBreakpoint();
 const exporter = useChatExport();
 const router = useRouter();
 const route = useRoute();
@@ -842,7 +837,6 @@ function rowProps(row: HistoryRow) {
     org: run?.otherOrg ? orgLabel(run.org) : null,
     agentIcon: agentIcon(row),
     sharedAs: row.share?.visibility ?? shareVisibility.value.get(row.sid) ?? null,
-    floatBlocked: floatBlocked.value,
     current: row.sid === props.currentSid,
     mode: props.mode,
     pending: history.pending[row.sid] ?? null,
@@ -855,14 +849,6 @@ function rowProps(row: HistoryRow) {
     quietStatus: statusOf(row) === "needs_you",
   };
 }
-
-const floatBlocked = computed(() =>
-  store.state.shell.windows.length >= MAX_FLOATING_CHATS
-    ? t("assistant.shell.placeWindowLimit")
-    : !lgUp.value
-      ? t("assistant.history.floatNeedsRoom")
-      : undefined,
-);
 
 function agentIcon(row: HistoryRow): IconName | null {
   if (!offersAgents.value) return null;
@@ -1026,12 +1012,6 @@ async function openRow(sid: Sid): Promise<void> {
     ? store.openInWindow(windowSid, { sid })
     : store.openSession({ sid }, { focus: true });
   await opening.catch(() => undefined);
-}
-
-async function floatRow(sid: Sid): Promise<void> {
-  if (!store.state.sessions[sid])
-    await store.openSession({ sid }, { focus: false }).catch(() => undefined);
-  store.floatChat(sid);
 }
 
 async function stopRow(sid: Sid): Promise<void> {

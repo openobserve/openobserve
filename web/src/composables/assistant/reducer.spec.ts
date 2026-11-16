@@ -1338,7 +1338,7 @@ describe("reduce: typed phases (live)", () => {
     expect(answerProgress(state)).toEqual({ steps: 2, partial: false });
   });
 
-  it("flips O2AIChat.stream.spec.ts:653: text before a trailing tool_call is kept", () => {
+  it("text before a trailing tool_call is kept", () => {
     const state = makeState();
     reduce(state, { type: "message_delta", content: "let me check" }, live());
     reduce(state, { type: "tool_call", tool: "A", call_id: "c1" }, live());
@@ -1348,7 +1348,7 @@ describe("reduce: typed phases (live)", () => {
     expect(answerProgress(state).partial).toBe(true);
   });
 
-  it("flips O2AIChat.stream.spec.ts:1723: a turn no container shows still records its steps", () => {
+  it("a turn no container shows still records its steps", () => {
     const state = makeState();
     reduce(
       state,

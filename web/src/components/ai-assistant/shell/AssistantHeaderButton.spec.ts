@@ -18,18 +18,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { gateLearnOpen } from "@/components/ai-assistant/gate/AssistantGateState.vue";
 import type { AssistantCapability, GateCode } from "@/composables/assistant";
+import { isLauncherDismissed, setLauncherDismissed } from "@/composables/assistant/prefs";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
 
 import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
-import { fakeRuns, runRow } from "../runs/runsTestKit";
 import AssistantHeaderButton from "./AssistantHeaderButton.vue";
 import { closeLockedPanel, useLockedPanel } from "./lockedPanel";
 
-const { fake, openAssistant, track, toast, lg, otherRuns } = vi.hoisted(() => ({
+const { fake, openAssistant, track, toast, lg } = vi.hoisted(() => ({
   lg: { value: true },
   fake: { current: null as any },
-  otherRuns: { current: null as any },
   openAssistant: vi.fn(async () => ({ ok: true })),
   track: vi.fn(),
   toast: vi.fn(),
@@ -52,7 +51,6 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantStore: () => fake.current.store,
   useAssistantCapability: () => fake.current.handle,
   useAssistantHistory: () => fake.current.history,
-  useAssistantRuns: () => otherRuns.current,
   openAssistant,
 }));
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
@@ -63,10 +61,6 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
   toast,
 }));
-
-beforeEach(() => {
-  otherRuns.current = fakeRuns().runs;
-});
 
 function setup(
   gate: GateCode = "available",
@@ -340,96 +334,36 @@ describe("AssistantHeaderButton light", () => {
     expect(openAssistant).not.toHaveBeenCalled();
   });
 
-  it("shows working with the title, and a count for more than one", async () => {
+  it.each<[string, (store: any, sid: string) => void]>([
+    [
+      "needs you",
+      (store, sid) =>
+        (store.state.sessions[sid].turn = { state: "awaiting_approval", callId: "c1" }),
+    ],
+    [
+      "answering",
+      (store, sid) => (store.state.sessions[sid].turn = { state: "responding.writing" }),
+    ],
+    [
+      "unread",
+      (store, sid) => {
+        store.state.sessions[sid].turn = { state: "done", saved: "local" };
+        store.state.sessions[sid].unread = true;
+      },
+    ],
+  ])("looks and reads like idle while a chat is %s", async (_n, light) => {
     const { wrapper, store } = setup();
-    const a = session(store, "Checkout 5xx");
-    store.state.sessions[a].turn = { state: "responding.writing" };
-    await flushPromises();
-    expect(button(wrapper).attributes("data-state")).toBe("working");
-    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, answering");
-    expect(tooltip(wrapper)).toBe("Answering: Checkout 5xx");
+    const sid = session(store, "Hidden");
     store.setActive(null);
-    const b = session(store, "Payments");
-    store.state.sessions[b].turn = { state: "queued" };
     await flushPromises();
-    expect(tooltip(wrapper)).toBe("2 answers running");
-  });
-
-  it("names another tab's answer by its history row, else claims no title", async () => {
-    const remote = { state: "working" as const, sid: "0190ffff-c3d4-7e5f-8a9b-000000000001" };
-    const unknown = setup("available", {}, remote);
+    const idle = button(wrapper).classes();
+    light(store, sid);
     await flushPromises();
-    expect(button(unknown.wrapper).attributes("data-state")).toBe("working");
-    expect(tooltip(unknown.wrapper)).toBe("O2 Assistant, answering");
-    unknown.wrapper.unmount();
-    const known = setup("available", { persistence: false }, remote);
-    known.store.setIdentity({ userOrgKey: "k1", org: "default" });
-    fake.current.db.rows.set(1, {
-      id: 1,
-      timestamp: new Date().toISOString(),
-      title: "Remote chat",
-      messages: [{ role: "user", content: raw("q") }],
-      sessionId: remote.sid,
-      userOrgKey: "k1",
-    });
-    fake.current.history.ensureLoaded();
-    await flushPromises();
-    expect(tooltip(known.wrapper)).toBe("Answering: Remote chat");
-  });
-
-  it("shows no count badge for another tab's waiting chat", async () => {
-    const { wrapper } = setup("available", {}, { state: "needs_you", sid: "elsewhere" });
-    await flushPromises();
-    expect(button(wrapper).attributes("data-state")).toBe("needs_you");
-    expect(wrapper.find('[data-test="assistant-header-status-light"]').exists()).toBe(false);
-  });
-
-  it("ranks needs you above working and shows the count", async () => {
-    const { wrapper, store } = setup();
-    const a = session(store, "Running");
-    store.state.sessions[a].turn = { state: "queued" };
-    store.setActive(null);
-    const b = session(store, "Delete alerts");
-    store.state.sessions[b].turn = { state: "awaiting_approval", callId: "c1" };
-    await flushPromises();
-    expect(button(wrapper).attributes("data-state")).toBe("needs_you");
-    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, needs you, 1 waiting");
-    expect(tooltip(wrapper)).toBe("Needs you");
-    expect(wrapper.find('[data-test="assistant-header-status-light"]').exists()).toBe(false);
-  });
-
-  it("names the visible needs-you count so the label matches the content", async () => {
-    const { wrapper, store } = setup();
-    for (const title of ["Delete alerts", "Mute monitors"]) {
-      const sid = session(store, title);
-      store.state.sessions[sid].turn = { state: "awaiting_approval", callId: title };
-    }
-    await flushPromises();
-    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, needs you, 2 waiting");
-  });
-
-  it("uses the one consent key when the decision is about paid usage", async () => {
-    const { wrapper, store } = setup();
-    const a = session(store, "Costly");
-    store.state.sessions[a].turn = { state: "awaiting_consent" };
-    await flushPromises();
-    expect(tooltip(wrapper)).toBe("Waiting for your decision on paid usage");
-  });
-
-  it("shows an unread answer, ready or failed, until a container shows it", async () => {
-    const { wrapper, store } = setup();
-    const a = session(store, "Latency");
-    store.state.sessions[a].turn = { state: "done", saved: "local" };
-    store.state.sessions[a].unread = true;
-    await flushPromises();
-    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, answer ready");
-    expect(tooltip(wrapper)).toBe("Answer ready: Latency");
-    store.state.sessions[a].turn = {
-      state: "failed",
-      error: { code: "unknown", phase: "post_admission", retryable: true, action: "retry" },
-    };
-    await flushPromises();
-    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, last answer failed");
+    const el = button(wrapper);
+    expect(el.attributes("aria-label")).toBe("O2 Assistant");
+    expect(tooltip(wrapper)).toBe("O2 Assistant");
+    expect(el.attributes("data-state")).toBe("idle");
+    expect(el.classes()).toEqual(idle);
   });
 
   it("opens the container on the lit session", async () => {
@@ -445,6 +379,14 @@ describe("AssistantHeaderButton light", () => {
     expect(openAssistant).toHaveBeenCalledWith(expect.objectContaining({ thread: "current" }));
   });
 
+  it("brings a dismissed launcher back when it opens the assistant", async () => {
+    const { wrapper, store } = setup();
+    setLauncherDismissed(store.state.userOrgKey, true);
+    expect(isLauncherDismissed(store.state.userOrgKey)).toBe(true);
+    await button(wrapper).trigger("click");
+    expect(isLauncherDismissed(store.state.userOrgKey)).toBe(false);
+  });
+
   it("fires ai_status_light once per change", async () => {
     const { store } = setup();
     const a = session(store, "x");
@@ -455,47 +397,6 @@ describe("AssistantHeaderButton light", () => {
     expect(track.mock.calls.filter(([name]) => name === "ai_status_light")).toEqual([
       ["ai_status_light", { state: "working" }],
     ]);
-  });
-});
-
-describe("AssistantHeaderButton other orgs (PO B51)", () => {
-  const other = (over = {}) => runRow("x", { otherOrg: true, org: "acme", ...over });
-
-  it("counts another org's chats in the light and lists them on click, never opening one", async () => {
-    otherRuns.current = fakeRuns([other()]).runs;
-    const { wrapper } = setup();
-    expect(button(wrapper).attributes("data-state")).toBe("working");
-    await button(wrapper).trigger("click");
-    await flushPromises();
-    expect(otherRuns.current.requestOpen).toHaveBeenCalled();
-    expect(openAssistant).not.toHaveBeenCalled();
-  });
-
-  it("shows a waiting decision of another org as needs you, with its count", () => {
-    const waiting = other({ group: "needs_you", status: "needsApproval", request: "x" });
-    otherRuns.current = fakeRuns([waiting]).runs;
-    const { wrapper } = setup();
-    expect(button(wrapper).attributes("data-state")).toBe("needs_you");
-    expect(button(wrapper).attributes("aria-label")).toContain("1 waiting");
-  });
-
-  it("leaves a light of this org's chats alone", async () => {
-    otherRuns.current = fakeRuns([other()]).runs;
-    const { wrapper } = setup("available", {}, { state: "working", sid: "here" });
-    await button(wrapper).trigger("click");
-    await flushPromises();
-    expect(otherRuns.current.requestOpen).not.toHaveBeenCalled();
-    expect(openAssistant).toHaveBeenCalled();
-  });
-
-  it("counts one decision once, however many chats wait on it", async () => {
-    const waiting = { group: "needs_you", status: "needsApproval", request: "c" } as const;
-    otherRuns.current = fakeRuns([
-      runRow("a", waiting),
-      runRow("b", { ...waiting, request: "d" }),
-    ]).runs;
-    const { wrapper } = setup("available", {}, { state: "needs_you", sid: "a" });
-    expect(button(wrapper).attributes("aria-label")).toContain("2 waiting");
   });
 });
 

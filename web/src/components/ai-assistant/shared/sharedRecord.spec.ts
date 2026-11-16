@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { StoredTurn } from "@/components/O2AIChat.history";
+import type { StoredTurn } from "@/composables/assistant/pure";
 
 import { projectSharedRecord, scrubModelNames, sharedMarkdown } from "./sharedRecord";
 

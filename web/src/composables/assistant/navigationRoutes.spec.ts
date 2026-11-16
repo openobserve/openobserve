@@ -13,15 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 
+import { raw, type TranslateFn } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/formatters";
 
 import {
   MARKDOWN_LINK_ROUTES,
   ROUTE_ID_KEYS,
   buildNavigationRoute,
+  generateNavigationFromToolResult,
   isFirstPartyTool,
   rebuildMarkdownTarget,
 } from "./navigationRoutes";
@@ -350,5 +352,172 @@ describe("isFirstPartyTool", () => {
     expect(isFirstPartyTool("mcp__github__create_issue")).toBe(false);
     expect(isFirstPartyTool("server.createThing")).toBe(false);
     expect(isFirstPartyTool(undefined)).toBe(false);
+  });
+});
+
+const t = ((key: string, params?: Record<string, any>) =>
+  raw(params ? `${key}:${JSON.stringify(params)}` : key)) as unknown as TranslateFn;
+
+const searchArgs = (over: Record<string, any> = {}) => ({
+  stream_type: "logs",
+  request_body: { query: { sql: "SELECT * FROM default", start_time: 1, end_time: 2 } },
+  ...over,
+});
+
+describe("generateNavigationFromToolResult", () => {
+  it("returns null without callArgs", () => {
+    expect(generateNavigationFromToolResult("Search", null, {}, t)).toBeNull();
+  });
+
+  it("builds a load_query action from a search tool", () => {
+    const action = generateNavigationFromToolResult("Search", searchArgs(), {}, t)!;
+    expect(action.action).toBe("load_query");
+    expect(action.resource_type).toBe("logs");
+    expect(action.target).toMatchObject({
+      query: "SELECT * FROM default",
+      sql_mode: true,
+      from: 1,
+      to: 2,
+      stream: ["default"],
+    });
+  });
+
+  it("prefers an explicit stream_name over the FROM clause", () => {
+    const action = generateNavigationFromToolResult(
+      "Search",
+      searchArgs({ stream_name: "a,b" }),
+      {},
+      t,
+    )!;
+    expect(action.target.stream).toEqual(["a", "b"]);
+  });
+
+  it("carries a VRL function through when present", () => {
+    const args = searchArgs();
+    args.request_body.query.functionContent = ".x = 1";
+    expect(generateNavigationFromToolResult("Search", args, {}, t)!.target.functionContent).toBe(
+      ".x = 1",
+    );
+  });
+
+  it("returns null when the search has no time range", () => {
+    const args = searchArgs();
+    delete (args.request_body.query as any).end_time;
+    expect(generateNavigationFromToolResult("Search", args, {}, t)).toBeNull();
+  });
+
+  it("returns null when a search has sql but no derivable stream, never falling through", () => {
+    const args = searchArgs({
+      request_body: { query: { sql: "SELECT 1", start_time: 1, end_time: 2 } },
+    });
+    expect(generateNavigationFromToolResult("createAlert", args, { alert_id: "a1" }, t)).toBeNull();
+  });
+
+  it("titles unknown stream types", () => {
+    const action = generateNavigationFromToolResult(
+      "Search",
+      searchArgs({ stream_type: "enrichment" }),
+      {},
+      t,
+    )!;
+    expect(action.label).toContain("Enrichment");
+  });
+
+  it("returns null when the tool name matches no CRUD prefix", () => {
+    expect(generateNavigationFromToolResult("listThings", { a: 1 }, { id: "x" }, t)).toBeNull();
+  });
+
+  // A deleted resource has no page left to open, so a "View" link would lead to a missing record.
+  it("returns null for a delete tool even when the id is known", () => {
+    expect(
+      generateNavigationFromToolResult("deleteAlert", { alert_id: "a1" }, { alert_id: "a1" }, t),
+    ).toBeNull();
+    expect(
+      generateNavigationFromToolResult("DeleteDashboard", { dashboard_id: "d1" }, {}, t),
+    ).toBeNull();
+  });
+
+  it("still builds navigate_direct for get and update tools", () => {
+    expect(generateNavigationFromToolResult("getAlert", { alert_id: "a1" }, {}, t)?.action).toBe(
+      "navigate_direct",
+    );
+    expect(
+      generateNavigationFromToolResult("updateDashboard", { dashboard_id: "d1" }, {}, t)?.action,
+    ).toBe("navigate_direct");
+  });
+
+  it("builds navigate_direct from a {resource}_id in the response", () => {
+    const action = generateNavigationFromToolResult(
+      "createAlert",
+      { request_body: {} },
+      { alert_id: "a1", name: "n" },
+      t,
+    )!;
+    expect(action.action).toBe("navigate_direct");
+    expect(action.resource_type).toBe("alert");
+    expect(action.target).toEqual({ alert_id: "a1", name: "n", folder: "default" });
+  });
+
+  it("accepts the camelCase id variant", () => {
+    const action = generateNavigationFromToolResult(
+      "getDashboard",
+      { request_body: {} },
+      { dashboardId: "d1" },
+      t,
+    )!;
+    expect(action.target.dashboard_id).toBe("d1");
+  });
+
+  it("omits folder for resources that do not use one", () => {
+    const action = generateNavigationFromToolResult(
+      "getPipeline",
+      { request_body: {} },
+      { pipeline_id: "p1" },
+      t,
+    )!;
+    expect(action.target.folder).toBeUndefined();
+  });
+
+  it("unwraps a JSON string response and its versioned payload", () => {
+    const action = generateNavigationFromToolResult(
+      "getDashboard",
+      { request_body: {} },
+      { response: JSON.stringify({ v5: { dashboard_id: "d5" } }) },
+      t,
+    )!;
+    expect(action.target.dashboard_id).toBe("d5");
+  });
+
+  it("unwraps the MCP content[0].text shape", () => {
+    const action = generateNavigationFromToolResult(
+      "getDashboard",
+      { request_body: {} },
+      { content: [{ text: JSON.stringify({ v8: { dashboard_id: "d8" } }) }] },
+      t,
+    )!;
+    expect(action.target.dashboard_id).toBe("d8");
+  });
+
+  it("returns null when the MCP text is unparseable", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(
+      generateNavigationFromToolResult(
+        "getDashboard",
+        { request_body: {} },
+        { content: [{ text: "not json" }] },
+        t,
+      ),
+    ).toBeNull();
+    warn.mockRestore();
+  });
+
+  it("lets callArgs.request_body override the parsed response", () => {
+    const action = generateNavigationFromToolResult(
+      "updateAlert",
+      { alert_id: "fromArgs", request_body: { alert_id: "fromBody" } },
+      { alert_id: "fromResponse" },
+      t,
+    )!;
+    expect(action.target.alert_id).toBe("fromBody");
   });
 });

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    v-if="hasItems"
+    v-if="hasItems && !launcherDismissed"
     ref="root"
     :aria-label="t('assistant.threadsBar.label')"
     data-test="threads-bar"
@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :expanded="expanded"
       @toggle="toggle"
       @restore="openThread"
+      @dismiss="setLauncherDismissed(store.state.userOrgKey, true)"
     />
   </section>
 </template>
@@ -142,7 +143,13 @@ import { useStore } from "vuex";
 
 import config from "@/aws-exports";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
-import { useAssistantRuns, useAssistantStore } from "@/composables/assistant";
+import {
+  isLauncherDismissed,
+  launcherDismissalVersion,
+  setLauncherDismissed,
+  useAssistantRuns,
+  useAssistantStore,
+} from "@/composables/assistant";
 import { fullThreadLocation, isHomeAskShown } from "@/composables/assistant/pure";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -247,6 +254,10 @@ const launcherItems = computed<ThreadPill[]>(() => {
 const hasItems = computed(
   () => incidents.value.shown.length > 0 || threads.value.length > 0 || props.order.length > 0,
 );
+const launcherDismissed = computed(() => {
+  void launcherDismissalVersion.value;
+  return isLauncherDismissed(store.state.userOrgKey);
+});
 
 watch(hasItems, (has) => {
   if (!has) expanded.value = false;
@@ -265,7 +276,7 @@ function items(): HTMLElement[] {
 }
 
 async function expand(): Promise<void> {
-  if (!hasItems.value) return;
+  if (!hasItems.value || launcherDismissed.value) return;
   expanded.value = true;
   if (incidentsOn.value) void openIncidents.refetch?.();
   await nextTick();

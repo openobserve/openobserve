@@ -15,7 +15,7 @@
 
 import http from "./http";
 import analytics from "./product_analytics";
-import type { StoredTurn } from "@/components/O2AIChat.history";
+import type { StoredTurn } from "@/composables/assistant/pure";
 
 export type ShareMode = "snapshot" | "live";
 export type ShareVisibility = "org" | "public";

@@ -236,9 +236,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdownItem
           :icon-left="action.icon"
           :variant="isDestructive(action.id) ? 'destructive' : 'default'"
-          :disabled="action.reason !== undefined"
-          :focusable-unavailable="action.reason !== undefined"
-          :description="action.reason"
           :data-test="`assistant-history-row-${action.id}`"
           @select="run(action.id)"
         >
@@ -272,8 +269,6 @@ export interface AssistantHistoryRowProps {
   agentIcon?: IconName | null;
   /** How the owner shared the chat, when a live link points at it; the row alone does not know. */
   sharedAs?: "org" | "public" | null;
-  /** Why the chat cannot float here, when it cannot. */
-  floatBlocked?: I18nText;
   pending: HistoryPending | null;
   /** The one row button in the Tab order (roving tabindex). */
   tabbable: boolean;
@@ -291,8 +286,7 @@ export interface AssistantHistoryRowProps {
   quietStatus?: boolean;
 }
 
-type RowAction =
-  "float" | "stop" | "rename" | "pin" | "share" | "export" | "delete" | "deleteDraft";
+type RowAction = "stop" | "rename" | "pin" | "share" | "export" | "delete" | "deleteDraft";
 
 const MAX_TITLE = 200;
 const COUNTER_FROM = 180;
@@ -352,7 +346,6 @@ const props = withDefaults(defineProps<AssistantHistoryRowProps>(), {
   org: null,
   agentIcon: null,
   sharedAs: null,
-  floatBlocked: undefined,
   readonly: false,
   timezone: undefined,
   tag: "li",
@@ -365,7 +358,6 @@ const emit = defineEmits<{
   navigate: [event: KeyboardEvent];
   rename: [sid: Sid, title: string];
   pin: [sid: Sid, pinned: boolean];
-  float: [sid: Sid];
   stop: [sid: Sid];
   share: [sid: Sid];
   export: [sid: Sid];
@@ -377,7 +369,6 @@ interface RowMenuAction {
   id: RowAction;
   label: I18nText;
   icon: IconName;
-  reason?: I18nText;
 }
 
 const { t } = useI18nTyped();
@@ -426,13 +417,6 @@ const actions = computed<RowMenuAction[]>(() => {
   }
   const browserOnly = props.serverMode && props.row.local;
   const list: RowMenuAction[] = [];
-  if (!browserOnly)
-    list.push({
-      id: "float",
-      label: t("assistant.history.openFloating"),
-      icon: assistantGlyph.floatingWindow,
-      reason: props.floatBlocked,
-    });
   if (status.value === "answering")
     list.push({ id: "stop", label: t("assistant.history.stop"), icon: assistantGlyph.stopped });
   if (!props.readonly && !browserOnly) {
@@ -494,7 +478,6 @@ function onRowKey(event: KeyboardEvent): void {
 function run(action: RowAction): void {
   if (action === "rename") setTimeout(() => void startRename(), 0);
   else if (action === "pin") emit("pin", props.row.sid, !props.row.pinned);
-  else if (action === "float") emit("float", props.row.sid);
   else if (action === "stop") emit("stop", props.row.sid);
   else if (action === "share") emit("share", props.row.sid);
   else if (action === "export") emit("export", props.row.sid);

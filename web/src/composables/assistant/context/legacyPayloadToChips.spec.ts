@@ -88,7 +88,7 @@ describe("legacyPayloadToChips", () => {
 });
 
 describe("legacyRelayArgs", () => {
-  // Flips O2AIChat.session.spec.ts:1060 ("a payload with autoSend false is dropped"): it is staged.
+  // it is staged.
   it("stages a payload whose autoSend is false, as chips and text", () => {
     const args = legacyRelayArgs({ query: "never sent", autoSend: false });
     expect(args).toMatchObject({

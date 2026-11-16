@@ -433,7 +433,7 @@ export function inertAssistantDeps(
       stop: async () => undefined,
       stopAll: async () => undefined,
       retry: async () => refused,
-      continueTurn: () => undefined,
+      continueTurn: async () => refused,
       retrySave: async () => undefined,
       setRequestBuilder: () => undefined,
       setConsentHandler: () => undefined,
@@ -1398,7 +1398,13 @@ function createTurnSlice(core: StoreCore) {
       if (locked) return Promise.resolve(locked);
       return track(sid, null, () => deps.engine.retry(sid));
     },
-    continueTurn: (sid) => deps.engine.continueTurn(sid),
+    continueTurn(sid) {
+      const session = core.session(sid);
+      if (!session || !core.writable(session)) return Promise.resolve(refusedUnknown());
+      const locked = refusedByLock(core.turnLock(sid));
+      if (locked) return Promise.resolve(locked);
+      return track(sid, null, () => deps.engine.continueTurn(sid));
+    },
     retrySave: (sid, turnId) => deps.engine.retrySave(sid, turnId),
     regenerate(sid) {
       const session = core.session(sid);

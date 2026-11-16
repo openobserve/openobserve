@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { foldTurns, mergeIncremental, type StoredTurn } from "@/components/O2AIChat.history";
+import { foldTurns, mergeIncremental, type StoredTurn } from "@/composables/assistant/pure";
 import type { ChatMessage, ChatHistoryEntry, TurnSpan } from "@/ts/interfaces/chat";
 import { raw, type TranslateFn } from "@/types/i18n";
 import { notifyChatListChanged } from "@/utils/chatListRevision";

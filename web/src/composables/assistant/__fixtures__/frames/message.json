@@ -1,5 +1,5 @@
 {
-  "_source": "web/src/components/O2AIChat.reducer.ts reduceText whole-block message form",
+  "_source": "web/src/composables/assistant/reducer.ts reduceText whole-block message form",
   "_item": "today",
   "frame": {
     "type": "message",

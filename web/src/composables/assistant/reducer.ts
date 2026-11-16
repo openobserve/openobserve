@@ -554,7 +554,7 @@ function dashboardEffect(data: any): StreamEffect | null {
     callArgs.dashboard_id || callArgs.args?.dashboard_id || callArgs.request_body?.dashboard_id;
   if (!dashboardId) {
     console.warn(
-      `[O2AIChat] Could not extract dashboardId from call_args for tool "${resolvedToolName}". Skipping dashboard event.`,
+      `[assistant] Could not extract dashboardId from call_args for tool "${resolvedToolName}". Skipping dashboard event.`,
       callArgs,
     );
     return null;

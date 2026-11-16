@@ -1319,8 +1319,9 @@ function onOutcomeAction(sid: string, action: OutcomeAction, outcome: TurnOutcom
       void store.retry(sid);
       return focusAfterAction();
     case "continue":
-      store.continueTurn(sid);
-      return focusEntry();
+      signedIn.value = false;
+      void store.continueTurn(sid);
+      return focusAfterAction();
     case "edit_resend":
       return stagePrompt(sid, outcome.turnId);
     case "stop_it":

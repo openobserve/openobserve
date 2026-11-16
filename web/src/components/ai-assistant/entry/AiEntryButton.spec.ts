@@ -763,6 +763,21 @@ describe("door registry (DG-12 AC 1)", () => {
   });
 });
 
+describe("AiEntryButton reveal", () => {
+  it("passes reveal: true to openAssistant only when the prop is set", async () => {
+    const withReveal = setup({ ...add, reveal: true });
+    await door(withReveal.wrapper, "ai-entry-log-row-add").trigger("click");
+    await flushPromises();
+    expect(lastCall()).toMatchObject({ reveal: true });
+    withReveal.wrapper.unmount();
+    const without = setup(add);
+    await door(without.wrapper, "ai-entry-log-row-add").trigger("click");
+    await flushPromises();
+    expect(lastCall()).not.toHaveProperty("reveal");
+    without.wrapper.unmount();
+  });
+});
+
 describe("AiEntryButton editor toggle and hand-off", () => {
   const toggle: Partial<AiEntryButtonProps> = {
     verb: "ask",

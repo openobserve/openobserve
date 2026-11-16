@@ -187,11 +187,10 @@ describe("AssistantHistoryRow", () => {
     expect(kebab.attributes("aria-disabled")).toBe("true");
   });
 
-  it("offers the full menu, a browser-only row only what it can do, and read-only none of the changes", async () => {
+  it("offers the full menu without a floating-window item, a browser-only row only what it can do, and read-only none of the changes", async () => {
     expect(menuIds(setup())).toEqual([]);
     document.body.innerHTML = "";
     expect(menuIds(await armed())).toEqual([
-      "assistant-history-row-float",
       "assistant-history-row-rename",
       "assistant-history-row-pin",
       "assistant-history-row-share",
@@ -206,10 +205,7 @@ describe("AssistantHistoryRow", () => {
       "assistant-history-row-delete",
     ]);
     document.body.innerHTML = "";
-    expect(menuIds(await armed({}, { readonly: true }))).toEqual([
-      "assistant-history-row-float",
-      "assistant-history-row-export",
-    ]);
+    expect(menuIds(await armed({}, { readonly: true }))).toEqual(["assistant-history-row-export"]);
   });
 
   it("exports the row's chat as Markdown from its menu", async () => {

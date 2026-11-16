@@ -60,13 +60,27 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
       '<div data-test="otable-stub">' +
       '<div v-if="$slots[\'loading-banner\']" data-test="otable-stub-has-loading-banner-slot" />' +
       '<div v-for="(r, i) in (data || [])" :key="i" data-test="otable-stub-row" :class="rowClass ? rowClass(r) : \'\'" :data-row-status-color="getRowStatusColor ? getRowStatusColor(r) : \'\'">' +
-      '<div v-for="c in (columns || [])" :key="c.id" :data-test="\'otable-stub-cell-\' + c.id"><slot :name="\'cell-\' + c.id" :row="r" :value="r[c.id]" /></div>' +
+      '<div v-for="c in (columns || [])" :key="c.id" :data-test="\'otable-stub-cell-\' + c.id"><slot :name="\'cell-\' + c.id" :row="r" :value="r[c.id]" /><slot name="cell-hover-actions" :row="r" :column="c" :value="r[c.id]" :active="true" /></div>' +
       "</div>" +
       "</div>",
   },
 }));
 
 // Named stub so both progress bars on the page can be told apart by their props.
+const assistantGate = await vi.hoisted(async () => (await import("vue")).ref("loading"));
+vi.mock("@/composables/assistant/pure", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/assistant/pure")>();
+  const { computed } = await import("vue");
+  return { ...actual, useAssistantGate: () => computed(() => assistantGate.value) };
+});
+
+const addDoorToChat = vi.hoisted(() => vi.fn());
+vi.mock("@/plugins/logs/logsDoors", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/plugins/logs/logsDoors")>()),
+  addDoorToChat,
+  currentUserOrgKey: () => "u|org-a",
+}));
+
 vi.mock("@/components/common/LoadingProgress.vue", () => ({
   default: {
     name: "LoadingProgress",
@@ -979,6 +993,16 @@ describe("SearchResult Component", () => {
     });
   });
 
+  describe("Row selection", () => {
+    it("has no row checkboxes or selection toolbar", async () => {
+      wrapper.vm.searchObj.data.queryResults.hits = [{ _timestamp: 1, message: "a" }];
+      await flushPromises();
+
+      expect(wrapper.vm.selectedLogRows).toBeUndefined();
+      expect(wrapper.find('[data-test="logs-search-result-selection-bar"]').exists()).toBe(false);
+    });
+  });
+
   describe("Pattern Details Navigation", () => {
     it("should open pattern details and set selectedPattern", () => {
       const mockPattern = { template: "INFO action <*> at 14:47", count: 10 };
@@ -1676,5 +1700,103 @@ describe("SearchResult rows while a search re-runs", () => {
 
     expect(table().props("data")).toHaveLength(0);
     expect(table().props("loading")).toBe(true);
+  });
+});
+
+describe("SearchResult AI doors (as on main: add to chat only)", () => {
+  let wrapper: any;
+  const slotted = { template: '<div><slot name="trigger" /><slot /></div>' };
+  const doorStub = { props: ["dataTest"], template: '<i :data-test="dataTest" />' };
+  const sparkleStub = {
+    emits: ["sendToAiChat"],
+    template: "<button @click=\"$emit('sendToAiChat')\" />",
+  };
+  const row = { _timestamp: 1, message: "a" };
+
+  const mountResult = async () => {
+    wrapper = mount(SearchResult, {
+      attachTo: document.body,
+      global: {
+        provide: { store },
+        plugins: [i18n],
+        stubs: {
+          DetailTable: true,
+          ChartRenderer: true,
+          SanitizedHtmlRenderer: true,
+          CellActions: true,
+          PatternDetailsDialog: true,
+          ODrawer: oDrawerStub,
+          OContextMenu: slotted,
+          OContextMenuItem: slotted,
+          OContextMenuLabel: slotted,
+          OContextMenuSeparator: { template: '<hr data-test="ctx-sep" />' },
+          AiEntryButton: doorStub,
+          O2AIContextAddBtn: sparkleStub,
+        },
+      },
+      props: { expandedLogs: [] },
+    });
+    await flushPromises();
+    wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+    wrapper.vm.searchObj.data.stream.streamType = "logs";
+    wrapper.vm.searchObj.data.stream.selectedStream = ["app"];
+    wrapper.vm.searchObj.loading = false;
+    wrapper.vm.searchObj.data.queryResults = { hits: [row] };
+    await flushPromises();
+  };
+
+  beforeEach(async () => {
+    resetLogsAutoRunForTests();
+    HTMLElement.prototype.scrollTo = vi.fn();
+    addDoorToChat.mockClear();
+    assistantGate.value = "available";
+    store.state.zoConfig = { ...store.state.zoConfig, timestamp_column: "_timestamp" };
+    store.state.selectedOrganization = { identifier: "test-org" };
+    await mountResult();
+  });
+
+  afterEach(() => {
+    assistantGate.value = "loading";
+    wrapper.unmount();
+  });
+
+  it("offers main's sparkle on the timestamp cell hover, adding that row bound to the loaded org", async () => {
+    wrapper.vm.searchObj.data.resultGrid.columns = [{ id: "_timestamp" }, { id: "message" }];
+    await flushPromises();
+    const cell = wrapper.find('[data-test="otable-stub-cell-_timestamp"]');
+    expect(cell.findAll('[data-test="logs-search-result-ai-btn"]')).toHaveLength(1);
+    await cell.get('[data-test="logs-search-result-ai-btn"]').trigger("click");
+    expect(addDoorToChat).toHaveBeenCalledWith(
+      expect.objectContaining({ objectKind: "log_row", boundOrg: "test-org" }),
+      "u|org-a",
+    );
+    expect(wrapper.find('[data-test="ai-entry-log-row-explain"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-entry-log-field-explain"]').exists()).toBe(false);
+  });
+
+  it("right-click offers add value and add row, and no explain items", async () => {
+    wrapper.vm.contextCell = { columnId: "message", row, value: "a" };
+    await flushPromises();
+    const menu = wrapper.find('[data-test="log-context-menu-field"]').element.parentElement!;
+    expect(menu.querySelectorAll('[data-test="ai-entry-log-field-add"]')).toHaveLength(1);
+    expect(menu.querySelectorAll('[data-test="ai-entry-log-row-add"]').length).toBeGreaterThan(0);
+    expect(menu.querySelector('[data-test$="-explain"]')).toBeNull();
+  });
+
+  it("drops the AI separator and doors while the assistant is unavailable", async () => {
+    assistantGate.value = "unavailable";
+    wrapper.vm.contextCell = { columnId: "message", row, value: "a" };
+    await flushPromises();
+    const menu = wrapper.find('[data-test="log-context-menu-field"]').element.parentElement!;
+    expect(menu.querySelectorAll('[data-test="ctx-sep"]')).toHaveLength(1);
+  });
+
+  it("hides the timestamp sparkle while the assistant is not entitled", async () => {
+    wrapper.unmount();
+    assistantGate.value = "not_entitled";
+    await mountResult();
+    wrapper.vm.searchObj.data.resultGrid.columns = [{ id: "_timestamp" }, { id: "message" }];
+    await flushPromises();
+    expect(wrapper.find('[data-test="logs-search-result-ai-btn"]').exists()).toBe(false);
   });
 });

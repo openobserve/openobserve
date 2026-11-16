@@ -21,7 +21,7 @@ import { gt, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n"
 import { ident } from "./ident";
 import { redactText } from "./redact";
 
-/** Kept free of the assistant runtime: the legacy ingestion page imports it through `firstEventAskAi.ts`. */
+/** Kept free of the assistant runtime: the ingestion page imports it directly. */
 export const REJECTION_REASON_KEYS: Record<RejectionReason, I18nKey> = {
   invalid_credentials: "ingestion.firstEvent.reasonInvalidCredentials",
   malformed_body: "ingestion.firstEvent.reasonMalformedBody",

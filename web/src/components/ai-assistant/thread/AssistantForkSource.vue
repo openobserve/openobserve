@@ -147,7 +147,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import type { StoredTurn } from "@/components/O2AIChat.history";
+import type { StoredTurn } from "@/composables/assistant/pure";
 import { sharedChatQuery } from "@/services/ai_chat_share.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatOrgTime } from "@/utils/formatters";

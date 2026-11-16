@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { ref } from "vue";
+
 import type {
   ActionLedgerEntry,
   ApprovalDecision,
@@ -159,6 +161,8 @@ export interface HomePrefs {
 export interface HintPrefs {
   recall?: boolean;
   disclosure?: boolean;
+  /** The floating launcher was hidden; opening the assistant brings it back. */
+  launcherDismissed?: boolean;
   /** The dictation primer was accepted (`40` §1.8.2). */
   dictate?: boolean;
 }
@@ -294,6 +298,19 @@ export function markHintSeen(userOrgKey: string, hint: keyof HintPrefs): void {
 }
 
 /** The self-hosted opt-in to browser dictation; it stays in this browser until org voice settings ship (PO A30). */
+/** Bumped on every launcher dismissal change in this tab, so its readers recompute. */
+export const launcherDismissalVersion = /* @__PURE__ */ ref(0);
+
+export function isLauncherDismissed(userOrgKey: string | null): boolean {
+  return !!userOrgKey && readHints(userOrgKey).launcherDismissed === true;
+}
+
+export function setLauncherDismissed(userOrgKey: string | null, on: boolean): void {
+  if (!userOrgKey || isLauncherDismissed(userOrgKey) === on) return;
+  mergeJson<HintPrefs>("local", LOCAL_KEYS.hints(userOrgKey), { launcherDismissed: on });
+  launcherDismissalVersion.value++;
+}
+
 export function readVoiceOptIn(userOrgKey: string): boolean {
   return readJson<boolean>("local", LOCAL_KEYS.voice(userOrgKey)) === true;
 }
