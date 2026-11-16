@@ -477,7 +477,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="empty:hidden"
                 data-snap-stop
               />
-              <AlertOptionalHeading v-if="!isAnomalyMode && !isCompositeMode" />
+              <!-- Every optional condition setting is scheduled-only, so a real-time step would show an empty heading. -->
+              <AlertOptionalHeading
+                v-if="!isAnomalyMode && !isCompositeMode && formData.is_real_time === 'false'"
+              />
               <div
                 v-show="!isAnomalyMode"
                 :ref="(el) => setSectionTarget('settingsHold', el)"
