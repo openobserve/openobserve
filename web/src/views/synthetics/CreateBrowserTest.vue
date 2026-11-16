@@ -530,7 +530,7 @@ function onLoadRetry(actionId?: string) {
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   // Warm detection so an already-installed extension lets Record skip setup.
   const warmProbe = probeExtension()
     .then((installed) => {
@@ -550,7 +550,7 @@ onMounted(async () => {
     extensionReady.value = true;
   });
 
-  const foldersReady = fetchFolders();
+  fetchFolders();
   fetchLocations();
   loadDestinations();
 
@@ -592,7 +592,6 @@ onMounted(async () => {
         }
       });
     }
-    await foldersReady;
     dropDraftCarriedByQuery();
     void browserDraft.start();
   }
@@ -906,8 +905,10 @@ function dropDraftCarriedByQuery() {
   const comparable = (value: BrowserCheck) =>
     stableStringify({ ...value, url: (value.url ?? "").trim(), name: (value.name ?? "").trim() });
   // The draft is stored redacted, so the reloaded check is compared in the same form.
+  // Protection must not wait for the folder list, so a still-unpicked folder is the one the draft holds.
   const reloaded = redactCheckDraftSecrets({
     ...check.value,
+    folder: check.value.folder || stored.folder,
     url: startUrl.value,
     name: checkName.value,
   }).data;

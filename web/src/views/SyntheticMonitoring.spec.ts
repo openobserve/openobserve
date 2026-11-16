@@ -79,6 +79,7 @@ vi.mock("vue-router", async () => {
     useRouter: () => ({
       push: mockRouterPush,
       replace: mockRouterReplace,
+      currentRoute: { value: { query: mockRoute.query } },
     }),
   };
 });
@@ -132,6 +133,7 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 }));
 
 import SyntheticMonitoring from "./SyntheticMonitoring.vue";
+import { getFoldersListByType } from "@/utils/commons";
 import {
   readEditorDraft,
   writeEditorDraft,
@@ -170,6 +172,7 @@ const baseStubs = {
       "sortBy",
       "sortOrder",
       "draftSavedAt",
+      "forbidden",
     ],
     emits: ["update:currentPage", "update:pageSize", "update:sortBy", "update:sortOrder"],
   },
@@ -267,14 +270,17 @@ const baseStubs = {
   },
 };
 
-function mountPage() {
+function mountPage(stubs: Record<string, unknown> = baseStubs) {
   return mount(SyntheticMonitoring, {
     global: {
       plugins: [store],
-      stubs: baseStubs,
+      stubs,
     },
   });
 }
+
+/** The page with its real folder sidebar, which selects and announces the folder itself. */
+const withFolderList = { ...baseStubs, FolderList: false };
 
 /** Renders the page as an OSS build sees it: no private locations. */
 function mountPageWithoutPrivateLocations() {
@@ -290,6 +296,7 @@ describe("SyntheticMonitoring", () => {
     confirmMock.mockResolvedValue(true);
     resetListViewState();
     mockServiceList.mockResolvedValue({ data: { monitors: [] } });
+    vi.mocked(getFoldersListByType).mockResolvedValue([{ folderId: "default", name: "Default" }]);
     // Both are process-global and mutated by individual tests, so they are
     // restored here rather than left for the next test to inherit.
     for (const k of Object.keys(mockRoute.query)) delete mockRoute.query[k];
@@ -403,6 +410,42 @@ describe("SyntheticMonitoring", () => {
       wrapper = mountPage();
       await flushPromises();
       expect(mockServiceList).toHaveBeenCalled();
+    });
+
+    it("loads the checks once the org hydrates, and refresh retries a failed folder load", async () => {
+      const org = store.state.selectedOrganization;
+      let down = false;
+      vi.mocked(getFoldersListByType).mockImplementation(async (s: any) => {
+        if (down || !s.state.selectedOrganization.identifier) throw new Error("unavailable");
+        return [{ folderId: "team", name: "Team" }];
+      });
+      store.state.selectedOrganization = { ...org, identifier: "" };
+      wrapper = mountPage(withFolderList);
+      await flushPromises();
+      store.state.selectedOrganization = org;
+      await flushPromises();
+      expect(mockServiceList).toHaveBeenCalledWith("default", "team");
+
+      wrapper.unmount();
+      mockServiceList.mockClear();
+      down = true;
+      wrapper = mountPage(withFolderList);
+      await flushPromises();
+      expect(mockServiceList).not.toHaveBeenCalled();
+      down = false;
+      wrapper.findComponent('[data-test="synthetic-monitoring-refresh-btn"]').vm.$emit("click");
+      await flushPromises();
+      expect(mockServiceList).toHaveBeenCalledWith("default", "team");
+    });
+
+    it("shows the access-denied state when the caller may list no synthetics folder", async () => {
+      vi.mocked(getFoldersListByType).mockRejectedValue({ response: { status: 403, data: {} } });
+      wrapper = mountPage(withFolderList);
+      await flushPromises();
+      const mt = wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+      expect(mt.props("forbidden")).toBe(true);
+      expect(mt.props("loading")).toBe(false);
+      expect(mockServiceList).not.toHaveBeenCalled();
     });
   });
 

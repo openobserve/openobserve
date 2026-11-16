@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
               data-test="synthetic-monitoring-refresh-btn"
-              @click="loadMonitors(undefined, true)"
+              @click="refreshMonitors"
             />
           </template>
         </MonitorTable>
@@ -758,13 +758,16 @@ const monitorsList = useQuery(() =>
 );
 
 const foldersLoaded = ref(false);
+const foldersFailed = ref(false);
+// Without a listable folder no check request runs, so the folder list's own 403 is the denial.
+const foldersForbidden = ref<ForbiddenState>(false);
 const loading = computed(
   () => !foldersLoaded.value || (!!activeFolderId.value && monitorsList.isPending.value),
 );
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = monitorsList.error.value;
-  return forbiddenState(e) || e?.status === 403;
+  return foldersForbidden.value || forbiddenState(e) || e?.status === 403;
 });
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
@@ -801,22 +804,33 @@ async function loadMonitors(folderId?: string, force = false) {
   if (force) await monitorsList.refetch();
 }
 
-async function initPage() {
-  // Load folders first so the sidebar tablist renders with data.
+async function loadFolders() {
+  // A request before the org hydrates would fail and leave no folder to read checks from.
+  await waitForOrgIdentifier();
   try {
     const folders = await getFoldersListByType(store, "synthetics");
     const folder = selectSyntheticsFolder(folders, route.query.folder as string | undefined);
     activeFolderId.value = folder ?? "";
+    foldersFailed.value = false;
+    foldersForbidden.value = false;
   } catch (err) {
     console.error("[synthetics] failed to load folders", err);
+    foldersFailed.value = true;
+    foldersForbidden.value = forbiddenState(err);
   } finally {
     foldersLoaded.value = true;
   }
+}
 
-  // Wait for the organisation identifier to be resolved before making API
-  // calls — loadMonitors silently returns when orgIdentifier is empty, and
-  // the table skeleton would stay forever because loading is never cleared.
-  await waitForOrgIdentifier();
+/** Refresh retries a failed folder load, since no check can be read without a folder. */
+async function refreshMonitors() {
+  if (foldersFailed.value) await loadFolders();
+  await loadMonitors(undefined, true);
+}
+
+async function initPage() {
+  // Load folders first so the sidebar tablist renders with data.
+  await loadFolders();
 
   await loadMonitors(activeFolderId.value);
 

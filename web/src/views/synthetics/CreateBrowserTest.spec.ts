@@ -3217,6 +3217,23 @@ describe("CreateBrowserTest", () => {
       },
     );
 
+    it("protects a new check typed while the folder list is still loading", async () => {
+      let listFolders: (list: { folderId: string; name: string }[]) => void = () => {};
+      mockGetFoldersListByType.mockReturnValue(new Promise((resolve) => (listFolders = resolve)));
+      wrapper = mountPage();
+      await flushPromises();
+      firstInput();
+      await wrapper.find('[data-test="synthetics-create-url-input"]').setValue("https://shop.test");
+      await wrapper.find('[data-test="synthetics-create-name-input"]').setValue("Shop");
+      await wrapper.find('[data-test="synthetics-create-build-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(await leaveAsks(wrapper)).toBe(true);
+      listFolders([{ folderId: "team", name: "Team" }]);
+      await flushPromises();
+      expect((wrapper.vm as any).check.folder).toBe("team");
+    });
+
     it("clears the URL folder when no folders are listable", async () => {
       mockRoute.query = { folder: "gone" };
       mockGetFoldersListByType.mockResolvedValue([]);
