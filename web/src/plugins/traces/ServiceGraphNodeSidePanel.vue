@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="svcver-panel-identity"
       >
         <OTruncatedText
-          v-if="identityNotReported"
+          v-if="identityNotReported || identityAbsent"
           class="text-text-secondary min-w-0 text-xs"
           data-test="svcver-panel-identity-not-reported"
           >{{ t("serviceVersions.panel.identityNotReported") }}</OTruncatedText
@@ -1374,6 +1374,10 @@ export default defineComponent({
         !pickedPlace.value &&
         Object.prototype.hasOwnProperty.call(props.selectedNode ?? {}, "where_key") &&
         !props.selectedNode?.where_key,
+    );
+    // A place whose spans carry no version once loaded says so, as the badge-less Versions tab does.
+    const identityAbsent = computed(
+      () => !pickedPlace.value && panelVersions.isSuccess.value && versionCount.value === 0,
     );
     const clearPickedPlace = () =>
       versionPanel.update(props.selectedNode?.where_key || "", activeTab.value);
@@ -3194,6 +3198,7 @@ export default defineComponent({
       headerVersion,
       pickedPlace,
       identityNotReported,
+      identityAbsent,
       clearPickedPlace,
       whereText,
       resourceEmptyText,

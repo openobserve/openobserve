@@ -1794,6 +1794,24 @@ describe("ServiceGraphNodeSidePanel", () => {
     it("says the stream's spans report no version, and shows a picked place as a chip that undoes the pick", async () => {
       const previous = config.isEnterprise;
       config.isEnterprise = "true";
+      panelVersions.splice(0, panelVersions.length, {
+        version_key: "",
+        version: "",
+        active: true,
+        first_seen: 1,
+        where_key: "default",
+        where: { kind: "default" },
+        signals: {},
+        deploys: [],
+      });
+      wrapper = mountPanel({ selectedNode: { ...baseNode, where_key: "default" } });
+      const placeOnly = () => wrapper.get('[data-test="svcver-panel-identity"]');
+      expect(placeOnly().find('[data-test="svcver-panel-identity-not-reported"]').exists()).toBe(
+        false,
+      );
+      await flushPromises();
+      expect(placeOnly().text()).toBe("This service's spans don't report env, where or version");
+      wrapper.unmount();
       Object.assign(routeQuery, { panel: "operations", panelSvc: "frontend", panelWhere: "" });
       panelVersions.splice(0, panelVersions.length, {
         version_key: "2.0",

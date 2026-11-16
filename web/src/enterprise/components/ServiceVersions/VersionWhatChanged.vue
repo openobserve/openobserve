@@ -443,7 +443,16 @@ const errorColumns = computed<OTableColumnDef<ErrorRow>[]>(() => [
   ...(rumOnly.value
     ? []
     : [{ id: "source", header: t("serviceVersions.compare.column.source"), size: 100 }]),
-  { id: "before", header: raw(props.result.arms.b.version), size: 70, meta: { align: "right" } },
+  ...(hasBaseline(props.result)
+    ? [
+        {
+          id: "before",
+          header: raw(props.result.arms.b.version),
+          size: 70,
+          meta: { align: "right" as const },
+        },
+      ]
+    : []),
   { id: "after", header: raw(props.result.arms.a.version), size: 70, meta: { align: "right" } },
   { id: "link", header: raw(""), size: 180, isAction: true },
 ]);
