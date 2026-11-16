@@ -618,11 +618,11 @@ export default defineComponent({
       () => [panelRoute.state.value, graphData.value.nodes] as const,
       ([state, nodes]) => {
         if (!state.open) {
-          if (!selectedNode.value?.service_type) showSidePanel.value = false;
+          showSidePanel.value = false;
           return;
         }
         const node = nodes.find((node: { id: string; name?: string; label?: string }) =>
-          [node.name, node.label, node.id].includes(state.service),
+          panelRoute.owns(node),
         );
         if (node && (!showSidePanel.value || selectedNode.value?.id !== node.id)) {
           selectedNode.value = node;
@@ -1856,11 +1856,12 @@ export default defineComponent({
         } else {
           selectedNode.value = params.data;
           showSidePanel.value = true;
-          if (!params.data.service_type)
-            void panelRoute.open(
-              params.data.name || params.data.label || params.data.id,
-              params.data.where_key || "",
-            );
+          void panelRoute.open(
+            params.data.name || params.data.label || params.data.id,
+            params.data.where_key || "",
+            "operations",
+            params.data.service_type || "",
+          );
         }
       }
       // For tree visualization, check if it's a tree node
@@ -1879,11 +1880,12 @@ export default defineComponent({
           } else {
             selectedNode.value = nodeData;
             showSidePanel.value = true;
-            if (!nodeData.service_type)
-              void panelRoute.open(
-                nodeData.name || nodeData.label || nodeData.id,
-                nodeData.where_key || "",
-              );
+            void panelRoute.open(
+              nodeData.name || nodeData.label || nodeData.id,
+              nodeData.where_key || "",
+              "operations",
+              nodeData.service_type || "",
+            );
           }
         } else {
           console.warn("[ServiceGraph] Could not find node data for:", params.data.name);
