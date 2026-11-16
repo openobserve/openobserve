@@ -15,43 +15,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-anomaly-alerting h-full">
+  <div class="step-anomaly-alerting" :class="bare ? '' : 'h-full'">
     <div
-      class="step-content rounded-default bg-surface-overlay border-border-default h-full overflow-y-auto border px-3 py-4"
+      class="step-content"
+      :class="
+        bare
+          ? ''
+          : 'rounded-default bg-surface-overlay border-border-default h-full overflow-y-auto border'
+      "
     >
-      <!-- Priority & tags (Feature 2). Anomaly configs appear in the same
-           alert list, so they carry the same triage metadata. -->
-      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.priority") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-            <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div class="flex h-11 items-center">
-          <OSelect
-            v-model="configModel.priority"
-            :options="priorityOptions"
-            labelKey="label"
-            valueKey="value"
-            :searchable="false"
-            clearable
-            width="xs"
-            :placeholder="t('alerts.priorityUnset')"
-            :aria-label="t('alerts.priority')"
-            data-test="anomaly-priority-select"
-          />
-        </div>
-      </div>
+      <OSettingRow
+        :label="t('alerts.priority')"
+        :info="t('alerts.priorityTooltip')"
+        data-test="anomaly-priority-row"
+        fill
+      >
+        <OSelect
+          v-model="configModel.priority"
+          :options="priorityOptions"
+          labelKey="label"
+          valueKey="value"
+          :searchable="false"
+          clearable
+          width="xs"
+          :placeholder="t('alerts.priorityUnset')"
+          :aria-label="t('alerts.priority')"
+          data-test="anomaly-priority-select"
+        />
+      </OSettingRow>
 
-      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.tags") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-            <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div class="min-w-60 flex-1">
+      <OSettingRow
+        :label="t('alerts.tags')"
+        :info="t('alerts.tagsTooltip')"
+        data-test="anomaly-tags-row"
+        fill
+      >
+        <div class="max-w-105">
           <OTagInput
             v-model="tagsModel"
             :aria-label="t('alerts.tags')"
@@ -59,20 +58,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="anomaly-tags-input"
           />
         </div>
-      </div>
+      </OSettingRow>
 
-      <!-- Enable Notifications toggle -->
-      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div
-          id="anomaly-alert-enabled-heading"
-          class="flex h-9 w-47.5 shrink-0 items-center font-semibold"
-        >
-          {{ t("alerts.anomaly.notifications") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-            <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div class="flex h-11 items-center">
+      <OSettingRow
+        :label="t('alerts.anomaly.notifications')"
+        :info="t('alerts.anomaly.notificationsTooltip')"
+        data-test="anomaly-notifications-row"
+        fill
+      >
+        <div class="flex min-h-9 items-center">
+          <span id="anomaly-alert-enabled-heading" class="sr-only">{{
+            t("alerts.anomaly.notifications")
+          }}</span>
           <OSwitch
             id="anomaly-alert-enabled-switch"
             v-model="configModel.alert_enabled"
@@ -83,88 +80,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="anomaly-alert-enabled"
           />
         </div>
-      </div>
-
-      <!-- Destination picker (shown when alert_enabled) -->
-      <div v-if="config.alert_enabled" class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.destination") }}
+        <div
+          v-if="!config.alert_enabled"
+          class="text-text-secondary mt-1 text-xs"
+          data-test="anomaly-notifications-disabled-note"
+        >
+          {{ t("alerts.anomaly.disabledNotificationsInfo") }}
         </div>
-        <div class="flex min-w-0 flex-1 basis-60 flex-col">
-          <div class="flex flex-wrap items-center gap-y-1">
-            <OSelect
-              v-model="configModel.alert_destination_ids"
-              :options="destinations"
-              labelKey="name"
-              valueKey="name"
-              multiple
-              searchable
-              :placeholder="t('alerts.summary.noDestination')"
-              class="h-auto! min-h-auto! max-w-105 min-w-0 flex-1 basis-75"
-              :aria-label="t('alerts.destination')"
-              data-test="anomaly-destination"
-            >
-              <template #selected-item="{ index, opt, removeAtIndex }">
-                <OTag v-if="index < visibleChipCount" type="selectionChip">
-                  {{ typeof opt === "object" ? opt.name : opt }}
-                  <template #trailing>
-                    <button
-                      type="button"
-                      :aria-label="t('common.remove')"
-                      class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
-                      @click="removeAtIndex(index)"
-                    >
-                      <OIcon name="close" size="xs" />
-                    </button>
-                  </template>
-                </OTag>
-                <span
-                  v-if="
-                    index === visibleChipCount &&
-                    config.alert_destination_ids.length > visibleChipCount
-                  "
-                  class="text-compact text-text-secondary ms-1 whitespace-nowrap"
-                >
-                  +{{ config.alert_destination_ids.length - visibleChipCount }}
-                </span>
-              </template>
-              <template #empty>
-                <span>{{ t("alerts.anomaly.noDestinationsFound") }}</span>
-              </template>
-            </OSelect>
-            <OButton
-              variant="ghost"
-              size="sm"
-              class="ms-1"
-              :title="t('alerts.alertSettings.refreshDestinations')"
-              data-test="anomaly-refresh-destinations"
-              @click="$emit('refresh:destinations')"
-              icon-left="refresh"
-            />
-            <OButton variant="outline" size="sm" class="ms-2" @click="openAddDestination">
-              {{ t("alerts.anomaly.addNewDestination") }}
-            </OButton>
-          </div>
-          <!-- Same field hint as the alert form's Destination field. -->
-          <p
-            class="text-input-help-text pt-1 text-xs"
-            :data-test="
-              config.alert_destination_ids.length === 0
-                ? 'anomaly-destination-note'
-                : 'anomaly-destination-status'
-            "
+      </OSettingRow>
+
+      <OSettingRow
+        v-if="config.alert_enabled"
+        :label="t('alerts.destination')"
+        data-test="anomaly-destination-row"
+        fill
+      >
+        <div class="flex flex-wrap items-center gap-2">
+          <OSelect
+            v-model="configModel.alert_destination_ids"
+            :options="destinations"
+            labelKey="name"
+            valueKey="name"
+            multiple
+            searchable
+            :placeholder="t('alerts.summary.noDestination')"
+            class="h-auto! min-h-auto! max-w-105 min-w-0 flex-1 basis-75"
+            :aria-label="t('alerts.destination')"
+            data-test="anomaly-destination"
           >
-            {{ destinationStatus }}
-          </p>
+            <template #selected-item="{ index, opt, removeAtIndex }">
+              <OTag v-if="index < visibleChipCount" type="selectionChip">
+                {{ typeof opt === "object" ? opt.name : opt }}
+                <template #trailing>
+                  <button
+                    type="button"
+                    :aria-label="t('common.remove')"
+                    class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
+                    @click="removeAtIndex(index)"
+                  >
+                    <OIcon name="close" size="xs" />
+                  </button>
+                </template>
+              </OTag>
+              <span
+                v-if="
+                  index === visibleChipCount &&
+                  config.alert_destination_ids.length > visibleChipCount
+                "
+                class="text-compact text-text-secondary ms-1 whitespace-nowrap"
+              >
+                +{{ config.alert_destination_ids.length - visibleChipCount }}
+              </span>
+            </template>
+            <template #empty>
+              <span>{{ t("alerts.anomaly.noDestinationsFound") }}</span>
+            </template>
+          </OSelect>
+          <OButton
+            variant="ghost"
+            size="sm"
+            :title="t('alerts.alertSettings.refreshDestinations')"
+            data-test="anomaly-refresh-destinations"
+            @click="$emit('refresh:destinations')"
+            icon-left="refresh"
+          />
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="anomaly-add-destination"
+            @click="openAddDestination"
+          >
+            {{ t("alerts.anomaly.addNewDestination") }}
+          </OButton>
         </div>
-      </div>
+        <p
+          class="text-input-help-text pt-1 text-xs"
+          :data-test="
+            config.alert_destination_ids.length === 0
+              ? 'anomaly-destination-note'
+              : 'anomaly-destination-status'
+          "
+        >
+          {{ destinationStatus }}
+        </p>
+      </OSettingRow>
 
-      <!-- Template override: a user template that applies to anomaly, or the destination's own. -->
-      <div v-if="config.alert_enabled" class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.templateOverride.label") }}
-        </div>
-        <div class="min-w-0 flex-1 basis-60">
+      <OSettingRow
+        v-if="config.alert_enabled"
+        :label="t('alerts.templateOverride.label')"
+        data-test="anomaly-template-row"
+        fill
+      >
+        <div class="max-w-105">
           <TemplateOverridePicker
             kind="anomaly"
             :model-value="config.template ?? null"
@@ -173,68 +180,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="onTemplateChange"
           />
         </div>
-      </div>
+      </OSettingRow>
 
-      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.anomaly.alertDirection") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-            <OTooltip :content="t('alerts.anomaly.alertDirectionTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div class="flex h-11 items-center">
-          <OSelect
-            v-model="directionModel"
-            :options="directionOptions"
-            labelKey="label"
-            valueKey="value"
-            :searchable="false"
-            width="sm"
-            :aria-label="t('alerts.anomaly.alertDirection')"
-            data-test="anomaly-alert-direction"
-          />
-        </div>
-      </div>
+      <OSettingRow
+        :label="t('alerts.anomaly.alertDirection')"
+        :info="t('alerts.anomaly.alertDirectionTooltip')"
+        data-test="anomaly-alert-direction-row"
+        fill
+      >
+        <OSelect
+          v-model="directionModel"
+          :options="directionOptions"
+          labelKey="label"
+          valueKey="value"
+          :searchable="false"
+          width="sm"
+          :aria-label="t('alerts.anomaly.alertDirection')"
+          data-test="anomaly-alert-direction"
+        />
+      </OSettingRow>
 
-      <div class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
-        <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
-          {{ t("alerts.anomaly.windowShare") }}
-          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-            <OTooltip :content="t('alerts.anomaly.windowShareTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div class="flex min-w-0 flex-1 basis-60 flex-col gap-1">
-          <div class="flex flex-wrap items-start gap-3">
-            <OInput
-              v-model="configModel.alert_window_buckets"
-              type="number"
-              :model-modifiers="{ number: true }"
-              :label="t('alerts.anomaly.windowBuckets')"
-              :placeholder="raw('1')"
-              :error="!!windowShareErrors.buckets"
-              width="xs"
-              data-test="anomaly-window-buckets"
-            />
-            <OInput
-              v-model="configModel.alert_window_fire_pct"
-              type="number"
-              :model-modifiers="{ number: true }"
-              :label="t('alerts.anomaly.windowFirePct')"
-              :placeholder="raw('100')"
-              :error="!!windowShareErrors.fire"
-              width="xs"
-              data-test="anomaly-window-fire-pct"
-            />
-            <OInput
-              v-model="configModel.alert_window_recover_pct"
-              type="number"
-              :model-modifiers="{ number: true }"
-              :label="t('alerts.anomaly.windowRecoverPct')"
-              :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
-              :error="!!windowShareErrors.recover"
-              width="xs"
-              data-test="anomaly-window-recover-pct"
-            />
+      <OSettingRow
+        :label="t('alerts.anomaly.windowShare')"
+        :info="t('alerts.anomaly.windowShareTooltip')"
+        data-test="anomaly-window-share-row"
+        fill
+      >
+        <div class="flex flex-col gap-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="w-36">
+              <OInput
+                v-model="configModel.alert_window_buckets"
+                type="number"
+                :model-modifiers="{ number: true }"
+                :prefix="t('alerts.anomaly.windowBucketsPrefix')"
+                :suffix="t('alerts.anomaly.windowBucketsSuffix')"
+                :aria-label="t('alerts.anomaly.windowBuckets')"
+                :placeholder="raw('1')"
+                :error="!!windowShareErrors.buckets"
+                data-test="anomaly-window-buckets"
+              />
+            </div>
+            <div class="w-33">
+              <OInput
+                v-model="configModel.alert_window_fire_pct"
+                type="number"
+                :model-modifiers="{ number: true }"
+                :prefix="t('alerts.anomaly.windowFirePrefix')"
+                :suffix="percentSuffix"
+                :aria-label="t('alerts.anomaly.windowFirePct')"
+                :placeholder="raw('100')"
+                :error="!!windowShareErrors.fire"
+                data-test="anomaly-window-fire-pct"
+              />
+            </div>
+            <div class="min-w-58 flex-1">
+              <OInput
+                v-model="configModel.alert_window_recover_pct"
+                type="number"
+                :model-modifiers="{ number: true }"
+                :prefix="t('alerts.anomaly.windowRecoverPrefix')"
+                :suffix="percentSuffix"
+                :aria-label="t('alerts.anomaly.windowRecoverPct')"
+                :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
+                :error="!!windowShareErrors.recover"
+                data-test="anomaly-window-recover-pct"
+              />
+            </div>
           </div>
           <div
             v-for="message in windowShareMessages"
@@ -253,23 +265,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ windowShareHint }}
           </span>
         </div>
-      </div>
-
-      <!-- Info note when notifications disabled -->
-      <div
-        v-if="!config.alert_enabled"
-        class="mt-2 flex items-start gap-2 text-xs"
-        :class="'text-text-secondary'"
-      >
-        <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
-        <span>{{ t("alerts.anomaly.disabledNotificationsInfo") }}</span>
-      </div>
+      </OSettingRow>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, type PropType } from "vue";
+import { computed, defineComponent, inject, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -278,9 +280,10 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
+import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
 import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import {
@@ -297,9 +300,9 @@ export default defineComponent({
     OSelect,
     OInput,
     OTagInput,
-    OTooltip,
     OIcon,
     OTag,
+    OSettingRow,
     TemplateOverridePicker,
   },
 
@@ -320,6 +323,9 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const router = useRouter();
     const store = useStore();
+    // The sectioned alert editor provides this; its rows sit flat on the page instead of in a card.
+    const bare = inject(SETTING_ROW_BARE_KEY, false);
+    const percentSuffix = raw("%");
 
     // Alias for the config prop; same reference, mutation stays identical.
     const configModel = computed(() => props.config);
@@ -429,6 +435,8 @@ export default defineComponent({
       t,
       raw,
       store,
+      bare,
+      percentSuffix,
       configModel,
       priorityOptions,
       tagsModel,
