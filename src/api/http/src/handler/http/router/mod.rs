@@ -3543,6 +3543,12 @@ mod tests {
             ("POST", "/api/default/status_pages/s1/domains", 403, "require an enterprise license"),
             ("POST", "/api/default/llm/models", 403, "Not supported in the open source version"),
             ("PUT", "/api/default/llm/models/m1", 403, "Not supported in the open source version"),
+            ("POST", "/api/v2/default/alerts/incidents", 403, "Service incidents require the enterprise build"),
+            ("PUT", "/api/default/service_identity/overrides", 403, "Service versions require the enterprise build"),
+            ("POST", "/api/default/service_identity/aliases", 403, "Service versions require the enterprise build"),
+            ("PUT", "/api/default/service_identity/aliases/k1", 403, "Service versions require the enterprise build"),
+            ("POST", "/api/default/service_identity/aliases/_bulk", 403, "Service versions require the enterprise build"),
+            ("POST", "/api/default/service_identity/aliases/_undo", 403, "Service versions require the enterprise build"),
         ];
         const BAD_QUERY: &str = "page=zz&page_size=zz&limit=zz&offset=zz&version=zz&start_time=zz&end_time=zz&status=zz&after_seq=zz&run_id=zz";
         const REPEATED_QUERY: &str = "known_version=a&known_version=b&run_id=a&run_id=b&start_time=1&start_time=2&folder=a&folder=b";
@@ -3562,12 +3568,12 @@ mod tests {
             .nest("/api", service_route_table())
             .merge(basic_routes())
             .nest("/config", config_routes());
-        let synthetics_on = get_config().synthetics.enabled;
+        assert!(
+            get_config().synthetics.enabled,
+            "the status page routes mount only with ZO_SYNTHETICS_ENABLED on"
+        );
         let mut wrong = Vec::new();
         for (method, path, status, message) in ENTERPRISE_STUBS {
-            if path.contains("/status_pages/") && !synthetics_on {
-                continue;
-            }
             for (label, query, content_type, body) in &probes {
                 let uri = if query.is_empty() {
                     path.to_string()

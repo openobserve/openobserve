@@ -15,8 +15,9 @@
 
 //! HTTP handlers for alert incident management
 
+#[cfg(feature = "enterprise")]
+use axum::Json;
 use axum::{
-    Json,
     extract::{Path, Query},
     response::Response,
 };
@@ -121,7 +122,9 @@ pub struct ListIncidentsResponse {
 pub async fn create_incident(
     Path(org): Path<String>,
     Headers(user): Headers<UserEmail>,
-    Json(request): Json<config::meta::alerts::incidents::ManualIncidentRequest>,
+    #[cfg(feature = "enterprise")] Json(request): Json<
+        config::meta::alerts::incidents::ManualIncidentRequest,
+    >,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -173,7 +176,7 @@ pub async fn create_incident(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org, user, request);
+        let _ = (org, user);
         MetaHttpResponse::forbidden("Service incidents require the enterprise build")
     }
 }

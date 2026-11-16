@@ -213,7 +213,9 @@ pub async fn overrides(
 pub async fn put_override(
     Path(org): Path<String>,
     Headers(user): Headers<UserEmail>,
-    axum::Json(request): axum::Json<config::meta::service_identity::OverrideWrite>,
+    #[cfg(feature = "enterprise")] axum::Json(request): axum::Json<
+        config::meta::service_identity::OverrideWrite,
+    >,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -228,7 +230,7 @@ pub async fn put_override(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org, user, request);
+        let _ = (org, user);
         HttpResponse::forbidden("Service versions require the enterprise build")
     }
 }
@@ -353,7 +355,7 @@ pub async fn list_aliases(
 pub async fn create_alias(
     Path(org): Path<String>,
     Headers(user): Headers<UserEmail>,
-    axum::Json(request): axum::Json<AliasCreate>,
+    #[cfg(feature = "enterprise")] axum::Json(request): axum::Json<AliasCreate>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -364,7 +366,7 @@ pub async fn create_alias(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org, user, request);
+        let _ = (org, user);
         HttpResponse::forbidden("Service versions require the enterprise build")
     }
 }
@@ -398,7 +400,7 @@ pub async fn create_alias(
 pub async fn update_alias(
     Path((org, key)): Path<(String, String)>,
     Headers(user): Headers<UserEmail>,
-    axum::Json(request): axum::Json<AliasUpdate>,
+    #[cfg(feature = "enterprise")] axum::Json(request): axum::Json<AliasUpdate>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -409,7 +411,7 @@ pub async fn update_alias(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org, user, key, request);
+        let _ = (org, user, key);
         HttpResponse::forbidden("Service versions require the enterprise build")
     }
 }
@@ -481,7 +483,7 @@ pub async fn delete_alias(
 pub async fn bulk_aliases(
     Path(org): Path<String>,
     Headers(user): Headers<UserEmail>,
-    axum::Json(request): axum::Json<AliasBulk>,
+    #[cfg(feature = "enterprise")] axum::Json(request): axum::Json<AliasBulk>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -492,7 +494,7 @@ pub async fn bulk_aliases(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org, user, request);
+        let _ = (org, user);
         HttpResponse::forbidden("Service versions require the enterprise build")
     }
 }
@@ -522,7 +524,7 @@ pub async fn bulk_aliases(
 pub async fn undo_aliases(
     Path(org): Path<String>,
     Headers(user): Headers<UserEmail>,
-    axum::Json(request): axum::Json<AliasUndo>,
+    #[cfg(feature = "enterprise")] axum::Json(request): axum::Json<AliasUndo>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -533,7 +535,7 @@ pub async fn undo_aliases(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org, user, request);
+        let _ = (org, user);
         HttpResponse::forbidden("Service versions require the enterprise build")
     }
 }
@@ -550,49 +552,18 @@ mod tests {
 
     #[tokio::test]
     async fn oss_identity_routes_require_enterprise() {
-        let request = serde_json::from_value(serde_json::json!({"scope":"service","service_name":"svc","where_key":"env:prod","value":"prod"})).unwrap();
         let responses = [
             envs(Path("org".into()), user(), Query(BTreeMap::new())).await,
             unresolved(Path("org".into()), user(), Query(BTreeMap::new())).await,
             overrides(Path("org".into()), user(), Query(BTreeMap::new())).await,
-            put_override(Path("org".into()), user(), axum::Json(request)).await,
+            put_override(Path("org".into()), user()).await,
             delete_override(Path(("org".into(), "key".into())), user()).await,
             list_aliases(Path("org".into()), user(), Query(BTreeMap::new())).await,
-            create_alias(
-                Path("org".into()),
-                user(),
-                axum::Json(
-                    serde_json::from_value(
-                        serde_json::json!({"kind":"rename","alias":"a","canonical":"b"}),
-                    )
-                    .unwrap(),
-                ),
-            )
-            .await,
-            update_alias(
-                Path(("org".into(), "key".into())),
-                user(),
-                axum::Json(serde_json::from_value(serde_json::json!({"status":"active"})).unwrap()),
-            )
-            .await,
+            create_alias(Path("org".into()), user()).await,
+            update_alias(Path(("org".into(), "key".into())), user()).await,
             delete_alias(Path(("org".into(), "key".into())), user()).await,
-            bulk_aliases(
-                Path("org".into()),
-                user(),
-                axum::Json(
-                    serde_json::from_value(
-                        serde_json::json!({"action":"accept","alias_keys":["k"]}),
-                    )
-                    .unwrap(),
-                ),
-            )
-            .await,
-            undo_aliases(
-                Path("org".into()),
-                user(),
-                axum::Json(serde_json::from_value(serde_json::json!({"batch_id":"b"})).unwrap()),
-            )
-            .await,
+            bulk_aliases(Path("org".into()), user()).await,
+            undo_aliases(Path("org".into()), user()).await,
         ];
         for response in responses {
             assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
