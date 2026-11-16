@@ -25,7 +25,6 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use common::utils::sql::escape_like;
 use config::{
     ider,
     meta::{
@@ -35,7 +34,7 @@ use config::{
         self_reporting::{error::NodeErrors, usage::TRIGGERS_STREAM},
         stream::StreamType,
     },
-    utils::time::now_micros,
+    utils::{sql::quote_like_pattern, time::now_micros},
 };
 use db::workflows::{AssociationDeleteEvent, WorkflowTriggerType};
 use infra::table::{
@@ -1524,9 +1523,9 @@ fn history_sql(
     format!(
         "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" \
          WHERE module = 'workflow' AND org = '{org_id}' \
-         AND key like '{}/%'\
+         AND key like {} \
          AND _timestamp >= {start_time} AND _timestamp <= {end_time}",
-        escape_like(workflow_id).replace("'", "''")
+        quote_like_pattern("", workflow_id, "/%")
     )
 }
 

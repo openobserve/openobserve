@@ -31,7 +31,7 @@ use config::{
         search::{Query as SearchQuery, Request as SearchRequest},
         stream::{SecuritySourceSetting, StreamType, UpdateStreamSettings},
     },
-    utils::time::now_micros,
+    utils::{sql::quote_identifier, time::now_micros},
 };
 use o2_enterprise::enterprise::security::{
     ocsf::severity::{SeveritySql, severity_sql},
@@ -666,10 +666,6 @@ fn activity_of(stream: &common::meta::stream::Stream) -> Activity {
     }
 }
 
-fn quote_ident(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
-}
-
 fn attach_error(status: StatusCode, err: AttachError) -> Response {
     (status, Json(err)).into_response()
 }
@@ -843,7 +839,7 @@ async fn search_rows(
 async fn recent_activity(org_id: &str, user_id: &str, stream: &str, now: i64) -> Option<Activity> {
     let sql = format!(
         "SELECT COUNT(*) AS zo_n, MAX(_timestamp) AS zo_last FROM {}",
-        quote_ident(stream)
+        quote_identifier(stream)
     );
     let hits = search_rows(
         org_id,
@@ -872,7 +868,7 @@ async fn classify_one(
         .await
         .ok()?;
     let fields: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
-    let sql = format!("SELECT * FROM {}", quote_ident(&stream.name));
+    let sql = format!("SELECT * FROM {}", quote_identifier(&stream.name));
     let samples: Vec<Map<String, Value>> = search_rows(
         org_id,
         user_id,
@@ -1237,8 +1233,12 @@ async fn create_pipeline(
     let found = realtime_pipelines_for(&list, stream_name);
     if found.len() > 1 {
         let winner = pick_winner(&found).to_string();
-        if winner != mine {
-            let _ = pipeline_service::delete_user_pipeline(org_id, &mine).await;
+        if winner != mine
+            && let Err(e) = pipeline_service::delete_user_pipeline(org_id, &mine).await
+        {
+            log::warn!(
+                "[SECURITY] attach on {org_id}/{stream_name} left duplicate pipeline {mine}: {e}"
+            );
         }
         let created = winner == mine;
         return Ok((winner, created));
@@ -1362,7 +1362,18 @@ async fn detach(
     let function = setting_function_name(&target, stream_name);
     if can(org_id, user_id, "functions", "DELETE", &function).await {
         // A function another pipeline still uses refuses deletion; detach succeeds either way.
-        let _ = openobserve_core::functions::delete_function(org_id, &function).await;
+        if let Err(e) = openobserve_core::functions::delete_function(org_id, &function).await {
+            use openobserve_core::functions::FunctionDeleteError;
+            match e {
+                FunctionDeleteError::FunctionInUse(m)
+                | FunctionDeleteError::PipelineDependencies(m) => log::debug!(
+                    "[SECURITY] detach on {org_id}/{stream_name} kept function {function}: {m}"
+                ),
+                FunctionDeleteError::NotFound => log::warn!(
+                    "[SECURITY] detach on {org_id}/{stream_name} could not delete function {function}"
+                ),
+            }
+        }
     }
     Ok(DetachResponse { setting, skipped })
 }
@@ -1424,12 +1435,6 @@ mod tests {
         assert_eq!(body["streams_readable"], false);
         assert!(body["streams"].as_array().unwrap().is_empty());
         assert!(body.get("listing").is_none());
-    }
-
-    #[test]
-    fn test_quote_ident_escapes_quotes() {
-        assert_eq!(quote_ident("web"), "\"web\"");
-        assert_eq!(quote_ident("a\"b"), "\"a\"\"b\"");
     }
 
     #[test]
