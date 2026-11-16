@@ -16,12 +16,11 @@
 //! Downtime handlers: enterprise-only (D1), 403 in the OSS build and while the flag is off.
 
 #[cfg(feature = "enterprise")]
-use axum::extract::Query;
 use axum::{
     Json,
-    extract::{Path, Query, rejection::JsonRejection},
-    response::Response,
+    extract::{Query, rejection::JsonRejection},
 };
+use axum::{extract::Path, response::Response};
 use config::meta::downtimes::{
     CancelDowntimeQuery, CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest,
     DowntimeTestRequest, DowntimeTestResult, ExtendDowntimeRequest, ExtendDowntimeResponse,
@@ -104,14 +103,14 @@ pub async fn create_downtime(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Query(folder): Query<FolderQuery>,
     Headers(user_email): Headers<UserEmail>,
-    body: Result<Json<DowntimeRequest>, JsonRejection>,
+    #[cfg(feature = "enterprise")] body: Result<Json<DowntimeRequest>, JsonRejection>,
 ) -> Response {
-    let req = match body_of(body) {
-        Ok(req) => req,
-        Err(response) => return response,
-    };
     #[cfg(feature = "enterprise")]
     {
+        let req = match body_of(body) {
+            Ok(req) => req,
+            Err(response) => return response,
+        };
         let mut req = req;
         if let Some(folder) = folder.folder.filter(|f| !f.is_empty()) {
             req.folder_id = folder;
@@ -322,14 +321,14 @@ pub async fn get_downtime(
 pub async fn update_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    body: Result<Json<DowntimeRequest>, JsonRejection>,
+    #[cfg(feature = "enterprise")] body: Result<Json<DowntimeRequest>, JsonRejection>,
 ) -> Response {
-    let req = match body_of(body) {
-        Ok(req) => req,
-        Err(response) => return response,
-    };
     #[cfg(feature = "enterprise")]
     {
+        let req = match body_of(body) {
+            Ok(req) => req,
+            Err(response) => return response,
+        };
         respond(
             openobserve_core::downtimes::update(&org_id, &user_email.user_id, &downtime_id, req)
                 .await,
@@ -589,6 +588,7 @@ pub async fn delete_downtime(
 }
 
 /// A body serde rejects, such as `targets: [null]`, is a 400 whose text names the field path.
+#[cfg(feature = "enterprise")]
 fn body_of<T>(body: Result<Json<T>, JsonRejection>) -> Result<T, Response> {
     use axum::response::IntoResponse;
     body.map(|Json(body)| body)
@@ -663,18 +663,17 @@ mod tests {
         let org = || Path("default".to_string());
         let one = || Path(("default".to_string(), "d1".to_string()));
         let responses = vec![
-            list_downtimes(org(), Query(ListDowntimesQuery::default()), user()).await,
-            create_downtime(
-                org(),
-                Query(FolderQuery::default()),
-                user(),
-                Ok(Json(body.clone())),
-            )
-            .await,
+            list_downtimes(org(), user()).await,
+            create_downtime(org(), user()).await,
+            preview_downtime(org(), user()).await,
+            downtime_resources(org(), user()).await,
+            downtime_values(org(), user()).await,
             get_downtime(one(), user()).await,
-            update_downtime(one(), user(), Ok(Json(body))).await,
-            cancel_downtime(one(), Query(CancelDowntimeQuery::default()), user()).await,
-            extend_downtime(one(), user(), Json(ExtendDowntimeRequest::default())).await,
+            update_downtime(one(), user()).await,
+            cancel_downtime(one(), user()).await,
+            extend_downtime(one(), user()).await,
+            test_downtime(one(), user()).await,
+            move_downtimes(org(), user()).await,
             delete_downtime(one(), user()).await,
         ];
         for response in responses {
@@ -682,6 +681,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_null_target_is_a_400_naming_the_field() {
         use axum::{body::Body, extract::FromRequest, http::Request};
@@ -702,6 +702,7 @@ mod tests {
         assert!(text.contains("targets[0]"), "{text}");
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn other_body_rejections_keep_their_status() {
         use axum::{body::Body, extract::FromRequest, http::Request};
