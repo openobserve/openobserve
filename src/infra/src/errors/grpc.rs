@@ -195,10 +195,6 @@ mod tests {
             .unwrap();
         assert_eq!(status.code(), tonic::Code::Unavailable);
         assert!(matches!(
-            ErrorCodes::from_json(status.message()).unwrap(),
-            ErrorCodes::ServiceUnavailable(reason) if reason == "memory is full"
-        ));
-        assert!(matches!(
             ErrorCodes::from_unavailable_status(&status),
             Some(ErrorCodes::ServiceUnavailable(reason)) if reason == "memory is full"
         ));

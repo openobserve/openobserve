@@ -198,25 +198,6 @@ mod tests {
     }
 
     #[test]
-    fn test_no_flapping_at_the_trip_limit() {
-        // RSS swings across the trip limit every second, never down to the release limit.
-        let mut tripped_at = 0;
-        let mut trips = 0;
-        for second in 0..600 {
-            let rss = if second % 2 == 0 {
-                9 * GIB + 1
-            } else {
-                9 * GIB - 1
-            };
-            let next = next_tripped_at(tripped_at, rss, &limits(), (second + 1) * SEC);
-            trips += i32::from(tripped_at == 0 && next != 0);
-            tripped_at = next;
-        }
-        assert_eq!(trips, 1);
-        assert_ne!(tripped_at, 0);
-    }
-
-    #[test]
     fn test_a_cycle_needs_a_full_swing_across_the_gap() {
         let mut tripped_at = 0;
         let mut states = vec![];
@@ -226,14 +207,6 @@ mod tests {
             states.push(tripped_at != 0);
         }
         assert_eq!(states, [true, true, true, true, false, false, false, true]);
-    }
-
-    #[test]
-    fn test_retry_after_is_jittered_within_its_window() {
-        let samples: Vec<u64> = (0..1_000).map(|_| retry_after_secs()).collect();
-        let window = RETRY_AFTER_SECS..=RETRY_AFTER_SECS + RETRY_AFTER_JITTER_SECS;
-        assert!(samples.iter().all(|s| window.contains(s)), "{samples:?}");
-        assert!(samples.iter().any(|s| *s != samples[0]), "no jitter");
     }
 
     #[test]

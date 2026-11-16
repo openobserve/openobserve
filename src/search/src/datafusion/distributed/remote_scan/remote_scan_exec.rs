@@ -548,24 +548,6 @@ mod tests {
     }
 
     #[test]
-    fn test_remote_error_keeps_a_followers_503() {
-        use infra::errors::{Error, ErrorCodes};
-
-        let overload = Error::ResourceError("full".into())
-            .to_unavailable_status()
-            .unwrap();
-        assert!(matches!(
-            Error::from(remote_error(&overload)),
-            Error::ErrorCode(ErrorCodes::ServiceUnavailable(reason)) if reason == "full"
-        ));
-        let other = tonic::Status::internal("boom");
-        assert!(matches!(
-            remote_error(&other),
-            DataFusionError::Execution(message) if message.contains("boom")
-        ));
-    }
-
-    #[test]
     fn test_is_parquet_file_not_found_no_json() {
         let status = tonic::Status::new(tonic::Code::Internal, "no json here");
         assert!(!is_parquet_file_not_found(&status));

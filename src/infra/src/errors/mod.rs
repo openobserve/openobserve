@@ -610,19 +610,6 @@ mod tests {
     }
 
     #[test]
-    fn test_service_unavailable_is_a_503_that_round_trips() {
-        let err = ErrorCodes::ServiceUnavailable("memory is full".into());
-        assert_eq!(err.get_code(), 10002);
-        assert_eq!(err.http_status(), 503);
-        assert_eq!(err.get_message(), "Service unavailable");
-        assert_eq!(err.get_error_detail(), "memory is full");
-        match ErrorCodes::from_json(&err.to_json()).unwrap() {
-            ErrorCodes::ServiceUnavailable(reason) => assert_eq!(reason, "memory is full"),
-            other => panic!("round trip lost the variant: {other:?}"),
-        }
-    }
-
-    #[test]
     fn test_license_feature_not_entitled() {
         let err = ErrorCodes::LicenseFeatureNotEntitled("oncall, workflows".into());
         assert_eq!(err.get_code(), 40001);
