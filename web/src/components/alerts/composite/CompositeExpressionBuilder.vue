@@ -95,31 +95,24 @@ onMounted(maybeApplyDefault);
 </script>
 
 <template>
-  <section class="flex flex-col gap-3" data-test="alerts-composite-expression-builder">
-    <!-- Live render: operands as level-coloured pills, operators as muted text. -->
-    <div
-      class="border-border-default bg-surface-subtle rounded-default flex min-h-12 flex-wrap items-center gap-1.5 border p-3"
-      data-test="alerts-composite-expression-live"
-      aria-live="polite"
-    >
-      <CompositeExpressionPills
-        v-if="effectiveExpression.trim()"
-        :expression="effectiveExpression"
-        :children="selectedChildren"
-      />
-      <span v-else class="text-text-secondary">{{ t("alerts.composite.expressionEmpty") }}</span>
-    </div>
-
-    <!-- Lettered expression — the editable, human-readable form. -->
+  <section class="flex flex-col gap-2" data-test="alerts-composite-expression-builder">
     <OInput
       :model-value="letteredInput"
-      :label="t('alerts.composite.expression')"
+      :aria-label="t('alerts.composite.expression')"
       :placeholder="t('alerts.composite.expressionPlaceholder')"
       data-test="alerts-composite-expression-input"
       @update:model-value="onLetteredInput"
     />
 
-    <!-- Operator palette + operand letter chips. -->
+    <div
+      v-if="effectiveExpression.trim()"
+      class="flex flex-wrap items-center gap-1.5"
+      data-test="alerts-composite-expression-live"
+      aria-live="polite"
+    >
+      <CompositeExpressionPills :expression="effectiveExpression" :children="selectedChildren" />
+    </div>
+
     <div class="flex flex-wrap items-center gap-1.5">
       <span class="text-text-secondary text-xs">{{ t("alerts.composite.insert") }}</span>
       <OButton
@@ -180,7 +173,6 @@ onMounted(maybeApplyDefault);
       </OButton>
     </div>
 
-    <!-- Unused children — offered as one-click place chips. -->
     <div
       v-if="unusedChildren.length"
       class="flex flex-wrap items-center gap-2"
@@ -208,12 +200,12 @@ onMounted(maybeApplyDefault);
       {{ t("alerts.composite.invalidExpression") }}
     </div>
 
-    <!-- Advanced: the raw `{id}` form, hidden behind a toggle. -->
-    <div class="border-border-default flex flex-col gap-2 border-t pt-2">
+    <div class="flex flex-col gap-2">
       <OButton
         variant="ghost-muted"
         size="xs"
         icon-left="code"
+        class="self-start"
         data-test="alerts-composite-expression-advanced-toggle"
         :aria-expanded="advancedOpen"
         @click="advancedOpen = !advancedOpen"

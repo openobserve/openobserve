@@ -170,7 +170,7 @@ const childLink = (child: CompositeChildOption): string =>
 
       <div
         v-if="count === 0"
-        class="text-text-secondary py-4 text-center text-xs"
+        class="text-text-secondary text-xs"
         data-test="alerts-composite-child-empty"
       >
         {{ t("alerts.composite.noChildren") }}

@@ -38,6 +38,18 @@ describe("CompositeExpressionBuilder", () => {
     expect(wrapper.find('[data-test="alerts-composite-expression-live"]').exists()).toBe(true);
   });
 
+  it("shows no live render for an empty expression and names the input without a visible label", () => {
+    const wrapper = mountBuilder("", selectedChildren.slice(0, 1));
+
+    expect(wrapper.find('[data-test="alerts-composite-expression-live"]').exists()).toBe(false);
+    expect(wrapper.find("label").exists()).toBe(false);
+    expect(
+      wrapper
+        .find('[data-test="alerts-composite-expression-input-field"]')
+        .attributes("aria-label"),
+    ).toBe(i18n.global.t("alerts.composite.expression"));
+  });
+
   it("renders a live pill per operand without leaking IDs or child names", () => {
     const wrapper = mountBuilder("{id-a} || ({id-b} && !{id-c})");
     const live = wrapper.find('[data-test="alerts-composite-expression-live"]');
