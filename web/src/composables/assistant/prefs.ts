@@ -111,18 +111,6 @@ const MAX_KEPT_ROWS = 200;
 
 const MAX_HISTORY_KEYS = 50;
 
-// A stored vote reason is only ever one of the bar's reasons or a findings outcome.
-const FEEDBACK_REASONS: ReadonlySet<unknown> = new Set([
-  "wrong_data",
-  "wrong_query",
-  "too_slow",
-  "wrong_action",
-  "other",
-  "cause:yes",
-  "cause:no",
-  "cause:unsure",
-]);
-
 const SESSION_KEYS = {
   selected: (k: string) => `o2.assistant.selected:${k}`,
   placement: (k: string) => `o2.assistant.placement:${k}`,
@@ -542,11 +530,6 @@ function toAnnotation(value: unknown): BlockAnnotation | null {
   if (!value || typeof value !== "object") return null;
   const source = value as Record<string, any>;
   const out: BlockAnnotation = {};
-  const rating = source.feedback?.rating;
-  if (rating === "up" || rating === "down") {
-    const reason = source.feedback.reason;
-    out.feedback = { rating, ...(FEEDBACK_REASONS.has(reason) && { reason }) };
-  }
   const openedAt = source.linkOutcome?.openedAt;
   if (typeof openedAt === "number" && Number.isFinite(openedAt)) out.linkOutcome = { openedAt };
   const from = source.window?.from;

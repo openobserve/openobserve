@@ -107,6 +107,7 @@ export const serialize: RequestBuilder = (session, snapshot, client, turn) => {
     message: { text, ...(snapshot.images.length > 0 && { images: [...snapshot.images] }) },
     context: {
       ...context,
+      ...session.pinnedContext,
       client,
       user_timezone: browserTimezone(),
       locale: uiIntlLocale(),

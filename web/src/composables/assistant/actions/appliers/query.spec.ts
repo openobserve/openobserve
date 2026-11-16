@@ -59,7 +59,6 @@ describe("query applier", () => {
       rows: [{ a: "1" }, { a: "2" }],
     });
     expect(store.state.sessions[sid].annotations.b1.run).toMatchObject({ status: "done", rows: 4 });
-    expect(env.feedback).not.toHaveBeenCalled();
   });
 
   it("says empty for zero rows, never an empty table", async () => {

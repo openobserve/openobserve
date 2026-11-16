@@ -1694,6 +1694,7 @@ function applyInit(session: AssistantSession, init: SessionInit): void {
   session.title = init.title ?? null;
   session.titleSource = init.title ? "object" : "generated";
   if (init.messages?.length) session.messages = [...init.messages];
+  delete session.pinnedContext;
 }
 
 function emptyComposer(sendId: string): ComposerState {

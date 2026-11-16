@@ -568,11 +568,8 @@ export function chipOpenQuery(chip: ContextChip, org: string): QueryRef | null {
   };
 }
 
-/** Where a turn's vote, findings outcome and asked window are kept beside its blocks. */
-export function turnAnnotationKey(
-  turnId: string,
-  what: "feedback" | "findings" | "window",
-): string {
+/** Where a turn's asked window is kept beside its blocks. */
+export function turnAnnotationKey(turnId: string, what: "window"): string {
   return `turn:${turnId}:${what}`;
 }
 

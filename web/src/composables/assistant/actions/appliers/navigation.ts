@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { isNavigationFailure } from "vue-router";
+import { isNavigationFailure, type Router } from "vue-router";
 
 import {
   encodeHomeReturn,
@@ -21,7 +21,9 @@ import {
   homeReturnFor,
   type HomeReturnState,
 } from "@/composables/goto/homeReturn";
+import store from "@/stores";
 import { AI_CHAT_QUERY, EXPLORER_ROUTE_NAMES } from "@/utils/assistant/explorerRoutes";
+import { featureState, routeLicenseFeature } from "@/utils/featureGate";
 
 import {
   ASSISTANT_SET_QUERY_KEY,
@@ -63,6 +65,8 @@ export async function openTarget(
   const router = env.router();
   const session = env.store().state.sessions[sid];
   if (!router || !session) return { ok: false, reason: "failed" };
+  // A page the license leaves out is never opened, by a click or by Auto Navigation; the card stays.
+  if (isLicenseLocked(router, target)) return { ok: false, reason: "gated" };
   const { org_identifier: _org, ...query }: Record<string, string> = { ...(target.query ?? {}) };
   const traces = target.name === EXPLORER_ROUTE_NAMES.traces;
   // An open Traces page re-applies a link only on a new nonce, and a repeated service link is otherwise the same URL.
@@ -116,8 +120,15 @@ function assistantSetOf(query: Record<string, string>): string {
   return encodeAssistantSet(fields);
 }
 
+function isLicenseLocked(router: Pick<Router, "resolve">, target: RouteTarget): boolean {
+  const key = routeLicenseFeature(
+    router.resolve({ name: target.name, params: target.params ?? {}, query: target.query ?? {} }),
+  );
+  return !!key && featureState(store.state.zoConfig?.features, key) === "locked";
+}
+
 // A docked container or a host with unsaved changes never navigates its own page.
-function mustOpenElsewhere(env: ActionEnv): boolean {
+export function mustOpenElsewhere(env: Pick<ActionEnv, "store" | "hosts">): boolean {
   if (env.store().state.shell.placement.kind === "docked") return true;
   return env.hosts.mounted.value.some((id) => env.hosts.get(id)?.isDirty() === true);
 }

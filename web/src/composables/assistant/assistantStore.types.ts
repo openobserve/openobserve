@@ -241,7 +241,6 @@ export interface BlockAnnotation {
   approvalOutcome?: ApprovalOutcome;
   /** The timeline entries an approval made, kept with its record so a reload has them. */
   ledger?: ActionLedgerEntry[];
-  feedback?: { rating: "up" | "down"; reason?: string };
   versionIndex?: number;
   run?: QueryRunState;
   /** The page's window when the turn was asked, epoch ms. */
@@ -321,6 +320,8 @@ export interface OpenAssistantArgs {
     removedPageKeys?: string[];
     /** Images attached at the door; the composer's own caps apply. */
     images?: ImageAttachment[];
+    /** An Ask hand-off's context (RCA keys stripped), pinned to the chat and sent with each of its turns. */
+    context?: Record<string, unknown>;
   };
   /** RCA interactive mode (`60` §5.1), forwarded on `PromptRequest`. */
   mode?: "chat";
@@ -608,8 +609,6 @@ export interface AssistantCapability {
   historyImport?: boolean;
   /** The server answers a turn's versions (`turn_versions`). */
   turnVersions?: boolean;
-  /** The server stores a vote with its turn (`feedback_stored`). */
-  feedbackStored?: boolean;
   /** `mode: "chat"` with `incident_id` reaches the interactive incident agent (`rca_chat_mode`). */
   rcaChatMode?: boolean;
   /** The org's data-sharing level (`data_sharing_level`); absent reads as raw. */
@@ -743,6 +742,8 @@ export interface AssistantSession {
   agentId?: AgentId;
   /** Picked on a chat with turns; becomes `agentId` when the next send's `turn_started` echoes it. */
   nextAgentId?: AgentId;
+  /** An Ask hand-off's context, merged into every turn's `context`; in memory only, never persisted. */
+  pinnedContext?: Record<string, unknown>;
 }
 
 export interface AssistantState {

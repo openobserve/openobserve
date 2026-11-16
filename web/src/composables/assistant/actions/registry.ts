@@ -15,12 +15,7 @@
 
 import type { Router } from "vue-router";
 
-import type {
-  ConfirmBody,
-  ConfirmResponse,
-  FeedbackBody,
-  UndoResponse,
-} from "@/services/assistant";
+import type { ConfirmBody, ConfirmResponse, UndoResponse } from "@/services/assistant";
 import { trackAssistant, type AiEventProps } from "@/services/assistantAnalytics";
 import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import type { TranslateFn } from "@/types/i18n";
@@ -74,7 +69,6 @@ export interface ActionEnv {
   openTab(href: string): boolean;
   copy(text: string): Promise<boolean>;
   search(request: SearchRequest): Promise<Record<string, unknown>>;
-  feedback(org: string, sid: Sid, body: FeedbackBody): Promise<void>;
   /** `POST /ai/confirm/{sid}` on the session the card was asked in. */
   confirm(org: string, sid: Sid, body: ConfirmBody, timeoutMs?: number): Promise<ConfirmResponse>;
   /** The server's undo of one action-ledger entry. */
@@ -211,20 +205,6 @@ function trackAction(sid: Sid, action: AssistantAction, result: ActionResult): v
     }
     case "open_step":
       return evidence("open_claim_step", "claim");
-    case "feedback": {
-      const turnId = (result.detail as { turnId?: string } | undefined)?.turnId;
-      if (!turnId) return;
-      trackAssistant(
-        "ai_feedback",
-        {
-          value: action.vote,
-          ...(isReason(action.reason) && { reason: action.reason }),
-          outcome: "done",
-        },
-        { sid, turnId },
-      );
-      return;
-    }
     default:
       return;
   }
@@ -240,16 +220,4 @@ function evidence(
     block_kind: blockKind,
     ...(language && { language }),
   });
-}
-
-function isReason(
-  reason: string | undefined,
-): reason is "wrong_data" | "wrong_query" | "too_slow" | "wrong_action" | "other" {
-  return (
-    reason === "wrong_data" ||
-    reason === "wrong_query" ||
-    reason === "too_slow" ||
-    reason === "wrong_action" ||
-    reason === "other"
-  );
 }

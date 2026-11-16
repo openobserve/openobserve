@@ -310,15 +310,8 @@ describe("manualRouteOf", () => {
     });
   });
 
-  it("keys a turn's vote, findings outcome and window apart", () => {
-    expect(
-      new Set([
-        turnAnnotationKey("t1", "feedback"),
-        turnAnnotationKey("t1", "findings"),
-        turnAnnotationKey("t1", "window"),
-        turnAnnotationKey("t2", "feedback"),
-      ]).size,
-    ).toBe(4);
+  it("keys each turn's window apart", () => {
+    expect(turnAnnotationKey("t1", "window")).not.toBe(turnAnnotationKey("t2", "window"));
   });
 
   it("is null without any query", () => {

@@ -163,20 +163,4 @@ describe("action registry", () => {
     ]);
     expect(JSON.stringify(track.mock.calls)).not.toContain("SELECT");
   });
-
-  it("tracks ai_feedback only on success and scoped to the voted turn", async () => {
-    registerApplier("feedback", () => ({ ok: true, detail: { turnId: "t1" } }));
-    createActionDispatcher(makeEnv().env);
-    await applyAction("s1", {
-      kind: "feedback",
-      messageId: "t1",
-      vote: "down",
-      reason: "wrong_query",
-    });
-    expect(track).toHaveBeenCalledWith(
-      "ai_feedback",
-      { value: "down", reason: "wrong_query", outcome: "done" },
-      { sid: "s1", turnId: "t1" },
-    );
-  });
 });

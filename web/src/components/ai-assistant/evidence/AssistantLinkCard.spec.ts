@@ -190,4 +190,52 @@ describe("AssistantLinkCard", () => {
       "Link in the answer",
     );
   });
+
+  describe("license lock", () => {
+    const lockedRoutes = [
+      {
+        path: "/dashboards/view",
+        name: "viewDashboard",
+        meta: { licenseFeature: "dashboards" },
+        component: { render: () => null },
+      },
+    ];
+    const mountWith = (state: string) => {
+      const evidence = fakeEvidence();
+      evidence.host.currentOrg.mockReturnValue("default");
+      const store = {
+        state: {
+          zoConfig: {
+            features: { dashboards: state },
+            feature_names: { dashboards: "Dashboards" },
+          },
+        },
+      };
+      const wrapper = mount(AssistantLinkCard, {
+        props: { source: "navigation", blockId: "b1", sid: evidence.sid, link: dashboard },
+        attachTo: document.body,
+        global: {
+          plugins: [fakeRouter(lockedRoutes)],
+          provide: { ...evidence.provide, store },
+        },
+      });
+      return { wrapper, ...evidence };
+    };
+
+    it("disables Open on a page the license leaves out and says why", async () => {
+      const { wrapper, host } = mountWith("locked");
+      const button = wrapper.get('[data-test="assistant-link-card-locked"]');
+      expect(button.text()).toContain("Locked: needs Dashboards");
+      expect(wrapper.find('[data-test="assistant-link-card-open"]').exists()).toBe(false);
+      await button.trigger("click");
+      await flushPromises();
+      expect(host.dispatch).not.toHaveBeenCalled();
+    });
+
+    it("opens a page the license includes", () => {
+      const { wrapper } = mountWith("enabled");
+      expect(wrapper.find('[data-test="assistant-link-card-locked"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="assistant-link-card-open"]').exists()).toBe(true);
+    });
+  });
 });

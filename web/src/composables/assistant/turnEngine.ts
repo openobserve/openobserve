@@ -30,7 +30,7 @@ import {
   suggestionFor,
 } from "./agents";
 import { ERROR_LEDGER, isConsentPrompt } from "./assistantErrors";
-import { renameWindowSid, type AssistantStoreInternal } from "./assistantStore";
+import { renameWindowSid, sessionView, type AssistantStoreInternal } from "./assistantStore";
 import type {
   AgentId,
   ApprovalsService,
@@ -62,8 +62,8 @@ import {
   type TurnSource,
 } from "./effects";
 import { footerOf, turnAnnotationKey } from "./evidence";
-import type { AssistantFrame } from "./frames";
-import { generateNavigationFromToolResult } from "./navigationRoutes";
+import type { AssistantFrame, NavigationActionFrame } from "./frames";
+import { buildNavigationRoute, generateNavigationFromToolResult } from "./navigationRoutes";
 import { useAssistantName } from "./useAssistantName";
 import {
   answerProgress,
@@ -171,6 +171,8 @@ export interface TurnEngineDeps {
   visibility?: { hidden(): boolean; onVisible(cb: () => void): () => void };
   /** The approvals runtime the reducer's card frames go to. */
   approvals?: () => Pick<ApprovalsService, "onConfirmationRequired" | "onResolved">;
+  /** The chat's Auto Navigation toggle allows a same-tab open; when false the link stays a card to click. */
+  autoNavigation?: (sid: Sid) => boolean;
 }
 
 /** The engine's record of one running turn; lives in `turnRuntime`, never in reactive state. */
@@ -220,6 +222,8 @@ interface TurnRecord {
   throughSeq: AssistantFrame[];
   /** Frames applied since the cursor last moved; a tail from the cursor sends their content again. */
   sinceSeq: AssistantFrame[];
+  /** Navigation frames already opened, so a tail resending one never navigates twice. */
+  navigated?: Set<string>;
   cancelConfirmed?: boolean;
   cancelMs: number | null;
   silenceTimer?: ReturnType<typeof setTimeout>;
@@ -427,6 +431,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         const fresh = session ? cursorFrame(rec, session.turnMeta, frame, id, tail) : frame;
         watchSilence(rec, true);
         if (!fresh) return;
+        if (fresh.type === "navigation_action") autoNavigate(rec, fresh);
         runner.schedule(rec.sid, frameWork(rec, fresh));
         if (fresh.type === "complete" || fresh.type === "error" || fresh.type === "cancelled") {
           runner.flush(rec.sid);
@@ -469,6 +474,24 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         dispatch(rec, { type: "eof", hasTail: hasTail(rec) });
       },
     };
+  };
+
+  // Auto Navigation opens the link of a chat on screen; the card is still appended as the record.
+  const autoNavigate = (rec: TurnRecord, frame: NavigationActionFrame) => {
+    const session = sessionOf(rec.sid);
+    const key = JSON.stringify(frame);
+    if (!session || !acceptsFrames(session.turn) || rec.navigated?.has(key)) return;
+    if (!deps.autoNavigation?.(rec.sid) || !sessionView(session, deps.store().state.shell).visible)
+      return;
+    const link = buildNavigationRoute(frame, session.org);
+    if (!link) return;
+    (rec.navigated ??= new Set()).add(key);
+    void deps.store().dispatch(rec.sid, {
+      kind: "navigate",
+      target: link.route,
+      newTab: false,
+      label: raw(link.name ?? ""),
+    });
   };
 
   // The SSE id rule (WP-18): a frame tagged N comes after seq N and several frames share N, so a repeated id is never a reason to drop one.
@@ -1010,6 +1033,7 @@ function defaultRequestBuilder(
       },
       context: {
         ...(rec?.pageContext ?? {}),
+        ...session.pinnedContext,
         client,
         user_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },

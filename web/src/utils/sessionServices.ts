@@ -38,11 +38,9 @@ interface ExpiringStore extends SessionServicesStore {
   dispatch: (type: "logout") => unknown;
 }
 
-/** Stops what outlives a page change: the search socket, AI chat streams, open toasts, access denials and the RUM user. */
+/** Stops what outlives a page change: the search socket, open toasts, access denials and the RUM user. */
 export const stopSessionServices = (store: SessionServicesStore): void => {
   closeSearchSocket();
-  // AI chat streams outlive their component by design, so sign-out stops them explicitly.
-  window.dispatchEvent(new Event("o2:abort-ai-streams"));
   dismissAll();
   resetAccess();
   if (store.state.zoConfig?.rum?.enabled) {

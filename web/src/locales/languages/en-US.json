@@ -11220,6 +11220,11 @@
       "title": "You're signed in"
     },
     "composer": {
+      "autoNavigation": {
+        "label": "Auto Navigation",
+        "enabledTooltip": "Auto navigation enabled - {product} will auto navigate without confirmation",
+        "disabledTooltip": "Auto navigation disabled - {product} will ask before navigating"
+      },
       "cleared": "Draft cleared",
       "clearedOrg": "Draft from {org} cleared",
       "draftStayed": "New chat. Your draft stayed in {chat}",
@@ -11920,10 +11925,7 @@
         "low": "low",
         "medium": "medium"
       },
-      "no": "No",
       "ruledOut": "Ruled out",
-      "wasThisTheCause": "Was this the cause?",
-      "yes": "Yes",
       "inferredLine": "Inferred: {text}",
       "next": "Next: {text}",
       "notEstablished": "Not established: {text}",

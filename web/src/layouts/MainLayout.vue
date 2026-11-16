@@ -235,7 +235,12 @@ import { useRouteEnterFade } from "@/layouts/useRouteEnterFade";
 import { PAGE_ENTRANCE_KEY } from "@/lib/core/PageLayout/pageEntrance";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav";
-import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
+import {
+  featureState,
+  menuState,
+  routeLicenseFeature,
+  type FeatureState,
+} from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
 import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
@@ -523,11 +528,8 @@ export default defineComponent({
     const features = computed(() => store.state.zoConfig?.features);
     // `route.meta` merges every matched record, so a gated parent locks its child pages too.
     const lockedFeature = computed<string | null>(() => {
-      const { meta, query } = router.currentRoute.value;
-      const key = meta?.licenseFeatureFromStreamType
-        ? streamTypeFeature(query.stream_type as string | undefined)
-        : meta?.licenseFeature;
-      return typeof key === "string" && featureState(features.value, key) === "locked" ? key : null;
+      const key = routeLicenseFeature(router.currentRoute.value);
+      return key && featureState(features.value, key) === "locked" ? key : null;
     });
     const isIncidentsEnabled = computed(
       () => isEnterpriseOrCloud && !!store.state.zoConfig.incidents_enabled,

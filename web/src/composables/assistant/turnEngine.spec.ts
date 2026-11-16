@@ -97,6 +97,7 @@ function setup(
     page?: Record<string, unknown>;
     pageRead?: Promise<void>;
     dataLevel?: "schema" | "aggregates" | "raw";
+    autoNavigation?: boolean;
   } = {},
 ) {
   const persistence = { value: opts.persistence ?? true };
@@ -165,6 +166,7 @@ function setup(
     raf: (cb) => cb(),
     visibility,
     ...(opts.approvals && { approvals: () => opts.approvals! }),
+    ...(opts.autoNavigation !== undefined && { autoNavigation: () => opts.autoNavigation! }),
   });
   deps.engine = engine;
   store = createAssistantStore(deps, {
@@ -2642,5 +2644,61 @@ describe("turnEngine: the chat list after the turn ends", () => {
     expect(rows.filter((row) => row.group === "answering" || row.group === "needs_you")).toEqual(
       [],
     );
+  });
+});
+
+describe("turnEngine: auto navigation", () => {
+  const nav: AssistantFrame = {
+    type: "navigation_action",
+    resource_type: "dashboard",
+    action: "open",
+    target: { dashboard: "d1", name: "Checkout" },
+  };
+
+  async function navigateWith(autoNavigation: boolean) {
+    const h = setup({ autoNavigation });
+    h.store.open({ kind: "sidebar" }, { sid: h.current.sid, focus: "none" });
+    const dispatch = vi.spyOn(h.store, "dispatch").mockResolvedValue({ ok: true });
+    h.type("open the checkout dashboard");
+    void h.store.send(h.current.sid);
+    await settle();
+    h.feed({ type: "message_delta", content: "Opening it." }, nav);
+    await settle();
+    return { h, dispatch };
+  }
+
+  const linkBlocks = (h: ReturnType<typeof setup>) =>
+    (h.session().messages[1].contentBlocks ?? []).filter((block) => block.type === "link");
+
+  it("opens the link once in the same tab when on, and keeps the card as the record", async () => {
+    const { h, dispatch } = await navigateWith(true);
+    // A tail resending the same frame never navigates again.
+    h.feed(nav);
+    await settle();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith(h.current.sid, {
+      kind: "navigate",
+      target: { name: "viewDashboard", query: expect.objectContaining({ dashboard: "d1" }) },
+      newTab: false,
+      label: raw("Checkout"),
+    });
+    expect(linkBlocks(h).length).toBeGreaterThan(0);
+  });
+
+  it("only shows the card when off", async () => {
+    const { h, dispatch } = await navigateWith(false);
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(linkBlocks(h)).toHaveLength(1);
+  });
+
+  it("never navigates for a chat that is not on screen", async () => {
+    const h = setup({ autoNavigation: true });
+    const dispatch = vi.spyOn(h.store, "dispatch").mockResolvedValue({ ok: true });
+    h.type("open the checkout dashboard");
+    void h.store.send(h.current.sid);
+    await settle();
+    h.feed(nav);
+    await settle();
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });

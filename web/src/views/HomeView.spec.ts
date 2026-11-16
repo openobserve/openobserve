@@ -125,6 +125,9 @@ vi.mock("@/composables/assistant", async () => {
       return prefs.migrateHome(key);
     },
     writeHome: prefs.writeHome,
+    openAssistant: assistantDoor.open,
+    legacyRelayArgs: (await import("@/composables/assistant/context/legacyPayloadToChips"))
+      .legacyRelayArgs,
   };
 });
 vi.mock("@/views/UsageTab.vue", () => ({
@@ -661,21 +664,36 @@ describe("HomeView", () => {
       expect(has("overview-tab-stub")).toBe(false);
     });
 
-    it("hands an Overview Ask AI to the assistant's door, staying on Overview", async () => {
+    it("opens an insight's Ask AI as a new chat in the AI tab, the facts in a named chip", async () => {
       assistant.userOrgKey = "k1";
       assistantDoor.open.mockClear();
       wrapper = mountHome();
       await settleAsync();
       (wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab = "overview";
       await settleAsync();
-      const handoff = { query: "Why is checkout slow?", chipName: "Checkout", newChat: true };
+      // The shape `askAiPayload` builds for an insight card or live row.
+      const handoff = {
+        query: "Kind: error spike",
+        prompt: "Why did errors spike?",
+        chipName: "AutoObserve · checkout",
+        newChat: true,
+        autoSend: false,
+        context: { currentPage: "autoobserve", org_id: "default" },
+      };
       wrapper.findComponent({ name: "OverviewTab" }).vm.$emit("sendToAiChat", handoff);
       await settleAsync();
-      expect(assistantDoor.open).toHaveBeenCalledWith({
-        entryKind: "legacy_relay",
-        relayed: handoff,
-      });
-      expect((wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab).toBe("overview");
+      expect(assistantDoor.open).toHaveBeenCalledOnce();
+      const call = assistantDoor.open.mock.calls[0][0];
+      expect(call).toMatchObject({ intent: "stage", thread: "new", container: "full" });
+      expect(call.payload.text).toBe("Why did errors spike?");
+      expect(call.payload.chips).toEqual([
+        expect.objectContaining({
+          kind: "report",
+          label: "AutoObserve · checkout",
+          data: "Kind: error spike",
+        }),
+      ]);
+      expect((wrapper.vm as unknown as { activeHomeTab: string }).activeHomeTab).toBe("ai");
     });
 
     it("hides the AI tab and opens on Overview when AI is off for the org", async () => {

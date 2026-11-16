@@ -845,10 +845,13 @@ export default defineComponent({
     });
     const homePrefsReady = homePrefs.ready;
 
-    // The hand-off goes through the assistant's one door, as MainLayout relays a page's payload.
+    // Ask AI opens a new chat in the AI tab with the chip and the question in the input.
     function onSendToAiChat(handoff: AiChatHandoff) {
       if (aiLocked.value) return;
-      void assistantModule.then((m) => m.openAssistant(m.legacyRelayArgs(handoff)));
+      activeHomeTab.value = AI_HOME_TAB;
+      void assistantModule.then((m) =>
+        m.openAssistant({ ...m.legacyRelayArgs(handoff), container: "full" }),
+      );
     }
 
     // One `/` binding for Home, so launchers swapping in and out never unbind each other; the visible one answers the request.

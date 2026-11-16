@@ -38,6 +38,7 @@ import { contextRegistry } from "@/composables/contextProviders/registry";
 import { requestOverviewFocus } from "@/composables/goto/goToRequests";
 import { queryClient } from "@/composables/query/queryClient";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
+import { isAutoNavigationEnabled } from "@/composables/useAutoNavigationPreferences";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import assistantService, {
@@ -62,6 +63,7 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 
 import { requestDashboardDraft } from "./actions/appliers/drafts";
+import { mustOpenElsewhere } from "./actions/appliers/navigation";
 import { pruneQueryRuns } from "./actions/appliers/query";
 import { registerBuiltInAppliers } from "./actions/appliers";
 import { createActionDispatcher, type ActionEnv } from "./actions/registry";
@@ -213,6 +215,7 @@ function buildRuntime(): AssistantRuntime {
         () => capability,
         () => lgUp.value,
         uiVersion,
+        () => hosts,
       ),
     );
 
@@ -518,6 +521,7 @@ function engineDeps(
   capability: () => AssistantCapabilityHandle,
   lgUp: () => boolean,
   uiVersion: ShallowRef<string>,
+  hosts: () => HostRegistry,
 ): TurnEngineDeps {
   return {
     client: useAssistantClient(),
@@ -544,6 +548,10 @@ function engineDeps(
     // The turn-stream route serves only a server that saves chats; it answers 404 otherwise.
     tailEnabled: () => capability().capability.value.persistence,
     approvals: () => deps.approvals,
+    // A docked or dirty page opens links in a new tab, which only a click may do.
+    autoNavigation: (sid) =>
+      isAutoNavigationEnabled(store().state.userOrgKey, sid) &&
+      !mustOpenElsewhere({ store, hosts: hosts() }),
   };
 }
 
@@ -570,7 +578,6 @@ function actionEnv(
     openTab: openTabWithoutOpener,
     copy: (text) => copyToClipboard(text, gt, { silent: true }),
     search: (request) => streamSearch(streaming, request, generateTraceContext().traceId),
-    feedback: (org, sid, body) => client.feedback(org, sid, body),
     confirm: (org, sid, body, timeoutMs) => client.confirm(org, sid, body, timeoutMs),
     undo: (org, ledgerId) => assistantService.undo(org, ledgerId),
     requestAlert: (prefill) => requestAlertCreation(prefill),

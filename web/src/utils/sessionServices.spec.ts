@@ -32,14 +32,10 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ dismissAll: vi.fn() }));
 describe("stopSessionServices", () => {
   afterEach(() => vi.clearAllMocks());
 
-  it("closes the search socket, stops AI streams, clears toasts and resets the RUM user", () => {
-    const aborted = vi.fn();
-    window.addEventListener("o2:abort-ai-streams", aborted);
+  it("closes the search socket, clears toasts and resets the RUM user", () => {
     stopSessionServices({ state: { zoConfig: { rum: { enabled: true } } } });
-    window.removeEventListener("o2:abort-ai-streams", aborted);
 
     expect(closeSearchSocket).toHaveBeenCalledTimes(1);
-    expect(aborted).toHaveBeenCalledTimes(1);
     expect(dismissAll).toHaveBeenCalledTimes(1);
     expect(openobserveRum.stopSessionReplayRecording).toHaveBeenCalledTimes(1);
     expect(openobserveRum.clearUser).toHaveBeenCalledTimes(1);

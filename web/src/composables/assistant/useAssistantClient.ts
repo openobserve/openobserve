@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import assistantService, {
-  type ConfirmBody,
-  type ConfirmResponse,
-  type FeedbackBody,
-} from "@/services/assistant";
+import assistantService, { type ConfirmBody, type ConfirmResponse } from "@/services/assistant";
 import { refreshSession as httpRefreshSession } from "@/services/http";
 import incidentsService, { type Incident } from "@/services/incidents";
 import store from "@/stores";
@@ -81,14 +77,13 @@ export interface AssistantClient {
   ): Promise<TailResult>;
   stop(org: string, session: StopTarget): Promise<void>;
   confirm(org: string, sid: Sid, body: ConfirmBody, timeoutMs?: number): Promise<ConfirmResponse>;
-  feedback(org: string, sid: Sid, body: FeedbackBody): Promise<void>;
 }
 
 export interface AssistantClientOptions {
   fetchImpl?: typeof fetch;
   /** The non-destructive refresh of `services/http.ts`; injected by specs. */
   refreshSession?: () => Promise<"refreshed" | "expired">;
-  services?: Pick<typeof assistantService, "cancelTurn" | "confirm" | "feedback">;
+  services?: Pick<typeof assistantService, "cancelTurn" | "confirm">;
   /** API origin; the store's `API_ENDPOINT` by default. */
   baseUrl?: () => string;
 }
@@ -197,7 +192,6 @@ export function useAssistantClient(opts: AssistantClientOptions = {}): Assistant
       await services.cancelTurn(org, session.sid, session.turnId);
     },
     confirm: (org, sid, body, timeoutMs) => services.confirm(org, sid, body, timeoutMs),
-    feedback: (org, sid, body) => services.feedback(org, sid, body),
   };
 }
 

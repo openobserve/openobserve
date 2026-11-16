@@ -294,7 +294,6 @@ describe("B-06 capabilities", () => {
       historyPins: true,
       historyImport: true,
       turnVersions: true,
-      feedbackStored: true,
       rcaChatMode: true,
     });
   });
@@ -307,7 +306,6 @@ describe("B-06 capabilities", () => {
       "historyPins",
       "historyImport",
       "turnVersions",
-      "feedbackStored",
       "rcaChatMode",
     ])
       expect(cap(handle)).not.toHaveProperty(flag);

@@ -145,7 +145,6 @@ const SAMPLES: { [N in AiEventName]: AiEventProps[N] } = {
     scan_estimate_bucket: "21_100",
   },
   ai_nl_decided: { decision: "accept", validated: "ok" },
-  ai_feedback: { value: "up", reason: "wrong_data", outcome: "done" },
   ai_thread_action: {
     action: "download",
     had_running: false,
@@ -262,7 +261,6 @@ const CATALOGUE: Record<AiEventName, string[]> = {
   ai_navigation: ["mode", "taken", "blocked_unsaved"],
   ai_nl_proposal: ["outcome", "language", "host", "validated", "scan_estimate_bucket"],
   ai_nl_decided: ["decision", "validated"],
-  ai_feedback: ["value", "reason", "outcome"],
   ai_thread_action: ["action", "had_running", "had_draft", "scope", "format", "to", "count"],
   ai_history_open: ["placement"],
   ai_history_search: ["length_bucket", "server"],
@@ -326,7 +324,7 @@ afterEach(() => {
 describe("event catalogue", () => {
   it("pins every event name of 99 §3.3", () => {
     expect([...AI_EVENT_NAMES].sort()).toEqual(Object.keys(CATALOGUE).sort());
-    expect(AI_EVENT_NAMES).toHaveLength(66);
+    expect(AI_EVENT_NAMES).toHaveLength(65);
   });
 
   it.each(AI_EVENT_NAMES)("%s carries exactly its catalogue properties", (name) => {
@@ -482,13 +480,8 @@ describe("trackAssistant", () => {
     expect(track.mock.calls[1][1]).toMatchObject({ viewport: "tablet" });
   });
 
-  it("allows value only as ai_feedback's up/down enum", () => {
+  it("rejects the banned value property", () => {
     expect(() => fire("ai_admin", { ...SAMPLES.ai_admin, value: "up" })).toThrow(/value/);
-    expect(() => fire("ai_feedback", SAMPLES.ai_feedback, TURN)).not.toThrow();
-  });
-
-  it("rejects ai_feedback unless the turn ended done", () => {
-    expect(() => fire("ai_feedback", { value: "down", outcome: "failed" }, TURN)).toThrow(/done/);
   });
 
   it("truncates the unknown frame type to 32 characters", () => {
@@ -549,7 +542,6 @@ describe("legacy mapping (one release)", () => {
       ai_stop_chat: legacyEventsFor("ai_stop", SAMPLES.ai_stop),
       ai_stop_helper: legacyEventsFor("ai_stop", { ...SAMPLES.ai_stop, surface: "inline_helper" }),
       ai_approval_decided: legacyEventsFor("ai_approval_decided", SAMPLES.ai_approval_decided),
-      ai_feedback: legacyEventsFor("ai_feedback", SAMPLES.ai_feedback),
       ai_nl_proposal: legacyEventsFor("ai_nl_proposal", SAMPLES.ai_nl_proposal),
       ai_nl_proposal_failed: legacyEventsFor("ai_nl_proposal", {
         ...SAMPLES.ai_nl_proposal,
@@ -563,14 +555,6 @@ describe("legacy mapping (one release)", () => {
             "name": "ai_assistant_tool_call_answered",
             "properties": {
               "approved": true,
-            },
-          },
-        ],
-        "ai_feedback": [
-          {
-            "name": "ai_assistant_feedback_given",
-            "properties": {
-              "type": "up",
             },
           },
         ],

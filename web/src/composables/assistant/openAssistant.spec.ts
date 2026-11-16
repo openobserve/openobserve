@@ -30,7 +30,8 @@ import type {
   PendingApproval,
 } from "./assistantStore.types";
 import { agentRequestOf, currentAgent, nextAgent } from "./agents";
-import { wireContextOf } from "./context/serialize";
+import { legacyRelayArgs } from "./context/legacyPayloadToChips";
+import { serialize, wireContextOf } from "./context/serialize";
 import type { ContextChip } from "./context/types";
 import { createDraftStore } from "./drafts";
 import {
@@ -352,6 +353,50 @@ describe("intent × thread", () => {
       text: "What needs attention?",
       homeStarter: true,
     });
+  });
+
+  it("pins an Ask hand-off's context to its chat for every turn, and to no other chat", async () => {
+    const { open, store } = setup();
+    const handoff = legacyRelayArgs({
+      query: "Kind: incident",
+      chipName: "Incident · pool exhausted",
+      newChat: true,
+      context: { currentPage: "incidents", org_id: "default", incident_id: "inc-1", run_id: "r" },
+    });
+    const { sid } = ok(await open(handoff));
+    const wire = (id: string) =>
+      serialize(
+        store.state.sessions[id],
+        { text: "why?", chips: [], images: [], mentions: [], timeOverride: null },
+        {
+          container: "full",
+          entry_kind: "legacy_relay",
+          entry_verb: "ask",
+          object_kind: "none",
+          ui_version: "t",
+        },
+        { pageContext: null, turnId: "t", userIndex: 0, persisted: true, attachments: false },
+      ).context;
+    const pinned = { currentPage: "incidents", org_id: "default" };
+    expect(wire(sid)).toMatchObject(pinned);
+    expect(wire(sid)).not.toHaveProperty("incident_id");
+    await store.send(sid);
+    expect(wire(sid)).toMatchObject(pinned);
+    const other = ok(await open(explain({ intent: "stage", thread: "new" })));
+    expect(other.sid).not.toBe(sid);
+    expect(wire(other.sid)).not.toHaveProperty("currentPage");
+    expect(store.state.sessions[sid].pinnedContext).toEqual(pinned);
+  });
+
+  it("a blank chat reused by another door drops an earlier hand-off's pin", async () => {
+    const { open, store } = setup();
+    const { sid } = ok(
+      await open(legacyRelayArgs({ query: "q", chipName: "Run", context: { currentPage: "x" } })),
+    );
+    store.state.sessions[sid].composer.chips = [];
+    const reused = ok(await open(explain({ intent: "stage", thread: "new" })));
+    expect(reused.sid).toBe(sid);
+    expect(store.state.sessions[sid].pinnedContext).toBeUndefined();
   });
 
   it("send + auto with a stale chat starts a new one", async () => {

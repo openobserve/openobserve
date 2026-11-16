@@ -99,7 +99,6 @@ export function makeEnv(
     openTab: vi.fn(() => true),
     copy: vi.fn(async () => true),
     search: vi.fn(async () => ({}) as Record<string, unknown>),
-    feedback: vi.fn(async () => undefined),
     confirm: vi.fn(
       async (_org: string, _sid: string, _body: ConfirmBody) => ({}) as ConfirmResponse,
     ),

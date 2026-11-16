@@ -16,11 +16,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 
+import appStore from "@/stores";
 import { armHomeReturn, decodeHomeReturn } from "@/composables/goto/homeReturn";
 import { decodeAssistantSet } from "../../assistantSet";
 import { timeWindowOf } from "../../context/contextChips";
 import { pageContext } from "../../context/pageContext";
 import { makeEnv } from "../__tests__/actionEnv";
+import { buildNavigationRoute } from "../../navigationRoutes";
 import { navigationApplier } from "./navigation";
 
 const lastQuery = (push: { mock: { calls: unknown[][] } }) =>
@@ -231,7 +233,7 @@ describe("navigation applier", () => {
       { kind: "navigate", target: { name: "incidentList", query: {} }, label: "x" as any },
       env,
     );
-    const resolved = router.resolve.mock.calls[0][0] as unknown as {
+    const resolved = router.resolve.mock.lastCall![0] as unknown as {
       query: Record<string, string>;
     };
     expect(decodeHomeReturn(resolved.query.home_return)).toEqual({ row: "incident:i1" });
@@ -330,5 +332,67 @@ describe("navigation applier", () => {
   it("never pushes on a frame's arrival: only this click navigates", () => {
     const { router } = makeEnv();
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  describe("license lock", () => {
+    const withFeatures = (features: Record<string, string>) => {
+      const ctx = makeEnv();
+      appStore.state.zoConfig = { ...appStore.state.zoConfig, features };
+      // The real routes carry the page's license key in `meta`, as the app router tags them.
+      ctx.router.resolve.mockImplementation(((to: { name: string; query?: any }) => ({
+        href: `/web/${to.name}`,
+        query: to.query,
+        meta:
+          to.name === "logs"
+            ? { licenseFeatureFromStreamType: true }
+            : { licenseFeature: to.name === "metrics" ? "metrics" : "dashboards" },
+      })) as any);
+      return ctx;
+    };
+    const dashboardOpen = {
+      kind: "navigate" as const,
+      target: { name: "viewDashboard", query: { dashboard: "d1" } },
+      label: "x" as any,
+    };
+
+    it("refuses a click on a page the license leaves out, in this tab or a new one", async () => {
+      const { env, sid, router } = withFeatures({ dashboards: "locked" });
+      expect(await navigationApplier(sid, dashboardOpen, env)).toEqual({
+        ok: false,
+        reason: "gated",
+      });
+      expect(await navigationApplier(sid, { ...dashboardOpen, newTab: true }, env)).toEqual({
+        ok: false,
+        reason: "gated",
+      });
+      expect(router.push).not.toHaveBeenCalled();
+      expect(env.openTab).not.toHaveBeenCalled();
+    });
+
+    it("opens a page the license includes", async () => {
+      const { env, sid, router } = withFeatures({ dashboards: "enabled" });
+      expect(await navigationApplier(sid, dashboardOpen, env)).toMatchObject({ ok: true });
+      expect(router.push).toHaveBeenCalled();
+    });
+
+    it("never auto-navigates to a locked explorer, by the stream type it opens", async () => {
+      const { env, sid, router } = withFeatures({ metrics: "locked" });
+      const link = (streamType: string) =>
+        buildNavigationRoute(
+          { resource_type: streamType, action: "load_query", target: { stream: "s" } },
+          "org1",
+        )!;
+      // Auto Navigation dispatches the same same-tab navigate a click does.
+      const autoOpen = (streamType: string) =>
+        navigationApplier(
+          sid,
+          { kind: "navigate", target: link(streamType).route, newTab: false, label: "x" as any },
+          env,
+        );
+      expect(await autoOpen("metrics")).toEqual({ ok: false, reason: "gated" });
+      expect(router.push).not.toHaveBeenCalled();
+      expect(await autoOpen("logs")).toMatchObject({ ok: true });
+      expect(router.push).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -86,7 +86,6 @@ export const AI_EVENT_NAMES = [
   "ai_navigation",
   "ai_nl_proposal",
   "ai_nl_decided",
-  "ai_feedback",
   "ai_thread_action",
   "ai_history_open",
   "ai_history_search",
@@ -117,7 +116,6 @@ export const TURN_SCOPED_EVENTS = [
   "ai_turn_recovered",
   "ai_stop",
   "ai_turn_busy",
-  "ai_feedback",
   "ai_approval_shown",
   "ai_approval_decided",
   "ai_approval_result",
@@ -144,9 +142,6 @@ export const MAX_STRING_PROPERTY_LENGTH = 64;
 
 /** Held sends kept at once; a turn abandoned without admission or `ai_turn_ended` is evicted oldest first. */
 export const MAX_PENDING_ADMISSIONS = 50;
-
-// `ai_feedback.value` is the catalogue's own enum (up | down), so the banned name is pinned there by type instead.
-const BANNED_NAME_EXEMPTIONS: ReadonlySet<string> = new Set(["ai_feedback.value"]);
 
 const TURN_SCOPED: ReadonlySet<string> = new Set(TURN_SCOPED_EVENTS);
 
@@ -410,11 +405,6 @@ export interface AiEventProps {
     decision: "accept" | "accept_run" | "reject" | "revert" | "edited_before_accept";
     validated: "ok" | "error" | "skipped";
   };
-  ai_feedback: {
-    value: "up" | "down";
-    reason?: "wrong_data" | "wrong_query" | "too_slow" | "wrong_action" | "other";
-    outcome: "done";
-  };
   ai_thread_action: {
     action:
       | "new"
@@ -602,9 +592,9 @@ export function assistantEventProblems(
   const problems: string[] = [];
   if (TURN_SCOPED.has(name) && !scope?.turnId) problems.push("turn-scoped event without turn_id");
   if (TURN_SCOPED.has(name) && !scope?.sid) problems.push("turn-scoped event without session_id");
-  if (name === "ai_feedback" && props.outcome !== "done") problems.push("feedback outside done");
   for (const [key, value] of Object.entries(props)) {
-    if (isBannedName(name, key)) problems.push(`banned property "${key}"`);
+    if ((BANNED_PROPERTY_NAMES as readonly string[]).includes(key))
+      problems.push(`banned property "${key}"`);
     if (ENVELOPE_FIELDS.has(key) && !ENVELOPE_OVERRIDES.has(`${name}.${key}`)) {
       problems.push(`property "${key}" would override the envelope`);
     }
@@ -628,9 +618,6 @@ export function legacyEventsFor(name: string, props: Record<string, unknown>): T
   if (name === "ai_approval_decided") {
     const approved = props.decision === "approve" || props.decision === "edit_then_approve";
     return [{ name: "ai_assistant_tool_call_answered", properties: { approved } }];
-  }
-  if (name === "ai_feedback") {
-    return [{ name: "ai_assistant_feedback_given", properties: { type: props.value } }];
   }
   if (name === "ai_nl_proposal" && props.outcome === "proposal") {
     return [{ name: "ai_query_generated", properties: {} }];
@@ -695,13 +682,6 @@ function emit(event: TrackedEvent): void {
   analytics.track(event.name, event.properties);
   if (typeof window === "undefined" || window.__O2_TELEMETRY_SINK__ !== true) return;
   (window.__o2telemetry ??= []).push(event);
-}
-
-function isBannedName(event: string, key: string): boolean {
-  return (
-    (BANNED_PROPERTY_NAMES as readonly string[]).includes(key) &&
-    !BANNED_NAME_EXEMPTIONS.has(`${event}.${key}`)
-  );
 }
 
 function hasLongString(value: unknown): boolean {

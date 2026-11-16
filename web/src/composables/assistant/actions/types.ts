@@ -66,13 +66,6 @@ export type AssistantAction =
   | { kind: "edit_resend"; messageId: string; text: string; chips: ContextChip[] }
   | { kind: "retry_save"; turnId: string }
   | {
-      kind: "feedback";
-      messageId: string;
-      vote: "up" | "down";
-      reason?: string;
-      comment?: string;
-    }
-  | {
       kind: "share";
       op: "create" | "update" | "revoke" | "copy_link" | "download" | "refresh" | "manage";
     }

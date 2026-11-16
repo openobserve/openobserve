@@ -23,6 +23,7 @@ export const assistantGlyph = {
   agentInvestigator: "target",
   agentQueryBuilder: "auto-fix-high",
   handoff: "arrow-forward",
+  autoNavigation: "navigation",
   explain: "lightbulb-outline",
   troubleshoot: "build",
   addToChat: "add-comment",

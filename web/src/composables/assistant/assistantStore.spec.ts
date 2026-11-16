@@ -299,16 +299,14 @@ describe("sessions", () => {
     });
   });
 
-  it("keeps a chat's votes and Opened times across a reload, for its own user and org only", () => {
+  it("keeps a chat's Opened times across a reload, for its own user and org only", () => {
     const { store } = makeStore();
     const sid = newSession(store);
-    store.annotate(sid, "turn:t1:feedback", { feedback: { rating: "down", reason: "too_slow" } });
     store.annotate(sid, "b1", { linkOutcome: { openedAt: 5 } });
     const reloaded = makeStore().store;
     const again = newSession(reloaded);
     expect(again).toBe(sid);
     expect(reloaded.state.sessions[again].annotations).toEqual({
-      "turn:t1:feedback": { feedback: { rating: "down", reason: "too_slow" } },
       b1: { linkOutcome: { openedAt: 5 } },
     });
     const other = makeStore().store;

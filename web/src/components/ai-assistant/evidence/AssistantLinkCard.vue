@@ -24,7 +24,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="assistant-link-card"
   >
     <div class="flex min-w-0 flex-wrap items-center gap-1">
-      <template v-if="link && canOpen && showOpen">
+      <OButton
+        v-if="link && lockReason"
+        variant="ghost"
+        size="xs"
+        :icon-left="assistantGlyph.locked"
+        disabled
+        focusable-unavailable
+        :class="['-ms-2 min-w-0', TOUCH_TARGET_CLASS]"
+        data-test="assistant-link-card-locked"
+      >
+        <span class="min-w-0 truncate" data-test="assistant-link-card-title">{{ title }}</span>
+        <template #unavailable-reason>{{ lockReason }}</template>
+        <OTooltip :content="lockReason" />
+      </OButton>
+      <template v-else-if="link && canOpen && showOpen">
         <OButton
           variant="ghost-primary"
           size="xs"
@@ -157,8 +171,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
+import { routeLicenseFeature } from "@/utils/featureGate";
 import { formatOrgTime } from "@/utils/formatters";
 
 import { explorerLabel, rangeText } from "./evidenceText";
@@ -207,6 +223,17 @@ const orgUnknown = computed(() => {
 const canOpen = computed(() => props.openable && !otherOrg.value && !orgUnknown.value);
 const showOpen = computed(() => live.value);
 const showNewTab = computed(() => !opensElsewhere.value);
+
+const { isLocked, lockedReason } = useLicenseLocks();
+// A page the license leaves out shows why instead of opening, as the page itself would.
+const lockReason = computed<I18nText | null>(() => {
+  if (!props.link || !router) return null;
+  const { name, params, query } = props.link.route;
+  const key = routeLicenseFeature(
+    router.resolve({ name, params: params ?? {}, query: query ?? {} }),
+  );
+  return key && isLocked(key) ? lockedReason(key) : null;
+});
 
 const href = computed(() => {
   if (!props.link || !router) return undefined;

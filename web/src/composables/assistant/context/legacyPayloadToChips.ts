@@ -40,6 +40,22 @@ export function legacyAutoSend(value: unknown, autoSend = false): boolean {
 
 /** The `openAssistant` call `MainLayout`'s v2 `sendToAiChat` forwards to; an auto-send still never sends over a draft. */
 export function legacyRelayArgs(value: unknown, autoSend = false): OpenAssistantCall {
+  // An Ask hand-off starts a new chat with its query as a named chip and its prompt in the input; it never sends.
+  if (isHandoff(value)) {
+    const context = sanitizeHandoffContext(value.context);
+    return {
+      entryKind: "legacy_relay",
+      entryVerb: "ask",
+      objectKind: "none",
+      intent: "stage",
+      thread: "new",
+      payload: {
+        chips: [handoffChip(value)],
+        ...(value.prompt && { text: value.prompt }),
+        ...(context && { context }),
+      },
+    };
+  }
   const payload = legacyPayloadToChips(value);
   const base = {
     entryKind: "legacy_relay" as const,
@@ -60,6 +76,54 @@ function isWrapper(value: unknown): value is { query: string; autoSend?: unknown
     typeof (value as { query?: unknown }).query === "string" &&
     keys.every((key) => key === "query" || key === "autoSend")
   );
+}
+
+/** The `{ query, chipName }` payload of Ask buttons (insight cards, incident analysis, traces). */
+function isHandoff(
+  value: unknown,
+): value is { query: string; chipName: string; prompt?: string; context?: unknown } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const v = value as { query?: unknown; chipName?: unknown; prompt?: unknown };
+  return (
+    typeof v.query === "string" &&
+    typeof v.chipName === "string" &&
+    v.chipName !== "" &&
+    (v.prompt === undefined || typeof v.prompt === "string")
+  );
+}
+
+// Keys that would scope the chat back to the RCA the hand-off came from (R-D9).
+const RCA_CONTEXT_KEYS = new Set([
+  "incident_id",
+  "incidentId",
+  "subject_id",
+  "subjectId",
+  "run_id",
+  "attempt_id",
+  "agent_type",
+]);
+
+/** A copy of the hand-off context without RCA scoping keys; null when nothing usable is left. */
+export function sanitizeHandoffContext(context: unknown): Record<string, unknown> | null {
+  if (!context || typeof context !== "object" || Array.isArray(context)) return null;
+  const clean = Object.fromEntries(
+    Object.entries(context).filter(
+      ([key]) => !RCA_CONTEXT_KEYS.has(key) && !key.startsWith("rca_"),
+    ),
+  );
+  return Object.keys(clean).length > 0 ? clean : null;
+}
+
+function handoffChip(value: { query: string; chipName: string }): ContextChip {
+  return truncateChip({
+    id: `legacy:${hash(value.query)}`,
+    kind: "report",
+    label: raw(value.chipName),
+    data: value.query,
+    sizeBytes: byteSize(value.query),
+    provenance: "door",
+    sent: "serialized",
+  });
 }
 
 function fromValue(value: unknown, t: TranslateFn): LegacyPayload {

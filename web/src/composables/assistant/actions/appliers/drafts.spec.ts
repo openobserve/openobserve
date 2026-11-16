@@ -42,7 +42,6 @@ describe("drafts applier", () => {
       }),
     );
     expect(env.search).not.toHaveBeenCalled();
-    expect(env.feedback).not.toHaveBeenCalled();
   });
 
   it("opens the dashboard picker with the query and its turn; the user's Save is the only write", async () => {

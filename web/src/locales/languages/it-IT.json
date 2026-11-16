@@ -30153,5 +30153,14 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "assistant": {
+    "composer": {
+      "autoNavigation": {
+        "label": "Navigazione automatica",
+        "enabledTooltip": "Navigazione automatica abilitata: {product} navigherà automaticamente senza conferma",
+        "disabledTooltip": "Navigazione automatica disattivata: {product} chiederà prima di navigare"
+      }
+    }
   }
 }

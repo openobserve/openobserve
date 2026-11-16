@@ -105,6 +105,49 @@ describe("legacyRelayArgs", () => {
     expect(args.payload?.chips).toHaveLength(1);
   });
 
+  it("opens an Ask hand-off as a new chat: the query in a named chip, the prompt in the input", () => {
+    const args = legacyRelayArgs({
+      query: "Kind: error spike",
+      prompt: "Why did errors spike?",
+      chipName: "AutoObserve · checkout",
+      newChat: true,
+      autoSend: false,
+      context: { currentPage: "autoobserve", org_id: "default" },
+    });
+    expect(args).toMatchObject({ intent: "stage", entryVerb: "ask", thread: "new" });
+    expect(args.payload?.text).toBe("Why did errors spike?");
+    expect(args.payload?.chips).toEqual([
+      expect.objectContaining({
+        kind: "report",
+        label: "AutoObserve · checkout",
+        data: "Kind: error spike",
+        sent: "serialized",
+      }),
+    ]);
+  });
+
+  it("carries the hand-off context without its RCA scoping keys, and none when only those are left", () => {
+    const args = legacyRelayArgs({
+      query: "q",
+      chipName: "Incident · pool",
+      context: {
+        currentPage: "incidents",
+        org_id: "default",
+        incident_id: "i",
+        incidentId: "i",
+        subject_id: "s",
+        subjectId: "s",
+        run_id: "r",
+        attempt_id: "a",
+        agent_type: "sre",
+        rca_run: "x",
+      },
+    });
+    expect(args.payload?.context).toEqual({ currentPage: "incidents", org_id: "default" });
+    const rcaOnly = legacyRelayArgs({ query: "q", chipName: "c", context: { incident_id: "i" } });
+    expect(rcaOnly.payload).not.toHaveProperty("context");
+  });
+
   it("keeps a row with a query column as a row, and a JSON value with no rows as text (S2)", () => {
     const row = { ...ROW, query: "SELECT 1" };
     const { chips, text } = legacyPayloadToChips(JSON.stringify(row));

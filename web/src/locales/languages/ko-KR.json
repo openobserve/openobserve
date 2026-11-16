@@ -30153,5 +30153,14 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "assistant": {
+    "composer": {
+      "autoNavigation": {
+        "label": "자동 내비게이션",
+        "enabledTooltip": "자동 내비게이션 활성화 - {product}가 확인 없이 자동으로 탐색합니다.",
+        "disabledTooltip": "자동 내비게이션 비활성화 - {product}가 탐색 전에 묻습니다."
+      }
+    }
   }
 }

@@ -20,13 +20,7 @@ import { raw } from "@/types/i18n";
 
 import { makeEnv } from "../__tests__/actionEnv";
 import { turnAnnotationKey } from "../../evidence";
-import {
-  feedbackApplier,
-  openStepApplier,
-  rerunApplier,
-  rerunWiderApplier,
-  turnOf,
-} from "./thread";
+import { openStepApplier, rerunApplier, rerunWiderApplier, turnOf } from "./thread";
 
 const FROM = 1_760_000_000_000;
 const TO = FROM + 15 * 60_000;
@@ -157,106 +151,6 @@ describe("thread appliers", () => {
       reason: "gated",
     });
     expect(resend).not.toHaveBeenCalled();
-  });
-
-  it("feedback carries each turn's own trace id and position", async () => {
-    const messages = [
-      prompt("t1"),
-      answer("trace-1"),
-      { role: "assistant" as const, content: raw("more") },
-      prompt("t2"),
-      {
-        ...answer("trace-2"),
-        contentBlocks: [
-          { type: "footer" as const, footer: { traceId: "trace-2", serverTurnId: "srv-2" } },
-        ],
-      },
-    ];
-    const { env, sid, store } = makeEnv({ messages });
-    await feedbackApplier(
-      sid,
-      {
-        kind: "feedback",
-        messageId: "t1",
-        vote: "down",
-        reason: "wrong_query",
-        comment: "used the wrong stream",
-      },
-      env,
-    );
-    await feedbackApplier(sid, { kind: "feedback", messageId: "t2", vote: "up" }, env);
-    expect(env.feedback.mock.calls).toEqual([
-      [
-        "org1",
-        sid,
-        {
-          feedback_type: "thumbs_down",
-          query_index: 0,
-          trace_id: "trace-1",
-          turn_id: "t1",
-          comment: "wrong_query: used the wrong stream",
-        },
-      ],
-      [
-        "org1",
-        sid,
-        { feedback_type: "thumbs_up", query_index: 1, trace_id: "trace-2", turn_id: "srv-2" },
-      ],
-    ]);
-    expect(
-      store.state.sessions[sid].annotations[turnAnnotationKey("t1", "feedback")].feedback,
-    ).toEqual({
-      rating: "down",
-      reason: "wrong_query",
-    });
-  });
-
-  it("stores nothing when the post fails, and refuses a vote on a turn that never completed", async () => {
-    const { env, sid, store } = makeEnv({
-      messages: [
-        prompt("t1"),
-        answer("tr"),
-        prompt("t2"),
-        { role: "assistant", content: raw("x"), contentBlocks: [] },
-      ],
-    });
-    env.feedback.mockRejectedValueOnce(new Error("500"));
-    await expect(
-      feedbackApplier(sid, { kind: "feedback", messageId: "t1", vote: "up" }, env),
-    ).resolves.toEqual({ ok: false, reason: "failed" });
-    expect(
-      store.state.sessions[sid].annotations[turnAnnotationKey("t1", "feedback")],
-    ).toBeUndefined();
-    await expect(
-      feedbackApplier(sid, { kind: "feedback", messageId: "t2", vote: "up" }, env),
-    ).resolves.toEqual({ ok: false, reason: "failed" });
-  });
-
-  it("keeps one vote in flight per turn", async () => {
-    const { env, sid } = makeEnv({ messages: [prompt("t1"), answer("tr")] });
-    let release!: () => void;
-    env.feedback.mockImplementationOnce(() => new Promise<void>((resolve) => (release = resolve)));
-    const first = feedbackApplier(sid, { kind: "feedback", messageId: "t1", vote: "up" }, env);
-    await expect(
-      feedbackApplier(sid, { kind: "feedback", messageId: "t1", vote: "down" }, env),
-    ).resolves.toEqual({ ok: false, reason: "failed" });
-    release();
-    await expect(first).resolves.toEqual({ ok: true, detail: { turnId: "t1" } });
-  });
-
-  it("posts the findings outcome as a rating with no ai_feedback detail", async () => {
-    const { env, sid } = makeEnv({ messages: [prompt("t1"), answer("tr")] });
-    const result = await feedbackApplier(
-      sid,
-      { kind: "feedback", messageId: "t1", vote: "down", reason: "cause:no", comment: "dns" },
-      env,
-    );
-    expect(result).toEqual({ ok: true, detail: {} });
-    expect(env.feedback.mock.calls[0][2]).toMatchObject({
-      feedback_type: "rating",
-      value: 1,
-      comment: "cause_no: dns",
-    });
   });
 
   it("finds a turn's answer as the last assistant message before the next prompt", () => {

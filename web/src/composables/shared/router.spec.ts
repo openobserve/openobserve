@@ -419,9 +419,7 @@ describe("useRoutes (router.ts)", () => {
       store.commit("setUserInfo", { email: "me@x.io" });
       writeEditorDraft(draftScope, { data: {} });
       const dispatch = vi.spyOn(store, "dispatch");
-      const aborted = vi.fn();
       const prompt = vi.fn();
-      window.addEventListener("o2:abort-ai-streams", aborted);
       window.addEventListener("beforeunload", prompt);
       const originalLocation = window.location;
       Object.defineProperty(window, "location", {
@@ -440,11 +438,9 @@ describe("useRoutes (router.ts)", () => {
       expect(dispatch).toHaveBeenCalledWith("logout");
       expect(dispatch).not.toHaveBeenCalledWith("logout", expect.anything());
       expect(readEditorDraft(draftScope)).not.toBeNull();
-      expect(aborted).toHaveBeenCalledTimes(1);
       expect(prompt).not.toHaveBeenCalled();
       expect(window.location.href).toBe("/login");
 
-      window.removeEventListener("o2:abort-ai-streams", aborted);
       window.removeEventListener("beforeunload", prompt);
       Object.defineProperty(window, "location", {
         configurable: true,

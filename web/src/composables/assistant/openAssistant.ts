@@ -523,6 +523,9 @@ function stagePayload(
   for (const image of payload.images ?? []) store.addImage(sid, image);
   if (payload.timeOverride) store.setTimeOverride(sid, payload.timeOverride);
   if (payload.title && fresh) store.setTitle(sid, payload.title, "object");
+  // A blank chat reused for another door must not keep an earlier hand-off's pin.
+  if (payload.context) session.pinnedContext = { ...payload.context };
+  else if (fresh) delete session.pinnedContext;
   const staged = store.state.sessions[sid].composer.chips.length - before;
   // A repeated prompt the store skipped adds nothing, so the helper line would claim a change that did not happen.
   const changed = staged > 0 || store.state.sessions[sid].composer.text !== textBefore;

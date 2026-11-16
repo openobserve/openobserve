@@ -98,6 +98,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <AssistantSessionTime :sid="sid" :disabled="inertKind !== null || accessLost" />
                 <AssistantAgentPicker :sid="sid" :disabled="inertKind !== null || accessLost" />
               </span>
+              <template v-if="!running">
+                <span
+                  class="bg-badge-default-soft-bg ring-badge-default-ol-border/30 rounded-default flex h-7 shrink-0 items-center px-2 ring-1 ring-inset"
+                >
+                  <OSwitch
+                    v-model="autoNavigation"
+                    size="sm"
+                    data-test="assistant-composer-auto-navigation"
+                  >
+                    <template #label>
+                      <OIcon :name="assistantGlyph.autoNavigation" size="sm" />
+                      <span class="sr-only">{{
+                        t("assistant.composer.autoNavigation.label")
+                      }}</span>
+                    </template>
+                  </OSwitch>
+                </span>
+                <OTooltip
+                  :content="
+                    t(
+                      autoNavigation
+                        ? 'assistant.composer.autoNavigation.enabledTooltip'
+                        : 'assistant.composer.autoNavigation.disabledTooltip',
+                      { product: t('assistant.name') },
+                    )
+                  "
+                />
+              </template>
             </template>
             <AssistantDictationWave v-if="voice.mine.value" :elapsed-ms="voice.elapsedMs.value" />
             <AssistantDictateButton
@@ -248,10 +276,14 @@ import {
   nextAgent,
   openTabWithoutOpener,
 } from "@/composables/assistant/pure";
+import { useAutoNavigationPreferences } from "@/composables/useAutoNavigationPreferences";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { MAX_IMAGE_SIZE_BYTES } from "@/ts/interfaces/chat";
@@ -364,6 +396,10 @@ const session = computed(() =>
     : null,
 );
 const liveSid = computed(() => session.value?.sid ?? null);
+const { isAutoNavigationEnabled: autoNavigation } = useAutoNavigationPreferences(
+  liveSid,
+  computed(() => store.state.userOrgKey),
+);
 const composer = computed(() => session.value?.composer ?? null);
 const context = useAssistantContext(liveSid, { store });
 const org = computed(() => session.value?.org ?? String(context.page.value?.org_id ?? ""));

@@ -333,7 +333,6 @@ describe("useAssistantClient: 401 (round 1 E-01)", () => {
     const services = {
       cancelTurn: vi.fn().mockRejectedValue(unauthorized),
       confirm: vi.fn().mockRejectedValue(unauthorized),
-      feedback: vi.fn().mockRejectedValue(unauthorized),
     };
     const client = useAssistantClient({ refreshSession, services });
     const target = {
@@ -347,12 +346,8 @@ describe("useAssistantClient: 401 (round 1 E-01)", () => {
     };
     await expect(client.stop("org1", target)).rejects.toBe(unauthorized);
     await expect(client.confirm("org1", "sid-1", { approved: true })).rejects.toBe(unauthorized);
-    await expect(
-      client.feedback("org1", "sid-1", { feedback_type: "x", query_index: 0 }),
-    ).rejects.toBe(unauthorized);
     expect(services.cancelTurn).toHaveBeenCalledTimes(1);
     expect(services.confirm).toHaveBeenCalledTimes(1);
-    expect(services.feedback).toHaveBeenCalledTimes(1);
     expect(refreshSession).not.toHaveBeenCalled();
   });
 
@@ -370,11 +365,10 @@ describe("useAssistantClient: 401 (round 1 E-01)", () => {
   });
 });
 
-describe("useAssistantClient: tail, stop, confirm, feedback", () => {
+describe("useAssistantClient: tail, stop, confirm", () => {
   const services = () => ({
     cancelTurn: vi.fn().mockResolvedValue(undefined),
     confirm: vi.fn().mockResolvedValue({ deleted: 1 }),
-    feedback: vi.fn().mockResolvedValue(undefined),
   });
   const session = (container: "sidebar") => ({
     sid: "sid-1",
@@ -433,23 +427,13 @@ describe("useAssistantClient: tail, stop, confirm, feedback", () => {
     ).rejects.toThrow();
   });
 
-  it("posts confirm and feedback through services/assistant.ts", async () => {
+  it("posts confirm through services/assistant.ts", async () => {
     const svc = services();
     const client = useAssistantClient({ services: svc });
     await expect(client.confirm("org1", "sid-1", { approved: true })).resolves.toEqual({
       deleted: 1,
     });
-    await client.feedback("org1", "sid-1", {
-      feedback_type: "thumbs_up",
-      query_index: 0,
-      trace_id: "t",
-    });
     expect(svc.confirm).toHaveBeenCalledWith("org1", "sid-1", { approved: true }, undefined);
-    expect(svc.feedback).toHaveBeenCalledWith(
-      "org1",
-      "sid-1",
-      expect.objectContaining({ trace_id: "t" }),
-    );
   });
 });
 

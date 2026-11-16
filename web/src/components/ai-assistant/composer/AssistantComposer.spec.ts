@@ -268,7 +268,7 @@ describe("rows (§1, S1)", () => {
     );
   });
 
-  it("puts + and the agent pill on the left and mic, Send on the right, on one line, with no @ button or ⓘ", async () => {
+  it("puts +, the agent pill and Auto Navigation on the left and mic, Send on the right, on one line, with no @ button or ⓘ", async () => {
     resetVoiceForTests(fakeVoiceEngine());
     const { wrapper } = setup();
     setVoiceOptIn("k1", true);
@@ -279,6 +279,8 @@ describe("rows (§1, S1)", () => {
       "assistant-composer-plus",
       "assistant-context-chip-time",
       "assistant-agent-pill",
+      "assistant-composer-auto-navigation",
+      "assistant-composer-auto-navigation-btn",
     ]);
     expect(
       right.findAll('[data-test^="assistant-"]').map((n) => n.attributes("data-test")),
@@ -2205,5 +2207,35 @@ describe("dictation (WP-48)", () => {
     button.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
     await flushPromises();
     expect(document.activeElement).toBe(ctx.textarea().element);
+  });
+});
+
+describe("AssistantComposer: auto navigation toggle", () => {
+  const TOGGLE = '[data-test="assistant-composer-auto-navigation-btn"]';
+
+  it("starts on and keeps a turn-off for this chat", async () => {
+    const { wrapper, store, sid } = setup();
+    const toggle = () => wrapper.get(TOGGLE);
+    expect(toggle().attributes("aria-checked")).toBe("true");
+    await toggle().trigger("click");
+    expect(toggle().attributes("aria-checked")).toBe("false");
+    const saved = localStorage.getItem(`ai-chat-auto-navigation:${store.state.userOrgKey}`);
+    expect(JSON.parse(saved!)).toEqual({ [sid]: false });
+  });
+
+  it("is a switch named by the label with no visible text, shown before the first message", () => {
+    const { wrapper } = setup({}, false);
+    const toggle = wrapper.get(TOGGLE);
+    expect(toggle.attributes("role")).toBe("switch");
+    expect(toggle.attributes("aria-checked")).toBe("true");
+    const name = wrapper.get(`#${toggle.attributes("aria-labelledby")}`);
+    expect(name.text()).toBe("Auto Navigation");
+    expect(name.get(".sr-only").text()).toBe("Auto Navigation");
+  });
+
+  it("keeps a turn-off made before a chat exists", async () => {
+    const { wrapper } = setup({}, false);
+    await wrapper.get(TOGGLE).trigger("click");
+    expect(wrapper.get(TOGGLE).attributes("aria-checked")).toBe("false");
   });
 });

@@ -199,15 +199,6 @@ describe("assistant service", () => {
       { ...managed, adapter: "fetch", fetchOptions: { keepalive: true }, timeout: 65_000 },
     );
   });
-
-  it("posts feedback with the session header and the managed flags", async () => {
-    const body = { feedback_type: "thumbs_up", query_index: 2, trace_id: "tr" };
-    await assistant.feedback("org1", "sid-1", body);
-    expect(api.post).toHaveBeenCalledWith("/api/org1/ai/feedback", body, {
-      ...managed,
-      headers: { "x-o2-assistant-session-id": "sid-1" },
-    });
-  });
 });
 
 describe("listActiveChats", () => {

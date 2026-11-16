@@ -30148,5 +30148,14 @@
         "applyMany": "Undone: {count} change is back to how it was. | Undone: {count} changes are back to how they were."
       }
     }
+  },
+  "assistant": {
+    "composer": {
+      "autoNavigation": {
+        "label": "自動導覽",
+        "enabledTooltip": "已啟用自動導覽 - {product}將在不確認的情況下自動導覽",
+        "disabledTooltip": "已停用自動導覽 - {product}將在導覽前先詢問"
+      }
+    }
   }
 }
