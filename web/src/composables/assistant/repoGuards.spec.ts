@@ -51,7 +51,6 @@ const AUTO_AWESOME_CALL_SITES = [
   "enterprise/views/AIObservability/Index.vue",
   "lib/core/EmptyState/presets.ts",
   "lib/core/Icon/OIcon.icons.ts",
-  "plugins/logs/SearchResult.vue",
   "plugins/traces/LLMInsightsDashboard.vue",
   "utils/featureGate.ts",
   "views/Infrastructure/kubernetes2/K8sAttentionList.vue",

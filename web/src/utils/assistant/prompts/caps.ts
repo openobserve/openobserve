@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// No imports: hosts read the caps statically without loading the assistant runtime on the flag-off path.
+// No imports: hosts read the caps statically without loading the assistant runtime.
 
 /** "Explain these {n} rows" takes at most this many rows. */
 export const MAX_EXPLAIN_ROWS = 20;
