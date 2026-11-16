@@ -279,26 +279,6 @@ describe("SettingsIndex.vue", () => {
     });
   });
 
-  describe("regexIcon computed property", () => {
-    it("should not be directly exposed (moved to settingsItems)", () => {
-      // regexIcon is used internally in settingsItems but not returned from setup
-      wrapper = createWrapper();
-      // If regexIcon is not in the returned scope, it's undefined on vm
-      // The icon is embedded in settingsItems instead
-      expect(wrapper.vm.sectionGroups).toBeDefined();
-    });
-
-    it("should embed regex icon in section items based on theme", () => {
-      // Create wrapper with dark theme via store override
-      wrapper = createWrapper({ theme: "dark" });
-      // The regex_patterns item uses regexIcon internally - verify via sectionGroups
-      const allItems = wrapper.vm.sectionGroups.flatMap((g: any) => g.items ?? []);
-      // regex_patterns item may be undefined if not enterprise (isEnterprise defaults to 'false')
-      // so this test just verifies the structure is accessible without throwing
-      expect(Array.isArray(allItems)).toBe(true);
-    });
-  });
-
   describe("Lifecycle Hooks", () => {
     it("should not redirect during mount when on a valid child route", () => {
       mockRouter.currentRoute.value.name = "general";
@@ -369,7 +349,7 @@ describe("SettingsIndex.vue", () => {
       expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
       const group = wrapper.vm.sectionGroups.find((g: any) => g.label === "Integrations");
       expect(group.items.map((i: any) => i.key)).toEqual(["slack", "ai_toolsets"]);
-      expect(group.items[0].icon).toMatch(/^img:.*slack/);
+      expect(group.items[0].icon).toBe("slack");
     });
 
     it.each(["flag", "master_key", "super_cluster"])(
@@ -453,7 +433,7 @@ describe("SettingsIndex.vue", () => {
     });
 
     it("should return organization for organization route", () => {
-      mockRouter.currentRoute.value.name = "organization";
+      mockRouter.currentRoute.value.name = "organizationSettings";
       wrapper = createWrapper();
       expect(wrapper.vm.activeSection).toBe("organization");
     });
@@ -464,8 +444,8 @@ describe("SettingsIndex.vue", () => {
       expect(wrapper.vm.activeSection).toBe("");
     });
 
-    it("should return queryManagement for queryManagement route", () => {
-      mockRouter.currentRoute.value.name = "queryManagement";
+    it("should return queryManagement for the query_management route", () => {
+      mockRouter.currentRoute.value.name = "query_management";
       wrapper = createWrapper();
       expect(wrapper.vm.activeSection).toBe("queryManagement");
     });
@@ -479,7 +459,7 @@ describe("SettingsIndex.vue", () => {
     });
 
     it("should be true for organization section", () => {
-      mockRouter.currentRoute.value.name = "organization";
+      mockRouter.currentRoute.value.name = "organizationSettings";
       wrapper = createWrapper();
       expect(wrapper.vm.isConstrainedSection).toBe(true);
     });

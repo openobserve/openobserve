@@ -16,6 +16,9 @@ export const makeBulkInstallSchema = (t: Translate) =>
       silence: z
         .any()
         .refine((v) => toMinutes(v) >= 0, t("siem.detections.validation.nonNegative")),
+      backfill: z.boolean(),
+      backfillHours: z.any(),
+      learnFirstRun: z.boolean(),
     })
     .superRefine((val, ctx) => {
       const period = toMinutes(val.period);
@@ -31,8 +34,12 @@ export const makeBulkInstallSchema = (t: Translate) =>
 
 export type BulkInstallForm = z.infer<ReturnType<typeof makeBulkInstallSchema>>;
 
+/** Backfill is off unless the author opts in; an untuned first run would flood the queue, so it learns. */
 export const bulkInstallDefaults = (): BulkInstallForm => ({
   period: 15,
   frequency: 15,
   silence: 30,
+  backfill: false,
+  backfillHours: 24,
+  learnFirstRun: true,
 });

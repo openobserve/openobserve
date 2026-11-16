@@ -1863,12 +1863,12 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
         const text = "SELECT * FROM logs WHERE level IN ('checkout',c";
         const result = await ask(provide, model, text, {}, CTRL_SPACE);
         const values = result.suggestions.filter((s: any) => nameOf(s).startsWith("'"));
-        expect(values.map(nameOf)).toEqual(["'cart'"]);
+        expect(values.map(nameOf)).toEqual(["'cart'", "'search'"]);
         expect(values[0].range).toMatchObject({
           startColumn: text.length,
           endColumn: text.length + 1,
         });
-        expect(labels(result)).toEqual(["'cart'", "code"]);
+        expect(labels(result)).toEqual(["'cart'", "'search'", "code"]);
         expect(labels(result)).not.toContain("count");
       },
     );
@@ -2006,6 +2006,68 @@ describe("P0-4 — PromQL label values come from the provider", () => {
         {},
       );
       expect(noMenu.suggestions).toEqual([]);
+    },
+  );
+
+  it(
+    "sends the typed label value as the lookup prefix and keeps only matching rows",
+    { timeout: 30000 },
+    async () => {
+      const api = await import("monaco-editor/esm/vs/editor/editor.api");
+      const { resolvePromqlLabelValues } = await import("@/composables/usePromqlSuggestions");
+      const createFn = vi.mocked(api.editor.create);
+      const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+      const before = createFn.mock.calls.length;
+      spy = vi
+        .spyOn(document, "getElementById")
+        .mockImplementation(() => document.createElement("div"));
+      const store = createStore({
+        state: { theme: "light", selectedOrganization: { identifier: "myorg" } },
+      });
+      mount(CodeQueryEditor, {
+        props: { editorId: "promql-contains", language: "promql", query: "", keywords: [] },
+        global: { plugins: [store] },
+      });
+      await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+        timeout: 15000,
+        interval: 25,
+      });
+      const model = createdEditors.at(-1)!.getModel();
+      const provide = registerFn.mock.calls.filter((c) => c[0] === "promql").at(-1)![1]
+        .provideCompletionItems;
+      const hit = "deploy-ft-k8s-meg-rd-5041-leader-open-close-emails-300400";
+      const miss = "deploy-ft-k8s-meg-rd-1042-leader-open-close-emails-100200";
+      const lookup = vi.mocked(resolvePromqlLabelValues);
+      lookup.mockImplementation(async () => [miss, hit]);
+      model.getWordUntilPosition.mockReturnValue({ word: "", startColumn: 1, endColumn: 1 });
+      const ask = async (text: string) => {
+        model.getValueInRange.mockReturnValue(text);
+        model.getLineContent.mockReturnValue(`${text}"}`);
+        const result = await provide(model, { lineNumber: 1, column: text.length + 1 }, {}, {});
+        return result.suggestions.filter((s: any) => !isHeader(s));
+      };
+      try {
+        const eq = await ask('repro_13984_metric{job_id="5041');
+        expect(lookup).toHaveBeenLastCalledWith(
+          expect.any(String),
+          "repro_13984_metric",
+          "job_id",
+          expect.objectContaining({ prefix: "5041" }),
+        );
+        expect(eq.map(nameOf)).toEqual([`"${hit}"`]);
+        expect(eq[0].filterText).toBe("5041");
+        expect(eq[0].insertText).toBe(`${hit}"`);
+
+        const re = await ask('repro_13984_metric{job_id=~"5041');
+        expect(lookup.mock.calls.at(-1)![3]).toMatchObject({ prefix: "5041" });
+        expect(re.map(nameOf)).toEqual([`"${hit}"`]);
+
+        const pattern = await ask('repro_13984_metric{job_id=~"50.*');
+        expect(lookup.mock.calls.at(-1)![3]).toMatchObject({ prefix: "" });
+        expect(pattern.map(nameOf)).toEqual([`"${miss}"`, `"${hit}"`]);
+      } finally {
+        lookup.mockImplementation(async () => ["api-gateway", "chat-service"]);
+      }
     },
   );
 });
@@ -2317,6 +2379,47 @@ describe("value quotes, late values, the empty-values copy and the typed prefix"
       await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
       expect(resolver.mock.calls.at(-1)![1]).toMatchObject({ prefix: "" });
     });
+
+    it(
+      "passes unquoted typed text and quotes the value it finds mid-text over it",
+      { timeout: 30000 },
+      async () => {
+        const job = "deploy-ft-k8s-meg-rd-5041-leader-open-close-emails-119768";
+        const resolver = vi.fn(async (_field: string, _options?: any) => [job]);
+        const { editor, model, provide } = await mountWith("p-unquoted", {
+          fieldValueResolver: resolver,
+        });
+        const text = "SELECT * FROM logs WHERE level = 5041";
+        const result = await ask(provide, editor, model, text);
+        expect(resolver.mock.calls.at(-1)![1]).toMatchObject({ prefix: "5041" });
+        const row = result.suggestions.find((s: any) => s.insertText === `'${job}'`);
+        expect(row, "the mid-text match is offered").toBeDefined();
+        expect(row.range.startColumn).toBe(text.length - 3);
+        expect(row.range.endColumn).toBe(text.length + 1);
+      },
+    );
+
+    it(
+      "keeps only matching values in the flat menu, prefix first, all past Monaco's filter",
+      { timeout: 30000 },
+      async () => {
+        const job = "deploy-ft-k8s-meg-rd-5041-leader-open-close-emails-119768";
+        const loose = "deploy-ft-k8s-meg-rd-1042-leader-open-close-emails-119768";
+        const resolver = vi.fn(async (_field: string, _options?: any) => [loose, job, "5041-a"]);
+        const { editor, model, provide } = await mountWith(
+          "p-flat-filter",
+          { fieldValueResolver: resolver },
+          { editor_suggest_mode: "off" },
+        );
+        const text = "SELECT * FROM logs WHERE level = 5041";
+        const result = await ask(provide, editor, model, text);
+        const values = result.suggestions.filter((s: any) => s.kind === 13);
+        expect(values.map((s: any) => s.insertText)).toEqual(["'5041-a'", `'${job}'`]);
+        expect(values.map((s: any) => s.filterText)).toEqual(["5041", "5041"]);
+        expect(values[0].sortText < values[1].sortText).toBe(true);
+        expect(values[1].range.startColumn).toBe(text.length - 3);
+      },
+    );
   });
 });
 

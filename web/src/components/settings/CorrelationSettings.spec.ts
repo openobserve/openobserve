@@ -25,10 +25,13 @@ import { onBeforeRouteLeave } from "vue-router";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { beginDraftSignOut, cancelDraftSignOut } from "@/utils/drafts/draftSession";
 
+const identitySave = vi.hoisted(() => vi.fn());
+
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("@/services/service_streams", () => ({
@@ -60,6 +63,8 @@ vi.mock("@/components/settings/ServiceEnvVersionSettings.vue", () => ({
 vi.mock("@/components/settings/ServiceIdentitySetup.vue", () => ({
   default: {
     name: "ServiceIdentitySetup",
+    data: () => ({ isDirty: false, saving: false }),
+    methods: { saveConfig: () => identitySave(), discardChanges: () => {} },
     template: '<div data-test="service-identity-setup" />',
     props: ["orgIdentifier", "semanticGroups"],
     emits: ["navigate-to-aliases", "navigate-to-services"],
@@ -323,6 +328,51 @@ describe("CorrelationSettings", () => {
 
       expect(spy).not.toHaveBeenCalledWith(scope);
       spy.mockRestore();
+    });
+  });
+
+  // Before, leaving the Field Mappings tab asked to discard; one page bar now keeps both tabs' drafts.
+  describe("page save bar", () => {
+    it("keeps unsaved field mappings across a tab switch and saves them from the bar", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      expect(wrapper.find('[data-test="correlation-settings-save-bar"]').exists()).toBe(false);
+
+      const draft = [{ display: "Host", group: "", fields: ["host"] }];
+      vm.draftSemanticGroups = draft;
+      await vm.onTabChange("services");
+      expect(vm.draftSemanticGroups).toEqual(draft);
+      expect(vm.changeCount).toBe(1);
+
+      await wrapper.find('[data-test="correlation-semanticfieldgroup-save-btn"]').trigger("click");
+      await flushPromises();
+      expect(serviceStreamsService.updateSemanticGroups).toHaveBeenCalledWith("test-org", draft);
+      expect(vm.changeCount).toBe(0);
+    });
+  });
+
+  describe("page save bar with both tabs changed", () => {
+    it("sends the field mappings Save was clicked on and keeps a later edit unsaved", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      let finishIdentity: (saved: boolean) => void = () => {};
+      identitySave.mockReturnValue(new Promise<boolean>((resolve) => (finishIdentity = resolve)));
+      wrapper.findComponent({ name: "ServiceIdentitySetup" }).vm.isDirty = true;
+      const clicked = [{ display: "Host", group: "", fields: ["host"] }];
+      vm.draftSemanticGroups = clicked;
+      await flushPromises();
+      expect(vm.changeCount).toBe(2);
+
+      const saved = vm.savePage();
+      vm.draftSemanticGroups = [{ display: "Host", group: "", fields: ["host", "hostname"] }];
+      finishIdentity(true);
+      await saved;
+      await flushPromises();
+
+      expect(serviceStreamsService.updateSemanticGroups).toHaveBeenCalledWith("test-org", clicked);
+      expect(vm.isFieldAliasesDirty).toBe(true);
     });
   });
 

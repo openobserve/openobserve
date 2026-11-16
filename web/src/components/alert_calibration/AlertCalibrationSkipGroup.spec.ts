@@ -47,6 +47,14 @@ const heading = (wrapper: ReturnType<typeof mountGroup>) => [
 ];
 
 describe("AlertCalibrationSkipGroup", () => {
+  it("formats every count in the locale's digits, the badge, the why and the more line", () => {
+    const wrapper = mountGroup(Array.from({ length: 1234 }, (_, i) => row(i)));
+    expect(heading(wrapper)[1]).toBe("1,234");
+    expect(wrapper.text()).toContain("1,229");
+    expect(wrapper.text()).not.toMatch(/\b1234\b|\b1229\b/);
+    wrapper.unmount();
+  });
+
   it("renders nothing for no rows", () => {
     expect(mountGroup([]).find('[data-test="alert-calibration-skip-group"]').exists()).toBe(false);
   });

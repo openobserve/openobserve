@@ -17,11 +17,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@/locales";
 import config from "@/aws-exports";
 import { gt, raw } from "@/types/i18n";
-import type { CoverageCell, CoverageRow } from "../fixtures";
+import type { CoverageCell, CoverageRow } from "../aoTypes";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import { cantBuildKinds, cellInsight, gapInsight, serviceRoute, tracesRoute } from "./coverageCta";
 import { serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
-import type { CoverageCell as Cell } from "../fixtures";
+import type { CoverageCell as Cell } from "../aoTypes";
 
 const gapCell = (stateKey: "none" | "silent" = "none", monitor?: string): CoverageCell => ({
   state: "gap",

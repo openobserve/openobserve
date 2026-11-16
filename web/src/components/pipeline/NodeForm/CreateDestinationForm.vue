@@ -15,388 +15,398 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="create-destination-form">
+  <div class="create-destination-form" :class="fill && 'flex min-h-0 flex-1 flex-col'">
     <OForm
       :form="form"
       class="pipeline-add-remote-destination-form w-full"
+      :class="fill && 'flex min-h-0 flex-1 flex-col'"
       v-slot="{ isSubmitting }"
     >
-      <!-- Stepper for Create New Destination.
-           Capped at 50vw (not fixed) so it reads as a readable column on the
-           full-width page editor, yet shrinks to fill narrower containers like
-           the External Destination drawer without overflowing/clipping. The
-           footer below stays full-width so its top border lines up with the
-           full-width page header (matching the other destination forms). -->
-      <div class="w-full max-w-[50vw]">
-        <!-- When the type is forced (step 1 skipped), the stepper is effectively a
+      <div :class="fill && 'min-h-0 flex-1 overflow-auto px-4 pt-3'">
+        <div class="w-full max-w-5xl">
+          <!-- When the type is forced (step 1 skipped), the stepper is effectively a
              single step, so hide its header — the progress bar would just be noise. -->
-        <OStepper v-model="step" ref="stepper" animated :hide-header="!!forcedType">
-          <!-- Step 1: Choose Destination Type. When the type is forced, it stays in
+          <OStepper v-model="step" ref="stepper" animated :hide-header="!!forcedType">
+            <!-- Step 1: Choose Destination Type. When the type is forced, it stays in
                the header as a done step but is NOT navigable — there's no going back. -->
-          <OStep
-            :name="1"
-            :title="t('alert_destinations.chooseTypeTitle')"
-            icon="edit"
-            :done="step > 1"
-            :navigable="forcedType ? false : step > 1"
-          >
-            <div class="mb-3 text-sm font-medium">
-              {{ t("alert_destinations.selectDestinationType") }}
-              <span class="text-status-error-text">*</span>
-            </div>
-            <div class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] gap-3">
-              <div
-                v-for="destType in destinationTypes"
-                :key="destType.value"
-                :data-test="`destination-type-card-${destType.value}`"
-                class="destination-type-card group rounded-default hover:border-card-glass-border hover:shadow-status-info-text/15 relative flex min-h-30 cursor-pointer flex-col items-center justify-center border-2 px-3 py-5 [transition:all_0.3s_ease] hover:-translate-y-0.5 hover:shadow-md"
-                :class="
-                  destinationType === destType.value
-                    ? 'selected border-card-glass-border bg-status-info-bg shadow-status-info-text/20 shadow-lg'
-                    : 'border-border-default bg-surface-base'
-                "
-                @click="form.setFieldValue('destination_type', destType.value)"
-              >
-                <img
-                  v-if="destType.image"
-                  :src="destType.image"
-                  :alt="destType.label"
-                  class="mb-2 h-12 w-12 object-contain [transition:all_0.3s_ease]"
-                />
-                <OIcon
-                  v-else
-                  :name="destType.icon"
-                  size="lg"
-                  class="card-icon text-icon-color group-[.selected]:text-card-glass-border mb-2 [transition:color_0.3s_ease]"
-                />
-                <div
-                  class="card-label text-compact text-text-body group-[.selected]:text-text-body mt-1 text-center leading-[1.3] font-medium"
-                >
-                  {{ destType.label }}
-                </div>
-                <div
-                  v-if="destinationType === destType.value"
-                  class="bg-status-positive text-text-inverse absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full"
-                >
-                  <!-- eslint-disable-next-line vue/max-attributes-per-line -->
-                  <OIcon name="check" size="xs" />
-                </div>
-              </div>
-            </div>
-          </OStep>
-
-          <!-- Step 2: Connection Details -->
-          <OStep
-            :name="2"
-            :title="t('alert_destinations.connectionStepTitle')"
-            icon="compare-arrows"
-            :done="step > 2"
-            :navigable="step > 2"
-          >
-            <div class="mb-4 text-sm font-medium">
-              {{ t("alert_destinations.connectionDetailsTitle") }}
-            </div>
-
-            <div class="flex flex-col gap-4">
-              <!-- Name is the destination's identifier — it can't be changed once
-                 created, so lock it in edit mode. -->
-              <OFormInput
-                data-test="add-destination-name-input"
-                name="name"
-                :label="t('alerts.name')"
-                required
-                :readonly="isEditMode"
-                :disabled="isEditMode"
-                tabindex="0"
-              />
-
-              <OFormInput
-                data-test="add-destination-url-input"
-                name="url"
-                :label="t('alert_destinations.url')"
-                required
-                :help-text="t('alert_destinations.urlHelpText')"
-                tabindex="0"
-              />
-
-              <!-- OpenObserve Organization and Stream fields -->
-              <div v-if="destinationType === 'openobserve'" class="flex gap-4">
-                <div class="w-1/2">
-                  <OFormInput
-                    data-test="add-destination-openobserve-org-input"
-                    name="org"
-                    :label="t('alert_destinations.organizationLabel')"
-                    required
-                    :placeholder="t('alert_destinations.defaultPlaceholder')"
-                    :help-text="t('alert_destinations.organizationHelpText')"
-                    tabindex="0"
-                  />
-                </div>
-                <div class="w-1/2">
-                  <OFormInput
-                    data-test="add-destination-openobserve-stream-input"
-                    name="stream"
-                    :label="t('alert_destinations.streamNameLabel')"
-                    required
-                    :placeholder="t('alert_destinations.defaultPlaceholder')"
-                    :help-text="t('alert_destinations.streamHelpText')"
-                    tabindex="0"
-                  />
-                </div>
-              </div>
-
-              <OFormInput
-                data-test="add-destination-url-endpoint-input"
-                name="url_endpoint"
-                :label="t('alert_destinations.endpointPathLabel')"
-                :required="destinationType !== 'custom'"
-                :disabled="destinationType !== 'custom'"
-                :help-text="t('alert_destinations.endpointPathHelpText')"
-                tabindex="0"
-              />
-              <!-- Method field - only shown for Custom destination type -->
-              <OFormSelect
-                v-if="destinationType === 'custom'"
-                data-test="add-destination-method-select"
-                name="method"
-                :label="t('alert_destinations.method')"
-                required
-                :options="apiMethods"
-                tabindex="0"
-              />
-
-              <!-- Output Format field - disabled for all except Custom -->
-              <OFormSelect
-                data-test="add-destination-output-format-select"
-                name="output_format"
-                :label="t('alert_destinations.output_format')"
-                required
-                :options="outputFormats"
-                labelKey="label"
-                valueKey="value"
-                :disabled="destinationType !== 'custom'"
-                tabindex="0"
-              />
-
-              <!-- ESBulk Index Name field - only shown when output format is esbulk -->
-              <OFormInput
-                v-if="outputFormat === 'esbulk'"
-                data-test="add-destination-esbulk-index-input"
-                name="esbulk_index"
-                :label="t('alert_destinations.esBulkIndexNameLabel')"
-                required
-                :placeholder="t('alert_destinations.esBulkIndexNamePlaceholder')"
-                :help-text="t('alert_destinations.esBulkIndexHelpText')"
-                tabindex="0"
-              />
-
-              <!-- StringSeparated Separator field - only shown when output format is stringseparated -->
-              <OFormInput
-                v-if="outputFormat === 'stringseparated'"
-                data-test="add-destination-separator-input"
-                name="separator"
-                :label="t('alert_destinations.separator')"
-                required
-                :placeholder="t('alert_destinations.separator_placeholder')"
-                :help-text="t('alert_destinations.separator_hint')"
-                tabindex="0"
-              />
-            </div>
-
-            <!-- Destination-specific Metadata Section -->
-            <div v-if="showMetadataFields" class="mt-4 flex flex-col gap-4">
-              <div class="text-input-label w-full text-sm font-bold">
-                {{ t("alert_destinations.metadataConfigurationTitle") }}
-              </div>
-
-              <!-- Splunk Metadata Fields -->
-              <template v-if="destinationType === 'splunk'">
-                <OFormInput
-                  data-test="add-destination-metadata-source-input"
-                  name="metadata.source"
-                  :label="t('alert_destinations.sourceLabel')"
-                  :placeholder="t('alert_destinations.sourcePlaceholder')"
-                  :help-text="t('alert_destinations.splunkSourceHelpText')"
-                  tabindex="0"
-                />
-
-                <OFormInput
-                  data-test="add-destination-metadata-sourcetype-input"
-                  name="metadata.sourcetype"
-                  :label="t('alert_destinations.sourceTypeLabel')"
-                  :placeholder="t('alert_destinations.sourceTypePlaceholder')"
-                  :help-text="t('alert_destinations.splunkSourceTypeHelpText')"
-                  tabindex="0"
-                />
-
-                <OFormInput
-                  data-test="add-destination-metadata-hostname-input"
-                  name="metadata.hostname"
-                  :label="t('alert_destinations.hostnameLabel')"
-                  :placeholder="t('alert_destinations.hostnamePlaceholder')"
-                  :help-text="t('alert_destinations.splunkHostnameHelpText')"
-                  tabindex="0"
-                />
-              </template>
-
-              <!-- Datadog Metadata Fields -->
-              <template v-if="destinationType === 'datadog'">
-                <OFormInput
-                  data-test="add-destination-metadata-ddsource-input"
-                  name="metadata.ddsource"
-                  :label="t('alert_destinations.ddSourceLabel')"
-                  required
-                  :placeholder="t('alert_destinations.ddSourcePlaceholder')"
-                  :help-text="t('alert_destinations.ddSourceHelpText')"
-                  tabindex="0"
-                />
-
-                <OFormInput
-                  data-test="add-destination-metadata-ddtags-input"
-                  name="metadata.ddtags"
-                  :label="t('alert_destinations.ddTagsLabel')"
-                  required
-                  :placeholder="t('alert_destinations.ddTagsPlaceholder')"
-                  :help-text="t('alert_destinations.ddTagsHelpText')"
-                  tabindex="0"
-                />
-
-                <OFormInput
-                  data-test="add-destination-metadata-service-input"
-                  name="metadata.service"
-                  :label="t('alert_destinations.serviceLabel')"
-                  :placeholder="t('alert_destinations.servicePlaceholder')"
-                  :help-text="t('alert_destinations.datadogServiceHelpText')"
-                  tabindex="0"
-                />
-
-                <OFormInput
-                  data-test="add-destination-metadata-hostname-input"
-                  name="metadata.hostname"
-                  :label="t('alert_destinations.hostnameLabel')"
-                  :placeholder="t('alert_destinations.hostnamePlaceholder')"
-                  :help-text="t('alert_destinations.datadogHostnameHelpText')"
-                  tabindex="0"
-                />
-              </template>
-            </div>
-
-            <div class="mt-4 flex flex-col gap-1">
-              <div
-                class="o-input-label text-compact text-input-label-text flex items-center leading-tight font-medium"
-              >
-                {{ t("alert_destinations.headers") }}
-              </div>
-              <div class="flex flex-col gap-2">
-                <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-1">
-                  <div class="w-5/12">
-                    <OFormInput
-                      :data-test="`add-destination-header-${header['key']}-key-input`"
-                      :name="`headers[${index}].key`"
-                      :placeholder="t('alert_destinations.api_header')"
-                      tabindex="0"
-                    />
-                  </div>
-                  <div class="w-5/12">
-                    <OFormInput
-                      :data-test="`add-destination-header-${header['key']}-value-input`"
-                      :name="`headers[${index}].value`"
-                      :placeholder="t('alert_destinations.api_header_value')"
-                      tabindex="0"
-                    />
-                  </div>
-                  <div class="headers-btns w-1/6">
-                    <OButton
-                      :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                      variant="ghost-destructive"
-                      size="icon-xs-sq"
-                      :title="t('alert_templates.edit')"
-                      @click="deleteApiHeader(index)"
-                      icon-left="delete"
-                    />
-                    <OButton
-                      data-test="add-destination-add-header-btn"
-                      v-if="index === apiHeaders.length - 1"
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      :title="t('alert_templates.edit')"
-                      @click="addApiHeader()"
-                      icon-left="add"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-3 inline-flex w-full">
-              <OFormSwitch
-                data-test="add-destination-skip-tls-verify-toggle"
-                name="skip_tls_verify"
-                :label="t('alert_destinations.skip_tls_verify')"
-              />
-            </div>
-
-            <!-- Connection Notes Card -->
-            <OCard
-              class="connection-notes-card rounded-default border-banner-info-border bg-banner-info-bg! mt-4 mb-6 border"
+            <OStep
+              :name="1"
+              :title="t('alert_destinations.chooseTypeTitle')"
+              icon="edit"
+              :done="step > 1"
+              :navigable="forcedType ? false : step > 1"
             >
-              <OCardSection role="body">
-                <div class="mb-2 flex items-center">
-                  <OIcon name="info" size="md" class="me-2" />
-                  <div class="text-sm font-medium">
-                    {{ connectionNotes.title }}
-                  </div>
-                </div>
-                <div class="text-sm">
-                  <ol class="mb-0 ps-3 leading-[1.8]">
-                    <li
-                      v-for="(stepText, index) in connectionNotes.steps"
-                      :key="index"
-                      class="mb-2"
-                    >
-                      {{ stepText }}
-                    </li>
-                  </ol>
+              <OFormSection
+                variant="plain"
+                required
+                :title="t('alert_destinations.selectDestinationType')"
+              >
+                <div
+                  class="grid grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] gap-3"
+                  role="radiogroup"
+                  aria-required="true"
+                  :aria-label="t('alert_destinations.selectDestinationType')"
+                >
                   <div
-                    v-if="connectionNotes.example"
-                    class="rounded-default text-compact bg-surface-base mt-2 p-2"
+                    v-for="(destType, index) in destinationTypes"
+                    :key="destType.value"
+                    :data-test="`destination-type-card-${destType.value}`"
+                    role="radio"
+                    :aria-checked="destinationType === destType.value"
+                    :tabindex="index === typeCardTabStop ? 0 : -1"
+                    class="focus-visible:ring-focus-ring-accent destination-type-card group rounded-default hover:border-card-glass-border hover:shadow-status-info-text/15 relative flex min-h-30 cursor-pointer flex-col items-center justify-center border-2 px-3 py-5 outline-none [transition:all_0.3s_ease] hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2"
+                    :class="
+                      destinationType === destType.value
+                        ? 'selected border-card-glass-border bg-status-info-bg shadow-status-info-text/20 shadow-lg'
+                        : 'border-border-default bg-surface-base'
+                    "
+                    @click="form.setFieldValue('destination_type', destType.value)"
+                    @keydown="onTypeCardKeydown($event, index)"
                   >
-                    <strong>{{ t("alert_destinations.exampleLabel") }}</strong>
-                    <code class="text-text-link ms-1 bg-transparent p-0 font-mono">{{
-                      connectionNotes.example
-                    }}</code>
+                    <img
+                      v-if="destType.image"
+                      :src="destType.image"
+                      :alt="destType.label"
+                      class="mb-2 h-12 w-12 object-contain [transition:all_0.3s_ease]"
+                    />
+                    <OIcon
+                      v-else
+                      :name="destType.icon"
+                      size="lg"
+                      class="card-icon text-icon-color group-[.selected]:text-card-glass-border mb-2 [transition:color_0.3s_ease]"
+                    />
+                    <div
+                      class="card-label text-compact text-text-body group-[.selected]:text-text-body mt-1 text-center leading-[1.3] font-medium"
+                    >
+                      {{ destType.label }}
+                    </div>
+                    <div
+                      v-if="destinationType === destType.value"
+                      class="bg-status-positive text-text-inverse absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full"
+                    >
+                      <!-- eslint-disable-next-line vue/max-attributes-per-line -->
+                      <OIcon name="check" size="xs" />
+                    </div>
                   </div>
                 </div>
-              </OCardSection>
-            </OCard>
-          </OStep>
-        </OStepper>
+              </OFormSection>
+            </OStep>
+
+            <!-- Step 2: Connection Details -->
+            <OStep
+              :name="2"
+              :title="t('alert_destinations.connectionStepTitle')"
+              icon="compare-arrows"
+              :done="step > 2"
+              :navigable="step > 2"
+            >
+              <OFormSection variant="plain" :title="t('alert_destinations.connectionDetailsTitle')">
+                <div class="flex flex-col gap-4">
+                  <!-- Name is the destination's identifier — it can't be changed once
+                 created, so lock it in edit mode. -->
+                  <OFormInput
+                    data-test="add-destination-name-input"
+                    name="name"
+                    :label="t('alerts.name')"
+                    required
+                    :readonly="isEditMode"
+                    :disabled="isEditMode"
+                    tabindex="0"
+                  />
+
+                  <OFormInput
+                    data-test="add-destination-url-input"
+                    name="url"
+                    :label="t('alert_destinations.url')"
+                    required
+                    :help-text="t('alert_destinations.urlHelpText')"
+                    tabindex="0"
+                  />
+
+                  <!-- OpenObserve Organization and Stream fields -->
+                  <div v-if="destinationType === 'openobserve'" class="flex gap-4">
+                    <div class="w-1/2">
+                      <OFormInput
+                        data-test="add-destination-openobserve-org-input"
+                        name="org"
+                        :label="t('alert_destinations.organizationLabel')"
+                        required
+                        :placeholder="t('alert_destinations.defaultPlaceholder')"
+                        :help-text="t('alert_destinations.organizationHelpText')"
+                        tabindex="0"
+                      />
+                    </div>
+                    <div class="w-1/2">
+                      <OFormInput
+                        data-test="add-destination-openobserve-stream-input"
+                        name="stream"
+                        :label="t('alert_destinations.streamNameLabel')"
+                        required
+                        :placeholder="t('alert_destinations.defaultPlaceholder')"
+                        :help-text="t('alert_destinations.streamHelpText')"
+                        tabindex="0"
+                      />
+                    </div>
+                  </div>
+
+                  <OFormInput
+                    data-test="add-destination-url-endpoint-input"
+                    name="url_endpoint"
+                    :label="t('alert_destinations.endpointPathLabel')"
+                    :required="destinationType !== 'custom'"
+                    :disabled="destinationType !== 'custom'"
+                    :help-text="t('alert_destinations.endpointPathHelpText')"
+                    tabindex="0"
+                  />
+                  <!-- Method field - only shown for Custom destination type -->
+                  <OFormSelect
+                    v-if="destinationType === 'custom'"
+                    data-test="add-destination-method-select"
+                    name="method"
+                    :label="t('alert_destinations.method')"
+                    required
+                    :options="apiMethods"
+                    tabindex="0"
+                  />
+
+                  <!-- Output Format field - disabled for all except Custom -->
+                  <OFormSelect
+                    data-test="add-destination-output-format-select"
+                    name="output_format"
+                    :label="t('alert_destinations.output_format')"
+                    required
+                    :options="outputFormats"
+                    labelKey="label"
+                    valueKey="value"
+                    :disabled="destinationType !== 'custom'"
+                    tabindex="0"
+                  />
+
+                  <!-- ESBulk Index Name field - only shown when output format is esbulk -->
+                  <OFormInput
+                    v-if="outputFormat === 'esbulk'"
+                    data-test="add-destination-esbulk-index-input"
+                    name="esbulk_index"
+                    :label="t('alert_destinations.esBulkIndexNameLabel')"
+                    required
+                    :placeholder="t('alert_destinations.esBulkIndexNamePlaceholder')"
+                    :help-text="t('alert_destinations.esBulkIndexHelpText')"
+                    tabindex="0"
+                  />
+
+                  <!-- StringSeparated Separator field - only shown when output format is stringseparated -->
+                  <OFormInput
+                    v-if="outputFormat === 'stringseparated'"
+                    data-test="add-destination-separator-input"
+                    name="separator"
+                    :label="t('alert_destinations.separator')"
+                    required
+                    :placeholder="t('alert_destinations.separator_placeholder')"
+                    :help-text="t('alert_destinations.separator_hint')"
+                    tabindex="0"
+                  />
+                </div>
+
+                <!-- Destination-specific Metadata Section -->
+                <div v-if="showMetadataFields" class="mt-4 flex flex-col gap-4">
+                  <div class="text-input-label w-full text-sm font-bold">
+                    {{ t("alert_destinations.metadataConfigurationTitle") }}
+                  </div>
+
+                  <!-- Splunk Metadata Fields -->
+                  <template v-if="destinationType === 'splunk'">
+                    <OFormInput
+                      data-test="add-destination-metadata-source-input"
+                      name="metadata.source"
+                      :label="t('alert_destinations.sourceLabel')"
+                      :placeholder="t('alert_destinations.sourcePlaceholder')"
+                      :help-text="t('alert_destinations.splunkSourceHelpText')"
+                      tabindex="0"
+                    />
+
+                    <OFormInput
+                      data-test="add-destination-metadata-sourcetype-input"
+                      name="metadata.sourcetype"
+                      :label="t('alert_destinations.sourceTypeLabel')"
+                      :placeholder="t('alert_destinations.sourceTypePlaceholder')"
+                      :help-text="t('alert_destinations.splunkSourceTypeHelpText')"
+                      tabindex="0"
+                    />
+
+                    <OFormInput
+                      data-test="add-destination-metadata-hostname-input"
+                      name="metadata.hostname"
+                      :label="t('alert_destinations.hostnameLabel')"
+                      :placeholder="t('alert_destinations.hostnamePlaceholder')"
+                      :help-text="t('alert_destinations.splunkHostnameHelpText')"
+                      tabindex="0"
+                    />
+                  </template>
+
+                  <!-- Datadog Metadata Fields -->
+                  <template v-if="destinationType === 'datadog'">
+                    <OFormInput
+                      data-test="add-destination-metadata-ddsource-input"
+                      name="metadata.ddsource"
+                      :label="t('alert_destinations.ddSourceLabel')"
+                      required
+                      :placeholder="t('alert_destinations.ddSourcePlaceholder')"
+                      :help-text="t('alert_destinations.ddSourceHelpText')"
+                      tabindex="0"
+                    />
+
+                    <OFormInput
+                      data-test="add-destination-metadata-ddtags-input"
+                      name="metadata.ddtags"
+                      :label="t('alert_destinations.ddTagsLabel')"
+                      required
+                      :placeholder="t('alert_destinations.ddTagsPlaceholder')"
+                      :help-text="t('alert_destinations.ddTagsHelpText')"
+                      tabindex="0"
+                    />
+
+                    <OFormInput
+                      data-test="add-destination-metadata-service-input"
+                      name="metadata.service"
+                      :label="t('alert_destinations.serviceLabel')"
+                      :placeholder="t('alert_destinations.servicePlaceholder')"
+                      :help-text="t('alert_destinations.datadogServiceHelpText')"
+                      tabindex="0"
+                    />
+
+                    <OFormInput
+                      data-test="add-destination-metadata-hostname-input"
+                      name="metadata.hostname"
+                      :label="t('alert_destinations.hostnameLabel')"
+                      :placeholder="t('alert_destinations.hostnamePlaceholder')"
+                      :help-text="t('alert_destinations.datadogHostnameHelpText')"
+                      tabindex="0"
+                    />
+                  </template>
+                </div>
+
+                <div class="mt-4 flex flex-col gap-1">
+                  <div
+                    class="o-input-label text-compact text-input-label-text flex items-center leading-tight font-medium"
+                  >
+                    {{ t("alert_destinations.headers") }}
+                  </div>
+                  <div class="flex flex-col gap-2">
+                    <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-1">
+                      <div class="w-5/12">
+                        <OFormInput
+                          :data-test="`add-destination-header-${header['key']}-key-input`"
+                          :name="`headers[${index}].key`"
+                          :placeholder="t('alert_destinations.api_header')"
+                          tabindex="0"
+                        />
+                      </div>
+                      <div class="w-5/12">
+                        <OFormInput
+                          :data-test="`add-destination-header-${header['key']}-value-input`"
+                          :name="`headers[${index}].value`"
+                          :placeholder="t('alert_destinations.api_header_value')"
+                          tabindex="0"
+                        />
+                      </div>
+                      <div class="headers-btns w-1/6">
+                        <OButton
+                          :data-test="`add-destination-header-${header['key']}-delete-btn`"
+                          variant="ghost"
+                          size="icon-xs-sq"
+                          :aria-label="t('common.delete')"
+                          :title="t('common.delete')"
+                          @click="deleteApiHeader(index)"
+                          icon-left="delete"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <OButton
+                        data-test="add-destination-add-header-btn"
+                        variant="outline"
+                        size="sm-action"
+                        icon-left="add"
+                        @click="addApiHeader()"
+                      >
+                        {{ t("alert_destinations.addHeader") }}
+                      </OButton>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-3 inline-flex w-full">
+                  <OFormSwitch
+                    data-test="add-destination-skip-tls-verify-toggle"
+                    name="skip_tls_verify"
+                    :label="t('alert_destinations.skip_tls_verify')"
+                    off-tone="neutral"
+                    state-text
+                  />
+                </div>
+
+                <!-- Connection Notes Card -->
+                <OCard
+                  class="connection-notes-card rounded-default border-banner-info-border bg-banner-info-bg! mt-4 border"
+                >
+                  <OCardSection role="body">
+                    <div class="mb-2 flex items-center">
+                      <OIcon name="info" size="md" class="me-2" />
+                      <div class="text-sm font-medium">
+                        {{ connectionNotes.title }}
+                      </div>
+                    </div>
+                    <div class="text-sm">
+                      <ol class="mb-0 ps-3 leading-[1.8]">
+                        <li
+                          v-for="(stepText, index) in connectionNotes.steps"
+                          :key="index"
+                          class="mb-2"
+                        >
+                          {{ stepText }}
+                        </li>
+                      </ol>
+                      <div
+                        v-if="connectionNotes.example"
+                        class="rounded-default text-compact bg-surface-base mt-2 p-2"
+                      >
+                        <strong>{{ t("alert_destinations.exampleLabel") }}</strong>
+                        <code class="text-text-link ms-1 bg-transparent p-0 font-mono">{{
+                          connectionNotes.example
+                        }}</code>
+                      </div>
+                    </div>
+                  </OCardSection>
+                </OCard>
+              </OFormSection>
+            </OStep>
+          </OStepper>
+        </div>
       </div>
 
-      <!-- Form buttons -->
-      <div class="border-border-default mb-3 flex justify-start border-t pt-4">
-        <div v-if="step === 1" class="flex gap-2">
+      <OSaveBar
+        v-if="step === 1"
+        mode="create"
+        :submit="false"
+        :class="fill ? 'shrink-0 px-4' : 'mt-4'"
+        :save-label="t('alerts.continue')"
+        :save-disabled="!canProceedStep1"
+        save-data-test="step1-continue-btn"
+        cancel-data-test="step1-cancel-btn"
+        @save="nextStep"
+        @cancel="$emit('cancel')"
+      />
+      <OSaveBar
+        v-else
+        mode="create"
+        :class="fill ? 'shrink-0 px-4' : 'mt-4'"
+        :save-label="t('alerts.save')"
+        save-data-test="add-destination-submit-btn"
+        cancel-data-test="add-destination-cancel-btn"
+        @cancel="$emit('cancel')"
+      >
+        <template v-if="!forcedType" #actions>
           <OButton
-            data-test="step1-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="$emit('cancel')"
-          >
-            {{ t("alerts.cancel") }}
-          </OButton>
-          <OButton
-            data-test="step1-continue-btn"
-            variant="primary"
-            size="sm-action"
-            :disabled="!canProceedStep1"
-            @click="nextStep"
-          >
-            {{ t("alerts.continue") }}
-          </OButton>
-        </div>
-        <div v-if="step > 1" class="flex gap-2">
-          <OButton
-            v-if="!forcedType"
             data-test="step3-back-btn"
             variant="outline"
             size="sm-action"
@@ -405,26 +415,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("common.back") }}
           </OButton>
-          <OButton
-            data-test="add-destination-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            :disabled="isSubmitting"
-            @click="$emit('cancel')"
-          >
-            {{ t("alerts.cancel") }}
-          </OButton>
-          <OButton
-            data-test="add-destination-submit-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            :loading="isSubmitting"
-          >
-            {{ t("alerts.save") }}
-          </OButton>
-        </div>
-      </div>
+        </template>
+      </OSaveBar>
     </OForm>
   </div>
 </template>
@@ -442,12 +434,14 @@ import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OSaveBar from "@/lib/forms/SaveBar/OSaveBar.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeDestinationSchema, type DestinationForm } from "./CreateDestinationForm.schema";
 
@@ -459,6 +453,8 @@ const props = defineProps<{
   // to step 1. Used by the workflow destination node, which only supports Custom
   // HTTP destinations for now.
   forcedType?: string;
+  // On a page: the form takes its host's height, the fields scroll and the bar stays at the bottom.
+  fill?: boolean;
 }>();
 
 const emit = defineEmits(["created", "updated", "cancel"]);
@@ -654,6 +650,31 @@ let isPrefilling = false;
 // These drive the parent-side conditional rendering (card grid selection, the
 // per-type/per-output_format v-ifs) and the computed reads below.
 const destinationType = form.useStore((s: any) => s.values.destination_type);
+
+// One tab stop for the group: the chosen card, or the first while none is chosen.
+const typeCardTabStop = computed(() =>
+  Math.max(
+    0,
+    destinationTypes.findIndex((d) => d.value === destinationType.value),
+  ),
+);
+
+// Arrows only move focus: choosing a type resets the connection defaults, so it takes Space or Enter.
+const onTypeCardKeydown = (event: KeyboardEvent, index: number) => {
+  if (event.key === " " || event.key === "Enter") {
+    event.preventDefault();
+    form.setFieldValue("destination_type", destinationTypes[index].value);
+    return;
+  }
+  const moves: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+  const move = moves[event.key];
+  if (!move) return;
+  event.preventDefault();
+  const cards = (event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>(
+    '[role="radio"]',
+  );
+  cards?.[(index + move + destinationTypes.length) % destinationTypes.length]?.focus();
+};
 const outputFormat = form.useStore((s: any) => s.values.output_format);
 const formName = form.useStore((s: any) => s.values.name);
 const formUrl = form.useStore((s: any) => s.values.url);

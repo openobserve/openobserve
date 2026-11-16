@@ -14,6 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Mock config to enable enterprise routes - must be first before any imports
+// The Logs tab of a finding looks its incident up in the AutoObserve list.
+vi.mock("@/services/autoobserve", async (importOriginal) => {
+  const mod = await importOriginal<{ default: Record<string, unknown> }>();
+  return { ...mod, default: { ...mod.default, incidents: vi.fn() } };
+});
+
 vi.mock("@/aws-exports", () => ({
   default: {
     isEnterprise: "true",
@@ -121,6 +127,7 @@ import incidentsService, {
 } from "@/services/incidents";
 import serviceStreamsApi, { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import oncallService from "@/services/oncall";
+import autoobserveService from "@/services/autoobserve";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -983,6 +990,46 @@ describe("IncidentDetailDrawer.vue", () => {
     it("shows N/A when the value is missing", () => {
       expect(wrapper.vm.formatPeriod(undefined)).toBe("N/A");
       expect(wrapper.vm.formatFrequency(undefined)).toBe("N/A");
+    });
+  });
+
+  describe("Alert Details - threshold and silence", () => {
+    const mountWithTriggerCondition = async (triggerCondition: Record<string, unknown>) => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: {
+          ...createIncidentWithAlerts({ id: "test-123" }),
+          alerts: [{ id: "a1", name: "cpu_high", trigger_condition: triggerCondition }],
+        },
+      });
+      wrapper = await createWrapper({}, {}, "test-123");
+      await flushPromises();
+      wrapper.vm.activeTab = "alertTriggers";
+      wrapper.vm.selectedAlertIndex = 0;
+      await nextTick();
+    };
+
+    const detailValue = (field: "threshold" | "silence") =>
+      wrapper.get(`[data-test="incident-alert-${field}"]`).text().replace(/\s+/g, " ").trim();
+
+    it("renders a silence of 0 as 0 min and a threshold of 0 as 0", async () => {
+      await mountWithTriggerCondition({ operator: ">=", threshold: 0, period: 5, silence: 0 });
+
+      expect(detailValue("silence")).toBe("0 min");
+      expect(detailValue("threshold")).toBe(">= 0");
+    });
+
+    it("renders a missing silence as N/A with no unit", async () => {
+      await mountWithTriggerCondition({ operator: ">=", threshold: 3, period: 5 });
+
+      expect(detailValue("silence")).toBe("N/A");
+      expect(detailValue("threshold")).toBe(">= 3");
+    });
+
+    it("renders a missing threshold as N/A", async () => {
+      await mountWithTriggerCondition({ operator: ">=", period: 5, silence: 30 });
+
+      expect(detailValue("threshold")).toBe(">= N/A");
+      expect(detailValue("silence")).toBe("30 min");
     });
   });
 
@@ -1883,6 +1930,76 @@ describe("IncidentDetailDrawer.vue", () => {
         ["Finding=Stopped sending data", "Stream Name=checkout", "Stream Type=logs"],
         ["env=prod"],
       ]);
+    });
+
+    const aoList = (items: unknown[]) => {
+      queryClient.clear();
+      (autoobserveService.incidents as any).mockResolvedValue({
+        data: { items, total: items.length },
+      });
+    };
+
+    it("drops the empty Metrics and Traces tabs and opens the stream in Logs instead", async () => {
+      aoList([]);
+      (incidentsService.getCorrelatedStreams as any).mockClear();
+      await openOn("logs", { group_values: FINDING, triggers: [findingTrigger(5)] });
+      expect(wrapper.vm.shownTabs).not.toContain("metrics");
+      expect(wrapper.vm.shownTabs).not.toContain("traces");
+      expect(wrapper.vm.shownTabs).toContain("logs");
+      expect(byTest("autoobserve-issue-logs").text()).toContain("checkout");
+      expect(incidentsService.getCorrelatedStreams).not.toHaveBeenCalled();
+    });
+
+    it("words the Logs link as its AutoObserve drawer does, ending an hour after a resolved incident", async () => {
+      const at = 1_794_309_300_000_000;
+      const member = (name: string, back: number) => ({
+        id: `f-${name}`,
+        title: name,
+        stream_type: "logs",
+        stream_name: name,
+        first_seen_at: at,
+        recovered_at: at + back,
+      });
+      aoList([
+        {
+          finding: {
+            id: "f1",
+            kind: "stream_silence",
+            stream_type: "logs",
+            stream_name: "checkout",
+            first_seen_at: at,
+          },
+          incident: { id: "inc-1", status: "resolved", severity: "P2", title: "t", created_at: at },
+          investigation: {
+            run_id: null,
+            state: null,
+            outcome: null,
+            summary: null,
+            not_run_reason: null,
+          },
+          members: [
+            member("checkout", 600_000_000),
+            member("cart", 900_000_000),
+            member("pay", 300_000_000),
+          ],
+        },
+      ]);
+      await openOn("logs", {
+        group_values: FINDING,
+        triggers: [findingTrigger(5)],
+        status: "resolved",
+        resolved_at: at + 900_000_000,
+      } as never);
+      const logs = byTest("autoobserve-issue-logs");
+      expect(logs.text()).toContain("See checkout and 2 more streams in Logs");
+      expect(logs.text()).toContain("an hour after it ended");
+    });
+
+    it("an incident with alerts keeps every tab and its correlated Logs", async () => {
+      await openOn("overview", { group_values: { service: "api" } });
+      expect(wrapper.vm.shownTabs).toEqual(wrapper.vm.tabOrder);
+      expect(wrapper.vm.shownTabs).toEqual(expect.arrayContaining(["logs", "metrics", "traces"]));
+      expect(byTest("autoobserve-issue-logs").exists()).toBe(false);
     });
   });
 

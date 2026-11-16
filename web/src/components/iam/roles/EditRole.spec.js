@@ -1010,6 +1010,52 @@ describe("EditRole - read-only preset", () => {
   });
 });
 
+describe("EditRole - role just created from a preset", () => {
+  it("saves the preset grants without a second Save", async () => {
+    const { updateRole } = await import("@/services/iam");
+    vi.mocked(updateRole).mockClear();
+    router.currentRoute.value.query = { preset: "readonly", created: "1" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+
+    expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);
+    const payload = vi.mocked(updateRole).mock.calls[0][0].payload;
+    expect(payload.add.length).toBeGreaterThan(0);
+    expect(payload.add.map((p) => p.permission)).toContain("AllowGet");
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+
+  it("keeps the grants staged and warns when the save fails", async () => {
+    const { updateRole } = await import("@/services/iam");
+    vi.mocked(updateRole).mockClear();
+    vi.mocked(updateRole).mockRejectedValueOnce({ response: { status: 500 } });
+    mockToast.mockClear();
+    router.currentRoute.value.query = { preset: "readonly", created: "1" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+
+    expect(vi.mocked(updateRole)).toHaveBeenCalledTimes(1);
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBeGreaterThan(0);
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "warning", message: expect.stringContaining("preset") }),
+    );
+  });
+
+  it("only stages the preset when the role was not just created", async () => {
+    const { updateRole } = await import("@/services/iam");
+    vi.mocked(updateRole).mockClear();
+    router.currentRoute.value.query = { preset: "readonly" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+
+    expect(vi.mocked(updateRole)).not.toHaveBeenCalled();
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBeGreaterThan(0);
+  });
+});
+
 describe("EditRole - dbm viewer preset", () => {
   const mountWithDbmPreset = async () => {
     router.currentRoute.value.query = { preset: "dbm" };

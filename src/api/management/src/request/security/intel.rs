@@ -107,8 +107,14 @@ pub async fn sweep(
                     .map(|f| f.name().to_string())
                     .collect();
                 let mut target = target.clone();
-                if target.mapped.is_empty() {
-                    target.mapped = mapped_columns(&source_type, &fields);
+                // The page knows only the catalog keys; the server adds each source type's own.
+                for (kind, columns) in mapped_columns(&source_type, &fields) {
+                    let known = target.mapped.entry(kind).or_default();
+                    for column in columns {
+                        if !known.contains(&column) {
+                            known.push(column);
+                        }
+                    }
                 }
                 fields_of.push((target, fields));
             }
@@ -315,15 +321,10 @@ async fn security_source_access(
     if !is_security_source(Some(&security)) {
         return None;
     }
-    let denied = openobserve_core::authz::check_stream_permissions(
-        stream,
-        org_id,
-        user_id,
-        &StreamType::Logs,
-        openobserve_core::authz::StreamPermissionResourceType::Search,
-    )
-    .await;
-    Some((denied.is_none(), security.source_type))
+    let readable = super::unreadable_streams(org_id, user_id, [stream])
+        .await
+        .is_empty();
+    Some((readable, security.source_type))
 }
 
 async fn run_search(

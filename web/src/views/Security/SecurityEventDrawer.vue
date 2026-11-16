@@ -14,7 +14,11 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
-import { openCasesQuery, promoteEventMutation } from "@/services/securityCases.queries";
+import {
+  entityCasesQuery,
+  openCasesQuery,
+  promoteEventMutation,
+} from "@/services/securityCases.queries";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { runSql } from "@/composables/security/useSecurityStreamPlans";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -23,6 +27,13 @@ import SecurityRecordDrawer, {
   type RecordTab,
 } from "@/components/security/SecurityRecordDrawer.vue";
 import SecurityKeyValues, { type KeyValueRow } from "@/components/security/SecurityKeyValues.vue";
+import SecurityOpenCaseDialog from "@/components/security/SecurityOpenCaseDialog.vue";
+import {
+  eventCaseTitle,
+  eventEntities,
+  type CasePriority,
+} from "@/components/security/SecurityOpenCaseDialog.schema";
+import type { PromoteEventOptions } from "@/services/securityCases";
 import { buildRuleCountSql, type RuleHit } from "@/composables/security/useSigmaRules";
 import type { Classification } from "@/services/securitySources";
 import { ocsfCategoryOf, ocsfStatusName, type NormalizedEvent } from "@/utils/security/ocsf";
@@ -278,10 +289,37 @@ watch(
 const promote = useMutation(computed(() => promoteEventMutation(props.orgId)));
 const eventAt = computed(() => Number(props.event._timestamp) || 0);
 
-async function caseFromEvent(caseId?: string) {
+const caseDialogOpen = ref(false);
+const caseEntities = computed(() => eventEntities(props.normalized));
+const caseTitle = computed(() => eventCaseTitle(title.value, caseEntities.value));
+// Asked only while the dialog is open: an event usually belongs in the case already on its entity.
+const entityCases = useQuery(() =>
+  Object.assign(
+    entityCasesQuery(
+      props.orgId,
+      caseEntities.value.map((e) => e.value),
+    ),
+    { enabled: caseDialogOpen.value && !!props.orgId && caseEntities.value.length > 0 },
+  ),
+);
+const LEVEL_PRIORITY: Record<string, CasePriority> = {
+  critical: "P1",
+  high: "P2",
+  medium: "P3",
+  low: "P4",
+  informational: "P4",
+};
+/** The most severe matched detection's level, as a detection's own case would get. */
+const casePriority = computed<CasePriority>(() => {
+  const ranks = matched.value.map((hit) => LEVEL_PRIORITY[String(hit.rule.level ?? "")] ?? "P3");
+  return ranks.sort()[0] ?? "P3";
+});
+
+async function caseFromEvent(caseId?: string, options: PromoteEventOptions = {}) {
   try {
     const opened = await promote.mutateAsync({
       event: { stream: props.stream, timestamp: eventAt.value, fields: props.event },
+      ...options,
       caseId,
     });
     const title = raw(opened.title || opened.id);
@@ -292,11 +330,13 @@ async function caseFromEvent(caseId?: string) {
         : t("siem.drawer.caseOpened", { title }),
     });
     targetCase.value = "";
+    return true;
   } catch (e: any) {
     toast({
       variant: "error",
       message: raw(e?.response?.data?.message) || t("siem.drawer.caseError"),
     });
+    return false;
   }
 }
 
@@ -565,13 +605,20 @@ function copy(text: string) {
         variant="primary"
         size="sm-action"
         icon-left="assignment"
-        :loading="promote.isPending.value && !targetCase"
         data-test="security-event-drawer-open-case"
-        @click="caseFromEvent()"
+        @click="caseDialogOpen = true"
       >
         {{ t("siem.drawer.openCase") }}
         <OTooltip :content="t('siem.drawer.openCaseHint')" />
       </OButton>
     </template>
   </SecurityRecordDrawer>
+  <SecurityOpenCaseDialog
+    v-model:open="caseDialogOpen"
+    :default-title="caseTitle"
+    :default-priority="casePriority"
+    :entities="caseEntities"
+    :existing="entityCases.data.value ?? []"
+    :submit="(options) => caseFromEvent(options.caseId, options)"
+  />
 </template>

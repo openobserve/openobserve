@@ -95,26 +95,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</span>
         </div>
       </ODescriptionItem>
-      <ODescriptionItem
-        v-if="cell.alsoWatchedBy"
-        stacked
-        :label="t('autoobserve.coverage.alsoWatchedBy')"
-      >
-        <div
-          v-for="extra in cell.alsoWatchedBy"
-          :key="extra.ledgerId"
-          class="flex flex-wrap items-center gap-2"
-        >
-          <OText variant="mono">{{ extra.detector }}</OText>
-          <span class="text-text-secondary text-xs">{{ extra.library }}</span>
-          <OTag
-            v-if="ledgerTag(extra.ledgerId)"
-            :variant="ledgerTag(extra.ledgerId)?.variant"
-            size="xs"
-            :label="ledgerTag(extra.ledgerId)?.label"
-          />
-        </div>
-      </ODescriptionItem>
     </ODescriptionList>
     <div v-if="cell.progress" class="flex flex-col gap-1">
       <OProgressBar :value="cell.progress[0] / cell.progress[1]" size="xs" />
@@ -131,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         t("autoobserve.coverage.guardrails")
       }}
     </p>
-    <div v-if="config && (!cell.engine || nerd)" class="flex flex-col gap-1">
+    <div v-if="config && nerd" class="flex flex-col gap-1">
       <span class="text-text-secondary text-xs">{{ t("autoobserve.coverage.config") }}</span>
       <OCodeBlock
         :code="config"
@@ -147,24 +127,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
-import { seed } from "./coverageSeries";
 import InsightBlock from "./insight/InsightBlock.vue";
 import type { InsightCta, InsightParts } from "./insight/insightCopy";
 import { useAutoObserveView } from "./v2/useAutoObserveView";
-import { LEDGER_STATUS, type CoverageCell, type EngineMonitor, type LedgerEntry } from "./fixtures";
+import type { CoverageCell, EngineMonitor } from "./aoTypes";
 
 const props = defineProps<{
   cell: CoverageCell;
   service: string;
   signal: string;
-  ledger: LedgerEntry[];
   insight?: InsightParts | null;
   pending?: boolean;
   /** When the live cell's alerts last fired, read from the alerts; absent until they are read. */
@@ -180,23 +157,6 @@ const { t } = useI18nTyped();
 const { view } = useAutoObserveView();
 const nerd = computed(() => view.value === "nerd");
 
-const ledgerTag = (id: string) => {
-  const entry = props.ledger.find((e) => e.id === id);
-  return entry
-    ? { variant: LEDGER_STATUS[entry.status].variant, label: t(LEDGER_STATUS[entry.status].key) }
-    : null;
-};
-
-const lastFired = computed(() => {
-  if (props.cell.engine) return props.lastFired ?? null;
-  if (props.cell.state !== "watched") return t("autoobserve.coverage.never");
-  const n = seed(`${props.service}:${props.signal}:fired`) % 6;
-  if (n === 0) return t("autoobserve.coverage.never");
-  return n < 3
-    ? t("autoobserve.coverage.hoursAgo", { count: n * 3 }, n * 3)
-    : t("autoobserve.coverage.daysAgo", { count: n }, n);
-});
-
 const engineConfig = (monitors: EngineMonitor[]) =>
   monitors
     .map((m) =>
@@ -210,21 +170,5 @@ const engineConfig = (monitors: EngineMonitor[]) =>
     )
     .join("\n");
 
-const config = computed(() => {
-  const cell = props.cell;
-  if (cell.engine) return engineConfig(cell.engine.monitors);
-  if (!cell.detector) return "";
-  const baseline =
-    cell.state === "learning" && cell.progress
-      ? `learning (${cell.progress[0]} of ${cell.progress[1]} days)`
-      : "7d, weekday x hour";
-  return [
-    `detector: ${cell.detector}`,
-    `method: ${cell.method}`,
-    `library: ${cell.library}`,
-    `stream: ${cell.stream}`,
-    `applies_when: "${cell.predicate}"`,
-    cell.method === "anomaly" ? `baseline: ${baseline}` : "condition: library default",
-  ].join("\n");
-});
+const config = computed(() => (props.cell.engine ? engineConfig(props.cell.engine.monitors) : ""));
 </script>

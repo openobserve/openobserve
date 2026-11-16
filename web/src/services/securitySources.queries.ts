@@ -22,6 +22,7 @@ import {
 } from "@/composables/query/cachePolicy";
 import { queryClient } from "@/composables/query/queryClient";
 import securitySources, {
+  type SecuritySetting,
   type SourceListing,
   type SourceMatch,
   type SourceType,
@@ -85,6 +86,35 @@ export const classifySourcesMutation = (org: string) =>
     meta: { invalidates: [securitySourceKeys.list(org)], silentError: true },
   });
 
+/** The listing with one stream's row moved to the setting an attach just stored, as the server would list it. */
+export function withAttachedSetting(
+  listing: SourceListing | undefined,
+  stream: string,
+  setting: SecuritySetting,
+): SourceListing | undefined {
+  if (!listing) return listing;
+  const pack = { id: setting.pack_id, version: setting.pack_version };
+  return {
+    ...listing,
+    sources: listing.sources.includes(stream) ? listing.sources : [...listing.sources, stream],
+    streams: listing.streams.map((row) =>
+      row.name !== stream
+        ? row
+        : {
+            ...row,
+            state: "mapped" as const,
+            setting,
+            source_type: setting.source_type || row.source_type,
+            detach_pack: {
+              ...pack,
+              label: row.offered_pack?.id === pack.id ? row.offered_pack.label : "",
+            },
+            update_available: null,
+          },
+    ),
+  };
+}
+
 /** The page shows the server's refusal itself, so the default error toast stays quiet. */
 export const attachPackMutation = (org: string) =>
   mutationOptions({
@@ -95,6 +125,13 @@ export const attachPackMutation = (org: string) =>
           pack_version: vars.packVersion,
         })
       ).data,
+    // The row reads mapped at once; the listing refetch that follows confirms it.
+    onSuccess: (res, vars) => {
+      if (!res?.setting) return;
+      queryClient.setQueryData<SourceListing>(securitySourceKeys.list(org), (old) =>
+        withAttachedSetting(old, vars.stream, res.setting),
+      );
+    },
     meta: { invalidates: [securitySourceKeys.list(org)], silentError: true },
   });
 
@@ -109,5 +146,13 @@ export const attachPlanMutation = (org: string) =>
 export const detachPackMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (stream: string) => (await securitySources.detach(org, stream)).data,
+    meta: { invalidates: [securitySourceKeys.list(org)], silentError: true },
+  });
+
+/** A manual source type; the page shows a refusal itself. */
+export const setSourceTypeMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (vars: { stream: string; sourceType: string }) =>
+      (await securitySources.setSourceType(org, vars.stream, vars.sourceType)).data,
     meta: { invalidates: [securitySourceKeys.list(org)], silentError: true },
   });

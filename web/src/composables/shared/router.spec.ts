@@ -24,6 +24,7 @@ import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
+import i18n from "@/locales";
 
 // Routes store an i18n KEY in `meta.titleKey` (src/router/index.ts translates it
 // per navigation), so assert the English copy the key still resolves to — a typo'd
@@ -2789,6 +2790,10 @@ describe("useRoutes (router.ts)", () => {
       }
     };
 
+    const global = i18n.global as any;
+    const setLocale = (locale: string) =>
+      typeof global.locale === "string" ? (global.locale = locale) : (global.locale.value = locale);
+
     beforeEach(() => {
       config.isEnterprise = "true";
       vi.mocked(loadSecurityAccess).mockResolvedValue({ read: true, triage: false, admin: false });
@@ -2854,6 +2859,34 @@ describe("useRoutes (router.ts)", () => {
         expect(loadSecurityAccess).not.toHaveBeenCalled();
       } finally {
         store.state.selectedOrganization = previousOrg;
+      }
+    });
+
+    it("merges the Security messages for the active locale before the page renders", async () => {
+      setLocale("ja");
+      try {
+        expect(global.te("siem.nav.cases", "ja")).toBe(false);
+        const next = vi.fn(() => global.te("siem.nav.cases", "ja"));
+        findRoute(useRoutes().homeChildRoutes, "securityCases").beforeEnter(
+          { query: { org_identifier: "acme" } },
+          {},
+          next,
+        );
+        await vi.waitFor(() => expect(next).toHaveBeenCalledWith());
+        expect(next).toHaveReturnedWith(true);
+      } finally {
+        setLocale("en-us");
+      }
+    });
+
+    it("loads the Security messages for a locked license too, whose page still renders", async () => {
+      setLocale("ko");
+      try {
+        const next = await enter("securityAlerts", { features: { security: "locked" } });
+        expect(next).toHaveBeenCalledWith();
+        expect(global.te("siem.nav.alerts", "ko")).toBe(true);
+      } finally {
+        setLocale("en-us");
       }
     });
 

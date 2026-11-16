@@ -232,18 +232,18 @@ describe("SecurityNewDetectionDialog correlations", () => {
   });
 });
 
-describe("SecurityNewDetectionDialog correlation preview", () => {
-  it("previews a correlation over its own timespan, not a day", async () => {
+describe("SecurityNewDetectionDialog history preview", () => {
+  it("runs the draft on the server over the chosen range and says exactly what was evaluated", async () => {
     authorOnly();
     const css = globalThis.CSS;
     Object.assign(globalThis, { CSS: { escape: (v: string) => v } });
     onTestFinished(() => {
       Object.assign(globalThis, { CSS: css });
     });
-    const search = (await import("@/services/search")).default;
-    const spy = vi
-      .spyOn(search, "search")
-      .mockResolvedValue(okResponse({ hits: [], total: 0 }) as never);
+    const sigma = (await import("@/services/securitySigma")).default as any;
+    const { previewFixture } = await import("@/views/Security/__fixtures__/sigmaFixtures");
+    // No sample rows: jsdom cannot unmount the results table when the range changes.
+    sigma.previewDetection.mockResolvedValue({ data: previewFixture({ sample: [] }) });
     vi.mocked(streamService.schema).mockResolvedValue(
       okResponse({ schema: [{ name: "eventtype", type: "Utf8" }] }) as never,
     );
@@ -254,171 +254,102 @@ describe("SecurityNewDetectionDialog correlation preview", () => {
     });
     await w.find('[data-test="security-detections-new-preview-run"]').trigger("click");
     await flushPromises();
-    const query = (spy.mock.calls[0][0] as any).query.query;
-    expect(query.end_time - query.start_time).toBe(60 * 60_000 * 1000);
+    expect(sigma.previewDetection).toHaveBeenCalledWith(
+      "default",
+      expect.objectContaining({
+        rule_id: "01932551-8222-400e-8529-a9e1c31d8447",
+        stream: "okta_auth",
+        range_minutes: 1440,
+        period: 60,
+        frequency: 15,
+      }),
+    );
+    const summary = w.find('[data-test="security-detections-new-preview-summary"]').text();
+    expect(summary).toContain("1 firing between");
+    expect(summary).toContain("93 windows of 60 min, starting every 15 min");
+    expect(w.find('[data-test="security-detections-new-preview-windows"]').exists()).toBe(true);
+
+    await w.find('[data-test="security-detections-new-preview-range-10080"]').trigger("click");
+    await flushPromises();
+    // A different range is a different preview, so the day's answer is no longer shown.
+    expect(w.find('[data-test="security-detections-new-preview-windows"]').exists()).toBe(false);
+    await w.find('[data-test="security-detections-new-preview-run"]').trigger("click");
+    await flushPromises();
+    expect(sigma.previewDetection).toHaveBeenLastCalledWith(
+      "default",
+      expect.objectContaining({ range_minutes: 10080 }),
+    );
   });
 });
 
-describe("SecurityNewDetectionDialog server answers", () => {
-  const withCssEscape = () => {
-    onTestFinished(() => {
-      vi.restoreAllMocks();
-    });
-    const css = globalThis.CSS;
-    Object.assign(globalThis, { CSS: { escape: (v: string) => v } });
-    onTestFinished(() => {
-      Object.assign(globalThis, { CSS: css });
-    });
-  };
-  const cloudtrailSchema = () =>
+describe("SecurityNewDetectionDialog edit in place", () => {
+  it("opens on the stored rule and saves through the server, keeping the name", async () => {
+    authorOnly();
+    const { sigmaCatalogFixture } = await import("@/views/Security/__fixtures__/sigmaFixtures");
+    const rule = sigmaCatalogFixture.rules.find((r) => !r.correlation)!;
+    const sigma = (await import("@/services/securitySigma")).default as any;
     vi.mocked(streamService.schema).mockResolvedValue(
       okResponse({
         schema: Object.keys(cloudtrailEvent()).map((name) => ({ name, type: "Utf8" })),
       }) as never,
     );
-
-  it("marks a rule that applies but cannot run on the stream yet, with the server's reason", async () => {
-    authorOnly();
-    withCssEscape();
-    cloudtrailSchema();
-    const sigma = (await import("@/services/securitySigma")).default;
-    const { compileFixture, stopLoggingRule } =
-      await import("@/views/Security/__fixtures__/sigmaFixtures");
-    vi.spyOn(sigma, "compile").mockImplementation(async (_org, body) => {
-      const res = compileFixture(body);
-      if (body.rule_id || body.stream !== "ct_gap") return { data: res } as never;
-      res.applicable = res.applicable.map((a) =>
-        a.key === stopLoggingRule.key
-          ? {
-              ...a,
-              runnable: false,
-              reason: "Stream has no column eventsource",
-              compiled: { ...a.compiled, runnable: false, where: "" },
-            }
-          : a,
-      );
-      return { data: res } as never;
-    });
-    const w = await mountDialog({ stream: "ct_gap", source: "aws_cloudtrail" });
-    const mark = w.find(
-      `[data-test="security-detections-new-not-runnable-${stopLoggingRule.key}"]`,
-    );
-    expect(mark.exists()).toBe(true);
-    expect(mark.text()).toContain("Not runnable yet");
-    expect(mark.findComponent({ name: "OTooltip" }).props("content")).toBe(
-      "Stream has no column eventsource",
-    );
-    expect(w.findAll('[data-test^="security-detections-new-not-runnable-"]')).toHaveLength(1);
-  });
-
-  it("saves the server-built SQL when the compile response carries it", async () => {
-    authorOnly();
-    withCssEscape();
-    cloudtrailSchema();
-    const serverSql = `SELECT "_timestamp", "host_name", "user_name" FROM "ct_server" WHERE x = 1`;
-    const sigma = (await import("@/services/securitySigma")).default;
-    const { compileFixture } = await import("@/views/Security/__fixtures__/sigmaFixtures");
-    vi.spyOn(sigma, "compile").mockImplementation(async (_org, body) => {
-      const res = compileFixture(body);
-      if (body.rule_id && body.stream === "ct_server") res.sql = serverSql;
-      return { data: res } as never;
-    });
-    vi.mocked(alertsService.create_by_alert_id).mockResolvedValue(okResponse({}) as never);
-    const w = await mountDialog({
-      sigmaId: "2b1a2a3d-6b41-4e58-91f0-31b7e4b8b7a1",
-      stream: "ct_server",
-      source: "aws_cloudtrail",
-    });
-    await submit(w);
-    await flushPromises();
-    const [, payload] = vi.mocked(alertsService.create_by_alert_id).mock.calls[0] as unknown as [
-      string,
-      { query_condition: { sql: string } },
-    ];
-    expect(payload.query_condition.sql).toBe(serverSql);
-  });
-
-  it("warns about columns not seen yet and creates them before saving", async () => {
-    authorOnly();
-    withCssEscape();
-    cloudtrailSchema();
-    const sigma = (await import("@/services/securitySigma")).default;
-    const { compileFixture } = await import("@/views/Security/__fixtures__/sigmaFixtures");
-    const unseen = [{ name: "eventtype", type: "Utf8" }];
-    vi.spyOn(sigma, "compile").mockImplementation(async (_org, body) => {
-      const res = compileFixture(body);
-      if (body.rule_id && res.compiled?.runnable) res.compiled.unseenFields = unseen;
-      return { data: res } as never;
-    });
-    const addColumns = vi.spyOn(sigma, "addColumns").mockResolvedValue({} as never);
-    vi.mocked(alertsService.create_by_alert_id).mockResolvedValue(okResponse({}) as never);
-    const w = await mountDialog({
-      sigmaId: "2b1a2a3d-6b41-4e58-91f0-31b7e4b8b7a1",
-      stream: "ct_unseen",
-      source: "aws_cloudtrail",
-    });
-    expect(w.find('[data-test="security-detections-new-unseen-fields"]').text()).toContain(
-      "eventtype",
-    );
-    await submit(w);
-    await flushPromises();
-    expect(addColumns).toHaveBeenCalledWith(expect.any(String), "ct_unseen", unseen);
-    expect(alertsService.create_by_alert_id).toHaveBeenCalled();
-    expect(addColumns.mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(alertsService.create_by_alert_id).mock.invocationCallOrder[0],
-    );
-  });
-
-  it("saves the pack's server-built SQL for a library rule when its own compile has none", async () => {
-    authorOnly();
-    withCssEscape();
-    cloudtrailSchema();
-    const serverSql = `SELECT "_timestamp", "src_endpoint_ip" FROM "ct_pack" WHERE x = 1`;
-    const sigma = (await import("@/services/securitySigma")).default;
-    const { compileFixture, rootRule } =
-      await import("@/views/Security/__fixtures__/sigmaFixtures");
-    vi.spyOn(sigma, "compile").mockImplementation(async (_org, body) => {
-      const res = compileFixture(body);
-      res.applicable = res.applicable.map((a) =>
-        a.key === rootRule.key ? { ...a, runnable: true, sql: serverSql } : a,
-      );
-      return { data: res } as never;
-    });
-    vi.mocked(alertsService.create_by_alert_id).mockResolvedValue(okResponse({}) as never);
-    const w = await mountDialog({
-      sigmaId: rootRule.key,
-      stream: "ct_pack",
-      source: "aws_cloudtrail",
-    });
-    await submit(w);
-    await flushPromises();
-    const [, payload] = vi.mocked(alertsService.create_by_alert_id).mock.calls[0] as unknown as [
-      string,
-      { query_condition: { sql: string } },
-    ];
-    expect(payload.query_condition.sql).toBe(serverSql);
-  });
-
-  it("shows the server's refusal, such as a duplicate name, in the dialog", async () => {
-    authorOnly();
-    withCssEscape();
-    cloudtrailSchema();
-    vi.mocked(alertsService.create_by_alert_id).mockRejectedValue({
-      response: {
-        status: 400,
-        data: { message: "A detection named AWS_Root_Account_Activity already exists" },
+    const router = await makeSecurityRouter("/security/detections");
+    wrapper = mount(SecurityNewDetectionDialog, {
+      props: {
+        open: true,
+        orgId: "default",
+        existingNames: ["Root_Login__aws_cloudtrail"],
+        edit: {
+          alertId: "a1",
+          name: "Root_Login__aws_cloudtrail",
+          yaml: rule.yaml,
+          stream: "aws_cloudtrail",
+          sourceType: "aws_cloudtrail",
+          period: 30,
+          frequency: 10,
+          silence: 5,
+          destinations: [],
+        },
       },
+      global: { provide: { store }, plugins: [store, router], stubs: { CodeQueryEditor: true } },
     });
-    const w = await mountDialog({
-      sigmaId: "2b1a2a3d-6b41-4e58-91f0-31b7e4b8b7a1",
-      stream: "aws_cloudtrail",
-      source: "aws_cloudtrail",
-    });
-    await submit(w);
     await flushPromises();
-    expect(w.find('[data-test="security-detections-new-save-error"]').text()).toContain(
-      "A detection named AWS_Root_Account_Activity already exists",
+    const w = wrapper;
+    expect(w.find('[data-test="security-detections-new-mode"]').exists()).toBe(false);
+    expect(w.find('[data-test="security-detections-new-backfill"]').exists()).toBe(false);
+    const period = w.find('[data-test="security-detections-new-period"] input');
+    expect((period.element as HTMLInputElement).value).toBe("30");
+    // Its own name is not "taken" by itself.
+    expect(w.find('[data-test="security-detections-new-name-taken"]').exists()).toBe(false);
+
+    // A saved detection previews with its own exceptions, so the server needs its id.
+    const { previewFixture } = await import("@/views/Security/__fixtures__/sigmaFixtures");
+    sigma.previewDetection.mockResolvedValue({ data: previewFixture({ sample: [] }) });
+    const css = globalThis.CSS;
+    Object.assign(globalThis, { CSS: { escape: (v: string) => v } });
+    onTestFinished(() => {
+      Object.assign(globalThis, { CSS: css });
+    });
+    await w.find('[data-test="security-detections-new-preview-run"]').trigger("click");
+    await flushPromises();
+    expect(sigma.previewDetection).toHaveBeenCalledWith(
+      "default",
+      expect.objectContaining({ alert_id: "a1", stream: "aws_cloudtrail" }),
     );
-    expect(w.emitted("created")).toBeFalsy();
+
+    await w.find("form").trigger("submit");
+    await vi.waitFor(() => expect(sigma.updateDetection).toHaveBeenCalled());
+    await flushPromises();
+    expect(sigma.updateDetection).toHaveBeenCalledWith("default", "a1", {
+      rule_yaml: rule.yaml,
+      stream: "aws_cloudtrail",
+      source_type: "aws_cloudtrail",
+      period: 30,
+      frequency: 10,
+      silence: 5,
+      destinations: [],
+    });
+    expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+    expect(w.emitted("updated")).toBeTruthy();
   });
 });

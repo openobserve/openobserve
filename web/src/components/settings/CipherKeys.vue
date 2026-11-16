@@ -51,6 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :frame="false"
           :data="visibleRows"
           :columns="columns"
+          :row-actions="rowActions"
+          row-actions-more-data-test="cipher-keys-row-more-actions"
           row-key="name"
           :loading="loading"
           :forbidden="forbidden"
@@ -104,65 +106,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-name="{ row }">
             <div class="flex min-w-0 items-center gap-2">
-              <OTruncatedText>{{ row.name }}</OTruncatedText>
+              <ONameLinkCell
+                :to="() => editCipherKey(row)"
+                data-test="cipher-keys-list-name-link"
+                >{{ row.name }}</ONameLinkCell
+              >
               <EditorDraftDot
                 v-if="cipherKeyDrafts.ids.has(row.name)"
                 :saved-at="cipherKeyDrafts.savedAt(row.name)"
                 :data-test="`cipher-keys-${row.name}-draft-dot`"
               />
             </div>
-          </template>
-          <template #cell-actions="{ row }">
-            <OButton
-              :data-test="`cipherkey-list-${row.name}-update`"
-              data-row-action="edit"
-              variant="ghost"
-              size="icon-sm"
-              class="ms-1 max-md:hidden"
-              :title="t('common.edit')"
-              @click="editCipherKey(row)"
-              icon-left="edit"
-            />
-            <OButton
-              :data-test="`cipherkey-list-${row.name}-delete`"
-              data-row-action="delete"
-              variant="ghost-destructive"
-              size="icon-sm"
-              class="ms-1 max-md:hidden"
-              :title="t('common.delete')"
-              @click="confirmDeleteCipherKey(row)"
-              icon-left="delete"
-            />
-            <ODropdown side="bottom" align="end">
-              <template #trigger>
-                <OButton
-                  :aria-label="t('common.moreActions')"
-                  icon-left="more-vert"
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  class="md:hidden"
-                  data-test="cipher-keys-row-more-actions"
-                  @click.stop
-                />
-              </template>
-              <ODropdownItem
-                icon-left="edit"
-                class="md:hidden"
-                :data-test="`cipherkey-list-${row.name}-update-menu`"
-                @select="editCipherKey(row)"
-              >
-                <span>{{ t("common.edit") }}</span>
-              </ODropdownItem>
-              <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
-                class="md:hidden"
-                :data-test="`cipherkey-list-${row.name}-delete-menu`"
-                @select="confirmDeleteCipherKey(row)"
-              >
-                <span>{{ t("common.delete") }}</span>
-              </ODropdownItem>
-            </ODropdown>
           </template>
           <template #selection-actions>
             <OButton
@@ -179,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </div>
     </OPageLayout>
-    <div v-else>
+    <div v-else class="min-h-0 flex-1">
       <AddCipherKey @cancel:hideform="hideAddDialog" />
     </div>
   </div>
@@ -219,15 +173,13 @@ import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import ONameLinkCell from "@/lib/core/Table/cells/ONameLinkCell.vue";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
@@ -245,12 +197,10 @@ export default defineComponent({
     AddCipherKey,
     ConfirmDialog,
     OButton,
-    ODropdown,
-    ODropdownItem,
+    ONameLinkCell,
     ORefreshButton,
     OSearchInput,
     OTable,
-    OTruncatedText,
     EditorDraftDot,
   },
   setup() {
@@ -349,8 +299,22 @@ export default defineComponent({
         header: t("cipherKey.actions"),
         isAction: true,
         pinned: "right",
-        size: 100,
-        meta: { align: "center", actionCount: 2 },
+      },
+    ];
+    const rowActions: OTableRowAction[] = [
+      {
+        id: "edit",
+        label: t("common.edit"),
+        icon: "edit",
+        onSelect: (row) => editCipherKey(row),
+        dataTest: (row) => `cipherkey-list-${row.name}-update`,
+      },
+      {
+        id: "delete",
+        label: t("common.delete"),
+        icon: "delete",
+        onSelect: (row) => confirmDeleteCipherKey(row),
+        dataTest: (row) => `cipherkey-list-${row.name}-delete`,
       },
     ];
 
@@ -645,6 +609,7 @@ export default defineComponent({
       forbidden,
       tabledata,
       columns,
+      rowActions,
       showAddDialog,
       addCipherKey,
       getData,

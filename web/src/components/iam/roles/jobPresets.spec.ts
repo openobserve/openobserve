@@ -46,9 +46,11 @@ describe("Security job presets", () => {
     expect(grants?.enrichment_table).toEqual(["AllowList", "AllowGet"]);
   });
 
-  it("lets a security viewer read the source streams", () => {
-    const grants = JOB_PRESETS.find((p) => p.id === "security_viewer")?.grants;
-    expect(grants?.stream).toEqual(["AllowList", "AllowGet"]);
+  it("gives tier-1 presets no org-wide stream read, since Security read covers the sources", () => {
+    for (const id of ["security_viewer", "soc_analyst"]) {
+      const grants = JOB_PRESETS.find((p) => p.id === id)?.grants;
+      expect(grants?.stream, id).toBeUndefined();
+    }
   });
 
   it("lets a security admin read the source streams its detections query", () => {
@@ -61,9 +63,8 @@ describe("Security job presets", () => {
     expect(grants?.incidents).toEqual(["AllowList", "AllowGet"]);
   });
 
-  it("gives every Security preset the stream and incident reads its pages need", () => {
+  it("gives every Security preset the incident reads its pages need", () => {
     for (const preset of JOB_PRESETS.filter((p) => p.tone === "security")) {
-      expect(preset.grants.stream, preset.id).toBeDefined();
       expect(preset.grants.incidents, preset.id).toBeDefined();
     }
   });

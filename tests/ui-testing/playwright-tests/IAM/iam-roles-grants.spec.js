@@ -369,19 +369,10 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         await pm.rolesPage.gotoRoles();
         await pm.rolesPage.createRole(name, { startFrom: 'readonly' });
         await pm.rolesPage.waitForGrantsSettled();
-        // The preset seeds ASYNCHRONOUSLY: EditRole awaits the resource fetches before it
-        // stages anything, and waitForGrantsSettled() only waits for the count to paint.
-        // Saving straight after it races the seed and stores an EMPTY role — measured
-        // twice in a row on pentest, so this is a reproducible race, not a slow run.
-        await expect
-            .poll(async () => staged(), { timeout: 30000 })
-            .toBeGreaterThan(0);
-        await pm.rolesPage.save();
 
-        // AddRole's start-from seeds once the user lands on EditRole; a role created
-        // this way that saves empty would silently grant nothing.
+        // Creating from a preset saves its grants in the same action; a role that lands empty grants nothing.
         await expect
-            .poll(async () => (await getPerms(page, name)).length, { timeout: 20000 })
+            .poll(async () => (await getPerms(page, name)).length, { timeout: 30000 })
             .toBeGreaterThan(0);
     });
 

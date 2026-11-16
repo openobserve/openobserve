@@ -91,7 +91,7 @@ const columns = computed<OTableColumnDef<SlackAdminLink>[]>(() => [
   { id: "last_used_at", header: t("slackApp.people.columnLastUsed"), size: 120 },
   {
     id: "actions",
-    header: raw(""),
+    header: t("common.actions"),
     size: 100,
     isAction: true,
     pinned: "right",
@@ -202,12 +202,7 @@ const confirmUnlink = (): void => {
           />
         </template>
         <template #empty>
-          <OEmptyState
-            size="compact"
-            illustration="users"
-            :title="t('slackApp.people.empty')"
-            :backdrop="false"
-          />
+          <OEmptyState size="compact" preset="no-slack-linked-people" :backdrop="false" />
         </template>
       </OTable>
       <OButton

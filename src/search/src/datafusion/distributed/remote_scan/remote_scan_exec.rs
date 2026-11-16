@@ -368,7 +368,7 @@ async fn get_remote_batch(
                 "[trace_id {trace_id}] flight->search: response node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}, err: {e:?}, took: {} ms",
                 start.elapsed().as_millis(),
             );
-            return Err(DataFusionError::Execution(e.to_string()));
+            return Err(remote_error(&e));
         }
     }
     .into_inner();
@@ -414,6 +414,14 @@ async fn get_remote_batch(
     };
 
     Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
+}
+
+/// A follower's 503 keeps its error code, so the leader answers 503 too.
+fn remote_error(e: &tonic::Status) -> DataFusionError {
+    match infra::errors::ErrorCodes::from_unavailable_status(e) {
+        Some(code) => code.into(),
+        None => DataFusionError::Execution(e.to_string()),
+    }
 }
 
 pub fn is_parquet_file_not_found(e: &tonic::Status) -> bool {

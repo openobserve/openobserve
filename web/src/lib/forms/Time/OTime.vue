@@ -470,8 +470,8 @@ const fieldClasses = computed(() => [
                 :class="[
                   'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                   clockMode === 'hour'
-                    ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
-                    : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
+                    ? 'text-datepicker-accent-text border-datepicker-day-selected-bg'
+                    : 'text-datepicker-heading-text hover:text-datepicker-accent-text border-transparent',
                 ]"
                 :aria-label="t('common.hourWithValue', { value: displayHour })"
                 @click="clockMode = 'hour'"
@@ -486,8 +486,8 @@ const fieldClasses = computed(() => [
                 :class="[
                   'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                   clockMode === 'minute'
-                    ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
-                    : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
+                    ? 'text-datepicker-accent-text border-datepicker-day-selected-bg'
+                    : 'text-datepicker-heading-text hover:text-datepicker-accent-text border-transparent',
                 ]"
                 :aria-label="t('common.minuteWithValue', { value: displayMinute })"
                 @click="clockMode = 'minute'"
@@ -503,8 +503,8 @@ const fieldClasses = computed(() => [
                   :class="[
                     'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                     clockMode === 'second'
-                      ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
-                      : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
+                      ? 'text-datepicker-accent-text border-datepicker-day-selected-bg'
+                      : 'text-datepicker-heading-text hover:text-datepicker-accent-text border-transparent',
                   ]"
                   :aria-label="t('common.secondWithValue', { value: displaySecond })"
                   @click="clockMode = 'second'"
@@ -663,7 +663,7 @@ const fieldClasses = computed(() => [
             </div>
             <button
               type="button"
-              class="text-datepicker-day-selected-bg ring-offset-surface-base focus-visible:ring-datepicker-focus-ring text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none hover:opacity-80 focus-visible:ring-2"
+              class="text-datepicker-accent-text ring-offset-surface-base focus-visible:ring-datepicker-focus-ring text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none hover:opacity-80 focus-visible:ring-2"
               data-test="otime-close"
               @click="popoverOpen = false"
             >
