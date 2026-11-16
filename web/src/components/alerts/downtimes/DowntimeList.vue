@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-          <div class="bg-card-glass-bg flex h-full flex-col">
+          <div class="bg-card-glass-bg @container/downtime-toolbar flex h-full flex-col">
             <OTable
               v-model:selected-ids="selectedIds"
               class="min-h-0 flex-1"
@@ -85,21 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :get-row-style="rowStyle"
               @row-click="openDetail"
             >
-              <template #subheader>
-                <div data-test="downtime-list-summary">
-                  <OStatStrip
-                    :items="summaryStats"
-                    :loading="loading"
-                    compact
-                    stacked
-                    selectable
-                    :selected-key="statFilter"
-                    default-key="total"
-                    @select="onStatSelect"
-                  />
+              <template v-if="truncatedNotice" #subheader>
+                <div class="px-page-edge border-table-row-divider border-b py-1.5">
                   <OBanner
-                    v-if="truncatedNotice"
-                    class="mt-1.5"
                     variant="info"
                     dense
                     :content="truncatedNotice"
@@ -109,9 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #toolbar>
-                <div
-                  class="@container/downtime-toolbar flex min-w-0 flex-1 items-center gap-2 max-md:contents"
-                >
+                <div class="contents">
                   <OToggleGroup
                     mobile-dropdown
                     :model-value="typeFilter"
@@ -126,10 +112,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :icon-left="option.icon"
                       :data-test="`downtime-list-type-${option.value}`"
                     >
-                      <span class="@max-[38rem]/downtime-toolbar:hidden">{{ option.label }}</span>
+                      <span class="@max-[48rem]/downtime-toolbar:hidden">{{ option.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="min-w-0 flex-1 max-md:min-w-40">
+                  <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
                     <OInput
                       v-model="search"
                       :placeholder="
@@ -157,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :title="t('alerts.downtimes.thisFolderTooltip')"
                             data-test="downtime-list-scope-this"
                           >
-                            <span class="max-md:hidden @max-[34rem]/downtime-toolbar:hidden">{{
+                            <span class="max-md:hidden @max-[52rem]/downtime-toolbar:hidden">{{
                               t("alerts.downtimes.thisFolder")
                             }}</span>
                           </OToggleGroupItem>
@@ -168,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :title="t('alerts.downtimes.allFoldersTooltip')"
                             data-test="downtime-list-scope-all"
                           >
-                            <span class="max-md:hidden @max-[34rem]/downtime-toolbar:hidden">{{
+                            <span class="max-md:hidden @max-[52rem]/downtime-toolbar:hidden">{{
                               t("alerts.downtimes.allFolders")
                             }}</span>
                           </OToggleGroupItem>
@@ -176,6 +162,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </OInput>
                   </div>
+                  <OStatStrip
+                    :items="summaryStats"
+                    :loading="loading"
+                    selectable
+                    :row="false"
+                    multiple
+                    :selected-keys="statFilters"
+                    default-key="total"
+                    class="max-md:order-last"
+                    data-test="downtime-list-summary"
+                    @update:selected-keys="onStatKeys"
+                  />
                 </div>
               </template>
 
@@ -689,6 +687,7 @@ import {
   statKeyOf,
   type StatKey,
 } from "@/utils/downtimes/listOrder";
+import { filterKeysToQuery, matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
 
 type TypeFilter = "all" | "once" | "recurring";
 
@@ -802,15 +801,16 @@ const searchAcrossFolders = ref(route.query.scope === "all");
 const typeFilter = ref<TypeFilter>(
   (["once", "recurring"] as const).find((v) => v === route.query.repeat) ?? "all",
 );
-const statFilter = ref<StatKey | null>(statKeyOf(route.query.status));
+const isStatKey = (key: string): key is StatKey => statKeyOf(key) !== null;
+const statFilters = ref<StatKey[]>(readFilterKeys(route.query.status, isStatKey));
 const selectedIds = ref<string[]>([]);
 
 // The banner link can land here while the page is open, so each URL value drives its filter on change.
 watch(
   () => route.query.status,
   (status) => {
-    const fromUrl = statKeyOf(status);
-    if (fromUrl) statFilter.value = fromUrl;
+    const fromUrl = readFilterKeys(status, isStatKey);
+    if (fromUrl.length) statFilters.value = fromUrl;
   },
 );
 watch(
@@ -825,12 +825,12 @@ watch(searchAcrossFolders, (across) => {
   void router.replace({ query: { ...route.query, scope: across ? "all" : undefined } });
 });
 
-watch([typeFilter, statFilter], ([repeat, status]) => {
+watch([typeFilter, statFilters], ([repeat, status]) => {
   router.replace({
     query: {
       ...route.query,
       repeat: repeat === "all" ? undefined : repeat,
-      status: status ?? undefined,
+      status: filterKeysToQuery(status),
     },
   });
 });
@@ -859,7 +859,7 @@ const folderRows = computed(() => {
   const term = search.value.trim().toLowerCase();
   // The org banner links here with every folder and a status filter, and no search term.
   const scoped =
-    searchAcrossFolders.value && (term || statFilter.value)
+    searchAcrossFolders.value && (term || statFilters.value.length)
       ? allRows.value
       : allRows.value.filter((r) => (r.folder_id || "default") === activeFolderId.value);
   const byType = scoped.filter((r) =>
@@ -873,12 +873,11 @@ const folderRows = computed(() => {
 });
 
 const displayedRows = computed(() => {
-  const f = statFilter.value;
-  const rows = !f
-    ? folderRows.value
-    : f === "recurring"
-      ? folderRows.value.filter((r) => r.schedule.repeat !== "none")
-      : folderRows.value.filter((r) => r.status === f);
+  const rows = folderRows.value.filter((row) =>
+    matchesAnyKey(statFilters.value, row, (r, key) =>
+      key === "recurring" ? r.schedule.repeat !== "none" : r.status === key,
+    ),
+  );
   return sortDowntimeRows(rows);
 });
 
@@ -890,7 +889,7 @@ const valueLabel = useDowntimeValueLabels(orgId, activeFolderId, () => ({
 }));
 
 const isFiltered = computed(
-  () => !!search.value.trim() || typeFilter.value !== "all" || statFilter.value !== null,
+  () => !!search.value.trim() || typeFilter.value !== "all" || statFilters.value.length > 0,
 );
 
 // ── Summary strip ───────────────────────────────────────────────────────────
@@ -898,7 +897,7 @@ const isFiltered = computed(
 const orgWideTiles = computed(
   () =>
     searchAcrossFolders.value &&
-    statFilter.value !== null &&
+    statFilters.value.length > 0 &&
     !search.value.trim() &&
     typeFilter.value === "all",
 );
@@ -980,7 +979,7 @@ const summaryStats = computed<StatItem[]>(() => {
     },
     {
       key: "total",
-      label: t("alerts.downtimes.stats.total"),
+      label: t("common.allStatuses"),
       value: hasData ? total : "—",
       icon: "format-list-bulleted",
       tone: "primary",
@@ -989,16 +988,19 @@ const summaryStats = computed<StatItem[]>(() => {
   ];
 });
 
-const onStatSelect = (key: string) => {
-  statFilter.value = key === "total" || statFilter.value === key ? null : (key as StatKey);
-  analytics.track("downtime_list_filtered", { filter: "status", value: statFilter.value ?? "all" });
+const onStatKeys = (keys: string[]) => {
+  statFilters.value = keys.filter(isStatKey);
+  analytics.track("downtime_list_filtered", {
+    filter: "status",
+    value: filterKeysToQuery(statFilters.value) ?? "all",
+  });
 };
 
 const onEmptyAction = (id?: string) => {
   if (id === "clear-filters") {
     search.value = "";
     typeFilter.value = "all";
-    statFilter.value = null;
+    statFilters.value = [];
     return;
   }
   createDowntime();

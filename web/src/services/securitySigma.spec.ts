@@ -17,6 +17,8 @@ describe("securitySigma service", () => {
     client = {
       get: vi.fn().mockResolvedValue({ data: {} }),
       post: vi.fn().mockResolvedValue({ data: {} }),
+      put: vi.fn().mockResolvedValue({ data: {} }),
+      delete: vi.fn().mockResolvedValue({ data: {} }),
     };
     vi.mocked(http).mockReturnValue(client as any);
   });
@@ -29,6 +31,16 @@ describe("securitySigma service", () => {
     const body = { rule_id: "r1", source_type: "aws_cloudtrail", stream: "ct" };
     await securitySigma.compile("acme", body);
     expect(client.post).toHaveBeenCalledWith("/api/acme/security/sigma/compile", body);
+  });
+
+  it("lists, upserts and removes allowlists by id", async () => {
+    await securitySigma.listAllowlists("acme");
+    expect(client.get).toHaveBeenCalledWith("/api/acme/security/allowlists");
+    const body = { name: "Scanners", purpose: "scanner" as const, values: ["10.0.0.0/8"] };
+    await securitySigma.putAllowlist("acme", "scanners", body);
+    expect(client.put).toHaveBeenCalledWith("/api/acme/security/allowlists/scanners", body);
+    await securitySigma.deleteAllowlist("acme", "scanners");
+    expect(client.delete).toHaveBeenCalledWith("/api/acme/security/allowlists/scanners");
   });
 
   it("keys a compile by its whole request, under the org", () => {

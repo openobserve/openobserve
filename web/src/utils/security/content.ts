@@ -47,6 +47,33 @@ export function streamsForRule(rule: CatalogRule, bySource: Map<string, string[]
   return rule.sources.flatMap((id) => bySource.get(id) ?? []);
 }
 
+/** Streams a rule applies to: its log source's streams plus any stream the server compiled it for, so a rule ready to run is always counted as applying. */
+export function ruleStreams(
+  rule: CatalogRule,
+  bySource: Map<string, string[]>,
+  checks: StreamCheck[],
+): string[] {
+  return [...new Set([...streamsForRule(rule, bySource), ...checks.map((c) => c.stream)])];
+}
+
+/** One definition for the Content counters: "ready" is always a subset of "applies". */
+export function ruleCounts(
+  rows: { streams: string[]; runnable: string[]; matched?: string[]; installed: boolean }[],
+) {
+  return {
+    ready: rows.filter((r) => (r.matched ?? r.runnable).length > 0 && !r.installed).length,
+    installed: rows.filter((r) => r.installed).length,
+    applies: rows.filter((r) => r.streams.length > 0).length,
+  };
+}
+
+/** Runnable streams whose source the rule was written for; a rule only compiling on another source's shared names is not ready. */
+export function matchedRunnable(rule: CatalogRule, checks: StreamCheck[]): string[] {
+  return checks
+    .filter((c) => c.compiled.runnable && rule.sources.includes(c.source.id))
+    .map((c) => c.stream);
+}
+
 export interface StreamCheck {
   stream: string;
   source: SourceType;

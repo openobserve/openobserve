@@ -80,6 +80,7 @@ const preview = (over: Partial<Preview> = {}): Preview => ({
   effect: { scope: "org", until: null, comes_back_when: "when_undone" },
   subject: { title: "disk latency", folder: "infra", team: null },
   revision: 3,
+  offer_fingerprint: "reviewed-patch",
   current: null,
   change: {
     alert: { title: "disk latency", folder: "infra", team: null, destinations: ["storage-oncall"] },
@@ -166,6 +167,32 @@ describe("ReviewChangeDialog (W5)", () => {
     expect(applyButton()?.disabled).toBe(false);
   });
 
+  it("names when the first dropped acknowledged firing began, once the run stored it", async () => {
+    const first = new Date(2026, 10, 4, 9, 30).getTime() * 1000;
+    api.preview.mockResolvedValue({
+      data: preview({
+        change: {
+          alert: {
+            title: "disk latency",
+            folder: "infra",
+            team: null,
+            destinations: ["storage-oncall"],
+          },
+          fields: [{ field: "pending_period_secs", from: 0, to: 120 }],
+          acknowledged_firings_dropped: { count: 1, of: 3, first_at: first },
+        },
+      }),
+    } as never);
+    await mountDialog();
+    const shown = new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(first / 1000);
+    expect(q("review-change-acknowledged")?.textContent?.trim()).toBe(
+      `1 of the 3 acknowledged firings would no longer alert, the first on ${shown}. Check it before applying.`,
+    );
+  });
+
   it("an_empty_destination_list_reads_as_no_destination_not_none", async () => {
     api.preview.mockResolvedValue({
       data: preview({
@@ -208,6 +235,7 @@ describe("ReviewChangeDialog (W5)", () => {
       id: "f-1",
       action: "apply",
       expected_revision: 3,
+      offer_fingerprint: "reviewed-patch",
     });
     expect(body.request_id).toBeTruthy();
     expect(body).not.toHaveProperty("applied_via");
@@ -225,6 +253,20 @@ describe("ReviewChangeDialog (W5)", () => {
       "alert_finding:f-1",
       expect.objectContaining({ expected_revision: 4 }),
     );
+  });
+
+  it("requires another review after the offered patch changes", async () => {
+    api.decide.mockRejectedValue(httpError(409, { error: "offer_changed" }));
+    await mountDialog();
+    applyButton()!.click();
+    await flushPromises();
+    expect(q("review-change-notice")?.dataset.severity).toBe("error");
+    expect(q("review-change-note")?.getAttribute("aria-hidden")).toBe("true");
+    const reads = api.preview.mock.calls.length;
+    q("review-change-review-again")!.click();
+    await flushPromises();
+    expect(api.preview.mock.calls.length).toBeGreaterThan(reads);
+    expect(applyButton()?.disabled).toBe(false);
   });
 
   it("409 alert_changed: amber, Apply off, the editor is the way on", async () => {

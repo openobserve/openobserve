@@ -13,6 +13,10 @@ import {
   histogramKeyToMs,
   histogramSql,
   isAggregateSql,
+  projectedColumns,
+  searchErrorText,
+  selectedColumns,
+  selectsAll,
   resultColumns,
   splitSeverity,
   topValuesSql,
@@ -319,5 +323,105 @@ describe("eventsSql sorting", () => {
     expect(eventsSql("okta", [], { field: "_timestamp", order: "asc" })).toBe(
       `SELECT * FROM "okta" ORDER BY _timestamp ASC`,
     );
+  });
+});
+
+describe("selectsAll", () => {
+  it("tells whole rows from a chosen column list", () => {
+    expect(selectsAll(`SELECT * FROM "okta"`)).toBe(true);
+    expect(selectsAll(`select t.*, lower(a) as b from "okta" t`)).toBe(true);
+    expect(selectsAll(`SELECT _timestamp, a, b FROM "okta"`)).toBe(false);
+    expect(selectsAll(`SELECT a, '*' AS star FROM "okta"`)).toBe(false);
+    expect(selectsAll(`SELECT a * 2 AS twice FROM "okta"`)).toBe(false);
+  });
+
+  it("still sees a column list when a literal holds a backslash", () => {
+    expect(selectsAll(STAGING_SQL)).toBe(false);
+    expect(isAggregateSql(STAGING_SQL)).toBe(false);
+    expect(selectsAll(`SELECT * FROM "sysmon" WHERE cmd LIKE '%\\%'`)).toBe(true);
+  });
+});
+
+// The analyst's round-4 hunts that fell back to the normalized grid.
+const STAGING_SQL = String.raw`SELECT _timestamp, winlog_computer_name AS h, winlog_event_id AS id, winlog_event_data_user AS u, winlog_event_data_image AS img, winlog_event_data_commandline AS cmd, winlog_event_data_targetfilename AS tf FROM "sysmon" WHERE winlog_event_id <> 1 AND winlog_event_id <> 3 AND winlog_event_id <> 22 OR winlog_event_data_commandline LIKE '%\\%' OR winlog_event_data_commandline LIKE '%robocopy%' OR winlog_event_data_commandline LIKE '%xcopy%' OR winlog_event_data_commandline LIKE '%rar%' OR winlog_event_data_commandline LIKE '%7z%' ORDER BY _timestamp DESC`;
+const EDR_TF_SQL = `SELECT _timestamp, computername, username, event_simplename, imagefilename, commandline, targetfilename FROM "edr" WHERE targetfilename IS NOT NULL ORDER BY _timestamp DESC`;
+const OKTA_PUB_SQL = `SELECT client_ipaddress AS ip, actor_alternateid AS u, client_geographicalcontext_city AS city, eventtype, outcome_result AS o, count(*) AS n, max(_timestamp) AS last FROM "okta" WHERE client_ipaddress NOT LIKE '10.%' AND client_ipaddress NOT IN ('198.51.100.10','198.51.100.20') GROUP BY ip, u, city, eventtype, o ORDER BY n DESC`;
+
+describe("selectedColumns", () => {
+  it("names each column a hand-written query projects, aliases included", () => {
+    expect(selectedColumns(STAGING_SQL)).toEqual([
+      "_timestamp",
+      "h",
+      "id",
+      "u",
+      "img",
+      "cmd",
+      "tf",
+    ]);
+    expect(selectedColumns(EDR_TF_SQL)).toEqual([
+      "_timestamp",
+      "computername",
+      "username",
+      "event_simplename",
+      "imagefilename",
+      "commandline",
+      "targetfilename",
+    ]);
+    expect(selectedColumns(OKTA_PUB_SQL)).toEqual([
+      "ip",
+      "u",
+      "city",
+      "eventtype",
+      "o",
+      "n",
+      "last",
+    ]);
+  });
+
+  it("reads quoted names, qualified columns and commas inside calls", () => {
+    expect(selectedColumns(`select t."Src IP", coalesce(a, 'x,y') AS "Who", b from "s" t`)).toEqual(
+      ["Src IP", "Who", "b"],
+    );
+  });
+
+  it("leaves the naming to the server for star and unnamed expressions", () => {
+    expect(selectedColumns(`SELECT * FROM "s"`)).toBeNull();
+    expect(selectedColumns(`SELECT a, count(*) FROM "s" GROUP BY a`)).toBeNull();
+    expect(selectedColumns(`SELECT 1`)).toBeNull();
+  });
+});
+
+describe("projectedColumns", () => {
+  it("keeps every named column even when no row carried it", () => {
+    expect(projectedColumns(EDR_TF_SQL, [])).toHaveLength(7);
+    expect(projectedColumns(EDR_TF_SQL, ["_timestamp", "username"])[6]).toBe("targetfilename");
+  });
+
+  it("keeps the server's spelling and order of extra columns", () => {
+    expect(projectedColumns(`SELECT Host, a FROM "s"`, ["host", "a", "zo_extra"])).toEqual([
+      "host",
+      "a",
+      "zo_extra",
+    ]);
+    expect(projectedColumns(`SELECT * FROM "s"`, ["b", "a"])).toEqual(["b", "a"]);
+  });
+});
+
+describe("searchErrorText", () => {
+  it("adds the engine's reason to the headline", () => {
+    expect(
+      searchErrorText({
+        code: 20003,
+        message: "Search SQL not valid",
+        error_detail: "Invalid function 'match_all_x'",
+      }),
+    ).toBe("Search SQL not valid: Invalid function 'match_all_x'");
+  });
+
+  it("does not repeat a detail the message already holds", () => {
+    expect(searchErrorText({ message: "boom", error_detail: "boom" })).toBe("boom");
+    expect(searchErrorText({ error: "bad", error_detail: "" })).toBe("bad");
+    expect(searchErrorText({ error_detail: "only detail" })).toBe("only detail");
+    expect(searchErrorText(undefined)).toBe("");
   });
 });

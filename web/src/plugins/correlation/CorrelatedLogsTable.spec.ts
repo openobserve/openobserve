@@ -405,6 +405,33 @@ describe("CorrelatedLogsTable.vue", () => {
 
       expect(wrapper.vm.expandedRows).not.toContain(row);
     });
+
+    describe("expand on row click", () => {
+      const expandOnRowClickFn = (w: any) => {
+        const table = w.findComponent({ name: "OTable" });
+        return (table.vm.$attrs["expand-on-row-click"] ?? table.vm.$attrs.expandOnRowClick) as (
+          row: any,
+        ) => boolean;
+      };
+
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      it("expands the row on a plain click", () => {
+        vi.spyOn(window, "getSelection").mockReturnValue({ toString: () => "" } as Selection);
+        wrapper = createWrapper();
+        expect(expandOnRowClickFn(wrapper)({ _timestamp: 1 })).toBe(true);
+      });
+
+      it("does not expand the row when the click ends a text selection", () => {
+        vi.spyOn(window, "getSelection").mockReturnValue({
+          toString: () => "selected text",
+        } as Selection);
+        wrapper = createWrapper();
+        expect(expandOnRowClickFn(wrapper)({ _timestamp: 1 })).toBe(false);
+      });
+    });
   });
 
   describe("Computed Properties", () => {

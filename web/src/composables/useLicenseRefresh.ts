@@ -20,6 +20,7 @@ import { configFullQuery } from "@/services/config.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { refreshLicenseMutation, licenseQuery } from "@/services/license_server.queries";
 import type { RefreshBody, RefreshResult } from "@/ts/interfaces/licenseRefresh";
+import { markFullConfigLoaded } from "@/composables/useFullConfigLoad";
 import { LICENSE_REFRESH_SETTLE_MS } from "@/utils/licenseWaivers";
 
 export function useLicenseRefresh() {
@@ -43,6 +44,7 @@ export function useLicenseRefresh() {
         refetchType: "none",
       });
       store.dispatch("setConfig", await queryClient.fetchQuery(configFullQuery(org)));
+      markFullConfigLoaded(org);
     } catch (error) {
       console.error("Error reloading license state:", error);
     }

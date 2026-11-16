@@ -11,7 +11,7 @@
 import { inject } from "vue";
 import OToggleGroup from "./OToggleGroup.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { useVisibleFieldError } from "@/lib/forms/Form/fieldError";
 import type { FormToggleGroupProps, FormToggleGroupSlots } from "./OFormToggleGroup.types";
 import type { AcceptableValue } from "reka-ui";
 
@@ -21,6 +21,7 @@ const props = defineProps<FormToggleGroupProps>();
 defineSlots<FormToggleGroupSlots>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormToggleGroup] must be rendered inside <OForm>. No form context found.");
@@ -54,10 +55,10 @@ if (import.meta.env.DEV && !form) {
         </OToggleGroup>
         <!-- Two OForm* wrappers on one field must not print the same message twice. -->
         <div
-          v-if="!$slots.error && field.state.meta.errors.length > 0"
+          v-if="!$slots.error && shown(field).message !== undefined"
           class="text-input-error-text text-xs"
         >
-          {{ firstFieldError(field.state.meta.errors) }}
+          {{ shown(field).message }}
         </div>
         <template v-if="$slots.error">
           <slot name="error" />

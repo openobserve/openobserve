@@ -45,18 +45,13 @@ import incidentsService, {
   type IncidentWithAlerts,
   type RcaLiveEvent,
   type RcaRun,
-  type RcaRunError,
   type RcaRunItem,
   type RcaRunState,
-  type RcaRunSummary,
-  type RcaSteering,
   type RcaSummary,
-  type RcaThread,
-  type RcaVerdictDetails,
 } from "@/services/incidents";
 import { incidentKeys } from "@/services/incidents.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import { useIncidentRca, type RcaReadStatus, type RcaRefusal } from "./useIncidentRca";
+import { useIncidentRca } from "./useIncidentRca";
 import {
   rcaRunSummary,
   rcaRunSummaryLive,
@@ -138,37 +133,10 @@ const detail = (summary: RcaSummary | null) => ({
   data: { id: "inc-1", rca: summary } as IncidentWithAlerts,
 });
 
-/** The part of the composable these tests read. */
-interface IncidentRcaApi {
-  live: Readonly<Ref<boolean>>;
-  state: Readonly<Ref<RcaRunState | null>>;
-  displayedRunId: Readonly<Ref<string | null>>;
-  threadRunId: Readonly<Ref<string | null>>;
-  reportText: Readonly<Ref<string>>;
-  reportVerdict: Readonly<Ref<RcaVerdictDetails | null>>;
-  currentError: Readonly<Ref<RcaRunError | null>>;
-  triggering: Readonly<Ref<boolean>>;
-  resuming: Readonly<Ref<boolean>>;
-  resumeRunId: Readonly<Ref<string | null>>;
-  thread: Readonly<Ref<RcaThread | null>>;
-  threadStatus: Readonly<Ref<RcaReadStatus>>;
-  runSummary: Readonly<Ref<RcaRunSummary | null>>;
-  runSummaryStatus: Readonly<Ref<RcaReadStatus>>;
-  steering: Readonly<Ref<RcaSteering | null>>;
-  steeringStatus: Readonly<Ref<RcaReadStatus>>;
-  trigger: (options?: { buildOnPrevious?: boolean; guidance?: string }) => Promise<void>;
-  refusal: Readonly<Ref<RcaRefusal | null>>;
-  resume: (runId: string) => Promise<void>;
-  cancel: () => Promise<void>;
-  reload: () => Promise<void>;
-  viewRun: (runId: string | null) => void;
-  retryLive: () => void;
-}
-
 interface Host {
   incident: Ref<IncidentWithAlerts | null>;
   analysisOpen: Ref<boolean>;
-  api: IncidentRcaApi;
+  api: ReturnType<typeof useIncidentRca>;
   wrapper: VueWrapper;
 }
 
@@ -491,19 +459,19 @@ describe("useIncidentRca (RR-35)", () => {
     });
   });
 
-  it("trigger sends the selected mode and reloads the committed run", async () => {
+  it("trigger sends the mode and the trimmed guidance, then reloads the committed run", async () => {
     service.triggerRca.mockResolvedValue({ data: { run_id: "run-2" } } as never);
     service.get.mockResolvedValue(detail(rca("running", "run-2", "run-1")) as never);
     host = mountHost(rca("completed", "run-1", "run-1"));
     await flushPromises();
 
-    await host.api.trigger({ buildOnPrevious: true });
+    await host.api.trigger({ buildOnPrevious: true, guidance: "  Check the pool  " });
 
     expect(service.triggerRca).toHaveBeenCalledTimes(1);
     expect(service.triggerRca.mock.calls[0].slice(0, 3)).toEqual([
       "default",
       "inc-1",
-      { build_on_previous: true },
+      { build_on_previous: true, guidance: "Check the pool" },
     ]);
     expect(service.get).toHaveBeenCalledTimes(1);
     expect(host.api.live.value).toBe(true);
@@ -530,20 +498,6 @@ describe("useIncidentRca (RR-35)", () => {
     await started;
     expect(host.api.triggering.value).toBe(false);
     expect(host.api.live.value).toBe(true);
-  });
-
-  it("SG33: trigger passes the trimmed guidance with the mode", async () => {
-    service.triggerRca.mockResolvedValue({ data: { run_id: "run-2" } } as never);
-    service.get.mockResolvedValue(detail(rca("running", "run-2", "run-1")) as never);
-    host = mountHost(rca("completed", "run-1", "run-1"));
-    await flushPromises();
-
-    await host.api.trigger({ buildOnPrevious: false, guidance: "  Check the pool  " });
-
-    expect(service.triggerRca.mock.calls[0][2]).toEqual({
-      build_on_previous: false,
-      guidance: "Check the pool",
-    });
   });
 
   it("RR-34: a started run invalidates the incidents list", async () => {
@@ -714,7 +668,7 @@ describe("useIncidentRca (RR-35)", () => {
     expect(host.api.live.value).toBe(false);
   });
 
-  it("the shown report's stored verdict gives the card its services and actions", async () => {
+  it("the shown report's stored verdict gives the card its services, actions and paging advice", async () => {
     service.getRcaRun.mockResolvedValueOnce({
       data: {
         run_id: "run-2",
@@ -723,6 +677,7 @@ describe("useIncidentRca (RR-35)", () => {
           verdict: {
             impacted_services: ["service=checkout-api"],
             proposed_actions: [{ title: "Roll back", kind: "rollback", detail: "Revert." }],
+            page_recommendation: { action: "page", reason: "Exposure needs review." },
           },
         },
       },
@@ -733,7 +688,46 @@ describe("useIncidentRca (RR-35)", () => {
     expect(host.api.reportVerdict.value).toEqual({
       impactedServices: ["service=checkout-api"],
       proposedActions: [{ title: "Roll back", kind: "rollback", detail: "Revert." }],
+      pageRecommendation: { action: "page", reason: "Exposure needs review." },
     });
+  });
+
+  it("a report that fails to load is marked failed in place, and Retry reads it again", async () => {
+    service.getRcaRun.mockRejectedValueOnce(new Error("network"));
+    host = mountHost(rca("completed", "run-2", "run-2"));
+    expect(host.api.reportLoading.value).toBe(true);
+    await flushPromises();
+
+    expect(host.api.reportFailed.value).toBe(true);
+    expect(host.api.reportLoading.value).toBe(false);
+    expect(toastMock).not.toHaveBeenCalled();
+
+    host.api.retryReport();
+    expect(host.api.reportFailed.value).toBe(false);
+    expect(host.api.reportLoading.value).toBe(true);
+    await flushPromises();
+
+    expect(service.getRcaRun).toHaveBeenCalledTimes(2);
+    expect(host.api.reportText.value).toBe("report of run-2");
+    expect(host.api.reportLoading.value).toBe(false);
+  });
+
+  it("clears a failed report read when reselecting a run with an empty report", async () => {
+    const finished = rca("completed", "run-2", "run-2");
+    finished.history = [reportRun("run-2"), { ...reportRun("run-1"), state: "failed" }];
+    host = mountHost(finished);
+    await flushPromises();
+    service.getRcaRun.mockRejectedValueOnce(new Error("network"));
+    host.api.viewRun("run-1");
+    await flushPromises();
+    expect(host.api.reportFailed.value).toBe(true);
+    host.api.viewRun("run-2");
+    await flushPromises();
+    service.getRcaRun.mockResolvedValueOnce({ data: { run_id: "run-1", report: "" } } as never);
+    host.api.viewRun("run-1");
+    await flushPromises();
+    expect(host.api.reportFailed.value).toBe(false);
+    expect(host.api.reportText.value).toBe("");
   });
 
   describe("v1: pre-upgrade reports", () => {
@@ -796,12 +790,6 @@ describe("useIncidentRca (RR-35)", () => {
         } as RcaRun,
       };
     };
-
-    const historyItem = (
-      runId: string,
-      state: RcaRunState,
-      outcome: RcaRunItem["outcome"] = null,
-    ) => ({ ...reportRun(runId), state, outcome }) as RcaRunItem;
 
     const RESUMED = (steps: number) => ({
       data: {
@@ -872,6 +860,7 @@ describe("useIncidentRca (RR-35)", () => {
         { code: "transcript_expired", message: "The transcript expired" },
         "The transcript expired",
       ],
+      [412, { message: "AI SRE is not configured" }, "AI SRE is not configured"],
       [500, {}, "Could not resume the run."],
     ])(
       "a refused resume (%i) toasts the server message and re-reads nothing",
@@ -887,23 +876,6 @@ describe("useIncidentRca (RR-35)", () => {
         expect(host.api.resuming.value).toBe(false);
       },
     );
-
-    it("a 412 (AI not available) toasts the server message and re-reads nothing", async () => {
-      service.resumeRca.mockRejectedValue({
-        isAxiosError: true,
-        response: { status: 412, data: { message: "AI SRE is not configured" } },
-      });
-      host = mountHost(stopped());
-      await flushPromises();
-
-      await host.api.resume("run-2");
-
-      expect(toastMock).toHaveBeenCalledWith({
-        variant: "error",
-        message: "AI SRE is not configured",
-      });
-      expect(service.get).not.toHaveBeenCalled();
-    });
 
     it("while a resume is in flight, a trigger or a second resume sends nothing", async () => {
       const request = Promise.withResolvers<unknown>();

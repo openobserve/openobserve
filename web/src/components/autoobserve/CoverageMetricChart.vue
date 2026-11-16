@@ -172,7 +172,7 @@ import {
   type MetricDef,
   type MetricSeries,
 } from "./coverageSeries";
-import type { CoverageCell } from "./fixtures";
+import type { CoverageCell } from "./aoTypes";
 import { liveCellWord } from "./live/liveCopy";
 import type { ServiceChartStatus } from "./live/useServiceCharts";
 
@@ -193,6 +193,8 @@ const props = defineProps<{
   wide?: boolean;
   /** An alert for this check was just added and waits for the next pass to count it. */
   added?: boolean;
+  /** The service is still learning, so a check without an alert waits instead of reading as a gap. */
+  learning?: boolean;
 }>();
 
 const emit = defineEmits<{ toggle: []; retry: [] }>();
@@ -256,6 +258,12 @@ const badge = computed<{ icon: IconName; label: I18nText; tone: string }>(() => 
     return {
       icon: "hourglass-empty",
       label: t("autoobserveLive.cell.added"),
+      tone: "text-text-secondary",
+    };
+  if (props.cell.state === "gap" && props.learning && props.cell.engine)
+    return {
+      icon: "psychology",
+      label: liveCellWord(t, props.cell.engine.stateKey, false, true),
       tone: "text-text-secondary",
     };
   if (props.cell.state === "gap")

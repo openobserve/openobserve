@@ -87,6 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OFormSwitch
           name="enabled"
           :label="t('synthetics.locations.enabled')"
+          off-tone="neutral"
+          state-text
           data-test="synthetics-location-enabled-toggle"
         />
       </div>

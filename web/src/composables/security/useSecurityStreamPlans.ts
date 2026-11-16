@@ -7,7 +7,10 @@ import { ref, shallowRef } from "vue";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import store from "@/stores";
 import streamService from "@/services/stream";
+import securitySources from "@/services/securitySources";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
+import { searchErrorText } from "@/utils/security/eventQuery";
+import { isForbiddenError } from "@/composables/security/useSecurityAccess";
 import { fetchSecuritySources, fetchSourceMatch } from "@/services/securitySources.queries";
 import {
   LARGE_STREAM_ROWS,
@@ -25,6 +28,20 @@ import {
 
 /** Queries in flight at once; the search service rejects a flood with 429. */
 export const QUERY_CONCURRENCY = 4;
+
+/** Orgs whose stream list refused this user; a source-only analyst is refused on every page, so it is asked once. */
+const streamListRefused = new Set<string>();
+
+/** The org's log streams with stats, or null when unavailable; a refusal is remembered for the session. */
+export async function listStreamStats(orgId: string): Promise<any[] | null> {
+  if (streamListRefused.has(orgId)) return null;
+  try {
+    return (await streamService.nameList(orgId, "logs", false))?.data?.list ?? [];
+  } catch (e) {
+    if (isForbiddenError(e)) streamListRefused.add(orgId);
+    return null;
+  }
+}
 
 /** Runs tasks through a small worker pool, keeping each result or error in order. */
 export async function runPool<T>(
@@ -133,7 +150,10 @@ export function runSql(
         searchType: "ui",
         traceId,
         org_id: orgId,
-        clear_cache: !useCache,
+        // Skipping the cache needs only read; clear_cache needs stream edit rights and 403s a reader.
+        use_cache: useCache,
+        // Security read covers the org's Security sources, never other streams.
+        meta: { security_scope: true },
       },
       {
         data: (_payload: unknown, response: any) => {
@@ -159,9 +179,7 @@ export function runSql(
         error: (_payload: unknown, response: any) => {
           done();
           const body = response?.content ?? response ?? {};
-          const error: any = new Error(
-            String(body.message ?? body.error ?? body.error_detail ?? "search failed"),
-          );
+          const error: any = new Error(searchErrorText(body) || "search failed");
           error.status = body.status;
           error.code = body.code;
           // Shaped like an axios error, so isForbiddenError and licenseDeniedFeatures read its status.
@@ -228,7 +246,7 @@ export function useSecurityStreamPlans() {
     options: PlanOptions,
   ): Promise<StreamPlan> {
     options.signal?.throwIfAborted();
-    const schema = await streamService.schema(orgId, name, "logs");
+    const schema = await securitySources.schema(orgId, name);
     const fields: string[] = (schema.data?.schema ?? schema.data?.fields ?? []).map((f: any) =>
       String(f.name),
     );
@@ -264,11 +282,14 @@ export function useSecurityStreamPlans() {
     error.value = "";
     failure.value = null;
     try {
-      const res = await streamService.nameList(orgId, "logs", false);
-      const list: any[] = res.data?.list ?? [];
+      // Stats only size the plans; a source-only analyst lists no streams, yet reads the sources.
+      const [streams, listing] = await Promise.all([
+        listStreamStats(orgId),
+        fetchSecuritySources(orgId),
+      ]);
+      const list: any[] = streams ?? [];
       const statsByName = new Map(list.map((s) => [String(s.name), s.stats]));
-      const listed = new Set(list.map((s) => String(s.name)));
-      const wanted = (await fetchSecuritySources(orgId)).sources.filter((n) => listed.has(n));
+      const wanted = listing.sources;
       if (mine !== seq) return;
       names.value = [...wanted].sort();
       const settled = await runPool(

@@ -26,6 +26,7 @@ import {
   rcaStatusHistoryLine,
   rcaUtcRange,
   sortedRcaTimeline,
+  rcaPageRecommendation,
   rcaVerdictDetails,
 } from "./rcaSummary";
 import {
@@ -240,5 +241,17 @@ describe("rcaVerdictDetails (stored verdict on the card)", () => {
   it("is null for a record with no verdict (a cancelled or failed run) and for no record", () => {
     expect(rcaVerdictDetails({ schema_version: 1, ledger: { hypotheses: [] } })).toBeNull();
     expect(rcaVerdictDetails(undefined)).toBeNull();
+  });
+});
+
+describe("rcaPageRecommendation (the agent's paging advice)", () => {
+  it("reads the agent's paging advice from a stored result", () => {
+    expect(
+      rcaPageRecommendation({
+        verdict: { page_recommendation: { action: "downgrade", reason: "Baseline volume." } },
+      }),
+    ).toEqual({ action: "downgrade", reason: "Baseline volume." });
+    expect(rcaPageRecommendation({ verdict: {} })).toBeNull();
+    expect(rcaPageRecommendation(null)).toBeNull();
   });
 });

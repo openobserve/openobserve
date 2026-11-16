@@ -329,7 +329,7 @@ import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import config from "../aws-exports";
 
 import { setLanguage } from "../utils/cookies";
-import { getLocale } from "../locales";
+import { getLocale, loadSecurityMessages, securityMessagesRevision } from "../locales";
 
 import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
@@ -357,6 +357,8 @@ import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/draft
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { confirmLeave, releaseLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
+import { switchOrganization, toOrganizationOption } from "@/utils/organizationSwitch";
 import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -385,6 +387,11 @@ import LicenseSearchBanner from "@/enterprise/components/billings/LicenseSearchB
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
+import {
+  markFullConfigFailed,
+  markFullConfigLoaded,
+  registerFullConfigLoader,
+} from "@/composables/useFullConfigLoad";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
@@ -702,7 +709,18 @@ export default defineComponent({
         store.state.zoConfig.version != ""
       ),
     );
-    const securityNavLinks = buildSecurityNavLinks(t);
+    // The rail can show on a shared route (settings, IAM) before any Security page loaded its messages.
+    const securityNavLinks = computed(() => {
+      void securityMessagesRevision.value;
+      return buildSecurityNavLinks(t);
+    });
+    watch(
+      () => store.state.solutionMode,
+      (mode) => {
+        if (mode === "security") loadSecurityMessages().catch(() => {});
+      },
+      { immediate: true },
+    );
 
     // The URL decides the mode, so a shared /security link or a /logs jump shows the matching nav.
     const route = useRoute();
@@ -748,7 +766,7 @@ export default defineComponent({
       !menuReady.value
         ? []
         : store.state.solutionMode === "security"
-          ? securityNavLinks
+          ? securityNavLinks.value
           : linksList.value,
     );
 
@@ -1168,9 +1186,7 @@ export default defineComponent({
     const splitterModel = ref(100);
     const selectedLanguage: any = langList.find((l) => l.code == getLocale()) || langList[0];
 
-    // Insert / remove the AI Observability menu entry based on the live config
-    // flag. Position: directly after Traces. Idempotent — safe to call from
-    // multiple lifecycle hooks.
+    // Profiles is inserted right after Traces, so anchoring on Traces would land between the two.
     const updateAIObservabilityMenu = () => {
       syncFeatureLink(
         {
@@ -1325,21 +1341,30 @@ export default defineComponent({
     }
 
     const updateOrganization = async () => {
-      resetStreams();
-      store.dispatch("logs/resetLogs");
-      store.dispatch("setIsDataIngested", false);
-      const orgIdentifier = selectedOrg.value.identifier;
+      const targetOrg = { ...selectedOrg.value };
+      const keepCurrent = () => {
+        const current = store.state.selectedOrganization;
+        selectedOrg.value =
+          orgOptions.value.find((org) => org.identifier === current?.identifier) ?? current;
+      };
+      // Re-picking the current org switches nothing, so it must not ask to discard the page's edits.
+      if (targetOrg.identifier === store.state.selectedOrganization?.identifier)
+        return keepCurrent();
+      // Asked before anything is committed: the switch unmounts the page, and its edits cannot be brought back.
+      if (!(await confirmLeave())) return keepCurrent();
       const queryParams =
         router.currentRoute.value.path.indexOf(".logs") > -1 ? router.currentRoute.value.query : {};
-      router.push({
+      const switched = await switchOrganization({ store, router, resetStreams }, targetOrg, {
         path: router.currentRoute.value.path,
         query: {
           ...queryParams,
-          org_identifier: orgIdentifier,
+          org_identifier: targetOrg.identifier,
         },
       });
-      useLocalOrganization(selectedOrg.value);
-      store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+      if (!switched) {
+        releaseLeave();
+        return keepCurrent();
+      }
       // setSelectedOrganization();
       // if (
       //   config.isCloud &&
@@ -1368,7 +1393,7 @@ export default defineComponent({
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
       ) {
-        await verifyStreamExist(selectedOrg.value);
+        await verifyStreamExist(targetOrg);
       }
     };
 
@@ -1461,26 +1486,7 @@ export default defineComponent({
                 label: string;
                 created_at?: number;
               }) => {
-                // `label` is the real name here — General.vue's delete-confirm gate matches it; disambiguation is applied only on the dropdown copy below.
-                const optiondata: any = {
-                  label: data.name,
-                  id: data.id,
-                  identifier: data.identifier,
-                  user_email: store.state.userInfo.email,
-                  ingest_threshold: data.ingest_threshold,
-                  search_threshold: data.search_threshold,
-                  subscription_type: Object.prototype.hasOwnProperty.call(
-                    data,
-                    "CustomerBillingObj",
-                  )
-                    ? data.CustomerBillingObj.subscription_type
-                    : "",
-                  status: data.status,
-                  note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
-                    ? data.CustomerBillingObj.note
-                    : "",
-                  created_at: data.created_at,
-                };
+                const optiondata: any = toOrganizationOption(data, store.state.userInfo.email);
 
                 if (
                   config.isCloud == "true" &&
@@ -1738,6 +1744,7 @@ export default defineComponent({
           initBrowserRum(res.data.rum, store.state.API_ENDPOINT);
           store.dispatch("setConfig", res.data);
           fullConfigOrg = orgIdentifier;
+          markFullConfigLoaded(orgIdentifier);
           fullConfigSettled.value = true;
           await nextTick();
 
@@ -1761,6 +1768,7 @@ export default defineComponent({
           } else {
             console.error("Failed to load the full configuration:", error);
           }
+          markFullConfigFailed(orgIdentifier);
           // Fail open: reveal the base menu even if the config never resolves.
           menuReady.value = true;
           fullConfigSettled.value = true;
@@ -1775,6 +1783,12 @@ export default defineComponent({
           }
         });
     };
+
+    // A manual retry passes the last attempt index: it forces a real fetch and schedules no further timers.
+    const unregisterFullConfigLoader = registerFullConfigLoader(() =>
+      getConfig(FULL_CONFIG_RETRY_DELAYS_MS.length),
+    );
+    onUnmounted(unregisterFullConfigLoader);
 
     if (config.isCloud == "true") {
       layoutMixin.getDefaultOrganization(store);

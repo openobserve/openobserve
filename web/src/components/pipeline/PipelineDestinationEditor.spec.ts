@@ -75,16 +75,16 @@ describe("PipelineDestinationEditor - rendering", () => {
   it("shows addTitle text (v-else branch) when no destination prop is passed", async () => {
     wrapper = await mountComp();
     const titleEl = wrapper.find('[data-test="pipeline-destination-editor-title"]');
-    // t("alert_destinations.addTitle") => "New Destination"
-    expect(titleEl.text()).toContain("New Destination");
+    // t("alert_destinations.addTitle") => "New destination"
+    expect(titleEl.text()).toContain("New destination");
   });
 
   it("shows updateTitle + destination.name (v-if branch) when destination prop is provided", async () => {
     wrapper = await mountComp({ destination: { name: "my-dest" } });
     await flushPromises();
     const titleEl = wrapper.find('[data-test="pipeline-destination-editor-title"]');
-    // t("alert_destinations.updateTitle") => "Update Destination"
-    expect(titleEl.text()).toContain("Update Destination");
+    // t("alert_destinations.updateTitle") => "Update destination"
+    expect(titleEl.text()).toContain("Update destination");
     expect(titleEl.text()).toContain("my-dest");
   });
 

@@ -47,8 +47,30 @@ describe("FolderIcon", () => {
     expect(wrapper.find('[data-test="glyph-emoji"]').text()).toBe("⭐");
   });
 
+  it("should render a flat icon token through OIcon", () => {
+    wrapper = mount(FolderIcon, { props: { token: "icon:dashboard" } });
+    expect(wrapper.find('[data-test="glyph-icon"]').exists()).toBe(true);
+    expect(wrapper.find(".text-current").exists()).toBe(false);
+  });
+
+  it("should render a mono logo token", () => {
+    wrapper = mount(FolderIcon, { props: { token: "mono:docker" } });
+    expect(wrapper.find('[data-test="glyph-mono"]').exists()).toBe(true);
+  });
+
+  it.each(["icon:no-such-icon", "mono:no-such-logo"])(
+    "should fall back to the folder outline for the unknown token %s",
+    (token) => {
+      wrapper = mount(FolderIcon, { props: { token } });
+      expect(wrapper.find('[data-test="glyph-icon"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="glyph-mono"]').exists()).toBe(false);
+      expect(wrapper.find(".text-current svg").exists()).toBe(true);
+      expect(wrapper.text()).not.toContain(token);
+    },
+  );
+
   it("should keep the same fixed footprint whatever it renders", () => {
-    const footprints = ["🚀", "o2:redis", null].map((token) => {
+    const footprints = ["🚀", "o2:redis", "icon:dashboard", "mono:docker", null].map((token) => {
       const w = mount(FolderIcon, { props: { token } });
       const classes = w.find('[data-test="folder-icon"]').classes().join(" ");
       w.unmount();

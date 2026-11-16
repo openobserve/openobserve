@@ -53,14 +53,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <p class="text-text-secondary text-xs" data-test="incident-finding-note">
-      {{ facts ? t("alerts.incidents.findingNote") : t("alerts.incidents.findingNoteNoFacts") }}
+      {{
+        facts
+          ? (note ?? t("alerts.incidents.findingNote"))
+          : t("alerts.incidents.findingNoteNoFacts")
+      }}
     </p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatToReadable } from "@/utils/date";
 import type { FindingFacts } from "@/utils/incidents/findingDimensions";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -69,11 +73,16 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 const props = defineProps<{
   /** Null when the incident's dimensions cannot be read; only the note shows. */
   facts: FindingFacts | null;
+  // Per-page options: a page's own time format and note; the incident page keeps the defaults.
+  formatTime?: (timestampUs: number) => string;
+  note?: I18nText;
 }>();
 
 const { t } = useI18nTyped();
 
 const started = computed(() =>
-  props.facts?.startedAt ? raw(formatToReadable(props.facts.startedAt)) : raw("—"),
+  props.facts?.startedAt
+    ? raw(props.formatTime?.(props.facts.startedAt) ?? formatToReadable(props.facts.startedAt))
+    : raw("—"),
 );
 </script>

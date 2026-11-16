@@ -20,11 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :link-label="pipelinesOk ? t('overview.dataHealth.viewPipelines') : undefined"
     :view="view"
     @retry="emit('retry')"
-    @view-all="emit('open', 'pipelines')"
+    @view-all="emit('viewAll')"
   >
     <ul class="flex flex-col" data-test="overview-data-health-rows">
-      <li v-for="row in rows" :key="row.key" class="border-border-default border-t">
-        <OverviewDataHealthRow :row="row" @open="emit('open', $event)" />
+      <li
+        v-for="row in rows"
+        :key="row.key"
+        class="border-border-default flex items-center border-t"
+      >
+        <OverviewDataHealthRow class="min-w-0 flex-1" :row="row" @open="emit('open', $event)" />
+        <span v-if="askVisible" class="flex w-9 shrink-0 justify-center">
+          <OverviewAskAiButton
+            kind="health"
+            :item-key="row.key"
+            :label="row.label"
+            :show="Boolean(askTarget(row))"
+            @ask="emit('askAi', askTarget(row)!)"
+          />
+        </span>
       </li>
     </ul>
   </OverviewSectionCard>
@@ -35,7 +48,10 @@ import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { OrgOverview, OverviewSection } from "@/ts/interfaces/overview";
 import OverviewDataHealthRow, { type HealthRow } from "./OverviewDataHealthRow.vue";
+import OverviewAskAiButton from "./OverviewAskAiButton.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
+import type { OverviewAskAiTarget, OverviewAskAiTopic } from "./overviewAskAi";
+import { useOverviewAskAi } from "./useOverviewAskAi";
 import {
   sectionView,
   type HealthTone,
@@ -50,9 +66,30 @@ const props = defineProps<{
   forbidden?: boolean;
 }>();
 
-const emit = defineEmits<{ retry: []; open: [destination: OverviewDestination] }>();
+const emit = defineEmits<{
+  retry: [];
+  viewAll: [];
+  open: [destination: OverviewDestination];
+  askAi: [target: OverviewAskAiTarget];
+}>();
 
 const { t } = useI18nTyped();
+const { visible: askVisible } = useOverviewAskAi();
+
+const ASK_TOPICS: Partial<Record<string, OverviewAskAiTopic>> = {
+  quiet: "quiet",
+  failing: "failing",
+  pipelines: "pipelines",
+  delivery: "delivery",
+};
+
+// informational rows (schema, compaction) are not problems, so only error and warning rows ask
+const askTarget = (row: HealthRow): OverviewAskAiTarget | undefined => {
+  const topic = ASK_TOPICS[row.key];
+  const problem = row.ok && !row.notSetUp && (row.tone === "error" || row.tone === "warning");
+  if (!topic || !problem || !row.count) return undefined;
+  return { kind: "count", topic, count: row.count };
+};
 
 const view = computed<OverviewView>(() => {
   if (props.pending) return "loading";
@@ -128,6 +165,7 @@ const healthRow = <T,>(
     value: count === null ? raw("—") : raw(count),
     ok: true,
     notSetUp: false,
+    count: count ?? undefined,
   };
 };
 
@@ -154,7 +192,7 @@ const healthRows = (): HealthRow[] => {
         key: "failing",
         label: t("overview.dataHealth.failing"),
         note: t("overview.dataHealth.failingNote"),
-        destination: "alerts",
+        destination: "failing",
       },
       o?.alerts,
       (d) => ({ count: d.failed_evaluation, tone: byCount("error"), notSetUp: d.enabled === 0 }),
@@ -182,7 +220,7 @@ const healthRows = (): HealthRow[] => {
         key: "delivery",
         label: t("overview.dataHealth.delivery"),
         note: t("overview.dataHealth.deliveryNote"),
-        destination: "alerts",
+        destination: "delivery",
       },
       o?.alerts,
       (d) => ({

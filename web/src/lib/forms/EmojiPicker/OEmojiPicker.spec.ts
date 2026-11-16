@@ -5,6 +5,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import OEmojiPicker from "./OEmojiPicker.vue";
 import { EMOJI_GROUPS } from "./emojiCatalog";
+import { FLAT_ICON_GROUPS } from "./flatIconCatalog";
 
 // The panel is portalled to document.body, so it is queried there rather than
 // through the wrapper.
@@ -57,7 +58,10 @@ describe("OEmojiPicker", () => {
   it("should render every catalog emoji once the panel is open", async () => {
     wrapper = mount(OEmojiPicker, { attachTo: document.body });
     await openPicker(wrapper);
-    const total = EMOJI_GROUPS.reduce((sum, group) => sum + group.emojis.length, 0);
+    const total = [...FLAT_ICON_GROUPS, ...EMOJI_GROUPS].reduce(
+      (sum, group) => sum + group.emojis.length,
+      0,
+    );
     expect(panelQueryAll("[data-emoji-cell]")).toHaveLength(total);
   });
 
@@ -118,8 +122,46 @@ describe("OEmojiPicker", () => {
     search!.dispatchEvent(new Event("input"));
     await nextTick();
     const cells = panelQueryAll("[data-emoji-cell]");
-    expect(cells).toHaveLength(1);
-    expect(cells[0].textContent?.trim()).toBe("🗄️");
+    expect(cells.map((cell) => cell.getAttribute("data-test"))).toEqual([
+      "emoji-picker-option-icon-database",
+      "emoji-picker-option-database",
+    ]);
+    expect(cells[1].textContent?.trim()).toBe("🗄️");
+  });
+
+  it("should open on the flat icons section, then mono logos, then the emoji catalog", async () => {
+    wrapper = mount(OEmojiPicker, { attachTo: document.body });
+    await openPicker(wrapper);
+    const cells = panelQueryAll("[data-emoji-cell]");
+    expect(cells[0].getAttribute("data-test")).toBe("emoji-picker-option-icon-folder-outline");
+    const flatCount = FLAT_ICON_GROUPS[0].emojis.length;
+    expect(cells[flatCount].getAttribute("data-test")).toMatch(/^emoji-picker-option-mono-/);
+    const firstEmoji = flatCount + FLAT_ICON_GROUPS[1].emojis.length;
+    expect(cells[firstEmoji].textContent?.trim()).toBe("🚀");
+  });
+
+  it("should find a flat icon, a mono logo and the colour logo by search", async () => {
+    wrapper = mount(OEmojiPicker, { attachTo: document.body });
+    await openPicker(wrapper);
+    const search = panelQuery<HTMLInputElement>('[data-test="emoji-picker-search"] input');
+    search!.value = "docker";
+    search!.dispatchEvent(new Event("input"));
+    await nextTick();
+    const ids = panelQueryAll("[data-emoji-cell]").map((cell) => cell.getAttribute("data-test"));
+    expect(ids).toEqual(["emoji-picker-option-mono-docker", "emoji-picker-option-docker"]);
+
+    search!.value = "terminal";
+    search!.dispatchEvent(new Event("input"));
+    await nextTick();
+    expect(panelQuery('[data-test="emoji-picker-option-icon-terminal"]')).not.toBeNull();
+  });
+
+  it("should emit an icon: token when a flat icon is picked", async () => {
+    wrapper = mount(OEmojiPicker, { attachTo: document.body });
+    await openPicker(wrapper);
+    panelQuery<HTMLButtonElement>('[data-test="emoji-picker-option-icon-dashboard"]')?.click();
+    await nextTick();
+    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual(["icon:dashboard"]);
   });
 
   it("should render brand glyphs as svgs alongside emoji cells", async () => {

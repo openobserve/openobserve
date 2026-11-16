@@ -161,7 +161,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         // Base state - inactive (transparent on track)
         'bg-toggle-item-bg text-toggle-item-text font-medium whitespace-nowrap',
         'rounded-default',
-        'transition-all duration-150',
+        'transition-[color,background-color,box-shadow] duration-(--duration-control) ease-(--ease-control)',
         'cursor-pointer outline-none',
         // Hover (inactive only) — scoped to data-state=off so hovering the
         // active item never repaints over the sliding indicator / active fill.
@@ -169,9 +169,11 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         // Active fill: normally painted per-item. When the group animates the
         // selection (opt-in), a single sliding indicator paints the fill instead,
         // so suppress the per-item background and just keep the active text colour.
-        !isAnimated &&
-          'data-[state=on]:bg-toggle-item-active-bg data-[state=on]:ring-toggle-item-active-border data-[state=on]:shadow-xs data-[state=on]:ring-1 data-[state=on]:ring-inset',
+        !isAnimated && 'data-[state=on]:bg-toggle-item-active-bg data-[state=on]:shadow-xs',
         'data-[state=on]:text-toggle-item-active-text',
+        // Gated off while focused so the focus ring keeps its own width and colour.
+        !isAnimated &&
+          'data-[state=on]:not-focus-visible:ring-toggle-item-active-border data-[state=on]:not-focus-visible:ring-1 data-[state=on]:not-focus-visible:ring-inset',
         // Sit above the sliding indicator so the icon/label stay readable.
         isAnimated && 'relative z-10',
         // Focus ring

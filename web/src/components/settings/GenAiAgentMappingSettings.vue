@@ -42,111 +42,119 @@
     </div>
 
     <template v-else>
-      <!-- Scrollable form body -->
-      <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        <div class="grid grid-cols-1 gap-5">
+      <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
+        <div class="flex flex-col gap-4">
           <!-- Standard attribute is read first, then each fallback in order. -->
-          <section class="flex flex-col gap-3" data-test="gen-ai-identity-section">
-            <div class="flex flex-col">
-              <span class="text-text-heading text-sm font-semibold">
-                {{ t("genAiAgentMapping.identity.title") }}
-              </span>
-              <span class="text-text-secondary text-xs">
-                {{ t("genAiAgentMapping.identity.help") }}
-              </span>
-            </div>
-            <div :class="FIELD_GRID">
-              <span class="text-2xs text-text-secondary font-semibold">{{
-                t("llmAttribution.settings.field")
-              }}</span>
-              <span class="text-2xs text-text-secondary font-semibold">{{
-                t("llmAttribution.settings.standard")
-              }}</span>
-              <span class="text-2xs text-text-secondary font-semibold">{{
-                t("llmAttribution.settings.fallbacks")
-              }}</span>
-              <span />
-              <template v-for="f in IDENTITY_FIELDS" :key="f.key">
-                <span class="text-text-body">{{ t(f.label) }}</span>
-                <code class="text-2xs text-text-body break-all">{{ f.standard }}</code>
-                <OInput
-                  v-model="identityText[f.key]"
-                  :placeholder="raw(f.placeholder)"
-                  :aria-label="t('llmAttribution.settings.fallbacksFor', { dim: t(f.label) })"
-                  spellcheck="false"
-                  :data-test="f.dataTest"
-                />
-                <span />
+          <OFormSection
+            variant="plain"
+            :title="t('genAiAgentMapping.identity.title')"
+            :description="t('genAiAgentMapping.identity.help')"
+            data-test="gen-ai-identity-section"
+          >
+            <OSettingRow
+              v-for="f in IDENTITY_FIELDS"
+              :key="f.key"
+              control-at="end"
+              :label="t(f.label)"
+              :error="shownFallbackError(f.key, identityText[f.key])"
+            >
+              <template #description>
+                {{ t("genAiAgentMapping.alwaysAppliedStandard") }}
+                <code class="text-text-body break-all">{{ f.standard }}</code>
               </template>
-            </div>
-          </section>
+              <OTextarea
+                v-model="identityText[f.key]"
+                autogrow
+                :max-rows="FALLBACK_MAX_ROWS"
+                :placeholder="raw(f.placeholder)"
+                :aria-label="t('llmAttribution.settings.fallbacksFor', { dim: t(f.label) })"
+                :error="!!shownFallbackError(f.key, identityText[f.key])"
+                :aria-invalid="!!shownFallbackError(f.key, identityText[f.key]) || undefined"
+                spellcheck="false"
+                :data-test="f.dataTest"
+                @blur="markLeft(f.key)"
+              />
+            </OSettingRow>
+            <p class="text-text-secondary px-4 py-3 text-xs">
+              {{ t("genAiAgentMapping.fallbacksNote") }}
+            </p>
+          </OFormSection>
 
           <!-- At ingest a span without the standard attribute takes its first fallback. -->
-          <section
-            id="cost-attribution"
-            class="border-border-default flex scroll-mt-4 flex-col gap-3 border-t pt-4"
-            data-test="gen-ai-attribution-section"
-          >
-            <div class="flex flex-col">
-              <span class="text-text-heading text-sm font-semibold">
-                {{ t("llmAttribution.settings.title") }}
-              </span>
-              <span class="text-text-secondary text-xs">
-                {{ t("llmAttribution.settings.help") }}
-              </span>
-            </div>
-            <div :class="FIELD_GRID">
-              <span class="text-2xs text-text-secondary font-semibold">{{
-                t("llmAttribution.settings.field")
-              }}</span>
-              <span class="text-2xs text-text-secondary font-semibold">{{
-                t("llmAttribution.settings.standard")
-              }}</span>
-              <span class="text-2xs text-text-secondary font-semibold">{{
-                t("llmAttribution.settings.fallbacks")
-              }}</span>
-              <span class="text-2xs text-text-secondary font-semibold">{{
-                t("llmAttribution.settings.coverage")
-              }}</span>
-              <template v-for="d in ATTRIBUTION_DIMS" :key="d">
-                <span class="text-text-body">{{ t(`llmAttribution.dims.${d}`) }}</span>
-                <code class="text-2xs text-text-body break-all">{{
-                  ATTRIBUTION_ATTRIBUTES[d]
-                }}</code>
-                <OInput
+          <div id="cost-attribution" class="scroll-mt-4">
+            <OFormSection
+              variant="plain"
+              :title="t('llmAttribution.settings.title')"
+              :description="t('llmAttribution.settings.help')"
+              data-test="gen-ai-attribution-section"
+            >
+              <OSettingRow
+                v-for="d in ATTRIBUTION_DIMS"
+                :key="d"
+                control-at="end"
+                :label="t(`llmAttribution.dims.${d}`)"
+                :error="shownFallbackError(d, attributionText[d])"
+              >
+                <template #description>
+                  {{ t("genAiAgentMapping.alwaysAppliedStandard") }}
+                  <code class="text-text-body break-all">{{ ATTRIBUTION_ATTRIBUTES[d] }}</code>
+                  <span
+                    v-if="coverage[d] !== undefined"
+                    :data-test="`gen-ai-attribution-coverage-${d}`"
+                  >
+                    {{ t("genAiAgentMapping.coverageValue", { percent: coverage[d] }) }}
+                  </span>
+                </template>
+                <OTextarea
                   v-model="attributionText[d]"
+                  autogrow
+                  :max-rows="FALLBACK_MAX_ROWS"
                   :placeholder="raw(ATTRIBUTION_PLACEHOLDERS[d])"
                   :aria-label="
                     t('llmAttribution.settings.fallbacksFor', {
                       dim: t(`llmAttribution.dims.${d}`),
                     })
                   "
+                  :error="!!shownFallbackError(d, attributionText[d])"
+                  :aria-invalid="!!shownFallbackError(d, attributionText[d]) || undefined"
+                  spellcheck="false"
                   :data-test="`gen-ai-attribution-${d}`"
+                  @blur="markLeft(d)"
                 />
-                <span class="text-text-secondary" :data-test="`gen-ai-attribution-coverage-${d}`">
-                  {{ coverage[d] === undefined ? `—` : `${coverage[d]}%` }}
-                </span>
-              </template>
-            </div>
-            <span class="text-2xs text-text-secondary">{{
-              t("llmAttribution.settings.note")
-            }}</span>
-          </section>
+              </OSettingRow>
+              <p class="text-text-secondary px-4 py-3 text-xs">
+                {{ t("genAiAgentMapping.fallbacksNote") }}
+                {{ t("llmAttribution.settings.note") }}
+              </p>
+            </OFormSection>
+          </div>
 
           <!-- Harness text agents wrap around user requests, hidden in titles and previews. -->
-          <section
-            class="border-border-default flex flex-col gap-3 border-t pt-4"
+          <OFormSection
+            variant="plain"
+            :title="t('genAiAgentMapping.sessions.title')"
+            :description="t('genAiAgentMapping.sessions.help')"
             data-test="gen-ai-harness-section"
           >
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex flex-col">
-                <span class="text-text-heading text-sm font-semibold">
-                  {{ t("readableSessions.settings.title") }}
-                </span>
-                <span class="text-text-secondary text-xs">
-                  {{ t("readableSessions.settings.help") }}
-                </span>
-              </div>
+            <OSettingRow
+              control-at="end"
+              :label="t('readableSessions.settings.titleSource')"
+              :description="t('readableSessions.settings.titleSourceHelp')"
+            >
+              <OSelect
+                v-model="sessionTitle"
+                :options="sessionTitleOptions"
+                :aria-label="t('readableSessions.settings.titleSource')"
+                :searchable="false"
+                data-test="gen-ai-session-title"
+              />
+            </OSettingRow>
+
+            <OSettingRow
+              control-at="end"
+              :label="t('readableSessions.settings.title')"
+              :description="t('readableSessions.settings.help')"
+            >
               <OButton
                 variant="outline"
                 size="sm"
@@ -156,139 +164,141 @@
               >
                 {{ t("readableSessions.settings.addAgent") }}
               </OButton>
-            </div>
+            </OSettingRow>
 
-            <div
-              v-for="(rule, i) in harnessRules"
-              :key="rule.id"
-              class="rounded-default border-border-default flex flex-col gap-2 border p-3"
-              :data-test="`gen-ai-harness-rule-${i}`"
-            >
-              <div class="flex items-end gap-2">
-                <OInput
-                  v-model="rule.agent"
-                  :label="t('readableSessions.settings.agent')"
-                  :placeholder="raw('omp')"
-                  class="max-w-64"
-                  :error="duplicateAgents.has(rule.agent.trim())"
-                  :error-message="t('readableSessions.settings.duplicateAgent')"
-                  :data-test="`gen-ai-harness-agent-${i}`"
-                />
-                <OButton
-                  variant="outline"
-                  size="sm"
-                  :data-test="`gen-ai-harness-defaults-${i}`"
-                  @click="rule.patternsText = DEFAULT_HARNESS_PATTERNS.join('\n')"
-                >
-                  {{ t("readableSessions.settings.codingAgentDefaults") }}
-                </OButton>
-                <OButton
-                  variant="outline"
-                  size="sm"
-                  :loading="testing === rule.id"
-                  :disabled="!rule.agent.trim()"
-                  :data-test="`gen-ai-harness-test-${i}`"
-                  @click="testRule(rule.id)"
-                >
-                  {{ t("readableSessions.settings.test") }}
-                </OButton>
-                <span class="flex-1" />
-                <OButton
-                  variant="ghost"
-                  size="sm"
-                  icon-left="delete"
-                  :aria-label="t('readableSessions.settings.remove')"
-                  :data-test="`gen-ai-harness-remove-${i}`"
-                  @click="removeHarnessRule(rule.id)"
-                />
-              </div>
-              <OTextarea
-                v-model="rule.patternsText"
-                :label="t('readableSessions.settings.patterns')"
-                :help-text="t('readableSessions.settings.patternsHelp')"
-                :placeholder="raw('tag system-reminder\ntag job\nregex ^Caveat:.*$')"
-                :rows="4"
-                spellcheck="false"
-                :data-test="`gen-ai-harness-patterns-${i}`"
-              />
-              <!-- Before / after on recent sessions of this agent, with the draft patterns. -->
-              <div
-                v-if="shownResults[rule.id]"
-                class="bg-surface-subtle rounded-default flex flex-col gap-2 p-2"
-                :data-test="`gen-ai-harness-result-${i}`"
+            <div class="flex flex-col gap-3 px-4 py-3">
+              <p
+                v-if="harnessRules.length === 0"
+                class="text-text-secondary text-xs"
+                data-test="gen-ai-harness-empty"
               >
-                <span class="text-2xs text-text-secondary">
-                  {{
-                    t("readableSessions.settings.matches", {
-                      matched: shownResults[rule.id].matched,
-                      total: shownResults[rule.id].total,
-                    })
-                  }}
-                </span>
-                <div v-if="shownResults[rule.id].before" class="grid grid-cols-2 gap-2">
-                  <div class="flex min-w-0 flex-col gap-1">
-                    <span class="text-2xs text-text-secondary font-semibold">
-                      {{ t("readableSessions.settings.before") }}
-                    </span>
-                    <pre
-                      class="text-2xs text-text-body max-h-32 overflow-auto whitespace-pre-wrap"
-                      >{{ shownResults[rule.id].before }}</pre>
-                  </div>
-                  <div class="flex min-w-0 flex-col gap-1">
-                    <span class="text-2xs text-text-secondary font-semibold">
-                      {{ t("readableSessions.settings.after") }}
-                    </span>
-                    <pre
-                      class="text-2xs text-text-body max-h-32 overflow-auto whitespace-pre-wrap"
-                      >{{ shownResults[rule.id].after }}</pre>
+                {{ t("genAiAgentMapping.sessions.noAgents") }}
+              </p>
+              <div
+                v-for="(rule, i) in harnessRules"
+                :key="rule.id"
+                class="rounded-default border-border-default flex flex-col gap-2 border p-3"
+                :data-test="`gen-ai-harness-rule-${i}`"
+              >
+                <div class="flex items-end gap-2">
+                  <OInput
+                    v-model="rule.agent"
+                    :label="t('readableSessions.settings.agent')"
+                    :placeholder="raw('omp')"
+                    class="max-w-64"
+                    :error="duplicateAgents.has(rule.agent.trim())"
+                    :error-message="t('readableSessions.settings.duplicateAgent')"
+                    :data-test="`gen-ai-harness-agent-${i}`"
+                  />
+                  <OButton
+                    variant="outline"
+                    size="sm"
+                    :data-test="`gen-ai-harness-defaults-${i}`"
+                    @click="rule.patternsText = DEFAULT_HARNESS_PATTERNS.join('\n')"
+                  >
+                    {{ t("readableSessions.settings.codingAgentDefaults") }}
+                  </OButton>
+                  <OButton
+                    variant="outline"
+                    size="sm"
+                    :loading="testing === rule.id"
+                    :disabled="!rule.agent.trim()"
+                    :data-test="`gen-ai-harness-test-${i}`"
+                    @click="testRule(rule.id)"
+                  >
+                    {{ t("readableSessions.settings.test") }}
+                  </OButton>
+                  <span class="flex-1" />
+                  <OButton
+                    variant="ghost"
+                    size="sm"
+                    icon-left="delete"
+                    :aria-label="t('readableSessions.settings.remove')"
+                    :data-test="`gen-ai-harness-remove-${i}`"
+                    @click="removeHarnessRule(rule.id)"
+                  />
+                </div>
+                <OTextarea
+                  v-model="rule.patternsText"
+                  :label="t('readableSessions.settings.patterns')"
+                  :help-text="t('readableSessions.settings.patternsHelp')"
+                  :placeholder="raw('tag system-reminder\ntag job\nregex ^Caveat:.*$')"
+                  :rows="4"
+                  spellcheck="false"
+                  :data-test="`gen-ai-harness-patterns-${i}`"
+                />
+                <!-- Before / after on recent sessions of this agent, with the draft patterns. -->
+                <div
+                  v-if="shownResults[rule.id]"
+                  class="bg-surface-subtle rounded-default flex flex-col gap-2 p-2"
+                  :data-test="`gen-ai-harness-result-${i}`"
+                >
+                  <span class="text-2xs text-text-secondary">
+                    {{
+                      t("readableSessions.settings.matches", {
+                        matched: shownResults[rule.id].matched,
+                        total: shownResults[rule.id].total,
+                      })
+                    }}
+                  </span>
+                  <div v-if="shownResults[rule.id].before" class="grid grid-cols-2 gap-2">
+                    <div class="flex min-w-0 flex-col gap-1">
+                      <span class="text-2xs text-text-secondary font-semibold">
+                        {{ t("readableSessions.settings.before") }}
+                      </span>
+                      <pre
+                        class="text-2xs text-text-body max-h-32 overflow-auto whitespace-pre-wrap"
+                        >{{ shownResults[rule.id].before }}</pre>
+                    </div>
+                    <div class="flex min-w-0 flex-col gap-1">
+                      <span class="text-2xs text-text-secondary font-semibold">
+                        {{ t("readableSessions.settings.after") }}
+                      </span>
+                      <pre
+                        class="text-2xs text-text-body max-h-32 overflow-auto whitespace-pre-wrap"
+                        >{{ shownResults[rule.id].after }}</pre>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-
-            <OSelect
-              v-model="sessionTitle"
-              :options="sessionTitleOptions"
-              :label="t('readableSessions.settings.titleSource')"
-              :help-text="t('readableSessions.settings.titleSourceHelp')"
-              width="sm"
-              data-test="gen-ai-session-title"
-            />
-          </section>
+          </OFormSection>
         </div>
-      </div>
+      </ConstrainedPage>
 
       <!-- Field helpers change the form, so they sit with its Save, not in the header. -->
-      <div class="border-border-default flex shrink-0 items-center gap-2 border-t px-4 py-2.5">
-        <OButton
-          data-test="gen-ai-agent-mapping-apply-defaults-btn"
-          variant="outline"
-          size="sm-action"
-          :loading="loadingDefaults"
-          @click="applyDefaults"
-        >
-          {{ t("genAiAgentMapping.applyDefaults") }}
-        </OButton>
-        <OButton
-          data-test="gen-ai-agent-mapping-reset-empty-btn"
-          variant="outline"
-          size="sm-action"
-          @click="resetToEmpty"
-        >
-          {{ t("genAiAgentMapping.resetToEmpty") }}
-        </OButton>
-        <OButton
-          data-test="gen-ai-agent-mapping-save-btn"
-          variant="primary"
-          size="sm-action"
-          class="ms-auto"
-          :loading="saving"
-          :disabled="!isDirty || duplicateAgents.size > 0"
-          @click="saveConfig"
-        >
-          {{ t("common.save") }}
-        </OButton>
-      </div>
+      <OSaveBar
+        class="shrink-0 px-4"
+        :loaded="loaded"
+        :change-count="changeCount"
+        :error-count="errorCount"
+        :saving="saving"
+        data-test="gen-ai-agent-mapping-save-bar"
+        save-data-test="gen-ai-agent-mapping-save-btn"
+        discard-data-test="gen-ai-agent-mapping-discard-btn"
+        @save="saveConfig"
+        @discard="discardChanges"
+      >
+        <template #start>
+          <OButton
+            data-test="gen-ai-agent-mapping-apply-defaults-btn"
+            variant="outline"
+            size="sm-action"
+            :loading="loadingDefaults"
+            @click="applyDefaults"
+          >
+            {{ t("genAiAgentMapping.applyDefaults") }}
+          </OButton>
+          <OButton
+            data-test="gen-ai-agent-mapping-reset-empty-btn"
+            variant="outline"
+            size="sm-action"
+            @click="resetToEmpty"
+          >
+            {{ t("genAiAgentMapping.resetToEmpty") }}
+          </OButton>
+        </template>
+      </OSaveBar>
     </template>
 
     <ODialog
@@ -314,7 +324,7 @@
 import { computed, nextTick, onBeforeMount, ref } from "vue";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
-import { onBeforeRouteLeave, useRoute } from "vue-router";
+import { useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -334,9 +344,12 @@ import { messagesFromInput } from "@/plugins/traces/threadView.utils";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
+import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
+import OSaveBar from "@/lib/forms/SaveBar/OSaveBar.vue";
+import { useLeaveGuard } from "@/lib/forms/SaveBar/useLeaveGuard";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { confirmForcedSignOutDiscard, draftSignOutForced } from "@/utils/drafts/draftSession";
 import genAiAgentMappingService, {
   fetchDefaultGenAiAgentMapping,
   type GenAiAgentMappingConfig,
@@ -350,11 +363,6 @@ import { useMutation } from "@tanstack/vue-query";
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
-const { confirm } = useConfirmDialog();
-
-// One grid for both field tables so their columns line up.
-const FIELD_GRID =
-  "text-compact grid grid-cols-[7rem_12rem_minmax(0,1fr)_8rem] items-center gap-x-3 gap-y-2";
 
 // Standard attributes are checked first by the resolver, mirroring agent_registry.rs.
 type IdentityKey = "agentName" | "agentId" | "env" | "version";
@@ -452,12 +460,56 @@ const ATTRIBUTION_PLACEHOLDERS: Record<AttributionDim, string> = {
 const attributionText = ref<Record<AttributionDim, string>>({ user: "", feature: "", tenant: "" });
 const coverage = ref<Partial<Record<AttributionDim, number>>>({});
 const { getStream } = useStreams(t);
+const FALLBACK_MAX_ROWS = 6;
 const listToText = (fields: string[]) => fields.join(", ");
+// The wrapping control takes Enter, so a line break separates fields like a comma does.
 const textToList = (text: string) =>
   text
-    .split(",")
+    .split(/[,\n]/)
     .map((field) => field.trim())
     .filter(Boolean);
+// Attribute names carry no spaces; anything else in a fallback list is a typo to catch on leave.
+const FIELD_NAME = /^[\w.:/@-]+$/;
+type FallbackKey = IdentityKey | AttributionDim;
+const leftFields = ref(new Set<FallbackKey>());
+const markLeft = (key: FallbackKey) => {
+  leftFields.value = new Set(leftFields.value).add(key);
+};
+const savedConfig = ref("");
+// A name already saved stays accepted, so an older config can still be saved without retyping it.
+const savedFallbackNames = computed(() => {
+  if (!savedConfig.value) return new Set<string>();
+  const c: GenAiAgentMappingConfig = JSON.parse(savedConfig.value);
+  return new Set([
+    ...c.agent_name_fields,
+    ...c.agent_id_fields,
+    ...c.env_fields,
+    ...c.version_fields,
+    ...c.attribution_fields.user,
+    ...c.attribution_fields.feature,
+    ...c.attribution_fields.tenant,
+  ]);
+});
+const isFallbackListValid = (text: string) =>
+  textToList(text).every((n) => FIELD_NAME.test(n) || savedFallbackNames.value.has(n));
+const shownFallbackError = (key: FallbackKey, text: string) =>
+  leftFields.value.has(key) && !isFallbackListValid(text)
+    ? t("genAiAgentMapping.fallbackInvalid")
+    : undefined;
+const fallbackTexts = (): Array<[FallbackKey, string]> => [
+  ...(Object.entries(identityText.value) as Array<[IdentityKey, string]>),
+  ...(Object.entries(attributionText.value) as Array<[AttributionDim, string]>),
+];
+const invalidFallbackKeys = computed(() =>
+  fallbackTexts()
+    .filter(([, text]) => !isFallbackListValid(text))
+    .map(([key]) => key),
+);
+const errorCount = computed(
+  () =>
+    invalidFallbackKeys.value.filter((key) => leftFields.value.has(key)).length +
+    duplicateAgents.value.size,
+);
 const textToLines = (text: string) =>
   text
     .split("\n")
@@ -767,6 +819,10 @@ const clearAgentRegistry = async () => {
 
 const saveConfig = async () => {
   if (!orgId.value || duplicateAgents.value.size) return;
+  if (invalidFallbackKeys.value.length) {
+    leftFields.value = new Set(invalidFallbackKeys.value);
+    return;
+  }
 
   saving.value = true;
   try {
@@ -792,21 +848,39 @@ const saveConfig = async () => {
   }
 };
 
-const savedConfig = ref("");
 const markSaved = () => {
   savedConfig.value = JSON.stringify(draftConfig());
 };
-const isDirty = computed(() => loaded.value && JSON.stringify(draftConfig()) !== savedConfig.value);
+// The parts the bar counts: each fallback list, the session title and the harness rules.
+const configParts = (c: GenAiAgentMappingConfig) =>
+  [
+    c.agent_name_fields,
+    c.agent_id_fields,
+    c.env_fields,
+    c.version_fields,
+    c.attribution_fields.user,
+    c.attribution_fields.feature,
+    c.attribution_fields.tenant,
+    c.session_title,
+    c.harness_patterns,
+  ].map((part) => JSON.stringify(part));
+const changeCount = computed(() => {
+  if (!loaded.value || !savedConfig.value) return 0;
+  const saved = configParts(JSON.parse(savedConfig.value));
+  return configParts(draftConfig()).filter((part, i) => part !== saved[i]).length;
+});
+const isDirty = computed(() => changeCount.value > 0);
 
-onBeforeRouteLeave(async () => {
-  if (!isDirty.value) return true;
-  if (draftSignOutForced.value) return confirmForcedSignOutDiscard(confirm, t);
-  return confirm({
-    title: t("common.unsavedChanges"),
-    message: t("genAiAgentMapping.unsavedConfirm"),
-    confirmLabel: t("common.discardChanges"),
-    cancelLabel: t("common.cancel"),
-  });
+const discardChanges = () => {
+  const saved: GenAiAgentMappingConfig = JSON.parse(savedConfig.value);
+  setDraft(saved);
+  setReadRules(saved);
+  leftFields.value = new Set();
+};
+
+useLeaveGuard(() => isDirty.value, {
+  count: () => changeCount.value,
+  onDiscard: discardChanges,
 });
 
 onBeforeMount(() => {

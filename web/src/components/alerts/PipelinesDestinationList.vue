@@ -39,6 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-destinations-list-table"
           :data="visibleRows"
           :columns="columns"
+          :row-actions="rowActions"
+          row-actions-more-data-test="alert-destination-list-row-more-actions"
           row-key="name"
           :loading="loading"
           :forbidden="forbidden"
@@ -106,61 +108,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-body">—</span>
           </template>
 
-          <template #cell-actions="{ row }">
-            <OButton
-              :data-test="`alert-destination-list-${row.name}-update-destination`"
-              data-row-action="edit"
-              variant="ghost"
-              size="icon-xs-sq"
-              class="max-md:hidden"
-              :title="t('alert_destinations.edit')"
-              @click="editDestination(row)"
-            >
-              <OIcon name="edit" size="sm" />
-            </OButton>
-            <OButton
-              :data-test="`alert-destination-list-${row.name}-delete-destination`"
-              data-row-action="delete"
-              variant="ghost"
-              size="icon-xs-sq"
-              class="max-md:hidden"
-              :title="t('alert_destinations.delete')"
-              @click="conformDeleteDestination(row)"
-            >
-              <OIcon name="delete" size="sm" />
-            </OButton>
-            <ODropdown side="bottom" align="end">
-              <template #trigger>
-                <OButton
-                  icon-left="more-vert"
-                  :title="t('dashboard.moreActions')"
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  class="md:hidden"
-                  data-test="alert-destination-list-row-more-actions"
-                  @click.stop
-                />
-              </template>
-              <ODropdownItem
-                icon-left="edit"
-                class="md:hidden"
-                :data-test="`alert-destination-list-${row.name}-update-destination-menu`"
-                @select="editDestination(row)"
-              >
-                <span>{{ t("alert_destinations.edit") }}</span>
-              </ODropdownItem>
-              <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
-                class="md:hidden"
-                :data-test="`alert-destination-list-${row.name}-delete-destination-menu`"
-                @select="conformDeleteDestination(row)"
-              >
-                <span>{{ t("alert_destinations.delete") }}</span>
-              </ODropdownItem>
-            </ODropdown>
-          </template>
-
           <template #selection-actions>
             <OButton
               data-test="pipeline-destination-list-delete-destinations-btn"
@@ -176,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </div>
     </OPageLayout>
-    <div v-else>
+    <div v-else class="min-h-0 flex-1">
       <PipelineDestinationEditor
         :destination="editingDestination"
         @cancel="toggleDestinationEditor"
@@ -231,15 +178,12 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { useListViewState } from "@/composables/useListViewState";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -265,12 +209,9 @@ export default defineComponent({
     OEmptyState,
     ConfirmDialog,
     OButton,
-    OIcon,
     OTag,
     OSearchInput,
     OTable,
-    ODropdown,
-    ODropdownItem,
   },
   setup() {
     const store = useStore();
@@ -287,11 +228,11 @@ export default defineComponent({
         hideable: true,
         size: COL.name,
         minSize: 160,
-        meta: { align: "left", flex: true },
+        meta: { align: "left", flex: true, link: (row: any) => () => editDestination(row) },
       },
       {
         id: "destination_type",
-        header: t("alert_destinations.destination_type"),
+        header: t("pipeline_destinations.destinationType"),
         accessorKey: "destination_type_name",
         sortable: true,
         resizable: true,
@@ -306,8 +247,9 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.url,
+        minSize: 140,
         // An endpoint URL can carry a key or password, so it never shows on hover.
-        meta: { align: "left", cellOverflowTooltip: false },
+        meta: { align: "left", flex: true, cellOverflowTooltip: false },
       },
       {
         id: "method",
@@ -316,12 +258,12 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: 120,
+        size: 100,
         meta: { align: "left" },
       },
       {
         id: "output_format",
-        header: t("alert_destinations.output_format"),
+        header: t("pipeline_destinations.outputFormat"),
         accessorKey: "output_format",
         sortable: true,
         resizable: true,
@@ -334,8 +276,22 @@ export default defineComponent({
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
-        size: 100,
-        meta: { align: "center", actionCount: 2 },
+      },
+    ];
+    const rowActions: OTableRowAction[] = [
+      {
+        id: "edit",
+        label: t("alert_destinations.edit"),
+        icon: "edit",
+        onSelect: (row) => editDestination(row),
+        dataTest: (row) => `alert-destination-list-${row.name}-update-destination`,
+      },
+      {
+        id: "delete",
+        label: t("alert_destinations.delete"),
+        icon: "delete",
+        onSelect: (row) => conformDeleteDestination(row),
+        dataTest: (row) => `alert-destination-list-${row.name}-delete-destination`,
       },
     ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
@@ -760,6 +716,7 @@ export default defineComponent({
       destinations,
       columns,
       editDestination,
+      rowActions,
       getImageURL,
       conformDeleteDestination,
       loading,

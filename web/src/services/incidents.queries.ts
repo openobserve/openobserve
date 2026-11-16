@@ -34,6 +34,21 @@ export const incidentQuery = (org: string, id: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
+/** One incident's events, oldest first: alerts, acknowledges, resolves, comments, analyses. */
+export interface IncidentEvent {
+  timestamp: number;
+  type: string;
+  data?: { user_id?: string | null; reason?: string | null } & Record<string, unknown>;
+}
+
+export const incidentEventsQuery = (org: string, id: string) =>
+  queryOptions({
+    queryKey: incidentKeys.events(org, id),
+    queryFn: async (): Promise<IncidentEvent[]> =>
+      (await incidents.getEvents(org, id)).data?.events ?? [],
+    staleTime: LIVE_STALE_TIME,
+  });
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 /** What a status write answers: the incident when it could be read, and the one ack's answer. */

@@ -15,7 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButton variant="row" block class="rounded-none">
     <!-- the row runs edge to edge in its card, with the card's own inset on the text -->
-    <span class="flex w-full min-w-0 items-center justify-between gap-3 px-3 py-0.5">
+    <span
+      :class="[
+        'flex w-full min-w-0 items-center justify-between gap-3 px-3',
+        compact ? '' : 'py-0.5',
+      ]"
+    >
       <slot />
     </span>
   </OButton>
@@ -23,4 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
+
+defineProps<{ compact?: boolean }>();
 </script>

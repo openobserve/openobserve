@@ -31,15 +31,49 @@ export interface FiringRow {
   stream_name?: string;
   priority?: number;
   last_outcome?: string;
+  last_outcome_since?: number;
+  last_satisfied_at?: number;
   firing_started_at?: number;
+  is_real_time?: boolean;
+  trigger_condition?: {
+    period?: number;
+    operator?: string;
+    threshold?: number;
+    frequency?: number;
+    frequency_type?: string;
+    cron?: string;
+    silence?: number;
+  } | null;
   groups_firing?: number;
   groups_firing_is_lower_bound?: boolean;
   ack?: AlertListAck;
   active_downtime?: ActiveDowntime | null;
   /** Sent only with `include_dependencies=true`. */
   destinations?: string[];
-  condition?: { aggregation?: { multi_alert?: boolean }; promql_multi_alert?: boolean };
+  condition?: {
+    type?: string;
+    sql?: string | null;
+    promql?: string | null;
+    promql_condition?: { operator?: string; value?: number | string } | null;
+    aggregation?: {
+      multi_alert?: boolean;
+      function?: string;
+      having?: { column?: string; operator?: string; value?: number | string };
+    } | null;
+    promql_multi_alert?: boolean;
+  };
+  stream_type?: string;
+  description?: string;
+  owner?: string;
   incident?: { id: string; title?: string; status: string };
+}
+
+/** The fields the open-firing rule reads, so another page's row type can use the same rule. */
+export interface FiringSignals {
+  enabled?: boolean;
+  last_outcome?: string | null;
+  firing_started_at?: number | null;
+  groups_firing?: number | null;
 }
 
 export interface FiringPage {
@@ -77,10 +111,10 @@ export const firingForLabel = (startedAtMicros: number | undefined, nowMs: numbe
   startedAtMicros === undefined ? "—" : durationLabel(nowMs - startedAtMicros / 1000);
 
 // Disabling keeps the stored firing on purpose, so the list is what hides it.
-const isLive = (row: FiringRow): boolean => row.enabled !== false;
+const isLive = (row: FiringSignals): boolean => row.enabled !== false;
 
 /** The list's open-firing rule: an errored run during a firing observed no recovery. */
-export const isFiringNow = (row: FiringRow): boolean =>
+export const isFiringNow = (row: FiringSignals): boolean =>
   isLive(row) &&
   (row.last_outcome === "firing" ||
     row.last_outcome === "notify_failed" ||

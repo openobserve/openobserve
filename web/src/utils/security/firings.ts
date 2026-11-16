@@ -118,3 +118,83 @@ export function evidenceSummary(ev: NormalizedEvent, valueField: string | null =
   ];
   return [...new Set(parts.filter(Boolean))].join(" · ");
 }
+
+export type EvidenceFieldKey = "actor" | "counted" | "src" | "dst" | "action" | "object" | "host";
+
+export interface EvidenceField {
+  key: EvidenceFieldKey;
+  /** The raw column the value came from, when read straight off the row. */
+  column: string | null;
+  value: string;
+}
+
+/** Raw column names that carry each key field across vendors, for rows no source mapping explains. */
+const RAW_FIELD_PATTERNS: [Exclude<EvidenceFieldKey, "counted">, RegExp][] = [
+  [
+    "actor",
+    /^(user(_?name|_?id|principalname)?|username|account(_?name)?|actor(_?\w+)?|principal(_?\w+)?|login|email|subject_?user_?name|target_?user_?name|useridentity_?arn)$/i,
+  ],
+  [
+    "src",
+    /^(src(_?ip|_?addr(ess)?)?|source(_?ip|_?address)?|client(_?ip|_?address)?|ip_?address|remote_?addr|c_?ip|callerip)$/i,
+  ],
+  ["dst", /^(dst(_?ip|_?addr(ess)?)?|dest(_?ip)?|destination(_?ip|_?address)?|server_?ip|s_?ip)$/i],
+  [
+    "action",
+    /^(action|event_?name|operation(_?name)?|activity(_?name)?|event_?id|event_?type|method|verb|request_?method|result_?type)$/i,
+  ],
+  [
+    "object",
+    /^(resource(_?name|_?type)?|object(_?name)?|target(_?resource)?|url|uri|request_?uri|path|file_?name|target_?filename|process_?name|image|command_?line|query|query_?name)$/i,
+  ],
+  ["host", /^(host(_?name)?|computer(_?name)?|device(_?name)?|workstation(_?name)?)$/i],
+];
+
+const scalarText = (value: unknown): string => {
+  if (value === null || value === undefined || value === "") return "";
+  if (typeof value === "object") return "";
+  return String(value);
+};
+
+const isInternal = (column: string) => column.startsWith("_") || column.startsWith("zo_");
+
+/** A row's key fields for its source (actor, src → dst, action, object), falling back to its raw column names. */
+export function evidenceKeyFields(
+  ev: NormalizedEvent,
+  valueField: string | null = null,
+): EvidenceField[] {
+  const counted = valueField ? scalarText(ev.raw[valueField]) : "";
+  const join = (ip: string, port: string) => (ip && port ? `${ip}:${port}` : ip);
+  const mapped: EvidenceField[] = [
+    { key: "actor" as const, column: null, value: ev.actor },
+    { key: "counted" as const, column: valueField, value: counted },
+    { key: "src" as const, column: null, value: join(ev.srcIp, ev.srcPort) },
+    { key: "dst" as const, column: null, value: join(ev.dstIp, ev.dstPort) },
+    { key: "action" as const, column: null, value: ev.activity || ev.operation },
+    { key: "object" as const, column: null, value: ev.resource || ev.process },
+    { key: "host" as const, column: null, value: ev.host },
+  ].filter((f) => f.value);
+  const have = new Set(mapped.map((f) => f.key));
+  const columns = Object.keys(ev.raw).filter((c) => !isInternal(c) && c !== valueField);
+  for (const [key, pattern] of RAW_FIELD_PATTERNS) {
+    if (have.has(key)) continue;
+    const column = columns.find((c) => pattern.test(c) && scalarText(ev.raw[c]));
+    if (column) {
+      mapped.push({ key, column, value: scalarText(ev.raw[column]) });
+      have.add(key);
+    }
+  }
+  const order: EvidenceFieldKey[] = ["actor", "counted", "src", "dst", "action", "object", "host"];
+  return mapped.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+}
+
+/** Up to `limit` populated columns, for a row neither the source map nor the name patterns explain. */
+export function evidenceFallbackFields(
+  raw: Record<string, unknown>,
+  limit = 4,
+): { column: string; value: string }[] {
+  return Object.keys(raw)
+    .filter((c) => !isInternal(c) && scalarText(raw[c]))
+    .slice(0, limit)
+    .map((column) => ({ column, value: scalarText(raw[column]) }));
+}

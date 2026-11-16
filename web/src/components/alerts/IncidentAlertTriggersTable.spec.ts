@@ -369,3 +369,37 @@ describe("IncidentAlertTriggersTable", () => {
     });
   });
 });
+
+describe("IncidentAlertTriggersTable per-page options", () => {
+  it("drops the empty Labels and action columns, uses the page's clock and shows only a known reason", async () => {
+    const w = mountComp({
+      triggers: makeAlerts(2, { correlation_reason: "alert_id" }),
+      hideEmptyColumns: true,
+      formatTime: () => "4:45 PM",
+      reasonLabel: (row: { alert_id: string }) =>
+        row.alert_id === "alert-1" ? "Grouped by AutoObserve" : null,
+    });
+    await flushPromises();
+    expect((w.vm as any).columns.map((c: { id: string }) => c.id)).not.toContain("labels");
+    expect((w.vm as any).columns.map((c: { id: string }) => c.id)).not.toContain("actions");
+    expect(w.findAll('[data-test="fired-at-timestamp"]').map((c) => c.text())).toEqual([
+      "4:45 PM",
+      "4:45 PM",
+    ]);
+    const labels = w.findAll('[data-test="correlation-reason-label"]');
+    expect(labels.map((l) => l.text())).toEqual(["Grouped by AutoObserve"]);
+    expect(w.find('[data-test="correlation-reason-badge"]').exists()).toBe(false);
+  });
+
+  it("keeps a column a row fills, and every column by default", async () => {
+    const filled = mountComp({
+      triggers: [makeAlert({ labels: { env: "prod" }, alert_kind: "external" })],
+      hideEmptyColumns: true,
+    });
+    const ids = (filled.vm as any).columns.map((c: { id: string }) => c.id);
+    expect(ids).toContain("labels");
+    expect(ids).toContain("actions");
+    const plain = mountComp();
+    expect((plain.vm as any).columns.map((c: { id: string }) => c.id)).toContain("labels");
+  });
+});

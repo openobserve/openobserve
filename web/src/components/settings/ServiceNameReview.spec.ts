@@ -713,8 +713,8 @@ describe("Discovered Services", () => {
     vm.searchQuery = "PaymentService";
     await flushPromises();
     const footer = wrapper!.text();
-    expect(footer).toContain("1 Service");
-    expect(footer).not.toContain("2 Services");
+    expect(footer).toContain("1 service (");
+    expect(footer).not.toContain("2 services");
   });
 
   it("names the workload Name review proposes instead of none", async () => {

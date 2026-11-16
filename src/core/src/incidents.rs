@@ -173,6 +173,20 @@ async fn get_event_metadata(
             metadata.push(("event_at", event_at.to_string().into()));
         }
 
+        IncidentEventType::DetectionJoined {
+            alert_id,
+            alert_name,
+            rule,
+            level,
+            ..
+        } => {
+            metadata.push(("event_type", "detection_joined".into()));
+            metadata.push(("alert_id", alert_id.into()));
+            metadata.push(("alert_name", alert_name.into()));
+            metadata.push(("rule", rule.into()));
+            metadata.push(("level", level.into()));
+        }
+
         IncidentEventType::Comment { user_id, comment } => {
             metadata.push(("event_type", "comment".into()));
             metadata.push(("user_id", user_id.into()));

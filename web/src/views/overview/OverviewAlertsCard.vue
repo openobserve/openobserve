@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-1 flex-col">
       <ul
         :class="[
-          'grid gap-2 px-3 pb-3 max-md:grid-cols-2',
+          'grid gap-2 px-3 pb-2 max-md:grid-cols-2',
           boxes.length === 4 ? 'grid-cols-4' : 'grid-cols-3',
         ]"
         data-test="overview-alerts-boxes"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="box in boxes"
           :key="box.key"
           :class="[
-            'rounded-default flex border transition-colors motion-reduce:transition-none',
+            'rounded-default relative flex border transition-colors motion-reduce:transition-none',
             box.count > 0 && box.tint
               ? box.tint
               : 'border-border-default hover:border-border-strong',
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`overview-alerts-box-${box.key}`"
             @click="emit('select', box.target)"
           >
-            <span class="flex flex-col gap-0.5 px-3 py-2.5 text-start">
+            <span class="flex flex-col gap-0 px-3 py-1.5 text-start">
               <span
                 :class="[
                   'text-xl font-bold tabular-nums',
@@ -68,14 +68,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="overview-alerts-box-count"
                 >{{ box.count }}</span
               >
-              <span class="text-text-label text-xs">{{ box.label }}</span>
+              <span :class="['text-text-label text-xs', askVisible && box.count > 0 && 'pe-6']">{{
+                box.label
+              }}</span>
             </span>
           </OButton>
+          <OverviewAskAiButton
+            kind="box"
+            :item-key="box.key"
+            :label="box.label"
+            :show="box.count > 0"
+            class="absolute end-1 top-1"
+            @ask="
+              emit('askAi', {
+                kind: 'count',
+                topic: box.target,
+                count: box.count,
+                ...(box.level && { level: box.level }),
+              })
+            "
+          />
         </li>
       </ul>
       <div
         v-if="rows.length === 0"
-        class="border-border-default flex flex-1 flex-col items-center justify-center gap-1 border-t p-3 py-4 text-center"
+        class="border-border-default flex flex-1 flex-col items-center justify-center gap-0.5 border-t px-3 py-2 text-center"
         data-test="overview-alerts-none-firing"
       >
         <OIcon name="check-circle" size="md" class="text-status-success-text" />
@@ -88,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else data-test="overview-alerts-firing">
         <div
-          class="border-border-default text-text-label flex items-center justify-between gap-3 border-t px-3 py-2 text-xs"
+          class="border-border-default text-text-label flex items-center justify-between gap-3 border-t px-3 py-1.5 text-xs"
           data-test="overview-alerts-table-header"
         >
           <span>{{ t("overview.alerts.firingNow") }}</span>
@@ -98,11 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li
             v-for="(row, index) in rows"
             :key="`${row.stream}-${row.name}-${row.since}-${index}`"
-            class="border-border-default border-t"
+            class="border-border-default flex items-center border-t"
           >
             <OverviewRowButton
+              compact
+              class="min-w-0 flex-1"
               :data-test="`overview-alerts-firing-${row.name}`"
-              @click="emit('open')"
+              @click="emit('select', 'firing')"
             >
               <span class="flex min-w-0 items-center gap-3">
                 <OTag
@@ -123,6 +142,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <span class="text-text-secondary shrink-0 text-xs tabular-nums">{{ row.age }}</span>
             </OverviewRowButton>
+            <span v-if="askVisible" class="flex w-9 shrink-0 justify-center">
+              <OverviewAskAiButton
+                kind="alert"
+                :item-key="row.name"
+                :label="row.name"
+                @ask="emit('askAi', { kind: 'alert', alert: row.alert })"
+              />
+            </span>
           </li>
         </ul>
       </div>
@@ -132,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         class="ms-0.5 mb-2 self-start"
         data-test="overview-alerts-show-more"
-        @click="emit('open')"
+        @click="emit('select', 'firing')"
       >
         {{ t("overview.alerts.showMore", { count: remaining }, remaining) }}
       </OButton>
@@ -154,6 +181,7 @@ import type {
   OverviewSection,
 } from "@/ts/interfaces/overview";
 import type { IncidentsTile, OverviewTarget } from "./OverviewHeadlineStrip.vue";
+import OverviewAskAiButton from "./OverviewAskAiButton.vue";
 import OverviewRowButton from "./OverviewRowButton.vue";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
 import {
@@ -165,9 +193,12 @@ import {
   microsToMs,
   sectionView,
 } from "./overviewFormat";
+import type { OverviewAskAiTarget } from "./overviewAskAi";
+import { useOverviewAskAi } from "./useOverviewAskAi";
 import { useOverviewTime } from "./useOverviewTime";
 
-type BoxTarget = Extract<OverviewTarget, "firing" | "failing" | "incidents">;
+export type AlertsBoxTarget =
+  Extract<OverviewTarget, "firing" | "failing" | "incidents"> | "critical" | "warning";
 
 interface CountBox {
   key: string;
@@ -176,7 +207,8 @@ interface CountBox {
   tone: string;
   // a box above zero takes a soft status surface so the problem reads before its number
   tint?: string;
-  target: BoxTarget;
+  target: AlertsBoxTarget;
+  level?: "critical" | "warning";
 }
 
 const TINT = {
@@ -198,11 +230,13 @@ const emit = defineEmits<{
   retry: [];
   open: [];
   create: [];
-  select: [target: BoxTarget];
+  select: [target: AlertsBoxTarget];
+  askAi: [target: OverviewAskAiTarget];
 }>();
 
 const { t } = useI18nTyped();
 const { formatElapsed } = useOverviewTime();
+const { visible: askVisible } = useOverviewAskAi();
 
 // OSS and a deployment with incidents off have no incidents to summarise, so the title says alerts only
 const hasIncidents = computed(
@@ -237,6 +271,7 @@ const rows = computed(() =>
     .slice(0, FIRING_ROWS_LIMIT)
     .map((row) => ({
       ...row,
+      alert: row,
       age: hasKnownSince(row.since) ? formatElapsed(Date.now() - microsToMs(row.since)) : "",
     })),
 );
@@ -262,7 +297,8 @@ const boxes = computed<CountBox[]>(() => {
       count: levelCount(data, "critical"),
       tone: "text-status-negative",
       tint: TINT.danger,
-      target: "firing",
+      target: "critical",
+      level: "critical",
     },
     {
       key: "warning",
@@ -270,7 +306,8 @@ const boxes = computed<CountBox[]>(() => {
       count: levelCount(data, "warning"),
       tone: "text-status-warning-text",
       tint: TINT.warning,
-      target: "firing",
+      target: "warning",
+      level: "warning",
     },
   ];
   if (props.incidentsState === "ok") {

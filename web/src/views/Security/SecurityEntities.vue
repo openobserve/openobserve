@@ -4,6 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!-- The server counts each stream and kind with one GROUP BY; the same value in two streams is one entity. -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { securityTime } from "@/utils/security/time";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
@@ -56,6 +57,7 @@ import securityInvestigate, {
 } from "@/services/securityInvestigate";
 import { severityRailColor } from "@/utils/security/severity";
 import { b64EncodeUnicode, formatCompactCount, formatEventCount } from "@/utils/formatters";
+import { matchesAnyKey } from "@/utils/filterKeys";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -69,7 +71,6 @@ const RANGES = [
   { value: "7d", minutes: 10080 },
 ] as const;
 type RangeKey = (typeof RANGES)[number]["value"];
-type SignalFilter = EntitySignal | "all";
 
 const q = route.query;
 const kind = ref<EntityKind>(
@@ -79,7 +80,7 @@ const range = ref<RangeKey>(
   RANGES.some((r) => r.value === q.period) ? (q.period as RangeKey) : "24h",
 );
 const search = ref(q.q ? String(q.q) : "");
-const signalFilter = ref<SignalFilter>("all");
+const signalFilters = ref<EntitySignal[]>([]);
 const pendingEntity = ref<string | null>(q.entity ? String(q.entity) : null);
 
 const windowEndUs = ref(Date.now() * 1000);
@@ -340,7 +341,7 @@ function onRange(value: unknown) {
 function onKind(value: string | number) {
   kind.value = value as EntityKind;
   analytics.track("security_tab_switched", { view: "entities", tab: kind.value });
-  signalFilter.value = "all";
+  signalFilters.value = [];
   closeDrawer();
   syncUrl();
 }
@@ -365,7 +366,7 @@ const filteredRows = computed(() => {
   const needle = search.value.trim().toLowerCase();
   return allRows.value.filter(
     (r) =>
-      (signalFilter.value === "all" || r.signals.includes(signalFilter.value)) &&
+      matchesAnyKey(signalFilters.value, r, (row, key) => row.signals.includes(key)) &&
       (!needle || [r.value, ...r.aliases].some((v) => v.toLowerCase().includes(needle))),
   );
 });
@@ -483,9 +484,6 @@ const stats = computed<StatItem[]>(() => {
   });
   return items;
 });
-function onStat(key: string) {
-  signalFilter.value = key === "all" || signalFilter.value === key ? "all" : (key as EntitySignal);
-}
 
 /** The server's failure-signal bar, for the chip's explanation. */
 const FAILURE_SIGNAL = { ratePct: 20, minFailures: 5 };
@@ -557,7 +555,7 @@ function restorePending() {
 /** Jumps to a related value as its own entity (kind switches with it). */
 function pivotTo(otherKind: EntityKind, value: string) {
   kind.value = otherKind;
-  signalFilter.value = "all";
+  signalFilters.value = [];
   const row = allRows.value.find((r) => r.value === value);
   if (row) openEntity(row);
   else {
@@ -675,13 +673,7 @@ const drawerTabs = computed<RecordTab[]>(() => [
 ]);
 
 function fmtAbsolute(us: number): string {
-  if (!us) return "—";
-  return new Date(us / 1000).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return us ? securityTime(us / 1000) : "—";
 }
 
 const facts = computed<RecordFact[]>(() => {
@@ -772,7 +764,7 @@ const otherAliases = (r: EntityRow) => r.aliases.filter((a) => a !== r.value);
 function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
     search.value = "";
-    signalFilter.value = "all";
+    signalFilters.value = [];
   }
 }
 
@@ -914,27 +906,26 @@ const noSources = computed(
         @row-click="openEntity"
         @sort-change="() => nextTick(relocate)"
       >
-        <template #subheader>
-          <div class="px-page-edge border-table-row-divider border-b py-1.5">
+        <template #toolbar>
+          <div class="contents">
+            <OSearchInput
+              v-model="search"
+              :placeholder="t(`siem.entities.search.${kind}`)"
+              class="min-w-0 flex-1 md:min-w-48"
+              data-test="security-entities-search"
+            />
             <OStatStrip
               compact-values
               :items="stats"
               :loading="tableLoading"
               selectable
-              :selected-key="signalFilter === 'all' ? null : signalFilter"
+              :row="false"
+              class="max-md:order-last"
+              multiple
+              :selected-keys="signalFilters"
+              default-key="all"
               data-test="security-entities-stats"
-              @select="onStat"
-            />
-          </div>
-        </template>
-
-        <template #toolbar>
-          <div class="flex w-full items-center gap-2">
-            <OSearchInput
-              v-model="search"
-              :placeholder="t(`siem.entities.search.${kind}`)"
-              class="max-w-md flex-1"
-              data-test="security-entities-search"
+              @update:selected-keys="signalFilters = $event as EntitySignal[]"
             />
             <span class="text-text-secondary text-xs">{{ t("siem.entities.windowNote") }}</span>
           </div>
@@ -1050,7 +1041,7 @@ const noSources = computed(
             icon="search-off"
             :title="t('siem.entities.empty')"
             :description="t('siem.entities.emptyHint')"
-            :filtered="!!search.trim() || signalFilter !== 'all'"
+            :filtered="!!search.trim() || signalFilters.length > 0"
             @action="onEmptyAction"
           />
         </template>

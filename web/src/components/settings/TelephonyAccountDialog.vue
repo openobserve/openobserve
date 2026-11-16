@@ -121,6 +121,7 @@ const form = useOForm<TelephonyForm>({
     from_number: props.account?.from_number ?? "",
   },
   schema: makeTelephonySchema(t, props.mode, props.account?.account_sid),
+  validateOn: "leave",
   onSubmit: submit,
 });
 

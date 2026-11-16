@@ -250,13 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-toolbar"
               @click="aiLicenseLocked ? openLockedAiAssistant() : toggleAIChat()"
               :data-test="aiLicenseLocked ? 'menu-link-ai-locked' : 'menu-link-ai-item'"
-              :aria-label="
-                aiLicenseLocked
-                  ? t('featureLock.headerLocked', {
-                      feature: featureName('ai_assistant') ?? t('featureLock.thisFeature'),
-                    })
-                  : t('menu.aiAssistant')
-              "
+              :aria-label="aiButtonLabel"
               class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
               :class="store.state.isAiChatEnabled && !aiLicenseLocked ? 'ai-btn-active' : ''"
               @mouseenter="handleMouseEnter"
@@ -269,17 +263,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
               <OTooltip
-                v-if="aiAccess.allowed"
                 side="bottom"
                 align="center"
-                :content="
-                  aiLicenseLocked
-                    ? t('featureLock.headerLocked', {
-                        feature: featureName('ai_assistant') ?? t('featureLock.thisFeature'),
-                      })
-                    : t('menu.aiAssistant')
-                "
-                :shortcut-id="aiLicenseLocked ? undefined : 'aiChatToggle'"
+                :content="aiButtonLabel"
+                :shortcut-id="aiAccess.allowed && !aiLicenseLocked ? 'aiChatToggle' : undefined"
               />
             </OButton>
           </template>
@@ -761,6 +748,15 @@ export default defineComponent({
         Boolean(props.store.state.zoConfig.ai_enabled),
       ),
     );
+    const aiButtonLabel = computed(() => {
+      if (!aiAccess.value.allowed) {
+        return t("featureLock.availableInEnterprise", { feature: t("menu.aiAssistant") });
+      }
+      if (!aiLicenseLocked.value) return t("menu.aiAssistant");
+      return t("featureLock.headerLocked", {
+        feature: featureName("ai_assistant") ?? t("featureLock.thisFeature"),
+      });
+    });
     const aiButtonVisible = computed(
       () => !focusMode.value && (!aiAccess.value.allowed || aiAssistantState.value === "enabled"),
     );
@@ -904,6 +900,7 @@ export default defineComponent({
       aiAssistantState,
       openLockedAiAssistant,
       aiAccess,
+      aiButtonLabel,
       aiButtonVisible,
       focusMode,
       aiLicenseLocked,

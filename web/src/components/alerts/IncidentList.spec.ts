@@ -419,6 +419,24 @@ describe("IncidentList.vue", () => {
       expect(visible.every((i: Incident) => i.severity === "P1")).toBe(true);
     });
 
+    it("ORs two picked severity chips", async () => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({ id: "1", severity: "P1" }),
+            createIncident({ id: "2", severity: "P2" }),
+            createIncident({ id: "3", severity: "P3" }),
+          ],
+          total: 3,
+        },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      (wrapper.vm as any).severityFilters = ["P1", "P3"];
+      const ids = (wrapper.vm as any).visibleIncidents.map((i: Incident) => i.id);
+      expect(ids.sort()).toEqual(["1", "3"]);
+    });
+
     it("returns empty array when no match", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -756,6 +774,83 @@ describe("IncidentList.vue", () => {
     });
   });
 
+  describe("status link from the Overview", () => {
+    const mountWithStatus = async (status: string) => {
+      router.currentRoute.value.query = { status } as any;
+      wrapper = createWrapper();
+      await flushPromises();
+      router.currentRoute.value.query = {};
+      return wrapper.vm as any;
+    };
+
+    it("shows exactly the open incidents for ?status=open, not the acknowledged ones", async () => {
+      const vm = await mountWithStatus("open");
+      expect(vm.statusFilter).toBe("open");
+      expect(vm.visibleIncidents.map((i: any) => i.id)).toEqual(["1"]);
+    });
+
+    it("strips ?status from the URL after reading it, keeping other keys", async () => {
+      const replace = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+      router.currentRoute.value.query = { status: "open", org_identifier: "default" } as any;
+      wrapper = createWrapper();
+      await flushPromises();
+      router.currentRoute.value.query = {};
+      expect(replace).toHaveBeenCalledWith({ query: { org_identifier: "default" } });
+      replace.mockRestore();
+    });
+
+    it("keeps Active as open plus acknowledged and falls back to it for an unknown status", async () => {
+      expect((await mountWithStatus("active")).visibleIncidents).toHaveLength(2);
+      wrapper.unmount();
+      expect((await mountWithStatus("bogus")).statusFilter).toBe("active");
+    });
+
+    it("lets ?status win over the saved state and drops a saved severity facet", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "",
+          statusFilter: "resolved",
+          pagination: { page: 1, rowsPerPage: 20 },
+          organizationIdentifier: "default",
+        },
+        cachedData: [],
+        isInitialized: true,
+        shouldRefresh: false,
+      };
+      useListViewState("incidents", { severityFilter: ["P3"] }).severityFilter = ["P3"];
+      const vm = await mountWithStatus("open");
+      store.state.incidents = { incidents: {}, isInitialized: false };
+
+      expect(vm.statusFilter).toBe("open");
+      expect(vm.severityFilters).toEqual([]);
+    });
+
+    it("starts without the saved search and page when ?status is present", async () => {
+      store.state.incidents = {
+        incidents: {
+          searchQuery: "saved",
+          statusFilter: "resolved",
+          pagination: { page: 4, rowsPerPage: 20 },
+          organizationIdentifier: "default",
+        },
+        cachedData: [],
+        isInitialized: true,
+        shouldRefresh: false,
+      };
+      const vm = await mountWithStatus("open");
+      store.state.incidents = { incidents: {}, isInitialized: false };
+
+      expect(vm.searchQuery).toBe("");
+      expect(vm.currentPage).toBe(1);
+    });
+
+    it("offers Open as a status toggle", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="incident-status-filter-open"]').exists()).toBe(true);
+    });
+  });
+
   // ── Page persistence across navigation (Vuex-backed, like searchQuery/statusFilter) ──
 
   describe("currentPage persistence", () => {
@@ -833,7 +928,7 @@ describe("IncidentList.vue", () => {
         sortOrder: "desc",
       });
       wrapper = createWrapper();
-      expect(wrapper.vm.severityFilter).toBe("P2");
+      expect(wrapper.vm.severityFilters).toEqual(["P2"]);
       expect(wrapper.vm.pageSize).toBe(50);
       expect(wrapper.vm.sortBy).toBe("title");
       expect(wrapper.vm.sortOrder).toBe("desc");
@@ -841,11 +936,11 @@ describe("IncidentList.vue", () => {
 
     it("saves changes to the view state", async () => {
       wrapper = createWrapper();
-      wrapper.vm.severityFilter = "P1";
+      wrapper.vm.severityFilters = ["P1", "P3"];
       wrapper.vm.pageSize = 100;
       await flushPromises();
       const saved: any = useListViewState("incidents", {});
-      expect(saved.severityFilter).toBe("P1");
+      expect(saved.severityFilter).toEqual(["P1", "P3"]);
       expect(saved.pageSize).toBe(100);
     });
   });
@@ -1066,7 +1161,7 @@ describe("IncidentList.vue", () => {
       wrapper.vm.onPageChange(2);
       await flushPromises();
 
-      wrapper.vm.severityFilter = "P2";
+      wrapper.vm.severityFilters = ["P2"];
       await flushPromises();
 
       expect(wrapper.vm.currentPage).toBe(1);

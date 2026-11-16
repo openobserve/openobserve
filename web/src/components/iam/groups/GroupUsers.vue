@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="rows"
         :columns="columns"
         row-key="email"
-        :loading="props.loading"
+        :loading="props.loading || orgListStatus === 'pending'"
         :global-filter="userSearchKey"
         pagination="client"
         :page-size="100"
@@ -115,7 +115,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #empty>
           <OEmptyState
-            size="hero"
+            v-if="orgListStatus === 'error'"
+            size="block"
+            class="shrink-0"
+            preset="load-error"
+            data-test="iam-users-selection-load-error"
+            @action="(id) => (id === 'retry' ? retryOrgUsers() : null)"
+          />
+          <OEmptyState
+            v-else-if="showNoneSelected"
+            size="block"
+            class="shrink-0"
+            preset="no-users"
+            data-test="iam-users-selection-none-selected"
+            :title="t('iam.groupUsers.noneSelectedTitle')"
+            :description="t('iam.groupUsers.noneSelectedDescription')"
+            :actions="[
+              {
+                id: 'show-all',
+                icon: 'list',
+                titleKey: 'iam.groupUsers.showAll',
+                descriptionKey: 'iam.groupUsers.showAllDesc',
+              },
+            ]"
+            @action="(id) => (id === 'show-all' ? updateUserTable('all') : null)"
+          />
+          <OEmptyState
+            v-else
+            size="block"
+            class="shrink-0"
             preset="no-users"
             :filtered="!!userSearchKey"
             :hide-action="!userSearchKey"
@@ -221,7 +249,15 @@ const usersDisplayOptions = [
 ];
 const userSearchKey = ref("");
 
+// An org with no users keeps the org-empty state even under Selected.
+const showNoneSelected = computed(
+  () => usersDisplay.value === "selected" && !userSearchKey.value && users.value.length > 0,
+);
+
 const hasFetchedOrgUsers = ref(false);
+
+// The org-empty copy is a claim about the org, so it waits for a successful read.
+const orgListStatus = ref<"pending" | "success" | "error">("pending");
 
 const groupUsersMap = ref(new Set());
 
@@ -350,11 +386,20 @@ const isListedAsSelected = (user: { email: string; isInGroup: boolean }) =>
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
+  orgListStatus.value = "pending";
   return new Promise((resolve, reject) => {
     (async () => {
-      const data: any = await usersState.getOrgUsers(store.state.selectedOrganization.identifier, {
-        list_all: true,
-      });
+      let data: any;
+      try {
+        data = await usersState.getOrgUsers(store.state.selectedOrganization.identifier, {
+          list_all: true,
+        });
+      } catch (e: unknown) {
+        console.error("Failed to load the organization's users:", e);
+        orgListStatus.value = "error";
+        resolve(false);
+        return;
+      }
 
       usersState.users = cloneDeep(
         data.map((user: any) => {
@@ -380,9 +425,15 @@ const getchOrgUsers = async () => {
           is_external: user.is_external || false,
         };
       });
+      orgListStatus.value = "success";
       resolve(true);
     })().catch(reject);
   });
+};
+
+const retryOrgUsers = async () => {
+  await getchOrgUsers();
+  updateUserTable(usersDisplay.value);
 };
 
 const toggleUserSelection = (user: any) => {

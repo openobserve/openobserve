@@ -156,6 +156,17 @@ describe("AlertCalibrationDigests", () => {
     wrapper.unmount();
   });
 
+  it("the findings badge reads its count in the locale's digits", async () => {
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([
+      run(NOW - DAY_MICROS, NOW - 100, 12_345),
+    ]);
+    const wrapper = await mountPage();
+    const text = wrapper.get("tbody tr").text();
+    expect(text).toContain("12,345");
+    expect(text).not.toContain("12345");
+    wrapper.unmount();
+  });
+
   it("reads runs through the module's endpoint, not a search of the digest stream", async () => {
     vi.mocked(alertCalibration.readDigests).mockResolvedValue([]);
     const wrapper = await mountPage();

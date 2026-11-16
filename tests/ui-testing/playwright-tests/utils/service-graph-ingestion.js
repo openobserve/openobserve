@@ -1094,6 +1094,142 @@ function generateHighCardinalityTraces({
 }
 
 // ============================================================================
+// TRACE DETAILS REGRESSION SCENARIOS
+// ============================================================================
+
+const recentStartNs = () => BigInt(Date.now() - 60000) * 1000000n;
+
+/** One span in its own trace, a minute old. */
+function generateSingleSpanTrace({ serviceName, name = 'checkout', kind = SpanKind.SERVER }) {
+  const traceId = generateTraceId();
+  const spanId = generateSpanId();
+  const startTimeNs = recentStartNs();
+  const span = buildSpan({ traceId, spanId, name, kind, startTimeNs, endTimeNs: startTimeNs + 5000000n });
+  return {
+    payload: buildTracePayload([buildResourceSpans(serviceName, [span])]),
+    metadata: { traceId, spanId, spanCount: 1 },
+  };
+}
+
+/** frontend-app calls order-service and inventory-service, and both call database: the shape that repeated a service per caller. */
+function generateDiamondTrace() {
+  const traceId = generateTraceId();
+  const nowNs = recentStartNs();
+  const span = (name, kind, spanId, parentSpanId, startMs, endMs) =>
+    buildSpan({
+      traceId,
+      spanId,
+      parentSpanId,
+      name,
+      kind,
+      startTimeNs: nowNs + BigInt(startMs) * 1000000n,
+      endTimeNs: nowNs + BigInt(endMs) * 1000000n,
+    });
+  const [root, callOrder, callInventory, order, inventory, orderDb, inventoryDb, dbFromOrder, dbFromInventory] =
+    Array.from({ length: 9 }, () => generateSpanId());
+  return {
+    payload: buildTracePayload([
+      buildResourceSpans('frontend-app', [
+        span('GET /checkout', SpanKind.SERVER, root, undefined, 0, 400),
+        span('POST /orders', SpanKind.CLIENT, callOrder, root, 10, 190),
+        span('POST /stock', SpanKind.CLIENT, callInventory, root, 200, 390),
+      ]),
+      buildResourceSpans('order-service', [
+        span('create order', SpanKind.SERVER, order, callOrder, 20, 180),
+        span('INSERT orders', SpanKind.CLIENT, orderDb, order, 30, 170),
+      ]),
+      buildResourceSpans('inventory-service', [
+        span('reserve stock', SpanKind.SERVER, inventory, callInventory, 210, 380),
+        span('UPDATE stock', SpanKind.CLIENT, inventoryDb, inventory, 220, 370),
+      ]),
+      buildResourceSpans('database', [
+        span('orders write', SpanKind.SERVER, dbFromOrder, orderDb, 40, 160),
+        span('stock write', SpanKind.SERVER, dbFromInventory, inventoryDb, 230, 360),
+      ]),
+    ]),
+    metadata: { traceId, spanCount: 9 },
+  };
+}
+
+/** An INTERNAL root named `rootName` with one `child-<label>` span per entry of `kinds` ({ label: kind }). */
+function generateSpanKindTrace({ serviceName, kinds, rootName = 'main' }) {
+  const traceId = generateTraceId();
+  const rootSpanId = generateSpanId();
+  const startTimeNs = recentStartNs();
+  const span = (name, kind, spanId, parentSpanId) =>
+    buildSpan({ traceId, spanId, parentSpanId, name, kind, startTimeNs, endTimeNs: startTimeNs + 5000000n });
+  const spans = [span(rootName, SpanKind.INTERNAL, rootSpanId)];
+  for (const [label, kind] of Object.entries(kinds)) spans.push(span(`child-${label}`, kind, generateSpanId(), rootSpanId));
+  return {
+    payload: buildTracePayload([buildResourceSpans(serviceName, spans)]),
+    metadata: { traceId, rootSpanId, spanCount: spans.length },
+  };
+}
+
+/** An "agent" root with one child per name, all carrying gen_ai attributes so the trace offers the DAG tab. */
+function generateLlmAgentTrace({ serviceName, childNames }) {
+  const traceId = generateTraceId();
+  const root = generateSpanId();
+  const nowNs = recentStartNs();
+  const genAiAttrs = [attr('gen_ai.operation.name', 'chat'), attr('gen_ai.request.model', 'e2e-model')];
+  const span = (name, spanId, parentSpanId, startMs) =>
+    buildSpan({
+      traceId,
+      spanId,
+      parentSpanId,
+      name,
+      kind: SpanKind.INTERNAL,
+      startTimeNs: nowNs + BigInt(startMs) * 1000000n,
+      endTimeNs: nowNs + BigInt(startMs + 5) * 1000000n,
+      attributes: genAiAttrs,
+    });
+  const spans = [span('agent', root, undefined, 0), ...childNames.map((name, i) => span(name, generateSpanId(), root, i + 1))];
+  return {
+    payload: buildTracePayload([buildResourceSpans(serviceName, spans)]),
+    metadata: { traceId, spanCount: spans.length },
+  };
+}
+
+/** One 5 ms SERVER span per `{ name, ms }`, each in its own trace and starting at epoch millisecond `ms`. */
+function generateSpansAt(serviceName, spans) {
+  return {
+    payload: buildTracePayload([
+      buildResourceSpans(
+        serviceName,
+        spans.map(({ name, ms }) =>
+          buildSpan({
+            traceId: generateTraceId(),
+            spanId: generateSpanId(),
+            name,
+            kind: SpanKind.SERVER,
+            startTimeNs: BigInt(ms) * 1000000n,
+            endTimeNs: BigInt(ms + 5) * 1000000n,
+          })
+        )
+      ),
+    ]),
+    metadata: { spanCount: spans.length },
+  };
+}
+
+/** A `topology/current` answer with healthy service nodes and one healthy edge per `[from, to]` pair. */
+function buildTopologyResponse(serviceNames, edgePairs) {
+  return {
+    nodes: serviceNames.map((name) => ({ id: name, label: name, requests: 10, errors: 0, error_rate: 0, kind: 'service' })),
+    edges: edgePairs.map(([from, to]) => ({
+      from,
+      to,
+      total_requests: 10,
+      failed_requests: 0,
+      error_rate: 0,
+      p50_latency_ns: 1000000,
+      p95_latency_ns: 2000000,
+      p99_latency_ns: 3000000,
+    })),
+  };
+}
+
+// ============================================================================
 // INGESTION FUNCTIONS
 // ============================================================================
 
@@ -2328,6 +2464,14 @@ module.exports = {
   generateCircularDependencyTrace,
   generateMultiHopTrace,
   generateHighCardinalityTraces,
+
+  // Trace details regression scenarios
+  generateSingleSpanTrace,
+  generateDiamondTrace,
+  generateSpanKindTrace,
+  generateLlmAgentTrace,
+  generateSpansAt,
+  buildTopologyResponse,
 
   // Production flow generators (multi-hop, matching telemetry-generator.py)
   generateErrorFlow,

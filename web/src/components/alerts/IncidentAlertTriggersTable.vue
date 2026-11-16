@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :default-columns="false"
       :enable-column-resize="true"
       :persist-columns="true"
-      table-id="incidents-alert-triggers"
+      :table-id="tableId"
       :show-global-filter="false"
       @row-click="onRowClick"
     >
@@ -93,7 +93,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-correlation_reason="{ row }">
-        <span class="inline-flex">
+        <template v-if="reasonLabel">
+          <OTag
+            v-if="reasonLabel(row)"
+            data-test="correlation-reason-label"
+            variant="default-soft"
+            size="sm"
+            :label="raw(reasonLabel(row) ?? '')"
+          />
+        </template>
+        <span v-else class="inline-flex">
           <OTag
             data-test="correlation-reason-badge"
             type="correlationReason"
@@ -193,13 +202,30 @@ export default defineComponent({
       type: Boolean,
       required: true,
     },
+    // Per-page options: the AutoObserve drawer keeps its own column widths, clock and reasons.
+    tableId: {
+      type: String,
+      default: "incidents-alert-triggers",
+    },
+    hideEmptyColumns: {
+      type: Boolean,
+      default: false,
+    },
+    formatTime: {
+      type: Function as PropType<(us: number) => string>,
+      default: null,
+    },
+    reasonLabel: {
+      type: Function as PropType<(row: IncidentAlert) => string | null>,
+      default: null,
+    },
   },
   emits: ["row-click"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
 
-    const columns = computed<OTableColumnDef[]>(() => [
+    const allColumns = computed<OTableColumnDef[]>(() => [
       {
         id: "alert_name",
         header: t("alerts.incidents.alertName"),
@@ -248,7 +274,7 @@ export default defineComponent({
         sortable: false,
         resizable: true,
         hideable: true,
-        size: 150,
+        size: props.reasonLabel !== null ? 200 : 150,
         meta: { align: "left" },
       },
       {
@@ -260,9 +286,19 @@ export default defineComponent({
       },
     ]);
 
+    // A page that hides empty columns drops Labels with no labels and the action column with no payloads.
+    const columns = computed(() => {
+      if (!props.hideEmptyColumns) return allColumns.value;
+      const labels = props.triggers.some((row) => row.labels && Object.keys(row.labels).length);
+      const payloads = props.triggers.some((row) => row.alert_kind === "external");
+      return allColumns.value.filter(
+        (c) => (c.id !== "labels" || labels) && (c.id !== "actions" || payloads),
+      );
+    });
+
     const formatTimestamp = (timestamp: number) => {
       if (!timestamp) return raw("N/A");
-      return formatToReadable(timestamp);
+      return props.formatTime ? raw(props.formatTime(timestamp)) : formatToReadable(timestamp);
     };
 
     const getReasonTooltip = (reason: string) => {
