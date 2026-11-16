@@ -573,8 +573,11 @@ async fn create_locked<C: ConnectionTrait + TransactionTrait>(
         allow_collisions: request.allow_collisions,
         ..Default::default()
     };
+    let committed = committed(conn, org).await?;
+    if row.kind == "rename" {
+        reject_traced_rename(&row.alias, &committed.summaries)?;
+    }
     if !request.allow_collisions {
-        let committed = committed(conn, org).await?;
         reject_collisions(std::slice::from_ref(&row), &committed)?;
     }
     written(conn, org, row).await
@@ -887,6 +890,24 @@ fn reject_collisions(rows: &[AliasRow], committed: &Committed) -> Result<(), Res
         axum::Json(json!({"error": "alias_collision", "collisions": collisions})),
     )
         .into_response())
+}
+
+// Every display shows a live trace name, so a rename of one would never be seen.
+#[cfg(feature = "enterprise")]
+fn reject_traced_rename(alias: &str, summaries: &[WhereSummaryRecord]) -> Result<(), Response> {
+    let key = config::meta::service_identity::service_key(alias);
+    let Some(traced) = display_feed::trace_scopes(summaries)
+        .into_iter()
+        .find(|scope| config::meta::service_identity::service_key(&scope.service) == key)
+    else {
+        return Ok(());
+    };
+    let message = format!(
+        "\"{}\" is the service.name its traces report, and that name is always shown. \
+         To rename it, change service.name where the service is instrumented.",
+        traced.service
+    );
+    Err(error(StatusCode::CONFLICT, &message))
 }
 
 #[cfg(feature = "enterprise")]
@@ -1210,6 +1231,16 @@ mod tests {
             assert_eq!(status, StatusCode::CONFLICT);
             assert_eq!(body["error"], "alias_collision");
             assert_eq!(body["collisions"][0]["suggested_qualifier"], "pentest");
+            let traced = create("rename", "", "Stock-Svc", "Inventory", true);
+            let error = create_with(&conn, org, "a", traced, 2).await.unwrap_err();
+            let (status, body) = status_and_body(error).await;
+            assert_eq!(status, StatusCode::CONFLICT);
+            assert!(
+                body["error"].as_str().unwrap().contains("service.name"),
+                "{body}"
+            );
+            let placeholder = create("rename", "", "unknown_service:node", "Node app", false);
+            create_with(&conn, org, "a", placeholder, 2).await.unwrap();
             let allowed = create("k8s_workload", "pentest", "alertquerier", "querier", true);
             let row = create_with(&conn, org, "admin@example.com", allowed, 3)
                 .await
