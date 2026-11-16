@@ -452,3 +452,33 @@ fn long_authored_urls_never_push_the_object_link_out_of_discord() {
     assert!(description.chars().count() <= 4_096);
     assert!(description.ends_with(&format!("[Open alert]({DETAIL_URL})")));
 }
+
+#[test]
+fn a_message_card_keeps_four_actions_and_lists_the_rest_as_text_links() {
+    let ctx = alert_ctx();
+    let card = rendered(
+        ChannelFormat::TeamsMessageCard,
+        &ctx,
+        &[
+            ("One", "https://wiki/1"),
+            ("Two", "https://wiki/2"),
+            ("Three", "https://wiki/3"),
+        ],
+    );
+    let names: Vec<&str> = card["potentialAction"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names.len(), 4, "{names:?}");
+    assert!(
+        names.contains(&"View logs") && names.contains(&"Open alert"),
+        "{names:?}"
+    );
+    let text = card["sections"][0]["text"].as_str().unwrap();
+    assert!(
+        text.contains(r#"<a href="https://wiki/3">Three</a>"#),
+        "{text}"
+    );
+}

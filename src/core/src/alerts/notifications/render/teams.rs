@@ -27,6 +27,8 @@ use crate::alerts::notifications::{
     resolve::{LinkRole, RenderedContent},
 };
 
+const MAX_CARD_ACTIONS: usize = 4;
+
 /// Body only: other surfaces hold raw values, which a markdown parse would cut, such as `>`.
 fn card_text(s: &str) -> String {
     markdown_to_plaintext(s)
@@ -113,8 +115,6 @@ pub fn render_teams_adaptive_card(c: &RenderedContent, ctx: &NotificationContext
                 "title": link.display_label(),
                 "url": url,
             });
-            // The data button is the card's primary action; the object button keeps the default
-            // style.
             if link.role == LinkRole::Primary {
                 action["style"] = json!("positive");
             }
@@ -181,6 +181,41 @@ pub fn render_teams_message_card(c: &RenderedContent) -> Value {
             text_parts.push(t);
         }
     }
+    // `OpenUri` targets must be absolute http(s) URIs — the O365 connector
+    // rejects anything else, so undispatchable links are dropped (see #13742).
+    let dispatchable: Vec<_> = c
+        .links
+        .iter()
+        .filter_map(|link| dispatchable_url(&link.url).map(|url| (link, url)))
+        .collect();
+    // MessageCard allows four actions, so authored links past that become text links.
+    let mut room =
+        MAX_CARD_ACTIONS.saturating_sub(dispatchable.iter().filter(|(l, _)| l.reserved).count());
+    let mut actions = Vec::new();
+    let mut overflow = Vec::new();
+    for (link, url) in dispatchable {
+        let label = if link.label.is_empty() {
+            link.display_label().to_string()
+        } else {
+            escape_html(&link.label)
+        };
+        if !link.reserved && room == 0 {
+            overflow.push(format!("<a href=\"{}\">{label}</a>", escape_html(url)));
+            continue;
+        }
+        if !link.reserved {
+            room -= 1;
+        }
+        actions.push(json!({
+            "@type": "OpenUri",
+            "name": label,
+            "targets": [{"os": "default", "uri": url}],
+        }));
+    }
+    if !overflow.is_empty() {
+        text_parts.push(overflow.join(" &middot; "));
+    }
+
     section["text"] = json!(text_parts.join("<br><br>"));
 
     if !c.fields.is_empty() {
@@ -191,22 +226,6 @@ pub fn render_teams_message_card(c: &RenderedContent) -> Value {
                 .collect::<Vec<_>>()
         );
     }
-
-    // `OpenUri` targets must be absolute http(s) URIs — the O365 connector
-    // rejects anything else, so undispatchable links are dropped (see the
-    // Adaptive Card renderer above and #13742).
-    let actions: Vec<Value> = c
-        .links
-        .iter()
-        .filter_map(|link| dispatchable_url(&link.url).map(|url| (link, url)))
-        .map(|(link, url)| {
-            json!({
-                "@type": "OpenUri",
-                "name": if link.label.is_empty() { link.display_label().to_string() } else { escape_html(&link.label) },
-                "targets": [{"os": "default", "uri": url}],
-            })
-        })
-        .collect();
 
     json!({
         "@type": "MessageCard",

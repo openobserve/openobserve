@@ -442,6 +442,35 @@ describe("TemplatePreviewPanel", () => {
     );
   });
 
+  it("does not name a link whose padded URL the Slack message shows as a button", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(
+      makePreviewResponse({
+        payload: {
+          blocks: [
+            {
+              type: "actions",
+              elements: [{ type: "button", url: "https://wiki.example/runbook" }],
+            },
+          ],
+        },
+        preview_model: {
+          title: "Alert fired",
+          body_html: "",
+          fields: [],
+          links: [{ label: "Runbook", url: " https://wiki.example/runbook " }],
+          color: "#ff0000",
+          severity: null,
+          footer: null,
+          chart_placeholder: false,
+        },
+      }) as any,
+    );
+    const w = await mountPanel();
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(w.find('[data-test="template-preview-panel-slack-hidden-links"]').exists()).toBe(false);
+  });
+
   it("puts Channel first, Severity next and Kind last in the preview row", async () => {
     vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
     const w = mount(TemplatePreviewPanel, {

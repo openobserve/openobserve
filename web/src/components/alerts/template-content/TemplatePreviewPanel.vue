@@ -597,17 +597,20 @@ const slackHiddenLinks = computed<string[]>(() => {
   for (const block of blocks as { type?: string; elements?: { url?: string }[] }[]) {
     if (block.type !== "actions") continue;
     for (const el of block.elements ?? []) {
-      if (el.url) shown.set(el.url, (shown.get(el.url) ?? 0) + 1);
+      const url = el.url?.trim();
+      if (url) shown.set(url, (shown.get(url) ?? 0) + 1);
     }
   }
-  for (const system of [previewModel.value.footer, previewModel.value.detail?.url]) {
+  for (const value of [previewModel.value.footer, previewModel.value.detail?.url]) {
+    const system = value?.trim();
     const left = system ? (shown.get(system) ?? 0) : 0;
     if (system && left > 0) shown.set(system, left - 1);
   }
   return previewModel.value.links
     .filter((link) => {
-      const left = shown.get(link.url) ?? 0;
-      if (left > 0) shown.set(link.url, left - 1);
+      const url = link.url.trim();
+      const left = shown.get(url) ?? 0;
+      if (left > 0) shown.set(url, left - 1);
       return left === 0;
     })
     .map((link) => link.label);

@@ -465,7 +465,7 @@ pub fn wire_from_content(c: &RenderedContent, ctx: &NotificationContext) -> Rend
         .links
         .iter()
         .filter(|l| l.role == LinkRole::Authored && Some(*l) != detail)
-        .map(|l| (l.label.clone(), l.url.clone()))
+        .map(|l| (l.display_label().to_string(), l.url.trim().to_string()))
         .collect();
     RenderedWire {
         title: c.title.clone(),
@@ -474,8 +474,10 @@ pub fn wire_from_content(c: &RenderedContent, ctx: &NotificationContext) -> Rend
         links,
         open_url: ctx.alert_url.clone(),
         open_label: open_label(ctx),
-        detail_url: detail.map(|l| l.url.clone()).unwrap_or_default(),
-        detail_label: detail.map(|l| l.label.clone()).unwrap_or_default(),
+        detail_url: detail.map(|l| l.url.trim().to_string()).unwrap_or_default(),
+        detail_label: detail
+            .map(|l| l.display_label().to_string())
+            .unwrap_or_default(),
     }
 }
 
@@ -523,33 +525,6 @@ pub fn wire_from_custom(msg: &str, ctx: &NotificationContext) -> RenderedWire {
     wire.body = body.join("\n");
     set_custom_detail(&mut wire, ctx);
     wire
-}
-
-/// The data button label; a kind with no label of its own reads the channel default.
-fn open_label(ctx: &NotificationContext) -> String {
-    if ctx.alert_url_label.is_empty() {
-        DEFAULT_LINK_LABEL.to_string()
-    } else {
-        ctx.alert_url_label.clone()
-    }
-}
-
-/// The object button; a custom button to that page takes the slot, so trimming cannot drop it.
-fn set_custom_detail(wire: &mut RenderedWire, ctx: &NotificationContext) {
-    let Some(url) = detail_url(ctx) else {
-        return;
-    };
-    match wire.links.iter().position(|(_, u)| u.trim() == url) {
-        Some(i) => {
-            let (label, own) = wire.links.remove(i);
-            wire.detail_url = own;
-            wire.detail_label = label;
-        }
-        None => {
-            wire.detail_url = url.to_string();
-            wire.detail_label = ctx.alert_detail_label.clone();
-        }
-    }
 }
 
 /// Clamps the body, then fields, then links, so the stored content fits its column.
@@ -699,6 +674,37 @@ fn level_of(ctx: &NotificationContext) -> AlertLevel {
 
 fn chart(ctx: &NotificationContext) -> Option<&[u8]> {
     ctx.chart_png.as_deref().map(Vec::as_slice)
+}
+
+/// The data button label; a kind with no label of its own reads the channel default.
+fn open_label(ctx: &NotificationContext) -> String {
+    if ctx.alert_url_label.is_empty() {
+        DEFAULT_LINK_LABEL.to_string()
+    } else {
+        ctx.alert_url_label.clone()
+    }
+}
+
+/// The object button; a custom button to that page takes the slot, so trimming cannot drop it.
+fn set_custom_detail(wire: &mut RenderedWire, ctx: &NotificationContext) {
+    let Some(url) = detail_url(ctx) else {
+        return;
+    };
+    match wire.links.iter().position(|(_, u)| u.trim() == url) {
+        Some(i) => {
+            let (label, own) = wire.links.remove(i);
+            wire.detail_url = own.trim().to_string();
+            wire.detail_label = if label.trim().is_empty() {
+                ctx.alert_detail_label.clone()
+            } else {
+                label
+            };
+        }
+        None => {
+            wire.detail_url = url.to_string();
+            wire.detail_label = ctx.alert_detail_label.clone();
+        }
+    }
 }
 
 fn is_manual_trigger(ctx: &NotificationContext) -> bool {
@@ -1337,6 +1343,39 @@ mod tests {
         assert_eq!(wire.detail_url, ctx.alert_detail_url);
         assert_eq!(wire.detail_label, "My alert");
         assert_eq!(wire.open_label, DEFAULT_LINK_LABEL);
+    }
+
+    #[test]
+    fn a_blank_label_or_padded_url_stand_in_still_gets_a_usable_object_button() {
+        let mut ctx = ctx();
+        ctx.alert_detail_url = "https://o2.test/web/alerts/detail/a1?org_identifier=prod".into();
+        ctx.alert_detail_label = "Open alert".into();
+        let padded = format!(" {} ", ctx.alert_detail_url);
+        let mut links = vec![
+            Link::authored("", padded),
+            Link::authored("", " https://wiki/rb "),
+        ];
+        crate::alerts::notifications::resolve::append_system_links(&mut links, &ctx);
+        let content = RenderedContent {
+            title: "t".into(),
+            body_markdown: String::new(),
+            fields: vec![],
+            links,
+            rows: vec![],
+            row_lines: None,
+            severity: None,
+            unknown_variables: vec![],
+        };
+        let wire = wire_from_content(&content, &ctx);
+        assert_eq!(wire.detail_url, ctx.alert_detail_url);
+        assert_eq!(wire.detail_label, DEFAULT_LINK_LABEL);
+        assert_eq!(
+            wire.links,
+            vec![(
+                DEFAULT_LINK_LABEL.to_string(),
+                "https://wiki/rb".to_string()
+            )]
+        );
     }
 
     #[test]

@@ -597,6 +597,11 @@ pub(crate) fn conversion_refusal<'a>(
     ))
 }
 
+#[cfg(test)]
+pub(crate) fn description_for_test(ctx: &NotificationContext) -> String {
+    description(ctx)
+}
+
 async fn connect(jira: &Jira, cloud: bool) -> Result<Value> {
     let me = jira.call(Method::GET, "/rest/api/2/myself", None).await?;
     let mut projects = Vec::new();
@@ -968,11 +973,6 @@ fn with_links(lines: Vec<String>, ctx: &NotificationContext) -> String {
         (true, false) => cut(&links, DESCRIPTION_MAX_CHARS),
         (false, false) => format!("{text}\n{links}"),
     }
-}
-
-#[cfg(test)]
-pub(crate) fn description_for_test(ctx: &NotificationContext) -> String {
-    description(ctx)
 }
 
 /// The data link label: the kind's own, else the label Jira issues always carried.

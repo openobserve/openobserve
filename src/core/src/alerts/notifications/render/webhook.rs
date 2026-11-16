@@ -76,9 +76,8 @@ pub fn render_webhook(c: &RenderedContent, ctx: &NotificationContext) -> Value {
         .map(|(k, v)| (k.clone(), Value::String(v.clone())))
         .collect();
 
-    // `label` is passed through VERBATIM — an empty one is a meaningful
-    // signal, not a value to be defaulted. See this module's contract docs.
-    // The Detail link stays out: a labelled system link would break the empty-label contract.
+    // `label` is passed VERBATIM, since an empty one is a signal (module docs).
+    // The Detail link stays out: a labelled system link would break that contract.
     let links: Vec<Value> = c
         .links
         .iter()

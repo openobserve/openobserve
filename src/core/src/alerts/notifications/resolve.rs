@@ -78,10 +78,6 @@ impl Link {
         }
     }
 
-    pub fn is_system(&self) -> bool {
-        self.role != LinkRole::Authored
-    }
-
     /// The label a human-facing channel shows; an empty one reads the channel default.
     pub fn display_label(&self) -> &str {
         if self.label.is_empty() {

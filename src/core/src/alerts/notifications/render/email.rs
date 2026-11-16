@@ -142,8 +142,6 @@ fn html_part(c: &RenderedContent, has_chart: bool) -> String {
         h.push_str(r#"<div style="margin:16px 0;">"#);
         for link in &c.links {
             let (label, url) = (link.display_label(), &link.url);
-            // The data button is the filled primary CTA; the object button and authored links are
-            // outlined.
             let style = if link.role == LinkRole::Primary {
                 "display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;".to_string()
             } else {
