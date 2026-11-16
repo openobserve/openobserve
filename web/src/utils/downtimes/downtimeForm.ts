@@ -379,7 +379,7 @@ export function groupLimitLost(values: DowntimeFormValues): boolean {
 }
 
 /** "Until it clears" holds only on a one-time row with an end whose alert is still a target. */
-const keptEndOnClear = (values: DowntimeFormValues): EndOnClear | null => {
+export const keptEndOnClear = (values: DowntimeFormValues): EndOnClear | null => {
   const end = values.end_on_clear;
   if (!end || values.schedule.repeat !== "none" || !values.schedule.end_date) return null;
   return alertTargetIds(values).has(end.alert_id) ? end : null;
