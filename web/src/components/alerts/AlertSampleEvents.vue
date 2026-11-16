@@ -66,12 +66,7 @@ watch(
 </script>
 
 <template>
-  <OSettingRow
-    :label="t('alerts.sections.samples.label')"
-    :description="t('alerts.sections.samples.help')"
-    fill
-    data-test="add-alert-sample-events"
-  >
+  <OSettingRow :label="t('alerts.sections.samples.label')" fill data-test="add-alert-sample-events">
     <ul v-if="rows.length" class="m-0 flex list-none flex-col gap-1.5 p-0">
       <li
         v-for="(row, index) in rows"

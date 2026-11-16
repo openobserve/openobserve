@@ -165,17 +165,9 @@ describe("AnomalyAlerting - direction and window share", () => {
     expect(config.alert_direction).toBe("above");
   });
 
-  it("states the rule with the server defaults filled in for blank inputs", async () => {
-    const w = await mountComp({
-      config: makeConfig({
-        alert_window_buckets: 5,
-        alert_window_fire_pct: 80,
-        alert_window_recover_pct: null,
-      }),
-    });
-    expect(w.find('[data-test="anomaly-window-share-hint"]').text()).toBe(
-      t("alerts.anomaly.windowShareHint", { buckets: 5, fire: 80, recover: 80 }),
-    );
+  it("does not restate the window share rule under its inputs", async () => {
+    const w = await mountComp({ config: makeConfig({ alert_window_buckets: 5 }) });
+    expect(w.find('[data-test="anomaly-window-share-hint"]').exists()).toBe(false);
   });
 
   it("flags a recover share above the fire share instead of stating the rule", async () => {

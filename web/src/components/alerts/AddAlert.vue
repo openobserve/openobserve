@@ -296,7 +296,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :current="activeSection === 'watch'"
             :index="1"
             :title="t('alerts.sections.watch.title')"
-            :help="t('alerts.sections.watch.help')"
             @go="goToSection"
           >
             <OSettingRow
@@ -309,6 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="alertTypeOptions"
                 :label="t('alerts.sections.howItChecks')"
                 :disabled="beingUpdated || anomalyEditMode"
+                :columns="alertTypeOptions.length === 4 ? 2 : undefined"
                 data-test="add-alert-type-tabs"
                 @update:model-value="onAlertTypeChange"
               />
@@ -324,12 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="onStreamTypeChange"
                 />
               </OSettingRow>
-              <OSettingRow
-                :label="t('alerts.sections.rows.streamLabel')"
-                :description="t('alerts.sections.rows.stream')"
-                required
-                fill
-              >
+              <OSettingRow :label="t('alerts.sections.rows.streamLabel')" required fill>
                 <div class="max-w-75">
                   <OFormSelect
                     ref="streamNameRef"
@@ -361,7 +356,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :current="activeSection === 'condition'"
             :index="2"
             :title="t('alerts.sections.condition.title')"
-            :help="t('alerts.sections.condition.help')"
             @go="goToSection"
           >
             <div data-test="add-alert-query-card" data-snap-stop>
@@ -427,7 +421,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSettingRow
                 v-if="showsConditionPresets"
                 :label="t('alerts.sections.presets.label')"
-                :description="t('alerts.sections.presets.help')"
                 fill
                 data-test="add-alert-condition-presets"
               >
@@ -518,7 +511,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :current="activeSection === 'notify'"
             :index="3"
             :title="t('alerts.sections.notify.title')"
-            :help="t('alerts.sections.notify.help')"
             @go="goToSection"
           >
             <div class="flex flex-col" data-snap-stop>
@@ -569,7 +561,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :current="activeSection === 'schedule'"
             :index="4"
             :title="t('alerts.sections.schedule.title')"
-            :help="t('alerts.sections.schedule.help')"
             @go="goToSection"
           >
             <div class="flex flex-col" data-snap-stop>
@@ -604,14 +595,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :current="activeSection === 'details'"
             :index="5"
             :title="t('alerts.sections.details.title')"
-            :help="t('alerts.sections.details.help')"
             @go="goToSection"
           >
             <div class="flex flex-col" data-snap-stop>
               <OSettingRow
                 v-if="!(beingUpdated || anomalyEditMode)"
                 :label="t('alerts.sections.details.name')"
-                :description="t('alerts.sections.rows.name')"
                 fill
                 data-snap-stop
               >
@@ -635,14 +624,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-alert-details-name-error"
                     >{{ t("alerts.nameNoSpecialChars") }}</span
                   >
-                  <span
-                    v-if="alertAutoName.isAuto.value && formData.name"
-                    class="text-text-secondary text-xs"
-                    data-test="add-alert-details-name-auto"
-                    >{{ t("alerts.sections.details.autoName") }}</span
-                  >
                   <OButton
-                    v-else-if="alertNameSuggestion && formData.name !== alertNameSuggestion"
+                    v-if="
+                      !(alertAutoName.isAuto.value && formData.name) &&
+                      alertNameSuggestion &&
+                      formData.name !== alertNameSuggestion
+                    "
                     class="self-start"
                     variant="ghost-primary"
                     size="xs"
@@ -717,29 +704,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @add="onTierAdd"
                 @toggle="onTierToggle('details')"
               />
-              <div
-                class="border-border-default mt-3 flex flex-col gap-2 border-t pt-3"
-                data-test="add-alert-review"
-              >
-                <span class="text-text-heading text-sm font-medium">{{
-                  t("alerts.sections.review.title")
-                }}</span>
-                <dl class="m-0 grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-3">
-                  <div v-for="item in reviewItems" :key="item.id" class="min-w-0">
-                    <dt class="text-text-secondary text-xs">{{ item.title }}</dt>
-                    <dd class="m-0 min-w-0">
-                      <button
-                        type="button"
-                        class="text-accent block max-w-full cursor-pointer truncate text-sm hover:underline"
-                        :data-test="`add-alert-review-${item.id}`"
-                        @click="goToSection(item.id)"
-                      >
-                        {{ item.summary }}
-                      </button>
-                    </dd>
-                  </div>
-                </dl>
-              </div>
             </div>
           </AlertFormSection>
         </OSnapScroll>
@@ -1295,14 +1259,12 @@ export default defineComponent({
     const alertTypeOptions = computed<ChoiceCardOption[]>(() => [
       {
         label: alertForm.t("alerts.sections.onSchedule"),
-        description: alertForm.t("alerts.sections.typeHelp.scheduled"),
         value: "false",
         icon: "schedule",
         dataTest: "add-alert-type-tab-false",
       },
       {
         label: alertForm.t("alerts.sections.asItHappens"),
-        description: alertForm.t("alerts.sections.typeHelp.realtime"),
         value: "true",
         icon: "bolt",
         dataTest: "add-alert-type-tab-true",
@@ -1311,9 +1273,7 @@ export default defineComponent({
         ? [
             {
               label: alertForm.t("alerts.sections.whenUnusual"),
-              description: anomalyLicenseLocked.value
-                ? anomalyLockedReason.value
-                : alertForm.t("alerts.sections.typeHelp.anomaly"),
+              description: anomalyLicenseLocked.value ? anomalyLockedReason.value : undefined,
               value: "anomaly",
               icon: anomalyLicenseLocked.value ? ("lock" as const) : ("query-stats" as const),
               disabled: anomalyLicenseLocked.value,
@@ -1326,7 +1286,6 @@ export default defineComponent({
         ? [
             {
               label: alertForm.t("alerts.sections.whenCombined"),
-              description: alertForm.t("alerts.sections.typeHelp.composite"),
               value: "composite",
               icon: "account-tree" as const,
               dataTest: "add-alert-type-tab-composite",
@@ -1338,21 +1297,18 @@ export default defineComponent({
     const streamTypeOptions = computed<ChoiceCardOption[]>(() => [
       {
         label: alertForm.t("alerts.sections.dataTypes.logs.label"),
-        description: alertForm.t("alerts.sections.dataTypes.logs.help"),
         value: "logs",
         icon: "search",
         dataTest: "add-alert-stream-type-card-logs",
       },
       {
         label: alertForm.t("alerts.sections.dataTypes.metrics.label"),
-        description: alertForm.t("alerts.sections.dataTypes.metrics.help"),
         value: "metrics",
         icon: "bar-chart",
         dataTest: "add-alert-stream-type-card-metrics",
       },
       {
         label: alertForm.t("alerts.sections.dataTypes.traces.label"),
-        description: alertForm.t("alerts.sections.dataTypes.traces.help"),
         value: "traces",
         icon: "account-tree",
         dataTest: "add-alert-stream-type-card-traces",
@@ -1591,8 +1547,6 @@ export default defineComponent({
       visited: visitedSections,
       t: alertForm.t,
     });
-
-    const reviewItems = computed(() => sectionItems.value.filter((item) => item.id !== "details"));
 
     const alertSentence = computed(() => {
       if (alertForm.isAnomalyMode.value) return "";
@@ -1961,7 +1915,6 @@ export default defineComponent({
       showsCheckTimeline,
       showsBacktest,
       backtestQuery,
-      reviewItems,
       lgUp,
       snapScrollRef,
       activeSection,

@@ -83,9 +83,6 @@ const hasGaps = computed(() => props.period < props.frequency);
     <div class="text-text-secondary grid grid-cols-5 text-center text-xs">
       <span v-for="tick in ticks" :key="tick.x">{{ tick.label }}</span>
     </div>
-    <p class="text-text-body m-0 mt-2 text-sm" data-test="add-alert-check-timeline-caption">
-      {{ t("alerts.sections.timeline.caption", { frequency, period }) }}
-    </p>
     <p
       v-if="hasGaps"
       class="text-text-secondary m-0 mt-1 text-xs"

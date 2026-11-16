@@ -950,12 +950,10 @@ describe("AnomalyDetectionConfig", () => {
   describe("training window — days suffix and one hint line", () => {
     const floorHint = (w: VueWrapper) => w.find('[data-test="anomaly-training-window-floor-hint"]');
 
-    it.each([7, 28])("%s days states the 21-day training floor", async (days) => {
+    it.each([7, 28])("%s days shows no helper line under the field", async (days) => {
       wrapper = mountConfig({ training_window_days: days });
       await flushPromises();
-      expect(floorHint(wrapper).text()).toBe(
-        i18n.global.t("alerts.anomaly.trainingWindowFloorHint", { days: 21 }),
-      );
+      expect(floorHint(wrapper).exists()).toBe(false);
     });
 
     it("shows days as the input's own unit and keeps the grouping out of the form", async () => {
@@ -1303,15 +1301,10 @@ describe("AnomalyDetectionConfig", () => {
       expect(fieldError(wrapper, "detection_window_value")).toBeDefined();
     });
 
-    it("states the minimum and the recommendation at the field in one line", async () => {
+    it("leaves the minimum to the field's error instead of a standing hint", async () => {
       wrapper = mountConfig();
       await flushPromises();
-
-      const hint = wrapper.find('[data-test="anomaly-detection-window-hint"]');
-      expect(hint.exists()).toBe(true);
-      expect(hint.text()).toContain("1h 5m");
-      // Twice the floor plus the 10-minute absence allowance.
-      expect(hint.text()).toContain("2h 20m");
+      expect(wrapper.find('[data-test="anomaly-detection-window-hint"]').exists()).toBe(false);
     });
   });
 

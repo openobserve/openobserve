@@ -284,11 +284,11 @@ test.describe('Composite alerts — builder', {
     await openBuilderWith(page, [a, b]);
 
     expect(await pm.compositeAlertsPage.stalePolicyValue()).toBe('use_last_state');
-    const initialHelp = await pm.compositeAlertsPage.stalePolicyHelp().textContent();
+    const initialHelp = await pm.compositeAlertsPage.stalePolicyHelp().getAttribute('aria-label');
 
     await pm.compositeAlertsPage.selectStalePolicy('treat_as_false');
     expect(await pm.compositeAlertsPage.stalePolicyValue()).toBe('treat_as_false');
-    await expect(pm.compositeAlertsPage.stalePolicyHelp()).not.toHaveText(initialHelp);
+    await expect(pm.compositeAlertsPage.stalePolicyHelp()).not.toHaveAttribute('aria-label', initialHelp);
 
     await pm.compositeAlertsPage.selectStalePolicy('treat_as_true');
     expect(await pm.compositeAlertsPage.stalePolicyValue()).toBe('treat_as_true');

@@ -146,7 +146,9 @@ describe("CompositeAlertForm", () => {
       wrapper.find('[data-test="alerts-composite-expression-row-info"]').attributes("aria-label"),
     ).toBe(i18n.global.t("alerts.composite.banner"));
     expect(wrapper.text()).not.toContain(i18n.global.t("alerts.composite.banner"));
-    expect(rows[3].find('[data-test="alerts-composite-stale-policy-help"]').exists()).toBe(true);
+    expect(rows[3].find('[data-test="alerts-composite-stale-policy-row-info"]').exists()).toBe(
+      true,
+    );
   });
 
   it("defaults Warning to firing and stale children to explicit use-last-state", () => {
@@ -160,9 +162,9 @@ describe("CompositeAlertForm", () => {
     expect(
       wrapper.find('[data-test="alerts-composite-stale-policy"]').attributes("data-value"),
     ).toBe("use_last_state");
-    expect(wrapper.find('[data-test="alerts-composite-stale-policy-help"]').text()).toMatch(
-      /last.*state/i,
-    );
+    expect(
+      wrapper.find('[data-test="alerts-composite-stale-policy-row-info"]').attributes("aria-label"),
+    ).toMatch(/last.*state/i);
   });
 
   it("writes Warning and stale-policy control changes into the draft condition", async () => {

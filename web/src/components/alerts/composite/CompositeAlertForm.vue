@@ -231,11 +231,9 @@ watch(
 
         <OSettingRow
           :label="t('alerts.composite.stalePolicy')"
+          :info="stalePolicyHelp"
           data-test="alerts-composite-stale-policy-row"
         >
-          <template #description>
-            <span data-test="alerts-composite-stale-policy-help">{{ stalePolicyHelp }}</span>
-          </template>
           <div class="w-60 max-md:w-full">
             <OSelect
               :model-value="draft.composite_condition.stale_child_policy"
