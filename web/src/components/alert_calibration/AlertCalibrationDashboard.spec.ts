@@ -1268,7 +1268,7 @@ describe("AlertCalibrationDashboard row next steps", () => {
 
   it("Review alert comes first and opens the editor at the finding's focus", async () => {
     const w = await openFailures();
-    expect(rowButtons(w)).toEqual(["Review alert", "Open alert", "Ask AI", "Dismiss…"]);
+    expect(rowButtons(w)).toEqual(["Review alert", "Open alert", "Ask Autobot", "Dismiss…"]);
     await w.find('[data-test="alert-calibration-dashboard-review-alert"]').trigger("click");
     expect(openAlertReview).toHaveBeenCalledWith(
       w.router,

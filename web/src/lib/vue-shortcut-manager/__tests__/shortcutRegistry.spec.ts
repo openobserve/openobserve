@@ -362,8 +362,8 @@ describe("cheatsheet with the assistant", () => {
       global: { plugins: [store, i18n] },
     });
     await flushPromises();
-    await vi.waitFor(() => expect(document.body.textContent).toContain("Open O2 Assistant"));
-    expect(document.body.textContent).toContain("O2 Assistant composer");
+    await vi.waitFor(() => expect(document.body.textContent).toContain("Open Autobot"));
+    expect(document.body.textContent).toContain("Autobot composer");
     expect(document.body.textContent).not.toContain("{product}");
     expect(capabilityDisposed).not.toHaveBeenCalled();
     wrapper.unmount();
