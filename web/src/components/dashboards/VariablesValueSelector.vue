@@ -2205,10 +2205,11 @@ export default defineComponent({
         }
       }
 
+      // "All" on a custom parent stands for its listed options here too, as it does for panels.
       const expandFilter = <T extends { operator?: string | null; value?: unknown }>(filter: T) =>
         expandMultiValueFilter(filter, (name) => {
           const parent = variablesByName.get(name);
-          return parent?.isVariablePartialLoaded ? parent.value : undefined;
+          return parent?.isVariablePartialLoaded ? resolveQueryVariableValue(parent) : undefined;
         });
       const filterGroup = variableObject.query_data?.filter_group;
 
@@ -2242,16 +2243,17 @@ export default defineComponent({
           // an unloaded variable keeps its placeholder rather than resolving as a shorter name
           if (!variable.isVariablePartialLoaded) return undefined;
 
-          if (Array.isArray(variable.value)) {
-            const values = variable.value.map((value: any) => escapeSingleQuotes(value));
+          const resolved = resolveQueryVariableValue(variable);
+          if (Array.isArray(resolved)) {
+            const values = resolved.map((value: any) => escapeSingleQuotes(value));
             // '$name' already supplies the outer quotes: '$name' -> 'a', 'b'
             return quoted
               ? values.join("', '")
               : values.map((value: any) => `'${value}'`).join(", ");
           }
-          if (variable.value === null || variable.value === undefined) return undefined;
+          if (resolved === null || resolved === undefined) return undefined;
           // a date variable passes its effective format, like a scalar value
-          return `${escapeSingleQuotes(formatDateVariable(variable, format) ?? variable.value)}`;
+          return `${escapeSingleQuotes(formatDateVariable(variable, format) ?? resolved)}`;
         },
       );
 

@@ -485,6 +485,41 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
       wrapper.unmount();
     });
 
+    it("filters an auto SQL child on the listed options of a custom parent set to 'All'", async () => {
+      streamReturns([{ svc: "checkout" }, { svc: "payments" }]);
+      const { wrapper } = await mountWith([
+        {
+          name: "svc",
+          type: "query_values",
+          scope: "global",
+          multiSelect: true,
+          selectAllValueForMultiSelect: "all",
+          query_data: { stream_type: "logs", query: "SELECT svc FROM logs", value_field: "svc" },
+        },
+        {
+          name: "pod",
+          type: "query_values",
+          scope: "global",
+          multiSelect: false,
+          query_data: {
+            stream_type: "logs",
+            stream: "default",
+            field: "pod",
+            filter: [
+              { name: "service", operator: "=", value: "$svc" },
+              { name: "owner", operator: "IN", value: "$svc" },
+            ],
+          },
+        },
+      ]);
+      await vi.waitFor(() => expect(valuesSql()).toHaveLength(1), { timeout: 5000 });
+      const sql = valuesSql()[0];
+      expect(sql).toContain("\"service\" IN ('checkout', 'payments')");
+      expect(sql).toContain("\"owner\" IN ('checkout', 'payments')");
+      expect(sql).not.toContain("_o2_all_");
+      wrapper.unmount();
+    });
+
     it("writes each filter_group leaf exactly as the flat filter rows write it", async () => {
       const env = {
         name: "env",
