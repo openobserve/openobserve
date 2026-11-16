@@ -57,6 +57,7 @@ export default class DashboardImport {
       '[data-test="dashboard-confirm-delete-folder-dialog"]'
     );
     this.folderSelect = page.locator('[data-test="index-dropdown-stream_type"]').first();
+    this.folderSelectTrigger = page.locator('[data-test="index-dropdown-stream_type-trigger"]').first();
     this.folderOptions = page.locator('[data-test="index-dropdown-stream_type-option"]');
     this.newFolderButton = page.locator('[data-test="dashboard-folder-move-new-add"]').first();
   }
@@ -69,9 +70,9 @@ export default class DashboardImport {
     });
   }
 
-  // a locked picker may refuse the click; the caller asserts the list stays closed
-  async tryOpenFolderSelect() {
-    await this.folderSelect.click({ force: true, timeout: 3000 }).catch(() => {});
+  // force skips the enabled check so a locked picker still gets the click; the caller asserts whether the list opened
+  async clickFolderSelect() {
+    await this.folderSelect.click({ force: true, timeout: 3000 });
   }
 
   /**

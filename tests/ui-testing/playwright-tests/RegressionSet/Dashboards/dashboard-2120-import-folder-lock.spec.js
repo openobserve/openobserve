@@ -52,6 +52,10 @@ test.describe('Dashboard import folder lock (ENT#2120)', { tag: ['@dashboards', 
       const newFolderBtn = pm.dashboardImport.newFolderButton;
       await expect(pm.dashboardImport.folderSelect).toBeVisible();
       await expect(newFolderBtn).toBeEnabled();
+      await pm.dashboardImport.clickFolderSelect();
+      await expect(pm.dashboardImport.folderOptions.first(), 'positive control: the folder list opens before the import').toBeVisible({ timeout: 10000 });
+      await page.keyboard.press('Escape');
+      await expect(pm.dashboardImport.folderOptions).toHaveCount(0);
 
       let release;
       const held = new Promise((r) => { release = r; });
@@ -66,7 +70,8 @@ test.describe('Dashboard import folder lock (ENT#2120)', { tag: ['@dashboards', 
       await pm.dashboardImport.importButtonByRole.click();
       await expect.poll(() => posts.length, { timeout: 15000 }).toBe(1);
       await expect(newFolderBtn, 'new-folder is locked mid-import').toBeDisabled();
-      await pm.dashboardImport.tryOpenFolderSelect();
+      await expect(pm.dashboardImport.folderSelectTrigger, 'folder picker is locked mid-import').toBeDisabled();
+      await pm.dashboardImport.clickFolderSelect();
       await expect(pm.dashboardImport.folderOptions, 'the folder list must not open mid-import').toHaveCount(0);
 
       release();

@@ -268,4 +268,38 @@ export class UserPage {
 
     }
 
+
+    _apiContext() {
+        const base = process.env["ZO_BASE_URL_SC"] || process.env["ZO_BASE_URL"];
+        const org = process.env["ORGNAME"];
+        const headers = { Authorization: 'Basic ' + Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64') };
+        return { api: this.page.context().request, url: `${base}/api/${org}`, headers };
+    }
+
+    async isRbacEnabledViaApi() {
+        const { api, url, headers } = this._apiContext();
+        const cfg = await (await api.get(`${url}/config`, { headers })).json();
+        return cfg.rbac_enabled === true;
+    }
+
+    async createUserViaApi(email, role) {
+        const { api, url, headers } = this._apiContext();
+        const res = await api.post(`${url}/users`, {
+            headers,
+            data: { email, password: process.env["ZO_ROOT_USER_PASSWORD"], first_name: 'r', last_name: 'c', role },
+        });
+        return res.status();
+    }
+
+    async getUserRoleViaApi(email) {
+        const { api, url, headers } = this._apiContext();
+        const list = await (await api.get(`${url}/users`, { headers })).json();
+        return (list.data || []).find((u) => u.email === email)?.role;
+    }
+
+    async deleteUserViaApi(email) {
+        const { api, url, headers } = this._apiContext();
+        await api.delete(`${url}/users/${encodeURIComponent(email)}`, { headers });
+    }
+
 }

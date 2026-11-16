@@ -20,48 +20,54 @@ async function seedTablePanel(stamp) {
   const stream = `ovn_c_tz_${stamp}`;
   // a whole minute 10 minutes ago, so the 1-minute histogram bucket equals the row time
   const rowMs = Math.floor((Date.now() - 10 * 60 * 1000) / 60000) * 60000;
-  const ing = await fetch(`${BASE}/api/${ORG()}/${stream}/_json`, { method: 'POST', headers: headers(), body: JSON.stringify([{ _timestamp: rowMs * 1000, msg: 'tz' }]) });
-  if (!ing.ok) throw new Error(`ingest ${ing.status}`);
-  const res = await fetch(`${BASE}/api/${ORG()}/dashboards?folder=default`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify({
-      version: 8,
-      title: `ovn_c_tz_${stamp}`,
-      description: 'ENT#1491 OSS#9855',
-      variables: { list: [], showDynamicFilters: false },
-      tabs: [{
-        tabId: 'default',
-        name: 'Default',
-        panels: [{
-          id: 'Panel_tz',
-          type: 'table',
-          title: 'tz table',
-          description: '',
-          queryType: 'sql',
-          config: { show_legends: true },
-          queries: [{
-            query: `SELECT histogram(_timestamp, '1 minute') as "x_axis_1", count(*) as "y_axis_1" FROM "${stream}" GROUP BY x_axis_1`,
-            vrlFunctionQuery: '',
-            customQuery: true,
-            fields: {
-              stream,
-              stream_type: 'logs',
-              x: [{ label: 'Time', alias: 'x_axis_1', column: '_timestamp', type: 'build', functionName: 'histogram', args: [], color: null }],
-              y: [{ label: 'Count', alias: 'y_axis_1', column: 'y_axis_1', type: 'custom', functionName: null, args: [], color: null }],
-              z: [],
-              filter: { filterType: 'group', logicalOperator: 'AND', conditions: [] },
-            },
-            config: { promql_legend: '' },
+  try {
+    const ing = await fetch(`${BASE}/api/${ORG()}/${stream}/_json`, { method: 'POST', headers: headers(), body: JSON.stringify([{ _timestamp: rowMs * 1000, msg: 'tz' }]) });
+    if (!ing.ok) throw new Error(`ingest ${ing.status}`);
+    const res = await fetch(`${BASE}/api/${ORG()}/dashboards?folder=default`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        version: 8,
+        title: `ovn_c_tz_${stamp}`,
+        description: 'ENT#1491 OSS#9855',
+        variables: { list: [], showDynamicFilters: false },
+        tabs: [{
+          tabId: 'default',
+          name: 'Default',
+          panels: [{
+            id: 'Panel_tz',
+            type: 'table',
+            title: 'tz table',
+            description: '',
+            queryType: 'sql',
+            config: { show_legends: true },
+            queries: [{
+              query: `SELECT histogram(_timestamp, '1 minute') as "x_axis_1", count(*) as "y_axis_1" FROM "${stream}" GROUP BY x_axis_1`,
+              vrlFunctionQuery: '',
+              customQuery: true,
+              fields: {
+                stream,
+                stream_type: 'logs',
+                x: [{ label: 'Time', alias: 'x_axis_1', column: '_timestamp', type: 'build', functionName: 'histogram', args: [], color: null }],
+                y: [{ label: 'Count', alias: 'y_axis_1', column: 'y_axis_1', type: 'custom', functionName: null, args: [], color: null }],
+                z: [],
+                filter: { filterType: 'group', logicalOperator: 'AND', conditions: [] },
+              },
+              config: { promql_legend: '' },
+            }],
+            layout: { x: 0, y: 0, w: 48, h: 12, i: 1 },
           }],
-          layout: { x: 0, y: 0, w: 48, h: 12, i: 1 },
         }],
-      }],
-    }),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`create dashboard ${res.status}: ${JSON.stringify(body)}`);
-  return { stream, rowMs, dashboardId: (body[`v${body.version}`] || body).dashboardId };
+      }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(`create dashboard ${res.status}: ${JSON.stringify(body)}`);
+    return { stream, rowMs, dashboardId: (body[`v${body.version}`] || body).dashboardId };
+  } catch (e) {
+    // the caller's finally never sees a seed that threw, so drop the ingested stream here
+    await cleanup({ stream });
+    throw e;
+  }
 }
 
 async function cleanup({ stream, dashboardId }) {

@@ -8,40 +8,30 @@ test.describe("IAM user role change", () => {
     test("Changing an existing user's role closes the edit dialog after Save (ENT#2677)", { tag: ['@regression', '@P3'] }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         const org = process.env["ORGNAME"];
-        const api = page.context().request;
-        const apiBase = process.env["ZO_BASE_URL_SC"] || process.env["ZO_BASE_URL"];
-        const auth = { Authorization: 'Basic ' + Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64') };
-        const cfg = await (await api.get(`${apiBase}/api/${org}/config`, { headers: auth })).json();
-        test.skip(cfg.rbac_enabled !== true, 'viewer/editor org roles need OpenFGA, which only the IAM shard starts');
+        pageManager = new PageManager(page);
+        const users = pageManager.userPage;
+        test.skip(!(await users.isRbacEnabledViaApi()), 'viewer/editor org roles need OpenFGA, which only the IAM shard starts');
 
         const email = `ovn_role_${Date.now()}_${Math.floor(Math.random() * 10000)}@example.com`;
-        const created = await api.post(`${apiBase}/api/${org}/users`, {
-            headers: auth,
-            data: { email, password: process.env["ZO_ROOT_USER_PASSWORD"], first_name: 'r', last_name: 'c', role: 'viewer' },
-        });
-        expect(created.ok(), `create user: ${created.status()}`).toBeTruthy();
+        const status = await users.createUserViaApi(email, 'viewer');
+        expect(status, `create user: ${status}`).toBeLessThan(300);
         try {
             await navigateToBase(page);
-            pageManager = new PageManager(page);
-            await pageManager.userPage.gotoIamPage();
-            await pageManager.userPage.searchUser(email);
-            await pageManager.userPage.getEditUserButton(email).click();
-            const dialog = pageManager.userPage.userDialog;
+            await users.gotoIamPage();
+            await users.searchUser(email);
+            await users.getEditUserButton(email).click();
+            const dialog = users.userDialog;
             await expect(dialog).toBeVisible({ timeout: 15000 });
-            await pageManager.userPage.selectUserRole('Editor');
+            await users.selectUserRole('Editor');
 
             const saved = page.waitForResponse((r) => r.url().includes(`/api/${org}/users/`) && r.request().method() === 'PUT', { timeout: 15000 });
-            await pageManager.userPage.userCreate();
+            await users.userCreate();
             expect((await saved).ok()).toBeTruthy();
             await expect(dialog).toBeHidden({ timeout: 3000 });
-            await page.waitForTimeout(2000);
-            await expect(dialog).toBeHidden();
-
-            const list = await (await api.get(`${apiBase}/api/${org}/users`, { headers: auth })).json();
-            const row = (list.data || []).find((u) => u.email === email);
-            expect(row?.role).toBe('editor');
+            await expect.poll(() => users.getUserRoleViaApi(email), { timeout: 10000 }).toBe('editor');
+            await expect(dialog, 'the dialog stays closed after the role is saved').toBeHidden();
         } finally {
-            await api.delete(`${apiBase}/api/${org}/users/${encodeURIComponent(email)}`, { headers: auth });
+            await users.deleteUserViaApi(email);
         }
     });
 });
