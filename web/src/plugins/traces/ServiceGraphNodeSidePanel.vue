@@ -1555,12 +1555,11 @@ export default defineComponent({
       if (schemaResolved.value) return streamFieldSet.value.has("o2_service_where") ? where : "";
       return schemaFailed.value ? "" : null;
     });
-    // The scope whose operations read came back empty.
+    // The read context (org, stream, range, scope) whose operations came back empty.
     const opsEmptyFor = ref<string | null>(null);
     // A registry place can have no spans in this stream; saying so beats charts that look broken, and the header claims nothing.
     const placeWithoutSpans = computed(
-      () =>
-        pickedPlace.value && Boolean(panelWhereKey.value) && opsEmptyFor.value === serviceFilter(),
+      () => pickedPlace.value && Boolean(panelWhereKey.value) && opsEmptyFor.value === opsContext(),
     );
     const placeNoSpansText = computed(() =>
       whereSentence(
@@ -1603,6 +1602,15 @@ export default defineComponent({
       }
       return `${filter} AND (${alias}infer_service_system IS NULL OR ${alias}infer_service_system = '')`;
     };
+
+    const opsContext = () =>
+      JSON.stringify([
+        store.state.selectedOrganization?.identifier,
+        props.streamFilter,
+        props.timeRange.startTime,
+        props.timeRange.endTime,
+        serviceFilter(),
+      ]);
 
     const loadDashboard = () => {
       if (!props.selectedNode || props.streamFilter === "all") {
@@ -1897,14 +1905,13 @@ export default defineComponent({
       },
     );
 
-    // The latest span only enriches the metric chips, so it names no optional column (a select of every
-    // column drops one the schema lacks and the predicate 400s) and a failed read degrades to no span.
+    // The latest span only enriches the metric chips, so a failed read degrades to no span.
     const fetchLatestSpan = async (): Promise<Record<string, any> | null> => {
       const streamName = props.streamFilter || "default";
       try {
         const rows = await streamTraceRows<Record<string, any>>({
           org: store.state.selectedOrganization.identifier,
-          sql: `SELECT * FROM "${streamName}" WHERE ${serviceNameField.value} = '${buildServiceName()}' ORDER BY _timestamp DESC`,
+          sql: `SELECT * FROM "${streamName}" WHERE ${serviceFilter()} ORDER BY _timestamp DESC`,
           startTime: props.timeRange.startTime,
           endTime: props.timeRange.endTime,
           size: 1,
@@ -2548,7 +2555,7 @@ export default defineComponent({
 
       loadingOperations.value = true;
       recentOperations.value = [];
-      const scope = serviceFilter();
+      const scope = opsContext();
 
       try {
         const streamName = props.streamFilter || "default";
@@ -2584,7 +2591,7 @@ export default defineComponent({
           keepPartial: true,
         });
 
-        if (scope !== serviceFilter()) return;
+        if (scope !== opsContext()) return;
         opsEmptyFor.value = hits.length ? null : scope;
         recentOperations.value = hits.map((op: any) => ({
           name: op.operation_name || "unknown",
@@ -2598,9 +2605,12 @@ export default defineComponent({
         }));
       } catch (error) {
         console.error("Failed to fetch aggregated operations:", error);
-        if (scope === serviceFilter()) recentOperations.value = [];
+        if (scope === opsContext()) {
+          recentOperations.value = [];
+          opsEmptyFor.value = null;
+        }
       } finally {
-        if (scope === serviceFilter()) loadingOperations.value = false;
+        if (scope === opsContext()) loadingOperations.value = false;
       }
     };
 
@@ -2670,6 +2680,8 @@ export default defineComponent({
         props.visible,
         props.selectedNode?.id,
         props.streamFilter,
+        props.timeRange.startTime,
+        props.timeRange.endTime,
         operationsViewMode.value,
         // Re-fetch once the schema resolves the model column (request vs
         // response) — otherwise a model node's operations query fires with the

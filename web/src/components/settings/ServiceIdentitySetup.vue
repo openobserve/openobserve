@@ -2986,10 +2986,15 @@ async function loadData() {
  * config, so any unsaved distinguish_by/tracked-alias edits are preserved.
  */
 async function refreshAvailableGroups() {
+  const query = dimensionAnalyticsQuery(props.orgIdentifier);
+  const state = queryClient.getQueryState(query.queryKey);
+  // fetchQuery joins a read in flight, and one started before a mapping save lacks the saved field.
+  const pendingStale = state?.isInvalidated && state.fetchStatus === "fetching";
   try {
     // A Field Mappings save invalidates this query first, so only a real change refetches.
+    if (pendingStale) await queryClient.fetchQuery(query).catch(() => undefined);
     const summary: DimensionAnalyticsSummary = await queryClient.fetchQuery(
-      dimensionAnalyticsQuery(props.orgIdentifier),
+      pendingStale ? { ...query, staleTime: 0 } : query,
     );
     availableGroups.value = deduplicateAndSortGroups(summary.available_groups ?? []);
     serviceFieldSources.value = summary.service_field_sources ?? [];

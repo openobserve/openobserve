@@ -940,6 +940,28 @@ describe("DiscoveredServices", () => {
       expect(serviceStreamsService.getServicesList).toHaveBeenCalledTimes(1);
     });
 
+    it("reads the list again after a reset instead of keeping a refresh started before it", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      let finishRefresh: (value: unknown) => void = () => {};
+      vi.mocked(serviceStreamsService.getServicesList).mockImplementationOnce(
+        () => new Promise((resolve) => (finishRefresh = resolve)) as never,
+      );
+      const refresh = wrapper.vm.loadServices(true);
+      await flushPromises();
+      let finishPostReset: (value: unknown) => void = () => {};
+      vi.mocked(serviceStreamsService.getServicesList).mockImplementationOnce(
+        () => new Promise((resolve) => (finishPostReset = resolve)) as never,
+      );
+      const reset = wrapper.vm.doResetServices();
+      await flushPromises();
+      finishRefresh({ data: mockServicesResponse });
+      await flushPromises();
+      finishPostReset({ data: [] });
+      await Promise.all([refresh, reset]);
+      expect(wrapper.vm.services).toEqual([]);
+    });
+
     it("should not throw and reset resetting flag when resetServices fails", async () => {
       vi.mocked(serviceStreamsService.resetServices).mockRejectedValueOnce(new Error("boom"));
       wrapper = mountComponent();

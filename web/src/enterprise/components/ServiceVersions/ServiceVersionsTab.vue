@@ -518,10 +518,11 @@ watch(
   },
   { immediate: true },
 );
+// Another service can land on the same place, so a new owner is saved even when the place stays.
 watch(
-  autoWhere,
-  (where) => {
-    if (where) emit("update:autoPick", { owner: owner.value, where });
+  [autoWhere, owner] as const,
+  ([where, key]) => {
+    if (where) emit("update:autoPick", { owner: key, where });
   },
   { immediate: true },
 );
@@ -725,6 +726,12 @@ watch([() => props.service, where, org, user, inactive, search], () => {
   selected.value = [];
   expanded.value = [];
   imagesShown.value = new Set();
+});
+// A refresh can hide a selected row (a version running again hides the stopped ones), and Compare reads only shown rows.
+watch(rows, (list) => {
+  const shown = new Set(list.map((row) => row.version_key));
+  if (selected.value.some((key) => !shown.has(key)))
+    selected.value = selected.value.filter((key) => shown.has(key));
 });
 function toggle(key: string) {
   expanded.value = expanded.value.includes(key)

@@ -172,8 +172,8 @@ it("pages history newest first, hides stopped versions until asked, and says wha
     "serviceVersions.panel.emptySearch",
   );
 });
-it("lists stopped versions when none is running, so the list agrees with the card and badge", async () => {
-  mocks.query.data.value.versions = [version(1, { active: false })];
+it("lists stopped versions when none is running, and unselects the ones a running version hides again", async () => {
+  mocks.query.data.value.versions = [version(1, { active: false }), version(2, { active: false })];
   const wrapper = render({ OTooltip: tipStub });
   await flushPromises();
   expect(wrapper.find('[data-test="svcver-version-key-1"]').exists()).toBe(true);
@@ -184,6 +184,12 @@ it("lists stopped versions when none is running, so the list agrees with the car
   expect(wrapper.get('[data-test="svcver-none-running"]').text()).toBe(
     "serviceVersions.panel.noneRunning",
   );
+  await wrapper.find('[data-test="svcver-select-key-1"]').setValue(true);
+  await wrapper.find('[data-test="svcver-select-key-2"]').setValue(true);
+  mocks.query.data.value.versions = [version(1), version(2, { active: false })];
+  await flushPromises();
+  expect(wrapper.find('[data-test="svcver-version-key-2"]').exists()).toBe(false);
+  expect(wrapper.get('[data-test="svcver-compare"]').attributes("disabled")).toBeDefined();
 });
 it("labels the live current row, the baseline, and compares older rows against current", async () => {
   mocks.query.data.value.versions = [
@@ -310,24 +316,33 @@ it("picks a stable where for a panel without one, locally, a named place over th
   expect(mocks.update).not.toHaveBeenCalled();
   expect(wrapper.findComponent({ name: "ServicePanelVerdictCard" }).props("where")).toBe("env:a");
 });
-it("keeps its picked place when discovery adds places, also when the panel remounts it", async () => {
-  mocks.state.value.where = "";
-  mocks.discovery.data.value.versions = [version(1, { where_key: "env:z" })];
-  const wrapper = render();
-  await flushPromises();
-  mocks.discovery.data.value.versions = [
-    version(1, { where_key: "env:z" }),
-    version(2, { where_key: "env:a" }),
-  ];
-  await flushPromises();
-  expect(wrapper.findComponent({ name: "ServicePanelVerdictCard" }).props("where")).toBe("env:z");
-  const autoPick = wrapper.emitted("update:autoPick")?.at(-1)?.[0];
-  wrapper.unmount();
-  const remounted = render({}, { autoPick });
-  await flushPromises();
-  expect(remounted.findComponent({ name: "ServicePanelVerdictCard" }).props("where")).toBe("env:z");
-  expect(mocks.update).not.toHaveBeenCalled();
-});
+it.each([
+  { opened: "the same service", service: "svc" },
+  { opened: "another service at the same place", service: "b" },
+])(
+  "keeps its picked place for $opened when discovery adds places, also when the panel remounts it",
+  async ({ service }) => {
+    mocks.state.value.where = "";
+    mocks.discovery.data.value.versions = [version(1, { where_key: "env:z" })];
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.setProps({ service });
+    mocks.discovery.data.value.versions = [
+      version(1, { where_key: "env:z" }),
+      version(2, { where_key: "env:a" }),
+    ];
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "ServicePanelVerdictCard" }).props("where")).toBe("env:z");
+    const autoPick = wrapper.emitted("update:autoPick")?.at(-1)?.[0];
+    wrapper.unmount();
+    const remounted = render({}, { service, autoPick });
+    await flushPromises();
+    expect(remounted.findComponent({ name: "ServicePanelVerdictCard" }).props("where")).toBe(
+      "env:z",
+    );
+    expect(mocks.update).not.toHaveBeenCalled();
+  },
+);
 it("announces its place for each service it shows, even when the place stays the same", async () => {
   mocks.state.value.where = "";
   mocks.discovery.data.value.versions = [version(1, { where_key: "env:z" })];

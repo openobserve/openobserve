@@ -1299,7 +1299,11 @@ const totalInstances = computed(() =>
   visibleGroups.value.reduce((sum, g) => sum + g.instances.length, 0),
 );
 
-const loadServices = async (isRefresh = false) => {
+// Only the latest read publishes, so a read a reset superseded never brings the deleted rows back.
+let loadGeneration = 0;
+
+const loadServices = async (isRefresh = false, afterReset = false) => {
+  const generation = ++loadGeneration;
   if (isRefresh) {
     refreshing.value = true;
   } else {
@@ -1316,9 +1320,12 @@ const loadServices = async (isRefresh = false) => {
 
     // Through the shared query, so the Detection Rules tab mounted beside this one reuses the same read.
     const query = servicesListQuery(orgId);
+    // fetchQuery joins a read in flight, and one from before the reset returns the rows it deleted.
+    if (afterReset) await queryClient.cancelQueries({ queryKey: query.queryKey });
     const raw = (await queryClient.fetchQuery(
-      isRefresh ? { ...query, staleTime: 0 } : query,
+      isRefresh || afterReset ? { ...query, staleTime: 0 } : query,
     )) as ServiceRecord[];
+    if (generation !== loadGeneration) return;
     services.value = raw.map((s) => ({
       ...s,
       logs_streams: unique(s.logs_streams),
@@ -1327,14 +1334,17 @@ const loadServices = async (isRefresh = false) => {
     }));
     lastLoadedAt.value = Date.now();
   } catch (err: any) {
+    if (generation !== loadGeneration) return;
     console.error("Failed to load services:", err);
     forbidden.value = forbiddenState(err);
     if (!forbidden.value) {
       error.value = err?.message || t("settings.discoveredServices.failedToLoadServices");
     }
   } finally {
-    loading.value = false;
-    refreshing.value = false;
+    if (generation === loadGeneration) {
+      loading.value = false;
+      refreshing.value = false;
+    }
   }
 };
 
@@ -1365,7 +1375,7 @@ const doResetServices = async () => {
       timeout: 5000,
     });
 
-    await loadServices();
+    await loadServices(false, true);
   } catch (err: any) {
     toast({
       variant: "error",

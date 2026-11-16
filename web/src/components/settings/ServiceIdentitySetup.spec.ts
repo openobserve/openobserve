@@ -269,6 +269,24 @@ describe("ServiceIdentitySetup", () => {
       await flushPromises();
       expect(serviceStreamsService.getDimensionAnalytics).toHaveBeenCalledTimes(1);
     });
+
+    it("reads analytics again when a mapping is saved while the first read is in flight", async () => {
+      const summary = { dimensions: [], available_groups: [], service_field_sources: [] };
+      const saved = { group_id: "new-field", display_name: "New field", dimensions: [] };
+      let finishFirst: (value: unknown) => void = () => {};
+      vi.mocked(serviceStreamsService.getDimensionAnalytics)
+        .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)) as never)
+        .mockResolvedValueOnce({ data: { ...summary, available_groups: [saved] } } as never);
+      wrapper = mountComponent();
+      await flushPromises();
+      void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all("test-org") });
+      await wrapper.setProps({ semanticGroups: [saved] });
+      finishFirst({ data: summary });
+      await flushPromises();
+      expect((wrapper.vm as any).availableGroups.map((g: any) => g.group_id)).toEqual([
+        "new-field",
+      ]);
+    });
   });
 
   describe("loading state", () => {

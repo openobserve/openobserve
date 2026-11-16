@@ -1828,7 +1828,13 @@ describe("ServiceGraphNodeSidePanel", () => {
         expect(header.find('[data-test="svcver-panel-place"]').exists()).toBe(true);
         expect(header.text()).not.toContain("2.0");
         expect(wrapper.find('[data-test="svcver-place-no-spans"]').exists()).toBe(true);
+        // The note speaks for one range, so a failed read of another range does not inherit it.
+        vi.mocked(streamTraceRows).mockRejectedValue(new Error("range read failed"));
+        await wrapper.setProps({ timeRange: { startTime: NOW - 86_400_000_000, endTime: NOW } });
+        await flushPromises();
+        expect(wrapper.find('[data-test="svcver-place-no-spans"]').exists()).toBe(false);
       } finally {
+        vi.mocked(streamTraceRows).mockReset().mockResolvedValue([]);
         config.isEnterprise = previous;
         getStreamMock.mockResolvedValue({ schema: [] });
         for (const key of Object.keys(routeQuery)) delete routeQuery[key];
@@ -2132,9 +2138,7 @@ describe("ServiceGraphNodeSidePanel", () => {
 
       (wrapper.vm as any).onTabChange("metrics");
       await flushPromises();
-      expect(vi.mocked(streamTraceRows).mock.calls.at(-1)?.[0].sql).not.toContain(
-        "o2_service_where",
-      );
+      expect(vi.mocked(streamTraceRows).mock.calls.at(-1)?.[0].sql).toContain(predicate);
 
       vi.mocked(streamTraceRows).mockClear();
       (wrapper.vm as any).operationsViewMode = "spans";
