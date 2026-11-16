@@ -36,19 +36,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Blobs exist only for main pushes that changed UI code and live 1 day, so a week without such a push skips.
-          cutoff=$(date -u -d '2 days ago' +%Y-%m-%dT%H:%M:%SZ)
-          page=1
-          while :; do
-            runs=$(gh api "repos/${{ github.repository }}/actions/workflows/unit-tests.yml/runs?branch=main&event=push&status=success&per_page=100&page=$page" --jq '.workflow_runs | map({id, created_at})')
-            [ "$(jq length <<< "$runs")" = 0 ] && break
-            for id in $(jq -r --arg c "$cutoff" '.[] | select(.created_at > $c) | .id' <<< "$runs"); do
-              n=$(gh api "repos/${{ github.repository }}/actions/runs/$id/artifacts?per_page=100" \
-                --jq '[.artifacts[] | select((.name | startswith("ui-unit-blob-")) and (.expired | not))] | length')
-              if [ "$n" = "4" ]; then echo "run_id=$id" >> "$GITHUB_OUTPUT"; exit 0; fi
-            done
-            # Runs are newest first; once one is past the artifact retention, the rest are too.
-            [ "$(jq --arg c "$cutoff" 'map(select(.created_at <= $c)) | length' <<< "$runs")" != 0 ] && break
-            page=$((page + 1))
+          # List live artifacts, not runs: a re-run of an old run carries fresh blobs.
+          live=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=ui-unit-blob-1&per_page=100" \
+            --jq '.artifacts[] | select((.expired | not) and .workflow_run.head_branch == "main") | .workflow_run.id')
+          mapfile -t ids < <(awk 'NF && !seen[$0]++' <<< "$live")
+          for id in "${ids[@]}"; do
+            ok=$(gh api "repos/${{ github.repository }}/actions/runs/$id" \
+              --jq 'select(.event == "push" and .conclusion == "success" and .path == ".github/workflows/unit-tests.yml") | .id')
+            [ -z "$ok" ] && continue
+            n=$(gh api "repos/${{ github.repository }}/actions/runs/$id/artifacts?per_page=100" \
+              --jq '[.artifacts[] | select((.name | startswith("ui-unit-blob-")) and (.expired | not))] | length')
+            if [ "$n" = "4" ]; then echo "run_id=$id" >> "$GITHUB_OUTPUT"; exit 0; fi
           done
           echo "No successful main run has all 4 unexpired ui-unit-blob artifacts; nothing to refresh." | tee -a "$GITHUB_STEP_SUMMARY"
 
