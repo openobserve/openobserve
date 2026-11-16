@@ -15,6 +15,8 @@
 
 //! Downtime handlers: enterprise-only (D1), 403 in the OSS build and while the flag is off.
 
+#[cfg(feature = "enterprise")]
+use axum::extract::Query;
 use axum::{
     Json,
     extract::{Path, Query, rejection::JsonRejection},
