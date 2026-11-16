@@ -117,7 +117,7 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 }));
 
 vi.mock("@/utils/commons", () => ({
-  getFoldersListByType: vi.fn().mockResolvedValue([]),
+  getFoldersListByType: vi.fn().mockResolvedValue([{ folderId: "default", name: "Default" }]),
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -365,7 +365,7 @@ describe("SyntheticMonitoring", () => {
       expect(seed().statusFilter).toEqual(["failed", "warning"]);
     });
 
-    it("restores the type tab and drops the stored page when the folder differs", () => {
+    it("restores the type tab and drops the stored page when the folder differs", async () => {
       Object.assign(seed(), {
         activeTab: "browser",
         typeFilter: "BROWSER",
@@ -374,6 +374,7 @@ describe("SyntheticMonitoring", () => {
       });
       mockRoute.query.folder = "default";
       wrapper = mountPage();
+      await flushPromises();
       const mt = wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
       expect(mt.props("mode")).toBe("browser");
       expect(mt.props("currentPage")).toBe(1);

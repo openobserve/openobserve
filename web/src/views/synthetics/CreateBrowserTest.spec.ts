@@ -660,7 +660,10 @@ describe("CreateBrowserTest", () => {
     mockServiceUpdateGlobalVariable.mockResolvedValue({ data: {} });
     mockServiceListGlobalVariables.mockResolvedValue({ data: [] });
     mockRecorderReplay.mockResolvedValue({});
-    mockGetFoldersListByType.mockResolvedValue([]);
+    mockGetFoldersListByType.mockResolvedValue([
+      { folderId: "default", name: "Default" },
+      { folderId: "folder-1", name: "Checkout" },
+    ]);
     // Re-primed here because clearAllMocks keeps implementations — a test that
     // resolves the probe true must not leak into the next one.
     mockDetectExtension.mockResolvedValue(false);
@@ -990,6 +993,7 @@ describe("CreateBrowserTest", () => {
     });
 
     it("should create (not update) and navigate back to the list in create mode", async () => {
+      mockGetFoldersListByType.mockResolvedValue([{ folderId: "default", name: "Default" }]);
       wrapper = await mountCreateAtConfigure();
 
       await wrapper.find('[data-test="synthetics-create-save-btn"]').trigger("click");
@@ -3203,6 +3207,23 @@ describe("CreateBrowserTest", () => {
       expect(errors.folder).toContain("folder-from-another-org");
     });
 
+    it.each([undefined, "gone"])(
+      "selects a listable folder without default for URL %s",
+      async (folder) => {
+        mockRoute.query = folder ? { folder } : {};
+        mockGetFoldersListByType.mockResolvedValue([{ folderId: "team", name: "Team" }]);
+        wrapper = await mountCreateAtConfigure();
+        expect(configuredCheck(wrapper).folder).toBe("team");
+      },
+    );
+
+    it("clears the URL folder when no folders are listable", async () => {
+      mockRoute.query = { folder: "gone" };
+      mockGetFoldersListByType.mockResolvedValue([]);
+      wrapper = await mountCreateAtConfigure();
+      expect(configuredCheck(wrapper).folder).toBe("");
+    });
+
     it("should not discard the preselected folder when the folder list failed to load", async () => {
       mockRoute.query = { folder: "folder-1" };
       mockGetFoldersListByType.mockRejectedValue(new Error("boom"));
@@ -3697,6 +3718,7 @@ describe("CreateBrowserTest", () => {
     });
 
     it("drops a draft holding only the gate fields the setup reload carries in the query", async () => {
+      mockGetFoldersListByType.mockResolvedValue([{ folderId: "default", name: "Default" }]);
       writeEditorDraft(newScope, {
         data: {
           check: { ...defaultDraftCheck(), name: "Shop", url: "https://shop.test", journey: [] },

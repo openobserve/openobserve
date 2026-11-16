@@ -96,6 +96,7 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 
 import CreateProtocolCheck from "./CreateProtocolCheck.vue";
 import destinationService from "@/services/alert_destination";
+import { getFoldersListByType } from "@/utils/commons";
 
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
@@ -182,6 +183,15 @@ describe("CreateProtocolCheck", () => {
     mockServiceCreate.mockResolvedValue({ data: { id: "proto-check-1" } });
     mockServiceUpdate.mockResolvedValue({});
     mockServiceGet.mockResolvedValue({ data: {} });
+  });
+
+  it("selects the first listable folder when default is unavailable", async () => {
+    vi.mocked(getFoldersListByType).mockResolvedValueOnce([{ folderId: "team", name: "Team" }]);
+    wrapper = mountPage();
+    await flushPromises();
+    expect(
+      wrapper.findComponent('[data-test="synthetics-check-configure"]').props("check").folder,
+    ).toBe("team");
   });
 
   afterEach(() => {

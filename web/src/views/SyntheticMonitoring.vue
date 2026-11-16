@@ -528,6 +528,7 @@ import statusPagesService, {
 import SyntheticsVariablesTab from "@/components/synthetics/variables/SyntheticsVariablesTab.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
+import { selectSyntheticsFolder } from "@/utils/synthetics/selectFolder";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
@@ -756,7 +757,10 @@ const monitorsList = useQuery(() =>
   }),
 );
 
-const loading = monitorsList.isPending;
+const foldersLoaded = ref(false);
+const loading = computed(
+  () => !foldersLoaded.value || (!!activeFolderId.value && monitorsList.isPending.value),
+);
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = monitorsList.error.value;
@@ -789,6 +793,7 @@ async function loadMonitors(folderId?: string, force = false) {
       : searchAcrossFolders.value
         ? undefined
         : activeFolderId.value;
+  if (!foldersLoaded.value || (!targetFolder && !searchAcrossFolders.value)) return;
   readFolder.value = targetFolder;
   folderResolved.value = true;
   // Let the key pick up the new folder before asking for the data.
@@ -799,9 +804,13 @@ async function loadMonitors(folderId?: string, force = false) {
 async function initPage() {
   // Load folders first so the sidebar tablist renders with data.
   try {
-    await getFoldersListByType(store, "synthetics");
+    const folders = await getFoldersListByType(store, "synthetics");
+    const folder = selectSyntheticsFolder(folders, route.query.folder as string | undefined);
+    activeFolderId.value = folder ?? "";
   } catch (err) {
     console.error("[synthetics] failed to load folders", err);
+  } finally {
+    foldersLoaded.value = true;
   }
 
   // Wait for the organisation identifier to be resolved before making API
@@ -887,9 +896,6 @@ const savedView = useListViewState("synthetics", {
   sortBy: "",
   sortOrder: "asc" as "asc" | "desc",
 });
-// A stored page belongs to the folder it was viewed in; arriving on another folder starts at page 1.
-const savedFolder = (route.query.folder as string) ?? "default";
-if (savedView.folder && savedView.folder !== savedFolder) savedView.currentPage = 1;
 const activeTab = ref(savedView.activeTab);
 const monitorTableMode = computed(() => (activeTab.value === "browser" ? "browser" : "all"));
 const isStatusKey = (key: string): key is string => !!key && key !== "all";
@@ -943,7 +949,7 @@ watch(loading, (isLoading) => {
 const showTypePicker = ref(false);
 
 // ── Folder state ───────────────────────────────────────────────────────
-const activeFolderId = ref<string>((route.query.folder as string) ?? "default");
+const activeFolderId = ref<string>("");
 const searchAcrossFolders = ref(false);
 
 const updateActiveFolderId = (folderId: string) => {
@@ -953,12 +959,16 @@ const updateActiveFolderId = (folderId: string) => {
 const activeFolderName = computed(() => {
   const folders: any[] = (store.state as any).organizationData?.foldersByType?.synthetics ?? [];
   const folder = folders.find((f: any) => f.folderId === activeFolderId.value);
-  return folder?.name ?? "Default";
+  return folder?.name ?? activeFolderId.value;
 });
 
-watch(activeFolderId, async (newFolderId) => {
-  currentPage.value = 1;
+watch(activeFolderId, async (newFolderId, oldFolderId) => {
+  if (oldFolderId || (savedView.folder && savedView.folder !== newFolderId)) currentPage.value = 1;
   savedView.folder = newFolderId;
+  if (!newFolderId) {
+    folderResolved.value = false;
+    return;
+  }
   selectedMonitorIds.value = [];
   duplicateFolder.value = newFolderId;
   if (searchAcrossFolders.value) {
@@ -1342,7 +1352,9 @@ async function loadLocations() {
 
 // The list is the query, not a copy of it: a monitor write invalidates the
 // synthetics scope and these rows repaint with no wiring here.
-const monitors = computed<DisplayMonitor[]>(() => (monitorsList.data.value ?? []).map(mapMonitor));
+const monitors = computed<DisplayMonitor[]>(() =>
+  folderResolved.value ? (monitorsList.data.value ?? []).map(mapMonitor) : [],
+);
 
 // Enrich monitors with folder names from Vuex store
 const enrichedMonitors = computed(() => {
@@ -1727,7 +1739,7 @@ async function duplicateMonitor(m: any) {
   // The row's own folder, falling back to the folder being browsed. These are
   // the same value unless "search across folders" is on, in which case the copy
   // should land beside its original rather than jump to the active folder.
-  duplicateFolder.value = m.folderId || activeFolderId.value || "default";
+  duplicateFolder.value = m.folderId || activeFolderId.value;
   duplicateSource.value = null;
   showDuplicateDialog.value = true;
   try {

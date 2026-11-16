@@ -93,6 +93,7 @@ import {
 } from "@/components/synthetics/CreateBrowserTest.schema";
 import { CHROME_UI_LABELS, SETUP_QUERY_PARAM } from "@/constants/synthetics";
 import { getFoldersListByType } from "@/utils/commons";
+import { selectSyntheticsFolder } from "@/utils/synthetics/selectFolder";
 import { syntheticsEditRoute, syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -354,6 +355,7 @@ const devices = ref<SyntheticsDevice[]>([]);
 const destinations = ref<string[]>([]);
 const folders = ref<SyntheticsFolder[]>([]);
 const foldersLoading = ref(false);
+const foldersLoaded = ref(false);
 
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
@@ -384,6 +386,7 @@ async function fetchFolders() {
     await waitForOrgIdentifier();
     const res = await getFoldersListByType(store, "synthetics");
     folders.value = (res ?? []) as SyntheticsFolder[];
+    foldersLoaded.value = true;
   } catch (err) {
     console.error("[synthetics] failed to load folders", err);
     folders.value = [];
@@ -527,7 +530,7 @@ function onLoadRetry(actionId?: string) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   // Warm detection so an already-installed extension lets Record skip setup.
   const warmProbe = probeExtension()
     .then((installed) => {
@@ -547,7 +550,7 @@ onMounted(() => {
     extensionReady.value = true;
   });
 
-  fetchFolders();
+  const foldersReady = fetchFolders();
   fetchLocations();
   loadDestinations();
 
@@ -589,6 +592,7 @@ onMounted(() => {
         }
       });
     }
+    await foldersReady;
     dropDraftCarriedByQuery();
     void browserDraft.start();
   }
@@ -606,7 +610,7 @@ const check = ref<BrowserCheck>({
   name: "",
   url: "",
   enabled: true,
-  folder: "default",
+  folder: "",
   tags: [],
   journey: [],
   schedule: { type: "interval", intervalValue: 5, intervalUnit: "minutes" },
@@ -700,36 +704,26 @@ watch(
   { immediate: true },
 );
 
-/**
- * Reconcile the selected folder against the folders this org actually has.
- *
- * `check.folder` arrives from `?folder=` (New Monitor opened inside a folder)
- * or from a stored check, and neither source is validated: a bookmarked link, a
- * folder deleted since, or a link from another org all leave an id no option can
- * resolve. The select then renders that id verbatim, and `persist` sends it
- * straight back as `?folder=` — which the server treats as authoritative for
- * both the destination folder and the RBAC gate, so the save fails on a folder
- * the author never picked. Fall back to the default folder and say why.
- *
- * Skipped while the list is empty: that means the fetch has not landed (or
- * failed), and a valid id must not be discarded on the strength of a list we
- * do not have.
- */
+// Unlisted folders cannot be used as save destinations, including the default folder.
 watch(
-  [folders, () => check.value.folder],
+  [folders, foldersLoaded, () => check.value.folder],
   () => {
-    if (!folders.value.length) return;
+    if (!foldersLoaded.value) return;
     const folderId = check.value.folder;
-    if (!folderId || folders.value.some((f) => f.folderId === folderId)) return;
-    check.value = { ...check.value, folder: "default" };
+    if (folders.value.some((f) => f.folderId === folderId)) return;
+    const folder = selectSyntheticsFolder(folders.value) ?? "";
+    if (folder === folderId) return;
+    check.value = { ...check.value, folder };
     // The unreachable folder could never be saved back, so the fallback is the baseline, not an edit.
-    if (savedCheck.value?.folder === folderId) {
-      savedCheck.value = { ...savedCheck.value, folder: "default" };
+    if (savedCheck.value && savedCheck.value.folder === folderId) {
+      savedCheck.value = { ...savedCheck.value, folder };
     }
-    validationErrors.value = {
-      ...validationErrors.value,
-      folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
-    };
+    if (folderId) {
+      validationErrors.value = {
+        ...validationErrors.value,
+        folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
+      };
+    }
   },
   { immediate: true },
 );
@@ -2508,7 +2502,7 @@ function onClearResults() {
           :executed-count="executedStepCount"
           :parent-name="check.name"
           :parent-starting-url="check.url"
-          :default-folder="check.folder ?? 'default'"
+          :default-folder="check.folder || selectSyntheticsFolder(folders) || ''"
           :folders="folders"
           :needs-schedule="check.locations.length === 0"
           :parent-locations="check.locations"
